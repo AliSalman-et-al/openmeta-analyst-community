@@ -1,17 +1,34 @@
+# Python
 *.pyc
-r_tmp/
-r_tmp/*.png
-.project
-.pydevproject
-.settings
+
+# R
 .RData
 .Rhistory
-openmetar_1.0.zip
+r_tmp/
+src/R/rtmp/
+HSROC_2.0.5.tar.gz
 openmetar_1.0.tar.gz
+openmetar_1.0.zip
+
+# IDEs
+.project
+.pydevproject
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build outputs
 build/
 dist/
-openmetar_1.0.tar.gz
-HSROC_2.0.5.tar.gz
-Thumbs.db
 dist.zip
-.DS_Store
+artifacts/
+src/build/
+src/build-debug/
+src/dist/
+src/dist-debug/
+src/OpenMetaAnalyst*.spec
+
+# Local agent scratch files
+.codex-tmp/
