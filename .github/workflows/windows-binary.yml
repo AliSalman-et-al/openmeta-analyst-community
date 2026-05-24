@@ -6,7 +6,12 @@ on:
     branches:
       - master
       - main
+    tags:
+      - "v*"
   pull_request:
+
+permissions:
+  contents: write
 
 jobs:
   build-windows-binary:
@@ -49,3 +54,23 @@ jobs:
           path: artifacts\OpenMetaAnalyst-windows-x64.zip
           if-no-files-found: error
           compression-level: 0
+
+      - name: Publish GitHub release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tagName = $env:GITHUB_REF_NAME
+          $assetPath = "artifacts\OpenMetaAnalyst-windows-x64.zip"
+          $notes = @(
+            "Community-maintained Windows binary build for OpenMeta[Analyst] Community."
+            ""
+            "This project is not affiliated with or endorsed by Brown University or the original maintainers."
+          ) -join [Environment]::NewLine
+
+          gh release create $tagName `
+            "$assetPath#OpenMetaAnalyst-windows-x64.zip" `
+            --repo $env:GITHUB_REPOSITORY `
+            --title "OpenMeta[Analyst] Community $tagName" `
+            --notes $notes `
+            --verify-tag
