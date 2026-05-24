@@ -85,6 +85,25 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-r-deps.ps1 -EnvName o
 powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-binary.ps1 -EnvName openmeta-analyst-community -ArtifactName OpenMetaAnalyst-windows-x64
 ```
 
+## macOS Binary Builds
+
+The repository includes a GitHub Actions workflow for building a macOS x64 binary artifact:
+
+```text
+.github/workflows/macos-binary.yml
+```
+
+The workflow creates a legacy conda environment on an Intel macOS runner, compiles the bundled R packages, packages the PyQt4 application with PyInstaller as `OpenMetaAnalyst.app`, bundles the conda R runtime and sample data, and uploads `OpenMetaAnalyst-macos-x64.zip` as a workflow artifact.
+
+When a `v*` tag is pushed, the Windows and macOS workflows both create the GitHub Release only if it does not already exist, then upload their platform-specific ZIP asset.
+
+The same steps can be run locally on macOS:
+
+```bash
+bash ./scripts/install-r-deps.sh openmeta-analyst-community
+bash ./scripts/build-macos-binary.sh openmeta-analyst-community OpenMetaAnalyst-macos-x64
+```
+
 ## Legacy Dependency Notes
 
 Important dependency versions:

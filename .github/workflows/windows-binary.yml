@@ -3,12 +3,8 @@ name: Windows binary
 on:
   workflow_dispatch:
   push:
-    branches:
-      - master
-      - main
     tags:
       - "v*"
-  pull_request:
 
 permissions:
   contents: write
@@ -58,19 +54,39 @@ jobs:
       - name: Publish GitHub release
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $tagName = $env:GITHUB_REF_NAME
           $assetPath = "artifacts\OpenMetaAnalyst-windows-x64.zip"
+          $releaseTitle = "OpenMeta[Analyst] Community $tagName - Windows and macOS binaries"
           $notes = @(
-            "Community-maintained Windows binary build for OpenMeta[Analyst] Community."
+            "Community-maintained binary builds for OpenMeta[Analyst] Community."
+            ""
+            "Downloads:"
+            "- Windows x64: OpenMetaAnalyst-windows-x64.zip"
+            "- macOS Intel x64: OpenMetaAnalyst-macos-x64.zip"
             ""
             "This project is not affiliated with or endorsed by Brown University or the original maintainers."
           ) -join [Environment]::NewLine
 
-          gh release create $tagName `
-            "$assetPath#OpenMetaAnalyst-windows-x64.zip" `
+          gh release view $tagName --repo $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tagName `
+              --repo $env:GITHUB_REPOSITORY `
+              --title $releaseTitle `
+              --notes $notes `
+              --verify-tag
+            if ($LASTEXITCODE -ne 0) { throw "GitHub release creation failed." }
+          }
+
+          gh release edit $tagName `
             --repo $env:GITHUB_REPOSITORY `
-            --title "OpenMeta[Analyst] Community $tagName" `
-            --notes $notes `
-            --verify-tag
+            --title $releaseTitle `
+            --notes $notes
+          if ($LASTEXITCODE -ne 0) { throw "GitHub release edit failed." }
+
+          gh release upload $tagName `
+            "$assetPath#Windows x64 binary (.exe ZIP)" `
+            --repo $env:GITHUB_REPOSITORY `
+            --clobber
+          if ($LASTEXITCODE -ne 0) { throw "GitHub release upload failed." }

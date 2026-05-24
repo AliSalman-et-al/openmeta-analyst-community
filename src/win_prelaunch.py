@@ -24,7 +24,12 @@ def _prepend_path(paths):
 
 def _set_r_environment():
     base_dir = _runtime_dir()
-    r_home = os.path.join(base_dir, "R")
+    contents_dir = os.path.dirname(base_dir)
+    r_home_candidates = [
+        os.path.join(base_dir, "R"),
+        os.path.join(contents_dir, "Resources", "R"),
+    ]
+    r_home = next((path for path in r_home_candidates if os.path.isdir(path)), r_home_candidates[0])
     if not os.path.isdir(r_home):
         return
 
@@ -34,13 +39,22 @@ def _set_r_environment():
     os.environ["R_INCLUDE_DIR"] = os.path.join(r_home, "include")
     os.environ["R_DOC_DIR"] = os.path.join(r_home, "doc")
 
-    _prepend_path([
+    runtime_paths = [
         os.path.join(base_dir, "Library", "bin"),
         os.path.join(base_dir, "Library", "mingw-w64", "bin"),
         os.path.join(base_dir, "Library", "usr", "bin"),
-        os.path.join(r_home, "bin", "x64"),
+        os.path.join(contents_dir, "Resources", "lib"),
+        os.path.join(contents_dir, "Resources", "bin"),
         os.path.join(r_home, "bin"),
-    ])
+        os.path.join(r_home, "lib"),
+        os.path.join(r_home, "bin", "x64"),
+    ]
+
+    _prepend_path(runtime_paths)
+    for library_path_variable in ("DYLD_LIBRARY_PATH", "LD_LIBRARY_PATH"):
+        old_value = os.environ.get(library_path_variable, "")
+        existing = [path for path in runtime_paths if os.path.isdir(path)]
+        os.environ[library_path_variable] = os.pathsep.join(existing + [old_value])
 
 # # Set R environment variables
 # oldpath = os.environ["PATH"]
