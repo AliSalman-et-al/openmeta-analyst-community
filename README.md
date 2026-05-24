@@ -104,6 +104,21 @@ bash ./scripts/install-r-deps.sh openmeta-analyst-community
 bash ./scripts/build-macos-binary.sh openmeta-analyst-community OpenMetaAnalyst-macos-x64
 ```
 
+The current macOS release artifact is an Intel x64 build. Apple Silicon Macs
+must have Rosetta 2 installed to run it. If the app exits immediately after the
+Dock icon appears, check the launcher log:
+
+```bash
+cat ~/Library/Logs/OpenMetaAnalyst/launcher.log
+```
+
+You can also run the bundled executable from Terminal to see the same startup
+errors directly:
+
+```bash
+/Applications/OpenMetaAnalyst.app/Contents/MacOS/OpenMetaAnalyst
+```
+
 ## Legacy Dependency Notes
 
 Important dependency versions:
