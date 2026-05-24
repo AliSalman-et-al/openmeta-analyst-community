@@ -7,6 +7,40 @@ developement
 '''
 
 import os
+import sys
+
+
+def _runtime_dir():
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def _prepend_path(paths):
+    old_path = os.environ.get("PATH", "")
+    existing = [path for path in paths if os.path.isdir(path)]
+    os.environ["PATH"] = os.pathsep.join(existing + [old_path])
+
+
+def _set_r_environment():
+    base_dir = _runtime_dir()
+    r_home = os.path.join(base_dir, "R")
+    if not os.path.isdir(r_home):
+        return
+
+    os.environ["R_HOME"] = r_home
+    os.environ["R_USER"] = os.environ.get("R_USER", "oma")
+    os.environ["R_SHARE_DIR"] = os.path.join(r_home, "share")
+    os.environ["R_INCLUDE_DIR"] = os.path.join(r_home, "include")
+    os.environ["R_DOC_DIR"] = os.path.join(r_home, "doc")
+
+    _prepend_path([
+        os.path.join(base_dir, "Library", "bin"),
+        os.path.join(base_dir, "Library", "mingw-w64", "bin"),
+        os.path.join(base_dir, "Library", "usr", "bin"),
+        os.path.join(r_home, "bin", "x64"),
+        os.path.join(r_home, "bin"),
+    ])
 
 # # Set R environment variables
 # oldpath = os.environ["PATH"]
@@ -22,6 +56,8 @@ import os
 # print("R_HOME: %s" % os.environ["R_HOME"])
 # 
 # os.environ["R_USER"] = "oma" 
+
+_set_r_environment()
 
 # we are ready to start the main program loop
 import launch
