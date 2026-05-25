@@ -88,6 +88,7 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         # flag maintaining whether the current dataset
         # has been saved
         self.current_data_unsaved = False
+        self._suspend_display_recalculation = False
 
         self.tableView.setModel(self.model)
         # attach a delegate for editing
@@ -152,6 +153,8 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
     def _model_about_to_be_reset(self):
         '''Call all the functions here that should be called when the model is
         about to be reset'''
+        if self._suspend_display_recalculation:
+            return
         self._recalculate_display_scale_values()
     
     def _recalculate_display_scale_values(self):
@@ -995,7 +998,9 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         undo_f = lambda: self.undo_set_model(prev_out_path, prev_state_dict,
                                              prev_dataset)
         redo_f = lambda: self.set_model(data_model, state_dict,
-                                        check_for_appropriate_metric=True)
+                                        check_for_appropriate_metric=True,
+                                        recalculate_outcomes=False,
+                                        mark_dirty=False)
         
         open_command = meta_globals.CommandGenericDo(redo_f, undo_f)
         self.tableView.undoStack.push(open_command)
@@ -1089,7 +1094,8 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         self.model.reset()
         self.data_dirtied()
 
-    def set_model(self, data_model, state_dict=None, check_for_appropriate_metric=False):
+    def set_model(self, data_model, state_dict=None, check_for_appropriate_metric=False,
+                  recalculate_outcomes=True, mark_dirty=True):
         
         ##
         # we explicitly append a blank study to the
@@ -1134,18 +1140,19 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
 #        else:
 #            self.action_cum_ma.setEnabled(True)
 
-        self.model_updated()
-        self.data_dirtied()
+        self.model_updated(recalculate_outcomes=recalculate_outcomes)
+        if mark_dirty:
+            self.data_dirtied()
         print "ok -- model set."
         
         
-    def model_updated(self):
+    def model_updated(self, recalculate_outcomes=True):
         ''' Call me when the model is changed. '''
         self.model.update_current_group_names()
         self.model.update_current_outcome()
         self.model.update_current_time_points()
 
-        if self.model.current_outcome is not None:
+        if recalculate_outcomes and self.model.current_outcome is not None:
             self.model.try_to_update_outcomes()
             
         # This is kind of subtle. We have to reconnect
@@ -1169,7 +1176,11 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
             self.populate_metrics_menu(\
                 metric_to_check=self.tableView.model().current_effect)
 
-        self.model.reset()
+        self._suspend_display_recalculation = not recalculate_outcomes
+        try:
+            self.model.reset()
+        finally:
+            self._suspend_display_recalculation = False
         self._change_conf_level_label()
         
         

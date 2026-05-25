@@ -78,6 +78,7 @@ set -euo pipefail
 
 APP_MACOS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_CONTENTS="$(cd "${APP_MACOS}/.." && pwd)"
+APP_BUNDLE="$(cd "${APP_CONTENTS}/.." && pwd)"
 APP_RESOURCES="${APP_CONTENTS}/Resources"
 R_HOME="${APP_RESOURCES}/R"
 
@@ -87,6 +88,8 @@ export R_SHARE_DIR="${R_HOME}/share"
 export R_INCLUDE_DIR="${R_HOME}/include"
 export R_DOC_DIR="${R_HOME}/doc"
 export R_ARCH="${R_ARCH:-}"
+export LANG="${LANG:-en_US.UTF-8}"
+export LC_ALL="${LC_ALL:-en_US.UTF-8}"
 
 runtime_paths=(
   "${APP_RESOURCES}/lib"
@@ -115,7 +118,35 @@ fi
 
 log_dir="${HOME}/Library/Logs/OpenMetaAnalyst"
 mkdir -p "${log_dir}"
-exec "${APP_MACOS}/OpenMetaAnalyst.bin" "$@" >>"${log_dir}/launcher.log" 2>&1
+log_file="${log_dir}/launcher.log"
+
+{
+  echo "----- $(date '+%Y-%m-%d %H:%M:%S %z') launcher started -----"
+  echo "app bundle: ${APP_BUNDLE}"
+  echo "resources: ${APP_RESOURCES}"
+  echo "R_HOME: ${R_HOME}"
+  echo "PATH: ${PATH:-}"
+  echo "DYLD_LIBRARY_PATH: ${DYLD_LIBRARY_PATH:-}"
+  echo "DYLD_FALLBACK_LIBRARY_PATH: ${DYLD_FALLBACK_LIBRARY_PATH:-}"
+  echo "QT_PLUGIN_PATH: ${QT_PLUGIN_PATH:-}"
+  if [[ "${APP_BUNDLE}" == /private/var/folders/*/AppTranslocation/* ]]; then
+    echo "warning: app is running under App Translocation; move it to /Applications and remove quarantine if launch problems persist."
+  fi
+  if command -v arch >/dev/null 2>&1; then
+    echo "process architecture: $(arch)"
+  fi
+  if command -v uname >/dev/null 2>&1; then
+    echo "machine architecture: $(uname -m)"
+  fi
+} >>"${log_file}" 2>&1
+
+set +e
+"${APP_MACOS}/OpenMetaAnalyst.bin" "$@" >>"${log_file}" 2>&1
+status=$?
+set -e
+
+echo "----- $(date '+%Y-%m-%d %H:%M:%S %z') launcher exiting with status ${status} -----" >>"${log_file}" 2>&1
+exit "${status}"
 LAUNCHER
 chmod +x "${APP_EXECUTABLE}"
 
