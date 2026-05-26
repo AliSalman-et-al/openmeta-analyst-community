@@ -385,7 +385,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                 add_save_as_png_menu_action(context_menu)
 
             pos = event.screenPos()
-            context_menu.popup(pos)
+            context_menu.exec_(pos)
             event.accept()
 
         return _graphics_item_context_menu

@@ -103,7 +103,7 @@ class MADataTable(QtGui.QTableView):
             context_menu.addAction(action)
 
             pos = event.globalPos()
-            context_menu.popup(pos)
+            context_menu.exec_(pos)
             event.accept()
 
         return _context_menu
@@ -140,7 +140,6 @@ class MADataTable(QtGui.QTableView):
                 action.setEnabled(False)
             context_menu.addAction(action)
 
-            context_menu.popup(self.mapToGlobal(pos))
         elif column_clicked in (1,2):
             col_name = {1:"study name", 2:"year"}[column_clicked]
             action_sort = QAction("sort studies by %s" % col_name, self)
@@ -212,7 +211,8 @@ class MADataTable(QtGui.QTableView):
             context_menu.addAction(action_change)
             
 
-        context_menu.popup(self.mapToGlobal(pos))
+        if len(context_menu.actions()) > 0:
+            context_menu.exec_(self.mapToGlobal(pos))
 
     def include_all_studies(self):
         self.model().include_all_studies()

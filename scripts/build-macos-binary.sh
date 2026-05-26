@@ -17,6 +17,48 @@ APP_EXECUTABLE="${APP_MACOS}/OpenMetaAnalyst"
 APP_BINARY="${APP_MACOS}/OpenMetaAnalyst.bin"
 ZIP_PATH="${ARTIFACT_DIR}/${ARTIFACT_NAME}.zip"
 
+require_macos_tool() {
+  local tool_name="$1"
+  if ! command -v "${tool_name}" >/dev/null 2>&1; then
+    echo "Required macOS build tool '${tool_name}' was not found." >&2
+    exit 1
+  fi
+}
+
+validate_macho_x86_64() {
+  local root="$1"
+  local invalid=0
+
+  require_macos_tool lipo
+
+  while IFS= read -r -d '' path; do
+    if ! archs="$(lipo -archs "${path}" 2>/dev/null)"; then
+      continue
+    fi
+
+    if [[ " ${archs} " != *" x86_64 "* ]]; then
+      echo "Mach-O file is missing an x86_64 slice: ${path} (${archs})" >&2
+      invalid=1
+    fi
+  done < <(find "${root}" -type f -perm -111 -print0)
+
+  while IFS= read -r -d '' path; do
+    if ! archs="$(lipo -archs "${path}" 2>/dev/null)"; then
+      continue
+    fi
+
+    if [[ " ${archs} " != *" x86_64 "* ]]; then
+      echo "Mach-O library is missing an x86_64 slice: ${path} (${archs})" >&2
+      invalid=1
+    fi
+  done < <(find "${root}" -type f \( -name "*.dylib" -o -name "*.so" -o -name "*.so.*" \) -print0)
+
+  if [[ "${invalid}" -ne 0 ]]; then
+    echo "The macOS artifact must be fully loadable by an x86_64 process under Rosetta." >&2
+    exit 1
+  fi
+}
+
 ENV_PREFIX="$(conda env list | awk -v env="${ENV_NAME}" '$1 == env { print $NF; exit }')"
 if [[ -z "${ENV_PREFIX}" ]]; then
   echo "Conda environment '${ENV_NAME}' was not found." >&2
@@ -70,6 +112,8 @@ if [[ ! -x "${APP_EXECUTABLE}" ]]; then
   echo "Expected app executable was not created: ${APP_EXECUTABLE}" >&2
   exit 1
 fi
+
+validate_macho_x86_64 "${APP_BUNDLE}"
 
 mv "${APP_EXECUTABLE}" "${APP_BINARY}"
 cat > "${APP_EXECUTABLE}" <<'LAUNCHER'
@@ -129,14 +173,20 @@ log_file="${log_dir}/launcher.log"
   echo "DYLD_LIBRARY_PATH: ${DYLD_LIBRARY_PATH:-}"
   echo "DYLD_FALLBACK_LIBRARY_PATH: ${DYLD_FALLBACK_LIBRARY_PATH:-}"
   echo "QT_PLUGIN_PATH: ${QT_PLUGIN_PATH:-}"
+  if command -v lipo >/dev/null 2>&1; then
+    echo "OpenMetaAnalyst.bin architectures: $(lipo -archs "${APP_MACOS}/OpenMetaAnalyst.bin" 2>/dev/null || true)"
+  fi
   if [[ "${APP_BUNDLE}" == /private/var/folders/*/AppTranslocation/* ]]; then
     echo "warning: app is running under App Translocation; move it to /Applications and remove quarantine if launch problems persist."
   fi
   if command -v arch >/dev/null 2>&1; then
-    echo "process architecture: $(arch)"
+    echo "launcher architecture: $(arch)"
   fi
   if command -v uname >/dev/null 2>&1; then
     echo "machine architecture: $(uname -m)"
+  fi
+  if command -v sysctl >/dev/null 2>&1; then
+    echo "launcher translated by Rosetta: $(sysctl -in sysctl.proc_translated 2>/dev/null || echo unknown)"
   fi
 } >>"${log_file}" 2>&1
 

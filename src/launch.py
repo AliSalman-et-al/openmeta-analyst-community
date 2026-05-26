@@ -1,5 +1,7 @@
+import platform
+import subprocess
 import sys, time
-from PyQt4 import QtGui
+from PyQt4 import QtCore, QtGui
 from PyQt4.Qt import *
 
 import meta_py_r
@@ -9,6 +11,32 @@ import settings
 from meta_form import DISABLE_NETWORK_STUFF
 
 SPLASH_DISPLAY_TIME = 0 # TODO: change to 5 seconds in production version
+
+def configure_macos_qt():
+    if sys.platform != "darwin":
+        return
+
+    dont_use_native_menu_bar = getattr(QtCore.Qt, "AA_DontUseNativeMenuBar", None)
+    if dont_use_native_menu_bar is not None:
+        QtGui.QApplication.setAttribute(dont_use_native_menu_bar, True)
+
+def log_macos_runtime():
+    if sys.platform != "darwin":
+        return
+
+    translated = "unknown"
+    try:
+        process = subprocess.Popen(
+            ["sysctl", "-in", "sysctl.proc_translated"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+        stdout, _stderr = process.communicate()
+        translated = stdout.strip() or translated
+    except Exception:
+        pass
+
+    print("macOS runtime: python_machine=%s rosetta_translated=%s" %
+          (platform.machine(), translated))
 
 def load_R_libraries(app, splash=None):
     ''' Loads the R libraries while updating the splash screen'''
@@ -41,6 +69,8 @@ def load_R_libraries(app, splash=None):
         rloader.load_gemtc()
 
 def start():
+    configure_macos_qt()
+    log_macos_runtime()
     app = QtGui.QApplication(sys.argv)
     app.setApplicationName(meta_globals.APPLICATION_NAME)
     app.setOrganizationName(meta_globals.ORGANIZATION_NAME)

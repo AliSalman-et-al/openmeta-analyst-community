@@ -219,6 +219,8 @@ class Ui_MainWindow(object):
         self.verticalLayout_3.addWidget(self.dataset_file_lbl)
         MainWindow.setCentralWidget(self.centralwidget)
         self.menu_bar = QtGui.QMenuBar(MainWindow)
+        if hasattr(self.menu_bar, "setNativeMenuBar"):
+            self.menu_bar.setNativeMenuBar(False)
         self.menu_bar.setGeometry(QtCore.QRect(0, 0, 1000, 22))
         self.menu_bar.setObjectName(_fromUtf8("menu_bar"))
         self.menu_file = QtGui.QMenu(self.menu_bar)

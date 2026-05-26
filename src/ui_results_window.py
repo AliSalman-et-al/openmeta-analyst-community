@@ -84,6 +84,8 @@ class Ui_ResultsWindow(object):
         self.verticalLayout.addWidget(self.splitter)
         ResultsWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtGui.QMenuBar(ResultsWindow)
+        if hasattr(self.menubar, "setNativeMenuBar"):
+            self.menubar.setNativeMenuBar(False)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 799, 22))
         self.menubar.setObjectName(_fromUtf8("menubar"))
         ResultsWindow.setMenuBar(self.menubar)

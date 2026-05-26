@@ -45,7 +45,7 @@ class WelcomePage(QWizardPage, forms.ui_welcome_page.Ui_WizardPage):
             ### 
             # then add a drop-down to the 'open recent' 
             # button with the recent datasets.
-            qm = QMenu()
+            qm = QMenu(self)
             for dataset in self.recent_datasets[::-1]: # most recent dataset is last in list
                 action_item = QAction(QString(dataset), qm)
                 qm.addAction(action_item)
