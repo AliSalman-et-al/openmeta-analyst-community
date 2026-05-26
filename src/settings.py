@@ -9,6 +9,8 @@
 #######################################################################
 
 import os
+import shutil
+import sys
 from PyQt4 import QtCore, QtGui
 from PyQt4.Qt import *
 import meta_py_r
@@ -203,6 +205,11 @@ def get_base_path(normalize=False):
     because it sees it as an escape character and Qt is fine with / throughout '''
 
     base_path = str(QDesktopServices.storageLocation(QDesktopServices.DataLocation))
+    if base_path in ("", "None"):
+        if sys.platform == "darwin":
+            base_path = os.path.expanduser("~/Library/Application Support/OpenMetaAnalyst")
+        else:
+            base_path = os.path.expanduser("~/.OpenMetaAnalyst")
     if normalize:
         base_path = str(QDir.toNativeSeparators(base_path))
     print("Base path is: %s" % base_path)
@@ -225,19 +232,31 @@ def to_posix_path(path):
     return new_path
 
 def clear_r_tmp():
-    r_tmp_dir = os.path.join(get_base_path(), "r_tmp")
+    base_path = os.path.abspath(get_base_path())
+    r_tmp_dir = os.path.abspath(os.path.join(base_path, "r_tmp"))
+    if not r_tmp_dir.startswith(base_path + os.sep):
+        raise Exception("Refusing to clear suspicious r_tmp path: %s" % r_tmp_dir)
+    if not os.path.isdir(r_tmp_dir):
+        print("Skipping missing r_tmp directory: %s" % r_tmp_dir)
+        return
+
     print("Clearing %s" % r_tmp_dir)
     for file_p in os.listdir(r_tmp_dir):
         file_path = os.path.join(r_tmp_dir, file_p)
         try:
-            if os.path.isfile(file_path):
+            if os.path.isfile(file_path) or os.path.islink(file_path):
                 print("deleting %s" % file_path)
                 os.unlink(file_path) # same as remove
+            elif os.path.isdir(file_path):
+                print("deleting directory %s" % file_path)
+                shutil.rmtree(file_path)
         except Exception, e:
             print e
             
 def get_user_documents_path():
     docs_path = str(QDesktopServices.storageLocation(QDesktopServices.DocumentsLocation))
+    if docs_path in ("", "None"):
+        docs_path = os.path.expanduser("~/Documents")
     return docs_path
             
 ############## END OF HANDLE R_TEMP IN USER-AREA DIRECTORY ####################

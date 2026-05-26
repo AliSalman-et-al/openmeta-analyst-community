@@ -35,6 +35,8 @@ def assert_before(text, first, second, description):
 
 def main():
     launch = read_repo_file("src/launch.py")
+    meta_py_r = read_repo_file("src/meta_py_r.py")
+    settings = read_repo_file("src/settings.py")
     meta_form = read_repo_file("src/meta_form.py")
     ma_data_table_view = read_repo_file("src/ma_data_table_view.py")
     main_wizard = read_repo_file("src/main_wizard.py")
@@ -63,6 +65,51 @@ def main():
         launch,
         "log_macos_runtime()",
         "macOS startup must log whether the GUI binary is running under Rosetta.",
+    )
+    assert_contains(
+        launch,
+        "configure_R_graphics()",
+        "macOS startup must configure R graphics before plot-generating analyses run.",
+    )
+    assert_contains(
+        meta_py_r,
+        "options(bitmapType='cairo')",
+        "macOS R PNG output must avoid the Quartz bitmap backend when cairo is available.",
+    )
+    assert_contains(
+        meta_py_r,
+        "for (device.name in c('png', 'jpeg', 'bmp', 'tiff'))",
+        "macOS R startup must route unqualified bitmap device calls through hardened shims.",
+    )
+    assert_contains(
+        meta_py_r,
+        "do.call(original, args)",
+        "macOS R bitmap shims must delegate to grDevices after selecting the backend.",
+    )
+    assert_contains(
+        meta_py_r,
+        "cleanup_R_graphics_devices()",
+        "R errors must close any open graphics devices before continuing.",
+    )
+    assert_contains(
+        meta_py_r,
+        "Could not reset R working directory",
+        "R error handling must preserve the original exception if cleanup/reset also fails.",
+    )
+    assert_contains(
+        settings,
+        "~/Library/Application Support/OpenMetaAnalyst",
+        "macOS workspace setup must have a fallback when Qt does not provide a data location.",
+    )
+    assert_contains(
+        settings,
+        "Refusing to clear suspicious r_tmp path",
+        "Temporary-directory cleanup must guard against clearing outside the app data directory.",
+    )
+    assert_contains(
+        settings,
+        "shutil.rmtree(file_path)",
+        "Temporary-directory cleanup must remove stale subdirectories from interrupted R/native runs.",
     )
     assert_contains(
         ui_meta,

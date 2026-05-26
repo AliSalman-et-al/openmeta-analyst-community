@@ -15,6 +15,7 @@
 print("Entering meta_py_r for import probably")
 import math
 import os
+import sys
 from meta_globals import *
 from settings import *
 
@@ -46,8 +47,57 @@ def execute_r_string(r_str):
     except Exception as e:
         # reset working directory in r then raise the error, hope this will address issue #244
         print("something bad happened in R")
-        reset_Rs_working_dir()
+        cleanup_R_graphics_devices()
+        try:
+            reset_Rs_working_dir()
+        except Exception as reset_error:
+            print("Could not reset R working directory: %s" % reset_error)
         raise e
+
+def cleanup_R_graphics_devices():
+    try:
+        ro.r("graphics.off()")
+    except Exception as e:
+        print("Could not close R graphics devices: %s" % e)
+
+def configure_R_graphics():
+    if sys.platform != "darwin":
+        return
+
+    try:
+        cairo_available = bool(execute_r_string("capabilities('cairo')")[0])
+    except Exception as e:
+        print("Could not determine R cairo capability: %s" % e)
+        return
+
+    if cairo_available:
+        execute_r_string("options(bitmapType='cairo')")
+        execute_r_string("""
+.oma.install.bitmap.device <- function(device.name) {
+    original <- get(device.name, envir=asNamespace('grDevices'))
+    wrapper <- function(...) {
+        args <- list(...)
+        if (is.null(args$type) && isTRUE(capabilities('cairo')) &&
+                'type' %in% names(formals(original))) {
+            args$type <- 'cairo'
+        }
+        do.call(original, args)
+    }
+    assign(device.name, wrapper, envir=.GlobalEnv)
+}
+for (device.name in c('png', 'jpeg', 'bmp', 'tiff')) {
+    .oma.install.bitmap.device(device.name)
+}
+rm(.oma.install.bitmap.device)
+""")
+    else:
+        print("R cairo capability is unavailable; leaving bitmapType unchanged")
+
+    try:
+        bitmap_type = execute_r_string("getOption('bitmapType')")[0]
+        print("R graphics bitmapType: %s" % bitmap_type)
+    except Exception as e:
+        print("Could not log R bitmapType: %s" % e)
 
 #################### R Library Loader ####################
 class RlibLoader:

@@ -42,6 +42,7 @@ def load_R_libraries(app, splash=None):
     ''' Loads the R libraries while updating the splash screen'''
     
     meta_py_r.get_R_libpaths() # print the lib paths
+    meta_py_r.configure_R_graphics()
     rloader = meta_py_r.RlibLoader()
     
     splash.showMessage("Loading R libraries\n..")
