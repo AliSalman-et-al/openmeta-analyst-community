@@ -2,13 +2,6 @@ name: macOS binary
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - master
-      - main
-    tags:
-      - "v*"
-  pull_request:
 
 permissions:
   contents: write
@@ -58,7 +51,7 @@ jobs:
           compression-level: 0
 
       - name: Publish GitHub release asset
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
