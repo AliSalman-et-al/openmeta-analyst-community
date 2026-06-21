@@ -500,7 +500,7 @@ diagnostic.fixed.mh <- function(diagnostic.data, params){
     if (!("DiagnosticData" %in% class(diagnostic.data))) stop("Diagnostic data expected.")  
     results <- NULL
     if (length(diagnostic.data@TP) == 1 || length(diagnostic.data@y) == 1){
-        res <- get.res.for.one.diagnostic.study(diagnostic.data, params)
+        res <- get.res.for.one.diag.study(diagnostic.data, params)
          # Package res for use by overall method.
         summary.disp <- list("MAResults" = res) 
         results <- list("Summary"=summary.disp)
@@ -631,7 +631,7 @@ diagnostic.fixed.peto <- function(diagnostic.data, params){
   if (!("DiagnosticData" %in% class(diagnostic.data))) stop("Diagnostic data expected.") 
   
   if (length(diagnostic.data@TP) == 1 || length(diagnostic.data@y) == 1){
-    res <- get.res.for.one.diagnostic.study(diagnostic.data, params)
+    res <- get.res.for.one.diag.study(diagnostic.data, params)
     # Package res for use by overall method.
     summary.disp <- list("MAResults" = res) 
     results <- list("Summary"=summary.disp)
@@ -664,13 +664,15 @@ diagnostic.fixed.peto <- function(diagnostic.data, params){
     for (count in 1:length(summary.disp$table.titles)) {
       summary.disp$table.titles[count] <- paste(" ", pretty.metric, " -", summary.disp$table.titles[count], sep="")
     }
+    results <- list("Summary"=summary.disp)
     
-    if (is.null(params$create.plot) || (is.null(params$write.to.file))) {
+    if (is.null(params$create.plot) || params$create.plot == TRUE ||
+        is.null(params$write.to.file) || params$write.to.file == TRUE) {
       if (is.null(diagnostic.data@y) || is.null(diagnostic.data@SE)) {
         # compute point estimates for plot.data in case they are missing
         diagnostic.data <- compute.bin.point.estimates(diagnostic.data, params)
       }
-      if (is.null(params$write.to.file)) {
+      if (is.null(params$write.to.file) || params$write.to.file == TRUE) {
         # Write results and study data to csv files  
         res$study.weights <- (1 / res$vi) / sum(1 / res$vi)
         results.path <- paste("./r_tmp/diagnostic_fixed_peto_results.csv")
@@ -678,7 +680,7 @@ diagnostic.fixed.peto <- function(diagnostic.data, params){
         #data.path <- paste("./r_tmp/diagnostic_fixed_peto_study_data.csv")
         write.results.to.file(diagnostic.data, params, res, outpath=results.path)
       }
-      if (is.null(params$create.plot)) {
+      if (is.null(params$create.plot) || params$create.plot == TRUE) {
         # Create forest plot and list to display summary of results
         metric.name <- pretty.metric.name(as.character(params$measure))
         model.title <- "Diagnostic Fixed-Effect Model - Peto\n\nMetric: Odds Ratio"
@@ -713,9 +715,6 @@ diagnostic.fixed.peto <- function(diagnostic.data, params){
 						"plot_params_paths"=plot.params.paths)
       }
     }
-    else {
-      results <- list("Summary"=res)
-    }    
   }
   
   references <- "this is a placeholder for diagnostic fixed peto reference"
@@ -763,7 +762,7 @@ diagnostic.fixed.peto.is.feasible <- function(diagnostic.data, metric){
 
 diagnostic.fixed.peto.overall <- function(results) {
   # this parses out the overall from the computed result
-  res <- results$Summary
+  res <- results$Summary$MAResults
 }
 
 ##################################

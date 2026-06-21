@@ -94,3 +94,7 @@ finally {
 
 & $rscriptExe -e "pkgs <- c('HSROC','openmetar','metafor','lme4','MCMCpack','igraph','mice','Hmisc'); ok <- sapply(pkgs, require, character.only=TRUE); print(ok); if (!all(ok)) quit(status=1)"
 if ($LASTEXITCODE -ne 0) { throw "R package verification failed." }
+
+$analysisSmokeTest = Join-Path $repoRoot "scripts\analysis-smoke-test.R"
+& $rscriptExe $analysisSmokeTest
+if ($LASTEXITCODE -ne 0) { throw "Analysis smoke test failed." }

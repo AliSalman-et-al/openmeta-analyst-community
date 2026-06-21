@@ -10,6 +10,8 @@
 ######################################
 
 import pickle
+import os
+import sys
 from PyQt4 import QtCore, QtGui
 from PyQt4.Qt import *
 import copy
@@ -44,6 +46,35 @@ import webbrowser
 
 
 import forms.ui_running
+
+
+def _application_root():
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+
+
+def _resolve_open_file_path(file_path):
+    if file_path in [None, ""] or os.path.exists(file_path):
+        return file_path
+
+    normalized_path = os.path.normpath(file_path).replace("/", os.sep)
+    path_parts = [part.lower() for part in normalized_path.split(os.sep)]
+    if "sample_data" not in path_parts:
+        return file_path
+
+    sample_file = os.path.basename(file_path)
+    candidates = [
+        os.path.join(_application_root(), "sample_data", sample_file),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, "sample_data", sample_file)),
+    ]
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+
+    return file_path
+
+
 class ImportProgress(QDialog, forms.ui_running.Ui_running):
     def __init__(self, parent=None, min_=0, max_=10):
         super(ImportProgress, self).__init__(parent)
@@ -962,6 +993,7 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
             if file_path == "":
                 return False                                               
 
+        file_path = _resolve_open_file_path(file_path)
         add_file_to_recent_files(file_path)
         
         data_model = None

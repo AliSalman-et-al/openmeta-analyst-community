@@ -82,3 +82,4 @@ pushd "${SRC_R}" >/dev/null
 popd >/dev/null
 
 "${RSCRIPT_EXE}" -e "pkgs <- c('HSROC','openmetar','metafor','lme4','MCMCpack','igraph','mice','Hmisc'); ok <- sapply(pkgs, require, character.only=TRUE); print(ok); if (!all(ok)) quit(status=1)"
+"${RSCRIPT_EXE}" "${REPO_ROOT}/scripts/analysis-smoke-test.R"
