@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ "${ENABLE_MACOS_BINARY_BUILD:-}" != "true" ]]; then
+  echo "macOS binary builds are currently disabled while Windows is the active build target." >&2
+  echo "Set ENABLE_MACOS_BINARY_BUILD=true to run this legacy build script intentionally." >&2
+  exit 1
+fi
+
 ENV_NAME="${1:-openmeta-analyst-community}"
 ARTIFACT_NAME="${2:-OpenMetaAnalyst-macos-x64}"
 

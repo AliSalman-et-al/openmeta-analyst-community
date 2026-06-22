@@ -8,6 +8,7 @@ permissions:
 
 jobs:
   build-macos-binary:
+    if: ${{ false }}
     runs-on: macos-15-intel
     defaults:
       run:

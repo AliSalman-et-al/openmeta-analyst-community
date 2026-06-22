@@ -55,13 +55,12 @@ jobs:
         run: |
           $tagName = $env:GITHUB_REF_NAME
           $assetPath = "artifacts\OpenMetaAnalyst-windows-x64.zip"
-          $releaseTitle = "OpenMeta[Analyst] Community $tagName - Windows and macOS binaries"
+          $releaseTitle = "OpenMeta[Analyst] Community $tagName - Windows binary"
           $notes = @(
             "Community-maintained binary builds for OpenMeta[Analyst] Community."
             ""
             "Downloads:"
             "- Windows x64: OpenMetaAnalyst-windows-x64.zip"
-            "- macOS Intel x64: OpenMetaAnalyst-macos-x64.zip"
             ""
             "This project is not affiliated with or endorsed by Brown University or the original maintainers."
           ) -join [Environment]::NewLine

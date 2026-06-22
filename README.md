@@ -87,20 +87,19 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-binary.ps1 -Env
 
 ## macOS Binary Builds
 
-The repository includes a GitHub Actions workflow for building a macOS x64 binary artifact:
+macOS binary builds are currently disabled while Windows is the active build target. The workflow and local build script remain in the repository so macOS support can be resumed later.
 
 ```text
 .github/workflows/macos-binary.yml
 ```
 
-The workflow creates a legacy conda environment on an Intel macOS runner, compiles the bundled R packages, packages the PyQt4 application with PyInstaller as `OpenMetaAnalyst.app`, bundles the conda R runtime and sample data, and uploads `OpenMetaAnalyst-macos-x64.zip` as a workflow artifact.
+The disabled workflow creates a legacy conda environment on an Intel macOS runner, compiles the bundled R packages, packages the PyQt4 application with PyInstaller as `OpenMetaAnalyst.app`, bundles the conda R runtime and sample data, and uploads `OpenMetaAnalyst-macos-x64.zip` as a workflow artifact.
 
-When a `v*` tag is pushed, the Windows and macOS workflows both create the GitHub Release only if it does not already exist, then upload their platform-specific ZIP asset.
-
-The same steps can be run locally on macOS:
+The local macOS script is also disabled by default:
 
 ```bash
 bash ./scripts/install-r-deps.sh openmeta-analyst-community
+ENABLE_MACOS_BINARY_BUILD=true \
 bash ./scripts/build-macos-binary.sh openmeta-analyst-community OpenMetaAnalyst-macos-x64
 ```
 
