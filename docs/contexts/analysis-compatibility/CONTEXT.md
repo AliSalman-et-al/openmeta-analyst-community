@@ -8,6 +8,10 @@ This context defines what must remain stable while OpenMeta[Analyst] Community i
 The current Python 2.7, PyQt4, and bundled R-package application used as the source of truth for preserved behavior during migration.
 _Avoid_: Legacy app, old version
 
+**Retired Reference Implementation**:
+The former Python 2.7, PyQt4, and bundled R-package application after it no longer serves as the maintained compatibility oracle.
+_Avoid_: Active baseline, fallback app
+
 **Reference Environment**:
 The reproducible Windows CI conda environment used to run the Reference Implementation and capture Golden Analysis Test outputs.
 _Avoid_: Developer machine, local legacy setup
@@ -28,6 +32,10 @@ _Avoid_: Migration complete, switch over
 The R runtime, rpy2 bridge, bundled R packages, and external R packages used to execute meta-analysis calculations.
 _Avoid_: R dependencies, statistical backend
 
+**OpenMetaR R Stack Slice**:
+The R Stack modernization increment scoped to the bundled `OpenMetaR` package, its direct runtime package declarations, and the external packages its functions call directly.
+_Avoid_: Full R dependency refresh, all CRAN transitive dependency migration
+
 **Out-of-Process R Bridge**:
 A process boundary where the Python 3 application invokes analysis code running in a separate R-capable environment instead of embedding R through in-process rpy2.
 _Avoid_: R subprocess hack, external script
@@ -39,6 +47,10 @@ _Avoid_: Exact functionality, analysis functionality
 **Golden Analysis Test**:
 A regression test that compares modernized analysis behavior against outputs captured from the Reference Implementation using representative project data.
 _Avoid_: Snapshot test, golden master
+
+**Modern Behavior Baseline**:
+A regression baseline captured from the maintained modern application, current R Stack, and `OpenMetaR` package after the Reference Implementation is retired as the compatibility oracle.
+_Avoid_: Legacy golden set, reference environment
 
 **Golden Output Bundle**:
 A structured set of reference outputs for a Golden Analysis Test, including JSON comparison data and external generated artifacts such as plots.
@@ -108,6 +120,10 @@ _Avoid_: Pixel-perfect plot diff, unchecked plot artifact, cosmetic clone
 An explicitly documented, reviewed difference from Reference Implementation Analysis Behavior that is accepted despite failing normal golden-test equivalence.
 _Avoid_: Known failure, acceptable drift
 
+**Statistical Modernization Drift**:
+A reviewed Analysis Behavior difference caused by moving the R Stack to current statistical package behavior, where the modern output is accepted because it is correct for the updated methods and APIs even though it differs from the Reference Implementation.
+_Avoid_: Regression, silent statistical change
+
 **Compatibility Exception Manifest**:
 A machine-readable list of accepted Compatibility Exceptions with stable IDs, affected workflows, reasons, approval references, and follow-up expectations.
 _Avoid_: Exception notes, known-fail list
@@ -175,6 +191,10 @@ _Avoid_: First GUI test, binary demo
 **Project File Read Compatibility**:
 The requirement that the modernized application can open existing `.oma` project files without user-visible migration steps.
 _Avoid_: File support, import compatibility
+
+**Legacy Project Data Compatibility**:
+The requirement that user project files created by earlier OpenMeta[Analyst] releases remain usable in the maintained modern application.
+_Avoid_: Reference Implementation support, legacy runtime support
 
 **Project File Round Trip**:
 A compatibility check that opens a representative `.oma` project file, saves it through the modernized application, and verifies that the saved project can be reopened by the modernized application with equivalent project data.
