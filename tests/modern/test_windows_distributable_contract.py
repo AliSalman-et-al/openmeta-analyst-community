@@ -29,8 +29,13 @@ def test_modern_windows_distributable_contract_is_declared():
         "OMA_REQUIRE_IN_PROCESS_RPY2",
         "OMA_STARTUP_PROJECT_SMOKE",
         "RPY2_CFFI_MODE",
-        "--hidden-import icons_rc",
-        "--hidden-import rpy2.robjects",
+        "Resolve-CommandOrRepoPath",
+        "Copy-DirectoryTree",
+        "robocopy",
+        "SkipClean",
+        "SkipSmoke",
+        '"--hidden-import", "icons_rc"',
+        '"--hidden-import", "rpy2.robjects"',
         "sample_data\\amino.oma",
     ]:
         assert expected in script
@@ -95,11 +100,15 @@ def test_modern_windows_workflow_builds_separate_artifact():
     assert "OpenMetaAnalyst-windows-x64.zip" not in workflow
     assert "workflow_dispatch:" in workflow
     assert "build_macos:" in workflow
-    assert "macos-modern:" in workflow
+    assert "build_macos_arm64:" in workflow
+    assert "macos-modern-intel:" in workflow
+    assert "macos-modern-arm64:" in workflow
     assert "macos-15-intel" in workflow
     assert "macos-14" in workflow
     assert "OpenMetaAnalyst-modern-macos-x64" in workflow
     assert "OpenMetaAnalyst-modern-macos-arm64" in workflow
+    assert "github.event_name == 'workflow_dispatch' && inputs.build_macos }}" in workflow
+    assert "github.event_name == 'workflow_dispatch' && inputs.build_macos_arm64 }}" in workflow
 
 
 def test_local_modern_workflow_uses_uv():
@@ -110,8 +119,10 @@ def test_local_modern_workflow_uses_uv():
         "uv run pytest tests\\modern\\test_metaform_automation_launch.py",
         "uv run pytest tests\\modern",
         "--ignore=tests\\modern\\test_metaform_automation_launch.py",
-        "-PythonExe $pythonExe",
+        '"-PythonExe", $pythonExe',
         "-SkipDependencyInstall",
+        "-SkipClean",
+        "-SkipSmoke",
     ]:
         assert expected in script
 
@@ -135,6 +146,12 @@ def test_modern_macos_distributable_contract_is_declared():
         "R/bin/Rscript",
         "R/library/openmetar/DESCRIPTION",
         "LaunchOpenMetaAnalyst.command",
+        "resolve_existing_dir",
+        "copy_tree",
+        "rsync -a --delete",
+        "repo_path",
+        "skip_clean",
+        "QT_QPA_PLATFORM",
         "OMA_REQUIRE_IN_PROCESS_RPY2",
         "OMA_STARTUP_PROJECT_SMOKE",
         "RPY2_CFFI_MODE",
@@ -152,6 +169,8 @@ def test_local_modern_macos_workflow_uses_shared_build_script():
         "build-modern-macos-binary.sh",
         "--architecture",
         "--skip-dependency-install",
+        "--skip-clean",
+        "--skip-smoke",
     ]:
         assert expected in script
 
@@ -165,3 +184,47 @@ def test_shared_modern_r_dependency_installer_is_used_by_packagers():
     assert "install_archive(\"metafor\", \"1.9-9\")" in installer
     assert "install-modern-r-deps.R" in windows
     assert "install-modern-r-deps.R" in macos
+
+
+def test_macos_packager_resolves_relative_python_before_changing_directory():
+    script = (ROOT / "scripts" / "build-modern-macos-binary.sh").read_text()
+
+    resolve_index = script.index('python_exe="$(repo_path "$python_exe")"')
+    cd_src_index = script.index('cd "$src_dir"')
+    pyinstaller_index = script.index('"$python_exe" -m PyInstaller')
+
+    assert resolve_index < cd_src_index < pyinstaller_index
+    assert "command -v \"$path\"" in script
+
+
+def test_macos_packager_copies_resolved_r_runtime_contents():
+    script = (ROOT / "scripts" / "build-modern-macos-binary.sh").read_text()
+
+    resolve_r_index = script.index('r_runtime_root="$(resolve_existing_dir "$r_runtime_root" "Source R runtime")"')
+    copy_r_index = script.index('copy_tree "$r_runtime_root" "$app_root/R"')
+    rscript_check_index = script.index('if [ ! -x "$rscript" ] || [ ! -x "$r_binary" ]; then')
+
+    assert resolve_r_index < copy_r_index < rscript_check_index
+    assert 'rsync -a --delete "$source"/ "$destination"/' in script
+
+
+def test_windows_packager_restores_smoke_environment():
+    script = (ROOT / "scripts" / "build-modern-windows-binary.ps1").read_text()
+
+    previous_env_index = script.index("$previousEnv = @{")
+    smoke_index = script.index('Start-Process -FilePath $exePath -ArgumentList @("--automation-smoke", $samplePath)')
+    restore_index = script.index("foreach ($name in $previousEnv.Keys)")
+
+    assert previous_env_index < smoke_index < restore_index
+
+
+def test_windows_packager_uses_clean_directory_copies_for_incremental_builds():
+    script = (ROOT / "scripts" / "build-modern-windows-binary.ps1").read_text()
+
+    helper_index = script.index("function Copy-DirectoryTree")
+    sample_copy_index = script.index('Copy-DirectoryTree -Source (Join-Path $repoRoot "sample_data")')
+    r_copy_index = script.index('Copy-DirectoryTree -Source $Root -Destination (Join-Path $DestinationRoot "R")')
+
+    assert helper_index < sample_copy_index
+    assert helper_index < r_copy_index
+    assert "robocopy $Source $Destination /MIR" in script

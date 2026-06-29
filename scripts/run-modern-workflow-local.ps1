@@ -1,6 +1,8 @@
 param(
     [string]$ArtifactName = "OpenMetaAnalyst-modern-windows-x64",
-    [switch]$RecreateVenv
+    [switch]$RecreateVenv,
+    [switch]$SkipClean,
+    [switch]$SkipSmoke
 )
 
 $ErrorActionPreference = "Stop"
@@ -34,10 +36,14 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Modern pytest tests failed." }
 
     Write-Step "Building modern Windows artifact with PyInstaller"
-    & (Join-Path $repoRoot "scripts\build-modern-windows-binary.ps1") `
-        -ArtifactName $ArtifactName `
-        -PythonExe $pythonExe `
-        -SkipDependencyInstall
+    $buildArgs = @(
+        "-ArtifactName", $ArtifactName,
+        "-PythonExe", $pythonExe,
+        "-SkipDependencyInstall"
+    )
+    if ($SkipClean) { $buildArgs += "-SkipClean" }
+    if ($SkipSmoke) { $buildArgs += "-SkipSmoke" }
+    & (Join-Path $repoRoot "scripts\build-modern-windows-binary.ps1") @buildArgs
     if ($LASTEXITCODE -ne 0) { throw "Modern Windows binary build failed." }
 
     Write-Step "Modern workflow complete: artifacts\$ArtifactName.zip"

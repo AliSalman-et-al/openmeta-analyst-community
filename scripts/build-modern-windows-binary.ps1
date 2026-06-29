@@ -3,7 +3,9 @@ param(
     [string]$PythonExe = "python",
     [string]$RRuntimeRoot,
     [string]$RPackageCacheRoot,
-    [switch]$SkipDependencyInstall
+    [switch]$SkipDependencyInstall,
+    [switch]$SkipClean,
+    [switch]$SkipSmoke
 )
 
 $ErrorActionPreference = "Stop"
@@ -20,13 +22,37 @@ if (-not $RPackageCacheRoot) {
     $RPackageCacheRoot = Join-Path $artifactDir "r-library-cache"
 }
 
-if ($PythonExe -match "[\\/]" -and -not [System.IO.Path]::IsPathRooted($PythonExe)) {
-    $PythonExe = Join-Path $repoRoot $PythonExe
+function Write-Step {
+    param([string]$Message)
+    Write-Host ("[{0}] {1}" -f (Get-Date -Format "HH:mm:ss"), $Message)
+}
+
+function Resolve-CommandOrRepoPath {
+    param([string]$Path)
+    if ([System.IO.Path]::IsPathRooted($Path)) {
+        return (Resolve-Path -LiteralPath $Path).ProviderPath
+    }
+    if ($Path -match "[\\/]") {
+        return (Resolve-Path -LiteralPath (Join-Path $repoRoot $Path)).ProviderPath
+    }
+    $command = Get-Command $Path -ErrorAction Stop
+    return $command.Source
 }
 
 function Assert-PathExists {
     param([string]$Path, [string]$Description)
     if (-not (Test-Path $Path)) { throw "$Description was not found at '$Path'." }
+}
+
+function Copy-DirectoryTree {
+    param([string]$Source, [string]$Destination)
+    Assert-PathExists -Path $Source -Description "Source directory"
+    if (Test-Path $Destination) { Remove-Item -LiteralPath $Destination -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $Destination | Out-Null
+
+    robocopy $Source $Destination /MIR /NFL /NDL /NJH /NJS /NP | Out-Host
+    if ($LASTEXITCODE -gt 7) { throw "robocopy failed while copying '$Source' to '$Destination' with exit code $LASTEXITCODE." }
+    $global:LASTEXITCODE = 0
 }
 
 function Assert-AppLayout {
@@ -45,18 +71,30 @@ function Invoke-PackagedAppSmokeTest {
     param([string]$Root)
     $exePath = Join-Path $Root "OpenMetaAnalyst.exe"
     $samplePath = Join-Path $Root "sample_data\amino.oma"
-    $env:OMA_REQUIRE_IN_PROCESS_RPY2 = "1"
-    $env:RPY2_CFFI_MODE = "ABI"
-    $process = Start-Process -FilePath $exePath -ArgumentList @("--automation-smoke", $samplePath) -Wait -PassThru -WindowStyle Hidden
-    if ($process.ExitCode -ne 0) { throw "Packaged app smoke test failed while opening '$samplePath' with exit code $($process.ExitCode)." }
-
-    $env:OMA_STARTUP_PROJECT_SMOKE = "1"
+    $previousEnv = @{
+        OMA_REQUIRE_IN_PROCESS_RPY2 = $env:OMA_REQUIRE_IN_PROCESS_RPY2
+        OMA_STARTUP_PROJECT_SMOKE = $env:OMA_STARTUP_PROJECT_SMOKE
+        RPY2_CFFI_MODE = $env:RPY2_CFFI_MODE
+    }
     try {
+        $env:OMA_REQUIRE_IN_PROCESS_RPY2 = "1"
+        $env:RPY2_CFFI_MODE = "ABI"
+        $process = Start-Process -FilePath $exePath -ArgumentList @("--automation-smoke", $samplePath) -Wait -PassThru -WindowStyle Hidden
+        if ($process.ExitCode -ne 0) { throw "Packaged app smoke test failed while opening '$samplePath' with exit code $($process.ExitCode)." }
+
+        $env:OMA_STARTUP_PROJECT_SMOKE = "1"
         $startupProcess = Start-Process -FilePath $exePath -ArgumentList @($samplePath) -Wait -PassThru -WindowStyle Hidden
         if ($startupProcess.ExitCode -ne 0) { throw "Packaged startup project smoke test failed while opening '$samplePath' with exit code $($startupProcess.ExitCode)." }
     }
     finally {
-        Remove-Item Env:\OMA_STARTUP_PROJECT_SMOKE -ErrorAction SilentlyContinue
+        foreach ($name in $previousEnv.Keys) {
+            if ($null -eq $previousEnv[$name]) {
+                Remove-Item "Env:\$name" -ErrorAction SilentlyContinue
+            }
+            else {
+                Set-Item "Env:\$name" $previousEnv[$name]
+            }
+        }
     }
 }
 
@@ -94,13 +132,13 @@ function Assert-ZipLayout {
 }
 
 function Resolve-RRuntimeRoot {
-    if ($RRuntimeRoot) { return $RRuntimeRoot }
-    if ($env:OMA_R_HOME) { return $env:OMA_R_HOME }
-    if ($env:R_HOME) { return $env:R_HOME }
+    if ($RRuntimeRoot) { return (Resolve-Path -LiteralPath $RRuntimeRoot).ProviderPath }
+    if ($env:OMA_R_HOME) { return (Resolve-Path -LiteralPath $env:OMA_R_HOME).ProviderPath }
+    if ($env:R_HOME) { return (Resolve-Path -LiteralPath $env:R_HOME).ProviderPath }
     $programFilesR = Join-Path $env:ProgramFiles "R"
     if (Test-Path $programFilesR) {
         $latestR = Get-ChildItem -Path $programFilesR -Directory | Sort-Object Name -Descending | Select-Object -First 1
-        if ($latestR) { return $latestR.FullName }
+        if ($latestR) { return (Resolve-Path -LiteralPath $latestR.FullName).ProviderPath }
     }
     throw "No source R runtime was found. Pass -RRuntimeRoot or set OMA_R_HOME/R_HOME."
 }
@@ -108,13 +146,13 @@ function Resolve-RRuntimeRoot {
 function Copy-RRuntime {
     param([string]$Root, [string]$DestinationRoot)
     Assert-PathExists -Path (Join-Path $Root "bin\x64\R.dll") -Description "Source R runtime"
-    Copy-Item -Path $Root -Destination (Join-Path $DestinationRoot "R") -Recurse -Force
+    Copy-DirectoryTree -Source $Root -Destination (Join-Path $DestinationRoot "R")
 
     $runtimeParent = Split-Path -Parent $Root
     foreach ($relativePath in @("Library\bin", "Library\mingw-w64\bin", "Library\usr\bin")) {
         $sourcePath = Join-Path $runtimeParent $relativePath
         if (Test-Path $sourcePath) {
-            Copy-Item -Path $sourcePath -Destination (Join-Path $DestinationRoot $relativePath) -Recurse -Force
+            Copy-DirectoryTree -Source $sourcePath -Destination (Join-Path $DestinationRoot $relativePath)
         }
     }
 }
@@ -179,9 +217,7 @@ if (any(vapply(leaks, function(value) grepl(value, rendered, fixed=TRUE), logica
 
 function Copy-RLibrary {
     param([string]$Source, [string]$Destination)
-    if (Test-Path $Destination) { Remove-Item -LiteralPath $Destination -Recurse -Force }
-    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Destination) | Out-Null
-    Copy-Item -Path $Source -Destination $Destination -Recurse -Force
+    Copy-DirectoryTree -Source $Source -Destination $Destination
 }
 
 function Install-LocalRPackagesFromSource {
@@ -230,11 +266,13 @@ function Install-BundledRPackages {
         Copy-RLibrary -Source $cacheLibrary -Destination $rLibrary
     }
     else {
+        Write-Step "Installing bundled R package dependencies"
         $installDeps = Join-Path $repoRoot "scripts\install-modern-r-deps.R"
         & $rscriptExe $installDeps
         if ($LASTEXITCODE -ne 0) { throw "Modern R dependency install failed." }
     }
 
+    Write-Step "Installing local OpenMeta R packages"
     Install-LocalRPackagesFromSource -Root $Root
     & $rscriptExe -e "pkgs <- c('HSROC','openmetar','metafor','lme4','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1)"
     if ($LASTEXITCODE -ne 0) { throw "Bundled R package verification failed." }
@@ -248,6 +286,7 @@ function Install-BundledRPackages {
 if (-not $SkipDependencyInstall) {
     Push-Location $repoRoot
     try {
+        Write-Step "Syncing locked modern environment"
         uv sync --locked
         if ($LASTEXITCODE -ne 0) { throw "Modern dependency sync failed." }
     }
@@ -256,6 +295,8 @@ if (-not $SkipDependencyInstall) {
     }
     $PythonExe = Join-Path $repoRoot ".venv\Scripts\python.exe"
 }
+
+$PythonExe = Resolve-CommandOrRepoPath -Path $PythonExe
 
 & $PythonExe -c "import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 11) else 1)"
 if ($LASTEXITCODE -ne 0) { throw "Modern Windows packaging requires Python 3.11 to match the CI runtime and PyQt5 wheel support." }
@@ -268,8 +309,10 @@ if ($LASTEXITCODE -ne 0 -or $installedPyInstallerVersion.Trim() -ne $requiredPyI
     if ($LASTEXITCODE -ne 0) { throw "PyInstaller install failed." }
 }
 
-if (Test-Path $distRoot) { Remove-Item -LiteralPath $distRoot -Recurse -Force }
-if (Test-Path $workRoot) { Remove-Item -LiteralPath $workRoot -Recurse -Force }
+if (-not $SkipClean) {
+    if (Test-Path $distRoot) { Remove-Item -LiteralPath $distRoot -Recurse -Force }
+    if (Test-Path $workRoot) { Remove-Item -LiteralPath $workRoot -Recurse -Force }
+}
 if (Test-Path $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
 if (Test-Path $tmpZipPath) { Remove-Item -LiteralPath $tmpZipPath -Force }
 New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
@@ -278,27 +321,33 @@ $resolvedRRuntimeRoot = Resolve-RRuntimeRoot
 Push-Location $srcDir
 try {
     $env:RPY2_CFFI_MODE = "ABI"
-    & $PythonExe -m PyInstaller `
-        --noconfirm `
-        --clean `
-        --windowed `
-        --name OpenMetaAnalyst `
-        --icon images\OMA_community.ico `
-        --distpath $distRoot `
-        --workpath $workRoot `
-        --paths forms `
-        --hidden-import icons_rc `
-        --hidden-import rpy2.robjects `
-        --hidden-import rpy2.rinterface `
-        launch.py
+    $pyInstallerArgs = @(
+        "--noconfirm",
+        "--windowed",
+        "--name", "OpenMetaAnalyst",
+        "--icon", "images\OMA_community.ico",
+        "--distpath", $distRoot,
+        "--workpath", $workRoot,
+        "--paths", "forms",
+        "--hidden-import", "icons_rc",
+        "--hidden-import", "rpy2.robjects",
+        "--hidden-import", "rpy2.rinterface",
+        "launch.py"
+    )
+    if (-not $SkipClean) {
+        $pyInstallerArgs = @("--clean") + $pyInstallerArgs
+    }
+    Write-Step "Building Windows app bundle with PyInstaller"
+    & $PythonExe -m PyInstaller @pyInstallerArgs
     if ($LASTEXITCODE -ne 0) { throw "PyInstaller build failed." }
 }
 finally {
     Pop-Location
 }
 
-Copy-Item -Path (Join-Path $repoRoot "sample_data") -Destination (Join-Path $appDir "sample_data") -Recurse -Force
-Copy-Item -Path (Join-Path $repoRoot "doc") -Destination (Join-Path $appDir "doc") -Recurse -Force
+Copy-DirectoryTree -Source (Join-Path $repoRoot "sample_data") -Destination (Join-Path $appDir "sample_data")
+Copy-DirectoryTree -Source (Join-Path $repoRoot "doc") -Destination (Join-Path $appDir "doc")
+Write-Step "Bundling R runtime and packages"
 Copy-RRuntime -Root $resolvedRRuntimeRoot -DestinationRoot $appDir
 Install-BundledRPackages -Root $appDir
 
@@ -310,7 +359,10 @@ start "" "%APP_DIR%OpenMetaAnalyst.exe" "%APP_DIR%sample_data\amino.oma"
 '@ | Set-Content -Path (Join-Path $appDir "LaunchOpenMetaAnalyst.bat") -Encoding ASCII
 
 Assert-AppLayout -Root $appDir
-Invoke-PackagedAppSmokeTest -Root $appDir
+if (-not $SkipSmoke) {
+    Write-Step "Running packaged Windows smoke checks"
+    Invoke-PackagedAppSmokeTest -Root $appDir
+}
 Compress-AppDirectory -SourceDirectory $appDir -DestinationPath $zipPath
 Assert-ZipLayout -Path $zipPath
 Write-Host "Created $zipPath"

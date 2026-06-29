@@ -7,6 +7,7 @@ python_exe=""
 r_runtime_root="${OMA_R_HOME:-${R_HOME:-}}"
 r_package_cache_root=""
 skip_dependency_install=0
+skip_clean=0
 skip_smoke=0
 
 while [ "$#" -gt 0 ]; do
@@ -35,6 +36,10 @@ while [ "$#" -gt 0 ]; do
       skip_dependency_install=1
       shift
       ;;
+    --skip-clean)
+      skip_clean=1
+      shift
+      ;;
     --skip-smoke)
       skip_smoke=1
       shift
@@ -50,6 +55,58 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
 src_dir="$repo_root/src"
 artifact_dir="$repo_root/artifacts"
+
+step() {
+  printf '[%s] %s\n' "$(date '+%H:%M:%S')" "$1"
+}
+
+repo_path() {
+  local path="$1"
+  case "$path" in
+    /*)
+      printf '%s\n' "$path"
+      ;;
+    */*)
+      printf '%s\n' "$repo_root/$path"
+      ;;
+    *)
+      if command -v "$path" >/dev/null 2>&1; then
+        command -v "$path"
+      else
+        echo "Command was not found on PATH: $path" >&2
+        exit 1
+      fi
+      ;;
+  esac
+}
+
+resolve_existing_dir() {
+  local path="$1"
+  local description="$2"
+  if [ -z "$path" ] || [ ! -d "$path" ]; then
+    echo "$description was not found at $path." >&2
+    exit 1
+  fi
+  (cd "$path" && pwd -P)
+}
+
+copy_tree() {
+  local source="$1"
+  local destination="$2"
+  if [ ! -d "$source" ]; then
+    echo "Source directory was not found: $source" >&2
+    exit 1
+  fi
+  rm -rf "$destination"
+  mkdir -p "$(dirname "$destination")"
+  if command -v rsync >/dev/null 2>&1; then
+    mkdir -p "$destination"
+    rsync -a --delete "$source"/ "$destination"/
+  else
+    mkdir -p "$destination"
+    (cd "$source" && tar -cf - .) | (cd "$destination" && tar -xf -)
+  fi
+}
 
 if [ "$(uname -s)" != "Darwin" ]; then
   echo "Modern macOS packaging must run on macOS." >&2
@@ -98,11 +155,13 @@ tmp_zip_path="$zip_path.tmp"
 r_package_cache_root="${r_package_cache_root:-$artifact_dir/r-library-cache}"
 
 if [ "$skip_dependency_install" -eq 0 ]; then
+  step "Syncing locked modern environment"
   (cd "$repo_root" && uv sync --locked)
   python_exe="$repo_root/.venv/bin/python"
 fi
 
 python_exe="${python_exe:-$repo_root/.venv/bin/python}"
+python_exe="$(repo_path "$python_exe")"
 if [ ! -x "$python_exe" ]; then
   echo "Python executable was not found or is not executable: $python_exe" >&2
   exit 1
@@ -120,28 +179,41 @@ PY
 if [ -z "$r_runtime_root" ]; then
   r_runtime_root="$(R RHOME)"
 fi
-if [ -z "$r_runtime_root" ] || [ ! -d "$r_runtime_root/bin" ]; then
+if [ -z "$r_runtime_root" ]; then
   echo "No source R runtime was found. Pass --r-runtime-root or set OMA_R_HOME/R_HOME." >&2
   exit 1
 fi
+r_runtime_root="$(resolve_existing_dir "$r_runtime_root" "Source R runtime")"
+if [ ! -d "$r_runtime_root/bin" ]; then
+  echo "Source R runtime is missing bin under $r_runtime_root." >&2
+  exit 1
+fi
 
-rm -rf "$dist_root" "$work_root" "$zip_path" "$tmp_zip_path"
+if [ "$skip_clean" -eq 0 ]; then
+  rm -rf "$dist_root" "$work_root"
+fi
+rm -rf "$zip_path" "$tmp_zip_path"
 mkdir -p "$artifact_dir"
 
 (
   cd "$src_dir"
-  RPY2_CFFI_MODE=ABI "$python_exe" -m PyInstaller \
-    --noconfirm \
-    --clean \
-    --windowed \
-    --name OpenMetaAnalyst \
-    --distpath "$dist_root" \
-    --workpath "$work_root" \
-    --paths forms \
-    --hidden-import icons_rc \
-    --hidden-import rpy2.robjects \
-    --hidden-import rpy2.rinterface \
+  pyinstaller_args=(
+    --noconfirm
+    --windowed
+    --name OpenMetaAnalyst
+    --distpath "$dist_root"
+    --workpath "$work_root"
+    --paths forms
+    --hidden-import icons_rc
+    --hidden-import rpy2.robjects
+    --hidden-import rpy2.rinterface
     launch.py
+  )
+  if [ "$skip_clean" -eq 0 ]; then
+    pyinstaller_args=(--clean "${pyinstaller_args[@]}")
+  fi
+  step "Building macOS app bundle with PyInstaller"
+  R_HOME="$r_runtime_root" RPY2_CFFI_MODE=ABI "$python_exe" -m PyInstaller "${pyinstaller_args[@]}"
 )
 
 if [ ! -x "$app_root/OpenMetaAnalyst" ]; then
@@ -149,10 +221,10 @@ if [ ! -x "$app_root/OpenMetaAnalyst" ]; then
   exit 1
 fi
 
-cp -R "$repo_root/sample_data" "$app_root/sample_data"
-cp -R "$repo_root/doc" "$app_root/doc"
-rm -rf "$app_root/R"
-cp -R "$r_runtime_root" "$app_root/R"
+step "Bundling sample data, help, and R runtime"
+copy_tree "$repo_root/sample_data" "$app_root/sample_data"
+copy_tree "$repo_root/doc" "$app_root/doc"
+copy_tree "$r_runtime_root" "$app_root/R"
 
 r_home="$app_root/R"
 r_lib="$r_home/library"
@@ -176,9 +248,7 @@ test_bundled_r_packages() {
 copy_r_library() {
   local source="$1"
   local destination="$2"
-  rm -rf "$destination"
-  mkdir -p "$(dirname "$destination")"
-  cp -R "$source" "$destination"
+  copy_tree "$source" "$destination"
 }
 
 install_local_r_packages() {
@@ -197,9 +267,11 @@ if test_bundled_r_packages "$cache_library"; then
   echo "Using cached bundled R library from $cache_library"
   copy_r_library "$cache_library" "$r_lib"
 else
+  step "Installing bundled R package dependencies"
   R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$rscript" "$repo_root/scripts/install-modern-r-deps.R"
 fi
 
+step "Installing local OpenMeta R packages"
 install_local_r_packages
 R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$rscript" -e "pkgs <- c('HSROC','openmetar','metafor','lme4','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1)"
 
@@ -236,11 +308,13 @@ done
 
 if [ "$skip_smoke" -eq 0 ]; then
   sample_path="$app_root/sample_data/amino.oma"
-  OMA_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=ABI OMA_R_HOME="$r_home" OMA_R_LIBS="$r_lib" "$app_root/OpenMetaAnalyst" --automation-smoke "$sample_path"
-  OMA_STARTUP_PROJECT_SMOKE=1 OMA_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=ABI OMA_R_HOME="$r_home" OMA_R_LIBS="$r_lib" "$app_root/OpenMetaAnalyst" "$sample_path"
+  step "Running packaged macOS smoke checks"
+  QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}" OMA_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=ABI OMA_R_HOME="$r_home" OMA_R_LIBS="$r_lib" "$app_root/OpenMetaAnalyst" --automation-smoke "$sample_path"
+  QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}" OMA_STARTUP_PROJECT_SMOKE=1 OMA_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=ABI OMA_R_HOME="$r_home" OMA_R_LIBS="$r_lib" "$app_root/OpenMetaAnalyst" "$sample_path"
 fi
 
 (
+  step "Creating macOS artifact ZIP"
   cd "$dist_root"
   zip -qry "$tmp_zip_path" "OpenMetaAnalyst.app"
 )

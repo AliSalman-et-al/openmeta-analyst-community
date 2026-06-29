@@ -5,6 +5,8 @@ target="macos"
 artifact_name=""
 recreate_venv=0
 skip_tests=0
+skip_clean=0
+skip_smoke=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -22,6 +24,14 @@ while [ "$#" -gt 0 ]; do
       ;;
     --skip-tests)
       skip_tests=1
+      shift
+      ;;
+    --skip-clean)
+      skip_clean=1
+      shift
+      ;;
+    --skip-smoke)
+      skip_smoke=1
       shift
       ;;
     *)
@@ -81,10 +91,18 @@ if [ "$skip_tests" -eq 0 ]; then
 fi
 
 step "Building modern macOS artifact with PyInstaller"
-bash "$repo_root/scripts/build-modern-macos-binary.sh" \
-  --architecture "$architecture" \
-  --artifact-name "$artifact_name" \
-  --python-exe "$python_exe" \
+build_args=(
+  --architecture "$architecture"
+  --artifact-name "$artifact_name"
+  --python-exe "$python_exe"
   --skip-dependency-install
+)
+if [ "$skip_clean" -eq 1 ]; then
+  build_args+=(--skip-clean)
+fi
+if [ "$skip_smoke" -eq 1 ]; then
+  build_args+=(--skip-smoke)
+fi
+bash "$repo_root/scripts/build-modern-macos-binary.sh" "${build_args[@]}"
 
 step "Modern macOS workflow complete: artifacts/$artifact_name.zip"
