@@ -106,6 +106,76 @@ _HSROC_RETRY_DRIVER = textwrap.dedent(
 ).replace("__REPO_ROOT__", repr(REPO_ROOT).replace("\\", "/"))
 
 
+_HSROC_NAMESPACE_DRIVER = textwrap.dedent(
+    r"""
+    repo <- normalizePath(__REPO_ROOT__, winslash = "/")
+    required <- c("coda", "MCMCpack")
+    missing <- required[!vapply(required, requireNamespace, logical(1), quietly=TRUE)]
+    if (length(missing) > 0) {
+      cat("SKIP missing R packages:", paste(missing, collapse=", "), "\n")
+      quit(status=42)
+    }
+
+    r.lib <- tempfile("hsroc_lib_")
+    dir.create(r.lib)
+    install <- system2(
+      file.path(R.home("bin"), "R"),
+      c("CMD", "INSTALL", paste0("--library=", r.lib), file.path(repo, "src/R/HSROC")),
+      stdout=TRUE,
+      stderr=TRUE
+    )
+    status <- attr(install, "status")
+    if (!is.null(status) && status != 0) {
+      cat("SKIP R CMD INSTALL HSROC failed\n", paste(tail(install, 40), collapse="\n"), "\n")
+      quit(status=42)
+    }
+
+    .libPaths(c(r.lib, .libPaths()))
+    requireNamespace("HSROC")
+    if (!exists("as.mcmc", envir=asNamespace("HSROC"), inherits=TRUE)) {
+      stop("HSROC namespace did not import coda::as.mcmc")
+    }
+
+    work <- tempfile("hsroc_ns_")
+    dir.create(work)
+    data <- data.frame(
+      TP=c(19, 8, 41, 5, 45),
+      FP=c(1, 9, 1, 1, 58),
+      FN=c(10, 2, 12, 2, 32),
+      TN=c(81, 13, 49, 18, 165)
+    )
+    chain <- file.path(work, "chain_1")
+    dir.create(chain)
+
+    old <- getwd()
+    setwd(chain)
+    set.seed(113)
+    HSROC::HSROC(
+      data=data,
+      iter.num=120,
+      prior_LAMBDA=c(-2, 2),
+      prior_THETA=c(-2, 2),
+      path=chain
+    )
+    setwd(old)
+
+    result <- HSROC::HSROCSummary(
+      data=data,
+      burn_in=1,
+      Thin=1,
+      print_plot=FALSE,
+      path=work,
+      chain=c(chain)
+    )
+    if (!is.list(result) || !"Between-study parameters" %in% names(result)) {
+      stop("HSROCSummary did not return the expected summary sections")
+    }
+
+    cat("OK\n")
+    """
+).replace("__REPO_ROOT__", repr(REPO_ROOT).replace("\\", "/"))
+
+
 def test_hsroc_retries_failed_chain_once_in_clean_directory():
     rscript = shutil.which("Rscript")
     if not rscript:
@@ -115,6 +185,30 @@ def test_hsroc_retries_failed_chain_once_in_clean_directory():
         [rscript, "-"],
         cwd=REPO_ROOT,
         input=_HSROC_RETRY_DRIVER,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
+    )
+
+    if result.returncode == 42:
+        pytest.skip(result.stdout.strip())
+
+    assert result.returncode == 0, (
+        "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s"
+        % (result.returncode, result.stdout[-2000:], result.stderr[-2000:])
+    )
+    assert "OK" in result.stdout
+
+
+def test_hsroc_summary_namespace_imports_as_mcmc():
+    rscript = shutil.which("Rscript")
+    if not rscript:
+        pytest.skip("Rscript executable not found")
+
+    result = subprocess.run(
+        [rscript, "-"],
+        cwd=REPO_ROOT,
+        input=_HSROC_NAMESPACE_DRIVER,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         universal_newlines=True,
