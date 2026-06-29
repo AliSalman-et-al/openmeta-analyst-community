@@ -9,8 +9,6 @@
 #  meta_reg.r                                                    #
 ##################################################################
 
-library(metafor)
-
 #gfactor <- function(x, ref.value=NULL) {
 #	### Transforms x in to a factor, with ref.value being the first level ###
 #	

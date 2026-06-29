@@ -8,8 +8,6 @@
 # data in a coherent interface.    # 
 ####################################
 
-library(metafor)
-
 binary.logit.metrics <- c("PLO")
 binary.log.metrics <- c("OR", "RR", "PLN")
 binary.arcsine.metrics <- c("PAS")

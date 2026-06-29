@@ -8,8 +8,6 @@
 # interface.                       #
 ####################################
 
-library(metafor)
-
 continuous.two.arm.metrics <- c("MD", "SMD")
 continuous.one.arm.metrics <- c("TXMean")
 

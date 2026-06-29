@@ -203,8 +203,6 @@ bootstrap <- function(fname, omdata, params, cond.means.data=FALSE) {
 	#      boot.params$plot.path
 	
 	
-	require(boot)
-	
 	####omdata2 <- data.frame(omdata@y, omdata@SE, omdata@study.names)
 	omdata.rows <- seq(1:length(omdata@y)) # just store the row #s, we will index in to the actual object in the statistic function
 	#####names(omdata2)<-c("y", "SE", "study.names")

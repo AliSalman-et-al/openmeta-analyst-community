@@ -7,10 +7,6 @@
 # data in a coherent interface.       # 
 #######################################
 
-library(metafor)
-library(HSROC)
-library(graphics)
-
 diagnostic.logit.metrics <- c("Sens", "Spec", "PPV", "NPV", "Acc")
 diagnostic.log.metrics <- c("PLR", "NLR", "DOR")
 bivariate.methods <- c("diagnostic.hsroc", "diagnostic.bivariate.ml")
@@ -924,7 +920,6 @@ run.hsroc.with.recovery <- function(diag.data.frame, params, chain.out.dir) {
 #       diagnostic hsroc         #
 ##################################
 diagnostic.hsroc <- function(diagnostic.data, params){
-    library(HSROC)
     prev.working.dir <- getwd()
     on.exit(setwd(prev.working.dir), add=TRUE)
 
@@ -1040,9 +1035,6 @@ diagnostic.hsroc.ml.is.feasible <- function(diagnostic.data, metric){
 diagnostic.bivariate.ml <- function(diagnostic.data, params){
 	alpha <- 1.0-(params$conf.level/100.0)
 	mult <- abs(qnorm(alpha/2.0))
-	
-    library(boot)
-
     adjusted.counts <- adjust.raw.data(diagnostic.data, params)
 
     biv.results <- bivariate.dx.test(adjusted.counts$TP, adjusted.counts$FP, adjusted.counts$FN, adjusted.counts$TN)

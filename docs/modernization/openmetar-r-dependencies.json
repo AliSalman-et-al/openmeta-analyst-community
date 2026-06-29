@@ -35,7 +35,7 @@
       "source": "recommended",
       "scope": ["runtime"],
       "declared_in": ["src/R/openmetar/DESCRIPTION"],
-      "evidence": ["src/R/openmetar/R/plotting.r: library(\"grid\")"],
+      "evidence": ["src/R/openmetar/R/plotting.r: forest plot rendering calls grid drawing and viewport APIs"],
       "reason": "Forest plot rendering uses grid viewports, layouts, axes, text, polygons, and line drawing.",
       "installed_version": "4.6.0"
     },
@@ -43,9 +43,18 @@
       "name": "graphics",
       "source": "base-runtime",
       "scope": ["runtime"],
-      "declared_in": [],
-      "evidence": ["src/R/openmetar/R/diagnostic_methods.r: library(graphics)"],
-      "reason": "Diagnostic analysis code explicitly attaches graphics for plotting behavior from the base R distribution.",
+      "declared_in": ["src/R/openmetar/DESCRIPTION"],
+      "evidence": ["src/R/openmetar/R/openmetar-package.r: @import graphics"],
+      "reason": "Diagnostic and plotting code relies on graphics behavior from the base R distribution.",
+      "installed_version": "4.6.0"
+    },
+    {
+      "name": "grDevices",
+      "source": "base-runtime",
+      "scope": ["runtime"],
+      "declared_in": ["src/R/openmetar/DESCRIPTION"],
+      "evidence": ["src/R/openmetar/R/plotting.r: forest and diagnostic plot functions call png(...), pdf(...), dev.off(...), and graphics.off(...)"],
+      "reason": "openmetar writes plot image/PDF devices and closes graphics devices through the base grDevices package.",
       "installed_version": "4.6.0"
     },
     {
@@ -54,10 +63,10 @@
       "scope": ["runtime"],
       "declared_in": ["src/R/openmetar/DESCRIPTION"],
       "evidence": [
-        "src/R/openmetar/R/binary_methods.r: library(metafor)",
-        "src/R/openmetar/R/continuous_methods.r: library(metafor)",
-        "src/R/openmetar/R/diagnostic_methods.r: library(metafor)",
-        "src/R/openmetar/R/meta_reg.r: library(metafor)"
+        "src/R/openmetar/R/binary_methods.r: rma.uni(...) and related metafor analysis calls",
+        "src/R/openmetar/R/continuous_methods.r: rma.uni(...) and related metafor analysis calls",
+        "src/R/openmetar/R/diagnostic_methods.r: rma.uni(...) and related metafor analysis calls",
+        "src/R/openmetar/R/meta_reg.r: rma.uni(...) and related metafor analysis calls"
       ],
       "reason": "Core binary, continuous, diagnostic, and meta-regression methods call metafor analysis functions.",
       "installed_version": "5.0-1"
@@ -68,7 +77,7 @@
       "scope": ["runtime"],
       "declared_in": ["src/R/openmetar/DESCRIPTION"],
       "evidence": [
-        "src/R/openmetar/R/diagnostic_methods.r: library(HSROC)",
+        "src/R/openmetar/R/diagnostic_methods.r: diagnostic.hsroc delegates to HSROC(...) and HSROCSummary(...)",
         "src/R/HSROC/DESCRIPTION"
       ],
       "reason": "Diagnostic HSROC analysis delegates sampling and summaries to the bundled HSROC package.",
@@ -79,9 +88,18 @@
       "source": "cran",
       "scope": ["runtime"],
       "declared_in": ["src/R/openmetar/DESCRIPTION"],
-      "evidence": ["src/R/openmetar/R/bivariate.r: library(lme4)"],
+      "evidence": ["src/R/openmetar/R/bivariate.r: bivariate.dx.test uses lmer(...) for mixed-model fitting"],
       "reason": "Bivariate diagnostic model fitting uses lme4 mixed-model functionality.",
       "installed_version": "2.0-1"
+    },
+    {
+      "name": "methods",
+      "source": "base-runtime",
+      "scope": ["runtime"],
+      "declared_in": ["src/R/openmetar/DESCRIPTION"],
+      "evidence": ["src/R/openmetar/R/classes.r: setClass(...)"],
+      "reason": "openmetar defines S4 data and analysis specification classes with methods::setClass.",
+      "installed_version": "4.6.0"
     },
     {
       "name": "boot",
@@ -89,8 +107,8 @@
       "scope": ["runtime"],
       "declared_in": ["src/R/openmetar/DESCRIPTION"],
       "evidence": [
-        "src/R/openmetar/R/diagnostic_methods.r: library(boot)",
-        "src/R/openmetar/R/meta_methods.r: require(boot)",
+        "src/R/openmetar/R/diagnostic_methods.r: bivariate diagnostic confidence intervals use boot.ci(...)",
+        "src/R/openmetar/R/meta_methods.r: bootstrap analysis uses boot(...)",
         "src/R/openmetar/R/meta_reg.r: boot(...) and boot.ci(...)"
       ],
       "reason": "Bootstrap analysis workflows use boot resampling and confidence interval helpers.",
@@ -100,9 +118,18 @@
       "name": "stats",
       "source": "base-runtime",
       "scope": ["runtime"],
-      "declared_in": [],
+      "declared_in": ["src/R/openmetar/DESCRIPTION"],
       "evidence": ["src/R/openmetar/R: package-wide statistical helpers call base stats APIs implicitly"],
       "reason": "openmetar relies on standard R statistical functions that are distributed with R.",
+      "installed_version": "4.6.0"
+    },
+    {
+      "name": "utils",
+      "source": "base-runtime",
+      "scope": ["runtime"],
+      "declared_in": ["src/R/openmetar/DESCRIPTION"],
+      "evidence": ["src/R/openmetar/R: package code calls capture.output(...) and write.csv(...)"],
+      "reason": "openmetar captures textual R summaries and writes CSV output through the base utils package.",
       "installed_version": "4.6.0"
     },
     {
