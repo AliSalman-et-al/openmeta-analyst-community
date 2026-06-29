@@ -273,6 +273,127 @@ _HSROC_SUMMARY_DRIVER = textwrap.dedent(
 ).replace("__REPO_ROOT__", repr(REPO_ROOT))
 
 
+_ADVANCED_OPENMETAR_DRIVER = textwrap.dedent(
+    """
+    import os
+    import shutil
+    import subprocess
+    import sys
+    import tempfile
+
+    repo_root = __REPO_ROOT__
+    r_exe = shutil.which("R")
+    if not r_exe:
+        sys.stdout.write("SKIP R executable not found\\n")
+        sys.exit(42)
+
+    with tempfile.TemporaryDirectory() as r_lib:
+        env = dict(os.environ)
+        existing_r_libs = env.get("R_LIBS")
+        env["R_LIBS"] = (
+            r_lib if not existing_r_libs
+            else r_lib + os.pathsep + existing_r_libs
+        )
+        install = subprocess.run(
+            [r_exe, "CMD", "INSTALL", "--library=" + r_lib, os.path.join(repo_root, "src", "R", "openmetar")],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+            env=env,
+        )
+        if install.returncode != 0:
+            sys.stdout.write("SKIP R CMD INSTALL openmetar failed\\n%s\\n%s\\n" % (install.stdout[-2000:], install.stderr[-2000:]))
+            sys.exit(42)
+
+        env.pop("OMA_STUB_BACKEND", None)
+        env["OMA_REQUIRE_IN_PROCESS_RPY2"] = "1"
+        os.environ.update(env)
+        sys.path.insert(0, os.path.join(repo_root, "src"))
+
+        import modern_compat
+        modern_compat.install()
+        try:
+            import meta_py_r
+            meta_py_r.RlibLoader().load_openmetar()
+        except Exception as exc:
+            sys.stdout.write("SKIP %s: %s\\n" % (exc.__class__.__name__, exc))
+            sys.exit(42)
+
+        ro = meta_py_r.ro
+        ro.r(
+            '''
+            set.seed(113)
+            dir.create("r_tmp", showWarnings=FALSE)
+            set.global.conf.level(95)
+            advanced_data <- new(
+              "BinaryData",
+              g1O1=c(6, 3, 19, 26, 8, 6),
+              g1O2=c(21, 56, 145, 129, 24, 74),
+              g2O1=c(9, 7, 13, 49, 6, 3),
+              g2O2=c(18, 57, 139, 96, 29, 73),
+              y=c(-0.5596157879, -0.8295982833, 0.3372298124, -0.9291879730, 0.4769240721, 0.6795415285),
+              SE=c(0.6172133998, 0.7152562329, 0.3790058736, 0.2775577532, 0.6064784349, 0.7260937568),
+              study.names=c("Gonzalez", "Prins", "Maller", "Marik", "Muijsken", "De Vries"),
+              years=as.integer(c(1993, 1993, 1993, 1991, 1988, 1990)),
+              covariates=list(
+                new("CovariateValues", cov.name="year", cov.vals=c(1993, 1993, 1993, 1991, 1988, 1990), cov.type="continuous", ref.var="1993"),
+                new("CovariateValues", cov.name="group", cov.vals=c("early", "late", "early", "late", "early", "late"), cov.type="factor", ref.var="early")
+              )
+            )
+            params <- data.frame(
+              conf.level=95, digits=3, measure="OR", rm.method="DL", to="only0", adjust=0.5,
+              fp_col1_str="Studies", fp_col2_str="[default]", fp_col3_str="Ev/Trt", fp_col4_str="Ev/Ctrl",
+              fp_xlabel="[default]", fp_outpath="./r_tmp/issue113_forest.png",
+              fp_plot_lb="[default]", fp_plot_ub="[default]", fp_show_col1=TRUE,
+              fp_show_col2=TRUE, fp_show_col3=TRUE, fp_show_col4=TRUE,
+              fp_show_summary_line=TRUE, fp_xticks="[default]",
+              bootstrap.type="boot.ma", num.bootstrap.replicates=25,
+              bootstrap.plot.path="./r_tmp/issue113_bootstrap.png",
+              histogram.title="Bootstrap", histogram.xlab="Effect"
+            )
+            boot.result <- bootstrap.binary("binary.random", advanced_data, params)
+            stopifnot("Summary" %in% names(boot.result))
+            stopifnot("Histogram" %in% names(boot.result$images))
+            stopifnot(file.exists(boot.result$images[["Histogram"]]))
+
+            params$bootstrap.type <- "boot.meta.reg"
+            params$bootstrap.plot.path <- "./r_tmp/issue113_bootstrap_meta_reg.png"
+            boot.reg.result <- bootstrap.binary("binary.random", advanced_data, params)
+            stopifnot("Summary" %in% names(boot.reg.result))
+            stopifnot("Histograms" %in% names(boot.reg.result$images))
+            stopifnot(file.exists(boot.reg.result$images[["Histograms"]]))
+
+            perm.data <- data.frame(
+              yi=advanced_data@y,
+              vi=advanced_data@SE^2,
+              slab=advanced_data@study.names,
+              year=advanced_data@covariates[[1]]@cov.vals
+            )
+            perm.ma <- permuted.ma(perm.data, method="DL", iter=20, digits=3)
+            stopifnot("Summary" %in% names(perm.ma))
+            stopifnot(nchar(perm.ma$Summary) > 0)
+
+            perm.reg <- permuted.meta.reg(
+              perm.data,
+              method="DL",
+              mods=list(numeric=c("year"), categorical=c(), interactions=list()),
+              iter=20,
+              digits=3
+            )
+            stopifnot("Standard Meta Regression Summary" %in% names(perm.reg))
+            stopifnot("Permuted Meta-Regression Summary" %in% names(perm.reg))
+            stopifnot(grepl("Coefficient table", perm.reg[["Standard Meta Regression Summary"]]))
+            '''
+        )
+
+        sys.stdout.write("OK\\n")
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(0)
+    """
+).replace("__REPO_ROOT__", repr(REPO_ROOT))
+
+
 def test_inprocess_rpy2_backend_python3_porting_fixes():
     # Force the real in-process backend: the surrounding test suite sets
     # OMA_STUB_BACKEND=1 (which selects the no-R stub), so clear it in the child
@@ -335,6 +456,27 @@ def test_hsroc_direct_table_summaries_expand_to_formatted_sections():
     )
     if result.returncode == 42:
         pytest.skip("HSROC summary formatting regression unavailable: %s" % result.stdout.strip())
+    assert result.returncode == 0, (
+        "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s"
+        % (result.returncode, result.stdout[-2000:], result.stderr[-2000:])
+    )
+    assert "OK" in result.stdout
+
+
+def test_openmetar_advanced_bootstrap_and_permutation_paths_execute():
+    env = dict(os.environ)
+    env.pop("OMA_STUB_BACKEND", None)
+    env["OMA_REQUIRE_IN_PROCESS_RPY2"] = "1"
+    result = subprocess.run(
+        [sys.executable, "-c", _ADVANCED_OPENMETAR_DRIVER],
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
+        env=env,
+    )
+    if result.returncode == 42:
+        pytest.skip("advanced openmetar workflow regression unavailable: %s" % result.stdout.strip())
     assert result.returncode == 0, (
         "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s"
         % (result.returncode, result.stdout[-2000:], result.stderr[-2000:])

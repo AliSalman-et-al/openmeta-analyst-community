@@ -329,6 +329,35 @@ coded.cat.mod.level <- function(lvl, l.mod) {
 }
 
 
+reg.output.helper <- function(theData, rma.results, model.formula, digits) {
+	coeffs <- tryCatch({
+		coef(summary(rma.results))
+	}, error=function(e) {
+		NULL
+	})
+	omnibus <- tryCatch({
+		anova(rma.results)
+	}, error=function(e) {
+		NULL
+	})
+	output <- list()
+	if (!is.null(coeffs)) {
+		output[["Coefficient table"]] <- paste(capture.output(round(coeffs, digits)), collapse="\n")
+	}
+	if (!is.null(omnibus)) {
+		output[["Omnibus test"]] <- paste(capture.output(omnibus), collapse="\n")
+	}
+	output[["Model data"]] <- sprintf(
+		"Studies: %d\nFormula: %s",
+		nrow(theData),
+		paste(deparse(model.formula), collapse=" ")
+	)
+	if (length(output) == 0) {
+		output[["Model output"]] <- paste(capture.output(rma.results), collapse="\n")
+	}
+	output
+}
+
 
 g.meta.regression <- function(
   data,

@@ -223,6 +223,7 @@ bootstrap <- function(fname, omdata, params, cond.means.data=FALSE) {
 		factor.n.levels <- cov.data$display.data$factor.n.levels
 		n.cont.covs <- cov.data$display.data$n.cont.covs
 		cat.ref.var.and.levels <- cov.data$cat.ref.var.and.levels
+		expected.coeff.count <- 1 + n.cont.covs + sum(factor.n.levels - 1)
 	}
 	
 	
@@ -254,20 +255,26 @@ bootstrap <- function(fname, omdata, params, cond.means.data=FALSE) {
 			
 			return(TRUE)
 		}
+		result.ok <- function(res) {
+			length(res$b[,1]) == expected.coeff.count
+		}
 		
 		data.tmp <- get.subset(omdata, indices, make.unique.names=TRUE)
 		error.during.meta.regression <- FALSE
 		first.try <- TRUE
-		while (first.try || !data.ok(data.tmp) || error.during.meta.regression) {
+		result.wrong.shape <- FALSE
+		while (first.try || !data.ok(data.tmp) || error.during.meta.regression || result.wrong.shape) {
 			if (extra.attempts >= max.extra.attempts)
 				stop("Number of extra attempts exceeded 5x the number of replicates")
 			
 			
-			if (!first.try) {
+			if (!first.try || result.wrong.shape) {
 				extra.attempts <<- extra.attempts + 1
 				#cat("attempt: ", extra.attempts, "\n")
 				new.indices <- sample.int(length(omdata.rows), size=length(indices), replace=TRUE)
 				data.tmp <- get.subset(omdata, new.indices, make.unique.names=TRUE)
+				error.during.meta.regression <- FALSE
+				result.wrong.shape <- FALSE
 			} else {
 				first.try <- FALSE
 			}
@@ -282,7 +289,8 @@ bootstrap <- function(fname, omdata, params, cond.means.data=FALSE) {
 					#cat("There was ane error during meta regression\n")
 				}
 				else {
-					error.during.meta.regrssion <- FALSE
+					error.during.meta.regression <- FALSE
+					result.wrong.shape <- !result.ok(res)
 				}
 			}
 		} # end while
@@ -344,7 +352,7 @@ construct.boot.res.and.value.info.for.results <- function(results, boot.res, boo
 	res[[summary.name]] <- summary
 	res.info[[summary.name]] <- list(type="blob", description="")
 	
-	if (isnt.na(xlabels)) {
+	if (any(isnt.na(xlabels))) {
 		res[['coefficient_labels']] = xlabels
 		res.info[['coefficient_labels']] = list(type="vector", description="Coefficients in t given in the following order")
 	}
