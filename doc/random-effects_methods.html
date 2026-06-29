@@ -1,0 +1,45 @@
+<html>
+<head>
+<link href="css/help.css" 
+type=text/css rel=stylesheet>
+</head>
+<body>
+<h2><a name="top">Random-Effects Methods</a></h2>
+ <p>You can choose a random-effects method for a meta-analysis as follows:</p>
+ <ul>
+     <li>Select <b>Random-Effects</b> in the <b>analysis method</b> field of the Method & Parameters dialog.</li>
+     <li>Select one of the random-effects methods in the <b>Random method</b> field.</li>
+</ul>
+ <h3>Random-Effects Methods</h3>
+ <p><a name="random">The following random-effects methods are available:</a></p>
+       <ul>
+          <li>Hedges estimator (HE)</li>
+          <li>DerSimonian-Laird (DL)</li>
+          <li>Sidik-Jonkman (SJ) - Sidik, K. & Jonkman, J. N. (2005a) A note on variance estimation in random effects meta-regression. Journal of Biopharmaceutical Statistics, 15, 823–838.<br>
+                Sidik, K. & Jonkman, J. N. (2005b) Simple heterogeneity variance estimation for meta-analysis. Journal of the Royal Statistical Society, Series C, 54, 367–384.</li>
+          <li>Maximum likelihood (ML)</li>
+          <li>Restricted maximum likelihood (REML)</li>
+          <li>Empirical Bayes (EB)</li>
+      </ul>     
+ <h3>Hedges Estimator</h3>
+ <p><b>Reference:</b>  Hedges, L. (1981) Distribution theory for Glass's estimator of effect size and related estimators. <em>Journal of Educational Statistics</em>, 6, 107-128</p> 
+ <h3>DerSimonian-Laird</h3>
+ <p>In the DerSimionian-Laird method, the heterogeneity &tau;<sup>2</sup> is estimated as follows:</p>  
+<eq><img src="images/tau_squared.png"></eq> 
+<p>where</p>
+<eq><img src="images/tau_squared_Q.png"></eq><br> 
+<eq><img src="images/tau_squared_df.png"></eq><br>
+<eq><img src="images/tau_squared_C.png"></eq> 
+<p>In the random effects model, the weight assigned to study <em>i</em> is</p>
+<eq><img src="images/random_effects_study_weight.png"></eq>
+<p>where <em>v<sub>i</sub></em> is the variance of study <em>i</em>. The summary estimate is computed as </p> 
+<eq><img src="images/random_effects_weighted_sum.png"></eq>
+<p>The variance of the summary estimate is</p>
+<eq><img src="images/eq_random_effects_overall_variance.png"></eq>
+<p><b>Reference:</b>  DerSimonian, R. & Laird, N. (1986) Meta-analysis in clinical trials. Controlled Clinical Trials, 7, 177–188.</p> 
+
+<p><a href="#top">Back to top</a></p>
+<br>
+ <table id="nav" cellspacing="0"><tr valign="center"><td align="left" width="20"><a href="analysis_methods.html#top"><img src="images/b_prev.gif" border="0"></td><td align="left">Fixed-Effect Methods</td></a><td>&nbsp;</td><td align="right">Diagnostic-Only Methods</td><td align="right" width="20"><a href="diagnostic_only_methods.html#top"><img src="images/b_next.gif" border="0"></td></a></td></tr></table>
+</body>
+</html>

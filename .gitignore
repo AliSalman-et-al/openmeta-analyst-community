@@ -1,0 +1,17 @@
+*.pyc
+r_tmp/
+r_tmp/*.png
+.project
+.pydevproject
+.settings
+.RData
+.Rhistory
+openmetar_1.0.zip
+openmetar_1.0.tar.gz
+build/
+dist/
+openmetar_1.0.tar.gz
+HSROC_2.0.5.tar.gz
+Thumbs.db
+dist.zip
+.DS_Store

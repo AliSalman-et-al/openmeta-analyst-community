@@ -1,0 +1,75 @@
+body {
+  background: #ffffff;
+  font-family: Georgia, "Times New Roman",
+        Times, serif;
+  PADDING-RIGHT: 30px; PADDING-LEFT: 30px; PADDING-BOTTOM: 0px; MARGIN: 0px; COLOR: #564b47; PADDING-TOP: 20px; FONT-FAMILY: Verdana, Helvetica; BACKGROUND-COLOR: white;
+}
+
+p {
+  PADDING-RIGHT: 10px; PADDING-LEFT: 10px; PADDING-BOTTOM: 5px; MARGIN: 0px; PADDING-TOP: 5px;
+  width: 700px;
+}
+
+img { 
+  PADDING-RIGHT: 10px; PADDING-LEFT: 0px; PADDING-BOTTOM: 10px; MARGIN: 0px; PADDING-TOP: 10px;
+  text-align: left;
+}
+
+eq {
+  PADDING-RIGHT: 10px; PADDING-LEFT: 35px; PADDING-BOTTOM: 10px; MARGIN: 0px; PADDING-TOP: 10px;
+  text-align: left;
+}
+
+h1 {
+	font-size: 26px;
+	text-align: center;
+	color: white;
+	background-color: #0066CC;
+	padding-top: 5px;
+	padding-bottom: 5px;
+	padding-left: 0px;
+	padding-right: 0px;
+	margin:0px;
+}
+
+h2 {
+  font-size:22px;
+  text-align: left;
+	color: #0066CC;
+	padding-left: 10px;
+}
+
+h3 {
+ font-size: 18px;
+ padding-left: 10px;
+}
+
+h4 {
+ font-size: 16px;
+ padding-left: 25px;
+ }
+
+h1, h2, h3, h3, h4 {
+  font-familty: arial, Helvetica, Geneva, SunSans-Regular, sans-serif;
+}
+
+li {
+  padding-bottom: 5px;
+  width: 700px;
+}
+
+a{
+  text-decoration:none;
+}
+
+a:hover{
+ color:#ef8c08;
+ text-decoration:underline;
+}
+
+table#nav {
+    background-color:#E0E0E0;
+    border: "0";
+    width: 700px;
+    height: 5px;
+}
