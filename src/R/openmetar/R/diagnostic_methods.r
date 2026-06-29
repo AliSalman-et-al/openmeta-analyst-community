@@ -1050,14 +1050,14 @@ diagnostic.bivariate.ml <- function(diagnostic.data, params){
 
     digits = 4
     digits.str <- paste("%.", digits, "f", sep="")
-    sensitivity <- sprintf(digits.str, inv.logit(logit_sens))
+    sensitivity <- sprintf(digits.str, invlogit(logit_sens))
 	# Un-hard-coding CI.. issue # 214
-    sens.low <- sprintf(digits.str, inv.logit(logit_sens - mult*se_logit_sens))
-    sens.high <- sprintf(digits.str, inv.logit(logit_sens + mult*se_logit_sens))
+    sens.low <- sprintf(digits.str, invlogit(logit_sens - mult*se_logit_sens))
+    sens.high <- sprintf(digits.str, invlogit(logit_sens + mult*se_logit_sens))
 
-    specificity <- sprintf(digits.str, inv.logit(logit_spec))
-    spec.low <- sprintf(digits.str, inv.logit(logit_spec - mult*se_logit_spec))
-    spec.high <- sprintf(digits.str, inv.logit(logit_spec + mult*se_logit_spec))
+    specificity <- sprintf(digits.str, invlogit(logit_spec))
+    spec.low <- sprintf(digits.str, invlogit(logit_spec - mult*se_logit_spec))
+    spec.high <- sprintf(digits.str, invlogit(logit_spec + mult*se_logit_spec))
 
     r <- sprintf(digits.str, biv.results$correlation)
 

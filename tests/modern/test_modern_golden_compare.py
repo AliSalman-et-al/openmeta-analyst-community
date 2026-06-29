@@ -98,9 +98,74 @@ def test_curated_golden_set_includes_sequential_binary_and_continuous_workflows(
         bundles = dict((bundle["id"], bundle) for bundle in golden_analysis.curated_golden_bundles())
 
     assert bundles["amino-binary-cumulative"]["case"].analysis_type == "cumulative"
+    assert "Cumulative Summary" in bundles["amino-binary-cumulative"]["expected"]
     assert bundles["amino-binary-leave-one-out"]["case"].analysis_type == "leave-one-out"
+    assert "Leave-one-out Summary" in bundles["amino-binary-leave-one-out"]["expected"]
     assert bundles["continuous-cumulative"]["case"].analysis_type == "cumulative"
+    assert "Cumulative Summary" in bundles["continuous-cumulative"]["expected"]
     assert bundles["continuous-leave-one-out"]["case"].analysis_type == "leave-one-out"
+    assert "Leave-one-out Summary" in bundles["continuous-leave-one-out"]["expected"]
+
+
+def test_golden_summary_parser_reads_current_openmetar_summary_display():
+    with _import_legacy_golden_modules() as (golden_analysis, _, _):
+        parsed = golden_analysis._parse_summary(
+            """
+$model.title
+[1] "Binary Random-Effects Model\\n\\nMetric: Odds Ratio"
+
+$table.titles
+[1] " Model Results"       " Heterogeneity"       " Results (log scale)"
+
+$arrays
+$arrays$arr1
+               [,1]       [,2]          [,3]          [,4]
+res.col.labels "Estimate" "Lower bound" "Upper bound" "p-Value"
+res.col.vals   "0.770"    "0.485"       "1.222"       "0.267"
+
+$arrays$arr2
+               [,1]    [,2]       [,3]           [,4]
+het.col.labels "tau^2" "Q(df=18)" "Het. p-Value" "I^2"
+het.col.vals   "0.378" "33.360"   "0.015"        "46.044"
+
+$arrays$arr3
+alt.col.labels "Estimate" "Lower bound" "Upper bound" "Std. error"
+alt.col.vals   "-0.262"   "-0.724"      "0.200"       "0.236"
+"""
+        )
+
+    assert parsed == {
+        "estimate": 0.770,
+        "lower_bound": 0.485,
+        "upper_bound": 1.222,
+        "p_value": 0.267,
+        "tau_squared": 0.378,
+        "q": 33.360,
+        "i_squared": 46.044,
+    }
+
+
+def test_compare_bundle_requires_expected_plot_artifacts(tmp_path):
+    with _import_legacy_golden_modules() as (golden_analysis, _, _):
+        plot = tmp_path / "forest.png"
+        plot.write_bytes(b"png")
+        bundle = {
+            "expected": {"Summary": {}},
+            "artifacts": {"Forest Plot": str(plot)},
+            "tolerances": {},
+        }
+
+        comparisons = golden_analysis.compare_bundle(
+            bundle,
+            {"texts": {"Summary": "ok"}, "images": {"forest plot": str(plot)}},
+        )
+        missing = golden_analysis.compare_bundle(
+            bundle,
+            {"texts": {"Summary": "ok"}, "images": {"Forest Plot": str(tmp_path / "missing.png")}},
+        )
+
+    assert {"metric": "artifact_present", "section": "Forest Plot", "passed": True, "expected": True, "observed": True, "tolerance": None, "drift": None} in comparisons
+    assert any(row["metric"] == "artifact_present" and row["passed"] is False for row in missing)
 
 
 def test_headless_analysis_dispatches_sequential_binary_and_continuous_workflows(monkeypatch, tmp_path):

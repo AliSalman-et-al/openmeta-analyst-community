@@ -310,7 +310,7 @@ def curated_golden_bundles(root_dir=None):
             "metric": "OR",
             "parameters": binary_cumulative_params,
             "tolerances": DEFAULT_TOLERANCES,
-            "expected": {"Summary": {}},
+            "expected": {"Cumulative Summary": {}},
             "artifacts": {"Cumulative Forest Plot": binary_cumulative_params["fp_outpath"]},
             "case": headless_analysis.HeadlessAnalysisCase(sample("amino.oma"), "binary.random", binary_cumulative_params, metric="OR", data_type=meta_globals.BINARY, analysis_type="cumulative"),
         },
@@ -322,7 +322,7 @@ def curated_golden_bundles(root_dir=None):
             "metric": "OR",
             "parameters": binary_loo_params,
             "tolerances": DEFAULT_TOLERANCES,
-            "expected": {"Summary": {}},
+            "expected": {"Leave-one-out Summary": {}},
             "artifacts": {"Leave-one-out Forest plot": binary_loo_params["fp_outpath"]},
             "case": headless_analysis.HeadlessAnalysisCase(sample("amino.oma"), "binary.random", binary_loo_params, metric="OR", data_type=meta_globals.BINARY, analysis_type="leave-one-out"),
         },
@@ -334,7 +334,7 @@ def curated_golden_bundles(root_dir=None):
             "metric": "SMD",
             "parameters": continuous_cumulative_params,
             "tolerances": DEFAULT_TOLERANCES,
-            "expected": {"Summary": {}},
+            "expected": {"Cumulative Summary": {}},
             "artifacts": {"Cumulative Forest Plot": continuous_cumulative_params["fp_outpath"]},
             "case": headless_analysis.HeadlessAnalysisCase(sample("continuous.oma"), "continuous.random", continuous_cumulative_params, metric="SMD", data_type=meta_globals.CONTINUOUS, analysis_type="cumulative"),
         },
@@ -346,7 +346,7 @@ def curated_golden_bundles(root_dir=None):
             "metric": "SMD",
             "parameters": continuous_loo_params,
             "tolerances": DEFAULT_TOLERANCES,
-            "expected": {"Summary": {}},
+            "expected": {"Leave-one-out Summary": {}},
             "artifacts": {"Leave-one-out Forest plot": continuous_loo_params["fp_outpath"]},
             "case": headless_analysis.HeadlessAnalysisCase(sample("continuous.oma"), "continuous.random", continuous_loo_params, metric="SMD", data_type=meta_globals.CONTINUOUS, analysis_type="leave-one-out"),
         },
@@ -416,7 +416,37 @@ def compare_bundle(bundle, result):
             drift = None if observed is None else abs(observed - expected)
             tolerance = bundle["tolerances"][metric]
             comparisons.append({"section": section, "metric": metric, "expected": expected, "observed": observed, "tolerance": tolerance, "drift": drift, "passed": drift is not None and drift <= tolerance})
+    comparisons.extend(_compare_artifacts(bundle, result))
     return comparisons
+
+
+def _compare_artifacts(bundle, result):
+    comparisons = []
+    images = result.get("images", {})
+    for label in sorted(bundle.get("artifacts", {})):
+        image_label = _matching_key(images, label)
+        path = images.get(image_label) if image_label is not None else None
+        present = bool(path and os.path.exists(path))
+        comparisons.append({
+            "section": label,
+            "metric": "artifact_present",
+            "expected": True,
+            "observed": present,
+            "tolerance": None,
+            "drift": None,
+            "passed": present,
+        })
+    return comparisons
+
+
+def _matching_key(mapping, expected):
+    if expected in mapping:
+        return expected
+    expected_normalized = expected.lower()
+    for key in mapping:
+        if key.lower() == expected_normalized:
+            return key
+    return None
 
 
 def run_curated_golden_set(report_path=None):
@@ -649,6 +679,10 @@ def _matches_reference_environment(reference_environment):
 
 
 def _parse_summary(text):
+    structured = _parse_structured_summary_display(text)
+    if structured:
+        return structured
+
     values = {}
     number = r"(?:<\s*)?-?\d+(?:\.\d+)?"
     model = re.search(r"Estimate\s+Lower bound\s+Upper bound.*?\n\s*(%s)\s+(%s)\s+(%s)\s+(?:%s\s+)?(%s)" % (number, number, number, number, number), text, re.S)
@@ -659,6 +693,60 @@ def _parse_summary(text):
         row = re.findall(number, heterogeneity.group(1))
         values.update({"tau_squared": _to_float(row[0]), "q": _to_float(row[1]), "i_squared": _to_float(row[3])})
     return values
+
+
+def _parse_structured_summary_display(text):
+    values = {}
+    model_values = _parse_quoted_summary_row(text, ["res.col", "col"])
+    if model_values:
+        values.update(_extract_model_values(model_values))
+
+    heterogeneity_values = _parse_quoted_summary_row(text, ["het.col"])
+    if heterogeneity_values:
+        values.update(_extract_heterogeneity_values(heterogeneity_values))
+
+    return values
+
+
+def _parse_quoted_summary_row(text, prefixes):
+    for prefix in prefixes:
+        labels_match = re.search(r"%s\.labels\s+([^\n]+)" % re.escape(prefix), text)
+        values_match = re.search(r"%s\.vals\s+([^\n]+)" % re.escape(prefix), text)
+        if not labels_match or not values_match:
+            continue
+
+        labels = re.findall(r'"([^"]+)"', labels_match.group(1))
+        values = re.findall(r'"([^"]+)"', values_match.group(1))
+        if labels and len(labels) == len(values):
+            return dict(zip(labels, values))
+    return {}
+
+
+def _extract_model_values(row):
+    extracted = {}
+    mapping = {
+        "Estimate": "estimate",
+        "Lower bound": "lower_bound",
+        "Upper bound": "upper_bound",
+        "p-Value": "p_value",
+        "p-Val": "p_value",
+    }
+    for label, key in mapping.items():
+        if label in row:
+            extracted[key] = _to_float(row[label])
+    return extracted
+
+
+def _extract_heterogeneity_values(row):
+    extracted = {}
+    for label, value in row.items():
+        if label == "tau^2":
+            extracted["tau_squared"] = _to_float(value)
+        elif label.startswith("Q("):
+            extracted["q"] = _to_float(value)
+        elif label == "I^2":
+            extracted["i_squared"] = _to_float(value)
+    return extracted
 
 
 def _to_float(value):
