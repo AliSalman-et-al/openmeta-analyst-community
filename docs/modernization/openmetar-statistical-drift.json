@@ -1,0 +1,27 @@
+{
+  "manifest": "openmetar-statistical-drift",
+  "schema_version": 1,
+  "target_runtime": {
+    "r": "4.6.0",
+    "rpy2": "3.6.7",
+    "cran_policy": "latest-compatible"
+  },
+  "reviewed_drift_required_fields": [
+    "id",
+    "status",
+    "workflow",
+    "result_family",
+    "reference_implementation_output",
+    "modern_openmetar_output",
+    "package_versions",
+    "methods_involved",
+    "likely_reason",
+    "independent_validation_signal",
+    "user_facing_impact",
+    "reviewed_by",
+    "reviewed_at",
+    "approval_reference"
+  ],
+  "statuses": ["reviewed", "superseded"],
+  "drift_records": []
+}
