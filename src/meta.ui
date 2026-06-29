@@ -16,7 +16,7 @@
    </font>
   </property>
   <property name="windowTitle">
-   <string>OpenMeta[analyst]</string>
+   <string>OpenMetaAnalyst</string>
   </property>
   <property name="windowIcon">
    <iconset resource="../images/icons.qrc">
@@ -367,18 +367,12 @@
                 <item row="1" column="1">
                  <widget class="QLabel" name="cur_time_lbl">
                   <property name="sizePolicy">
-                   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                   <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
                     <horstretch>0</horstretch>
                     <verstretch>0</verstretch>
                    </sizepolicy>
                   </property>
                   <property name="minimumSize">
-                   <size>
-                    <width>80</width>
-                    <height>25</height>
-                   </size>
-                  </property>
-                  <property name="maximumSize">
                    <size>
                     <width>80</width>
                     <height>25</height>
@@ -397,18 +391,12 @@
                 <item row="0" column="1">
                  <widget class="QLabel" name="cur_outcome_lbl">
                   <property name="sizePolicy">
-                   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                   <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
                     <horstretch>0</horstretch>
                     <verstretch>0</verstretch>
                    </sizepolicy>
                   </property>
                   <property name="minimumSize">
-                   <size>
-                    <width>80</width>
-                    <height>25</height>
-                   </size>
-                  </property>
-                  <property name="maximumSize">
                    <size>
                     <width>80</width>
                     <height>25</height>
@@ -481,7 +469,7 @@
     </property>
     <widget class="QMenu" name="action_open_recent_2">
      <property name="title">
-      <string>open recent...</string>
+      <string>open recent</string>
      </property>
     </widget>
     <addaction name="action_save"/>
@@ -588,7 +576,7 @@
      <normaloff>:/function_icon_set/function_icon_set/folder_48.png</normaloff>:/function_icon_set/function_icon_set/folder_48.png</iconset>
    </property>
    <property name="text">
-    <string>open...</string>
+    <string>open</string>
    </property>
   </action>
   <action name="action_quit">
@@ -606,22 +594,22 @@
      <normaloff>:/misc/meta_analysis.png</normaloff>:/misc/meta_analysis.png</iconset>
    </property>
    <property name="text">
-    <string>meta-analysis...</string>
+    <string>meta-analysis</string>
    </property>
   </action>
   <action name="action_edit">
    <property name="text">
-    <string>edit...</string>
+    <string>edit</string>
    </property>
   </action>
   <action name="action_view_network">
    <property name="text">
-    <string>view network...</string>
+    <string>view network</string>
    </property>
   </action>
   <action name="action_add_covariate">
    <property name="text">
-    <string>add covariate...</string>
+    <string>add covariate</string>
    </property>
   </action>
   <action name="action_cum_ma">
@@ -630,7 +618,7 @@
      <normaloff>:/misc/cum_meta_analysis.png</normaloff>:/misc/cum_meta_analysis.png</iconset>
    </property>
    <property name="text">
-    <string>cumulative meta-analysis...</string>
+    <string>cumulative meta-analysis</string>
    </property>
   </action>
   <action name="action_loo_ma">
@@ -639,7 +627,7 @@
      <normaloff>:/misc/leave_one_out.png</normaloff>:/misc/leave_one_out.png</iconset>
    </property>
    <property name="text">
-    <string>leave-one-out meta-analysis...</string>
+    <string>leave-one-out meta-analysis</string>
    </property>
   </action>
   <action name="actionOR">
@@ -664,7 +652,7 @@
   </action>
   <action name="actionNew_dataset">
    <property name="text">
-    <string>new dataset...</string>
+    <string>new dataset</string>
    </property>
   </action>
   <action name="action_new_dataset">
@@ -673,7 +661,7 @@
      <normaloff>:/function_icon_set/function_icon_set/add_48.png</normaloff>:/function_icon_set/function_icon_set/add_48.png</iconset>
    </property>
    <property name="text">
-    <string>new dataset...</string>
+    <string>new dataset</string>
    </property>
   </action>
   <action name="action_meta_regression">
@@ -691,7 +679,10 @@
      <normaloff>:/toolbar-icons/toolbar-icons/back.png</normaloff>:/toolbar-icons/toolbar-icons/back.png</iconset>
    </property>
    <property name="text">
-    <string>undo (ctrl + z)</string>
+    <string>undo</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Z</string>
    </property>
   </action>
   <action name="action_redo">
@@ -700,7 +691,10 @@
      <normaloff>:/toolbar-icons/toolbar-icons/forward.png</normaloff>:/toolbar-icons/toolbar-icons/forward.png</iconset>
    </property>
    <property name="text">
-    <string>redo (ctrl + y)</string>
+    <string>redo</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Y</string>
    </property>
   </action>
   <action name="action_copy">
@@ -709,7 +703,10 @@
      <normaloff>:/misc/copy.png</normaloff>:/misc/copy.png</iconset>
    </property>
    <property name="text">
-    <string>copy (ctrl + c)</string>
+    <string>copy</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+C</string>
    </property>
   </action>
   <action name="action_paste">
@@ -718,7 +715,10 @@
      <normaloff>:/toolbar-icons/toolbar-icons/paste.png</normaloff>:/toolbar-icons/toolbar-icons/paste.png</iconset>
    </property>
    <property name="text">
-    <string>paste (ctrl + v)</string>
+    <string>paste</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+V</string>
    </property>
   </action>
   <action name="action_subgroup_ma">
@@ -732,7 +732,7 @@
   </action>
   <action name="action_save_as">
    <property name="text">
-    <string>save as...</string>
+    <string>save as</string>
    </property>
   </action>
   <action name="action_open_help">

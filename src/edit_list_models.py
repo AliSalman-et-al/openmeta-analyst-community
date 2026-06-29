@@ -11,17 +11,33 @@
 #import pdb
 
 # core libraries
-#from PyQt4.QtCore import *
-from PyQt4.QtCore import QAbstractTableModel, QModelIndex, QString, Qt, QVariant
+from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt
 
-class TXGroupsModel(QAbstractTableModel):
+
+def _to_native_text(value):
+    if hasattr(value, "toString"):
+        value = value.toString()
+    if hasattr(value, "toUtf8"):
+        return str(value.toUtf8(), "utf-8")
+    if isinstance(value, bytes):
+        return str(value, "utf-8")
+    return "" if value is None else str(value)
+
+
+class ResettableTableModel(QAbstractTableModel):
+    def reset(self):
+        self.beginResetModel()
+        self.endResetModel()
+
+
+class TXGroupsModel(ResettableTableModel):
     '''
     This module mediates between the classes comprising a dataset
     (i.e., study & ma_unit objects) and the view. In particular, we
     subclass the QAbstractTableModel and provide the fields of interest
     to the view.
     '''
-    def __init__(self, filename=QString(), dataset=None, outcome=None, follow_up=None):
+    def __init__(self, filename="", dataset=None, outcome=None, follow_up=None):
         super(TXGroupsModel, self).__init__()
         self.dataset = dataset
         self.current_outcome = outcome
@@ -30,18 +46,18 @@ class TXGroupsModel(QAbstractTableModel):
         
     def refresh_group_list(self, outcome, follow_up):
         self.group_list = self.dataset.get_group_names_for_outcome_fu(outcome, follow_up)
-        print "\ngroup names are: %s" % self.group_list
+        print("\ngroup names are: %s" % self.group_list)
         self.reset()
         
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid() or not (0 <= index.row() < len(self.group_list)):
-            return QVariant()
+            return None
         group_name = self.group_list[index.row()]
         if role == Qt.DisplayRole:
-            return QVariant(group_name)
+            return group_name
         elif role == Qt.TextAlignmentRole:
-            return QVariant(int(Qt.AlignLeft|Qt.AlignVCenter))
-        return QVariant()
+            return int(Qt.AlignLeft|Qt.AlignVCenter)
+        return None
     
     def rowCount(self, index=QModelIndex()):
         return len(self.group_list)
@@ -51,7 +67,7 @@ class TXGroupsModel(QAbstractTableModel):
         
     def setData(self, index, value, role=Qt.EditRole):
         old_name = self.group_list[index.row()]
-        new_name = unicode(value.toString().toUtf8(), "utf-8")
+        new_name = _to_native_text(value)
 
         ###
         # we don't allow empty strings for group names; just pass
@@ -71,13 +87,13 @@ class TXGroupsModel(QAbstractTableModel):
                             Qt.ItemIsEditable)
 
         
-class OutcomesModel(QAbstractTableModel):
+class OutcomesModel(ResettableTableModel):
     '''
     A simple table model for editing/deleting/adding outcomes.
     Subclasses the QAbstractTableModel and provide the fields of interest
     to the view.
     '''
-    def __init__(self, filename=QString(), dataset=None):
+    def __init__(self, filename="", dataset=None):
         super(OutcomesModel, self).__init__()
         self.dataset = dataset
         self.current_outcome = None
@@ -91,17 +107,17 @@ class OutcomesModel(QAbstractTableModel):
     def data(self, index, role=Qt.DisplayRole):
         self.outcome_list = self.dataset.get_outcome_names()
         if not index.isValid() or not (0 <= index.row()):
-            return QVariant()
+            return None
         outcome_name = ""
         try:
             outcome_name = self.outcome_list[index.row()]
         except:
             pass
         if role == Qt.DisplayRole:
-            return QVariant(outcome_name)
+            return outcome_name
         elif role == Qt.TextAlignmentRole:
-            return QVariant(int(Qt.AlignLeft|Qt.AlignVCenter))
-        return QVariant()
+            return int(Qt.AlignLeft|Qt.AlignVCenter)
+        return None
     
     def rowCount(self, index=QModelIndex()):
         return len(self.outcome_list)
@@ -111,7 +127,7 @@ class OutcomesModel(QAbstractTableModel):
         
     def setData(self, index, value, role=Qt.EditRole):
         old_outcome_name = self.outcome_list[index.row()]
-        new_outcome_name = unicode(value.toString().toUtf8(), "utf-8")
+        new_outcome_name = _to_native_text(value)
         if new_outcome_name == "":
             return False
             
@@ -127,13 +143,13 @@ class OutcomesModel(QAbstractTableModel):
         return Qt.ItemFlags(QAbstractTableModel.flags(self, index)|
                             Qt.ItemIsEditable)
                             
-class FollowUpsModel(QAbstractTableModel):
+class FollowUpsModel(ResettableTableModel):
     '''
     A simple table model for editing/deleting/adding follow-ups.
     Subclasses the QAbstractTableModel and provide the fields of interest
     to the view.
     '''
-    def __init__(self, filename=QString(), dataset=None, outcome = None):
+    def __init__(self, filename="", dataset=None, outcome = None):
         super(FollowUpsModel, self).__init__()
         self.dataset = dataset
         ## we maintain a current outcome string variable because
@@ -147,7 +163,7 @@ class FollowUpsModel(QAbstractTableModel):
         
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid() or not (0 <= index.row()):
-            return QVariant()
+            return None
         follow_up_name = None
         try:
             follow_up_name = self.follow_up_list[index.row()] 
@@ -155,10 +171,10 @@ class FollowUpsModel(QAbstractTableModel):
             pass
             
         if role == Qt.DisplayRole:
-            return QVariant(follow_up_name)
+            return follow_up_name
         elif role == Qt.TextAlignmentRole:
-            return QVariant(int(Qt.AlignLeft|Qt.AlignVCenter))
-        return QVariant()
+            return int(Qt.AlignLeft|Qt.AlignVCenter)
+        return None
     
     def rowCount(self, index=QModelIndex()):
         return len(self.follow_up_list)
@@ -168,7 +184,7 @@ class FollowUpsModel(QAbstractTableModel):
         
     def setData(self, index, value, role=Qt.EditRole):
         old_follow_up_name = self.follow_up_list[index.row()]
-        new_follow_up_name = unicode(value.toString().toUtf8(), "utf-8")
+        new_follow_up_name = _to_native_text(value)
         self.dataset.change_follow_up_name(self.current_outcome, old_follow_up_name, new_follow_up_name)
         self.refresh_follow_up_list()
         return True
@@ -180,11 +196,11 @@ class FollowUpsModel(QAbstractTableModel):
         return Qt.ItemFlags(QAbstractTableModel.flags(self, index)|
                             Qt.ItemIsEditable)
                             
-class StudiesModel(QAbstractTableModel):
+class StudiesModel(ResettableTableModel):
     '''
     Table model implementation for studies list.
     '''
-    def __init__(self, filename=QString(), dataset=None):
+    def __init__(self, filename="", dataset=None):
         super(StudiesModel, self).__init__()
         self.dataset = dataset
         self.update_study_list()
@@ -195,13 +211,13 @@ class StudiesModel(QAbstractTableModel):
         
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid() or not (0 <= index.row() < len(self.studies_list)):
-            return QVariant()
+            return None
         study_name = self.studies_list[index.row()].name
         if role == Qt.DisplayRole:
-            return QVariant(study_name)
+            return study_name
         elif role == Qt.TextAlignmentRole:
-            return QVariant(int(Qt.AlignLeft|Qt.AlignVCenter))
-        return QVariant()
+            return int(Qt.AlignLeft|Qt.AlignVCenter)
+        return None
     
     def rowCount(self, index=QModelIndex()):
         return len(self.studies_list)
@@ -211,7 +227,7 @@ class StudiesModel(QAbstractTableModel):
         
     def setData(self, index, value, role=Qt.EditRole):
         study_object = self.studies_list[index.row()]
-        new_name = unicode(value.toString().toUtf8(), "utf-8")
+        new_name = _to_native_text(value)
 
         ###
         # we don't allow empty strings for group names; just pass
@@ -229,11 +245,11 @@ class StudiesModel(QAbstractTableModel):
         return Qt.ItemFlags(QAbstractTableModel.flags(self, index)|
                             Qt.ItemIsEditable)
                             
-class CovariatesModel(QAbstractTableModel):
+class CovariatesModel(ResettableTableModel):
     '''
     Table model implementation for covariates.
     '''
-    def __init__(self, filename=QString(), dataset=None):
+    def __init__(self, filename="", dataset=None):
         super(CovariatesModel, self).__init__()
         self.dataset = dataset
         self.update_covariates_list()
@@ -244,13 +260,13 @@ class CovariatesModel(QAbstractTableModel):
         
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid() or not (0 <= index.row() < len(self.covariates_list)):
-            return QVariant()
+            return None
         cov_name = self.covariates_list[index.row()].name
         if role == Qt.DisplayRole:
-            return QVariant(cov_name)
+            return cov_name
         elif role == Qt.TextAlignmentRole:
-            return QVariant(int(Qt.AlignLeft|Qt.AlignVCenter))
-        return QVariant()
+            return int(Qt.AlignLeft|Qt.AlignVCenter)
+        return None
     
     def rowCount(self, index=QModelIndex()):
         return len(self.covariates_list)
@@ -260,7 +276,7 @@ class CovariatesModel(QAbstractTableModel):
         
     def setData(self, index, value, role=Qt.EditRole):
         cov_object = self.covariates_list[index.row()]
-        new_name = unicode(value.toString().toUtf8(), "utf-8")
+        new_name = _to_native_text(value)
 
         ###
         # we don't allow empty strings for group names; just pass

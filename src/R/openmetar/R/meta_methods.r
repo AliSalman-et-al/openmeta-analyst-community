@@ -15,7 +15,7 @@
 #  is implemented.                                               #
 ##################################################################
 
-cum_meta_analysis_ref = 'Cumulative Meta-Analysis: Lau, Joseph, et al. "Cumulative meta-analysis of therapeutic trials for myocardial infarction." New England Journal of Medicine 327.4 (1992): 248-254.)'
+cum_meta_analysis_ref = 'Cumulative Meta-Analysis: Lau, Joseph, et al. "Cumulative meta-analysis of therapeutic trials for myocardial infarction." New England Journal of Medicine 327.4 (1992): 248-254.'
 subgroup_ma_ref = "Subgroup Meta-Analysis: subgroup ma reference placeholder"
 loo_ma_ref = "Leave-one-out Meta-Analysis: LOO ma reference placeholder"
 
@@ -75,9 +75,9 @@ cum.ma.binary <- function(fname, binary.data, params){
     }
     metric.name <- pretty.metric.name(as.character(params.tmp$measure))
 	model.title <- switch(fname,
-                          binary.fixed.inv.var=paste("Binary Fixed-effect Model - Inverse Variance\n\nMetric: ", metric.name, sep=""),
-                          binary.fixed.mh=paste("Binary Fixed-effect Model - Mantel Haenszel\n\nMetric: ", metric.name, sep=""),
-                          binary.fixed.peto=paste("Binary Fixed-effect Model - Peto\n\nMetric: ", metric.name, sep=""),
+                          binary.fixed.inv.var=paste("Binary Fixed-Effect Model - Inverse Variance\n\nMetric: ", metric.name, sep=""),
+                          binary.fixed.mh=paste("Binary Fixed-Effect Model - Mantel Haenszel\n\nMetric: ", metric.name, sep=""),
+                          binary.fixed.peto=paste("Binary Fixed-Effect Model - Peto\n\nMetric: ", metric.name, sep=""),
                           binary.random=paste("Binary Random-Effects Model\n\nMetric: ", metric.name, sep=""))
 	value.info <- switch(fname,
                          binary.fixed.inv.var = cumul.rma.uni.value.info(),
@@ -99,7 +99,7 @@ cum.ma.binary <- function(fname, binary.data, params){
     params.changed.in.forest.plot <- two.forest.plots(two.plot.data, outpath=forest.path)
     changed.params <- c(changed.params, params.changed.in.forest.plot)
     # Update params changed in two.forest.plots
-    params[names(changed.params)] <- changed.params
+    params <- update.changed.plot.params(params, changed.params)
     # we use the system time as our unique-enough string to store
     # the params object
     forest.plot.params.path <- save.data(binary.data, res, params, two.plot.data)
@@ -559,9 +559,9 @@ loo.ma.binary <- function(fname, binary.data, params){
     study.names <- c("Overall", paste("- ",binary.data@study.names, sep=""))
     metric.name <- pretty.metric.name(as.character(params$measure))
 	model.title <- switch(fname,
-			binary.fixed.inv.var = paste("Binary Fixed-effect Model - Inverse Variance\n\nMetric: ", metric.name, sep=""),
-			binary.fixed.mh = paste("Binary Fixed-effect Model - Mantel Haenszel\n\nMetric: ", metric.name, sep=""),
-			binary.fixed.peto = paste("Binary Fixed-effect Model - Peto\n\nMetric: ", metric.name, sep=""),
+			binary.fixed.inv.var = paste("Binary Fixed-Effect Model - Inverse Variance\n\nMetric: ", metric.name, sep=""),
+			binary.fixed.mh = paste("Binary Fixed-Effect Model - Mantel Haenszel\n\nMetric: ", metric.name, sep=""),
+			binary.fixed.peto = paste("Binary Fixed-Effect Model - Peto\n\nMetric: ", metric.name, sep=""),
 			binary.random = paste("Binary Random-Effects Model\n\nMetric: ", metric.name, sep=""))
 	value.info <- switch(fname,
 			binary.fixed.inv.var = loo.rma.uni.value.info(),
@@ -575,7 +575,7 @@ loo.ma.binary <- function(fname, binary.data, params){
     # list of changed params values
     params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
     changed.params <- c(changed.params, params.changed.in.forest.plot)
-    params[names(changed.params)] <- changed.params
+    params <- update.changed.plot.params(params, changed.params)
     # update params values
     # we use the system time as our unique-enough string to store
     # the params object
@@ -675,7 +675,7 @@ cum.ma.continuous <- function(fname, cont.data, params){
     
     metric.name <- pretty.metric.name(as.character(params$measure))
 	model.title <- switch(fname,
-                          continuous.fixed  = paste("Continuous Fixed-effect Model - Inverse Variance\n\nMetric: ", metric.name, sep=""),
+                          continuous.fixed  = paste("Continuous Fixed-Effect Model - Inverse Variance\n\nMetric: ", metric.name, sep=""),
 						  continuous.random = paste("Continuous Random-Effects Model\n\nMetric: ", metric.name, sep=""))
     value.info <- switch(fname,
 						 continuous.fixed  = cumul.rma.uni.value.info(), 
@@ -695,7 +695,7 @@ cum.ma.continuous <- function(fname, cont.data, params){
     params.changed.in.forest.plot <- two.forest.plots(two.plot.data, outpath=forest.path)
     changed.params <- c(changed.params, params.changed.in.forest.plot)
     # Update params changed in two.forest.plots
-    params[names(changed.params)] <- changed.params
+    params <- update.changed.plot.params(params, changed.params)
     # we use the system time as our unique-enough string to store
     # the params object
     forest.plot.params.path <- save.data(cont.data, res=cum.results, params, two.plot.data)
@@ -804,7 +804,7 @@ cum.ma.diagnostic <- function(fname, diagnostic.data, params){
 	params.changed.in.forest.plot <- two.forest.plots(two.plot.data, outpath=forest.path)
 	changed.params <- c(changed.params, params.changed.in.forest.plot)
 	# Update params changed in two.forest.plots
-	params[names(changed.params)] <- changed.params
+	params <- update.changed.plot.params(params, changed.params)
 	# we use the system time as our unique-enough string to store
 	# the params object
 	forest.plot.params.path <- save.data(diagnostic.data, res, params, two.plot.data)
@@ -949,7 +949,7 @@ loo.ma.continuous <- function(fname, cont.data, params){
     params$data.type <- "continuous"
     metric.name <- pretty.metric.name(as.character(params$measure))
 	model.title <- switch(fname,
-			continuous.fixed=paste("Continuous Fixed-effect Model - Inverse Variance\n\nMetric: ", metric.name, sep=""),
+			continuous.fixed=paste("Continuous Fixed-Effect Model - Inverse Variance\n\nMetric: ", metric.name, sep=""),
 			continuous.random=paste("Continuous Random-Effects Model\n\nMetric: ", metric.name, sep=""))
 	value.info <- switch(fname,
 			continuous.fixed  = loo.rma.uni.value.info(), 
@@ -961,7 +961,7 @@ loo.ma.continuous <- function(fname, cont.data, params){
     # list of changed params values
     params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
     changed.params <- c(changed.params, params.changed.in.forest.plot)
-    params[names(changed.params)] <- changed.params
+    params <- update.changed.plot.params(params, changed.params)
     # update params values
      # we use the system time as our unique-enough string to store
     # the params object
@@ -1035,9 +1035,9 @@ subgroup.ma.binary <- function(fname, binary.data, params){
     subgroup.names <- c(subgroup.names, "Overall")
     metric.name <- pretty.metric.name(as.character(params$measure))
 	model.title <- switch(fname,
-		binary.fixed.inv.var = paste("Binary Fixed-effect Model - Inverse Variance\n\nMetric: ", metric.name, sep=""),
-		binary.fixed.mh = paste("Binary Fixed-effect Model - Mantel Haenszel\n\nMetric: ", metric.name, sep=""),
-		binary.fixed.peto = paste("Binary Fixed-effect Model - Peto\n\nMetric: ", metric.name, sep=""),
+		binary.fixed.inv.var = paste("Binary Fixed-Effect Model - Inverse Variance\n\nMetric: ", metric.name, sep=""),
+		binary.fixed.mh = paste("Binary Fixed-Effect Model - Mantel Haenszel\n\nMetric: ", metric.name, sep=""),
+		binary.fixed.peto = paste("Binary Fixed-Effect Model - Peto\n\nMetric: ", metric.name, sep=""),
 		binary.random = paste("Binary Random-Effects Model\n\nMetric: ", metric.name, sep=""))
 	value.info <- switch(fname,
 		binary.fixed.inv.var = binary.fixed.inv.var.value.info(),
@@ -1054,7 +1054,7 @@ subgroup.ma.binary <- function(fname, binary.data, params){
     # list of changed params values
     params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
     changed.params <- c(changed.params, params.changed.in.forest.plot)
-    params[names(changed.params)] <- changed.params
+    params <- update.changed.plot.params(params, changed.params)
     # update params values
     # we use the system time as our unique-enough string to store
     # the params object
@@ -1138,7 +1138,7 @@ subgroup.ma.continuous <- function(fname, cont.data, params){
     subgroup.names <- c(subgroup.names, "Overall")
     metric.name <- pretty.metric.name(as.character(params$measure))
     model.title <- switch(fname,
-						  continuous.fixed = paste("Continuous Fixed-effect Model - Inverse Variance\n\nMetric: ", metric.name, sep=""),
+						  continuous.fixed = paste("Continuous Fixed-Effect Model - Inverse Variance\n\nMetric: ", metric.name, sep=""),
 						  continuous.random = paste("Continuous Random-Effects Model\n\nMetric: ", metric.name, sep=""))
     value.info <- switch(fname,
 						 continuous.fixed  = continuous.fixed.value.info(),
@@ -1153,7 +1153,7 @@ subgroup.ma.continuous <- function(fname, cont.data, params){
     # list of changed params values
     params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
     changed.params <- c(changed.params, params.changed.in.forest.plot)
-    params[names(changed.params)] <- changed.params
+    params <- update.changed.plot.params(params, changed.params)
     # update params values
     # we use the system time as our unique-enough string to store
     # the params object
@@ -1523,7 +1523,7 @@ loo.ma.diagnostic <- function(fname, diagnostic.data, params){
     study.names <- c("Overall", paste("- ", diagnostic.data@study.names, sep=""))
     metric.name <- pretty.metric.name(as.character(params$measure))
 	model.title <- switch(fname,
-			diagnostic.fixed = paste("Diagnostic Fixed-effect Model - Inverse Variance\n\nMetric: ", metric.name, sep=""),
+			diagnostic.fixed = paste("Diagnostic Fixed-Effect Model - Inverse Variance\n\nMetric: ", metric.name, sep=""),
 			diagnostic.random = paste("Diagnostic Random-Effects Model\n\nMetric: ", metric.name, sep=""))
     loo.disp <- create.overall.display(res=loo.results, study.names, params, model.title, data.type="diagnostic")
         
@@ -1534,7 +1534,7 @@ loo.ma.diagnostic <- function(fname, diagnostic.data, params){
         # list of changed params values
         params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
         changed.params <- c(changed.params, params.changed.in.forest.plot)
-        params[names(changed.params)] <- changed.params
+        params <- update.changed.plot.params(params, changed.params)
         # update params values
         # we use the system time as our unique-enough string to store
         # the params object
@@ -1814,7 +1814,7 @@ subgroup.ma.diagnostic <- function(fname, diagnostic.data, params, selected.cov)
     
     metric.name <- pretty.metric.name(params.tmp$measure)
     model.title <- switch(fname,
-                          diagnostic.fixed = paste("Diagnostic Fixed-effect Model - Inverse Variance\n\nMetric: ", metric.name, sep=""),
+                          diagnostic.fixed = paste("Diagnostic Fixed-Effect Model - Inverse Variance\n\nMetric: ", metric.name, sep=""),
                           diagnostic.random = paste("Diagnostic Random-Effects Model\n\nMetric: ", metric.name, sep=""))
     subgroup.disp <- create.subgroup.display(subgroup.results, subgroup.names, params, model.title, data.type="diagnostic")
     forest.path <- paste(params$fp_outpath, sep="")
@@ -1827,7 +1827,7 @@ subgroup.ma.diagnostic <- function(fname, diagnostic.data, params, selected.cov)
         # list of changed params values
         params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
         changed.params <- c(changed.params, params.changed.in.forest.plot)
-        params[names(changed.params)] <- changed.params
+        params <- update.changed.plot.params(params, changed.params)
         # update params values
         # we use the system time as our unique-enough string to store
         # the params object

@@ -1,4 +1,4 @@
-from PyQt4.Qt import *
+from PyQt5.QtWidgets import QDialog
 import forms.ui_edit_group_name
 
 class EditGroupName(QDialog, forms.ui_edit_group_name.Ui_group_name_dialog):

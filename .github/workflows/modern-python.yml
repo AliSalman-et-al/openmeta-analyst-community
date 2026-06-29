@@ -1,0 +1,142 @@
+name: Modern Python
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      build_windows:
+        description: Build the modern Windows artifact.
+        required: true
+        default: true
+        type: boolean
+      build_macos:
+        description: Build opt-in modern macOS artifacts.
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: modern-python-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-modern:
+    name: Windows modern package
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_windows }}
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: powershell
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: "3.11"
+          enable-cache: true
+
+      - name: Set up R for bundled runtime
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+
+      - name: Cache bundled R package library
+        uses: actions/cache@v4
+        with:
+          path: artifacts\r-library-cache
+          key: modern-r-library-windows-${{ hashFiles('scripts/install-modern-r-deps.R', 'scripts/build-modern-windows-binary.ps1', 'src/R/HSROC/DESCRIPTION', 'src/R/openmetar/DESCRIPTION') }}
+          restore-keys: |
+            modern-r-library-windows-
+
+      - name: Install modern CI dependencies
+        run: uv sync --locked
+
+      - name: Validate Comprehensive Golden Baseline manifests
+        run: uv run python scripts/validate_golden_baseline_manifests.py
+
+      - name: Run modern full-app automation tests
+        run: uv run pytest tests/modern/test_metaform_automation_launch.py
+
+      - name: Run remaining modern pytest tests
+        run: uv run pytest tests/modern --ignore=tests/modern/test_metaform_automation_launch.py
+
+      - name: Build modern Windows binary
+        run: .\scripts\build-modern-windows-binary.ps1 -ArtifactName OpenMetaAnalyst-modern-windows-x64 -PythonExe .\.venv\Scripts\python.exe -SkipDependencyInstall
+
+      - name: Upload modern Windows binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenMetaAnalyst-modern-windows-x64
+          path: artifacts\OpenMetaAnalyst-modern-windows-x64.zip
+          if-no-files-found: error
+          compression-level: 0
+
+  macos-modern:
+    name: macOS modern package (${{ matrix.name }})
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_macos }}
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Intel
+            runner: macos-15-intel
+            arch: x64
+            artifact: OpenMetaAnalyst-modern-macos-x64
+            experimental: false
+          - name: Apple Silicon
+            runner: macos-14
+            arch: arm64
+            artifact: OpenMetaAnalyst-modern-macos-arm64
+            experimental: true
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: "3.11"
+          enable-cache: true
+
+      - name: Set up R for bundled runtime
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+
+      - name: Cache bundled R package library
+        uses: actions/cache@v4
+        with:
+          path: artifacts/r-library-cache
+          key: modern-r-library-macos-${{ matrix.arch }}-${{ hashFiles('scripts/install-modern-r-deps.R', 'scripts/build-modern-macos-binary.sh', 'src/R/HSROC/DESCRIPTION', 'src/R/openmetar/DESCRIPTION') }}
+          restore-keys: |
+            modern-r-library-macos-${{ matrix.arch }}-
+
+      - name: Install modern CI dependencies
+        run: uv sync --locked
+
+      - name: Run focused macOS packaging tests
+        run: uv run pytest tests/modern/test_pyqt5_ci_path.py tests/modern/test_pyqt5_generated_ui_imports.py tests/modern/test_project_pickle_loader.py
+
+      - name: Build modern macOS binary
+        run: bash scripts/build-modern-macos-binary.sh --architecture "${{ matrix.arch }}" --artifact-name "${{ matrix.artifact }}" --python-exe .venv/bin/python --skip-dependency-install
+
+      - name: Upload modern macOS binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: artifacts/${{ matrix.artifact }}.zip
+          if-no-files-found: error
+          compression-level: 0

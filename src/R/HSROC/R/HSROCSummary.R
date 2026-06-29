@@ -1977,7 +1977,7 @@ function (data, burn_in = 0, iter.keep = NULL, Thin = 1, sub_rs = NULL,
                 if (rs.length != 1) {
                   refstd_parameters = array(0, dim = c(rs.length, 
                     4, 1), dimnames = list(1:rs.length, c("True Value", 
-                    paste(point_estimate, "estimate"), "HPD lower", 
+                    paste(point_estimate, "estimate"), "HPD lower",
                     "HPD upper"), "C2"))
                   refstd_parameters[, 1, 1] <- true.C2
                   refstd_parameters[, 2, 1] <- C2.est
@@ -2054,8 +2054,8 @@ function (data, burn_in = 0, iter.keep = NULL, Thin = 1, sub_rs = NULL,
                   refstd_parameters = matrix(0, ncol = 4, nrow = 1)
                   rownames(refstd_parameters) = c("C2")
                   colnames(refstd_parameters) = c("True Value", 
-                    paste(point_estimate, "estimate"), "HPD.low", 
-                    "HPD.high")
+                    paste(point_estimate, "estimate"), "HPD lower",
+                    "HPD upper")
                   refstd_parameters[1, 1] <- true.C2
                   refstd_parameters[1, 2] <- C2.est
                   refstd_parameters[1, 3] <- C2.HPD[1]
@@ -2125,7 +2125,7 @@ function (data, burn_in = 0, iter.keep = NULL, Thin = 1, sub_rs = NULL,
                   if (rs.length != 1) {
                     refstd_parameters = array(0, dim = c(rs.length, 
                       4, 1), dimnames = list(1:rs.length, c("True Value", 
-                      paste(point_estimate, "estimate"), "HPD lower", 
+                      paste(point_estimate, "estimate"), "HPD lower",
                       "HPD upper"), "S2"))
                     refstd_parameters[, 1, 1] <- true.S2
                     refstd_parameters[, 2, 1] <- S2.est
@@ -2204,8 +2204,8 @@ function (data, burn_in = 0, iter.keep = NULL, Thin = 1, sub_rs = NULL,
                     refstd_parameters = matrix(0, ncol = 4, nrow = 1)
                     rownames(refstd_parameters) = c("S2")
                     colnames(refstd_parameters) = c("True Value", 
-                      paste(point_estimate, "estimate"), "HPD.low", 
-                      "HPD.high")
+                      paste(point_estimate, "estimate"), "HPD lower",
+                      "HPD upper")
                     refstd_parameters[1, 1] <- true.S2
                     refstd_parameters[1, 2] <- S2.est
                     refstd_parameters[1, 3] <- S2.HPD[1]
@@ -2274,7 +2274,7 @@ function (data, burn_in = 0, iter.keep = NULL, Thin = 1, sub_rs = NULL,
                   if (rs.length != 1) {
                     refstd_parameters = array(0, dim = c(rs.length, 
                       4, 2), dimnames = list(1:rs.length, c("True Value", 
-                      paste(point_estimate, "estimate"), "HPD lower", 
+                      paste(point_estimate, "estimate"), "HPD lower",
                       "HPD upper"), c("S2", "C2")))
                     refstd_parameters[, 1, 1] <- true.S2
                     refstd_parameters[, 2, 1] <- S2.est
@@ -2365,8 +2365,8 @@ function (data, burn_in = 0, iter.keep = NULL, Thin = 1, sub_rs = NULL,
                     refstd_parameters = matrix(0, ncol = 4, nrow = 2)
                     rownames(refstd_parameters) = c("S2", "C2")
                     colnames(refstd_parameters) = c("True Value", 
-                      paste(point_estimate, "estimate"), "HPD.low", 
-                      "HPD.high")
+                      paste(point_estimate, "estimate"), "HPD lower",
+                      "HPD upper")
                     refstd_parameters[1, 1] <- true.S2
                     refstd_parameters[1, 2] <- S2.est
                     refstd_parameters[1, 3] <- S2.HPD[1]
@@ -2454,7 +2454,7 @@ function (data, burn_in = 0, iter.keep = NULL, Thin = 1, sub_rs = NULL,
                 if (rs.length != 1) {
                   refstd_parameters = array(0, dim = c(rs.length, 
                     4, 4), dimnames = list(1:rs.length, c("True Value", 
-                    paste(point_estimate, "estimate"), "HPD lower", 
+                    paste(point_estimate, "estimate"), "HPD lower",
                     "HPD upper"), c("S2", "C2", "a1", "a0")))
                   refstd_parameters[, 1, 1] <- true.S2
                   refstd_parameters[, 2, 1] <- S2.est
@@ -2534,8 +2534,8 @@ function (data, burn_in = 0, iter.keep = NULL, Thin = 1, sub_rs = NULL,
                   rownames(refstd_parameters) = c("S2", "C2", 
                     "a1", "a0")
                   colnames(refstd_parameters) = c("True Value", 
-                    paste(point_estimate, "estimate"), "HPD.low", 
-                    "HPD.high")
+                    paste(point_estimate, "estimate"), "HPD lower",
+                    "HPD upper")
                   refstd_parameters[1, 1] <- true.S2
                   refstd_parameters[1, 2] <- S2.est
                   refstd_parameters[1, 3] <- S2.HPD[1]
@@ -2645,7 +2645,7 @@ function (data, burn_in = 0, iter.keep = NULL, Thin = 1, sub_rs = NULL,
             "sigma.theta", "S Overall", "C Overall", "S1_new", 
             "C1_new")
         colnames(parameter) = c("True.value", paste(point_estimate, 
-            "estimate"), "HPD.low", "HPD.high")
+            "estimate"), "HPD lower", "HPD upper")
         parameter[1, 1] <- true.THETA
         parameter[1, 2] <- THETA.est
         parameter[1, 3] <- THETA.HPD[1]
@@ -3763,7 +3763,7 @@ function (data, burn_in = 0, iter.keep = NULL, Thin = 1, sub_rs = NULL,
                     refstd_parameters = matrix(0, ncol = 3, nrow = 1)
                     rownames(refstd_parameters) = c("C2")
                     colnames(refstd_parameters) = c(paste(point_estimate, 
-                      "estimate"), "HPD.low", "HPD.high")
+                      "estimate"), "HPD lower", "HPD upper")
                     refstd_parameters[1, 1] <- C2.est
                     refstd_parameters[1, 2] <- C2.HPD[1]
                     refstd_parameters[1, 3] <- C2.HPD[2]
@@ -3913,7 +3913,7 @@ function (data, burn_in = 0, iter.keep = NULL, Thin = 1, sub_rs = NULL,
                         nrow = 1)
                       rownames(refstd_parameters) = c("S2")
                       colnames(refstd_parameters) = c(paste(point_estimate, 
-                        "estimate"), "HPD.low", "HPD.high")
+                        "estimate"), "HPD lower", "HPD upper")
                       refstd_parameters[1, 1] <- S2.est
                       refstd_parameters[1, 2] <- S2.HPD[1]
                       refstd_parameters[1, 3] <- S2.HPD[2]
@@ -4072,7 +4072,7 @@ function (data, burn_in = 0, iter.keep = NULL, Thin = 1, sub_rs = NULL,
                         nrow = 2)
                       rownames(refstd_parameters) = c("S2", "C2")
                       colnames(refstd_parameters) = c(paste(point_estimate, 
-                        "estimate"), "HPD.low", "HPD.high")
+                        "estimate"), "HPD lower", "HPD upper")
                       refstd_parameters[1, 1] <- S2.est
                       refstd_parameters[1, 2] <- S2.HPD[1]
                       refstd_parameters[1, 3] <- S2.HPD[2]
@@ -4232,7 +4232,7 @@ function (data, burn_in = 0, iter.keep = NULL, Thin = 1, sub_rs = NULL,
                     rownames(refstd_parameters) = c("S2", "C2", 
                       "a1", "a0")
                     colnames(refstd_parameters) = c(paste(point_estimate, 
-                      "estimate"), "HPD.low", "HPD.high")
+                      "estimate"), "HPD lower", "HPD upper")
                     refstd_parameters[1, 1] <- S2.est
                     refstd_parameters[1, 2] <- S2.HPD[1]
                     refstd_parameters[1, 3] <- S2.HPD[2]
@@ -4299,7 +4299,7 @@ function (data, burn_in = 0, iter.keep = NULL, Thin = 1, sub_rs = NULL,
                 }
             }
             parameters = array(0, dim = c(N, 3, 5), dimnames = list(Num_study, 
-                c(paste(point_estimate, "estimate"), "HPD lower", 
+                c(paste(point_estimate, "estimate"), "HPD lower",
                   "HPD upper"), c("theta", "alpha", "pi", "S1", 
                   "C1")))
             parameters[, 1, 1] <- theta.est
@@ -4329,7 +4329,7 @@ function (data, burn_in = 0, iter.keep = NULL, Thin = 1, sub_rs = NULL,
                 "sigma.alpha", "sigma.theta", "Sensitivity (summary)", "Specificity (summary)", 
                 "Sensitivity (new)", "Specificity (new)")
             colnames(parameter) = c(paste(point_estimate, "estimate"), 
-                "HPD.low", "HPD.high")
+                "HPD lower", "HPD upper")
             parameter[1, 1] <- THETA.est
             parameter[1, 2] <- THETA.HPD[1]
             parameter[1, 3] <- THETA.HPD[2]

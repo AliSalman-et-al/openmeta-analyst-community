@@ -6,13 +6,16 @@ OpenMeta[Analyst] is an open-source application for conducting meta-analyses fro
 
 ## Running From Source
 
-To run OpenMeta[Analyst] Community from source, install the R and Python dependencies, build the bundled R packages, and then launch the Python GUI.
+The maintained application path uses Python 3.11, PyQt5, and the uv-managed environment committed in `pyproject.toml` and `uv.lock`.
 
-Binary builds for the original project were historically distributed from:
-
-<http://www.cebm.brown.edu/openmeta>
+```powershell
+uv sync --locked
+uv run python src\launch.py
+```
 
 ## R Dependencies
+
+Normal desktop users do not need to manually install R or R packages before running the Windows distributable. Developer source runs need an R installation with the packages used by the analysis backend.
 
 Install the required R packages:
 
@@ -32,99 +35,51 @@ R CMD INSTALL HSROC_2.0.5.tar.gz
 R CMD INSTALL openmetar_1.0.tar.gz
 ```
 
-This branch uses R 3.x. The legacy Windows build currently targets R 3.3.2 in CI.
-
-## Python Dependencies
-
-Install Python 2.7 and the required libraries:
-
-- PyQt4
-- Qt
-- rpy2
-
-The original project used PyQt 4.10. The community build environment currently uses PyQt 4.11.4 and rpy2 2.8.5.
-
-Verify `rpy2` from a Python console:
-
-```python
-import rpy2
-from rpy2 import robjects
-```
-
-Launch the GUI:
-
-```sh
-python src/launch.py
-```
-
 ## Tests
 
-The legacy nose tests are run from the `src` directory:
+Run the modern full-app automation test first when checking GUI launch behavior:
 
-```sh
-cd src
-nosetests -v test_meta_analysis.py
+```powershell
+uv run pytest tests\modern\test_metaform_automation_launch.py
 ```
 
-Some tests load optional network meta-analysis dependencies such as `gemtc`, which are not part of the default desktop binary build.
+Run the remaining modern pytest suite with the automation test excluded:
+
+```powershell
+uv run pytest tests\modern --ignore=tests\modern\test_metaform_automation_launch.py
+```
 
 ## Windows Binary Builds
 
-The repository includes a GitHub Actions workflow for building a Windows x64 binary artifact:
+The maintained Windows build path is the modern Python 3/PyQt5 workflow:
 
 ```text
-.github/workflows/windows-binary.yml
+.github/workflows/modern-python.yml
 ```
 
-The workflow creates a legacy conda environment, compiles the bundled R packages, packages the PyQt4 application with PyInstaller, bundles the R runtime and sample data, and uploads `OpenMetaAnalyst-windows-x64.zip` as a workflow artifact.
+It packages `src/launch.py` through PyInstaller so the artifact starts the real `MetaForm` application path. The ZIP includes the PyQt5 runtime, bundled R package sources, sample data, bundled help, and a launcher script as `OpenMetaAnalyst-modern-windows-x64.zip`.
 
-The same steps can be run locally on Windows:
+Run the same modern workflow locally with `uv`:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install-r-deps.ps1 -EnvName openmeta-analyst-community
-powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-binary.ps1 -EnvName openmeta-analyst-community -ArtifactName OpenMetaAnalyst-windows-x64
+powershell -ExecutionPolicy Bypass -File .\scripts\run-modern-workflow-local.ps1 -ArtifactName OpenMetaAnalyst-modern-windows-x64
 ```
+
+The local script syncs the committed `uv.lock` into `.venv`, runs `tests\modern` through `uv run`, and builds the modern Windows artifact through PyInstaller.
 
 ## macOS Binary Builds
 
-macOS binary builds are currently disabled while Windows is the active build target. The workflow and local build script remain in the repository so macOS support can be resumed later.
-
-```text
-.github/workflows/macos-binary.yml
-```
-
-The disabled workflow creates a legacy conda environment on an Intel macOS runner, compiles the bundled R packages, packages the PyQt4 application with PyInstaller as `OpenMetaAnalyst.app`, bundles the conda R runtime and sample data, and uploads `OpenMetaAnalyst-macos-x64.zip` as a workflow artifact.
-
-The local macOS script is also disabled by default:
+macOS packaging is available as an explicit opt-in path for Intel and Apple Silicon runners:
 
 ```bash
-bash ./scripts/install-r-deps.sh openmeta-analyst-community
-ENABLE_MACOS_BINARY_BUILD=true \
-bash ./scripts/build-macos-binary.sh openmeta-analyst-community OpenMetaAnalyst-macos-x64
+bash ./scripts/run-modern-workflow-local.sh --target macos-intel
+bash ./scripts/run-modern-workflow-local.sh --target macos-arm64
 ```
 
-The current macOS release artifact is an Intel x64 build. Apple Silicon Macs
-must have Rosetta 2 installed to run it. If the app exits immediately after the
-Dock icon appears, check the launcher log:
+The GitHub workflow keeps Windows active by default on push and pull request. macOS package jobs run from `workflow_dispatch` when `build_macos` is enabled.
 
-```bash
-cat ~/Library/Logs/OpenMetaAnalyst/launcher.log
-```
+Apple Silicon packaging is present as an opt-in CI target. With the current single Qt runtime policy (`PyQt5-Qt5==5.15.2` everywhere), it is experimental because the common PyPI Qt wheel is Intel-only on macOS; the job is isolated from the default Windows build.
 
-You can also run the bundled executable from Terminal to see the same startup
-errors directly:
+## Release Scope
 
-```bash
-/Applications/OpenMetaAnalyst.app/Contents/MacOS/OpenMetaAnalyst
-```
-
-## Legacy Dependency Notes
-
-Important dependency versions:
-
-| Dependency | Version |
-| --- | --- |
-| R | 3.x |
-| Python | 2.7 |
-| metafor | 1.6.0-ish historically; CI installs archived `1.9-9` |
-| PyQt4 | 4.10-ish historically; CI uses 4.11.4 |
+Windows is the active packaged release target. macOS packages are available for build validation and release-candidate work.

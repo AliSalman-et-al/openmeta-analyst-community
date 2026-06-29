@@ -429,7 +429,7 @@ diagnostic.fixed.inv.var <- function(diagnostic.data, params){
             # list of changed params values
             params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
             changed.params <- c(changed.params, params.changed.in.forest.plot)
-            params[names(changed.params)] <- changed.params
+            params <- update.changed.plot.params(params, changed.params)
             # dump the forest plot params to disk; return path to
             # this .Rdata for later use
             forest.plot.params.path <- save.data(diagnostic.data, res, params, plot.data)
@@ -476,7 +476,7 @@ diagnostic.fixed.inv.var.pretty.names <- function() {
                          "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
                          "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
                          "to"=list("pretty.name"="Add correction factor to", "description"="When Add correction factor is set to \"only 0\", the correction factor
-                                   is added to all cells of each two-by-two table that contains at leason one zero. When set to \"all\", the correction factor
+                                   is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor
                                    is added to all two-by-two tables if at least one table contains a zero."),
                          "measure"=list("Sens"="Sensitivity", "Spec"="Specificity", "DOR"="Odds Ratio", "PLR"="Positive Likelihood Ratio",
                                         "NLR"="Negative Likelihood Ratio")           
@@ -560,7 +560,7 @@ diagnostic.fixed.mh <- function(diagnostic.data, params){
             # list of changed params values
             params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
             changed.params <- c(changed.params, params.changed.in.forest.plot)
-            params[names(changed.params)] <- changed.params
+            params <- update.changed.plot.params(params, changed.params)
             # dump the forest plot params to disk; return path to
             # this .Rdata for later use
             forest.plot.params.path <- save.data(diagnostic.data, res, params, plot.data)
@@ -607,7 +607,7 @@ diagnostic.fixed.mh.pretty.names <- function() {
                          "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
                          "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
                          "to"=list("pretty.name"="Add correction factor to", "description"="When Add correction factor is set to \"only 0\", the correction factor
-                                   is added to all cells of each two-by-two table that contains at leason one zero. When set to \"all\", the correction factor
+                                   is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor
                                    is added to all two-by-two tables if at least one table contains a zero."),
                           "measure"=list("Sens"="Sensitivity", "Spec"="Specificity", "DOR"="Odds Ratio", "PLR"="Positive Likelihood Ratio",
                                         "NLR"="Negative Likelihood Ratio")
@@ -695,7 +695,7 @@ diagnostic.fixed.peto <- function(diagnostic.data, params){
         # list of changed params values
         params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
         changed.params <- c(changed.params, params.changed.in.forest.plot)
-        params[names(changed.params)] <- changed.params
+        params <- update.changed.plot.params(params, changed.params)
         # dump the forest plot params to disk; return path to
         # this .Rdata for later use
         forest.plot.params.path <- save.data(diagnostic.data, res, params, plot.data)
@@ -745,7 +745,7 @@ diagnostic.fixed.peto.pretty.names <- function() {
                        "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
                        "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
                        "to"=list("pretty.name"="Add correction factor to", "description"="When Add correction factor is set to \"only 0\", the correction factor
-                                   is added to all cells of each two-by-two table that contains at leason one zero. When set to \"all\", the correction factor
+                                   is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor
                                    is added to all two-by-two tables if at least one table contains a zero.")
                          )
 }
@@ -816,7 +816,7 @@ diagnostic.random <- function(diagnostic.data, params){
             # list of changed params values
             params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
             changed.params <- c(changed.params, params.changed.in.forest.plot)
-            params[names(changed.params)] <- changed.params
+            params <- update.changed.plot.params(params, changed.params)
             # update params values
             # we use the system time as our unique-enough string to store
             # the params object
@@ -871,10 +871,10 @@ diagnostic.random.pretty.names <- function() {
                          "description" = "Performs random-effects meta-analysis.",
                          "rm.method"=list("pretty.name"="Random-Effects method", "description"="Method for estimating between-studies heterogeneity", "rm.method.names"=rm_method_names),                      
                          "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"), 
-                         "digits"=list("pretty.name"="Number of digits of precision to display", "description"="Number of digits to display in results"),
+                         "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
                          "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
-                         "to"=list("pretty.name"="Cells to which correction factor should be added", "description"="When Add correction factor is set to \"only 0\", the correction factor
-                                   is added to all cells of each two-by-two table that contains at leason one zero. When set to \"all\", the correction factor
+                         "to"=list("pretty.name"="Correction factor target", "description"="When Add correction factor is set to \"only 0\", the correction factor
+                                   is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor
                                    is added to all two-by-two tables if at least one table contains a zero."),
                          "measure"=list("Sens"="Sensitivity", "Spec"="Specificity", "DOR"="Odds Ratio", "PLR"="Positive Likelihood Ratio",
                                         "NLR"="Negative Likelihood Ratio")
@@ -889,12 +889,44 @@ diagnostic.random.overall <- function(results) {
     res <- results$Summary$MAResults
 }
 
+hsroc.retry.out.dir <- function(chain.out.dir) {
+    retry.out.dir <- paste(chain.out.dir, "_retry_1", sep="")
+    if (!dir.create(retry.out.dir, showWarnings=FALSE)) {
+        stop(paste("Could not create HSROC retry output directory:", retry.out.dir))
+    }
+    retry.out.dir
+}
+
+run.hsroc.with.recovery <- function(diag.data.frame, params, chain.out.dir) {
+    run.once <- function(path) {
+        try(HSROC(data=diag.data.frame, iter.num=params$num.iters,
+                prior_LAMBDA=c(params$lambda.lower, params$lambda.upper),
+                prior_THETA=c(params$theta.lower, params$theta.upper),
+                path=path), silent=TRUE)
+    }
+
+    res <- run.once(chain.out.dir)
+    if (!inherits(res, "try-error")) {
+        return(list("result"=res, "path"=chain.out.dir))
+    }
+
+    retry.out.dir <- hsroc.retry.out.dir(chain.out.dir)
+    setwd(retry.out.dir)
+    retry.res <- run.once(retry.out.dir)
+
+    if (inherits(retry.res, "try-error")) {
+        return(list("result"=retry.res, "path"=retry.out.dir))
+    }
+    list("result"=retry.res, "path"=retry.out.dir)
+}
+
 ##################################
 #       diagnostic hsroc         #
 ##################################
 diagnostic.hsroc <- function(diagnostic.data, params){
     library(HSROC)
     prev.working.dir <- getwd()
+    on.exit(setwd(prev.working.dir), add=TRUE)
 
     # step into r_tmp
     setwd("r_tmp")
@@ -920,17 +952,14 @@ diagnostic.hsroc <- function(diagnostic.data, params){
         dir.create(chain.out.dir)
         setwd(chain.out.dir)
 
-        # TODO parameterize lambda, theta priors
-        res <- try(HSROC(data=diag.data.frame, iter.num=params$num.iters, 
-                prior_LAMBDA=c(params$lambda.lower, params$lambda.upper), 
-                prior_THETA=c(params$theta.lower, params$theta.upper), 
-                path=chain.out.dir))
+        chain.res <- run.hsroc.with.recovery(diag.data.frame, params, chain.out.dir)
+        res <- chain.res$result
 
         # Put in try block in case HSROC fails
-        if (class(res)=="try-error") {
+        if (inherits(res, "try-error")) {
             stop("Sorry -- HSROC failed during sampling. Perhaps try running it again?")
         }
-        chain.out.dirs <- c(chain.out.dirs, chain.out.dir)
+        chain.out.dirs <- c(chain.out.dirs, chain.res$path)
     }
 
     hsroc.sum <- HSROCSummary(data=diag.data.frame , burn_in=params$burn.in, Thin=params$thin, print_plot=T ,
@@ -951,9 +980,6 @@ diagnostic.hsroc <- function(diagnostic.data, params){
     }
 
     images <- image.list
-
-    # reset the working directory
-    setwd(prev.working.dir)
 
     # we don't want the SROC plot to be mixed in with 
     # the density plots...
@@ -1031,16 +1057,17 @@ diagnostic.bivariate.ml <- function(diagnostic.data, params){
     correlation = biv.results[1,7]
 
     digits = 4
-    sensitivity <- round(inv.logit(logit_sens), digits)
+    digits.str <- paste("%.", digits, "f", sep="")
+    sensitivity <- sprintf(digits.str, inv.logit(logit_sens))
 	# Un-hard-coding CI.. issue # 214
-    sens.low <- round(inv.logit(logit_sens - mult*se_logit_sens), digits)
-    sens.high <- round(inv.logit(logit_sens + mult*se_logit_sens), digits)
+    sens.low <- sprintf(digits.str, inv.logit(logit_sens - mult*se_logit_sens))
+    sens.high <- sprintf(digits.str, inv.logit(logit_sens + mult*se_logit_sens))
 
-    specificity <- round(inv.logit(logit_spec), digits)
-    spec.low <- round(inv.logit(logit_spec - mult*se_logit_spec), digits)
-    spec.high <- round(inv.logit(logit_spec + mult*se_logit_spec), digits)
+    specificity <- sprintf(digits.str, inv.logit(logit_spec))
+    spec.low <- sprintf(digits.str, inv.logit(logit_spec - mult*se_logit_spec))
+    spec.high <- sprintf(digits.str, inv.logit(logit_spec + mult*se_logit_spec))
 
-    r <- round(biv.results$correlation, digits)
+    r <- sprintf(digits.str, biv.results$correlation)
 
     report.array <- array(c("", "Sensitivity","Specificity", "Correlation",
                             "Estimate", sensitivity, specificity, r,
@@ -1048,8 +1075,8 @@ diagnostic.bivariate.ml <- function(diagnostic.data, params){
                             "Upper bound", sens.high,spec.high, ""),
                             dim=c(4,4))
 
-    # this makes it pretty-print?
     class(report.array) <- "summary.data"
+    summary.text <- capture.output.and.collapse(report.array)
 
 
     # generate the plot
@@ -1062,7 +1089,7 @@ diagnostic.bivariate.ml <- function(diagnostic.data, params){
 
 	references <- "this is a placeholder for bivariate references"
     results <- list("images"=images,
-			        "Summary"=list("Bivariate Summary"=report.array),
+			        "Summary"=list("Bivariate Summary"=summary.text),
 					"References"=references)
 }
 
@@ -1087,7 +1114,7 @@ diagnostic.bivariate.ml.pretty.names <- function() {
 						 "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"), 
 						 "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
                          "to"=list("pretty.name"="Add correction factor to", "description"="When Add correction factor is set to \"only 0\", the correction factor
-                                   is added to all cells of each two-by-two table that contains at leason one zero. When set to \"all\", the correction factor
+                                   is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor
                                    is added to all two-by-two tables if at least one table contains a zero.")
                         )  
                     

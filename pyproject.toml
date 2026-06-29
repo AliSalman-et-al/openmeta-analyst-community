@@ -1,0 +1,16 @@
+[project]
+name = "openmeta-analyst-community-modern"
+version = "0.0.0"
+description = "Modern Python 3.11 and PyQt5 environment for OpenMeta[Analyst] Community."
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "PyQt5==5.15.11",
+    "PyQt5-Qt5==5.15.2",
+    "pyinstaller==6.21.0",
+    "pytest==9.1.1",
+    "rpy2==3.6.7",
+]
+
+[tool.uv]
+package = false

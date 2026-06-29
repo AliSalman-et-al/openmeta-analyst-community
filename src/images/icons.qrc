@@ -6,14 +6,14 @@
     <file>subgroup_ma.png</file>
     <file>cum_meta_analysis.png</file>
     <file>meta_analysis.png</file>
-    <file>splash.png</file>
+    <file alias="splash.png">OMA_community_splash.png</file>
     <file>calculator-34.png</file>
     <file>down_arrow.png</file>
     <file>left_arrow.png</file>
     <file>meta.bmp</file>
     <file>ci_icon.png</file>
-    <file>meta.ico</file>
-    <file>meta.png</file>
+    <file alias="meta.ico">OMA_community.ico</file>
+    <file alias="meta.png">OMA_community.png</file>
     <file>meta.svg</file>
     <file>ometa.png</file>
     <file>right_arrow.png</file>

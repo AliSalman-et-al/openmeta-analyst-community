@@ -1,4 +1,0 @@
-# clean the build directories
-rm -rf build
-
-python setup.py bdist_dmg

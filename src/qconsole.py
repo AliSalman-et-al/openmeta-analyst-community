@@ -1,9 +1,12 @@
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtWidgets import QTextEdit
 
 START_COLUMN = 3
 
 class QConsole(QTextEdit):
+    returnPressed = pyqtSignal()
+    upArrowPressed = pyqtSignal()
+    downArrowPressed = pyqtSignal()
         
     def __init__(self, parent):
         super(QConsole, self).__init__(parent)
@@ -11,11 +14,11 @@ class QConsole(QTextEdit):
         
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Return:
-            self.emit(SIGNAL("returnPressed()"))
+            self.returnPressed.emit()
         elif event.key() == Qt.Key_Up:
-            self.emit(SIGNAL("upArrowPressed()"))
+            self.upArrowPressed.emit()
         elif event.key() == Qt.Key_Down:
-            self.emit(SIGNAL("downArrowPressed()"))
+            self.downArrowPressed.emit()
         elif event.key() in (Qt.Key_Left, Qt.Key_Backspace) and \
             self.textCursor().columnNumber() == START_COLUMN:
             # we just want to 'block' here, i.e., do nothing; the user
@@ -36,5 +39,5 @@ class QConsole(QTextEdit):
         for i in range(3):
             self.moveCursor(16)
         self.moveCursor(15)
-        print "(mouse clicked)"
+        print("(mouse clicked)")
         

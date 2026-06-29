@@ -18,12 +18,15 @@
 #                                                                                           # 
 #############################################################################################
 import pdb
-from PyQt4.QtCore import pyqtRemoveInputHook
+from PyQt5.QtCore import pyqtRemoveInputHook
 import copy
 
 import two_way_dict
 import meta_globals
 #from meta_globals import *
+import meta_py_r_backend
+
+meta_py_r_backend.install_meta_py_r_backend()
 import meta_py_r
 
 BINARY = meta_globals.BINARY
@@ -32,6 +35,19 @@ DIAGNOSTIC = meta_globals.DIAGNOSTIC
 EMPTY_VALS = meta_globals.EMPTY_VALS
 FACTOR = meta_globals.FACTOR
 TYPE_TO_STR_DICT = meta_globals.TYPE_TO_STR_DICT
+
+def _unique_in_first_seen_order(values):
+    seen = set()
+    ordered = []
+    for value in values:
+        if value not in seen:
+            seen.add(value)
+            ordered.append(value)
+    return ordered
+
+
+def _cmp(left, right):
+    return (left > right) - (left < right)
 
 class Dataset:
     def __len__(self):
@@ -65,16 +81,16 @@ class Dataset:
 
     def change_group_name(self, old_group_name, new_group_name, outcome=None, follow_up=None):
         if (outcome is None and follow_up is not None) or (follow_up is None and outcome is not None):
-            raise Exception, "dataset -- change_group_name -- either both outcome and follow_up should be None, \
-                                            or else neither should."
+            raise Exception("dataset -- change_group_name -- either both outcome and follow_up should be None, \
+                                            or else neither should.")
     
         for study in self.studies:
             if outcome is None and follow_up is None:
                 # if no outcome/follow-up was specified, we change *all* occurrences of
                 # the old_group_name to the new_group_name
-                for outcome_name in study.outcomes_to_follow_ups.keys():
+                for outcome_name in list(study.outcomes_to_follow_ups.keys()):
                     cur_outcome = study.outcomes_to_follow_ups[outcome_name]
-                    for ma_unit in cur_outcome.values():                
+                    for ma_unit in list(cur_outcome.values()):                
                         ma_unit.rename_group(old_group_name, new_group_name)
             else:
                 ma_unit = study.outcomes_to_follow_ups[outcome][follow_up]
@@ -93,9 +109,9 @@ class Dataset:
     def delete_group(self, group_name):
         study = self.studies[0]
         for study in self.studies:
-            for outcome_name in study.outcomes_to_follow_ups.keys():
+            for outcome_name in list(study.outcomes_to_follow_ups.keys()):
                 cur_outcome = study.outcomes_to_follow_ups[outcome_name]
-                for ma_unit in cur_outcome.values():                
+                for ma_unit in list(cur_outcome.values()):                
                     ma_unit.remove_group(group_name)    
 
     def add_study(self, study, study_index=None):
@@ -176,7 +192,7 @@ class Dataset:
             # the user clicked 'redo' -- we want to repopulate
             # the dataset with the previous covariate values.
             for study in self.studies:
-                if cov_values.has_key(study.name):
+                if study.name in cov_values:
                     study.covariate_dict[covariate.name] = cov_values[study.name]
                 else:
                     study.covariate_dict[covariate.name] = None
@@ -217,7 +233,7 @@ class Dataset:
             cov_name = covariate.name
         cov_d = {}
         for study in self.studies:  
-            if study.covariate_dict.has_key(cov_name) and \
+            if cov_name in study.covariate_dict and \
                     study.covariate_dict[cov_name] is not None:
                 if ids_for_keys:
                     cov_d[study.id] = study.covariate_dict[cov_name]
@@ -258,24 +274,33 @@ class Dataset:
         #
         # However, if the follow_up_name argument is not None, the 
         # group will only be added to the specified follow up.
+        outcome = self.get_outcome_obj(outcome_name)
+        group_names = self.get_group_names()
+        if len(group_names) == 0:
+            group_names = None
         for study in self.studies:
+            if outcome_name not in study.outcomes_to_follow_ups:
+                study.add_outcome(outcome, group_names=group_names)
+                for follow_up in list(self.outcome_names_to_follow_ups[outcome_name].values()):
+                    if follow_up not in study.outcomes_to_follow_ups[outcome_name]:
+                        study.add_outcome_at_follow_up(outcome, follow_up)
             cur_outcome = study.outcomes_to_follow_ups[outcome_name]
             if follow_up_name is None:
-                for ma_unit in cur_outcome.values():
+                for ma_unit in list(cur_outcome.values()):
                     ma_unit.add_group(group_name)
             else:
                 ma_unit = cur_outcome[follow_up_name]
                 ma_unit.add_group(group_name)
 
-        print "added group: %s. cur groups: %s" % (group_name, self.get_group_names())
+        print("added group: %s. cur groups: %s" % (group_name, self.get_group_names()))
         
     def remove_group(self, group_name):
         for study in self.studies:
-            for outcome_name in study.outcomes_to_follow_ups.keys():
+            for outcome_name in list(study.outcomes_to_follow_ups.keys()):
                 cur_outcome = study.outcomes_to_follow_ups[outcome_name]
-                for ma_unit in cur_outcome.values():
+                for ma_unit in list(cur_outcome.values()):
                     ma_unit.remove_group(group_name)
-        print "removed group: %s. cur groups: %s" % (group_name, self.get_group_names())
+        print("removed group: %s. cur groups: %s" % (group_name, self.get_group_names()))
         
     def add_follow_up(self, follow_up_name):
         ''' adds the follow-up to *all* outcomes '''
@@ -311,26 +336,26 @@ class Dataset:
     def get_group_names(self):
         group_names = []
         for study in self.studies:
-            for outcome_name in study.outcomes_to_follow_ups.keys():
+            for outcome_name in list(study.outcomes_to_follow_ups.keys()):
                 cur_outcome = study.outcomes_to_follow_ups[outcome_name]
-                for ma_unit in cur_outcome.values():
+                for ma_unit in list(cur_outcome.values()):
                     group_names.extend(ma_unit.get_group_names())
-        return list(set(group_names))
+        return _unique_in_first_seen_order(group_names)
 
     def get_group_names_for_outcome_fu(self, outcome_name, follow_up):
         group_names = []
         for study in self.studies:
-            print study.name
-            if study.outcomes_to_follow_ups.has_key(outcome_name):
-                if study.outcomes_to_follow_ups[outcome_name].has_key(follow_up):
+            print(study.name)
+            if outcome_name in study.outcomes_to_follow_ups:
+                if follow_up in study.outcomes_to_follow_ups[outcome_name]:
                     cur_ma_unit = study.outcomes_to_follow_ups[outcome_name][follow_up]
                     group_names.extend(cur_ma_unit.get_group_names())
-        return list(set(group_names))
+        return _unique_in_first_seen_order(group_names)
         
     def change_follow_up_name(self, outcome, old_name, new_name):
         # make sure that the follow up doesn't already exist
         if new_name in self.get_follow_up_names_for_outcome(outcome):
-            raise Exception, "follow up name %s alerady exists for outcome!" % new_name
+            raise Exception("follow up name %s alerady exists for outcome!" % new_name)
         for study in self.studies:
             study.outcomes_to_follow_ups[outcome][new_name] = study.outcomes_to_follow_ups[outcome].pop(old_name)
         # also update the outcomes -> follow-ups dictionary
@@ -341,15 +366,15 @@ class Dataset:
         ''' returns *all* known follow-up names '''
         follow_up_names = []
         ## iterate over each outcome
-        for outcome_d in self.outcome_names_to_follow_ups.values():
-            follow_up_names.extend(outcome_d.values())
-        return list(set(follow_up_names))
+        for outcome_d in list(self.outcome_names_to_follow_ups.values()):
+            follow_up_names.extend(list(outcome_d.values()))
+        return _unique_in_first_seen_order(follow_up_names)
         
     def get_study_names(self):
         return [study.name for study in self.studies]
 
     def get_follow_up_names_for_outcome(self, outcome):
-        return self.outcome_names_to_follow_ups[outcome].values()
+        return list(self.outcome_names_to_follow_ups[outcome].values())
 
     def get_network(self, outcome, time_point):
         node_list = [] # list of all nodes
@@ -514,7 +539,7 @@ class Dataset:
         elif study_b_val in EMPTY_VALS:
             return flip_sign*-1
         else:
-            return cmp(study_a_val, study_b_val)
+            return _cmp(study_a_val, study_b_val)
 
         
 class Study:
@@ -554,12 +579,12 @@ class Study:
         try:
             return self.outcomes_to_follow_ups[outcome][follow_up]
         except:
-            raise Exception, "You're trying to access an ma_unit that doesn't exist"
+            raise Exception("You're trying to access an ma_unit that doesn't exist")
 
     def add_outcome(self, outcome, follow_up_name="first", group_names=None):
         ''' Adds a new, blank outcome (i.e., no raw data) '''
-        if outcome.name in self.outcomes_to_follow_ups.keys():
-            raise Exception, "Study already contains an outcome named %s" % outcome.name
+        if outcome.name in list(self.outcomes_to_follow_ups.keys()):
+            raise Exception("Study already contains an outcome named %s" % outcome.name)
         self.outcomes_to_follow_ups[outcome.name] = {}
         self.outcomes_to_follow_ups[outcome.name][follow_up_name] = \
                         MetaAnalyticUnit(outcome, group_names=group_names)
@@ -642,7 +667,7 @@ class MetaAnalyticUnit:
         elif outcome.data_type == DIAGNOSTIC:
             self.raw_data_length = 4
         else:
-            raise Exception, "Unrecognized outcome data type, '%s' was given" % outcome.data_type
+            raise Exception("Unrecognized outcome data type, '%s' was given" % outcome.data_type)
         
         # Makes list of (empty lists of length of raw_data): 
         raw_data = raw_data or \
@@ -689,7 +714,7 @@ class MetaAnalyticUnit:
         keys corresponding to pairwise combinations of this with other groups.
         '''
 
-        group_names = self.tx_groups.keys() # existing groups
+        group_names = list(self.tx_groups.keys()) # existing groups
         if self.outcome.data_type == BINARY:
             # we assume that an entry for each effect already exists!
             for effect in meta_globals.BINARY_TWO_ARM_METRICS:
@@ -733,7 +758,7 @@ class MetaAnalyticUnit:
             upper = self.effects_dict[effect][group_str]["upper"]
         
         print("Using the following values to calculate se:")
-        print("  (est,lower,upper, mult) = (%s,%s,%s, %s)" % (str(est),str(lower),str(upper), str(mult)))
+        print(("  (est,lower,upper, mult) = (%s,%s,%s, %s)" % (str(est),str(lower),str(upper), str(mult))))
         try:
             se = (upper - est)/mult
         except:
@@ -791,7 +816,7 @@ class MetaAnalyticUnit:
         d_se = se
         #d_se = convert_to_display_scale(se) # this doesn't mean anything...i suppose its just to check to see if we have an se value
         
-        print("results of calculating display effect and ci: (est,low,high,se(calc scale): %s, %s, %s, %s" % (d_est,d_lower,d_upper,se))
+        print(("results of calculating display effect and ci: (est,low,high,se(calc scale): %s, %s, %s, %s" % (d_est,d_lower,d_upper,se)))
         
         self.set_display_effect(effect, group_str, d_est)
         self.set_display_lower(effect, group_str, d_lower)
@@ -842,7 +867,7 @@ class MetaAnalyticUnit:
         if conf_level is None:
             raise ValueError("Confidence level must be specified")
         
-        existing_display_conf_level = "display_conf_level" in self.effects_dict[effect][group_str].keys()
+        existing_display_conf_level = "display_conf_level" in list(self.effects_dict[effect][group_str].keys())
         if existing_display_conf_level:
             display_cl = self.effects_dict[effect][group_str]["display_conf_level"] # conf level @ which display values were computed
             disp_cl_eq_global_cl = meta_globals.equal_close_enough(
@@ -893,11 +918,11 @@ class MetaAnalyticUnit:
     
     def get_se(self, effect, group_str, mult):
         if "SE" in self.effects_dict[effect][group_str]:
-            print("SE found: %s" % str(self.effects_dict[effect][group_str]["SE"]))
+            print(("SE found: %s" % str(self.effects_dict[effect][group_str]["SE"])))
             se = self.effects_dict[effect][group_str]["SE"]
             if se is None:
                 new_se = self.calculate_SE_if_possible(effect, group_str, mult=mult)
-                print("new se is %s" % str(new_se))
+                print(("new se is %s" % str(new_se)))
                 return new_se
             return se
         else:
@@ -933,7 +958,7 @@ class MetaAnalyticUnit:
         return self.effects_dict[effect][group_str]
     
     def get_group_strings(self, effect):
-        return self.effects_dict[effect].keys()
+        return list(self.effects_dict[effect].keys())
     
     def get_effects_dict(self):
         ''' Be careful with using this because this returns the actual effects
@@ -941,16 +966,16 @@ class MetaAnalyticUnit:
         return self.effects_dict
     
     def get_effect_names(self):
-        return self.effects_dict.keys()
+        return list(self.effects_dict.keys())
     
     def type(self):
         return self.outcome.data_type
         
     def add_group(self, name, raw_data=None):
-        if len(self.tx_groups.keys()) == 0:
+        if len(list(self.tx_groups.keys())) == 0:
             grp_id = 0
         else:
-            grp_id = max([group.id for group in self.tx_groups.values()]) + 1
+            grp_id = max([group.id for group in list(self.tx_groups.values())]) + 1
         if raw_data is None:
             raw_data = ["" for x in range(self.raw_data_length)]
         # Here we add this group to the set of group keys --
@@ -1019,7 +1044,7 @@ class MetaAnalyticUnit:
             self.set_raw_data_for_group(group, raw_data_list[i])
         
     def get_group_names(self):
-        return self.tx_groups.keys()
+        return list(self.tx_groups.keys())
             
     
 class TreatmentGroup:
@@ -1041,8 +1066,7 @@ class Covariate:
     ''' Meta-data about covariates. '''
     def __init__(self, name, data_type):
         if not data_type in ("factor", "continuous"):
-            raise Exception, \
-                "covariates need to have associated type factor or continuous; %s was given" % data_type
+            raise Exception("covariates need to have associated type factor or continuous; %s was given" % data_type)
         self.name = name
         self.data_type = CONTINUOUS if data_type == "continuous" else FACTOR
         

@@ -1,4 +1,4 @@
-from PyQt4.Qt import *
+from PyQt5.QtWidgets import QCheckBox, QDialog, QGridLayout, QMessageBox
 
 import forms.ui_meta_reg
 import meta_py_r
@@ -18,11 +18,11 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
         if not self.is_diagnostic:
             self.diagnostic_group_box.hide()
 
-        QObject.connect(self.buttonBox, SIGNAL("rejected()"), self.cancel)
-        QObject.connect(self.buttonBox, SIGNAL("accepted()"), self.run_meta_reg)
+        self.buttonBox.rejected.connect(self.cancel)
+        self.buttonBox.accepted.connect(self.run_meta_reg)
         
     def cancel(self):
-        print "(cancel)"
+        print("(cancel)")
         self.reject()
         
     def run_meta_reg(self):
@@ -100,7 +100,7 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
         if isinstance(result, str):
             # then there was an error!
             QMessageBox.critical(self,
-                                "Whoops.",
+                                "Whoops",
                                 "Sorry, there was an error performing the regression.\n%s" % \
                                 result)
         else:

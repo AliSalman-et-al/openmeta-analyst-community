@@ -133,7 +133,7 @@
       <item>
        <widget class="QRadioButton" name="fixed_effects_radio">
         <property name="text">
-         <string>fixed effect</string>
+         <string>fixed effects</string>
         </property>
        </widget>
       </item>

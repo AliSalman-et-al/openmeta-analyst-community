@@ -18,8 +18,7 @@
 
 #import pdb
 
-#from PyQt4.Qt import *
-from PyQt4.Qt import QDialog, QObject, SIGNAL
+from PyQt5.QtWidgets import QDialog
 
 import forms.ui_edit_dialog
 import edit_list_models
@@ -86,56 +85,41 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
     def _setup_connections(self):
         ###
         # groups
-        QObject.connect(self.add_group_btn, SIGNAL("pressed()"),
-                                    self.add_group)
-        QObject.connect(self.remove_group_btn, SIGNAL("pressed()"),
-                                    self.remove_group)
-        QObject.connect(self.group_list, SIGNAL("clicked(QModelIndex)"),
-                                    self.group_selected)
+        self.add_group_btn.pressed.connect(self.add_group)
+        self.remove_group_btn.pressed.connect(self.remove_group)
+        self.group_list.clicked.connect(self.group_selected)
                  
         ###
         # outcomes   
-        QObject.connect(self.add_outcome_btn, SIGNAL("pressed()"),
-                                    self.add_outcome)
-        QObject.connect(self.remove_outcome_btn, SIGNAL("pressed()"),
-                                    self.remove_outcome)                          
-        QObject.connect(self.outcome_list, SIGNAL("clicked(QModelIndex)"),
-                                    self.outcome_selected)
+        self.add_outcome_btn.pressed.connect(self.add_outcome)
+        self.remove_outcome_btn.pressed.connect(self.remove_outcome)
+        self.outcome_list.clicked.connect(self.outcome_selected)
 
 
         ###
         # follow-ups
-        QObject.connect(self.add_follow_up_btn, SIGNAL("pressed()"),
-                                    self.add_follow_up)
-        QObject.connect(self.remove_follow_up_btn, SIGNAL("pressed()"),
-                                    self.remove_follow_up)                          
-        QObject.connect(self.follow_up_list, SIGNAL("clicked(QModelIndex)"),
-                                    self.follow_up_selected)
+        self.add_follow_up_btn.pressed.connect(self.add_follow_up)
+        self.remove_follow_up_btn.pressed.connect(self.remove_follow_up)
+        self.follow_up_list.clicked.connect(self.follow_up_selected)
                                     
         ###
         # studies
-        QObject.connect(self.add_study_btn, SIGNAL("pressed()"),
-                                    self.add_study)
-        QObject.connect(self.remove_study_btn, SIGNAL("pressed()"),
-                                    self.remove_study)                          
-        QObject.connect(self.study_list, SIGNAL("clicked(QModelIndex)"),
-                                    self.study_selected)
+        self.add_study_btn.pressed.connect(self.add_study)
+        self.remove_study_btn.pressed.connect(self.remove_study)
+        self.study_list.clicked.connect(lambda _index: self.study_selected())
                                     
         ###
         # covariates
-        QObject.connect(self.add_covariate_btn, SIGNAL("pressed()"),
-                                    self.add_covariate)
-        QObject.connect(self.remove_covariate_btn, SIGNAL("pressed()"),
-                                    self.remove_covariate)                          
-        QObject.connect(self.covariate_list, SIGNAL("clicked(QModelIndex)"),
-                                    self.covariate_selected)
+        self.add_covariate_btn.pressed.connect(self.add_covariate)
+        self.remove_covariate_btn.pressed.connect(self.remove_covariate)
+        self.covariate_list.clicked.connect(lambda _index: self.covariate_selected())
                                     
                                   
     def add_group(self):
         form = add_new_dialogs.AddNewGroupForm(self)
         form.group_name_le.setFocus()        
         if form.exec_():
-            new_group_name = unicode(form.group_name_le.text().toUtf8(), "utf-8")
+            new_group_name = str(form.group_name_le.text())
             self.group_list.model().dataset.add_group(new_group_name, self.selected_outcome)
             self.group_list.model().refresh_group_list(self.selected_outcome, self.selected_follow_up)
             
@@ -157,7 +141,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
             # then the user clicked ok and has added a new outcome.
             # here we want to add the outcome to the dataset, and then
             # display it
-            new_outcome_name = unicode(form.outcome_name_le.text().toUtf8(), "utf-8")
+            new_outcome_name = str(form.outcome_name_le.text())
             # the outcome type is one of the enumerated types; we don't worry about
             # unicode encoding
             data_type = str(form.datatype_cbo_box.currentText())
@@ -189,7 +173,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         # update the follow-ups list as appropriate
         if self.selected_outcome is not None:
             self.follow_up_list.model().current_outcome = self.selected_outcome
-            print "\ncurrent outcome updated. is now: %s" % self.selected_outcome
+            print("\ncurrent outcome updated. is now: %s" % self.selected_outcome)
             self.follow_up_list.model().refresh_follow_up_list()
             self.selected_follow_up = self.get_selected_follow_up()
             ## also update the groups and follow-up lists
@@ -215,15 +199,15 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         form = add_new_dialogs.AddNewFollowUpForm(self)
         form.follow_up_name_le.setFocus()
         if form.exec_():
-            follow_up_lbl = unicode(form.follow_up_name_le.text().toUtf8(), "utf-8")
+            follow_up_lbl = str(form.follow_up_name_le.text())
             self.follow_up_list.model().dataset.add_follow_up(follow_up_lbl)
             self.follow_up_list.model().current_outcome =self.selected_outcome
             self.follow_up_list.model().refresh_follow_up_list()
             
     def get_selected_follow_up(self):
         index = self.follow_up_list.currentIndex()
-        print "index is: %s" % index.row()
-        print "here is the current follow-up list: %s" % self.follow_up_list.model().follow_up_list
+        print("index is: %s" % index.row())
+        print("here is the current follow-up list: %s" % self.follow_up_list.model().follow_up_list)
         return self.follow_up_list.model().follow_up_list[index.row()]
 
     def get_selected_study(self):
@@ -240,7 +224,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         form = add_new_dialogs.AddNewCovariateForm(self)
         form.covariate_name_le.setFocus()
         if form.exec_():
-            new_covariate_name = unicode(form.covariate_name_le.text().toUtf8(), "utf-8")
+            new_covariate_name = str(form.covariate_name_le.text())
             new_covariate_type = str(form.datatype_cbo_box.currentText())
             cov_obj = ma_dataset.Covariate(new_covariate_name, new_covariate_type)
             self.covariate_list.model().dataset.add_covariate(cov_obj)
@@ -277,7 +261,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         form = add_new_dialogs.AddNewStudyForm(self)
         form.study_lbl.setFocus()
         if form.exec_():
-            study_name = unicode(form.study_lbl.text().toUtf8(), "utf-8")
+            study_name = str(form.study_lbl.text())
             study_id = self.study_list.model().dataset.max_study_id()+1
             new_study = ma_dataset.Study(study_id, name = study_name)
             self.study_list.model().dataset.add_study(new_study)

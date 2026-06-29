@@ -12,8 +12,20 @@
 import pickle
 import os
 import sys
-from PyQt4 import QtCore, QtGui
-from PyQt4.Qt import *
+from functools import cmp_to_key
+from PyQt5 import QtCore, QtWidgets
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QKeySequence
+from PyQt5.QtWidgets import (
+    QAction,
+    QApplication,
+    QDialog,
+    QFileDialog,
+    QLabel,
+    QMessageBox,
+    QTableView,
+    QUndoCommand,
+)
 import copy
 
 ## hand-rolled modules
@@ -23,6 +35,7 @@ import ma_data_table_model
 import meta_globals
 from meta_globals import *
 import ma_dataset
+import legacy_pickle
 from settings import *
 
 # additional forms
@@ -54,6 +67,12 @@ def _application_root():
     return os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 
 
+def _qt_item_text(value):
+    if hasattr(value, "toString"):
+        return str(value.toString())
+    return str(value)
+
+
 def _resolve_open_file_path(file_path):
     if file_path in [None, ""] or os.path.exists(file_path):
         return file_path
@@ -65,7 +84,7 @@ def _resolve_open_file_path(file_path):
 
     sample_file = os.path.basename(file_path)
     candidates = [
-        os.path.join(_application_root(), "sample_data", sample_file),
+        os.path.join(get_sample_data_path(), sample_file),
         os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, "sample_data", sample_file)),
     ]
     for candidate in candidates:
@@ -73,6 +92,36 @@ def _resolve_open_file_path(file_path):
             return candidate
 
     return file_path
+
+
+def _load_legacy_pickle(file_path):
+    return legacy_pickle.load_legacy_pickle(file_path)
+
+
+def _qt_dialog_path(value):
+    value = value[0] if isinstance(value, tuple) else value
+    return str(value.toUtf8(), "utf8") if hasattr(value, "toUtf8") else str(value)
+
+
+def _qt_text(value):
+    return str(value.toUtf8(), "utf8") if hasattr(value, "toUtf8") else str(value)
+
+
+def _connect_action(action, callback):
+    action.triggered.connect(lambda checked=False: callback())
+
+
+def _format_confidence_level_status(conf_level):
+    if conf_level is None:
+        return "confidence level: not set"
+    return "confidence level: {:.1%}".format(float(conf_level) / 100.0)
+
+
+def _disconnect_signal(signal, slot):
+    try:
+        signal.disconnect(slot)
+    except (TypeError, RuntimeError):
+        pass
 
 
 class ImportProgress(QDialog, forms.ui_running.Ui_running):
@@ -96,7 +145,7 @@ class ImportProgress(QDialog, forms.ui_running.Ui_running):
     
 ###############################################################################
 
-class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
+class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
     def __init__(self, parent=None):
         # We follow the advice given by Mark Summerfield in his Python QT book: 
@@ -104,9 +153,12 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         # this approach throughout OpenMeta.
         super(MetaForm, self).__init__(parent)
         self.setupUi(self)
+        table_view = ma_data_table_view.MADataTable(self.nav_frame)
+        self.verticalLayout.replaceWidget(self.tableView, table_view)
+        self.tableView.deleteLater()
+        self.tableView = table_view
         
-        # crazy number to indicate the conf level hasn't really been set yet
-        self.cl_label=QLabel("confidence level: {:.1%}".format(meta_globals.DEFAULT_CONF_LEVEL/2/100.0))
+        self.cl_label=QLabel(_format_confidence_level_status(meta_globals.DEFAULT_CONF_LEVEL))
         self.cl_label.setAlignment(Qt.AlignRight)
         self.statusbar.addWidget(self.cl_label,1)
         
@@ -156,7 +208,7 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         show_tom = QAction(self)
         show_tom.setShortcut(QKeySequence("T, Shift+O, M"))
         self.addAction(show_tom)
-        QObject.connect(show_tom, SIGNAL("triggered()"), self._show_tom)
+        _connect_action(show_tom, self._show_tom)
         
         
         if DISABLE_NETWORK_STUFF:
@@ -259,7 +311,7 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         if (event.modifiers() & QtCore.Qt.ControlModifier):
             if event.key() == QtCore.Qt.Key_S:
                 # ctrl + s = save
-                print "saving.."
+                print("saving..")
                 self.save()
             elif event.key() == QtCore.Qt.Key_O:
                 # ctrl + o = open
@@ -274,27 +326,25 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         _setup_connections (with menu_actiosn set to False) should subsequently be invoked. 
         '''
         
-        #QObject.disconnect(self.tableView.model(), SIGNAL("conf_level_changed()"), self._change_conf_level_label)
-        QObject.disconnect(self.tableView.model(), SIGNAL("pyCellContentChanged(PyQt_PyObject, PyQt_PyObject, PyQt_PyObject, PyQt_PyObject)"),
-                           self.tableView.cell_content_changed)
-
-        QObject.disconnect(self.tableView.model(), SIGNAL("outcomeChanged()"),
-                           self.tableView.displayed_ma_changed)
-        QObject.disconnect(self.tableView.model(), SIGNAL("followUpChanged()"),
-                           self.tableView.displayed_ma_changed)
-                                                                 
-        QObject.disconnect(self.tableView, SIGNAL("dataDirtied()"), self.data_dirtied)
-        
-        QObject.disconnect(self.tableView.model(), SIGNAL("modelAboutToBeReset()"),
-                           self._model_about_to_be_reset)
+        model = self.tableView.model()
+        _disconnect_signal(model.pyCellContentChanged, self.tableView.cell_content_changed)
+        _disconnect_signal(model.outcomeChanged, self.tableView.displayed_ma_changed)
+        _disconnect_signal(model.followUpChanged, self.tableView.displayed_ma_changed)
+        _disconnect_signal(self.tableView.dataDirtied, self.data_dirtied)
+        _disconnect_signal(model.modelAboutToBeReset, self._model_about_to_be_reset)
+        _disconnect_signal(model.editFocusRequested, self.set_edit_focus)
 
 
     def data_error(self, msg):
-        QMessageBox.warning(self.parent(), "whoops", msg)
+        QMessageBox.warning(self.parent(), "Whoops", msg)
 
     def set_edit_focus(self, index):
         ''' sets edit focus to the row,col specified by index.'''
+        if not index.isValid():
+            return
         self.tableView.setCurrentIndex(index)
+        if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
+            return
         self.tableView.edit(index)
          
     def populate_open_recent_menu(self):
@@ -304,15 +354,14 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         # gave up struggling with it. grr.
         self.action_open_recent_2.clear()
         for dataset in recent_datasets:
-            action_item = QAction(QString(dataset), self.action_open_recent_2)
+            action_item = QAction(str(dataset), self.action_open_recent_2)
             self.action_open_recent_2.addAction(action_item)
-            QObject.connect(action_item, SIGNAL("triggered()"), self.dataset_selected) 
+            _connect_action(action_item, lambda dataset=dataset: self.dataset_selected(dataset)) 
                 
         
         
 
-    def dataset_selected(self):
-        dataset_path = QObject.sender(self).text()
+    def dataset_selected(self, dataset_path):
         self.open(file_path=dataset_path)
         
     def _change_global_ci(self):
@@ -334,11 +383,10 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         
     def _setup_connections(self, menu_actions=True):
         ''' Signals & slots '''
-        QObject.connect(self.tableView.model(), SIGNAL("pyCellContentChanged(PyQt_PyObject, PyQt_PyObject, PyQt_PyObject, PyQt_PyObject)"),
-                                                                self.tableView.cell_content_changed)
-
-        QObject.connect(self.tableView.model(), SIGNAL("outcomeChanged()"), self.tableView.displayed_ma_changed)
-        QObject.connect(self.tableView.model(), SIGNAL("followUpChanged()"), self.tableView.displayed_ma_changed)
+        model = self.tableView.model()
+        model.pyCellContentChanged.connect(self.tableView.cell_content_changed)
+        model.outcomeChanged.connect(self.tableView.displayed_ma_changed)
+        model.followUpChanged.connect(self.tableView.displayed_ma_changed)
                                                                 
         ###
         # this is not ideal, but I couldn't get the rowsInserted methods working. 
@@ -347,12 +395,11 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         # where it was before this reset() call (reset clears the current editor).
         # this index is the QModelIndex. this is used, e.g., when a new study is added.
         # this fixes bug #20.
-        QObject.connect(self.tableView.model(), SIGNAL("modelReset(QModelIndex)"),
-                                                                self.set_edit_focus) 
+        model.editFocusRequested.connect(self.set_edit_focus) 
         
         # Do actions when the model is about to be reset (for now, just
         # recalculate display scale values)
-        QObject.connect(self.tableView.model(), SIGNAL("modelAboutToBeReset()"), self._model_about_to_be_reset)
+        model.modelAboutToBeReset.connect(self._model_about_to_be_reset)
            
         ###
         # this listens to the model regarding errors in data entry -- 
@@ -360,44 +407,44 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         # and this hook allows the model to pass along error messages to the
         # user. the data checking happens in ma_dataset (specifically, in the
         # setData method)                                     
-        QObject.connect(self.tableView.model(), SIGNAL("dataError(QString)"), self.data_error)
+        model.dataError.connect(self.data_error)
 
-        QObject.connect(self.tableView, SIGNAL("dataDirtied()"), self.data_dirtied)                                                       
+        self.tableView.dataDirtied.connect(self.data_dirtied)                                                       
         if menu_actions:                
-            QObject.connect(self.nav_add_btn, SIGNAL("pressed()"), self.add_new)
-            QObject.connect(self.nav_right_btn, SIGNAL("pressed()"), self.next)
-            QObject.connect(self.nav_left_btn, SIGNAL("pressed()"), self.previous)
-            QObject.connect(self.nav_up_btn, SIGNAL("pressed()"), self.next_dimension)
-            QObject.connect(self.nav_down_btn, SIGNAL("pressed()"), self.previous_dimension)
+            self.nav_add_btn.pressed.connect(self.add_new)
+            self.nav_right_btn.pressed.connect(self.next)
+            self.nav_left_btn.pressed.connect(self.previous)
+            self.nav_up_btn.pressed.connect(self.next_dimension)
+            self.nav_down_btn.pressed.connect(self.previous_dimension)
     
-            QObject.connect(self.action_save, SIGNAL("triggered()"), self.save)
-            QObject.connect(self.action_save_as, SIGNAL("triggered()"), self.save_as)
-            QObject.connect(self.action_open, SIGNAL("triggered()"), self.open)
-            QObject.connect(self.action_new_dataset, SIGNAL("triggered()"), self.create_new_dataset)
-            QObject.connect(self.action_quit, SIGNAL("triggered()"), self.quit)
-            QObject.connect(self.action_go, SIGNAL("triggered()"), self.go)
-            QObject.connect(self.action_cum_ma, SIGNAL("triggered()"), self.cum_ma)
-            QObject.connect(self.action_loo_ma, SIGNAL("triggered()"), self.loo_ma)
+            _connect_action(self.action_save, self.save)
+            _connect_action(self.action_save_as, self.save_as)
+            _connect_action(self.action_open, self.open)
+            _connect_action(self.action_new_dataset, self.create_new_dataset)
+            _connect_action(self.action_quit, self.quit)
+            _connect_action(self.action_go, self.go)
+            _connect_action(self.action_cum_ma, self.cum_ma)
+            _connect_action(self.action_loo_ma, self.loo_ma)
             
-            QObject.connect(self.action_undo, SIGNAL("triggered()"), self.undo)
-            QObject.connect(self.action_redo, SIGNAL("triggered()"), self.redo)
-            QObject.connect(self.action_copy, SIGNAL("triggered()"), self.tableView.copy)
-            QObject.connect(self.action_paste, SIGNAL("triggered()"), self.tableView.paste)
+            _connect_action(self.action_undo, self.undo)
+            _connect_action(self.action_redo, self.redo)
+            _connect_action(self.action_copy, self.tableView.copy)
+            _connect_action(self.action_paste, self.tableView.paste)
             
-            QObject.connect(self.action_edit, SIGNAL("triggered()"), self.edit_dataset)
-            QObject.connect(self.action_view_network, SIGNAL("triggered()"), self.view_network)
-            QObject.connect(self.action_add_covariate, SIGNAL("triggered()"), self.add_covariate)
+            _connect_action(self.action_edit, self.edit_dataset)
+            _connect_action(self.action_view_network, self.view_network)
+            _connect_action(self.action_add_covariate, self.add_covariate)
             
-            QObject.connect(self.action_meta_regression, SIGNAL("triggered()"), self.meta_reg)
-            QObject.connect(self.action_subgroup_ma, SIGNAL("triggered()"), self.meta_subgroup_get_cov)
+            _connect_action(self.action_meta_regression, self.meta_reg)
+            _connect_action(self.action_subgroup_ma, self.meta_subgroup_get_cov)
 
-            QObject.connect(self.action_open_help, SIGNAL("triggered()"), self.show_help)
-            QObject.connect(self.action_change_conf_level, SIGNAL("triggered()"), self._change_global_ci)
-            QObject.connect(self.action_import_csv, SIGNAL("triggered()"), self._import_csv)
+            _connect_action(self.action_open_help, self.show_help)
+            _connect_action(self.action_change_conf_level, self._change_global_ci)
+            _connect_action(self.action_import_csv, self._import_csv)
 
     def _change_conf_level_label(self):
         conf_level = self.model.get_global_conf_level()
-        self.cl_label.setText("confidence level: {:.1%}".format(conf_level/100.0))
+        self.cl_label.setText(_format_confidence_level_status(conf_level))
 
     def go(self):
         form = None
@@ -408,11 +455,13 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
             # note that the spec form gets *this* form as a parameter.
             # this allows the spec form to callback to this
             # module when specifications have been provided.
-            form =  ma_specs.MA_Specs(self.model, parent=self, conf_level=self.model.get_global_conf_level())
+            form = self._build_analysis_specs_dialog(conf_level=self.model.get_global_conf_level())
         else:
             # diagnostic data; we first have the user select metric(s),
             # and only then the model, &etc.
             form = diag_metrics.Diag_Metrics(self.model, parent=self)
+        if form is None:
+            return
         form.show()
     
     def meta_reg(self):
@@ -444,7 +493,7 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         # this allows the spec form to callback to this
         # module when specifications have been provided.
         if self.model.get_current_outcome_type() != "diagnostic":
-            form =  ma_specs.MA_Specs(self.model, meta_f_str="cum.ma", parent=self, conf_level=self.model.get_global_conf_level())
+            form = self._build_analysis_specs_dialog(meta_f_str="cum.ma", conf_level=self.model.get_global_conf_level())
         else:
             # diagnostic data; we first have the user select metric(s),
             # and only then the model, &etc.
@@ -454,8 +503,10 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
             *never* be called with diagnostic data.
             '''
             form = diag_metrics.Diag_Metrics(self.model, meta_f_str="cum.ma", \
-                                                parent=self) 
+                                            parent=self)
 
+        if form is None:
+            return
         form.show()
         
     def loo_ma(self):
@@ -467,13 +518,15 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
             # note that the spec form gets *this* form as a parameter.
             # this allows the spec form to callback to this
             # module when specifications have been provided.
-            form =  ma_specs.MA_Specs(self.model, meta_f_str="loo.ma", parent=self, conf_level=self.model.get_global_conf_level())
+            form = self._build_analysis_specs_dialog(meta_f_str="loo.ma", conf_level=self.model.get_global_conf_level())
         else:
             # diagnostic data; we first have the user select metric(s),
             # and only then the model, &etc.
             form = diag_metrics.Diag_Metrics(self.model, meta_f_str="loo.ma", \
-                                                parent=self)
+                                            parent=self)
 
+        if form is None:
+            return
         form.show()
 
     def show_help(self):
@@ -488,19 +541,44 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
             # note that the spec form gets *this* form as a parameter.
             # this allows the spec form to callback to this
             # module when specifications have been provided.
-            form = ma_specs.MA_Specs(self.model,
-                                     meta_f_str="subgroup.ma", 
-                                     parent=self, 
-                                     external_params={"cov_name":selected_cov},
-                                     conf_level=self.model.get_global_conf_level())
+            form = self._build_analysis_specs_dialog(meta_f_str="subgroup.ma",
+                                                     external_params={"cov_name":selected_cov},
+                                                     conf_level=self.model.get_global_conf_level())
         else:
             # diagnostic data; we first have the user select metric(s),
             # and only then the model, &etc.
             form = diag_metrics.Diag_Metrics(self.model, meta_f_str="subgroup.ma", \
-                                                parent=self,\
-                                                external_params={"cov_name":selected_cov})
+                                            parent=self,\
+                                            external_params={"cov_name":selected_cov})
 
+        if form is None:
+            return
         form.show()
+
+    def _build_analysis_specs_dialog(self, meta_f_str=None, external_params=None,
+                                     diag_metrics=None, conf_level=None):
+        try:
+            kwargs = {
+                "meta_f_str": meta_f_str,
+                "parent": self,
+                "conf_level": conf_level,
+            }
+            if external_params is not None:
+                kwargs["external_params"] = external_params
+            if diag_metrics is not None:
+                kwargs["diag_metrics"] = diag_metrics
+            return ma_specs.MA_Specs(self.model, **kwargs)
+        except Exception as e:
+            self._show_analysis_backend_error(e)
+            return None
+
+    def _show_analysis_backend_error(self, exception):
+        message = (
+            "The analysis backend is not available in this modern build, so "
+            "OpenMeta[Analyst] cannot build the Method & Parameters dialog.\n\n"
+            "Details: %s: %s" % (exception.__class__.__name__, exception)
+        )
+        QMessageBox.critical(self, "Analysis backend unavailable", message)
     
     def undo(self):
         self.tableView.undoStack.undo()
@@ -605,26 +683,25 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
       
 
     def add_sub_metric_menu(self, name):
-        sub_menu = QtGui.QMenu(QString(name), self.menuMetric)
+        sub_menu = QtWidgets.QMenu(str(name), self.menuMetric)
         self.menuMetric.addAction(sub_menu.menuAction())
         return sub_menu
            
     def add_metric_action(self, metric, menu):
         metric_names = meta_globals.ALL_METRIC_NAMES
         
-        metric_action = QAction(QString(metric+": "+metric_names[metric]), self)
+        metric_action = QAction(str(metric + ": " + metric_names[metric]), self)
         try:
             if str(metric) in metric_names:
                 metric_action.setToolTip(metric_names[metric]) # doesn't do anything in OSX?
                 metric_action.setStatusTip(metric_names[metric])
-                metric_action.setData(QVariant(metric)) # store code for metric in here
+                metric_action.setData(metric) # store code for metric in here
         except:
             print("Could not set metric name tooltip")
         metric_action.setCheckable(True)
-        QObject.connect(metric_action,
-                        SIGNAL("toggled(bool)"),
-                        lambda: self.metric_selected(metric, menu)
-                        )
+        metric_action.toggled.connect(
+            lambda checked=False, metric=metric, menu=menu: self.metric_selected(metric, menu)
+        )
         menu.addAction(metric_action)     
         return metric_action
     
@@ -652,7 +729,7 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         prev_metric_name = self.tableView.model().current_effect
         for action in menu.actions():
             #action_text = action.text()
-            action_data = action.data().toString()
+            action_data = _qt_item_text(action.data())
             #if action_text == metric_name:
             if action_data == metric_name:
                 action.blockSignals(True)
@@ -680,12 +757,12 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         orig_group_name = copy.copy(cur_group_name)
         edit_group_form = edit_group_name_form.EditGroupName(cur_group_name, parent=self)
         if edit_group_form.exec_():
-            new_group_name = unicode(edit_group_form.group_name_le.text().toUtf8(), "utf-8")
+            new_group_name = _qt_text(edit_group_form.group_name_le.text())
             
             # make sure the group name doesn't already exist
             if new_group_name in self.model.dataset.get_group_names():
                 QMessageBox.warning(self,
-                            "whoops.",
+                            "Whoops",
                             "%s is already a group name -- pick something else, please" % new_group_name)
             
             else:
@@ -700,14 +777,14 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         form.covariate_name_le.setFocus()
         if form.exec_():
             # then the user clicked 'ok'.
-            new_covariate_name = unicode(form.covariate_name_le.text().toUtf8(), "utf-8")
+            new_covariate_name = _qt_text(form.covariate_name_le.text())
 
             # fix for issue #59; do not allow the user to create two covariates with
             # the same name!
             new_covariate_type = str(form.datatype_cbo_box.currentText()).lower()
             if new_covariate_name in self.model.get_covariate_names():
                 QMessageBox.warning(self,
-                            "whoops.",
+                            "Whoops",
                             "you've already entered a covariate with the name %s; please pick another name." % \
                                     new_covariate_name)
             else:
@@ -720,7 +797,7 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
 
     def _add_new_covariate(self, cov_name, cov_type):
         self.model.add_covariate(cov_name, cov_type)
-        print "new covariate name: %s with type %s" % (cov_name, cov_type)
+        print("new covariate name: %s with type %s" % (cov_name, cov_type))
         self.tableView.resizeColumnsToContents()
         self.action_meta_regression.setEnabled(True)
         
@@ -739,7 +816,7 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
                 # then the user clicked ok and has added a new outcome.
                 # here we want to add the outcome to the dataset, and then
                 # display it
-                new_outcome_name = unicode(form.outcome_name_le.text().toUtf8(), "utf-8")
+                new_outcome_name = _qt_text(form.outcome_name_le.text())
                 # the outcome type is one of the enumerated types; we don't worry about
                 # unicode encoding
                 new_outcome_type = str(form.datatype_cbo_box.currentText())
@@ -747,7 +824,7 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
                 prev_outcome = str(self.model.current_outcome)
                 undo_f = lambda: self._undo_add_new_outcome(new_outcome_name, prev_outcome)
         elif self.cur_dimension == "outcome" and startup_outcome: # For dealing with outcomes from the startup form
-            new_outcome_name = unicode(startup_outcome['name'].toUtf8(), "utf-8")
+            new_outcome_name = str(startup_outcome['name'].toUtf8(), "utf-8") if hasattr(startup_outcome['name'], "toUtf8") else str(startup_outcome['name'])
             new_outcome_type = str(startup_outcome['data_type'])
             try:
                 new_outcome_subtype = startup_outcome['sub_type']
@@ -755,7 +832,7 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
                 print("ERROR: No outcome subtype detected.")
                 #pyqtRemoveInputHook()
                 #pdb.set_trace()
-            print 'Startup Outcome',startup_outcome
+            print('Startup Outcome',startup_outcome)
             redo_f = lambda: self._add_new_outcome(new_outcome_name, new_outcome_type, new_outcome_subtype)
             prev_outcome = str(self.model.current_outcome)
             undo_f = lambda: self._undo_add_new_outcome(new_outcome_name, prev_outcome)
@@ -763,7 +840,7 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
             form = add_new_dialogs.AddNewGroupForm(self)
             form.group_name_le.setFocus()        
             if form.exec_():
-                new_group_name = unicode(form.group_name_le.text().toUtf8(), "utf-8")
+                new_group_name = _qt_text(form.group_name_le.text())
                 cur_groups = list(self.model.get_current_groups())
                 redo_f = lambda: self._add_new_group(new_group_name)
                 undo_f = lambda: self._undo_add_new_group(new_group_name, cur_groups)
@@ -772,7 +849,7 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
             form = add_new_dialogs.AddNewFollowUpForm(self)
             form.follow_up_name_le.setFocus()
             if form.exec_():
-                follow_up_lbl = unicode(form.follow_up_name_le.text().toUtf8(), "utf-8")
+                follow_up_lbl = _qt_text(form.follow_up_name_le.text())
                 redo_f = lambda: self._add_new_follow_up_for_cur_outcome(follow_up_lbl)
                 previous_follow_up = self.model.get_current_follow_up_name()
                 undo_f = lambda: self._undo_add_follow_up_for_cur_outcome(\
@@ -784,7 +861,7 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
                 
     def _add_new_group(self, new_group_name):
         self.model.add_new_group(new_group_name)
-        print "\nok. added new group: %s" % new_group_name
+        print("\nok. added new group: %s" % new_group_name)
         cur_groups = list(self.model.get_current_groups())
         cur_groups[1] = new_group_name
         self.model.set_current_groups(cur_groups)
@@ -794,15 +871,15 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         
     def _undo_add_new_group(self, added_group, previously_displayed_groups):
         self.model.remove_group(added_group)
-        print "\nremoved group %s" % added_group
-        print "attempting to display groups: %s" % previously_displayed_groups
+        print("\nremoved group %s" % added_group)
+        print("attempting to display groups: %s" % previously_displayed_groups)
         self.model.set_current_groups(previously_displayed_groups)
         self.display_groups(previously_displayed_groups)
     
     def _undo_add_new_outcome(self, added_outcome, previously_displayed_outcome):
-        print "removing added outcome: %s" % added_outcome
+        print("removing added outcome: %s" % added_outcome)
         self.model.remove_outcome(added_outcome)
-        print "trying to display: %s" % previously_displayed_outcome
+        print("trying to display: %s" % previously_displayed_outcome)
         ##
         # RESOLVED previously, if previous outcome was None, this threw up
         # (see Issue 4: http://github.com/bwallace/OpenMeta-analyst-/issues#issue/4)
@@ -906,14 +983,14 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         self.nav_lbl.setText(self.cur_dimension)
 
     def display_groups(self, groups):
-        print "displaying groups: %s" % groups
+        print("displaying groups: %s" % groups)
         self.model.set_current_groups(groups)
         self.model.try_to_update_outcomes()
         self.model.reset()
         self.tableView.resizeColumnsToContents()
         
     def display_outcome(self, outcome_name, group_names=None, follow_up_name=None):
-        print "displaying outcome: %s" % outcome_name
+        print("displaying outcome: %s" % outcome_name)
         ###
         # We need to update which groups & follow-ups are current
         # in order to avoid attempting to display a group/fu that
@@ -948,20 +1025,20 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
                             outcome_name, self.model.get_current_follow_up_name(), group) for group in cur_groups]):
                 self.model.set_current_groups(self.model.next_groups())
             
-        self.cur_outcome_lbl.setText(u"<font color='Blue'>%s</font>" % outcome_name)
-        self.cur_time_lbl.setText(u"<font color='Blue'>%s</font>" % self.model.get_current_follow_up_name())
+        self.cur_outcome_lbl.setText("<font color='Blue'>%s</font>" % outcome_name)
+        self.cur_time_lbl.setText("<font color='Blue'>%s</font>" % self.model.get_current_follow_up_name())
         self.model.reset()
         self.tableView.resizeColumnsToContents()
 
     def display_follow_up(self, time_point):
-        print "follow up"
+        print("follow up")
         self.model.current_time_point = time_point
         self.update_follow_up_label()
         self.model.reset()
         self.tableView.resizeColumnsToContents()
         
     def update_follow_up_label(self):
-        self.cur_time_lbl.setText(u"<font color='Blue'>%s</font>" % self.model.get_current_follow_up_name())
+        self.cur_time_lbl.setText("<font color='Blue'>%s</font>" % self.model.get_current_follow_up_name())
         
     def open(self, file_path=None):
         '''
@@ -984,10 +1061,10 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         if file_path is None:
             file_path = QFileDialog.getOpenFileName(
                 parent=self,
-                caption=QString("OpenMeta[analyst] - Open File"),
-                directory=".",
+                caption="OpenMetaAnalyst - Open File",
+                directory=get_default_open_directory(),
                 filter="open meta files (*.oma)")
-            file_path = unicode(file_path.toUtf8(),'utf8')
+            file_path = _qt_dialog_path(file_path)
 
             # if the user didn't select anything, we return false.                                  
             if file_path == "":
@@ -997,14 +1074,14 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         add_file_to_recent_files(file_path)
         
         data_model = None
-        print "loading %s..." % file_path
+        print("loading %s..." % file_path)
         try:
-            data_model = pickle.load(open(file_path, 'r'))
-            print "successfully loaded data"
+            data_model = _load_legacy_pickle(file_path)
+            print("successfully loaded data")
         except Exception as e:
             msg = "Could not open %s, error: %s" % (file_path, str(e))
             print(msg)
-            QMessageBox.critical(self, "whoops", msg)
+            QMessageBox.critical(self, "Whoops", msg)
             return None
         
         ## cache current state for undo.
@@ -1015,19 +1092,22 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         
         state_dict = None
         try:
-            state_dict = pickle.load(open(file_path + ".state"))
-            print "found state dictionary: \n%s" % state_dict
+            state_dict = _load_legacy_pickle(file_path + ".state")
+            print("found state dictionary: \n%s" % state_dict)
         except:
-            print "no state dictionary found -- using 'reasonable' defaults"
+            print("no state dictionary found -- using 'reasonable' defaults")
             state_dict = self.tableView.model().make_reasonable_stateful_dict(data_model)
-            print "made state dictionary: \n%s" % state_dict
+            print("made state dictionary: \n%s" % state_dict)
 
         prev_dataset = self.model.dataset.copy()
         
         undo_f = lambda: self.undo_set_model(prev_out_path, prev_state_dict,
                                              prev_dataset)
-        redo_f = lambda: self.set_model(data_model, state_dict,
-                                        check_for_appropriate_metric=True)
+        def redo_open():
+            self.set_model(data_model, state_dict, check_for_appropriate_metric=True)
+            self.model.analysis_source_path = file_path
+
+        redo_f = redo_open
         
         open_command = meta_globals.CommandGenericDo(redo_f, undo_f)
         self.tableView.undoStack.push(open_command)
@@ -1059,9 +1139,13 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
             modified_dataset = change_type_form.dataset
             # revert to original study ordering
             modified_dataset.studies.sort(\
-                    cmp=modified_dataset.cmp_studies(compare_by="ordered_list",\
-                                        ordered_list=original_study_order,
-                                        mult=self.model.get_mult()))
+                    key=cmp_to_key(
+                        modified_dataset.cmp_studies(
+                            compare_by="ordered_list",
+                            ordered_list=original_study_order,
+                            mult=self.model.get_mult(),
+                        )
+                    ))
             
             ### use the same state dict as before.
             old_state_dict = self.tableView.model().get_stateful_dict()
@@ -1081,12 +1165,12 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         if edit_cov_form.exec_():
             # the field names are also poorly named, in this case. here we mean the 
             # **covariate name**, of course.
-            new_cov = unicode(edit_cov_form.group_name_le.text().toUtf8(), "utf-8")
+            new_cov = _qt_text(edit_cov_form.group_name_le.text())
             
             # make sure the group name doesn't already exist
             if new_cov in self.model.dataset.get_cov_names():
                 QMessageBox.warning(self,
-                            "whoops.",
+                            "Whoops",
                             "%s is already a covariate name -- pick something else, please" % new_cov)
             
             else:
@@ -1110,13 +1194,13 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         self.tableView.undoStack.push(delete_command)  
 
     def _add_study(self, study, study_index=None):
-        print "adding study: %s" % study.name
+        print("adding study: %s" % study.name)
         self.model.dataset.add_study(study, study_index=study_index)
         self.model.reset()
         self.data_dirtied()
         
     def _remove_study(self, study):
-        print "deleting study: %s" % study.name
+        print("deleting study: %s" % study.name)
         self.model.dataset.studies.remove(study)
         self.model.reset()
         self.data_dirtied()
@@ -1168,7 +1252,7 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
 
         self.model_updated()
         self.data_dirtied()
-        print "ok -- model set."
+        print("ok -- model set.")
         
         
     def model_updated(self):
@@ -1177,7 +1261,7 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         self.model.update_current_outcome()
         self.model.update_current_time_points()
 
-        if self.model.current_outcome is not None:
+        if self.model.current_outcome is not None and not self.model.is_diag():
             self.model.try_to_update_outcomes()
             
         # This is kind of subtle. We have to reconnect
@@ -1217,7 +1301,7 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         
     def update_outcome_lbl(self):
         self.cur_outcome_lbl.setText(\
-                u"<font color='Blue'>%s</font>" % self.model.current_outcome)
+                "<font color='Blue'>%s</font>" % self.model.current_outcome)
         
     def quit(self):
         if self.current_data_unsaved:
@@ -1248,17 +1332,17 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         if self.out_path is None or save_as:
             # use current out_path otherwise base it on the current dataset name
             if self.out_path:
-                out_f = unicode(self.out_path)
+                out_f = str(self.out_path)
             else:
                 out_f = os.path.join(docs_path, self.model.get_name())
 
             out_f = QFileDialog.getSaveFileName(
                 parent=self,
-                caption="OpenMeta[analyst] - Save File",
+                caption="OpenMetaAnalyst - Save File",
                 directory=out_f,
                 filter="open meta files: (.oma)",
             )
-            out_f = unicode(out_f.toUtf8(),'utf8')
+            out_f = _qt_dialog_path(out_f)
             if out_f == "" or out_f == None:
                 return None
             else:
@@ -1266,8 +1350,8 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
         
         # add proper file extension
         try:
-            if self.out_path[-4:] != u".oma":
-                self.out_path += u".oma"
+            if self.out_path[-4:] != ".oma":
+                self.out_path += ".oma"
                 print("added proper file extension")
         except Exception as e:
             print("")
@@ -1275,26 +1359,27 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
                 
                 
         try:
-            print "trying to write data out to: %s" % self.out_path
+            print("trying to write data out to: %s" % self.out_path)
             f = open(self.out_path, 'wb')
-            pickle.dump(self.model.dataset, f)
+            pickle.dump(self.model.dataset, f, protocol=2)
             f.close()
             # also write out the 'state', which contains things
             # pertaining to the view
             d = self.model.get_stateful_dict()
             f = open(self.out_path + ".state", 'wb')
-            pickle.dump(d, f)
+            pickle.dump(d, f, protocol=2)
             f.close()
+            self.model.analysis_source_path = self.out_path
 
             # add dataset to recent files
             add_file_to_recent_files(self.out_path)
             
             self.dataset_file_lbl.setText("open file: %s" % self.out_path)
             self.current_data_unsaved = False
-        except Exception, e:
+        except Exception as e:
             # @TODO handle this elegantly?
-            print e
-            raise Exception, "whoops. exception thrown attempting to save."
+            print(e)
+            raise Exception("whoops. exception thrown attempting to save.")
 
 
         
@@ -1346,7 +1431,7 @@ class MetaForm(QtGui.QMainWindow, ui_meta.Ui_MainWindow):
             covariate_names = csv_data['covariate_names']
             covariate_types = csv_data['covariate_types']
             
-            print("Data to import: %s\ncovariate names: %s\ncovariate_types: %s" % (str(imported_data),str(covariate_names),str(covariate_types) ))
+            print(("Data to import: %s\ncovariate names: %s\ncovariate_types: %s" % (str(imported_data),str(covariate_names),str(covariate_types) )))
         
             #Undo/redo stuff
             importcsv_command = CommandImportCSV(
@@ -1421,8 +1506,8 @@ class CommandImportCSV(QUndoCommand):
             for col in range(num_cols):
                 progress_bar.setValue(row*num_cols + col)
                 QApplication.processEvents()
-                print("bar_ value: %s" % str([progress_bar.value(),progress_bar.minimum(), progress_bar.maximum()]))
-                value = QVariant(QString(self.imported_data[row][col]))
+                print(("bar_ value: %s" % str([progress_bar.value(),progress_bar.minimum(), progress_bar.maximum()])))
+                value = str(self.imported_data[row][col])
                 self.main_form.model.setData(self.main_form.model.index(row,col+1), value, import_csv=True)
         
         progress_bar.hide() # we are done
@@ -1463,8 +1548,8 @@ class Command_Change_Conf_Level(QUndoCommand):
         
     def _set_conf_level(self, conf_level):
         self.mainform.model.set_conf_level(conf_level)
-        self.mainform.cl_label.setText("confidence level: {:.1%}".format(conf_level/100.0))
+        self.mainform.cl_label.setText(_format_confidence_level_status(conf_level))
         self.mainform.model.reset()
-        print("Global Confidence level is now: %f" % self.mainform.model.get_global_conf_level())
+        print(("Global Confidence level is now: %f" % self.mainform.model.get_global_conf_level()))
         
 

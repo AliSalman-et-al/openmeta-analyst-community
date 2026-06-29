@@ -1,5 +1,6 @@
 # Python
 *.pyc
+.venv/
 
 # R
 .RData
@@ -24,6 +25,7 @@ build/
 dist/
 dist.zip
 artifacts/
+artifacts/golden-baseline/
 src/build/
 src/build-debug/
 src/dist/

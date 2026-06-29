@@ -1,0 +1,19 @@
+# Capture a Comprehensive Golden Baseline Before Further Porting
+
+Before further Python 3.11 and PyQt5 porting changes alter application behavior, the project must expand Golden Analysis Tests into a Comprehensive Golden Baseline for the testable user-facing analysis workflows in the Release Cutover scope. This is a hard gate for behavior-changing port work; only mechanical enabling work that does not alter Analysis Behavior should continue before the gate is satisfied, such as regenerating canonical `.ui` modules, removing Python 2-only syntax, and making parser or import compatibility fixes needed to run tooling and shell-launch tests.
+
+The existing curated golden set remains the normal CI gate, but it is not enough by itself to protect Functional Indistinguishability across the full legacy application. The Comprehensive Golden Baseline should be driven by an explicit Coverage Matrix that covers as much user-facing functionality as practical: every analysis data family, every user-facing analysis workflow, major method and metric classes, important option branches, relevant project states, and generated artifacts. Any omitted user-facing branch should be documented with a reason instead of being silently skipped.
+
+The baseline does not need full combinatorial coverage of every equivalent metric/method/option pairing when those combinations exercise the same path and produce redundant confidence. It should still bias toward more coverage when there is uncertainty about whether a branch is behaviorally distinct. Omitting a user-facing branch requires a short rationale in the Coverage Matrix so the omission can be reviewed later.
+
+The Comprehensive Golden Baseline should capture parsed numeric summaries as the hard comparison target and preserve generated artifacts, including plots, for Plot Similarity review. Plot verification should check analysis content and recognizable presentation, not pixel-perfect rendering.
+
+Capture should use both headless and GUI-driven paths. The headless harness provides broad numeric and artifact coverage because it is faster and less fragile. GUI-driven capture is required for representative end-to-end workflows and for any workflow where dialog state, project state, or user choices affect analysis parameters.
+
+The repository should commit the Coverage Matrix, capture manifests, schemas, tooling, and a small Curated Golden Set for normal CI. Broader Comprehensive Golden Baseline outputs should live as ignored local artifacts or CI/release artifact bundles so the baseline remains reproducible without making the repository large.
+
+The Comprehensive Golden Baseline gate is satisfied when the Coverage Matrix has concrete rows for every Release Cutover workflow, the Reference Environment has captured outputs or documented omissions for each row, the Curated Golden Set is committed and passing in normal CI, and the broader baseline artifact is reproducible even if it is stored outside the repository. Passing every baseline row in the Modern CI Path is a later Release Cutover gate, not the exit criterion for this capture gate.
+
+The hard gate should be enforced through both documentation and CI. The first CI enforcement step should be a manifest-completeness check that verifies the Coverage Matrix, Workflow Traceability Manifest, Curated Golden Set, schema, and broader artifact manifest are present and internally consistent. Behavior-changing full-port PRs should not merge until that check passes. The broader captured baseline may remain an uploaded CI or release artifact instead of committed repository data.
+
+This adds upfront work before deeper porting, but it prevents the migration from losing the Reference Implementation target while Python runtime, Qt APIs, project-file behavior, and R bridge mechanics are changing.

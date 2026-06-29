@@ -1,0 +1,255 @@
+# Analysis Compatibility
+
+This context defines what must remain stable while OpenMeta[Analyst] Community is migrated from its legacy Python 2.7 and Qt 4 implementation to a modern Python 3 and Qt 5 implementation.
+
+## Language
+
+**Reference Implementation**:
+The current Python 2.7, PyQt4, and bundled R-package application used as the source of truth for preserved behavior during migration.
+_Avoid_: Legacy app, old version
+
+**Reference Environment**:
+The reproducible Windows CI conda environment used to run the Reference Implementation and capture Golden Analysis Test outputs.
+_Avoid_: Developer machine, local legacy setup
+
+**Retired Legacy CI Path**:
+The former Python 2 and PyQt4 Windows CI/build workflow that produced the Reference Environment and legacy distributable before cutover.
+_Avoid_: Active fallback, maintained legacy build
+
+**Modern CI Path**:
+The Python 3 and PyQt5 test/build workflow used for the maintained release path.
+_Avoid_: New workflow, preview build
+
+**Release Cutover**:
+The point where the Modern CI Path replaces the Legacy CI Path as the accepted release path.
+_Avoid_: Migration complete, switch over
+
+**R Stack**:
+The R runtime, rpy2 bridge, bundled R packages, and external R packages used to execute meta-analysis calculations.
+_Avoid_: R dependencies, statistical backend
+
+**Out-of-Process R Bridge**:
+A process boundary where the Python 3 application invokes analysis code running in a separate R-capable environment instead of embedding R through in-process rpy2.
+_Avoid_: R subprocess hack, external script
+
+**Analysis Behavior**:
+The statistical inputs, model choices, numerical outputs, result summaries, and generated analysis artifacts that users rely on when conducting meta-analyses.
+_Avoid_: Exact functionality, analysis functionality
+
+**Golden Analysis Test**:
+A regression test that compares modernized analysis behavior against outputs captured from the Reference Implementation using representative project data.
+_Avoid_: Snapshot test, golden master
+
+**Golden Output Bundle**:
+A structured set of reference outputs for a Golden Analysis Test, including JSON comparison data and external generated artifacts such as plots.
+_Avoid_: Raw snapshot, console output
+
+**Comprehensive Golden Baseline**:
+The hard-gated pre-port capture of Reference Implementation outputs across the testable user-facing analysis workflows needed to protect Functional Indistinguishability before further behavior-changing modernization changes are made.
+_Avoid_: Nice-to-have test expansion, later coverage, exhaustive proof of everything
+
+**Coverage Matrix**:
+The explicit list of data families, analysis workflows, metrics, methods, options, project states, and generated artifacts included in the Comprehensive Golden Baseline, with documented reasons for any omitted user-facing branch.
+_Avoid_: Representative sample, implicit coverage, best-effort tests
+
+**Curated Golden Set**:
+The small committed set of Golden Output Bundles required to gate core compatibility in normal CI.
+_Avoid_: Full capture, all snapshots
+
+**Data-Family Breadth**:
+Golden Analysis Test coverage that samples the major analysis data families before exhaustively covering every method within one family.
+_Avoid_: Broad test coverage, representative tests
+
+**Initial Golden Datasets**:
+The first committed project files used to capture and compare Golden Output Bundles: `amino.oma`, `continuous.oma`, and `lymph.oma`.
+_Avoid_: Sample data, fixture set
+
+**Initial Golden Methods**:
+The first analysis methods captured for the Curated Golden Set, prioritizing random-effects analyses across the Initial Golden Datasets.
+_Avoid_: Method fixtures, first methods
+
+**Network Meta-Analysis**:
+The optional network-analysis feature area that depends on packages outside the default desktop binary build.
+_Avoid_: Network feature, optional analysis
+
+**Meta-Regression**:
+An analysis feature that models study-level covariates as predictors of effect estimates and must remain compatible before the first modernization milestone is releasable.
+_Avoid_: Regression feature, covariate analysis
+
+**Subgroup Analysis**:
+An analysis feature that compares effect estimates across study groups or categorical covariates and must remain compatible before the first modernization milestone is releasable.
+_Avoid_: Group analysis, subgroup feature
+
+**Required Advanced Analysis Coverage**:
+The milestone-1 compatibility coverage required for Meta-Regression and Subgroup Analysis before release.
+_Avoid_: Advanced tests, full matrix
+
+**Confidence Level**:
+The percentage level used to compute confidence intervals for analysis results and displayed confidence intervals; the default Confidence Level is 95.0% unless a project or user action sets another value.
+_Avoid_: CI setting, interval percentage, confidence placeholder
+
+**Modern Test Runner**:
+The test runner used by Python 3 modernization tests and compatibility harness work.
+_Avoid_: Test cleanup, new tests
+
+**Compatibility Report**:
+A CI artifact that records the datasets, analysis methods, metrics, tolerances, and observed drift values from Golden Analysis Tests.
+_Avoid_: Test log, CI summary
+
+**Numerical Equivalence**:
+Compatibility between analysis outputs when parsed numerical values match the Reference Implementation within explicit tolerances for each output type.
+_Avoid_: Exact match, string equality
+
+**Plot Similarity**:
+Compatibility where generated plots preserve the same analysis content, labels, grouping, ordering, and recognizable presentation as the Reference Implementation without requiring pixel-perfect image equality.
+_Avoid_: Pixel-perfect plot diff, unchecked plot artifact, cosmetic clone
+
+**Compatibility Exception**:
+An explicitly documented, reviewed difference from Reference Implementation Analysis Behavior that is accepted despite failing normal golden-test equivalence.
+_Avoid_: Known failure, acceptable drift
+
+**Compatibility Exception Manifest**:
+A machine-readable list of accepted Compatibility Exceptions with stable IDs, affected workflows, reasons, approval references, and follow-up expectations.
+_Avoid_: Exception notes, known-fail list
+
+**GUI Verification Evidence**:
+Manual or scripted proof that a GUI Compatibility Slice can be completed with preserved workflow behavior and GUI Similarity.
+_Avoid_: GUI test suite, visual snapshot
+
+**GUI Compatibility Exception**:
+An explicitly documented difference from the Reference Implementation GUI workflow or layout that is accepted for the modernization milestone.
+_Avoid_: UI change, simplification
+
+**GUI Compatibility Exception Manifest**:
+A machine-readable list of accepted GUI Compatibility Exceptions with stable IDs, affected workflows, before and after behavior, reasons, approval references, and follow-up expectations.
+_Avoid_: UI exception notes, visual-diff list
+
+**Headless Analysis Harness**:
+A test harness that exercises Analysis Behavior without requiring the full desktop window lifecycle.
+_Avoid_: GUI test harness, analysis runner
+
+**Analysis Adapter**:
+The Python boundary that prepares analysis inputs, invokes R-backed analysis behavior, and normalizes returned summaries and artifacts for the application.
+_Avoid_: R wrapper, direct R call
+
+**Compatibility Slice**:
+A small migration increment that produces a runnable or testable path whose behavior can be compared against the Reference Implementation.
+_Avoid_: Mechanical conversion batch, big-bang port
+
+**Compatibility-First Port**:
+A migration approach that preserves existing code organization unless a local change is required to make a compatibility slice run under the target runtime.
+_Avoid_: Cleanup port, rewrite
+
+**Post-Port Refactor**:
+A planned modernization phase after compatibility slices are stable, focused on improving module boundaries and maintainability without changing Analysis Behavior.
+_Avoid_: Future cleanup, code reorganization
+
+**GUI Compatibility Slice**:
+A Compatibility Slice that proves a user-visible desktop workflow still works with GUI Similarity and preserved Analysis Behavior.
+_Avoid_: GUI milestone, screen port
+
+**Full Legacy App Port**:
+The modernization target where all non-network desktop workflows from the Reference Implementation are available through the Modern CI Path before Release Cutover.
+_Avoid_: Full rewrite, preview slice, modern demo
+
+**Complete User-Facing Legacy Port**:
+The post-cutover modernization target where every user-facing desktop workflow from the Reference Implementation, including Network Meta-Analysis, is available through the Modern CI Path.
+_Avoid_: First milestone, release cutover, all-at-once port
+
+**Functional Indistinguishability**:
+Compatibility where a user can complete the same user-facing workflow with the same project data, choices, outputs, side effects, and error handling as the Reference Implementation, even when the Qt 5 interface is not pixel-perfect.
+_Avoid_: Pixel-perfect clone, approximate feature parity, modernized behavior
+
+**User-Facing Workflow Inventory**:
+The authoritative checklist of Reference Implementation workflows that must be preserved for the Full Legacy App Port, built from legacy GUI actions, bundled user documentation, sample projects, and R-backed analysis paths.
+_Avoid_: Feature brainstorm, implementation task list, partial menu audit
+
+**Workflow Traceability Manifest**:
+A machine-readable map from each Release Cutover workflow to its Golden Analysis Test coverage, GUI Verification Evidence, documented omission, Compatibility Exception, or GUI Compatibility Exception.
+_Avoid_: Manual checklist, prose-only trace, informal audit
+
+**Standard Binary Analysis Workflow**:
+The first GUI Compatibility Slice: open an existing `.oma` sample dataset, display the data table, run a standard binary random-effects meta-analysis, and show the result summary plus forest plot.
+_Avoid_: First GUI test, binary demo
+
+**Project File Read Compatibility**:
+The requirement that the modernized application can open existing `.oma` project files without user-visible migration steps.
+_Avoid_: File support, import compatibility
+
+**Project File Round Trip**:
+A compatibility check that opens a representative `.oma` project file, saves it through the modernized application, and verifies that the saved project can be reopened by the modernized application with equivalent project data.
+_Avoid_: Byte-perfect save, file snapshot
+
+**Versioned Project Format**:
+A future project file format that can evolve beyond the current `.oma` representation while preserving access to existing projects through migration tooling.
+_Avoid_: New save format, file rewrite
+
+**Windows Distributable**:
+The packaged Windows application artifact that users can run without setting up the source development environment.
+_Avoid_: Build artifact, packaged app
+
+**Windows Packaging Candidate**:
+The packaging toolchain assumed for the first modern Windows distributable unless dependency feasibility proves it unsuitable.
+_Avoid_: Installer choice, packaging stack
+
+**Release Readiness Documentation**:
+Minimal user-facing documentation that explains how to run the modern Windows distributable and what compatibility promises the release makes.
+_Avoid_: Developer notes, migration docs
+
+**Milestone Platform Scope**:
+The operating systems that count toward acceptance for a modernization milestone.
+_Avoid_: Platform support, supported systems
+
+**GUI Similarity**:
+A rough preservation target for the desktop interface's workflows, layout, and user-facing concepts without requiring pixel-perfect visual equivalence.
+_Avoid_: Exact GUI, identical GUI
+
+**Recognizable Layout**:
+GUI compatibility where users can identify the same menus, dialogs, tables, controls, and result views even if Qt5 changes spacing, fonts, or widget rendering.
+_Avoid_: Pixel match, visual clone
+
+**Qt Binding Target**:
+The Python Qt binding chosen for the first GUI migration milestone.
+_Avoid_: Qt wrapper, GUI framework choice
+
+**Python Runtime Target**:
+The specific Python 3 minor version chosen for the first modernization milestone.
+_Avoid_: Python 3, modern Python
+
+**Modern Python Environment**:
+The reproducible Python 3 dependency environment used for the port, tests, and packaging work.
+_Avoid_: Dependency cleanup, dev setup
+
+**Dependency Feasibility Spike**:
+The first implementation investigation that proves whether the proposed Python runtime, PyQt5, rpy2 bridge, and pinned R stack can work together.
+_Avoid_: Setup task, environment check
+
+**Text Boundary**:
+A boundary where project-file data, GUI labels, model values, or R-bridge inputs must be normalized between legacy Python 2 text types and Python 3 strings.
+_Avoid_: String fix, unicode issue
+
+**Canonical UI Form**:
+A Qt Designer `.ui` file that is treated as the source of truth for generated Python UI code.
+_Avoid_: Generated UI module, hand-ported UI file
+
+**Signal Migration**:
+The conversion of PyQt4 old-style signal and slot connections to PyQt5-compatible signal handling.
+_Avoid_: Signal cleanup, connect rewrite
+
+**Qt Compatibility Helper**:
+A small focused helper for repeated PyQt4-to-PyQt5 API differences used only where local replacement would duplicate behavior across slices.
+_Avoid_: PyQt4 shim, compatibility layer
+
+**Narrow Qt Compatibility Helper**:
+A Qt Compatibility Helper with an explicit, limited charter for repeated PyQt5 migration boundaries such as text extraction and file-dialog return normalization. Modern GUI modules should prefer direct PyQt5 imports and local Qt5 methods over shared Qt compatibility behavior.
+_Avoid_: Fake PyQt4 layer, QString clone, QVariant clone
+
+**Modern Bootstrap Helper**:
+A minimal setup helper for modern tests and automation that selects the modern R backend. It is not a Qt binding compatibility layer.
+_Avoid_: PyQt4 bootstrap, fake Qt module installer
+
+## Headless Harness Notes
+
+The first Headless Analysis Harness loads `.oma` files into `DatasetModel`, normalizes legacy state, converts the model through the existing Analysis Adapter functions in `meta_py_r`, and runs one binary or continuous method without creating `QApplication` or `MetaForm`.
+
+Remaining GUI coupling: `DatasetModel` still subclasses `QAbstractTableModel` and uses Qt signal/reset behavior while shaping analysis inputs. It now imports PyQt5 directly and owns its Qt5 reset behavior locally.

@@ -1,5 +1,4 @@
-#from PyQt4.Qt import *
-from PyQt4.Qt import QDialog, QString, QVariant
+from PyQt5.QtWidgets import QDialog
 #from meta_globals import *
 from meta_globals import DIAGNOSTIC
 import forms.ui_new_group
@@ -39,10 +38,10 @@ class AddNewOutcomeForm(QDialog, forms.ui_new_outcome.Ui_Dialog):
     def _populate_combo_box(self):
         # diagnostic datasets can have only diagnostic outcomes
         if self.is_diag:
-            self.datatype_cbo_box.addItem(QString("Diagnostic"), QVariant(DIAGNOSTIC))
+            self.datatype_cbo_box.addItem("Diagnostic", DIAGNOSTIC)
         else:
-            for name, type_id in zip([QString(s) for s in ["Binary", "Continuous"]],
-                                         [QVariant(i) for i in range(2)]):
+            for name, type_id in zip(["Binary", "Continuous"],
+                                         range(2)):
                 self.datatype_cbo_box.addItem(name, type_id)
         
 
@@ -62,6 +61,6 @@ class AddNewCovariateForm(QDialog, forms.ui_new_covariate.Ui_new_covariate_dialo
 
         
     def _populate_combo_box(self):
-        for name, type_id in zip([QString(s) for s in ["continuous", "factor"]],
-                                     [QVariant(i) for i in range(2)]):
+        for name, type_id in zip(["continuous", "factor"],
+                                     range(2)):
             self.datatype_cbo_box.addItem(name, type_id)
