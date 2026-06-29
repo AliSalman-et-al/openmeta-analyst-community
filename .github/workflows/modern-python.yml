@@ -72,6 +72,9 @@ jobs:
       - name: Run remaining modern pytest tests
         run: uv run pytest tests/modern --ignore=tests/modern/test_metaform_automation_launch.py
 
+      - name: Verify OpenMetaR R Stack Slice
+        run: uv run python scripts/verify_openmetar_r_stack.py
+
       - name: Build modern Windows binary
         run: .\scripts\build-modern-windows-binary.ps1 -ArtifactName OpenMetaAnalyst-modern-windows-x64 -PythonExe .\.venv\Scripts\python.exe -SkipDependencyInstall
 

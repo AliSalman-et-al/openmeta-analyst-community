@@ -1,4 +1,8 @@
-options(repos = c(CRAN = "https://cran.r-project.org"), timeout = 600)
+options(
+  repos = c(CRAN = "https://cran.r-project.org"),
+  timeout = 600,
+  install.packages.check.source = "no"
+)
 lib <- Sys.getenv("R_LIBS_USER")
 
 if (!nzchar(lib)) {
@@ -33,11 +37,12 @@ required_packages <- unique(c(
   app_cran_bundle_packages,
   recommended_bundle_packages
 ))
+package_install_type <- if (.Platform$OS.type == "windows") "binary" else "source"
 
 install_cran_packages <- function(packages) {
   missing <- packages[!vapply(packages, requireNamespace, logical(1), quietly = TRUE)]
   if (length(missing)) {
-    install.packages(missing, lib = lib, dependencies = NA)
+    install.packages(missing, lib = lib, dependencies = NA, type = package_install_type)
   }
 }
 

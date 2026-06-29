@@ -35,6 +35,10 @@ try {
     uv run pytest tests\modern --ignore=tests\modern\test_metaform_automation_launch.py
     if ($LASTEXITCODE -ne 0) { throw "Modern pytest tests failed." }
 
+    Write-Step "Verifying OpenMetaR R Stack Slice"
+    uv run python scripts\verify_openmetar_r_stack.py
+    if ($LASTEXITCODE -ne 0) { throw "OpenMetaR R Stack Slice verification failed." }
+
     Write-Step "Building modern Windows artifact with PyInstaller"
     $buildArgs = @(
         "-ArtifactName", $ArtifactName,

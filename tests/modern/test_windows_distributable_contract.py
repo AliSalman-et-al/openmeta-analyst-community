@@ -95,6 +95,8 @@ def test_modern_windows_workflow_builds_separate_artifact():
     workflow = (ROOT / ".github" / "workflows" / "modern-python.yml").read_text()
 
     assert "windows-modern" in workflow
+    assert "Verify OpenMetaR R Stack Slice" in workflow
+    assert "uv run python scripts/verify_openmetar_r_stack.py" in workflow
     assert "build-modern-windows-binary.ps1" in workflow
     assert "OpenMetaAnalyst-modern-windows-x64.zip" in workflow
     assert "OpenMetaAnalyst-windows-x64.zip" not in workflow
@@ -119,6 +121,8 @@ def test_local_modern_workflow_uses_uv():
         "uv run pytest tests\\modern\\test_metaform_automation_launch.py",
         "uv run pytest tests\\modern",
         "--ignore=tests\\modern\\test_metaform_automation_launch.py",
+        "uv run python scripts\\verify_openmetar_r_stack.py",
+        "OpenMetaR R Stack Slice verification failed.",
         '"-PythonExe", $pythonExe',
         "-SkipDependencyInstall",
         "-SkipClean",
@@ -199,6 +203,28 @@ def test_shared_modern_r_dependency_installer_is_used_by_packagers():
     assert "openmetar-r-dependencies.json" in macos
     assert "-rdeps-" in windows
     assert "-rdeps-" in macos
+
+
+def test_openmetar_r_stack_verifier_declares_issue_114_gate_sequence():
+    script = (ROOT / "scripts" / "verify_openmetar_r_stack.py").read_text()
+
+    for expected in [
+        "validate_openmetar_r_manifests.py",
+        "install-modern-r-deps.R",
+        "\"CMD\", \"INSTALL\"",
+        "src\") / \"R\" / \"HSROC\"",
+        "src\") / \"R\" / \"openmetar\"",
+        "\"CMD\", \"build\"",
+        "\"CMD\"",
+        "\"check\"",
+        "analysis-smoke-test.R",
+        "test_inprocess_rpy2_backend.py",
+        "test_openmetar_r_manifest_validation.py",
+        "--report-installed-versions",
+        "isolated R library",
+        "OpenMetaR R Stack Slice verification complete",
+    ]:
+        assert expected in script
 
 
 def test_macos_packager_resolves_relative_python_before_changing_directory():
