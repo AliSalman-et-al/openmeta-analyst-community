@@ -23,12 +23,12 @@ if (is.element(R.version, valid.versions)) {
             }
         }
     } 
-    if (!is.element("openmetar", package.names)) {
+    if (!is.element("OpenMetaR", package.names)) {
         if (type == "win.binary") {
-            local.pkgs <- c(local.pkgs, "openmetar_1.0.zip")
+            local.pkgs <- c(local.pkgs, "OpenMetaR_1.0.zip")
         }
         if (type == "source") {
-            local.pkgs <- c(local.pkgs, "openmetar_1.0.tar.gz")
+            local.pkgs <- c(local.pkgs, "OpenMetaR_1.0.tar.gz")
         }
     }    
     if (length(repo.pkgs) > 0) {
@@ -40,6 +40,6 @@ if (is.element(R.version, valid.versions)) {
     install.packages(local.pkgs, repo=NULL)
     }
 } else {
-    cat("Your version of R is not compatible with openmetar.\n")
+    cat("Your version of R is not compatible with OpenMetaR.\n")
     cat("Compatible versions are 2.9.2, 2.10.0, 2.10.1, 2.11.0, and 2.11.1.\n")
 }

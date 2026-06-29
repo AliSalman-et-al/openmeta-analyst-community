@@ -1,4 +1,4 @@
-#' openmetar: R component for Open Meta-Analyst
+#' OpenMetaR: R component for Open Meta-Analyst
 #'
 #' R component for Open Meta-Analyst, a graphical user interface for performing
 #' meta-analysis.
@@ -9,7 +9,7 @@
 
 #' Namespace directives for the preserved OpenMetaR R Stack Slice surface
 #'
-#' The Python Analysis Adapter discovers openmetar analysis functions dynamically
+#' The Python Analysis Adapter discovers OpenMetaR analysis functions dynamically
 #' through the attached package namespace. Keep this explicit list synchronized
 #' with the legacy `exportPattern("^[[:alpha:]]+")`-eligible function surface.
 #'

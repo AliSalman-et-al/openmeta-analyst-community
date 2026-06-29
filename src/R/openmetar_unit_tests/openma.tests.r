@@ -1,5 +1,5 @@
 
-library(openmetar)
+library(OpenMetaR)
 
 test.all <- function() {
   try.errors <- array(list())

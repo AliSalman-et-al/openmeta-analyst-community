@@ -12,15 +12,15 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 _HSROC_RETRY_DRIVER = textwrap.dedent(
     r"""
     repo <- normalizePath(__REPO_ROOT__, winslash = "/")
-    required <- c("openmetar", "metafor", "HSROC")
+    required <- c("OpenMetaR", "metafor", "HSROC")
     missing <- required[!vapply(required, requireNamespace, logical(1), quietly=TRUE)]
     if (length(missing) > 0) {
       cat("SKIP missing R packages:", paste(missing, collapse=", "), "\n")
       quit(status=42)
     }
 
-    suppressPackageStartupMessages(library(openmetar))
-    suppressPackageStartupMessages(source(file.path(repo, "src/R/openmetar/R/diagnostic_methods.r")))
+    suppressPackageStartupMessages(library(OpenMetaR))
+    suppressPackageStartupMessages(source(file.path(repo, "src/R/OpenMetaR/R/diagnostic_methods.r")))
 
     work <- tempfile("hsroc_retry_")
     dir.create(work)

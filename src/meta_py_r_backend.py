@@ -80,7 +80,7 @@ def install_stub_meta_py_r():
         (),
         {
             "load_metafor": lambda self: None,
-            "load_openmetar": lambda self: None,
+            "load_OpenMetaR": lambda self: None,
             "load_igraph": lambda self: None,
             "load_grid": lambda self: None,
             "load_gemtc": lambda self: None,

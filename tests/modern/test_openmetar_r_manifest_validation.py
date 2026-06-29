@@ -10,9 +10,9 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VALIDATOR = REPO_ROOT / "scripts" / "validate_openmetar_r_manifests.py"
-DEPENDENCY_MANIFEST = Path("docs") / "modernization" / "openmetar-r-dependencies.json"
-DRIFT_MANIFEST = Path("docs") / "modernization" / "openmetar-statistical-drift.json"
-OPENMETAR_PACKAGE = REPO_ROOT / "src" / "R" / "openmetar"
+DEPENDENCY_MANIFEST = Path("docs") / "modernization" / "OpenMetaR-r-dependencies.json"
+DRIFT_MANIFEST = Path("docs") / "modernization" / "OpenMetaR-statistical-drift.json"
+OPENMETAR_PACKAGE = REPO_ROOT / "src" / "R" / "OpenMetaR"
 OPENMETAR_R_DIR = OPENMETAR_PACKAGE / "R"
 OPENMETAR_DESCRIPTION = OPENMETAR_PACKAGE / "DESCRIPTION"
 OPENMETAR_NAMESPACE = OPENMETAR_PACKAGE / "NAMESPACE"

@@ -228,13 +228,13 @@ def test_comprehensive_golden_baseline_capture_writes_reproducible_bundle(tmp_pa
         plot.write_bytes(b"plot")
 
         monkeypatch.setattr(golden_analysis, "curated_golden_bundles", lambda root_dir=None: bundles)
-        monkeypatch.setattr(golden_analysis.meta_py_r, "RlibLoader", lambda: types.SimpleNamespace(load_openmetar=lambda: None))
+        monkeypatch.setattr(golden_analysis.meta_py_r, "RlibLoader", lambda: types.SimpleNamespace(load_OpenMetaR=lambda: None))
         monkeypatch.setattr(golden_analysis, "_commit_sha", lambda: "abc123")
-        monkeypatch.setattr(golden_analysis, "_tool_versions", lambda: {"openmeta_analyst": "0.005", "python": "2.7.18", "os": "Windows", "r": "R version 3.3.2", "rpy2": "2.8.5", "pyqt": "4.11.4"})
+        monkeypatch.setattr(golden_analysis, "_tool_versions", lambda: {"openmeta_analyst": "0.005", "python": "3.11.15", "os": "Windows", "r": "R version 4.6.0", "rpy2": "3.6.7", "pyqt": "5.15.11"})
 
         def runner(case):
             if case == "failing-case":
-                raise RuntimeError("reference capture failed")
+                    raise RuntimeError("modern baseline capture failed")
             return {"texts": {"Summary": "Estimate Lower bound Upper bound\n 1.0 0.5 1.5 0.02"}, "images": {"Forest Plot": str(plot)}}
 
         report = golden_analysis.capture_comprehensive_golden_baseline(
@@ -243,7 +243,7 @@ def test_comprehensive_golden_baseline_capture_writes_reproducible_bundle(tmp_pa
             timestamp="2026-06-23T00:00:00Z",
             capture_mode="authoritative",
             capture_command="capture command",
-            reference_environment=dict(golden_analysis.REFERENCE_ENVIRONMENT_EXPECTED),
+            baseline_environment=dict(golden_analysis.MODERN_BASELINE_ENVIRONMENT_EXPECTED),
         )
 
     capture_dir = tmp_path / "artifacts" / "golden-baseline" / "captures"

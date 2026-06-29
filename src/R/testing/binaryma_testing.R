@@ -1,6 +1,6 @@
 # test for binary meta analysis function
 
-library("openmetar")
+library("OpenMetaR")
 
 CONF.LEVEL.GLOBAL <- 95
 

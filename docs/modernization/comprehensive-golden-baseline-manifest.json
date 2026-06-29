@@ -14,20 +14,22 @@
   "captured_at": "2026-06-23T00:00:00Z",
   "capture_metadata": {
     "authoritative_capture_mode": "authoritative",
-    "authoritative_requires_reference_environment_match": true,
+    "authoritative_requires_baseline_environment_match": true,
     "authority_values": [
       "authoritative",
       "local-debug"
     ],
-    "local_default_capture_mode": "local-debug",
-    "reference_environment": {
-      "id": "windows-ci-conda-python2-pyqt4-r3",
+    "baseline": "modern-behavior",
+    "baseline_environment": {
+      "id": "modern-ci-python3-pyqt5-r4-OpenMetaR",
       "os": "Windows",
-      "pyqt": "4.11.4",
-      "python": "2.7.18",
-      "r": "R version 3.3.2",
-      "rpy2": "2.8.5"
+      "package": "OpenMetaR",
+      "pyqt": "5.15.11",
+      "python": "3.11",
+      "r": "R version 4.6.0",
+      "rpy2": "3.6.7"
     },
+    "local_default_capture_mode": "local-debug",
     "required_fields": [
       "python",
       "os",
@@ -38,7 +40,7 @@
       "commit_sha",
       "capture_mode",
       "capture_command",
-      "reference_environment",
+      "baseline_environment",
       "authoritative",
       "authority"
     ]

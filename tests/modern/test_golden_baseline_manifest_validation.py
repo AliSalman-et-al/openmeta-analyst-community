@@ -60,10 +60,10 @@ def test_baseline_manifest_requires_capture_metadata_contract(tmp_path):
     root = copy_modernization_docs(tmp_path)
     manifest_path = root / "docs" / "modernization" / "comprehensive-golden-baseline-manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["capture_metadata"]["required_fields"].remove("authoritative")
+    manifest["capture_metadata"]["required_fields"].remove("baseline_environment")
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
     result = run_validator(root)
 
     assert result.returncode == 1
-    assert "capture_metadata.required_fields missing authoritative" in result.stderr
+    assert "capture_metadata.required_fields missing baseline_environment" in result.stderr

@@ -54,9 +54,9 @@ _DRIVER = textwrap.dedent(
     modern_compat.install()
     try:
         import meta_py_r
-        meta_py_r.RlibLoader().load_openmetar()
+        meta_py_r.RlibLoader().load_OpenMetaR()
     except Exception as exc:
-        # R / rpy2 / openmetar not available in this environment.
+        # R / rpy2 / OpenMetaR not available in this environment.
         sys.stdout.write("SKIP %s: %s\\n" % (exc.__class__.__name__, exc))
         sys.exit(42)
 
@@ -123,14 +123,14 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
             else r_lib + os.pathsep + existing_r_libs
         )
         install = subprocess.run(
-            [r_exe, "CMD", "INSTALL", "--library=" + r_lib, os.path.join(repo_root, "src", "R", "openmetar")],
+            [r_exe, "CMD", "INSTALL", "--library=" + r_lib, os.path.join(repo_root, "src", "R", "OpenMetaR")],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             universal_newlines=True,
             env=env,
         )
         if install.returncode != 0:
-            sys.stdout.write("SKIP R CMD INSTALL openmetar failed\\n%s\\n%s\\n" % (install.stdout[-2000:], install.stderr[-2000:]))
+            sys.stdout.write("SKIP R CMD INSTALL OpenMetaR failed\\n%s\\n%s\\n" % (install.stdout[-2000:], install.stderr[-2000:]))
             sys.exit(42)
 
         env.pop("OMA_STUB_BACKEND", None)
@@ -146,7 +146,7 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
         modern_compat.install()
         try:
             import meta_py_r
-            meta_py_r.RlibLoader().load_openmetar()
+            meta_py_r.RlibLoader().load_OpenMetaR()
         except Exception as exc:
             sys.stdout.write("SKIP %s: %s\\n" % (exc.__class__.__name__, exc))
             sys.exit(42)
@@ -295,14 +295,14 @@ _ADVANCED_OPENMETAR_DRIVER = textwrap.dedent(
             else r_lib + os.pathsep + existing_r_libs
         )
         install = subprocess.run(
-            [r_exe, "CMD", "INSTALL", "--library=" + r_lib, os.path.join(repo_root, "src", "R", "openmetar")],
+            [r_exe, "CMD", "INSTALL", "--library=" + r_lib, os.path.join(repo_root, "src", "R", "OpenMetaR")],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             universal_newlines=True,
             env=env,
         )
         if install.returncode != 0:
-            sys.stdout.write("SKIP R CMD INSTALL openmetar failed\\n%s\\n%s\\n" % (install.stdout[-2000:], install.stderr[-2000:]))
+            sys.stdout.write("SKIP R CMD INSTALL OpenMetaR failed\\n%s\\n%s\\n" % (install.stdout[-2000:], install.stderr[-2000:]))
             sys.exit(42)
 
         env.pop("OMA_STUB_BACKEND", None)
@@ -314,7 +314,7 @@ _ADVANCED_OPENMETAR_DRIVER = textwrap.dedent(
         modern_compat.install()
         try:
             import meta_py_r
-            meta_py_r.RlibLoader().load_openmetar()
+            meta_py_r.RlibLoader().load_OpenMetaR()
         except Exception as exc:
             sys.stdout.write("SKIP %s: %s\\n" % (exc.__class__.__name__, exc))
             sys.exit(42)
@@ -434,7 +434,7 @@ def test_openmetar_summary_capture_uses_formatted_print_methods():
         env=env,
     )
     if result.returncode == 42:
-        pytest.skip("openmetar summary print regression unavailable: %s" % result.stdout.strip())
+        pytest.skip("OpenMetaR summary print regression unavailable: %s" % result.stdout.strip())
     assert result.returncode == 0, (
         "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s"
         % (result.returncode, result.stdout[-2000:], result.stderr[-2000:])
@@ -476,7 +476,7 @@ def test_openmetar_advanced_bootstrap_and_permutation_paths_execute():
         env=env,
     )
     if result.returncode == 42:
-        pytest.skip("advanced openmetar workflow regression unavailable: %s" % result.stdout.strip())
+        pytest.skip("advanced OpenMetaR workflow regression unavailable: %s" % result.stdout.strip())
     assert result.returncode == 0, (
         "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s"
         % (result.returncode, result.stdout[-2000:], result.stderr[-2000:])

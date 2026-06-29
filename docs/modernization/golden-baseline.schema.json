@@ -58,8 +58,9 @@
         "local_default_capture_mode",
         "authoritative_capture_mode",
         "authority_values",
-        "reference_environment",
-        "authoritative_requires_reference_environment_match"
+        "baseline",
+        "baseline_environment",
+        "authoritative_requires_baseline_environment_match"
       ],
       "properties": {
         "required_fields": {
@@ -75,7 +76,7 @@
               "commit_sha",
               "capture_mode",
               "capture_command",
-              "reference_environment",
+              "baseline_environment",
               "authoritative",
               "authority"
             ]
@@ -98,7 +99,10 @@
           },
           "minItems": 2
         },
-        "reference_environment": {
+        "baseline": {
+          "const": "modern-behavior"
+        },
+        "baseline_environment": {
           "type": "object",
           "required": [
             "id",
@@ -106,10 +110,11 @@
             "python",
             "pyqt",
             "r",
-            "rpy2"
+            "rpy2",
+            "package"
           ]
         },
-        "authoritative_requires_reference_environment_match": {
+        "authoritative_requires_baseline_environment_match": {
           "const": true
         }
       }

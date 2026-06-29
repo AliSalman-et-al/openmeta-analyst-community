@@ -63,7 +63,7 @@ function Assert-AppLayout {
     Assert-PathExists -Path (Join-Path $Root "sample_data\amino.oma") -Description "Bundled GUI slice sample data"
     Assert-PathExists -Path (Join-Path $Root "doc\openMA_help.html") -Description "Bundled help"
     Assert-PathExists -Path (Join-Path $Root "R\bin\x64\R.dll") -Description "Bundled R runtime"
-    Assert-PathExists -Path (Join-Path $Root "R\library\openmetar\DESCRIPTION") -Description "Bundled openmetar R package"
+    Assert-PathExists -Path (Join-Path $Root "R\library\OpenMetaR\DESCRIPTION") -Description "Bundled OpenMetaR R package"
     Assert-PathExists -Path (Join-Path $Root "LaunchOpenMetaAnalyst.bat") -Description "Windows launcher"
 }
 
@@ -114,7 +114,7 @@ function Assert-ZipLayout {
     try {
         $entryNames = @{}
         foreach ($entry in $zip.Entries) { $entryNames[$entry.FullName -replace "/", "\"] = $true }
-        foreach ($requiredEntry in @("OpenMetaAnalyst.exe", "sample_data\BCG.oma", "sample_data\amino.oma", "doc\openMA_help.html", "R\bin\x64\R.dll", "R\library\openmetar\DESCRIPTION", "LaunchOpenMetaAnalyst.bat")) {
+        foreach ($requiredEntry in @("OpenMetaAnalyst.exe", "sample_data\BCG.oma", "sample_data\amino.oma", "doc\openMA_help.html", "R\bin\x64\R.dll", "R\library\OpenMetaR\DESCRIPTION", "LaunchOpenMetaAnalyst.bat")) {
             if (-not $entryNames.ContainsKey($requiredEntry)) { throw "Created ZIP is missing '$requiredEntry'." }
         }
         $hasPyQt5Runtime = $false
@@ -162,7 +162,7 @@ function Get-RPackageCacheKey {
     $version = & $RscriptExe -e "cat(paste0('R-', getRversion()))"
     if ($LASTEXITCODE -ne 0 -or -not $version) { throw "Could not determine R runtime version." }
     $installDeps = Join-Path $repoRoot "scripts\install-modern-r-deps.R"
-    $manifest = Join-Path $repoRoot "docs\modernization\openmetar-r-dependencies.json"
+    $manifest = Join-Path $repoRoot "docs\modernization\OpenMetaR-r-dependencies.json"
     $hashInput = @(
         (Get-FileHash -Algorithm SHA256 -LiteralPath $installDeps).Hash
         (Get-FileHash -Algorithm SHA256 -LiteralPath $manifest).Hash
@@ -176,7 +176,7 @@ function Get-RPackageCacheKey {
 function Test-BundledRPackages {
     param([string]$RscriptExe, [string]$Library)
     if (-not (Test-Path $Library)) { return $false }
-    $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','openmetar','metafor','lme4','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }"
+    $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','OpenMetaR','metafor','lme4','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }"
     & $RscriptExe -e $verify
     return ($LASTEXITCODE -eq 0)
 }
@@ -187,7 +187,7 @@ function Assert-OpenMetaRSummaryFormatting {
     $verify = @"
 lib <- normalizePath('$libraryPath', winslash='/')
 .libPaths(c(lib, .libPaths()))
-library(openmetar)
+library(OpenMetaR)
 if (is.null(getS3method('print', 'summary.display', optional=TRUE))) {
   stop('print.summary.display is not registered')
 }
@@ -221,7 +221,7 @@ if (any(vapply(leaks, function(value) grepl(value, rendered, fixed=TRUE), logica
 }
 "@
     & $RscriptExe -e $verify
-    if ($LASTEXITCODE -ne 0) { throw "Bundled openmetar summary formatting verification failed." }
+    if ($LASTEXITCODE -ne 0) { throw "Bundled OpenMetaR summary formatting verification failed." }
 }
 
 function Copy-RLibrary {
@@ -238,13 +238,13 @@ function Install-LocalRPackagesFromSource {
     if (Test-Path $packageBuildRoot) { Remove-Item -LiteralPath $packageBuildRoot -Recurse -Force }
     New-Item -ItemType Directory -Force -Path $packageBuildRoot | Out-Null
     Copy-Item -Path (Join-Path $srcDir "R\HSROC") -Destination (Join-Path $packageBuildRoot "HSROC") -Recurse -Force
-    Copy-Item -Path (Join-Path $srcDir "R\openmetar") -Destination (Join-Path $packageBuildRoot "openmetar") -Recurse -Force
+    Copy-Item -Path (Join-Path $srcDir "R\OpenMetaR") -Destination (Join-Path $packageBuildRoot "OpenMetaR") -Recurse -Force
     Get-ChildItem -Path $packageBuildRoot -Recurse -Include *.o,*.so,*.dll | Remove-Item -Force
 
     & $rExe CMD INSTALL --library="$rLibrary" (Join-Path $packageBuildRoot "HSROC")
     if ($LASTEXITCODE -ne 0) { throw "R CMD INSTALL HSROC failed." }
-    & $rExe CMD INSTALL --library="$rLibrary" (Join-Path $packageBuildRoot "openmetar")
-    if ($LASTEXITCODE -ne 0) { throw "R CMD INSTALL openmetar failed." }
+    & $rExe CMD INSTALL --library="$rLibrary" (Join-Path $packageBuildRoot "OpenMetaR")
+    if ($LASTEXITCODE -ne 0) { throw "R CMD INSTALL OpenMetaR failed." }
 
     Assert-OpenMetaRSummaryFormatting -RscriptExe $rscriptExe -Library $rLibrary
 }
@@ -283,7 +283,7 @@ function Install-BundledRPackages {
 
     Write-Step "Installing local OpenMeta R packages"
     Install-LocalRPackagesFromSource -Root $Root
-    & $rscriptExe -e "pkgs <- c('HSROC','openmetar','metafor','lme4','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1)"
+    & $rscriptExe -e "pkgs <- c('HSROC','OpenMetaR','metafor','lme4','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1)"
     if ($LASTEXITCODE -ne 0) { throw "Bundled R package verification failed." }
 
     if (Test-BundledRPackages -RscriptExe $rscriptExe -Library $rLibrary) {

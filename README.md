@@ -23,16 +23,16 @@ Install the required R packages:
 install.packages(c("metafor", "lme4", "MCMCpack", "igraph"))
 ```
 
-Build and install the bundled `HSROC` package and the bundled `openmetar` package from `src/R`.
+Build and install the bundled `HSROC` package and the bundled `OpenMetaR` package from `src/R`.
 
 These packages are distributed with the source tree. Use the bundled `HSROC` package, not the CRAN package.
 
 ```sh
 cd src/R
 R CMD build HSROC
-R CMD build openmetar
+R CMD build OpenMetaR
 R CMD INSTALL HSROC_2.0.5.tar.gz
-R CMD INSTALL openmetar_1.0.tar.gz
+R CMD INSTALL OpenMetaR_1.0.tar.gz
 ```
 
 ## Tests

@@ -11,7 +11,7 @@ The Full Legacy App Port covers all non-network desktop workflows before Release
 - `src/main_wizard.py` and `src/forms/*.ui` for startup, dataset creation, and CSV import workflows.
 - `doc/*.html` and `doc/images/*` for documented user workflows and expected concepts.
 - `sample_data/*.oma` for representative legacy projects.
-- `src/R/openmetar` and related R analysis calls for preserved Analysis Behavior.
+- `src/R/OpenMetaR` and related R analysis calls for preserved Analysis Behavior.
 
 ## Release Cutover Scope
 

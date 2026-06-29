@@ -1,6 +1,6 @@
 # Test for diagnost hsroc for sens/spec
 
-library("openmetar")
+library("OpenMetaR")
 CONF.LEVEL.GLOBAL <- 95
 
 # SET_UP PARAMETERS

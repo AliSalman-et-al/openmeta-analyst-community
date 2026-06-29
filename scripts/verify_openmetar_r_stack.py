@@ -12,7 +12,7 @@ import tempfile
 from pathlib import Path
 
 
-OPENMETAR_PACKAGE = Path("src") / "R" / "openmetar"
+OPENMETAR_PACKAGE = Path("src") / "R" / "OpenMetaR"
 HSROC_PACKAGE = Path("src") / "R" / "HSROC"
 R_DEP_INSTALLER = Path("scripts") / "install-modern-r-deps.R"
 R_SMOKE_TEST = Path("scripts") / "analysis-smoke-test.R"
@@ -28,7 +28,7 @@ class VerificationError(Exception):
 
 
 def step(message: str) -> None:
-    print(f"[openmetar-r-stack] {message}", flush=True)
+    print(f"[OpenMetaR-r-stack] {message}", flush=True)
 
 
 def run(command: list[str | Path], *, cwd: Path, env: dict[str, str] | None = None) -> None:
@@ -123,10 +123,10 @@ def isolated_r_env(base_env: dict[str, str], library: Path, r_home: Path | None 
     return env
 
 
-def built_openmetar_tarball(work_dir: Path) -> Path:
-    tarballs = sorted(work_dir.glob("openmetar_*.tar.gz"), key=lambda path: path.stat().st_mtime)
+def built_OpenMetaR_tarball(work_dir: Path) -> Path:
+    tarballs = sorted(work_dir.glob("OpenMetaR_*.tar.gz"), key=lambda path: path.stat().st_mtime)
     if not tarballs:
-        raise VerificationError(f"R CMD build did not create an openmetar tarball in {work_dir}")
+        raise VerificationError(f"R CMD build did not create an OpenMetaR tarball in {work_dir}")
     return tarballs[-1]
 
 
@@ -158,7 +158,7 @@ def verify(args: argparse.Namespace) -> None:
 
     run([python, R_MANIFEST_VALIDATOR, "--root", root], cwd=root, env=base_env)
 
-    with tempfile.TemporaryDirectory(prefix="openmetar-r-stack-", dir=args.work_dir) as temp_name:
+    with tempfile.TemporaryDirectory(prefix="OpenMetaR-r-stack-", dir=args.work_dir) as temp_name:
         work_dir = Path(temp_name)
         r_library = work_dir / "library"
         r_library.mkdir(parents=True)
@@ -172,7 +172,7 @@ def verify(args: argparse.Namespace) -> None:
 
         run([r_exe, "CMD", "INSTALL", f"--library={r_library}", root / HSROC_PACKAGE], cwd=root, env=env)
         run([r_exe, "CMD", "build", "--no-build-vignettes", root / OPENMETAR_PACKAGE], cwd=work_dir, env=env)
-        tarball = built_openmetar_tarball(work_dir)
+        tarball = built_OpenMetaR_tarball(work_dir)
         run(
             [
                 r_exe,

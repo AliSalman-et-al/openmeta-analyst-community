@@ -89,8 +89,8 @@ def load_R_libraries(app, splash=None):
     _status("Loading metafor\n....")
     rloader.load_metafor()
 
-    _status("Loading openmetar\n........")
-    rloader.load_openmetar()
+    _status("Loading OpenMetaR\n........")
+    rloader.load_OpenMetaR()
 
     _status("Loading igraph\n............")
     rloader.load_igraph()

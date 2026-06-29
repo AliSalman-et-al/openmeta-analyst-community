@@ -12,7 +12,7 @@ if (!nzchar(lib)) {
 dir.create(lib, recursive = TRUE, showWarnings = FALSE)
 .libPaths(c(lib, .libPaths()))
 
-openmetar_cran_packages <- c(
+OpenMetaR_cran_packages <- c(
   "metafor", "lme4", "roxygen2"
 )
 
@@ -33,7 +33,7 @@ recommended_bundle_packages <- c(
 )
 
 required_packages <- unique(c(
-  openmetar_cran_packages,
+  OpenMetaR_cran_packages,
   app_cran_bundle_packages,
   recommended_bundle_packages
 ))

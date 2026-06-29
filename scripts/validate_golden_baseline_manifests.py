@@ -19,13 +19,14 @@ GOLDEN_BASELINE = MODERNIZATION_DIR / "comprehensive-golden-baseline-manifest.js
 GOLDEN_MATRIX = MODERNIZATION_DIR / "golden-coverage-matrix.md"
 WORKFLOW_INVENTORY = MODERNIZATION_DIR / "user-facing-workflow-inventory.md"
 
-EXPECTED_REFERENCE_ENVIRONMENT = {
-    "id": "windows-ci-conda-python2-pyqt4-r3",
+EXPECTED_MODERN_BASELINE_ENVIRONMENT = {
+    "id": "modern-ci-python3-pyqt5-r4-OpenMetaR",
     "os": "Windows",
-    "python": "2.7.18",
-    "pyqt": "4.11.4",
-    "r": "R version 3.3.2",
-    "rpy2": "2.8.5",
+    "python": "3.11",
+    "pyqt": "5.15.11",
+    "r": "R version 4.6.0",
+    "rpy2": "3.6.7",
+    "package": "OpenMetaR",
 }
 
 REQUIRED_CAPTURE_METADATA_FIELDS = {
@@ -38,7 +39,7 @@ REQUIRED_CAPTURE_METADATA_FIELDS = {
     "commit_sha",
     "capture_mode",
     "capture_command",
-    "reference_environment",
+    "baseline_environment",
     "authoritative",
     "authority",
 }
@@ -173,8 +174,9 @@ def validate_capture_metadata(metadata: object) -> None:
             "local_default_capture_mode",
             "authoritative_capture_mode",
             "authority_values",
-            "reference_environment",
-            "authoritative_requires_reference_environment_match",
+            "baseline",
+            "baseline_environment",
+            "authoritative_requires_baseline_environment_match",
         ],
         f"{GOLDEN_BASELINE}:capture_metadata",
     )
@@ -191,11 +193,13 @@ def validate_capture_metadata(metadata: object) -> None:
     authority_values = set(require_list(metadata["authority_values"], f"{GOLDEN_BASELINE}:capture_metadata.authority_values"))
     if authority_values != {"authoritative", "local-debug"}:
         raise ValidationError(f"{GOLDEN_BASELINE}:capture_metadata.authority_values must be authoritative and local-debug")
-    if metadata["reference_environment"] != EXPECTED_REFERENCE_ENVIRONMENT:
-        raise ValidationError(f"{GOLDEN_BASELINE}:capture_metadata.reference_environment does not match the Windows CI Reference Environment")
-    if metadata["authoritative_requires_reference_environment_match"] is not True:
+    if metadata["baseline"] != "modern-behavior":
+        raise ValidationError(f"{GOLDEN_BASELINE}:capture_metadata.baseline must be modern-behavior")
+    if metadata["baseline_environment"] != EXPECTED_MODERN_BASELINE_ENVIRONMENT:
+        raise ValidationError(f"{GOLDEN_BASELINE}:capture_metadata.baseline_environment does not match the Modern Behavior Baseline")
+    if metadata["authoritative_requires_baseline_environment_match"] is not True:
         raise ValidationError(
-            f"{GOLDEN_BASELINE}:capture_metadata.authoritative_requires_reference_environment_match must be true"
+            f"{GOLDEN_BASELINE}:capture_metadata.authoritative_requires_baseline_environment_match must be true"
         )
 
 

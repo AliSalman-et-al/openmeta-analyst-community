@@ -29,7 +29,7 @@ def configure_bundled_r_environment(app_root=None):
     r_libs = _first_existing([
         os.environ.get("OMA_R_LIBS"),
         os.path.join(root, "R", "library"),
-    ], required_child=os.path.join("openmetar"))
+    ], required_child=os.path.join("OpenMetaR"))
     if r_libs:
         os.environ["R_LIBS"] = r_libs
         os.environ["R_LIBS_USER"] = r_libs

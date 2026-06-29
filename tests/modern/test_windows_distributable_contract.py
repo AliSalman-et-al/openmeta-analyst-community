@@ -17,7 +17,7 @@ def test_modern_windows_distributable_contract_is_declared():
         "sample_data\\amino.oma",
         "doc\\openMA_help.html",
         "R\\bin\\x64\\R.dll",
-        "R\\library\\openmetar\\DESCRIPTION",
+        "R\\library\\OpenMetaR\\DESCRIPTION",
         "r-library-cache",
         "scripts\\install-modern-r-deps.R",
         "Install-LocalRPackagesFromSource",
@@ -148,7 +148,7 @@ def test_modern_macos_distributable_contract_is_declared():
         "doc/openMA_help.html",
         "scripts/install-modern-r-deps.R",
         "R/bin/Rscript",
-        "R/library/openmetar/DESCRIPTION",
+        "R/library/OpenMetaR/DESCRIPTION",
         "LaunchOpenMetaAnalyst.command",
         "resolve_existing_dir",
         "copy_tree",
@@ -196,11 +196,11 @@ def test_shared_modern_r_dependency_installer_is_used_by_packagers():
     ]:
         assert archived_pin not in installer
     assert '"HSROC"' not in installer
-    assert '"openmetar"' not in installer
+    assert '"OpenMetaR"' not in installer
     assert "install-modern-r-deps.R" in windows
     assert "install-modern-r-deps.R" in macos
-    assert "openmetar-r-dependencies.json" in windows
-    assert "openmetar-r-dependencies.json" in macos
+    assert "OpenMetaR-r-dependencies.json" in windows
+    assert "OpenMetaR-r-dependencies.json" in macos
     assert "-rdeps-" in windows
     assert "-rdeps-" in macos
 
@@ -213,7 +213,7 @@ def test_openmetar_r_stack_verifier_declares_issue_114_gate_sequence():
         "install-modern-r-deps.R",
         "\"CMD\", \"INSTALL\"",
         "src\") / \"R\" / \"HSROC\"",
-        "src\") / \"R\" / \"openmetar\"",
+        "src\") / \"R\" / \"OpenMetaR\"",
         "\"CMD\", \"build\"",
         "\"CMD\"",
         "\"check\"",

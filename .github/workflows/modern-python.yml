@@ -56,7 +56,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: artifacts\r-library-cache
-          key: modern-r-library-windows-${{ hashFiles('scripts/install-modern-r-deps.R', 'scripts/build-modern-windows-binary.ps1', 'src/R/HSROC/DESCRIPTION', 'src/R/openmetar/DESCRIPTION') }}
+          key: modern-r-library-windows-${{ hashFiles('scripts/install-modern-r-deps.R', 'scripts/build-modern-windows-binary.ps1', 'src/R/HSROC/DESCRIPTION', 'src/R/OpenMetaR/DESCRIPTION') }}
           restore-keys: |
             modern-r-library-windows-
 
@@ -126,7 +126,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: artifacts/r-library-cache
-          key: modern-r-library-macos-x64-${{ hashFiles('scripts/install-modern-r-deps.R', 'scripts/build-modern-macos-binary.sh', 'src/R/HSROC/DESCRIPTION', 'src/R/openmetar/DESCRIPTION') }}
+          key: modern-r-library-macos-x64-${{ hashFiles('scripts/install-modern-r-deps.R', 'scripts/build-modern-macos-binary.sh', 'src/R/HSROC/DESCRIPTION', 'src/R/OpenMetaR/DESCRIPTION') }}
           restore-keys: |
             modern-r-library-macos-x64-
 
@@ -188,7 +188,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: artifacts/r-library-cache
-          key: modern-r-library-macos-arm64-${{ hashFiles('scripts/install-modern-r-deps.R', 'scripts/build-modern-macos-binary.sh', 'src/R/HSROC/DESCRIPTION', 'src/R/openmetar/DESCRIPTION') }}
+          key: modern-r-library-macos-arm64-${{ hashFiles('scripts/install-modern-r-deps.R', 'scripts/build-modern-macos-binary.sh', 'src/R/HSROC/DESCRIPTION', 'src/R/OpenMetaR/DESCRIPTION') }}
           restore-keys: |
             modern-r-library-macos-arm64-
 

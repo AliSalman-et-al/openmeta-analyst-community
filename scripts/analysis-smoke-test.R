@@ -1,7 +1,7 @@
 options(warn = 1)
 
 dir.create("r_tmp", showWarnings = FALSE)
-suppressPackageStartupMessages(library(openmetar))
+suppressPackageStartupMessages(library(OpenMetaR))
 CONF.LEVEL.GLOBAL <- 95
 
 failures <- list()

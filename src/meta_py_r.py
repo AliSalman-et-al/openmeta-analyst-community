@@ -74,7 +74,7 @@ def _r_is_null(r_object):
     return str(r_object) == "NULL"
 
 # rpy2 >= 3.x honours R's "visibility" flag: a top-level call whose result is
-# returned invisibly (as every openmetar `*.parameters()` routine and many
+# returned invisibly (as every OpenMetaR `*.parameters()` routine and many
 # analysis functions do) yields Python `None` from `ro.r(...)`. The legacy
 # Python-2 rpy2 always returned the value regardless of visibility, which the
 # whole backend relies on (e.g. get_params, run_*_ma). Restore that behaviour
@@ -102,8 +102,8 @@ class RlibLoader:
         print("R Libary loader (RlibLoader) initialized...")
     def load_metafor(self):
         return self._load_r_lib("metafor")
-    def load_openmetar(self):
-        return self._load_r_lib("openmetar")
+    def load_OpenMetaR(self):
+        return self._load_r_lib("OpenMetaR")
     def load_igraph(self):
         return self._load_r_lib("igraph")
     def load_grid(self):
@@ -112,7 +112,7 @@ class RlibLoader:
         return self._load_r_lib("gemtc")
     def load_all(self):
         self.load_metafor()
-        self.load_openmetar()
+        self.load_OpenMetaR()
         self.load_igraph()
         self.load_grid()
         self.load_gemtc()
@@ -443,7 +443,7 @@ def get_params(method_name):
      
 @RfunctionCaller
 def get_pretty_names_and_descriptions_for_params(method_name, param_list):
-    method_list = execute_r_string("lsf.str('package:openmetar')")
+    method_list = execute_r_string("lsf.str('package:OpenMetaR')")
     pretty_names_f = "%s.pretty.names" % method_name
     params_d = {}
     if pretty_names_f in method_list:
@@ -471,7 +471,7 @@ def get_available_methods(for_data_type=None, data_obj_name=None, metric=None):
     Returns a list of methods available in OpenMeta for the particular data_type
     (if one is given). Excludes "*.parameters" methods
     '''
-    method_list = execute_r_string("lsf.str('package:openmetar')")
+    method_list = execute_r_string("lsf.str('package:OpenMetaR')")
 
     # the following constitute 'special' or 'reserved' function
     # names that are used by meta-analyst to parse out available
@@ -524,7 +524,7 @@ def get_available_methods(for_data_type=None, data_obj_name=None, metric=None):
 @RfunctionCaller
 def get_method_description(method_name):
     pretty_names_f = "%s.pretty.names" % method_name
-    method_list = execute_r_string("lsf.str('package:openmetar')")
+    method_list = execute_r_string("lsf.str('package:OpenMetaR')")
     description = "None provided."
     if pretty_names_f in method_list:
         try:

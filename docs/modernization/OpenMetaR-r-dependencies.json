@@ -1,5 +1,5 @@
 {
-  "manifest": "openmetar-r-dependencies",
+  "manifest": "OpenMetaR-r-dependencies",
   "schema_version": 1,
   "target_runtime": {
     "r": "4.6.0",
@@ -7,8 +7,8 @@
     "cran_policy": "latest-compatible"
   },
   "package_metadata": {
-    "package": "openmetar",
-    "description": "src/R/openmetar/DESCRIPTION",
+    "package": "OpenMetaR",
+    "description": "src/R/OpenMetaR/DESCRIPTION",
     "dependency_fields": {
       "runtime": ["Depends", "Imports"],
       "build": ["LinkingTo"],
@@ -17,25 +17,25 @@
     }
   },
   "empty_scope_rationale": {
-    "test": "The current openmetar R unit test file uses base R plus library(openmetar) and does not declare a direct R test framework such as testthat or RUnit.",
-    "build": "No compiled openmetar code or LinkingTo dependency is present in the current package metadata; roxygen2 is listed because the parent modernization slice requires generated documentation and NAMESPACE output."
+    "test": "The current OpenMetaR R unit test file uses base R plus library(OpenMetaR) and does not declare a direct R test framework such as testthat or RUnit.",
+    "build": "No compiled OpenMetaR code or LinkingTo dependency is present in the current package metadata; roxygen2 is listed because the parent modernization slice requires generated documentation and NAMESPACE output."
   },
-  "direct_openmetar_dependencies": [
+  "direct_OpenMetaR_dependencies": [
     {
       "name": "R",
       "source": "base-runtime",
       "scope": ["runtime"],
-      "declared_in": ["src/R/openmetar/DESCRIPTION"],
-      "evidence": ["src/R/openmetar/DESCRIPTION: Depends: R (>= 2.9.2)"],
-      "reason": "openmetar is an R package and declares a minimum R runtime.",
+      "declared_in": ["src/R/OpenMetaR/DESCRIPTION"],
+      "evidence": ["src/R/OpenMetaR/DESCRIPTION: Depends: R (>= 2.9.2)"],
+      "reason": "OpenMetaR is an R package and declares a minimum R runtime.",
       "installed_version": "4.6.0"
     },
     {
       "name": "grid",
       "source": "recommended",
       "scope": ["runtime"],
-      "declared_in": ["src/R/openmetar/DESCRIPTION"],
-      "evidence": ["src/R/openmetar/R/plotting.r: forest plot rendering calls grid drawing and viewport APIs"],
+      "declared_in": ["src/R/OpenMetaR/DESCRIPTION"],
+      "evidence": ["src/R/OpenMetaR/R/plotting.r: forest plot rendering calls grid drawing and viewport APIs"],
       "reason": "Forest plot rendering uses grid viewports, layouts, axes, text, polygons, and line drawing.",
       "installed_version": "4.6.0"
     },
@@ -43,8 +43,8 @@
       "name": "graphics",
       "source": "base-runtime",
       "scope": ["runtime"],
-      "declared_in": ["src/R/openmetar/DESCRIPTION"],
-      "evidence": ["src/R/openmetar/R/openmetar-package.r: @import graphics"],
+      "declared_in": ["src/R/OpenMetaR/DESCRIPTION"],
+      "evidence": ["src/R/OpenMetaR/R/openmetar-package.r: @import graphics"],
       "reason": "Diagnostic and plotting code relies on graphics behavior from the base R distribution.",
       "installed_version": "4.6.0"
     },
@@ -52,21 +52,21 @@
       "name": "grDevices",
       "source": "base-runtime",
       "scope": ["runtime"],
-      "declared_in": ["src/R/openmetar/DESCRIPTION"],
-      "evidence": ["src/R/openmetar/R/plotting.r: forest and diagnostic plot functions call png(...), pdf(...), dev.off(...), and graphics.off(...)"],
-      "reason": "openmetar writes plot image/PDF devices and closes graphics devices through the base grDevices package.",
+      "declared_in": ["src/R/OpenMetaR/DESCRIPTION"],
+      "evidence": ["src/R/OpenMetaR/R/plotting.r: forest and diagnostic plot functions call png(...), pdf(...), dev.off(...), and graphics.off(...)"],
+      "reason": "OpenMetaR writes plot image/PDF devices and closes graphics devices through the base grDevices package.",
       "installed_version": "4.6.0"
     },
     {
       "name": "metafor",
       "source": "cran",
       "scope": ["runtime"],
-      "declared_in": ["src/R/openmetar/DESCRIPTION"],
+      "declared_in": ["src/R/OpenMetaR/DESCRIPTION"],
       "evidence": [
-        "src/R/openmetar/R/binary_methods.r: rma.uni(...) and related metafor analysis calls",
-        "src/R/openmetar/R/continuous_methods.r: rma.uni(...) and related metafor analysis calls",
-        "src/R/openmetar/R/diagnostic_methods.r: rma.uni(...) and related metafor analysis calls",
-        "src/R/openmetar/R/meta_reg.r: rma.uni(...) and related metafor analysis calls"
+        "src/R/OpenMetaR/R/binary_methods.r: rma.uni(...) and related metafor analysis calls",
+        "src/R/OpenMetaR/R/continuous_methods.r: rma.uni(...) and related metafor analysis calls",
+        "src/R/OpenMetaR/R/diagnostic_methods.r: rma.uni(...) and related metafor analysis calls",
+        "src/R/OpenMetaR/R/meta_reg.r: rma.uni(...) and related metafor analysis calls"
       ],
       "reason": "Core binary, continuous, diagnostic, and meta-regression methods call metafor analysis functions.",
       "installed_version": "5.0-1"
@@ -75,9 +75,9 @@
       "name": "HSROC",
       "source": "bundled-local",
       "scope": ["runtime"],
-      "declared_in": ["src/R/openmetar/DESCRIPTION"],
+      "declared_in": ["src/R/OpenMetaR/DESCRIPTION"],
       "evidence": [
-        "src/R/openmetar/R/diagnostic_methods.r: diagnostic.hsroc delegates to HSROC(...) and HSROCSummary(...)",
+        "src/R/OpenMetaR/R/diagnostic_methods.r: diagnostic.hsroc delegates to HSROC(...) and HSROCSummary(...)",
         "src/R/HSROC/DESCRIPTION"
       ],
       "reason": "Diagnostic HSROC analysis delegates sampling and summaries to the bundled HSROC package.",
@@ -87,8 +87,8 @@
       "name": "lme4",
       "source": "cran",
       "scope": ["runtime"],
-      "declared_in": ["src/R/openmetar/DESCRIPTION"],
-      "evidence": ["src/R/openmetar/R/bivariate.r: bivariate.dx.test uses lmer(...) for mixed-model fitting"],
+      "declared_in": ["src/R/OpenMetaR/DESCRIPTION"],
+      "evidence": ["src/R/OpenMetaR/R/bivariate.r: bivariate.dx.test uses lmer(...) for mixed-model fitting"],
       "reason": "Bivariate diagnostic model fitting uses lme4 mixed-model functionality.",
       "installed_version": "2.0-1"
     },
@@ -96,20 +96,20 @@
       "name": "methods",
       "source": "base-runtime",
       "scope": ["runtime"],
-      "declared_in": ["src/R/openmetar/DESCRIPTION"],
-      "evidence": ["src/R/openmetar/R/classes.r: setClass(...)"],
-      "reason": "openmetar defines S4 data and analysis specification classes with methods::setClass.",
+      "declared_in": ["src/R/OpenMetaR/DESCRIPTION"],
+      "evidence": ["src/R/OpenMetaR/R/classes.r: setClass(...)"],
+      "reason": "OpenMetaR defines S4 data and analysis specification classes with methods::setClass.",
       "installed_version": "4.6.0"
     },
     {
       "name": "boot",
       "source": "recommended",
       "scope": ["runtime"],
-      "declared_in": ["src/R/openmetar/DESCRIPTION"],
+      "declared_in": ["src/R/OpenMetaR/DESCRIPTION"],
       "evidence": [
-        "src/R/openmetar/R/diagnostic_methods.r: bivariate diagnostic confidence intervals use boot.ci(...)",
-        "src/R/openmetar/R/meta_methods.r: bootstrap analysis uses boot(...)",
-        "src/R/openmetar/R/meta_reg.r: boot(...) and boot.ci(...)"
+        "src/R/OpenMetaR/R/diagnostic_methods.r: bivariate diagnostic confidence intervals use boot.ci(...)",
+        "src/R/OpenMetaR/R/meta_methods.r: bootstrap analysis uses boot(...)",
+        "src/R/OpenMetaR/R/meta_reg.r: boot(...) and boot.ci(...)"
       ],
       "reason": "Bootstrap analysis workflows use boot resampling and confidence interval helpers.",
       "installed_version": "1.3-32"
@@ -118,18 +118,18 @@
       "name": "stats",
       "source": "base-runtime",
       "scope": ["runtime"],
-      "declared_in": ["src/R/openmetar/DESCRIPTION"],
-      "evidence": ["src/R/openmetar/R: package-wide statistical helpers call base stats APIs implicitly"],
-      "reason": "openmetar relies on standard R statistical functions that are distributed with R.",
+      "declared_in": ["src/R/OpenMetaR/DESCRIPTION"],
+      "evidence": ["src/R/OpenMetaR/R: package-wide statistical helpers call base stats APIs implicitly"],
+      "reason": "OpenMetaR relies on standard R statistical functions that are distributed with R.",
       "installed_version": "4.6.0"
     },
     {
       "name": "utils",
       "source": "base-runtime",
       "scope": ["runtime"],
-      "declared_in": ["src/R/openmetar/DESCRIPTION"],
-      "evidence": ["src/R/openmetar/R: package code calls capture.output(...) and write.csv(...)"],
-      "reason": "openmetar captures textual R summaries and writes CSV output through the base utils package.",
+      "declared_in": ["src/R/OpenMetaR/DESCRIPTION"],
+      "evidence": ["src/R/OpenMetaR/R: package code calls capture.output(...) and write.csv(...)"],
+      "reason": "OpenMetaR captures textual R summaries and writes CSV output through the base utils package.",
       "installed_version": "4.6.0"
     },
     {
@@ -242,14 +242,14 @@
     {
       "name": "MCMCpack",
       "source": "cran",
-      "reason": "Bundled for app-level R workflows and transitive Bayesian analysis support outside direct openmetar metadata.",
+      "reason": "Bundled for app-level R workflows and transitive Bayesian analysis support outside direct OpenMetaR metadata.",
       "evidence": ["scripts/install-modern-r-deps.R"]
     },
     {
       "name": "igraph",
       "source": "cran",
-      "reason": "Currently declared by openmetar metadata and bundled by the app, but no direct openmetar call site has been identified in this slice.",
-      "evidence": ["src/R/openmetar/DESCRIPTION", "scripts/install-modern-r-deps.R"]
+      "reason": "Currently declared by OpenMetaR metadata and bundled by the app, but no direct OpenMetaR call site has been identified in this slice.",
+      "evidence": ["src/R/OpenMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
     },
     {
       "name": "quantreg",
@@ -260,32 +260,32 @@
     {
       "name": "ape",
       "source": "cran",
-      "reason": "Currently declared by openmetar metadata and bundled by the app, but no direct openmetar call site has been identified in this slice.",
-      "evidence": ["src/R/openmetar/DESCRIPTION", "scripts/install-modern-r-deps.R"]
+      "reason": "Currently declared by OpenMetaR metadata and bundled by the app, but no direct OpenMetaR call site has been identified in this slice.",
+      "evidence": ["src/R/OpenMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
     },
     {
       "name": "Hmisc",
       "source": "cran",
-      "reason": "Currently declared by openmetar metadata and bundled by the app, but no direct openmetar call site has been identified in this slice.",
-      "evidence": ["src/R/openmetar/DESCRIPTION", "scripts/install-modern-r-deps.R"]
+      "reason": "Currently declared by OpenMetaR metadata and bundled by the app, but no direct OpenMetaR call site has been identified in this slice.",
+      "evidence": ["src/R/OpenMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
     },
     {
       "name": "mice",
       "source": "cran",
-      "reason": "Currently declared by openmetar metadata and bundled by the app, but no direct openmetar call site has been identified in this slice.",
-      "evidence": ["src/R/openmetar/DESCRIPTION", "scripts/install-modern-r-deps.R"]
+      "reason": "Currently declared by OpenMetaR metadata and bundled by the app, but no direct OpenMetaR call site has been identified in this slice.",
+      "evidence": ["src/R/OpenMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
     },
     {
       "name": "ggplot2",
       "source": "cran",
-      "reason": "Currently declared by openmetar metadata and bundled by the app, but no direct openmetar call site has been identified in this slice.",
-      "evidence": ["src/R/openmetar/DESCRIPTION", "scripts/install-modern-r-deps.R"]
+      "reason": "Currently declared by OpenMetaR metadata and bundled by the app, but no direct OpenMetaR call site has been identified in this slice.",
+      "evidence": ["src/R/OpenMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
     },
     {
       "name": "RColorBrewer",
       "source": "cran",
-      "reason": "Currently declared by openmetar metadata and bundled by the app, but no direct openmetar call site has been identified in this slice.",
-      "evidence": ["src/R/openmetar/DESCRIPTION", "scripts/install-modern-r-deps.R"]
+      "reason": "Currently declared by OpenMetaR metadata and bundled by the app, but no direct OpenMetaR call site has been identified in this slice.",
+      "evidence": ["src/R/OpenMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
     },
     {
       "name": "lattice",
@@ -308,25 +308,25 @@
     {
       "name": "nlme",
       "source": "recommended",
-      "reason": "Currently declared by openmetar metadata and bundled by the app, but no direct openmetar call site has been identified in this slice.",
-      "evidence": ["src/R/openmetar/DESCRIPTION", "scripts/install-modern-r-deps.R"]
+      "reason": "Currently declared by OpenMetaR metadata and bundled by the app, but no direct OpenMetaR call site has been identified in this slice.",
+      "evidence": ["src/R/OpenMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
     },
     {
       "name": "splines",
       "source": "base-runtime",
-      "reason": "Currently declared by openmetar metadata, but no direct openmetar call site has been identified in this slice.",
-      "evidence": ["src/R/openmetar/DESCRIPTION"]
+      "reason": "Currently declared by OpenMetaR metadata, but no direct OpenMetaR call site has been identified in this slice.",
+      "evidence": ["src/R/OpenMetaR/DESCRIPTION"]
     },
     {
       "name": "survival",
       "source": "recommended",
-      "reason": "Currently declared by openmetar metadata and installed by the app bundle, but no direct openmetar call site has been identified in this slice.",
-      "evidence": ["src/R/openmetar/DESCRIPTION", "scripts/install-modern-r-deps.R"]
+      "reason": "Currently declared by OpenMetaR metadata and installed by the app bundle, but no direct OpenMetaR call site has been identified in this slice.",
+      "evidence": ["src/R/OpenMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
     },
     {
       "name": "mcmc",
       "source": "cran",
-      "reason": "Installed by the app-level archived dependency bootstrap for Bayesian dependency chains, not direct openmetar metadata.",
+      "reason": "Installed by the app-level archived dependency bootstrap for Bayesian dependency chains, not direct OpenMetaR metadata.",
       "evidence": ["scripts/install-modern-r-deps.R"]
     }
   ],

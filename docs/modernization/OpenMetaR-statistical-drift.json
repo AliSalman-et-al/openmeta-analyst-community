@@ -1,5 +1,5 @@
 {
-  "manifest": "openmetar-statistical-drift",
+  "manifest": "OpenMetaR-statistical-drift",
   "schema_version": 1,
   "target_runtime": {
     "r": "4.6.0",
@@ -12,7 +12,7 @@
     "workflow",
     "result_family",
     "reference_implementation_output",
-    "modern_openmetar_output",
+    "modern_OpenMetaR_output",
     "package_versions",
     "methods_involved",
     "likely_reason",

@@ -39,13 +39,17 @@ GOLDEN_MATRIX_METRICS = {
 }
 
 
-REFERENCE_ENVIRONMENT_EXPECTED = {
-    "id": "windows-ci-conda-python2-pyqt4-r3",
+OPENMETAR_R_PACKAGE = "OpenMetaR"
+
+
+MODERN_BASELINE_ENVIRONMENT_EXPECTED = {
+    "id": "modern-ci-python3-pyqt5-r4-OpenMetaR",
     "os": "Windows",
-    "python": "2.7.18",
-    "pyqt": "4.11.4",
-    "r": "R version 3.3.2",
-    "rpy2": "2.8.5",
+    "python": "3.11",
+    "pyqt": "5.15.11",
+    "r": "R version 4.6.0",
+    "rpy2": "3.6.7",
+    "package": OPENMETAR_R_PACKAGE,
 }
 
 
@@ -73,7 +77,7 @@ def _common_plot_params(path):
 def golden_coverage_matrix(root_dir=None, method_discoverer=None):
     root_dir = os.path.abspath(root_dir or os.path.join(os.path.dirname(__file__), ".."))
     if method_discoverer is None:
-        meta_py_r.RlibLoader().load_openmetar()
+        meta_py_r.RlibLoader().load_OpenMetaR()
         method_discoverer = lambda data_family, dataset, metric: discover_reference_methods(root_dir, data_family, dataset, metric)
 
     rows = []
@@ -130,15 +134,16 @@ def comprehensive_golden_baseline_manifest(root_dir=None, timestamp=None):
                 "commit_sha",
                 "capture_mode",
                 "capture_command",
-                "reference_environment",
+                "baseline_environment",
                 "authoritative",
                 "authority",
             ],
             "local_default_capture_mode": "local-debug",
             "authoritative_capture_mode": "authoritative",
             "authority_values": ["authoritative", "local-debug"],
-            "reference_environment": dict(REFERENCE_ENVIRONMENT_EXPECTED),
-            "authoritative_requires_reference_environment_match": True,
+            "baseline": "modern-behavior",
+            "baseline_environment": dict(MODERN_BASELINE_ENVIRONMENT_EXPECTED),
+            "authoritative_requires_baseline_environment_match": True,
         },
         "bundle_contents": ["capture", "texts", "artifacts", "plot-similarity-metadata", "omissions"],
     }
@@ -450,7 +455,7 @@ def _matching_key(mapping, expected):
 
 
 def run_curated_golden_set(report_path=None):
-    meta_py_r.RlibLoader().load_openmetar()
+    meta_py_r.RlibLoader().load_OpenMetaR()
     reports = []
     for bundle in curated_golden_bundles():
         result = headless_analysis.run_headless_analysis(bundle["case"])
@@ -462,14 +467,14 @@ def run_curated_golden_set(report_path=None):
     return report
 
 
-def capture_bundle(bundle, runner=None, timestamp=None, capture_mode=None, capture_command=None, reference_environment=None):
+def capture_bundle(bundle, runner=None, timestamp=None, capture_mode=None, capture_command=None, baseline_environment=None, reference_environment=None):
     runner = runner or headless_analysis.run_headless_analysis
     captured_at = timestamp or datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
     capture_mode = capture_mode or os.environ.get("OMA_GOLDEN_CAPTURE_MODE", "local-debug")
     capture_command = capture_command or os.environ.get("OMA_GOLDEN_CAPTURE_COMMAND") or _capture_command()
     tool_versions = _tool_versions()
-    reference_environment = _reference_environment(reference_environment, tool_versions)
-    authoritative = capture_mode == "authoritative" and reference_environment["matches_expected"]
+    baseline_environment = _baseline_environment(baseline_environment or reference_environment, tool_versions)
+    authoritative = capture_mode == "authoritative" and baseline_environment["matches_expected"]
     base = {
         "id": bundle["id"],
         "dataset": bundle["dataset"],
@@ -483,7 +488,7 @@ def capture_bundle(bundle, runner=None, timestamp=None, capture_mode=None, captu
         "commit_sha": _commit_sha(),
         "capture_mode": capture_mode,
         "capture_command": capture_command,
-        "reference_environment": reference_environment,
+        "baseline_environment": baseline_environment,
         "authoritative": authoritative,
         "authority": "authoritative" if authoritative else "local-debug",
     }
@@ -496,7 +501,7 @@ def capture_bundle(bundle, runner=None, timestamp=None, capture_mode=None, captu
 
 
 def capture_curated_binary_bundle(report_path=None):
-    meta_py_r.RlibLoader().load_openmetar()
+    meta_py_r.RlibLoader().load_OpenMetaR()
     capture = capture_bundle(curated_golden_bundles()[0])
     if report_path:
         with open(report_path, "w") as f:
@@ -504,14 +509,14 @@ def capture_curated_binary_bundle(report_path=None):
     return capture
 
 
-def capture_comprehensive_golden_baseline(output_dir=None, runner=None, timestamp=None, capture_mode=None, capture_command=None, reference_environment=None, root_dir=None):
+def capture_comprehensive_golden_baseline(output_dir=None, runner=None, timestamp=None, capture_mode=None, capture_command=None, baseline_environment=None, reference_environment=None, root_dir=None):
     output_dir = os.path.abspath(output_dir or os.path.join(os.path.dirname(__file__), "..", "artifacts", "golden-baseline"))
     captures_dir = os.path.join(output_dir, "captures")
     artifacts_dir = os.path.join(output_dir, "artifacts")
     _ensure_dir(captures_dir)
     _ensure_dir(artifacts_dir)
 
-    meta_py_r.RlibLoader().load_openmetar()
+    meta_py_r.RlibLoader().load_OpenMetaR()
     rows = []
     for bundle in curated_golden_bundles(root_dir):
         capture = capture_bundle(
@@ -520,7 +525,7 @@ def capture_comprehensive_golden_baseline(output_dir=None, runner=None, timestam
             timestamp=timestamp,
             capture_mode=capture_mode,
             capture_command=capture_command,
-            reference_environment=reference_environment,
+            baseline_environment=baseline_environment or reference_environment,
         )
         _preserve_capture_artifacts(capture, bundle["id"], artifacts_dir)
         rows.append(capture)
@@ -625,7 +630,15 @@ def _package_versions(tool_versions):
         "r": tool_versions.get("r"),
         "rpy2": tool_versions.get("rpy2"),
         "pyqt": tool_versions.get("pyqt"),
+        "OpenMetaR": _r_package_version(OPENMETAR_R_PACKAGE),
     }
+
+
+def _r_package_version(package_name):
+    try:
+        return str(meta_py_r.ro.r("as.character(utils::packageVersion('%s'))" % package_name)[0])
+    except Exception:
+        return None
 
 
 def _capture_command():
@@ -651,29 +664,35 @@ def _commit_sha():
     return "unknown"
 
 
-def _reference_environment(reference_environment, tool_versions):
-    supplied = dict(reference_environment or {})
+def _baseline_environment(baseline_environment, tool_versions):
+    supplied = dict(baseline_environment or {})
     if not supplied:
-        supplied = _reference_environment_from_env(tool_versions)
-    supplied["expected"] = dict(REFERENCE_ENVIRONMENT_EXPECTED)
-    supplied["matches_expected"] = _matches_reference_environment(supplied)
+        supplied = _baseline_environment_from_env(tool_versions)
+    supplied["expected"] = dict(MODERN_BASELINE_ENVIRONMENT_EXPECTED)
+    supplied["matches_expected"] = _matches_baseline_environment(supplied)
     return supplied
 
 
-def _reference_environment_from_env(tool_versions):
+def _baseline_environment_from_env(tool_versions):
     return {
-        "id": os.environ.get("OMA_REFERENCE_ENVIRONMENT_ID", "local-debug"),
-        "os": os.environ.get("OMA_REFERENCE_ENVIRONMENT_OS", tool_versions.get("os")),
-        "python": os.environ.get("OMA_REFERENCE_ENVIRONMENT_PYTHON", tool_versions.get("python")),
-        "pyqt": os.environ.get("OMA_REFERENCE_ENVIRONMENT_PYQT", tool_versions.get("pyqt")),
-        "r": os.environ.get("OMA_REFERENCE_ENVIRONMENT_R", tool_versions.get("r")),
-        "rpy2": os.environ.get("OMA_REFERENCE_ENVIRONMENT_RPY2", tool_versions.get("rpy2")),
+        "id": os.environ.get("OMA_MODERN_BASELINE_ENVIRONMENT_ID", "local-debug"),
+        "os": os.environ.get("OMA_MODERN_BASELINE_ENVIRONMENT_OS", tool_versions.get("os")),
+        "python": os.environ.get("OMA_MODERN_BASELINE_ENVIRONMENT_PYTHON", tool_versions.get("python")),
+        "pyqt": os.environ.get("OMA_MODERN_BASELINE_ENVIRONMENT_PYQT", tool_versions.get("pyqt")),
+        "r": os.environ.get("OMA_MODERN_BASELINE_ENVIRONMENT_R", tool_versions.get("r")),
+        "rpy2": os.environ.get("OMA_MODERN_BASELINE_ENVIRONMENT_RPY2", tool_versions.get("rpy2")),
+        "package": os.environ.get("OMA_MODERN_BASELINE_PACKAGE", OPENMETAR_R_PACKAGE),
     }
 
 
-def _matches_reference_environment(reference_environment):
-    for key, expected in REFERENCE_ENVIRONMENT_EXPECTED.items():
-        if reference_environment.get(key) != expected:
+def _matches_baseline_environment(baseline_environment):
+    for key, expected in MODERN_BASELINE_ENVIRONMENT_EXPECTED.items():
+        observed = baseline_environment.get(key)
+        if key in {"python", "r"}:
+            if not str(observed or "").startswith(expected):
+                return False
+            continue
+        if observed != expected:
             return False
     return True
 

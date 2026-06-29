@@ -10,8 +10,8 @@ from pathlib import Path
 
 
 MODERNIZATION_DIR = Path("docs") / "modernization"
-DEPENDENCY_MANIFEST = MODERNIZATION_DIR / "openmetar-r-dependencies.json"
-DRIFT_MANIFEST = MODERNIZATION_DIR / "openmetar-statistical-drift.json"
+DEPENDENCY_MANIFEST = MODERNIZATION_DIR / "OpenMetaR-r-dependencies.json"
+DRIFT_MANIFEST = MODERNIZATION_DIR / "OpenMetaR-statistical-drift.json"
 EXPECTED_R_TARGET = "4.6.0"
 
 DIRECT_DEPENDENCY_REQUIRED_FIELDS = {
@@ -30,7 +30,7 @@ DRIFT_RECORD_REQUIRED_FIELDS = {
     "workflow",
     "result_family",
     "reference_implementation_output",
-    "modern_openmetar_output",
+    "modern_OpenMetaR_output",
     "package_versions",
     "methods_involved",
     "likely_reason",
@@ -85,14 +85,14 @@ def validate_dependency_manifest(manifest: dict) -> list[str]:
             "target_runtime",
             "package_metadata",
             "empty_scope_rationale",
-            "direct_openmetar_dependencies",
+            "direct_OpenMetaR_dependencies",
             "app_r_bundle_dependencies",
             "validation",
         },
         str(DEPENDENCY_MANIFEST),
     )
-    if manifest["manifest"] != "openmetar-r-dependencies":
-        raise ValidationError(f"{DEPENDENCY_MANIFEST}: manifest must be openmetar-r-dependencies")
+    if manifest["manifest"] != "OpenMetaR-r-dependencies":
+        raise ValidationError(f"{DEPENDENCY_MANIFEST}: manifest must be OpenMetaR-r-dependencies")
     if manifest["schema_version"] != 1:
         raise ValidationError(f"{DEPENDENCY_MANIFEST}: schema_version must be 1")
     target_runtime = manifest["target_runtime"]
@@ -105,28 +105,28 @@ def validate_dependency_manifest(manifest: dict) -> list[str]:
     if not isinstance(package_metadata, dict):
         raise ValidationError(f"{DEPENDENCY_MANIFEST}: package_metadata must be an object")
     require_keys(package_metadata, {"package", "description", "dependency_fields"}, f"{DEPENDENCY_MANIFEST}:package_metadata")
-    if package_metadata["package"] != "openmetar":
-        raise ValidationError(f"{DEPENDENCY_MANIFEST}: package_metadata.package must be openmetar")
+    if package_metadata["package"] != "OpenMetaR":
+        raise ValidationError(f"{DEPENDENCY_MANIFEST}: package_metadata.package must be OpenMetaR")
     empty_scope_rationale = manifest["empty_scope_rationale"]
     if not isinstance(empty_scope_rationale, dict):
         raise ValidationError(f"{DEPENDENCY_MANIFEST}: empty_scope_rationale must be an object")
     require_non_empty_string(empty_scope_rationale.get("test"), f"{DEPENDENCY_MANIFEST}:empty_scope_rationale.test")
 
     direct_dependencies = require_list(
-        manifest["direct_openmetar_dependencies"],
-        f"{DEPENDENCY_MANIFEST}:direct_openmetar_dependencies",
+        manifest["direct_OpenMetaR_dependencies"],
+        f"{DEPENDENCY_MANIFEST}:direct_OpenMetaR_dependencies",
     )
     app_dependencies = require_list(
         manifest["app_r_bundle_dependencies"],
         f"{DEPENDENCY_MANIFEST}:app_r_bundle_dependencies",
     )
     if not direct_dependencies:
-        raise ValidationError(f"{DEPENDENCY_MANIFEST}: direct_openmetar_dependencies must not be empty")
+        raise ValidationError(f"{DEPENDENCY_MANIFEST}: direct_OpenMetaR_dependencies must not be empty")
 
     direct_names: list[str] = []
     seen_direct: set[str] = set()
     for index, dependency in enumerate(direct_dependencies):
-        label = f"{DEPENDENCY_MANIFEST}:direct_openmetar_dependencies[{index}]"
+        label = f"{DEPENDENCY_MANIFEST}:direct_OpenMetaR_dependencies[{index}]"
         if not isinstance(dependency, dict):
             raise ValidationError(f"{label}: expected an object")
         require_keys(dependency, DIRECT_DEPENDENCY_REQUIRED_FIELDS, label)
@@ -160,7 +160,7 @@ def validate_dependency_manifest(manifest: dict) -> list[str]:
         require_non_empty_string(dependency["reason"], f"{label}.reason")
     if overlap:
         raise ValidationError(
-            f"{DEPENDENCY_MANIFEST}: dependencies must be separated between direct openmetar and app bundle: "
+            f"{DEPENDENCY_MANIFEST}: dependencies must be separated between direct OpenMetaR and app bundle: "
             + ", ".join(sorted(overlap))
         )
 
@@ -180,8 +180,8 @@ def validate_drift_manifest(manifest: dict) -> None:
         },
         str(DRIFT_MANIFEST),
     )
-    if manifest["manifest"] != "openmetar-statistical-drift":
-        raise ValidationError(f"{DRIFT_MANIFEST}: manifest must be openmetar-statistical-drift")
+    if manifest["manifest"] != "OpenMetaR-statistical-drift":
+        raise ValidationError(f"{DRIFT_MANIFEST}: manifest must be OpenMetaR-statistical-drift")
     if manifest["schema_version"] != 1:
         raise ValidationError(f"{DRIFT_MANIFEST}: schema_version must be 1")
     required_fields = set(require_list(manifest["reviewed_drift_required_fields"], f"{DRIFT_MANIFEST}:reviewed_drift_required_fields"))

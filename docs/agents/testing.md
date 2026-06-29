@@ -66,7 +66,7 @@ delegates:
 `DatasetModel` initialization calls OpenMeta R functions such as `set.global.conf.level`. Focused tests that instantiate `DatasetModel` without the full application setup should load only the needed package:
 
 ```python
-meta_py_r.RlibLoader().load_openmetar()
+meta_py_r.RlibLoader().load_OpenMetaR()
 ```
 
 Avoid `load_all()` for narrow tests unless network meta-analysis packages are required; this local environment currently lacks `gemtc`.

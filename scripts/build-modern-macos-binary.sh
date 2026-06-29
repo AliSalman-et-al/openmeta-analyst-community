@@ -238,9 +238,9 @@ fi
 
 r_version_cache_key="$("$rscript" -e "cat(paste0('R-', getRversion()))")"
 if command -v sha256sum >/dev/null 2>&1; then
-  r_dependency_policy_hash="$(cat "$repo_root/scripts/install-modern-r-deps.R" "$repo_root/docs/modernization/openmetar-r-dependencies.json" | sha256sum | awk '{print substr($1, 1, 12)}')"
+  r_dependency_policy_hash="$(cat "$repo_root/scripts/install-modern-r-deps.R" "$repo_root/docs/modernization/OpenMetaR-r-dependencies.json" | sha256sum | awk '{print substr($1, 1, 12)}')"
 else
-  r_dependency_policy_hash="$(cat "$repo_root/scripts/install-modern-r-deps.R" "$repo_root/docs/modernization/openmetar-r-dependencies.json" | shasum -a 256 | awk '{print substr($1, 1, 12)}')"
+  r_dependency_policy_hash="$(cat "$repo_root/scripts/install-modern-r-deps.R" "$repo_root/docs/modernization/OpenMetaR-r-dependencies.json" | shasum -a 256 | awk '{print substr($1, 1, 12)}')"
 fi
 r_package_cache_key="${r_version_cache_key}-rdeps-${r_dependency_policy_hash}"
 cache_library="$r_package_cache_root/$r_package_cache_key/library"
@@ -248,7 +248,7 @@ cache_library="$r_package_cache_root/$r_package_cache_key/library"
 test_bundled_r_packages() {
   local library="$1"
   [ -d "$library" ] || return 1
-  R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" "$rscript" -e "lib <- normalizePath('$library', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','openmetar','metafor','lme4','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) quit(status=1)" >/dev/null 2>&1
+  R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" "$rscript" -e "lib <- normalizePath('$library', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','OpenMetaR','metafor','lme4','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) quit(status=1)" >/dev/null 2>&1
 }
 
 copy_r_library() {
@@ -262,11 +262,11 @@ install_local_r_packages() {
   rm -rf "$package_build_root"
   mkdir -p "$package_build_root"
   cp -R "$src_dir/R/HSROC" "$package_build_root/HSROC"
-  cp -R "$src_dir/R/openmetar" "$package_build_root/openmetar"
+  cp -R "$src_dir/R/OpenMetaR" "$package_build_root/OpenMetaR"
   find "$package_build_root" \( -name '*.o' -o -name '*.so' -o -name '*.dll' \) -delete
 
   R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$r_binary" CMD INSTALL --library="$r_lib" "$package_build_root/HSROC"
-  R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$r_binary" CMD INSTALL --library="$r_lib" "$package_build_root/openmetar"
+  R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$r_binary" CMD INSTALL --library="$r_lib" "$package_build_root/OpenMetaR"
 }
 
 if test_bundled_r_packages "$cache_library"; then
@@ -279,7 +279,7 @@ fi
 
 step "Installing local OpenMeta R packages"
 install_local_r_packages
-R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$rscript" -e "pkgs <- c('HSROC','openmetar','metafor','lme4','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1)"
+R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$rscript" -e "pkgs <- c('HSROC','OpenMetaR','metafor','lme4','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1)"
 
 if test_bundled_r_packages "$r_lib"; then
   echo "Caching bundled R library at $cache_library"
@@ -303,7 +303,7 @@ for required_path in \
   "$app_root/sample_data/amino.oma" \
   "$app_root/doc/openMA_help.html" \
   "$app_root/R/bin/Rscript" \
-  "$app_root/R/library/openmetar/DESCRIPTION" \
+  "$app_root/R/library/OpenMetaR/DESCRIPTION" \
   "$app_root/LaunchOpenMetaAnalyst.command"
 do
   if [ ! -e "$required_path" ]; then
@@ -337,7 +337,7 @@ required = [
     "OpenMetaAnalyst.app/Contents/MacOS/sample_data/amino.oma",
     "OpenMetaAnalyst.app/Contents/MacOS/doc/openMA_help.html",
     "OpenMetaAnalyst.app/Contents/MacOS/R/bin/Rscript",
-    "OpenMetaAnalyst.app/Contents/MacOS/R/library/openmetar/DESCRIPTION",
+    "OpenMetaAnalyst.app/Contents/MacOS/R/library/OpenMetaR/DESCRIPTION",
     "OpenMetaAnalyst.app/Contents/MacOS/LaunchOpenMetaAnalyst.command",
 ]
 with zipfile.ZipFile(zip_path) as archive:
