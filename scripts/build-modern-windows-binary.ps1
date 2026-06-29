@@ -157,11 +157,20 @@ function Copy-RRuntime {
     }
 }
 
-function Get-RVersionCacheKey {
+function Get-RPackageCacheKey {
     param([string]$RscriptExe)
     $version = & $RscriptExe -e "cat(paste0('R-', getRversion()))"
     if ($LASTEXITCODE -ne 0 -or -not $version) { throw "Could not determine R runtime version." }
-    return ($version.Trim() -replace "[^A-Za-z0-9_.-]", "_")
+    $installDeps = Join-Path $repoRoot "scripts\install-modern-r-deps.R"
+    $manifest = Join-Path $repoRoot "docs\modernization\openmetar-r-dependencies.json"
+    $hashInput = @(
+        (Get-FileHash -Algorithm SHA256 -LiteralPath $installDeps).Hash
+        (Get-FileHash -Algorithm SHA256 -LiteralPath $manifest).Hash
+    ) -join ""
+    $policyHash = [System.BitConverter]::ToString(
+        [System.Security.Cryptography.SHA256]::Create().ComputeHash([System.Text.Encoding]::UTF8.GetBytes($hashInput))
+    ).Replace("-", "").Substring(0, 12).ToLowerInvariant()
+    return (($version.Trim() + "-rdeps-" + $policyHash) -replace "[^A-Za-z0-9_.-]", "_")
 }
 
 function Test-BundledRPackages {
@@ -259,8 +268,8 @@ function Install-BundledRPackages {
         $env:Path
     ) -join ";"
 
-    $rVersionCacheKey = Get-RVersionCacheKey -RscriptExe $rscriptExe
-    $cacheLibrary = Join-Path (Join-Path $RPackageCacheRoot $rVersionCacheKey) "library"
+    $rPackageCacheKey = Get-RPackageCacheKey -RscriptExe $rscriptExe
+    $cacheLibrary = Join-Path (Join-Path $RPackageCacheRoot $rPackageCacheKey) "library"
     if (Test-BundledRPackages -RscriptExe $rscriptExe -Library $cacheLibrary) {
         Write-Host "Using cached bundled R library from $cacheLibrary"
         Copy-RLibrary -Source $cacheLibrary -Destination $rLibrary

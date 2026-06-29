@@ -181,9 +181,24 @@ def test_shared_modern_r_dependency_installer_is_used_by_packagers():
     macos = (ROOT / "scripts" / "build-modern-macos-binary.sh").read_text()
 
     assert "R_LIBS_USER must point at the target bundled R library" in installer
-    assert "install_archive(\"metafor\", \"1.9-9\")" in installer
+    assert "install_cran_packages(" in installer
+    assert "install_archive" not in installer
+    assert "src/contrib/Archive" not in installer
+    assert "repos = NULL" not in installer
+    for archived_pin in [
+        '"metafor", "1.9-9"',
+        '"igraph", "1.0.1"',
+        '"lme4", "1.1-12"',
+    ]:
+        assert archived_pin not in installer
+    assert '"HSROC"' not in installer
+    assert '"openmetar"' not in installer
     assert "install-modern-r-deps.R" in windows
     assert "install-modern-r-deps.R" in macos
+    assert "openmetar-r-dependencies.json" in windows
+    assert "openmetar-r-dependencies.json" in macos
+    assert "-rdeps-" in windows
+    assert "-rdeps-" in macos
 
 
 def test_macos_packager_resolves_relative_python_before_changing_directory():
