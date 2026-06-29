@@ -9,9 +9,13 @@
 #######################################################################
 
 import os
-from PyQt4 import QtCore, QtGui
-from PyQt4.Qt import *
+import sys
+from PyQt5 import QtCore, QtGui
 import meta_py_r
+
+QColor = QtGui.QColor
+QDir = QtCore.QDir
+QSettings = QtCore.QSettings
 
 ##################### HANDLE SETTINGS #####################
 
@@ -44,7 +48,7 @@ def update_setting(field, value):
     elif value_type == dict:
         raise Exception("Not implemented yet!")
     elif value_type == bool:
-        settings.setValue(field, QVariant(value))
+        settings.setValue(field, value)
     elif value_type == QColor:
         # just being explicit to signify i am aware of QColors and to match get_setting
         settings.setValue(field, value)
@@ -54,8 +58,8 @@ def update_setting(field, value):
         settings.setValue(field, value)
     else:
         # nothing special needs to be done
-        print("Field: %s" % field)
-        print("Value type: %s" % str(value_type))
+        print(("Field: %s" % field))
+        print(("Value type: %s" % str(value_type)))
         raise Exception("Are you SURE that NOTHING special needs to be done?")
         settings.setValue(field, value)
 
@@ -66,7 +70,7 @@ def get_setting(field):
     try:
         return _get_setting_helper(field)
     except Exception as e:
-        print "Exception while trying to access setting '%s', resetting settings to defaults" % field
+        print("Exception while trying to access setting '%s', resetting settings to defaults" % field)
         reset_settings()
         return _get_setting_helper(field)
     return _get_setting_helper(field)
@@ -82,22 +86,29 @@ def _get_setting_helper(field):
         indexes = list(settings.childKeys())
         foo_list = []
         for i in indexes:
-            value = settings.value(i).toString().toUtf8() # byte array encoded in utf-8
-            value = unicode(value, 'utf8')
-            foo_list.append(value)
+            value = settings.value(i)
+            foo_list.append(str(value.toString().toUtf8(), 'utf8') if hasattr(value, "toString") else str(value))
         settings.endGroup()
         setting_value = foo_list
     elif value_type == dict:
         raise Exception("Not implemented yet!")
     elif value_type == bool:
-        print("Converted %s to a boolean" % field)
-        setting_value = settings.value(field).toBool()
+        print(("Converted %s to a boolean" % field))
+        value = settings.value(field)
+        if hasattr(value, "toBool"):
+            setting_value = value.toBool()
+        elif hasattr(value, "value"):
+            setting_value = bool(value.value())
+        else:
+            setting_value = bool(value)
     elif value_type == str:
-        setting_value = settings.value(field).toString()
-    elif value_type == unicode:
+        value = settings.value(field)
+        setting_value = value.toString() if hasattr(value, "toString") else str(value)
+    elif value_type == str:
         settings.setValue(field, value)
     elif value_type == int:
-        setting_value = settings.value(field).toInt()[0]
+        value = settings.value(field)
+        setting_value = value.toInt()[0] if hasattr(value, "toInt") else int(value)
     elif value_type == QColor:
         setting_value = QColor(settings.value(field))
     else:
@@ -125,10 +136,10 @@ def load_settings():
         toplevel_group_keys = [str(x) for x in childgroups]
         return field_name in toplevel_group_keys
 
-    for field, value in DEFAULT_SETTINGS.items():
+    for field, value in list(DEFAULT_SETTINGS.items()):
         setting_present = settings.contains(field) or field_is_toplevel_child_group_keys(field)
         if not setting_present:
-            print("Filling in setting for %s" % field)
+            print(("Filling in setting for %s" % field))
             update_setting(field, value)
 
     save_settings()
@@ -141,7 +152,7 @@ def reset_settings():
     settings = QSettings()
     settings.clear()
 
-    for field, value in DEFAULT_SETTINGS.items():
+    for field, value in list(DEFAULT_SETTINGS.items()):
         update_setting(field, value)
     save_settings()
 
@@ -165,6 +176,34 @@ def add_file_to_recent_files(fpath):
 
     update_setting("recent_files", recent_files)
     save_settings()
+
+
+def get_sample_data_path():
+    if getattr(sys, "frozen", False):
+        app_root = os.path.dirname(sys.executable)
+    else:
+        app_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+    return os.path.join(app_root, "sample_data")
+
+
+def get_default_open_directory(recent_files=None):
+    if recent_files is None:
+        recent_files = get_setting("recent_files")
+
+    for recent_file in reversed(recent_files):
+        recent_dir = os.path.dirname(os.path.abspath(str(recent_file)))
+        if os.path.isdir(recent_dir):
+            return recent_dir
+
+    sample_data_path = get_sample_data_path()
+    if os.path.isdir(sample_data_path):
+        return sample_data_path
+
+    documents_path = get_user_documents_path()
+    if documents_path and os.path.isdir(documents_path):
+        return documents_path
+
+    return "."
 
 ################ END HANDLE SETTINGS ######################
 
@@ -194,7 +233,7 @@ def make_base_path():
     success = QDir().mkpath(base_path)
     if not success:
         raise Exception("Could not create base path at %s" % base_path)
-    print("Made base path: %s" % base_path)
+    print(("Made base path: %s" % base_path))
     return base_path
 
 def get_base_path(normalize=False):
@@ -202,10 +241,10 @@ def get_base_path(normalize=False):
     Usually this shouldn't be done because R is confused by backward slashes \
     because it sees it as an escape character and Qt is fine with / throughout '''
 
-    base_path = str(QDesktopServices.storageLocation(QDesktopServices.DataLocation))
+    base_path = str(QtCore.QStandardPaths.writableLocation(QtCore.QStandardPaths.AppDataLocation))
     if normalize:
         base_path = str(QDir.toNativeSeparators(base_path))
-    print("Base path is: %s" % base_path)
+    print(("Base path is: %s" % base_path))
     return base_path
 
 def make_r_tmp():
@@ -214,11 +253,11 @@ def make_r_tmp():
     success = QDir().mkpath(r_tmp_path)
     if not success:
         raise Exception("Could not create r_tmp path at %s" % r_tmp_path)
-    print("Made r_tmp_path at %s" % r_tmp_path)
+    print(("Made r_tmp_path at %s" % r_tmp_path))
     return r_tmp_path
 
 def to_posix_path(path):
-    ''' for now, just changes \ to /
+    r''' for now, just changes \ to /
     Assumes there are no escapes in the path, very important!'''
 
     new_path = path.replace('\\', '/')
@@ -226,18 +265,18 @@ def to_posix_path(path):
 
 def clear_r_tmp():
     r_tmp_dir = os.path.join(get_base_path(), "r_tmp")
-    print("Clearing %s" % r_tmp_dir)
+    print(("Clearing %s" % r_tmp_dir))
     for file_p in os.listdir(r_tmp_dir):
         file_path = os.path.join(r_tmp_dir, file_p)
         try:
             if os.path.isfile(file_path):
-                print("deleting %s" % file_path)
+                print(("deleting %s" % file_path))
                 os.unlink(file_path) # same as remove
-        except Exception, e:
-            print e
+        except Exception as e:
+            print(e)
             
 def get_user_documents_path():
-    docs_path = str(QDesktopServices.storageLocation(QDesktopServices.DocumentsLocation))
+    docs_path = str(QtCore.QStandardPaths.writableLocation(QtCore.QStandardPaths.DocumentsLocation))
     return docs_path
             
 ############## END OF HANDLE R_TEMP IN USER-AREA DIRECTORY ####################

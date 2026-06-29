@@ -1,4 +1,5 @@
-from PyQt4.Qt import *
+from PyQt5.QtGui import QPixmap
+from PyQt5.QtWidgets import QDialog, QGraphicsScene
 import forms.ui_network_view
 import edit_list_models
 import meta_py_r
@@ -27,10 +28,8 @@ class ViewDialog(QDialog, forms.ui_network_view.Ui_network_view_dialog):
         self.graph_network(self.cur_outcome, self.cur_follow_up)
     
     def setup_signals(self):
-        QObject.connect(self.outcome_cbo_box, SIGNAL("currentIndexChanged(QString)"),
-                                                            self.outcome_changed)
-        QObject.connect(self.follow_up_cbo_box, SIGNAL("currentIndexChanged(QString)"),
-                                                            self.follow_up_changed)
+        self.outcome_cbo_box.currentIndexChanged[str].connect(self.outcome_changed)
+        self.follow_up_cbo_box.currentIndexChanged[str].connect(self.follow_up_changed)
         
     def outcome_changed(self, new_outcome):
         self.cur_outcome = str(new_outcome)

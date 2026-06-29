@@ -26,7 +26,7 @@
    <item>
     <widget class="QLabel" name="instructions">
      <property name="text">
-      <string>Please select a csv file to import:
+      <string>Please select a CSV file to import:
 The CSV should match the format of the spreadsheet currently displayed under &quot;required CSV format&quot;. Don't worry if the column titles are not the same, these can be changed later.
 
 Also, things will be OK if you don't have data for all the columns, however if you have data for a column to the right of a column for which you do not have data, the left hand column(s) must exist (but have blank cells).
@@ -59,7 +59,7 @@ Additional columns will be treated as covariates.</string>
       <item>
        <widget class="QCheckBox" name="from_excel_chkbx">
         <property name="text">
-         <string>csv exported from excel?</string>
+         <string>CSV exported from Excel?</string>
         </property>
        </widget>
       </item>
@@ -78,7 +78,7 @@ Additional columns will be treated as covariates.</string>
         <item>
          <widget class="QLabel" name="delimter_lbl">
           <property name="text">
-           <string>Delimter:</string>
+           <string>Delimiter:</string>
           </property>
           <property name="buddy">
            <cstring>delimter_le</cstring>
@@ -180,7 +180,7 @@ Additional columns will be treated as covariates.</string>
         <item>
          <widget class="QPushButton" name="select_file_btn">
           <property name="text">
-           <string>select csv file ...</string>
+           <string>Select CSV file...</string>
           </property>
           <property name="icon">
            <iconset resource="../images/icons.qrc">

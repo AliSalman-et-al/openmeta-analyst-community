@@ -289,6 +289,20 @@ save.data <- function(om.data, res, params, plot.data, out.path=NULL) {
   out.path
 }
 
+update.changed.plot.params <- function(params, changed.params) {
+  if (length(changed.params) == 0) {
+    return(params)
+  }
+  for (param.name in names(changed.params)) {
+    value <- changed.params[[param.name]]
+    if (length(value) > 1) {
+      value <- paste(value, collapse=", ")
+    }
+    params[[param.name]][1] <- value
+  }
+  params
+}
+
 create.regression.display <- function(res, params, display.data) {
   
   if (is.null(params$bootstrap.type))
@@ -406,7 +420,7 @@ create.overall.display <- function(res, study.names, params, model.title, data.t
   overall.array <- array(dim=c(length(study.names) + 1, 6))
     #QLabel =  paste("Q(df = ", degf, ")", sep="")
   
-  overall.array[1,] <- c("Studies", "Estimate", "Lower bound", "Upper bound", "Std. error", "p-Val")
+  overall.array[1,] <- c("Studies", "Estimate", "Lower bound", "Upper bound", "Std. error", "p-Value")
   
   # unpack the data
   for (count in 1:length(res)) {
@@ -458,9 +472,9 @@ create.subgroup.display <- function(res, study.names, params, model.title, data.
   # hmm....
   n <- length(study.names)
 
-  subgroup.array[1,] <- c("Subgroups", "Studies", "Estimate", "Lower bound", "Upper bound", "Std. error", "p-Val", "z-Val")
+  subgroup.array[1,] <- c("Subgroups", "Studies", "Estimate", "Lower bound", "Upper bound", "Std. error", "p-Value", "z-Value")
   het.array[1,] <- c("Studies", "Q (df)",
-               "Het. p-Val", "I^2")
+               "Het. p-Value", "I^2")
   # unpack the data
   for (count in 1:length(study.names)) {
     num.studies <- res[[count]]$k
@@ -512,7 +526,7 @@ create.subgroup.display <- function(res, study.names, params, model.title, data.
     het.array[count+1,] <- c(study.names[count], QE, QEp, I2)
   }
 
-  table.titles <- c(" Model Results", "  Heterogeneity")
+  table.titles <- c(" Model Results", " Heterogeneity")
   arrays <- list(arr1=subgroup.array, arr2=het.array)
   #}
   subgroup.disp <- list("model.title" = model.title, "table.titles" = table.titles, "arrays" = arrays,
@@ -748,6 +762,6 @@ loo.rma.mh.value.info <- function () {
 }
 
 capture.output.and.collapse <- function (x) {
-  output <- paste(capture.output(x), collapse="\n")
+  output <- paste(capture.output(print(x)), collapse="\n")
   output
 }

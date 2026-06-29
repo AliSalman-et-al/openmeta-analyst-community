@@ -861,9 +861,10 @@ meta.regression <- function(reg.data, params, cond.means.data=NULL, stop.at.rma=
             results <- list("images"=images,
 					        "Summary"=reg.disp,
 							"plot_names"=plot.names,
-                            "plot_params_paths"=plot.params.paths,
+							"plot_params_paths"=plot.params.paths,
 							"res"=pure.res,
-							"res.info"=rma.uni.value.info())
+							"res.info"=rma.uni.value.info(),
+							"Weights"=weights(res))
 		} else if (isnt.null(cond.means.data)) { # Give the conditional means results
 			mr.cond.means.disp <- cond_means_display(res, params, display.data, reg.data=reg.data, cat.ref.var.and.levels=cat.ref.var.and.levels, cond.means.data=cond.means.data)
 			res.output <- c(pure.res,

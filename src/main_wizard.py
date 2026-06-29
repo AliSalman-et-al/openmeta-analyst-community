@@ -4,10 +4,22 @@ import forms.ui_data_type_page
 import forms.ui_outcome_name_page
 import forms.ui_welcome_page
 
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPixmap
+from PyQt5.QtWidgets import (
+    QAction,
+    QApplication,
+    QFileDialog,
+    QAbstractButton,
+    QMenu,
+    QMessageBox,
+    QTableWidgetItem,
+    QWizard,
+    QWizardPage,
+)
 import meta_globals
 from ma_data_table_model import DatasetModel
+from settings import get_default_open_directory
 
 
 class WelcomePage(QWizardPage, forms.ui_welcome_page.Ui_WizardPage):
@@ -35,10 +47,10 @@ class WelcomePage(QWizardPage, forms.ui_welcome_page.Ui_WizardPage):
             return Page_DataType   
              
     def _setup_connections(self):
-        QObject.connect(self.create_new_btn, SIGNAL("clicked()"), self.new_dataset)
-        QObject.connect(self.open_btn,       SIGNAL("clicked()"), self.open_dataset)
+        self.create_new_btn.clicked.connect(lambda _checked=False: self.new_dataset())
+        self.open_btn.clicked.connect(lambda _checked=False: self.open_dataset())
         self._setup_open_recent_btn()
-        QObject.connect(self.import_csv_btn, SIGNAL("clicked()"), self.import_csv)
+        self.import_csv_btn.clicked.connect(lambda _checked=False: self.import_csv())
             
     def _setup_open_recent_btn(self):
         if len(self.recent_datasets) > 0:
@@ -47,25 +59,27 @@ class WelcomePage(QWizardPage, forms.ui_welcome_page.Ui_WizardPage):
             # button with the recent datasets.
             qm = QMenu()
             for dataset in self.recent_datasets[::-1]: # most recent dataset is last in list
-                action_item = QAction(QString(dataset), qm)
+                action_item = QAction(dataset, qm)
                 qm.addAction(action_item)
                 # I wanted to handle this with lambdas, but the method would
                 # inexplicably always be invoked with the last dataset as the
                 # argument. Instead, I've opted to use the .sender method to
                 # retrieve the action_item, i.e., dataset, selected (see
                 # the dataset_selected routine).
-                QObject.connect(action_item, SIGNAL("triggered()"), self.dataset_selected) 
+                action_item.triggered.connect(
+                    lambda _checked=False, action_item=action_item: self.dataset_selected(action_item)
+                )
             self.open_recent_btn.setMenu(qm)
         else:
             self.open_recent_btn.setEnabled(False)
     
-    def dataset_selected(self):
+    def dataset_selected(self, action_item=None):
         self.wizard().set_wizard_path("open")
         
         # we use the sender method to see which menu item was
         # triggered
-        dataset_path = QObject.sender(self).text() # is a qstring
-        dataset_path = unicode(dataset_path.toUtf8(),'utf8')
+        dataset_path = (action_item or self.sender()).text()
+        dataset_path = str(dataset_path.toUtf8(), 'utf8') if hasattr(dataset_path, "toUtf8") else str(dataset_path)
         self.selected_dataset = dataset_path
         self.wizard().set_selected_dataset(self.selected_dataset)
         self.wizard().accept()
@@ -75,10 +89,12 @@ class WelcomePage(QWizardPage, forms.ui_welcome_page.Ui_WizardPage):
 
         self.selected_dataset = QFileDialog.getOpenFileName(
             parent=self,
-            caption=QString("OpenMeta[analyst] - Open File"),
-            directory=".",
+            caption="OpenMetaAnalyst - Open File",
+            directory=get_default_open_directory(self.recent_datasets),
             filter="open meta files (*.oma)")
-        self.selected_dataset = unicode(self.selected_dataset.toUtf8(),'utf8')
+        if isinstance(self.selected_dataset, tuple):
+            self.selected_dataset = self.selected_dataset[0]
+        self.selected_dataset = str(self.selected_dataset.toUtf8(), 'utf8') if hasattr(self.selected_dataset, "toUtf8") else str(self.selected_dataset)
 
         if self.selected_dataset != '':
             self.wizard().set_selected_dataset(self.selected_dataset)
@@ -102,7 +118,7 @@ class DataTypePage(QWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
         self.selected_datatype = None
         self.summary = dict(arms=None, data_type=None, sub_type=None, effect=None, metric_choices=[], name=None) #ProjectInfo()
         
-        QObject.connect(self.buttonGroup, SIGNAL("buttonClicked(QAbstractButton*)"), self._button_selected)
+        self.buttonGroup.buttonClicked[QAbstractButton].connect(self._button_selected)
         
         self.setPixmap(QWizard.BackgroundPixmap, QPixmap(':/wizard_images/wizard_images/laplace.jpg'))
     
@@ -162,7 +178,7 @@ class DataTypePage(QWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
             
         # Put information from pressing the button into the wizard storage area
         self.wizard().set_dataset_info(self.summary)
-        self.emit(SIGNAL("completeChanged()"))
+        self.completeChanged.emit()
         
     def isComplete(self):
         #print(self.buttonGroup.checkedButton())
@@ -187,7 +203,7 @@ class ChooseMetricPage(QWizardPage, forms.ui_choose_metric_page.Ui_WizardPage):
         super(ChooseMetricPage, self).__init__(parent)
         self.setupUi(self)
         
-        QObject.connect(self.metric_cbo_box, SIGNAL("currentIndexChanged(int)"), self._metric_choice_changed)
+        self.metric_cbo_box.currentIndexChanged[int].connect(self._metric_choice_changed)
         
     def initializePage(self):
         data_type = self.wizard().get_dataset_info()['data_type']
@@ -202,12 +218,14 @@ class ChooseMetricPage(QWizardPage, forms.ui_choose_metric_page.Ui_WizardPage):
             self.metric_cbo_box.blockSignals(True)
             for metric in metric_choices:
                 metric_pretty_name = meta_globals.ALL_METRIC_NAMES[metric]
-                self.metric_cbo_box.addItem(QString(metric + ": " + metric_pretty_name), userData=QVariant(QString(metric)))
-            index_of_default = self.metric_cbo_box.findData(QVariant(QString(default_effect)))
+                self.metric_cbo_box.addItem(metric + ": " + metric_pretty_name, userData=str(metric))
+            index_of_default = self.metric_cbo_box.findData(str(default_effect))
+            if index_of_default < 0:
+                raise ValueError("Default metric %r is not available for %r" % (default_effect, data_type))
             self.metric_cbo_box.setCurrentIndex(index_of_default)
             
             default_item_text = self.metric_cbo_box.itemText(index_of_default)
-            default_item_text += QString(" (DEFAULT)")
+            default_item_text += " (DEFAULT)"
             self.metric_cbo_box.setItemText(index_of_default, default_item_text)
             # Resize the dialog
             self.metric_cbo_box.blockSignals(False)
@@ -216,7 +234,7 @@ class ChooseMetricPage(QWizardPage, forms.ui_choose_metric_page.Ui_WizardPage):
         #self.wizard().adjustSize()
         
     def _metric_choice_changed(self, newindex):
-        self.wizard().set_effect(str(self.metric_cbo_box.itemData(newindex).toString()))
+        self.wizard().set_effect(_qt_item_text(self.metric_cbo_box.itemData(newindex)))
         
     def nextId(self):
         return Page_OutcomeName
@@ -224,14 +242,22 @@ class ChooseMetricPage(QWizardPage, forms.ui_choose_metric_page.Ui_WizardPage):
 
 import csv
 
+def _qt_item_text(value):
+    if hasattr(value, "toString"):
+        value = value.toString()
+    if hasattr(value, "toUtf8"):
+        return str(value.toUtf8(), "utf8")
+    return str(value)
+
+
 class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
     def __init__(self, parent=None):
         super(CsvImportPage, self).__init__(parent)
         self.setupUi(self)
     
-        self.connect(self.select_file_btn, SIGNAL("clicked()"), self._select_file)
-        self.connect(self.from_excel_chkbx,  SIGNAL("stateChanged(int)"), self._rebuild_display)
-        self.connect(self.has_headers_chkbx, SIGNAL("stateChanged(int)"), self._rebuild_display)
+        self.select_file_btn.clicked.connect(lambda _checked=False: self._select_file())
+        self.from_excel_chkbx.stateChanged.connect(lambda _state: self._rebuild_display())
+        self.has_headers_chkbx.stateChanged.connect(lambda _state: self._rebuild_display())
         
         self.setPixmap(QWizard.BackgroundPixmap, QPixmap(':/wizard_images/wizard_images/cochran.jpg'))
     
@@ -277,13 +303,14 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
     def _select_file(self):
         self.file_path = QFileDialog.getOpenFileName(
             parent=self,
-            caption=QString("OpenMeta[analyst] - Import CSV"),
+            caption="OpenMetaAnalyst - Import CSV",
             directory=".",
             filter="csv files (*.csv)")
-        self.file_path = unicode(self.file_path.toUtf8(),'utf8')
+        self.file_path = self.file_path[0] if isinstance(self.file_path, tuple) else self.file_path
+        self.file_path = str(self.file_path.toUtf8(),'utf8') if hasattr(self.file_path, "toUtf8") else str(self.file_path)
 
         if self.file_path:
-            self.file_path_lbl.setText(QString(self.file_path))
+            self.file_path_lbl.setText(self.file_path)
         
         if self.file_path:
             self._rebuild_display()
@@ -294,7 +321,7 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
             self.extract_data()
         except Exception as e:
             print(e)
-            QMessageBox.warning(self, "Whoops", "Something went wrong while trying to import csv, try again")
+            QMessageBox.warning(self, "Whoops", "Something went wrong while trying to import the CSV. Try again.")
             self.imported_data_ok = False
             return False
         
@@ -305,7 +332,7 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
                 expected_headers = self.required_header_labels)
     
         if len(self.imported_data) == 0:
-            QMessageBox.warning(self, "Whoops", "No data in CSV!, try again")
+            QMessageBox.warning(self, "Whoops", "No data in CSV. Try again.")
             self.imported_data_ok = False
             return False
         
@@ -322,7 +349,7 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
         # copy extracted data to table
         for row in range(num_rows):
             for col in range(num_cols):
-                item = QTableWidgetItem(QString(self.imported_data[row][col]))
+                item = QTableWidgetItem(self.imported_data[row][col])
                 item.setFlags(Qt.NoItemFlags)
                 self.preview_table.setItem(row,col,item)
         self.preview_table.resizeColumnsToContents()
@@ -330,7 +357,7 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
         
         # Validate table entries
         self._validate_imported_data()
-        self.emit(SIGNAL("completeChanged()"))
+        self.completeChanged.emit()
         
     def _validate_imported_data(self):
         # Make sure there are at least as many columns as required columns
@@ -374,7 +401,7 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
                             raw_columns=raw_cols, outcome_columns=outcome_cols,
                             current_effect=effect,
                             groups=meta_globals.DEFAULT_GROUP_NAMES)
-            col_name = str(col_name.toString())
+            col_name = _qt_item_text(col_name)
             header_labels.append(col_name)
         return header_labels
     
@@ -395,7 +422,7 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
     def _handle_covariates_in_extracted_data(self, num_rows, num_cols, headers=[], expected_headers=[]):
         if num_cols > len(expected_headers): # Do we have covariates?
             num_covariates = num_cols - len(expected_headers)
-            print("There are %d covariates" % num_covariates)
+            print(("There are %d covariates" % num_covariates))
         else:
             return None # no covariates to deal with
         
@@ -425,7 +452,7 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
             self.covariate_types.append(covariate_type(cov_data))
     
     def extract_data(self):
-        with open(self._get_filepath(), 'rU') as csvfile:
+        with open(self._get_filepath(), newline='') as csvfile:
             args_csv_reader = {'delimiter': self._get_delimter(),
                                'quotechar': self._get_quotechar(),
                                }
@@ -439,16 +466,16 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
             self.headers = []
             self.imported_data = []
             if self._hasHeaders():
-                self.headers = reader.next()
+                self.headers = next(reader)
             for row in reader:
                 self.imported_data.append(row)
         self.print_extracted_data() # just for debugging
         
     def print_extracted_data(self):
         print("Data extracted from csv:")
-        print(self.headers)
+        print((self.headers))
         for row in self.imported_data:
-            print(str(row))
+            print((str(row)))
 
     def _get_filepath(self):
         return self.file_path
@@ -480,7 +507,7 @@ class OutcomeNamePage(QWizardPage, forms.ui_outcome_name_page.Ui_WizardPage):
         else: #normal case
             return -1
 ################################################################################          
-Page_Welcome, Page_DataType, Page_ChooseMetric, Page_OutcomeName, Page_CsvImport = range(5)
+Page_Welcome, Page_DataType, Page_ChooseMetric, Page_OutcomeName, Page_CsvImport = list(range(5))
 class MainWizard(QWizard):
     def __init__(self, parent=None, path=None, recent_datasets=[]):
         super(MainWizard, self).__init__(parent)
@@ -495,22 +522,22 @@ class MainWizard(QWizard):
         
         if path is None:
             self.setStartId(Page_Welcome)
-            self.setWindowTitle("Open Meta-Analyst")
-        elif path is "csv_import":
+            self.setWindowTitle("OpenMetaAnalyst")
+        elif path == "csv_import":
             self.setStartId(Page_DataType)
             self.setWindowTitle("Import a CSV")
-        elif path is "new_dataset":
+        elif path == "new_dataset":
             self.setStartId(Page_DataType)
             self.setWindowTitle("Create a new dataset")
  
 
-        #self.setPixmap(QtGui.QWizard.BannerPixmap,
+        #self.setPixmap(QtWidgets.QWizard.BannerPixmap,
         #        QtGui.QPixmap(':/misc/meta.png'))
-        #self.setPixmap(QtGui.QWizard.BackgroundPixmap,
+        #self.setPixmap(QtWidgets.QWizard.BackgroundPixmap,
         #               QtGui.QPixmap(':/misc/meta.png'))
         
         # make the displayed size of the pages reasonable
-        QObject.connect(self, SIGNAL("currentIdChanged(int)"), self._change_size)
+        self.currentIdChanged.connect(self._change_size)
     
     def _change_size(self, pageid):
         self.adjustSize()
@@ -563,11 +590,11 @@ class MainWizard(QWizard):
         information['outcome_info']=self.get_dataset_info()
         # set outcome name
         if information['outcome_info'] is not None:
-            information['outcome_info']['name']=self.field("outcomeName").toString()
+            information['outcome_info']['name']=_qt_item_text(self.field("outcomeName"))
         information['selected_dataset'] = self.get_selected_dataset()
         information['csv_data'] = self.get_csv_data()
         
-        print("Information from wizard: %s" % str(information))
+        print(("Information from wizard: %s" % str(information)))
         return information
         
 if __name__ == '__main__':

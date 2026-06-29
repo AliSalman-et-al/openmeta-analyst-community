@@ -224,7 +224,7 @@ binary.fixed.inv.var <- function(binary.data, params){
 		if (is.null(params$supress.output) || !params$supress.output) {
             params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
             changed.params <- c(changed.params, params.changed.in.forest.plot)
-            params[names(changed.params)] <- changed.params
+            params <- update.changed.plot.params(params, changed.params)
             # update params values
             forest.plot.params.path <- save.data(binary.data, res, params, plot.data)
 		}
@@ -248,7 +248,7 @@ binary.fixed.inv.var <- function(binary.data, params){
                         "plot_params_paths"=plot.params.paths,
                         "res"=pure.res,
                         "res.info"=binary.fixed.inv.var.value.info(),
-                        "weights"=weights(res))
+                        "Weights"=weights(res))
     }
     
     #references <- "this is a placeholder for binary fixed effect inv var reference"
@@ -289,7 +289,7 @@ binary.fixed.inv.var.pretty.names <- function() {
                          "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
                          "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
                          "to"=list("pretty.name"="Add correction factor to", "description"="When Add correction factor is set to \"only 0\", the correction factor
-                                   is added to all cells of each two-by-two table that contains at leason one zero. When set to \"all\", the correction factor
+                                   is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor
                                    is added to all two-by-two tables if at least one table contains a zero.")
                           )
 }
@@ -343,7 +343,7 @@ binary.fixed.mh <- function(binary.data, params){
 	        # list of changed params values
 	        params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
 	        changed.params <- c(changed.params, params.changed.in.forest.plot)
-	        params[names(changed.params)] <- changed.params
+	        params <- update.changed.plot.params(params, changed.params)
 	        # dump the forest plot params to disk; return path to
 	        # this .Rdata for later use
 	        forest.plot.params.path <- save.data(binary.data, res, params, plot.data)
@@ -358,7 +358,7 @@ binary.fixed.mh <- function(binary.data, params){
         # (mapping titles to pretty-printed text). In this case we have only one 
         # of each. 
         # 
-        #references <- "Mantel, N., & Haenszel, W. (1959) Statistical aspects of the analysis of data from retrospective studies of disease. Journal of the National Cancer Institute, 22, 719-748."
+        #references <- "Mantel, N., & Haenszel, W. (1959). Statistical aspects of the analysis of data from retrospective studies of disease. Journal of the National Cancer Institute, 22, 719-748."
         plot.params.paths <- c("Forest Plot"=forest.plot.params.path)
         images <- c("Forest Plot"=forest.path)
         plot.names <- c("forest plot"="forest_plot")
@@ -371,12 +371,12 @@ binary.fixed.mh <- function(binary.data, params){
                         "plot_params_paths"=plot.params.paths,
                         "res"=pure.res,
                         "res.info"=binary.fixed.mh.value.info(),
-                        "weights"=weights(res))
+                        "Weights"=weights(res))
             
            
     }
     
-    references <- "Mantel, N., & Haenszel, W. (1959) Statistical aspects of the analysis of data from retrospective studies of disease. Journal of the National Cancer Institute, 22, 719-748."
+    references <- "Mantel, N., & Haenszel, W. (1959). Statistical aspects of the analysis of data from retrospective studies of disease. Journal of the National Cancer Institute, 22, 719-748."
     results[["References"]] = references
     
     results
@@ -430,7 +430,7 @@ binary.fixed.mh.pretty.names <- function() {
                          "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
                          "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
                          "to"=list("pretty.name"="Add correction factor to", "description"="When Add correction factor is set to \"only 0\", the correction factor
-                                   is added to all cells of each two-by-two table that contains at leason one zero. When set to \"all\", the correction factor
+                                   is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor
                                    is added to all two-by-two tables if at least one table contains a zero.")
                           )
 }
@@ -505,7 +505,7 @@ binary.fixed.peto <- function(binary.data, params) {
 	        # list of changed params values
 	        params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
 	        changed.params <- c(changed.params, params.changed.in.forest.plot)
-	        params[names(changed.params)] <- changed.params
+	        params <- update.changed.plot.params(params, changed.params)
 	        # dump the forest plot params to disk; return path to
 	        # this .Rdata for later use
 	        forest.plot.params.path <- save.data(binary.data, res, params, plot.data)
@@ -531,7 +531,7 @@ binary.fixed.peto <- function(binary.data, params) {
                         "plot_params_paths"=plot.params.paths,
                         "res"=pure.res, # if res is here, res.info must be too
                         "res.info"=binary.fixed.peto.value.info(),
-                        "weights"=weights(res))
+                        "Weights"=weights(res))
     }
     
     references <- "Fixed Peto: Yusuf, S., Peto, R., Lewis, J., Collins, R., & Sleight, P. (1985). Beta blockade during and after myocardial infarction: An overview of the randomized trials. Progress in Cardiovascular Disease, 27, 335-371."
@@ -581,7 +581,7 @@ binary.fixed.peto.pretty.names <- function() {
                          "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
                          "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
                          "to"=list("pretty.name"="Add correction factor to", "description"="When Add correction factor is set to \"only 0\", the correction factor
-                                   is added to all cells of each two-by-two table that contains at leason one zero. When set to \"all\", the correction factor
+                                   is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor
                                    is added to all two-by-two tables if at least one table contains a zero.")
                          )
 }
@@ -654,7 +654,7 @@ binary.random <- function(binary.data, params) {
 	        # list of changed params values
 	        params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
 	        changed.params <- c(changed.params, params.changed.in.forest.plot)
-	        params[names(changed.params)] <- changed.params
+	        params <- update.changed.plot.params(params, changed.params)
 	        # dump the forest plot params to disk; return path to
 	        # this .Rdata for later use
 	        forest.plot.params.path <- save.data(binary.data, res, params, plot.data)
@@ -679,7 +679,7 @@ binary.random <- function(binary.data, params) {
                         "plot_params_paths"=plot.params.paths,
                         "res"=pure.res, # the results directly from metafor in order to extract values of interests
                         "res.info"=binary.random.value.info(),
-                        "weights"=weights(res))
+                        "Weights"=weights(res))
     }
     
     #references <- "this is a placeholder for binary random reference"
@@ -726,10 +726,10 @@ binary.random.pretty.names <- function() {
                          "description" = "Performs random-effects meta-analysis.",
                          "rm.method"=list("pretty.name"="Random-Effects method", "description"="Method for estimating between-studies heterogeneity", "rm.method.names"=rm_method_names),                      
                          "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"), 
-                         "digits"=list("pretty.name"="Number of digits of precision to display", "description"="Number of digits to display in results"),
+                         "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
                          "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
-                         "to"=list("pretty.name"="Cells to which correction factor should be added", "description"="When Add correction factor is set to \"only 0\", the correction factor
-                                   is added to all cells of each two-by-two table that contains at leason one zero. When set to \"all\", the correction factor
+                         "to"=list("pretty.name"="Correction factor target", "description"="When Add correction factor is set to \"only 0\", the correction factor
+                                   is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor
                                    is added to all two-by-two tables if at least one table contains a zero.")
                          )
 }

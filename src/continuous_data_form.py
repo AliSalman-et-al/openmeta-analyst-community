@@ -23,7 +23,9 @@
 import sys
 import copy
 
-from PyQt4.Qt import *
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QBrush, QColor, QKeySequence, QPalette
+from PyQt5.QtWidgets import QAction, QDialog, QMessageBox, QTableWidgetItem, QUndoStack
 from functools import partial
 import calculator_routines as calc_fncs
 
@@ -72,15 +74,15 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         self.current_item_data = {}
         
         # Set the table headers to reflect the group names
-        groups_names = QStringList(self.cur_groups)
+        groups_names = [str(group_name) for group_name in self.cur_groups]
         self.simple_table.setVerticalHeaderLabels(groups_names)
         
         self.tables = [self.simple_table, self.g1_pre_post_table, self.g2_pre_post_table]
         for table in self.tables:
             self._set_col_widths(table)
             
-        self.grp_1_lbl.setText(QString(self.cur_groups[0]))
-        self.grp_2_lbl.setText(QString(self.cur_groups[1]))
+        self.grp_1_lbl.setText(str(self.cur_groups[0]))
+        self.grp_2_lbl.setText(str(self.cur_groups[1]))
         
         self.setup_clear_button_palettes() # Color for clear_button_pallette
         self.initialize_form() # initialize cells to empty items 
@@ -92,7 +94,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         self.impute_data()
         self.enable_back_calculation_btn()
         
-        print("current effect: %s" % str(self.cur_effect))
+        print(("current effect: %s" % str(self.cur_effect)))
         # Hide pre-post for SMD until it is implemented
         if self.cur_effect not in ["MD","SMD"]:
             self.grp_box_pre_post.setVisible(False)
@@ -116,23 +118,23 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                     self._set_val(row, col, None, table)
         
         for txt_box in self.text_boxes:
-            txt_box.setText(QString(""))
+            txt_box.setText("")
             if txt_box == self.correlation_pre_post:
-                txt_box.setText(QString("0.0"))
+                txt_box.setText("0.0")
         
     def setup_signals_and_slots(self):
-        QObject.connect(self.simple_table,      SIGNAL("cellChanged (int, int)"), self._cell_changed)
-        QObject.connect(self.g1_pre_post_table, SIGNAL("cellChanged (int, int)"), lambda row,col: self.impute_pre_post_data(self.g1_pre_post_table, 0, row, col))
-        QObject.connect(self.g2_pre_post_table, SIGNAL("cellChanged (int, int)"), lambda row,col: self.impute_pre_post_data(self.g2_pre_post_table, 1, row, col))
+        self.simple_table.cellChanged.connect(self._cell_changed)
+        self.g1_pre_post_table.cellChanged.connect(lambda row, col: self.impute_pre_post_data(self.g1_pre_post_table, 0, row, col))
+        self.g2_pre_post_table.cellChanged.connect(lambda row, col: self.impute_pre_post_data(self.g2_pre_post_table, 1, row, col))
         
-        QObject.connect(self.effect_cbo_box, SIGNAL("currentIndexChanged(QString)"), self.effect_changed)
-        QObject.connect(self.clear_Btn,      SIGNAL("clicked()"), self.clear_form)
-        QObject.connect(self.back_calc_btn,  SIGNAL("clicked()"), lambda: self.enable_back_calculation_btn(engage=True) )
+        self.effect_cbo_box.currentIndexChanged[str].connect(lambda _text: self.effect_changed())
+        self.clear_Btn.clicked.connect(self.clear_form)
+        self.back_calc_btn.clicked.connect(lambda: self.enable_back_calculation_btn(engage=True))
                                                                                 
-        QObject.connect(self.effect_txt_box, SIGNAL("editingFinished()"),   lambda: self.val_changed("est"))
-        QObject.connect(self.low_txt_box,    SIGNAL("editingFinished()"),   lambda: self.val_changed("lower"))
-        QObject.connect(self.high_txt_box,   SIGNAL("editingFinished()"),   lambda: self.val_changed("upper"))
-        QObject.connect(self.correlation_pre_post, SIGNAL("editingFinished()"),   lambda: self.val_changed("correlation_pre_post"))     
+        self.effect_txt_box.editingFinished.connect(lambda: self.val_changed("est"))
+        self.low_txt_box.editingFinished.connect(lambda: self.val_changed("lower"))
+        self.high_txt_box.editingFinished.connect(lambda: self.val_changed("upper"))
+        self.correlation_pre_post.editingFinished.connect(lambda: self.val_changed("correlation_pre_post"))
         
         # Add undo/redo actions
         undo = QAction(self)
@@ -141,8 +143,8 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         redo.setShortcut(QKeySequence.Redo)
         self.addAction(undo)
         self.addAction(redo)
-        QObject.connect(undo, SIGNAL("triggered()"), self.undo)
-        QObject.connect(redo, SIGNAL("triggered()"), self.redo)
+        undo.triggered.connect(lambda _checked=False: self.undo())
+        redo.triggered.connect(lambda _checked=False: self.redo())
             
                                                                                 
     def _set_col_widths(self, table):
@@ -151,14 +153,14 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         
     def _populate_effect_data(self):
         effect_names = self.ma_unit.get_effect_names()
-        q_effects = sorted([QString(effect_str) for effect_str in effect_names])
+        q_effects = sorted([str(effect_str) for effect_str in effect_names])
         self.effect_cbo_box.blockSignals(True)
         self.effect_cbo_box.addItems(q_effects)
+        self.effect_cbo_box.setCurrentIndex(q_effects.index(str(self.cur_effect)))
         self.effect_cbo_box.blockSignals(False)
-        self.effect_cbo_box.setCurrentIndex(q_effects.index(QString(self.cur_effect)))
         
     def effect_changed(self):
-        self.cur_effect = unicode(self.effect_cbo_box.currentText().toUtf8(), "utf-8")
+        self.cur_effect = str(self.effect_cbo_box.currentText())
         
         # hide pre-post for SMD
         if self.cur_effect not in ["MD","SMD"]:
@@ -204,7 +206,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             calc_fncs.block_signals(self.entry_widgets, False)
             return False, False
         calc_fncs.block_signals(self.entry_widgets, False)
-        print("Val_str: %s" % val_str)
+        print(("Val_str: %s" % val_str))
         return True,display_scale_val
     
     def _get_txt_from_val_str(self, val_str):
@@ -256,7 +258,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         except ValueError:
             # a number wasn't entered; ignore
             # should probably clear out the box here, too.
-            print "fail."
+            print("fail.")
             return None
         
         calc_scale_val = meta_py_r.continuous_convert_scale(display_scale_val,
@@ -269,7 +271,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         elif val_str == "upper":
             self.ma_unit.set_upper(self.cur_effect, self.group_str, calc_scale_val)
         elif val_str == "correlation_pre_post":
-            print "ok -- correlation set to %s" % self.correlation_pre_post.text()
+            print("ok -- correlation set to %s" % self.correlation_pre_post.text())
             # Recompute the estimates
             self.impute_pre_post_data(self.g1_pre_post_table, 0)
             self.impute_pre_post_data(self.g2_pre_post_table, 1)
@@ -388,7 +390,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             self.impute_data()
         except Exception as e:
             msg = e.args[0]
-            QMessageBox.warning(self.parent(), "whoops", msg)
+            QMessageBox.warning(self.parent(), "Whoops", msg)
             self.restore_ma_unit_and_tables(old_ma_unit, old_tables_data, old_correlation)
             return
         
@@ -418,7 +420,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         
         row,col = row_index, var_index    
         if is_NaN(val): # get out quick
-            print "%s is not a number" % val
+            print("%s is not a number" % val)
             return
         
         try:
@@ -432,8 +434,8 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             
             ###self._disable_row_if_filled(table, row, col)
         except:
-            print "Unexpected error:", sys.exc_info()[0]
-            print("Got to except in _set_val when trying to set (%d,%d) to %s" % (row,col, str(val)))    
+            print("Unexpected error:", sys.exc_info()[0])
+            print(("Got to except in _set_val when trying to set (%d,%d) to %s" % (row,col, str(val))))    
             #raise  
 
     def _disable_row_if_filled(self, table, row, col):
@@ -441,10 +443,10 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         table.blockSignals(True)
         N_col = table.columnCount()
         
-        print("Row is filled? %s" % str(self._table_row_filled(table, row)))
+        print(("Row is filled? %s" % str(self._table_row_filled(table, row))))
         
         if self._table_row_filled(table, row):
-            print("Disabling row... %d" % row)
+            print(("Disabling row... %d" % row))
             for col in range(N_col):
                 self._disable_cell(table, row, col)
         table.blockSignals(False)
@@ -480,7 +482,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
     def restore_ma_unit(self, old_ma_unit):
         ''' Restores the ma_unit data and resets the form'''
         self.ma_unit.__dict__ = copy.deepcopy(old_ma_unit.__dict__)
-        print("Restored ma_unit data: %s" % str(self.ma_unit.get_raw_data_for_groups(self.cur_groups)))
+        print(("Restored ma_unit data: %s" % str(self.ma_unit.get_raw_data_for_groups(self.cur_groups))))
         
         self.initialize_form() # clear form first
         self.update_raw_data()
@@ -558,23 +560,23 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             alpha = self.conf_level_to_alpha()
             results_from_r = meta_py_r.impute_cont_data(cur_dict, alpha)
 
-            print "Raw results from R (imputation): %s" % results_from_r
-            print results_from_r
+            print("Raw results from R (imputation): %s" % results_from_r)
+            print(results_from_r)
 
-            print "Results from r succeeded?:", results_from_r["succeeded"]
+            print("Results from r succeeded?:", results_from_r["succeeded"])
             if results_from_r["succeeded"]:
                 computed_vals = results_from_r["output"]
                 # and then iterate over the columns again, 
                 # populating the table with any available
                 # computed fields
             
-                print "Computed vals:",computed_vals
+                print("Computed vals:",computed_vals)
                 for var_index, var_name in enumerate(var_names):  
                     self._set_val(row_index, var_index, computed_vals[var_name])
                 self._copy_raw_data_from_table_to_ma_unit()
             else:
                 try:
-                    print("Why didn't it succeed?: '%s'" % results_from_r["comment"])
+                    print(("Why didn't it succeed?: '%s'" % results_from_r["comment"]))
                 except KeyError:
                     pass
     def conf_level_to_alpha(self):
@@ -618,7 +620,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                                         float(self.correlation_pre_post.text()),
                                         self.conf_level_to_alpha())
  
-        print "imputation results from R: %s" % results_from_r
+        print("imputation results from R: %s" % results_from_r)
         
         if not results_from_r["succeeded"]:
             return None
@@ -687,17 +689,14 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
     def get_column_header_strs_pre_post(self):
         return self.get_column_header_strs(table=self.g1_pre_post_table)
     
-    @pyqtSignature("int, int, int, int")
     def on_simple_table_currentCellChanged(self,currentRow,currentColumn,previousRow,previousColumn):
         self.current_item_data[self.simple_table] = self._get_float(currentRow,currentColumn)
         ###print "Current Item Data:",self.current_item_data
         
-    @pyqtSignature("int, int, int, int")
     def on_g1_pre_post_table_currentCellChanged(self,currentRow,currentColumn,previousRow,previousColumn):
         self.current_item_data[self.g1_pre_post_table] = self._get_float(currentRow,currentColumn)
         ###print "Current Item Data:",self.current_item_data
         
-    @pyqtSignature("int, int, int, int")
     def on_g2_pre_post_table_currentCellChanged(self,currentRow,currentColumn,previousRow,previousColumn):
         self.current_item_data[self.g2_pre_post_table] = self._get_float(currentRow,currentColumn)
         ###print "Current Item Data:",self.current_item_data
@@ -715,7 +714,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             try:
                 return float(table.item(i,j).text())
             except:
-                print("Could not convert %s to float" % table.item(i,j))
+                print(("Could not convert %s to float" % table.item(i,j)))
                 return None
         return None
         
@@ -763,7 +762,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         
         # Choose metric parameter if not already chosen
         if (self.metric_parameter is None) and self.cur_effect in ["MD","SMD"]:
-            print("need to choose metric parameter because it is %s" % str(self.metric_parameter))
+            print(("need to choose metric parameter because it is %s" % str(self.metric_parameter)))
             if self.cur_effect == "MD":
                 info = "In order to perform back-calculation most accurately, we need to know something about the assumptions about the two population standard deviations.\n*Are we assuming that both of the population standard deviations are the same (as in most parametric data analysis techniques)"
                 option0_txt = "yes (default)."
@@ -780,7 +779,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                 dialog.setWindowTitle("SMD bias correction")
                 if dialog.exec_():
                     self.metric_parameter = True if dialog.getChoice() == 0 else False
-            print("metric_parameter is now %s" % str(self.metric_parameter))
+            print(("metric_parameter is now %s" % str(self.metric_parameter)))
                 
         def build_data_dicts():
             var_names = self.get_column_header_strs()
@@ -819,7 +818,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                         )
             new_item_available = lambda old, new: (old is None) and (new is not None)
             comparison = [new_item_available(old_data[i], new_data[i]) for i in range(len(new_data))]
-            print("Comparison:", comparison)
+            print(("Comparison:", comparison))
             if any(comparison):
                 changed = True
             else:
@@ -834,7 +833,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             
         (group1_data, group2_data, effect_data) = build_data_dicts()
         imputed = meta_py_r.back_calc_cont_data(group1_data, group2_data, effect_data, self.conf_level)
-        print("Imputed data: ", imputed)
+        print(("Imputed data: ", imputed))
         
         # Leave if there was a failure
         if "FAIL" in imputed:
@@ -861,7 +860,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                          "sd2":"group 2 standard deviation",
                          "mean1":"group 1 mean",
                          "mean2":"group 2 mean"}
-        for key,value in imputed.iteritems():
+        for key,value in imputed.items():
             # TODO: (maybe).....: The R code which generates results can
             # POTENTIALLY yield a maximum of 4 numbers for n1 and n2. However,
             # empirical testing has shown that this doesn't really happen.
@@ -873,7 +872,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                         + keys_to_names[key] + "\n\nPlease choose one of the following:")
                 option0_txt = keys_to_names[key] + " = " + str(value[0])
                 option1_txt = keys_to_names[key] + " = " + str(value[1])
-                print("Options (0,1)", value[0], value[1])
+                print(("Options (0,1)", value[0], value[1]))
                 
                 dialog = ChooseBackCalcResultForm(info, option0_txt, option1_txt)
                 if dialog.exec_():

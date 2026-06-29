@@ -1,14 +1,37 @@
 #import pdb
 import string
 import math
+from functools import cmp_to_key
 
-from PyQt4.Qt import *
-from PyQt4 import QtGui
+from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt
+from PyQt5.QtWidgets import QDialog
 
 from meta_globals import *
 import forms.ui_change_cov_type
 from forms.ui_change_cov_type import Ui_ChangeCovTypeForm
 from ma_dataset import Covariate
+
+
+def _to_native_text(value):
+    if value is None:
+        return ""
+    if hasattr(value, "toString"):
+        value = value.toString()
+    if hasattr(value, "toUtf8"):
+        return str(value.toUtf8(), encoding="utf8")
+    if isinstance(value, bytes):
+        return str(value, encoding="utf8")
+    return str(value)
+
+
+def _to_double(value):
+    if hasattr(value, "toDouble"):
+        return value.toDouble()
+    try:
+        return float(value), True
+    except (TypeError, ValueError):
+        return 0.0, False
+
 
 class ChangeCovTypeForm(QDialog, Ui_ChangeCovTypeForm):
     def __init__(self, dataset, cov, parent=None):
@@ -25,7 +48,7 @@ class CovModel(QAbstractTableModel):
     This module mediates between the dataset class and 
     the TableView used in the ui.
     '''
-    def __init__(self, dataset, covariate, filename=QString()):
+    def __init__(self, dataset, covariate, filename=""):
         super(CovModel, self).__init__()
         self.dataset = dataset
         studies = self.dataset.studies
@@ -36,15 +59,19 @@ class CovModel(QAbstractTableModel):
         self.new_data_type = CONTINUOUS if covariate.data_type==FACTOR else FACTOR
 
         # first sort the studies by the cov. of interest
-        self.dataset.studies.sort(\
-            cmp=self.dataset.cmp_studies(compare_by=self.covariate.name))
+        self.dataset.studies.sort(
+            key=cmp_to_key(self.dataset.cmp_studies(compare_by=self.covariate.name)))
         
         self.update_included_studies()
         self.add_cov_with_new_type()
 
         self.refresh_cov_values()
         
-        self.STUDY_COL, self.ORIG_VAL, self.NEW_VAL = range(3)
+        self.STUDY_COL, self.ORIG_VAL, self.NEW_VAL = list(range(3))
+
+    def reset(self):
+        self.beginResetModel()
+        self.endResetModel()
 
     def add_cov_with_new_type(self):
         new_name = self.covariate.name
@@ -66,7 +93,7 @@ class CovModel(QAbstractTableModel):
 
         studies_to_guessed_vals = {}
         for study in self.included_studies:
-            if cov_d.has_key(study.name):
+            if study.name in cov_d:
                 orig_val = cov_d[study.name]
                 studies_to_guessed_vals[study.name] = guessed_vals_d[orig_val]
             else:
@@ -86,7 +113,7 @@ class CovModel(QAbstractTableModel):
             else:
                 mapping[val] = i
         
-        print mapping
+        print(mapping)
         return mapping
 
     def _is_a_num(self, x):
@@ -113,8 +140,8 @@ class CovModel(QAbstractTableModel):
         return alpha_str 
 
     def refresh_cov_values(self):
-        self.dataset.studies.sort(\
-            cmp=self.dataset.cmp_studies(compare_by=self.covariate.name))
+        self.dataset.studies.sort(
+            key=cmp_to_key(self.dataset.cmp_studies(compare_by=self.covariate.name)))
         
         self.update_included_studies()
         cov_d = self.dataset.get_values_for_cov(self.covariate)
@@ -122,7 +149,7 @@ class CovModel(QAbstractTableModel):
 
         self.orig_cov_list, self.new_cov_list = [], []
         for study in self.included_studies:
-            if cov_d.has_key(study.name):
+            if study.name in cov_d:
                 self.orig_cov_list.append(cov_d[study.name])            
                 self.new_cov_list.append(new_cov_d[study.name])
             else:
@@ -142,20 +169,24 @@ class CovModel(QAbstractTableModel):
     def data(self, index, role=Qt.DisplayRole):
         
         if not index.isValid() or not (0 <= index.row() < len(self.included_studies)):
-            return QVariant()
+            return None
 
         orig_cov_val = self.orig_cov_list[index.row()]
         if role == Qt.DisplayRole:
             row, column = index.row(), index.column()
             if column == self.STUDY_COL:
-                return QVariant(self.included_studies[row].name)
+                return self.included_studies[row].name
             elif column == self.ORIG_VAL:
-                return QVariant(self.orig_cov_list[row])
+                if self.covariate.data_type == FACTOR:
+                    return _to_native_text(self.orig_cov_list[row])
+                return self.orig_cov_list[row]
             elif column == self.NEW_VAL:
-                return QVariant(self.new_cov_list[row])
+                if self.new_covariate.data_type == FACTOR:
+                    return _to_native_text(self.new_cov_list[row])
+                return self.new_cov_list[row]
         elif role == Qt.TextAlignmentRole:
-            return QVariant(int(Qt.AlignLeft|Qt.AlignVCenter))
-        return QVariant()
+            return int(Qt.AlignLeft|Qt.AlignVCenter)
+        return None
    
 
 
@@ -179,12 +210,12 @@ class CovModel(QAbstractTableModel):
                 cov_name = self.new_covariate.name
                 new_value = None
                 if self.new_covariate.data_type == FACTOR:
-                    new_value = value.toString()
+                    new_value = _to_native_text(value)
                 else:
                     # continuous
-                    new_value, converted_ok = value.toDouble()
+                    new_value, converted_ok = _to_double(value)
                     if not converted_ok: 
-                        print "whoops! can't convert %s to a number." % value
+                        print("whoops! can't convert %s to a number." % value)
                         new_value = None
                 study.covariate_dict[cov_name] = new_value
                 self.refresh_cov_values()
@@ -200,13 +231,13 @@ class CovModel(QAbstractTableModel):
 
     def headerData(self, section, orientation, role=Qt.DisplayRole):
         if role == Qt.TextAlignmentRole:
-            return QVariant(int(Qt.AlignLeft|Qt.AlignVCenter))
+            return int(Qt.AlignLeft|Qt.AlignVCenter)
         if role != Qt.DisplayRole:
-            return QVariant()
+            return None
         if orientation == Qt.Horizontal:
             if section == self.STUDY_COL:
-                return QVariant("study")
+                return "study"
             elif section == self.ORIG_VAL:
-                return QVariant(self.covariate.name)
+                return self.covariate.name
             elif section == self.NEW_VAL:
-                return QVariant(self.new_covariate.name)
+                return self.new_covariate.name

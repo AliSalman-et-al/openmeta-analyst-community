@@ -125,7 +125,7 @@
        <item row="0" column="1">
         <widget class="QGroupBox" name="grpbox_follow_ups">
          <property name="title">
-          <string>follow ups</string>
+          <string>follow-ups</string>
          </property>
          <widget class="QListView" name="follow_up_list">
           <property name="geometry">

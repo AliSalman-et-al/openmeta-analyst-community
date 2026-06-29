@@ -10,8 +10,9 @@
 #  outcome data                                               #
 ###############################################################
 
-from PyQt4.Qt import *
 from functools import partial
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QMessageBox, QUndoCommand
 
 from meta_globals import *
 import meta_py_r
@@ -50,9 +51,9 @@ def cast_to_int(value, name=None):
         return int(rounded)
     except:
         if not name is None:
-            print("Could not convert %s='%s' to int" % (name,str(value)))
+            print(("Could not convert %s='%s' to int" % (name,str(value))))
         else:
-            print("Could not convert '%s' to int" % (str(value)))
+            print(("Could not convert '%s' to int" % (str(value))))
         return None
 
 def compute_2x2_table(params):
@@ -227,14 +228,14 @@ class ConsistencyChecker():
     def _color_row(self, row):
         self.table.blockSignals(True)
         for col in range(3):
-            print "setting row: %s, col: %s" % (row, col)
+            print("setting row: %s, col: %s" % (row, col))
             self.table.item(row, col).setTextColor(ERROR_COLOR)
         self.table.blockSignals(False)
         
     def _color_col(self, col):
         self.table.blockSignals(True)
         for row in range(3):
-            print "setting row: %s, col: %s" % (row, col)
+            print("setting row: %s, col: %s" % (row, col))
             self.table.item(row, col).setTextColor(ERROR_COLOR)
         self.table.blockSignals(False)
         
@@ -242,7 +243,7 @@ class ConsistencyChecker():
         
         result = not True in [self._is_empty_cell(row, col) for col in range(3)]
         if result:
-            print "Row %d is populated" % row
+            print("Row %d is populated" % row)
         return result
     def _col_is_populated(self, col):
         return not True in [self._is_empty_cell(row, col) for row in range(3)]
@@ -310,9 +311,9 @@ def helper_set_current_effect(ma_unit, txt_boxes, current_effect, group_str, dat
                           [effect_tbox, lower_tbox, upper_tbox]):
         txt_box.blockSignals(True)
         if val is not None:
-            txt_box.setText(QString("%s" % round(val, CALC_NUM_DIGITS)))
+            txt_box.setText("%s" % round(val, CALC_NUM_DIGITS))
         else:
-            txt_box.setText(QString(""))
+            txt_box.setText("")
         txt_box.blockSignals(False)
 
 def save_table_data(table):
@@ -420,17 +421,17 @@ def evaluate(new_text, ma_unit, curr_effect, group_str, conv_to_disp_scale, ci_p
     ###### ERROR CHECKING CODE#####
         # Make sure entered value is numeric and between the appropriate bounds
     if not is_a_float(new_text) :
-        QMessageBox.warning(parent, "whoops", "Must be numeric!")
+        QMessageBox.warning(parent, "Whoops", "Must be numeric!")
         raise Exception("error")
     if not opt_cmp_fn: # est, lower, upper
         (good_result, msg) = is_between_bounds(**{ci_param:new_text})
         if not good_result:
-            QMessageBox.warning(parent, "whoops", msg)
+            QMessageBox.warning(parent, "Whoops", msg)
             raise Exception("error")
     else: # something other than est, lower, upper (like correlation or prevalence)
-        print("Result of correlation evaluation is: %s" % str(opt_cmp_fn(new_text)))
+        print(("Result of correlation evaluation is: %s" % str(opt_cmp_fn(new_text))))
         if not opt_cmp_fn(new_text):
-            QMessageBox.warning(parent, "whoops", opt_cmp_msg)
+            QMessageBox.warning(parent, "Whoops", opt_cmp_msg)
             print("raising exception")
             raise Exception("error")
     return float(new_text) # display_scale_val

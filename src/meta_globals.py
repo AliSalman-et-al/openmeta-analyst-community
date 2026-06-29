@@ -13,9 +13,10 @@
 # TODO: move functions out of here and just have this be constants w/o imports
 
 import os
+import sys
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.Qt import *
+from PyQt5.QtGui import QColor
+from PyQt5.QtWidgets import QUndoCommand
 
 APPLICATION_NAME = "OpenMetaAnalyst"
 ORGANIZATION_NAME = "CEBM"
@@ -33,7 +34,7 @@ CALC_NUM_DIGITS = 4
 VERSION = .005 
 
 DISABLE_NETWORK_STUFF = True # disable this until we can package jags, rjags, getmc
-DEFAULT_DATASET_NAME = unicode("untitled_dataset", "utf-8")
+DEFAULT_DATASET_NAME = "untitled_dataset"
 
 ## For now we're going to hardcode which metrics are available.
 # In the future, we may want to pull these out dynamically from 
@@ -47,14 +48,14 @@ BINARY_ONE_ARM_METRICS = ["PR", "PLN", "PLO", "PAS", "PFT"]
 BINARY_METRIC_NAMES = {"OR":"Odds Ratio",
                        "RD":"Risk Difference",
                        "RR":"Risk Ratio",
-                       "AS":"Difference of arcsines transformed proportions",
-                       "YUQ":"Yule's Q is equal to (oi-1)/(oi+1), where oi is the odds ratio.",
-                       "YUY":"Yule's Y is equal to (sqrt(oi)-1)/(sqrt(oi)+1), where oi is the odds ratio.",
+                       "AS":"Arcsine Difference",
+                       "YUQ":"Yule's Q",
+                       "YUY":"Yule's Y",
                        "PR":"Untransformed Proportion",
                        "PLN":"Natural Logarithm transformed Proportion",
                        "PLO":"Logit transformed Proportion",
                        "PAS":"Arcsine transformed Proportion",
-                       "PFT":"Freeman-Tukey Transformed Proportion",
+                       "PFT":"Freeman-Tukey transformed Proportion",
                        }
 
 # Continuous metrics
@@ -131,7 +132,8 @@ BASE_PATH = str(os.path.abspath(os.getcwd()))
 # this is a useful function sometimes.
 none_to_str = lambda x: "" if x is None else x
 
-HELP_URL = "http://www.cebm.brown.edu/static/oma/doc/OpenMA_help.html"
+_APPLICATION_ROOT = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+HELP_URL = os.path.abspath(os.path.join(_APPLICATION_ROOT, "doc", "openMA_help.html"))
 
 # for diagnostic data -- this dictionary maps
 # the mteric names as they appear in the UI/ure
@@ -155,7 +157,7 @@ THRESHOLD = 1e-5
 ERROR_COLOR = QColor("red")
 OK_COLOR = QColor("black")
 
-DEFAULT_GROUP_NAMES = ["Grp A", "Grp B"]  # old: DEFAULT_GROUP_NAMES = ["tx A", "tx B"]
+DEFAULT_GROUP_NAMES = ["tx A", "tx B"]
 
 
 def equal_close_enough(x,y):
@@ -207,7 +209,11 @@ def is_an_int(s):
         int(s)
         return True
     except:
-        return False
+        try:
+            value = float(s)
+            return value.is_integer()
+        except:
+            return False
     
     
 def is_NaN(x):

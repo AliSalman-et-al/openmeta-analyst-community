@@ -15,10 +15,11 @@
 print("Entering meta_py_r for import probably")
 import math
 import os
+import r_runtime
 from meta_globals import *
-from settings import *
 
-print("the path: %s" % os.getenv("PATH"))
+r_runtime.configure_bundled_r_environment()
+print(("the path: %s" % os.getenv("PATH")))
 
 try:
     print("importing from rpy2")
@@ -27,21 +28,67 @@ try:
     #from rpy2 import robjects as ro
     import rpy2.robjects as ro
     print("succesfully imported from rpy2")
-except Exception, e:
-    print e
+except Exception as e:
+    print(e)
     print("rpy2 import problem")
     #pyqtRemoveInputHook()
     #pdb.set_trace()
     raise Exception("rpy2 not properly installed!")
-    print e
+    print(e)
 print("importing rpy2.robjects")
 import rpy2.robjects
+import rpy2.rinterface
 print("succesfully imported rpy2.robjects")
+
+try:
+    import rpy2.rinterface_lib.conversion as _rpy2_conversion
+    _rpy2_cchar_to_str_with_maxlen = _rpy2_conversion._cchar_to_str_with_maxlen
+
+    def _cchar_to_str_with_latin1_fallback(c, maxlen, encoding):
+        try:
+            return _rpy2_cchar_to_str_with_maxlen(c, maxlen, encoding)
+        except UnicodeDecodeError:
+            return _rpy2_conversion.ffi.string(c, maxlen).decode("latin-1", "replace")
+
+    _rpy2_conversion._cchar_to_str_with_maxlen = _cchar_to_str_with_latin1_fallback
+except Exception:
+    pass
+
+
+def _r_is_null(r_object):
+    '''True if an rpy2 object is R's NULL.
+
+    rpy2 >= 3.x represents NULL as a ``NULLType`` singleton whose ``str()`` is
+    an object repr (e.g. ``<rpy2...NULLType object at 0x...>``), not the literal
+    ``"NULL"`` that the legacy Python-2 rpy2 produced. Code that detected NULL
+    via ``str(x) == "NULL"`` therefore silently misfires (e.g. treating a list
+    with NULL names as if it had names). Prefer identity/type checks and fall
+    back to the legacy string compare for older rpy2 builds.'''
+    try:
+        if r_object is rpy2.rinterface.NULL:
+            return True
+        if isinstance(r_object, type(rpy2.rinterface.NULL)):
+            return True
+    except Exception:
+        pass
+    return str(r_object) == "NULL"
+
+# rpy2 >= 3.x honours R's "visibility" flag: a top-level call whose result is
+# returned invisibly (as every openmetar `*.parameters()` routine and many
+# analysis functions do) yields Python `None` from `ro.r(...)`. The legacy
+# Python-2 rpy2 always returned the value regardless of visibility, which the
+# whole backend relies on (e.g. get_params, run_*_ma). Restore that behaviour
+# globally so invisible R results still come back to Python. Harmless on older
+# rpy2 builds that never applied the visibility flag.
+try:
+    ro.r._invisible = False
+except Exception:
+    pass
 
 def execute_r_string(r_str):
     
     try:
-        print("Executing: %s\n" % r_str)
+        print(("Executing: %s\n" % r_str))
         return ro.r(r_str)
     except Exception as e:
         # reset working directory in r then raise the error, hope this will address issue #244
@@ -82,7 +129,7 @@ install this package and then re-start OpenMeta." % name)
 
 def RfunctionCaller(function):
     def _RfunctionCaller(*args, **kw):
-        print("Using rpy2 interface to R to call %s" % function.func_name)
+        print(("Using rpy2 interface to R to call %s" % function.__name__))
         res = function(*args, **kw)
         return res
     return _RfunctionCaller
@@ -93,7 +140,7 @@ def get_R_libpaths():
     libpaths = execute_r_string(".libPaths()")
     print("R Lib paths:")
     for i, path in enumerate(libpaths):
-        print("%d: %s" % (i,path))
+        print(("%d: %s" % (i,path)))
     return list(libpaths)
 
 @RfunctionCaller
@@ -102,24 +149,26 @@ def reset_Rs_working_dir():
     print("resetting R working dir")
 
     # Fix paths issue in windows
-    base_path = get_base_path()
-    base_path = to_posix_path(base_path)
+    import settings
 
-    print("Trying to set base_path to %s" % base_path)
+    base_path = settings.get_base_path()
+    base_path = settings.to_posix_path(base_path)
+
+    print(("Trying to set base_path to %s" % base_path))
     r_str = "setwd('%s')" % base_path
     # Executing r call with escaped backslashes
     ro.r(r_str)
 
-    print("Set R's working directory to %s" % base_path)
+    print(("Set R's working directory to %s" % base_path))
 
 @RfunctionCaller
 def impute_diag_data(diag_data_dict):
-    print "computing 2x2 table via R..."
-    print diag_data_dict
+    print("computing 2x2 table via R...")
+    print(diag_data_dict)
 
     # rpy2 doesn't know how to handle None types.
     # we can just remove them from the dictionary.
-    for param, val in diag_data_dict.items():
+    for param, val in list(diag_data_dict.items()):
         if val is None:
             diag_data_dict.pop(param)
 
@@ -128,7 +177,7 @@ def impute_diag_data(diag_data_dict):
     
     
     imputed_2x2 =  R_parse_tools.rlist_to_pydict(two_by_two)
-    print ("Imputed 2x2: %s" % str(imputed_2x2))
+    print(("Imputed 2x2: %s" % str(imputed_2x2)))
     
     return imputed_2x2
 
@@ -144,14 +193,14 @@ def R_fn_with_dataframe_arg(data_dict, R_fn_name):
     parameters within. Returns a python dictionary. Assumes R function returns
     an R list'''
     
-    for param, val in data_dict.items():
+    for param, val in list(data_dict.items()):
         if val is None:
             data_dict.pop(param)
 
     dataf = ro.r['data.frame'](**data_dict)
     r_string = R_fn_name + "(" + str(dataf.r_repr()) + ")"
     
-    print("executing (from R_fn_with_dataframe_arg: %s" % r_string)
+    print(("executing (from R_fn_with_dataframe_arg: %s" % r_string))
     R_result = execute_r_string(r_string)
     
     res_as_dict = R_parse_tools.recursioner(R_result)
@@ -192,7 +241,7 @@ def back_calc_cont_data(group1_data, group2_data, effect_data, conf_level):
 
 def remove_value(toRemove, t_dict):
     ''' Removes all entries in t_dict with value toRemove'''
-    for param, val in t_dict.items():
+    for param, val in list(t_dict.items()):
         if val == toRemove:
             t_dict.pop(param)
 
@@ -212,11 +261,11 @@ class R_parse_tools:
             #Only parses one level, is not recursive.'''
             
         keys = named_r_list.names
-        if str(keys) == "NULL":
+        if _r_is_null(keys):
             raise ValueError("No names found in alleged named R list")
         
         data = R_parse_tools.R_iterable_to_pylist(named_r_list)
-        d = dict(zip(keys, data))    
+        d = dict(list(zip(keys, data)))    
         
         return d
     
@@ -230,7 +279,7 @@ class R_parse_tools:
         
         if R_parse_tools.haskeys(data): # can be converted to dictionary
             d = R_parse_tools.rlist_to_pydict(data)
-            for k,v in d.items():
+            for k,v in list(d.items()):
                 d[k] = R_parse_tools.recursioner(v)
             return d
         elif R_parse_tools._isListable(data): # can be converted to list
@@ -301,8 +350,8 @@ class R_parse_tools:
     def haskeys(r_object):
         if not hasattr(r_object,'names'):
             return False
-        
-        return str(r_object.names) != "NULL"
+
+        return not _r_is_null(r_object.names)
         
 
     
@@ -313,16 +362,16 @@ class R_parse_tools:
 # This should be renamed as it is not doing back-calculation from effects
 @RfunctionCaller
 def impute_cont_data(cont_data_dict, alpha):
-    print "computing continuous data via R..."
+    print("computing continuous data via R...")
     
     # first check that we have some data;
     # if not, there's no sense in trying to
     # impute anything
-    if len(cont_data_dict.items()) == 0:
+    if len(list(cont_data_dict.items())) == 0:
         return {"succeeded":False}
     
     r_str = ["fillin.cont.1spell("]
-    for param, val in cont_data_dict.items():
+    for param, val in list(cont_data_dict.items()):
         r_str.append("%s=%s," % (param, val))
         
     r_str = "".join(r_str)
@@ -330,7 +379,7 @@ def impute_cont_data(cont_data_dict, alpha):
     # append alpha argument (for CI level); close function call (parens)
     r_str += "alpha=%s)" % alpha
     
-    print "attempting to execute: %s" % r_str
+    print("attempting to execute: %s" % r_str)
     c_data = execute_r_string(r_str)
     
     results = R_parse_tools.recursioner(c_data)
@@ -339,16 +388,16 @@ def impute_cont_data(cont_data_dict, alpha):
 
 @RfunctionCaller
 def impute_pre_post_cont_data(cont_data_dict, correlation, alpha):
-    if len(cont_data_dict.items()) == 0:
+    if len(list(cont_data_dict.items())) == 0:
         return {"succeeded":False}
         
     r_str  = ["fillin.cont.AminusB("]
-    for param, val in cont_data_dict.items():
+    for param, val in list(cont_data_dict.items()):
         r_str.append("%s=%s," % (param, val))
     
     r_str = "".join(r_str)
     r_str += "correlation=%s, alpha=%s)" % (correlation, alpha)
-    print "attempting to execute: %s" % r_str
+    print("attempting to execute: %s" % r_str)
     c_data = execute_r_string(r_str)
     pythonized_data = R_parse_tools.recursioner(c_data)
     
@@ -379,7 +428,7 @@ def get_params(method_name):
         param_d[name] = r_obj
 
     order_vars = None
-    if param_d.has_key("var_order"):
+    if "var_order" in param_d:
         order_vars = list(param_d["var_order"])
 
     pretty_names_and_descriptions = get_pretty_names_and_descriptions_for_params(
@@ -410,7 +459,7 @@ def get_pretty_names_and_descriptions_for_params(method_name, param_list):
     names_index = param_list.names.index("parameters") 
     param_names = param_list[names_index].names # pull out the list
     for param in param_names:
-        if not param in params_d.keys():
+        if not param in list(params_d.keys()):
             params_d[param] = {"pretty.name":param, "description":"None provided"}
     
     return params_d
@@ -508,7 +557,7 @@ def draw_network(edge_list, unconnected_vertices, network_path = '"./r_tmp/netwo
         execute_r_string("g <- graph.empty()") 
     
     if len(unconnected_vertices) > 0:
-        print unconnected_vertices
+        print(unconnected_vertices)
         vertices_str = ", ".join([" '%s' " % x for x in unconnected_vertices])
         execute_r_string("g <- add.vertices(g, %s, name=c(%s))" % (len(unconnected_vertices), vertices_str))
     execute_r_string("png(%s)" % network_path)
@@ -546,7 +595,7 @@ def ma_dataset_to_simple_continuous_robj(table_model, var_name="tmp_obj",
     # we're using a one-armed metric for cont. data, we just use y/SE
     if (not table_model.current_effect in ONE_ARM_METRICS) and \
                          table_model.included_studies_have_raw_data():
-        print "we have raw data... parsing, parsing, parsing"
+        print("we have raw data... parsing, parsing, parsing")
             
         raw_data = table_model.get_cur_raw_data(only_these_studies=study_ids)
         Ns1_str    = _get_str(raw_data, 0)
@@ -566,7 +615,7 @@ def ma_dataset_to_simple_continuous_robj(table_model, var_name="tmp_obj",
                             ests_str, SEs_str, study_names, study_years, cov_str)
          
     else:
-        print "no raw data (or one-arm)... using effects"
+        print("no raw data (or one-arm)... using effects")
         r_str = "%s <- new('ContinuousData', \
                             y=c(%s), SE=c(%s), study.names=c(%s),\
                             years=c(%s), covariates=%s)" \
@@ -575,9 +624,9 @@ def ma_dataset_to_simple_continuous_robj(table_model, var_name="tmp_obj",
         
     # character encodings for R
     r_str = _sanitize_for_R(r_str)
-    print "executing: %s" % r_str
+    print("executing: %s" % r_str)
     execute_r_string(r_str)
-    print "ok."
+    print("ok.")
     return r_str
     
     
@@ -630,7 +679,7 @@ def ma_dataset_to_simple_binary_robj(table_model, var_name="tmp_obj",
 
     # first try and construct an object with raw data
     if include_raw_data and table_model.included_studies_have_raw_data():
-        print "ok; raw data has been entered for all included studies"
+        print("ok; raw data has been entered for all included studies")
         
         # now figure out the raw data
         raw_data = table_model.get_cur_raw_data(only_these_studies=study_ids)
@@ -664,14 +713,14 @@ def ma_dataset_to_simple_binary_robj(table_model, var_name="tmp_obj",
                              ests_str, SEs_str, study_names, study_years, cov_str)
 
     elif table_model.included_studies_have_point_estimates():
-        print "not sufficient raw data, but studies have point estimates..."
+        print("not sufficient raw data, but studies have point estimates...")
 
         r_str = "%s <- new('BinaryData', y=c(%s), SE=c(%s), study.names=c(%s), years=c(%s), covariates=%s)" \
                             % (var_name, ests_str, SEs_str, study_names, study_years, cov_str)
         
                
     else:
-        print "there is neither sufficient raw data nor entered effects/CIs. I cannot run an analysis."
+        print("there is neither sufficient raw data nor entered effects/CIs. I cannot run an analysis.")
         # @TODO complain to the user here
     
 
@@ -682,9 +731,9 @@ def ma_dataset_to_simple_binary_robj(table_model, var_name="tmp_obj",
     # to parse a character; so we sanitize. This isn't great,
     # because sometimes characters get garbled...
     r_str = _sanitize_for_R(r_str)
-    print "executing: %s" % r_str
+    print("executing: %s" % r_str)
     execute_r_string(r_str)
-    print "ok."
+    print("ok.")
     return r_str
 
 def ma_dataset_to_simple_network(table_model,
@@ -714,7 +763,7 @@ def ma_dataset_to_simple_network(table_model,
             if not _data_blank_or_none(*raw_data):
                 groups_to_include.append(group)
                 break
-    print("groups to include: %s" % str(groups_to_include))
+    print(("groups to include: %s" % str(groups_to_include)))
     
     
     ############ Make 'treatments' data frame in R ###################
@@ -786,33 +835,33 @@ def _make_table_string_from_dict(table_dict):
     '''Makes a string from dictionary d with the keys of d serving as the
     column headers'''
     
-    keys, values = table_dict.keys(), table_dict.values()
+    keys, values = list(table_dict.keys()), list(table_dict.values())
     if len(keys)==0:
         raise ValueError("Dictionary must have at least one key")
     
     #import pdb; pdb.set_trace()
 
-    headers = [unicode(key) for key in keys]
-    header_str = u' '.join(headers)
+    headers = [str(key) for key in keys]
+    header_str = ' '.join(headers)
     table_str = header_str + "\n"
     
-    table_row_data = zip(*values)
+    table_row_data = list(zip(*values))
     
     row_strings = []
     def process_datum(x):
         # quote strings
-        if type(x) in [str, unicode]:
+        if type(x) in [str, str]:
             return '"' + str(x) + '"'
         else:
             return str(x)
-    row_data_to_row_str = lambda row_data: u" ".join([process_datum(datum) for datum in row_data])
+    row_data_to_row_str = lambda row_data: " ".join([process_datum(datum) for datum in row_data])
 
         
         
     for row_data in table_row_data:
         row_str = row_data_to_row_str(row_data)
         row_strings.append(row_str)
-    table_data_str = u"\n".join(row_strings)
+    table_data_str = "\n".join(row_strings)
     
     table_str += table_data_str
     
@@ -821,13 +870,15 @@ def _make_table_string_from_dict(table_dict):
 
 def _sanitize_for_R(a_str):
     # may want to do something fancier in the future...
-    return a_str.encode('latin-1', 'ignore')
-    
-    
-    # Mysterious fix for issue #73. For some reason, R doesn't throw up anymore
-    # when non-latin characters are given. Maybe this was fixed in R at some
-    # point by a 3rd party.
-    #return a_str
+    if a_str is None:
+        return a_str
+    # Strip characters that can't be represented in latin-1 (the encoding R
+    # expects here) but keep the result a `str`. On Python 2 `str.encode`
+    # returned a `str`, so passing the bytes straight to rpy2 worked; on
+    # Python 3 `encode` returns `bytes`, which rpy2's `ro.r()` rejects with
+    # "text must be a string." Decoding back to `str` preserves the original
+    # non-latin-stripping intent while staying Python 3 / rpy2 compatible.
+    return a_str.encode('latin-1', 'ignore').decode('latin-1')
 
 
 @RfunctionCaller
@@ -867,7 +918,7 @@ def ma_dataset_to_simple_diagnostic_robj(table_model, var_name="tmp_obj",
 
     # first try and construct an object with raw data
     if table_model.included_studies_have_raw_data():
-        print "ok; raw data has been entered for all included studies"
+        print("ok; raw data has been entered for all included studies")
         
         # grab the raw data; the order is 
         # tp, fn, fp, tn
@@ -889,20 +940,20 @@ def ma_dataset_to_simple_diagnostic_robj(table_model, var_name="tmp_obj",
                              y_ests_str, y_SEs_str, study_names, study_years, cov_str)
         
     elif table_model.included_studies_have_point_estimates(effect=metric):
-        print "not sufficient raw data, but studies have point estimates..."
+        print("not sufficient raw data, but studies have point estimates...")
 
         r_str = "%s <- new('DiagnosticData', y=c(%s), SE=c(%s), study.names=c(%s), \
                                     years=c(%s), covariates=%s)" \
                             % (var_name, y_ests_str, y_SEs_str, study_names, study_years, cov_str)
                             
     else:
-        print "there is neither sufficient raw data nor entered effects/CIs. I cannot run an analysis."
+        print("there is neither sufficient raw data nor entered effects/CIs. I cannot run an analysis.")
         # @TODO complain to the user here
     
     # character (unicode) encodings for R
     r_str = _sanitize_for_R(r_str)
     execute_r_string(r_str)
-    print "ok."
+    print("ok.")
     return r_str
 
 
@@ -926,14 +977,14 @@ def cov_to_str(cov, study_ids, dataset, \
    
     for study_id in study_ids:
         if cov.data_type == CONTINUOUS:
-            if cov_value_d.has_key(study_id):
+            if study_id in cov_value_d:
                 cov_values.append("%s" % cov_value_d[study_id])
             else:
                 cov_values.append("NA")
         else:
-            if cov_value_d.has_key(study_id):
+            if study_id in cov_value_d:
                 # factor; note the string.
-                cov_values.append("'%s'" % unicode(str(cov_value_d[study_id]).encode('latin1'), 'latin1'))
+                cov_values.append("'%s'" % str(str(cov_value_d[study_id]).encode('latin1'), 'latin1'))
             else:
                 cov_values.append("NA")
     cov_str += ",".join(cov_values) + ")"
@@ -947,7 +998,7 @@ def cov_to_str(cov, study_ids, dataset, \
 def run_continuous_ma(function_name, params, res_name = "result", cont_data_name="tmp_obj"):
     params_df = ro.r['data.frame'](**params)
     r_str = "%s<-%s(%s, %s)" % (res_name, function_name, cont_data_name, params_df.r_repr())
-    print "\n\n(run_continuous_ma): executing:\n %s\n" % r_str
+    print("\n\n(run_continuous_ma): executing:\n %s\n" % r_str)
     execute_r_string(r_str)
     result = execute_r_string("%s" % res_name)
     return parse_out_results(result)
@@ -958,7 +1009,7 @@ def run_binary_ma(function_name, params, res_name="result", bin_data_name="tmp_o
     params_df = ro.r['data.frame'](**params)
     r_str = "%s<-%s(%s, %s)" % (res_name, function_name, bin_data_name,\
                                     params_df.r_repr())
-    print "\n\n(run_binary_ma): executing:\n %s\n" % r_str
+    print("\n\n(run_binary_ma): executing:\n %s\n" % r_str)
     execute_r_string(r_str)
     result = execute_r_string("%s" % res_name)
     return parse_out_results(result)
@@ -968,7 +1019,7 @@ def _to_R_param_str(param):
     Encodes Python parameters for consumption by R. Strings are single quoted,
     booleans cast to all-caps.
     '''
-    if isinstance(param, str) or isinstance(param, unicode):
+    if isinstance(param, str) or isinstance(param, str):
         return "'%s'"% param
     elif isinstance(param, bool):
         if param:
@@ -982,7 +1033,7 @@ def _to_R_params(params):
     that represents a named list in R. 
     '''
     params_str = []
-    for param in params.keys():
+    for param in list(params.keys()):
         params_str.append("'%s'=%s" % (param, _to_R_param_str(params[param])))
     
     params_str = "list("+ ",".join(params_str) + ")"
@@ -1016,7 +1067,7 @@ def run_diagnostic_ma(function_name, params, res_name="result", diag_data_name="
     r_str = "%s<-%s(%s, %s)" % \
                         (res_name, function_name, diag_data_name, params_str) 
     
-    print "\n\n(run_diagnostic_ma): executing:\n %s\n" % r_str
+    print("\n\n(run_diagnostic_ma): executing:\n %s\n" % r_str)
     execute_r_string(r_str)
     result = execute_r_string("%s" % res_name)
     return parse_out_results(result)
@@ -1034,9 +1085,9 @@ def load_vars_for_plot(params_path, return_params_dict=False):
         cur_path = "%s.%s" % (params_path, var)
         if os.path.exists(cur_path):
             load_in_R(cur_path)
-            print "loaded %s" % cur_path
+            print("loaded %s" % cur_path)
         else:
-            print "whoops -- couldn't load %s" % cur_path
+            print("whoops -- couldn't load %s" % cur_path)
             return False
 
     if return_params_dict:
@@ -1103,7 +1154,7 @@ def generate_reg_plot(file_path, params_name="plot.data"):
 @RfunctionCaller
 def generate_forest_plot(file_path, side_by_side=False, params_name="plot.data"):
     if side_by_side:
-        print "generating a side-by-side forest plot..."
+        print("generating a side-by-side forest plot...")
         execute_r_string("two.forest.plots(%s, '%s')" % (params_name, file_path))
     else:
         print("generating a forest plot....")
@@ -1118,26 +1169,26 @@ def parse_out_results(result):
     image_order = None
     
     # Turn result into a nice dictionary
-    result = dict(zip(list(result.names), list(result)))
+    result = dict(list(zip(list(result.names), list(result))))
     
 
-    for text_n, text in result.items():
+    for text_n, text in list(result.items()):
         # some special cases, notably the plot names and the path for a forest
         # plot. TODO in the case of diagnostic data, we're probably going to 
         # need to parse out multiple forest plot param objects...
-        print text_n
-        print "\n--------\n"
+        print(text_n)
+        print("\n--------\n")
         if text_n == "images":
             image_path_d = R_parse_tools.recursioner(text)
         elif text_n == "image_order":
             image_order = list(text)
         elif text_n == "plot_names":
-            if str(text) == "NULL":
+            if _r_is_null(text):
                 image_var_name_d = {}
             else:
                 image_var_name_d = R_parse_tools.recursioner(text)
         elif text_n == "plot_params_paths":
-            if str(text) == "NULL":
+            if _r_is_null(text):
                 image_params_paths_d = {}
             else:
                 image_params_paths_d = R_parse_tools.recursioner(text)
@@ -1153,8 +1204,8 @@ def parse_out_results(result):
                 references_str += str(i+1) + ". " + ref + "\n"
             
             text_d[text_n] = references_str
-        elif text_n == "weights":
-            text_d[text_n] = make_weights_str(result)
+        elif text_n in ("weights", "Weights"):
+            text_d["Weights"] = make_weights_str(result)
         elif text_n in ["res","res.info", "input_data","input_params"]: # ignore the special output for OpenMEE (may want to have this in the future for OpenMeta as well)
             pass
         elif "gui.ignore" in text_n:
@@ -1162,6 +1213,14 @@ def parse_out_results(result):
         else:
             if type(text)==rpy2.robjects.vectors.StrVector:
                 text_d[text_n] = text[0]
+            elif _is_summary_display(text):
+                text_d[text_n] = _capture_formatted_summary(text)
+            elif _is_table_summary(text):
+                text_d.update(_format_table_summary(text_n, text))
+            elif _is_named_table_summary(text):
+                text_d.update(_format_named_table_summary(text_n, text))
+            elif _is_named_text_summary(text):
+                text_d.update(_format_named_text_summary(text_n, text))
             else:
                 text_d[text_n]=str(text)
 
@@ -1173,10 +1232,203 @@ def parse_out_results(result):
     
     return to_return
 
+
+def _is_table_summary(r_object):
+    return len(_r_dims(r_object)) in (2, 3)
+
+
+def _is_summary_display(r_object):
+    return bool(ro.r["inherits"](r_object, "summary.display")[0])
+
+
+def _capture_formatted_summary(r_object):
+    return ro.r["capture.output.and.collapse"](r_object)[0]
+
+
+def _format_table_summary(section_name, r_object, title=None):
+    if title is None:
+        title = section_name
+    dims = _r_dims(r_object)
+    if len(dims) == 2:
+        return {section_name: "%s\n%s" % (title, _format_r_matrix(r_object))}
+    if len(dims) == 3:
+        return _format_r_array_sections("Summary", section_name, r_object)
+    return {section_name: str(r_object)}
+
+
+def _is_named_table_summary(r_object):
+    if not R_parse_tools.haskeys(r_object):
+        return False
+
+    for item in list(r_object):
+        dims = _r_dims(item)
+        if len(dims) in (2, 3):
+            return True
+    return False
+
+
+def _is_named_text_summary(r_object):
+    if not R_parse_tools.haskeys(r_object):
+        return False
+
+    has_named_text = False
+    for item in list(r_object):
+        if not _is_r_string_vector(item):
+            return False
+        has_named_text = True
+    return has_named_text
+
+
+def _format_named_text_summary(parent_name, r_object):
+    sections = {}
+    for name, item in zip(list(r_object.names), list(r_object)):
+        if name == "" or not _is_r_string_vector(item):
+            continue
+        sections[_summary_section_name(parent_name, name)] = item[0]
+
+    if not sections:
+        sections[parent_name] = str(r_object)
+    return sections
+
+
+def _format_named_table_summary(parent_name, r_object):
+    sections = {}
+    for name, item in zip(list(r_object.names), list(r_object)):
+        if name == "":
+            continue
+
+        dims = _r_dims(item)
+        if len(dims) == 2:
+            sections.update(
+                _format_table_summary(_summary_section_name(parent_name, name), item, name)
+            )
+        elif len(dims) == 3:
+            sections.update(_format_r_array_sections(parent_name, name, item))
+        elif _is_r_string_vector(item):
+            sections[_summary_section_name(parent_name, name)] = item[0]
+
+    if not sections:
+        sections[parent_name] = str(r_object)
+    return sections
+
+
+def _summary_section_name(parent_name, child_name):
+    if parent_name == "Summary":
+        return child_name
+    return "%s: %s" % (parent_name, child_name)
+
+
+def _is_r_string_vector(r_object):
+    return isinstance(r_object, rpy2.robjects.vectors.StrVector)
+
+
+def _r_dims(r_object):
+    dims = ro.r["dim"](r_object)
+    if _r_is_null(dims):
+        return []
+    return [int(dim) for dim in list(dims)]
+
+
+def _r_dimnames(r_object):
+    dimnames = ro.r["dimnames"](r_object)
+    if _r_is_null(dimnames):
+        return []
+    return [
+        None if _r_is_null(names) else [str(name) for name in list(names)]
+        for names in list(dimnames)
+    ]
+
+
+def _format_r_matrix(matrix):
+    dims = _r_dims(matrix)
+    dimnames = _r_dimnames(matrix)
+    row_names = dimnames[0] if len(dimnames) > 0 and dimnames[0] is not None else None
+    col_names = dimnames[1] if len(dimnames) > 1 and dimnames[1] is not None else None
+    values = list(matrix)
+    return _format_matrix_values(values, dims[0], dims[1], row_names, col_names)
+
+
+def _format_r_array_sections(parent_name, array_name, r_array):
+    dims = _r_dims(r_array)
+    dimnames = _r_dimnames(r_array)
+    row_names = dimnames[0] if len(dimnames) > 0 and dimnames[0] is not None else None
+    col_names = dimnames[1] if len(dimnames) > 1 and dimnames[1] is not None else None
+    slice_names = dimnames[2] if len(dimnames) > 2 and dimnames[2] is not None else [
+        str(index + 1) for index in range(dims[2])
+    ]
+
+    values = list(r_array)
+    sections = {}
+    slice_size = dims[0] * dims[1]
+    for slice_index, slice_name in enumerate(slice_names):
+        start = slice_index * slice_size
+        end = start + slice_size
+        title = "%s - %s" % (array_name, slice_name)
+        sections[_summary_section_name(parent_name, title)] = (
+            "%s\n%s" % (
+                title,
+                _format_matrix_values(
+                    values[start:end], dims[0], dims[1], row_names, col_names
+                ),
+            )
+        )
+    return sections
+
+
+def _format_matrix_values(values, nrow, ncol, row_names, col_names):
+    headers = list(col_names) if col_names is not None else [
+        "V%s" % (index + 1) for index in range(ncol)
+    ]
+    rows = []
+    include_row_names = row_names is not None
+    if include_row_names:
+        headers = [""] + headers
+
+    for row_index in range(nrow):
+        row = []
+        if include_row_names:
+            row.append(row_names[row_index])
+        for col_index in range(ncol):
+            row.append(_format_r_table_cell(values[row_index + (col_index * nrow)]))
+        rows.append(row)
+
+    return _format_text_table(headers, rows)
+
+
+def _format_r_table_cell(value):
+    if str(value) == "NA":
+        return "NA"
+    if isinstance(value, float):
+        return "%g" % value
+    return str(value)
+
+
+def _format_text_table(headers, rows):
+    table_rows = [headers] + rows
+    widths = [
+        max(len(str(row[col_index])) for row in table_rows)
+        for col_index in range(len(headers))
+    ]
+    rendered_rows = []
+    for row_index, row in enumerate(table_rows):
+        cells = []
+        for col_index, cell in enumerate(row):
+            cell = str(cell)
+            if col_index == 0:
+                cells.append(cell.ljust(widths[col_index]))
+            else:
+                cells.append(cell.rjust(widths[col_index]))
+        rendered_rows.append("  ".join(cells).rstrip())
+        if row_index == 0:
+            rendered_rows.append("  ".join("-" * width for width in widths).rstrip())
+    return "\n".join(rendered_rows)
+
 def make_weights_str(results):
     ''' Make a string representing the weights due to each study in the meta analysis '''
     
     # This function assumes that 'weights' and 'input_data' are actually in the results
+    if "weights" not in results and "Weights" in results:
+        results["weights"] = results["Weights"]
     if not ("weights" in results and "input_data" in results and "input_params" in results):
         print("Uh oh")
         raise Exception("make_weights_str() requires 'weights','input_data', and 'input_params' in the results")
@@ -1211,7 +1463,7 @@ def run_binary_fixed_meta_regression(selected_cov, bin_data_name="tmp_obj",
     params_df = ro.r['data.frame'](**params)
     r_str = "%s<-binary.fixed.meta.regression(%s, %s, %s)" % \
             (res_name, bin_data_name, params_df.r_repr(), "'"+ selected_cov + "'")
-    print "\n\n(run_binary_ma): executing:\n %s\n" % r_str
+    print("\n\n(run_binary_ma): executing:\n %s\n" % r_str)
     execute_r_string(r_str)
     result = execute_r_string("%s" % res_name)
     return parse_out_results(result)
@@ -1268,7 +1520,7 @@ def run_meta_regression(dataset, study_names, cov_list, metric_name,
                             (results_name, data_name, str(params_df.r_repr()))
 
 
-    print "\n\n(run_meta_regression): executing:\n %s\n" % r_str
+    print("\n\n(run_meta_regression): executing:\n %s\n" % r_str)
 
     ### TODO -- this is hacky
 
@@ -1324,7 +1576,7 @@ def run_meta_method(meta_function_name, function_name, params, \
     r_str = "%s<-%s('%s', %s, %s)" % \
             (res_name, meta_function_name, function_name, data_name, params_df.r_repr())
 
-    print "\n\n(run_meta_method): executing:\n %s\n" % r_str
+    print("\n\n(run_meta_method): executing:\n %s\n" % r_str)
 
     execute_r_string(r_str)
     result = execute_r_string("%s" % res_name)
@@ -1355,7 +1607,7 @@ def diagnostic_effects_for_study(tp, fn, fp, tn, metrics=["Spec", "Sens"],
     r_str = "diag.tmp <- new('DiagnosticData', TP=c(%s), FN=c(%s), TN=c(%s), FP=c(%s))" % \
                             (tp, fn, tn, fp)
                             
-    print "\n\n(diagnostic_effects_for_study): executing:\n %s\n" % r_str
+    print("\n\n(diagnostic_effects_for_study): executing:\n %s\n" % r_str)
     execute_r_string(r_str)
     
     # this will map metrics to est., lower, upper
@@ -1437,7 +1689,7 @@ def effect_for_study(e1, n1, e2=None, n2=None, two_arm=True,
     n2 -- size of group 2
     --
     '''
-    print metric
+    print(metric)
     r_str = None
     if two_arm:
         # notice that we're using WV's escalc routine here
@@ -1466,7 +1718,7 @@ def effect_for_study(e1, n1, e2=None, n2=None, two_arm=True,
     # ratios)
     lower, upper = (point_est-mult*se, point_est+mult*se)
     
-    print "%s, %s, %s" % (lower, point_est, upper)
+    print("%s, %s, %s" % (lower, point_est, upper))
 
     # we return both the transformed and untransformed scales here
     est_and_ci = (point_est, lower, upper)

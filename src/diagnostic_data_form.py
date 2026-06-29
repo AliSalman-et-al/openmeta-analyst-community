@@ -14,7 +14,9 @@
 import copy
 from functools import partial
 
-from PyQt4.Qt import *
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QKeySequence, QPalette
+from PyQt5.QtWidgets import QAction, QDialog, QDialogButtonBox, QMessageBox, QTableWidgetItem, QUndoStack
 
 import meta_py_r
 from meta_globals import *
@@ -85,18 +87,18 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
                 self._set_val(row, col, None)
 
         for txt_box in self.text_boxes:
-            txt_box.setText(QString(""))
+            txt_box.setText("")
     
     def setup_signals_and_slots(self):
-        QObject.connect(self.two_by_two_table, SIGNAL("cellChanged (int, int)"), self.cell_changed)                          
-        QObject.connect(self.effect_cbo_box, SIGNAL("currentIndexChanged(QString)"), self.effect_changed) 
-        QObject.connect(self.clear_Btn, SIGNAL("clicked()"), self.clear_form)
-        QObject.connect(self.back_calc_Btn, SIGNAL("clicked()"), lambda: self.enable_back_calculation_btn(engage=True))
+        self.two_by_two_table.cellChanged.connect(self.cell_changed)
+        self.effect_cbo_box.currentIndexChanged[str].connect(lambda _text: self.effect_changed())
+        self.clear_Btn.clicked.connect(self.clear_form)
+        self.back_calc_Btn.clicked.connect(lambda: self.enable_back_calculation_btn(engage=True))
         
-        QObject.connect(self.effect_txt_box, SIGNAL("editingFinished()"),   lambda: self.val_changed("est"))
-        QObject.connect(self.low_txt_box,    SIGNAL("editingFinished()"),   lambda: self.val_changed("lower"))
-        QObject.connect(self.high_txt_box,   SIGNAL("editingFinished()"),   lambda: self.val_changed("upper"))
-        QObject.connect(self.prevalence_txt_box, SIGNAL("editingFinished()"),   lambda: self.val_changed("prevalence"))
+        self.effect_txt_box.editingFinished.connect(lambda: self.val_changed("est"))
+        self.low_txt_box.editingFinished.connect(lambda: self.val_changed("lower"))
+        self.high_txt_box.editingFinished.connect(lambda: self.val_changed("upper"))
+        self.prevalence_txt_box.editingFinished.connect(lambda: self.val_changed("prevalence"))
 
         # Add undo/redo actions
         undo = QAction(self)
@@ -105,16 +107,15 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         redo.setShortcut(QKeySequence.Redo)
         self.addAction(undo)
         self.addAction(redo)
-        QObject.connect(undo, SIGNAL("triggered()"), self.undo)
-        QObject.connect(redo, SIGNAL("triggered()"), self.redo)
+        undo.triggered.connect(lambda _checked=False: self.undo())
+        redo.triggered.connect(lambda _checked=False: self.redo())
         
         
-    @pyqtSignature("int, int, int, int")
     def on_two_by_two_table_currentCellChanged(self,currentRow,currentColumn,previousRow,previousColumn):
         self.current_item_data = self._get_int(currentRow, currentColumn)
-        print("Current item data @ (%d, %d) is: %s" % (currentRow,
+        print(("Current item data @ (%d, %d) is: %s" % (currentRow,
                                                        currentColumn,
-                                                       str(self.current_item_data)))
+                                                       str(self.current_item_data))))
 
     def setup_inconsistency_checking(self):
         # set-up inconsistency label
@@ -144,7 +145,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         except:
             # Should never appear....
             msg = "Could not convert %s to integer" % self.two_by_two_table.item(i, j)
-            QMessageBox.warning(self.parent(), "whoops", msg)
+            QMessageBox.warning(self.parent(), "Whoops", msg)
             raise Exception("Could not convert %s to int" % self.two_by_two_table.item(i, j))
             
     def cell_data_invalid(self, celldata_string):
@@ -156,7 +157,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             return "Raw data needs to be numeric."
 
         if not is_an_int(celldata_string):
-            return "Expecting count data -- you provided a float (?)"
+            return "Expected a whole number (count), but a decimal value was entered."
 
         if int(celldata_string) < 0:
             return "Counts cannot be negative."
@@ -180,7 +181,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
     
     def _set_val(self, row, col, val):
         if is_NaN(val): # get out quick
-            print "%s is not a number" % val
+            print("%s is not a number" % val)
             return
         
         try:
@@ -199,7 +200,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
                 item.setFlags(newflags)
                 self.two_by_two_table.blockSignals(False)
         except:
-            print("Got to except in _set_val when trying to set (%d,%d)" % (row,col)) 
+            print(("Got to except in _set_val when trying to set (%d,%d)" % (row,col))) 
     
     def _set_vals(self, computed_d):
         '''Sets values in table widget'''
@@ -239,7 +240,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
                 raise Exception("Table no longer consistent.")
         except Exception as e:
             msg = e.args[0]
-            QMessageBox.warning(self.parent(), "whoops", msg) #popup warning
+            QMessageBox.warning(self.parent(), "Whoops", msg) #popup warning
             self.restore_ma_unit_and_table(old_ma_unit,old_table, old_prevalence) # brings things back to the way they were
             return                    # and leave
         
@@ -262,7 +263,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
     def restore_ma_unit(self, old_ma_unit):
         ''' Restores the ma_unit data and resets the form'''
         self.ma_unit.__dict__ = copy.deepcopy(old_ma_unit.__dict__)
-        print("Restored ma_unit data: %s" % str(self.ma_unit.get_raw_data_for_groups(self.cur_groups)))
+        print(("Restored ma_unit data: %s" % str(self.ma_unit.get_raw_data_for_groups(self.cur_groups))))
         
         self.initialize_form() # clear form first
         self._update_raw_data()
@@ -309,7 +310,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             line = ""
             for col in range(3):
                 line += self.table_backup[row][col] + ", "
-            print line
+            print(line)
     
     def _get_table_vals(self):
         ''' Package table from 2x2 table in to a dictionary'''
@@ -366,16 +367,16 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
     def update_2x2_table(self, imputed_dict):
         ''' Fill in entries in 2x2 table and add data to ma_unit'''
         
-        print "Updating 2x2......"
+        print("Updating 2x2......")
         
         # reset relevant column and sums column if we have new data
         if imputed_dict["TP"] and imputed_dict["FN"]:
-            print("TP, FN:", imputed_dict["TP"],imputed_dict["FN"])
-            print "clearing col 0 and 2"
+            print(("TP, FN:", imputed_dict["TP"],imputed_dict["FN"]))
+            print("clearing col 0 and 2")
             self.clear_column(0)
             self.clear_column(2)
         if imputed_dict["TN"] and imputed_dict["FP"]:
-            print "clearing col 1 and 2"
+            print("clearing col 1 and 2")
             self.clear_column(1)
             self.clear_column(2)
         
@@ -393,9 +394,9 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
     def _update_ma_unit(self):
         '''Copy data from data table to the MA_unit'''
         
-        print "updating ma unit...."
+        print("updating ma unit....")
         raw_dict = self.get_raw_diag_data() # values are floats or None
-        for field in raw_dict.iterkeys():
+        for field in raw_dict.keys():
             i = DIAG_FIELDS_TO_RAW_INDICES[field]
             self.ma_unit.tx_groups[self.group_str].raw_data[i] = raw_dict[field]  # TODO: ENC
     
@@ -486,7 +487,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         except ValueError:
             # a number wasn't entered; ignore
             # should probably clear out the box here, too.
-            print "fail."
+            print("fail.")
             return None
         
 
@@ -542,8 +543,8 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         effects = BACK_CALCULATABLE_DIAGNOSTIC_EFFECTS # TODO add more metrics
         self.effect_cbo_box.blockSignals(True)
         self.effect_cbo_box.addItems(effects)
-        self.effect_cbo_box.blockSignals(False)
         self.effect_cbo_box.setCurrentIndex(0)
+        self.effect_cbo_box.blockSignals(False)
     
     def set_current_effect(self):
         '''Fill in effect text boxes with data from ma_unit'''
@@ -553,7 +554,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             group_str=self.group_str, data_type="diagnostic", mult=self.mult)
     
     def print_effects_dict_from_ma_unit(self):
-        print self.ma_unit.get_effects_dict()
+        print(self.ma_unit.get_effects_dict())
 
     def _update_data_table(self):
         '''Try to calculate rest of 2x2 table from existing cells'''
@@ -562,7 +563,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         
         params = self._get_table_vals()
         computed_params = calc_fncs.compute_2x2_table(params)
-        print "Computed Params", computed_params
+        print("Computed Params", computed_params)
         if computed_params:
             self._set_vals(computed_params) # computed --> table widget
         
@@ -578,7 +579,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
     def clear_column(self,col):
         '''Clears out column in table and ma_unit'''
         
-        print("Clearing column %d" % col)
+        print(("Clearing column %d" % col))
         for row in range(3):
             self._set_val(row, col, None)  
         
@@ -593,7 +594,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         old_prevalence = self._get_prevalence_str()
         
         keys = ["c11", "c12", "r1sum", "c21", "c22", "r2sum", "c1sum", "c2sum", "total"]
-        blank_vals = dict( zip(keys, [""]*len(keys)) )
+        blank_vals = dict( list(zip(keys, [""]*len(keys))) )
 
         self._set_vals(blank_vals)
         self._update_ma_unit()
@@ -682,7 +683,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             isBlank = lambda x: x in EMPTY_VALS
             new_item_available = lambda old, new: isBlank(old) and not isBlank(new)
             comparison = [new_item_available(old_data[i], new_data[i]) for i in range(len(new_data))]
-            print("Comparison:", comparison)
+            print(("Comparison:", comparison))
             if any(comparison):
                 changed = True
             else:
@@ -690,12 +691,12 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             return changed
             
         diag_data = build_dict()
-        print("Diagnostic Data for back-calculation: ", diag_data)
+        print(("Diagnostic Data for back-calculation: ", diag_data))
 
         #if diag_data is not None:
             
         imputed = meta_py_r.impute_diag_data(diag_data)
-        print "imputed data: %s" % imputed
+        print("imputed data: %s" % imputed)
         
         # Leave if nothing was imputed
         if not (imputed["TP"] or imputed["TN"] or imputed["FP"] or imputed["FN"]):

@@ -55,7 +55,7 @@
        <item>
         <widget class="QPushButton" name="create_new_btn">
          <property name="text">
-          <string>Create a new Project</string>
+          <string>Create a new dataset</string>
          </property>
          <property name="icon">
           <iconset resource="../images/icons.qrc">
@@ -77,7 +77,7 @@
        <item>
         <widget class="QPushButton" name="open_recent_btn">
          <property name="text">
-          <string>open recent ...</string>
+          <string>Open recent...</string>
          </property>
          <property name="icon">
           <iconset resource="../images/icons.qrc">
@@ -88,7 +88,7 @@
        <item>
         <widget class="QPushButton" name="open_btn">
          <property name="text">
-          <string>Open an existing project</string>
+          <string>Open an existing dataset</string>
          </property>
          <property name="icon">
           <iconset resource="../images/icons.qrc">
@@ -173,7 +173,7 @@
         </size>
        </property>
        <property name="text">
-        <string>&lt;a href=&quot;www.google.com&quot;&gt;How to cite&lt;/a&gt;</string>
+        <string>&lt;a href=&quot;https://www.jstatsoft.org/article/view/v049i05&quot;&gt;How to cite&lt;/a&gt;</string>
        </property>
        <property name="alignment">
         <set>Qt::AlignCenter</set>

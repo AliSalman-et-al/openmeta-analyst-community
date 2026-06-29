@@ -1,4 +1,4 @@
-from PyQt4.Qt import *
+from PyQt5.QtWidgets import QDialog
 
 import forms.ui_diagnostic_metrics
 import ma_specs
@@ -14,14 +14,28 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
         self.parent = parent
         self.external_params = external_params
         self.meta_f_str = meta_f_str
-        QObject.connect(self.btn_ok, SIGNAL("pressed()"), self.ok)
+        self.btn_ok.pressed.connect(self.ok)
 
     def ok(self):
-        form =  ma_specs.MA_Specs(self.model, parent=self.parent,
-                                  meta_f_str=self.meta_f_str,
-                                  external_params=self.external_params,
-                                  diag_metrics=self.get_selected_metrics(),
-                                  conf_level=self.model.get_global_conf_level())
+        # Route the Method & Parameters dialog through the parent's
+        # backend-error-handling builder (the same path the binary/continuous
+        # case uses). This ensures a backend failure surfaces the "Analysis
+        # backend unavailable" dialog instead of propagating out of this Qt
+        # slot and being silently swallowed by the event loop. See issue #53.
+        builder = getattr(self.parent, "_build_analysis_specs_dialog", None)
+        if builder is not None:
+            form = builder(meta_f_str=self.meta_f_str,
+                           external_params=self.external_params,
+                           diag_metrics=self.get_selected_metrics(),
+                           conf_level=self.model.get_global_conf_level())
+        else:
+            form = ma_specs.MA_Specs(self.model, parent=self.parent,
+                                     meta_f_str=self.meta_f_str,
+                                     external_params=self.external_params,
+                                     diag_metrics=self.get_selected_metrics(),
+                                     conf_level=self.model.get_global_conf_level())
+        if form is None:
+            return
         form.show()
         self.hide()
 
@@ -32,7 +46,7 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
 
         for metric in self.SELECTABLE_METRICS:
             if eval("self.chk_box_%s.isChecked()" % metric):
-                print metric
+                print(metric)
                 selected_metrics.append(metric)
 
   

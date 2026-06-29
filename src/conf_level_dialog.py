@@ -4,10 +4,14 @@ Created on Apr 29, 2013
 @author: George Dietz
 '''
 
-#from PyQt4.QtCore import *
-#from PyQt4.QtGui import *
-from PyQt4.QtCore import QString, SIGNAL, SLOT
-from PyQt4.QtGui import QDialog, QDialogButtonBox, QDoubleSpinBox, QHBoxLayout, QLabel, QVBoxLayout
+from PyQt5.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QDoubleSpinBox,
+    QHBoxLayout,
+    QLabel,
+    QVBoxLayout,
+)
 
 from meta_globals import DEFAULT_CONF_LEVEL
 
@@ -22,7 +26,7 @@ class ChangeConfLevelDlg(QDialog):
         self.conf_level_spinbox = QDoubleSpinBox()
         self.conf_level_spinbox.setRange(50, 99.999 )
         self.conf_level_spinbox.setSingleStep(0.1)
-        self.conf_level_spinbox.setSuffix(QString("%"))
+        self.conf_level_spinbox.setSuffix("%")
         self.conf_level_spinbox.setValue(previous_value)
         self.conf_level_spinbox.setDecimals(1)
         
@@ -35,9 +39,10 @@ class ChangeConfLevelDlg(QDialog):
         vlayout.addLayout(hlayout)
         vlayout.addWidget(buttonBox)
         self.setLayout(vlayout)
+        self.setMinimumWidth(260)
         
-        self.connect(buttonBox, SIGNAL("accepted()"), self, SLOT("accept()"))
-        self.connect(buttonBox, SIGNAL("rejected()"), self, SLOT("reject()"))
+        buttonBox.accepted.connect(self.accept)
+        buttonBox.rejected.connect(self.reject)
         self.setWindowTitle("Change Confidence Level")
         
     def get_value(self):

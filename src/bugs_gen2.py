@@ -174,7 +174,7 @@ def generate_model_file_binary(out_path, metric="or", cr="none", num_covs=0, is_
         out_str = out_str.replace("mu[i] ~ dnorm(mu.bar, invtau2)", "mu[i] ~ dnorm(mu.bar.star[i], invtau2)\n\t\tmu.bar.star[i]<-mu.bar + " + cov_str)
         out_str += build_assignments_for_covs(num_covs)
         out_str += "\n}"
-    f = file(out_path, 'w')
+    f = open(out_path, 'w')
     f.write(out_str)
     f.close()
     return 
@@ -201,10 +201,10 @@ def generate_model_file_binary(out_path, metric="or", cr="none", num_covs=0, is_
         out_str = out_str.replace("d[i] ~ dnorm(delta,invtau2)",  "d[i] <- d.star[i] " +  cov_str + "\n\t\td.star[i] ~ dnorm(delta,invtau2)")
             
     elif cr == "linear":
-    out_str = out_str.replace("beta1 ~ dnorm(0.0, precnorm)", "")
+        out_str = out_str.replace("beta1 ~ dnorm(0.0, precnorm)", "")
         out_str = out_str.replace("d[i] ~ dnorm(delta,invtau2)", "d[i] <- d.star[i] + beta*(mu[i] - mu.bar)" + cov_str + "\n\t\td.star[i] ~ dnorm(delta,invtau2)")
     else:
-    # quadratic
+        # quadratic
         out_str = out_str.replace("d[i] ~ dnorm(delta,invtau2)", "d[i] <- d.star[i] + beta*(mu[i] - mu.bar) + beta1*((mu[i] - mu.bar) * (mu[i] - mu.bar)) " + cov_str + "\n\t\td.star[i] ~ dnorm(delta,invtau2)")
     
     if num_covs:
@@ -212,7 +212,7 @@ def generate_model_file_binary(out_path, metric="or", cr="none", num_covs=0, is_
  
     out_str += "\n}"
 
-    f = file(out_path, 'w')
+    f = open(out_path, 'w')
     f.write(out_str)
     f.close()
    
@@ -229,7 +229,7 @@ def generate_data_file_binary_one_group(out_path, num_studies, r, n, prior_on_q,
     '''
     precnorm = "%15.10f" % precnorm
     bin_data = []
-    f = file(out_path, 'w')
+    f = open(out_path, 'w')
     r = build_brugs_list_from_vector("r", r)
     n = build_brugs_list_from_vector("n", n)
     f.write("list(")
@@ -253,29 +253,29 @@ def generate_all_data_files_diagnostic(out_dir, num_studies, tps, fps, fns, tns,
     metric_functions_one_grp = ["specificity(tn, fp)", "sensitivity(tp, fn)", "ppv(tp, fp)", "npv(tn, fn)", "accuracy(tp, fp, fn, tn)"]
     
     for metric_index in range(len(metric_functions_one_grp)):
-    metric_f = metric_functions_one_grp[metric_index]
-    r, n = [], []
+        metric_f = metric_functions_one_grp[metric_index]
+        r, n = [], []
         for i in range(num_studies):
             tp, fp, fn, tn = tps[i], fps[i], fns[i], tns[i]
-        r_i, n_i = eval(metric_f)
-        r.append(r_i) # outcome metric for study
-        n.append(n_i) # study size
-    generate_data_file_binary_one_group(out_dir + metric_f.split("(")[0] + "//data.txt", num_studies, r, n, q_priors[metric_index], lam_priors[metric_index], xt)
+            r_i, n_i = eval(metric_f)
+            r.append(r_i) # outcome metric for study
+            n.append(n_i) # study size
+        generate_data_file_binary_one_group(out_dir + metric_f.split("(")[0] + "//data.txt", num_studies, r, n, q_priors[metric_index], lam_priors[metric_index], xt)
         
     metric_functions_two_grp = ["dor(tp, fp, fn, tn)",  "lrp(tp, fp, fn, tn)", "lrn(tp, fp, fn, tn)"]
     for metric_index in range(len(metric_functions_two_grp)):
         metric_f = metric_functions_two_grp[metric_index]
-    rt, nt, rc, nc = [], [], [], []
-    for i in range(num_studies):
-        tp, fp, fn, tn = tps[i], fps[i], fns[i], tns[i]
+        rt, nt, rc, nc = [], [], [], []
+        for i in range(num_studies):
+            tp, fp, fn, tn = tps[i], fps[i], fns[i], tns[i]
             rt_i, nt_i, rc_i, nc_i = eval(metric_f)
-        rt.append(rt_i)
-        nt.append(nt_i)
-        rc.append(rc_i)
-        nc.append(nc_i)
-    q_tuple = [q_priors[metric_index] for i in range(2)]
-    lam_tuple = [lam_priors[metric_index] for i in range(2)]
-    generate_data_file_binary(out_dir + metric_f.split("(")[0] + "//data.txt", num_studies, rt, nt, rc, nc, q_tuple , lam_tuple , xt)
+            rt.append(rt_i)
+            nt.append(nt_i)
+            rc.append(rc_i)
+            nc.append(nc_i)
+        q_tuple = [q_priors[metric_index] for i in range(2)]
+        lam_tuple = [lam_priors[metric_index] for i in range(2)]
+        generate_data_file_binary(out_dir + metric_f.split("(")[0] + "//data.txt", num_studies, rt, nt, rc, nc, q_tuple , lam_tuple , xt)
     
     
 # 
@@ -318,7 +318,7 @@ def generate_data_file_binary(out_path, num_studies, rt, Nt, rc, Nc, priors_on_q
     '''
     precnorm = "%15.10f" % precnorm
     bin_data = []
-    f = file(out_path, 'w')
+    f = open(out_path, 'w')
     f.write("list(")
     rt = build_brugs_list_from_vector("rt", rt)
     nt = build_brugs_list_from_vector("nt", Nt)
@@ -359,14 +359,14 @@ def generate_all_inits_for_cont(outdir, N, cr, num_covs, is_two_group, generic=F
     scalar_vars, scalar_vals = None, None
     list_chains = None
     if is_two_group:
-    list_chains = generate_inits_for_vars_that_need_list(num_chains, ["delta.star", "theta.c"], N)
+        list_chains = generate_inits_for_vars_that_need_list(num_chains, ["delta.star", "theta.c"], N)
         scalar_vars = ["delta", "muc", "inv.tau2", "inv.tauc2"]
-    scalar_vals = [0.0, 0.0, 0.1, 0.05]
-    if cr == "linear":
-        scalar_vars.append("beta0")
-        scalar_vals.append(0.0)
+        scalar_vals = [0.0, 0.0, 0.1, 0.05]
+        if cr == "linear":
+            scalar_vars.append("beta0")
+            scalar_vals.append(0.0)
     else:
-    list_chains = generate_inits_for_vars_that_need_list(num_chains, ["theta"], N)
+        list_chains = generate_inits_for_vars_that_need_list(num_chains, ["theta"], N)
         if not generic:	
             scalar_vars = ["Ysum", "inv.tau2"]
             scalar_vals = [0.0, 0.1]
@@ -376,7 +376,7 @@ def generate_all_inits_for_cont(outdir, N, cr, num_covs, is_two_group, generic=F
 
     for cov in range(num_covs):
         scalar_vars.append("cov%s"%cov)
-    scalar_vals.append(0.0)
+        scalar_vals.append(0.0)
     scalar_chains = generate_inits_for_vars_that_need_scalars(num_chains,  scalar_vars, scalar_vals)
     for list_inits, scalar_inits in zip(list_chains, scalar_chains):
         list_inits.append(scalar_inits)
@@ -390,9 +390,9 @@ def generate_all_inits_using_values(phi_mat, xi_mat, outdir, num_chains, num_cov
 
 def write_out_init_chains(outdir, list_of_chains):
     for chain_index in range(len(list_of_chains)):
-        f = file(outdir + "//inits%s.txt" % (chain_index+1), 'w')
-    f.write("list(" + ",".join(list_of_chains[chain_index]) + ")")
-    f.close()
+        f = open(outdir + "//inits%s.txt" % (chain_index+1), 'w')
+        f.write("list(" + ",".join(list_of_chains[chain_index]) + ")")
+        f.close()
 
 def massage_inits_to_bugs_format_binary(num_chains, phi_mat, xi_mat, num_covs, cr, is_two_group):
     '''
@@ -425,26 +425,26 @@ def massage_inits_to_bugs_format_binary(num_chains, phi_mat, xi_mat, num_covs, c
     
     if cr > 0:
         # we need beta!
-    phi_mat_parameter_names.append("beta")
+        phi_mat_parameter_names.append("beta")
     
     if cr == 2:
-    phi_mat_parameter_names.append("beta1")
+        phi_mat_parameter_names.append("beta1")
 
     if is_two_group:
         phi_mat_parameter_names.extend(["invtauc2", "invtau2"])
     else:
-    phi_mat_parameter_names.append("invtau2")
+        phi_mat_parameter_names.append("invtau2")
 
     for chain in range(xi_mat.GetLength(2)):
-    # generate the whole chain at once
-    chain_str = []
+        # generate the whole chain at once
+        chain_str = []
         for param in range(xi_mat.GetLength(1)):
-        # first generate the inits for the values in the xi_mat; i.e., study-level initial values
+            # first generate the inits for the values in the xi_mat; i.e., study-level initial values
             cur_param_vector= [xi_mat[study, param, chain] for study in range(number_of_studies)]
             chain_str.append(build_brugs_list_from_vector(xi_parameter_names[param], cur_param_vector))
-    phi_vals_for_cur_chain = [phi_mat[param, chain] for param in range(phi_mat.GetLength(0))]
-    chain_str.append(", ".join(["%s = %15.10f" % (parameter, val) for parameter, val in zip(phi_mat_parameter_names, phi_vals_for_cur_chain)]))
-    list_of_chains.append(chain_str)
+        phi_vals_for_cur_chain = [phi_mat[param, chain] for param in range(phi_mat.GetLength(0))]
+        chain_str.append(", ".join(["%s = %15.10f" % (parameter, val) for parameter, val in zip(phi_mat_parameter_names, phi_vals_for_cur_chain)]))
+        list_of_chains.append(chain_str)
     return list_of_chains
     
 
@@ -461,15 +461,15 @@ def generate_inits_for_vars_that_need_list(num_chains, parameters, num_vals_need
     first_three_vals = [0.0, -.1, .1]
     all_chains = []
     for chain_i in range(num_chains):
-    chain_str = []
+        chain_str = []
         for p in parameters:
-        if chain_i < 3:
-            val = first_three_vals[chain_i]
-        else:
-        val = .1 * rand.NextDouble()
-        if (rand.NexDouble > .5):
-            val = -1 * val
-        chain_str.append(build_brugs_list_from_vector(p, ["%15.10f" % val for i in range(num_vals_needed)]))
+            if chain_i < 3:
+                val = first_three_vals[chain_i]
+            else:
+                val = .1 * rand.NextDouble()
+                if rand.NextDouble() > .5:
+                    val = -1 * val
+            chain_str.append(build_brugs_list_from_vector(p, ["%15.10f" % val for i in range(num_vals_needed)]))
         all_chains.append(chain_str)
     return all_chains
 
@@ -591,7 +591,7 @@ def build_diagnostic_bayes_outcome_table(results_dir, outcome, N, cr, num_covs, 
     if two_group:
         vars_for_overall_table = ["d.exp"]
     else:
-    vars_for_overall_table = ["mu.bar"]
+        vars_for_overall_table = ["mu.bar"]
     
     if cr == "linear":
         total_rows += 1
@@ -600,9 +600,9 @@ def build_diagnostic_bayes_outcome_table(results_dir, outcome, N, cr, num_covs, 
     vars_for_overall_table.append("tau2")
     pstr = "p"
     if two_group:
-    pstr = "d.exp"
+        pstr = "d.exp"
         vars_for_overall_table.append("tau2")
-    total_rows += 1
+        total_rows += 1
      
     outcome_table = System.Array.CreateInstance(float, total_rows, 6)
      
@@ -616,7 +616,7 @@ def build_diagnostic_bayes_outcome_table(results_dir, outcome, N, cr, num_covs, 
     file.close()
     
     for row_index in range(len(lines)):
-    row = lines[row_index]
+        row = lines[row_index]
         insert_arr_into_mat(outcome_table, row_index, ma_format_arr(parse_numbers_from_line(row)))
 
     # add the 'overall' variables
@@ -632,45 +632,45 @@ def build_results_list_for_diagnostic_bayes(results_dir, metrics, N, num_covs, n
     forest_plot_stuff = arraylist()
     outcome_index = 0
     for outcome in metrics:
-    is_two_group = False
-    if outcome in ["dor", "lrp", "lrn"]:
-        is_two_group = True
-    cur_outcome_table = build_diagnostic_bayes_outcome_table(results_dir, outcome, N, cr, num_covs, is_two_group)
-    results.Add(cur_outcome_table)
+        is_two_group = False
+        if outcome in ["dor", "lrp", "lrn"]:
+            is_two_group = True
+        cur_outcome_table = build_diagnostic_bayes_outcome_table(results_dir, outcome, N, cr, num_covs, is_two_group)
+        results.Add(cur_outcome_table)
     
-    #
-    # now deal with forest plot stuff
-    #
-    # this will include: [lowers, means, uppers, overalls]
-    stuff_for_this_forest_plot = arraylist() 
+        #
+        # now deal with forest plot stuff
+        #
+        # this will include: [lowers, means, uppers, overalls]
+        stuff_for_this_forest_plot = arraylist() 
         # here we build double[] arrays to hand off for the forest plot. we need lowers, means and uppers, as well
         # as overalls, for each metric. first we add results for each study.
-    lowers, means, uppers = System.Array.CreateInstance(float, N), System.Array.CreateInstance(float, N), System.Array.CreateInstance(float, N)
-    lower_index, mean_index, upper_index = 0, 2, 4
-    for study_i in range(N):
-        lowers[study_i] = cur_outcome_table[study_i, lower_index]
-        means[study_i] = cur_outcome_table[study_i, mean_index]
-        uppers[study_i] = cur_outcome_table[study_i, upper_index]
+        lowers, means, uppers = System.Array.CreateInstance(float, N), System.Array.CreateInstance(float, N), System.Array.CreateInstance(float, N)
+        lower_index, mean_index, upper_index = 0, 2, 4
+        for study_i in range(N):
+            lowers[study_i] = cur_outcome_table[study_i, lower_index]
+            means[study_i] = cur_outcome_table[study_i, mean_index]
+            uppers[study_i] = cur_outcome_table[study_i, upper_index]
         
     
-    for double_arr in [lowers, means, uppers]:
-        stuff_for_this_forest_plot.Add(double_arr)
+        for double_arr in [lowers, means, uppers]:
+            stuff_for_this_forest_plot.Add(double_arr)
         
-    # now add the overall estimate
-    overall = System.Array.CreateInstance(float, 3)
-    # the summary statistic is psum if 'one group' model; delta.exp otherwise
-    overall_var = "psum"
-    if is_two_group:
-        overall_var = "delta.exp"
-        #overall_var = "delta"
-    overall_arr = ma_format_arr(get_first_line_arr(results_dir + outcome + "//%s//buffer.txt" % overall_var))
+        # now add the overall estimate
+        overall = System.Array.CreateInstance(float, 3)
+        # the summary statistic is psum if 'one group' model; delta.exp otherwise
+        overall_var = "psum"
+        if is_two_group:
+            overall_var = "delta.exp"
+            #overall_var = "delta"
+        overall_arr = ma_format_arr(get_first_line_arr(results_dir + outcome + "//%s//buffer.txt" % overall_var))
 
-    overall[0] = overall_arr[2]
-    overall[1] = overall_arr[0]
-    overall[2] = overall_arr[4]
-    stuff_for_this_forest_plot.Add(overall)
-    forest_plot_stuff.Add(stuff_for_this_forest_plot)
-    outcome_index += 1
+        overall[0] = overall_arr[2]
+        overall[1] = overall_arr[0]
+        overall[2] = overall_arr[4]
+        stuff_for_this_forest_plot.Add(overall)
+        forest_plot_stuff.Add(stuff_for_this_forest_plot)
+        outcome_index += 1
     all_results.Add(results)
     all_results.Add(forest_plot_stuff)
     return all_results
@@ -685,29 +685,29 @@ def generate_model_file_cont(out_path, cr, num_covs, is_two_group, generic):
         cov_str = " + " + build_reg_str_for_covs(num_covs)
         
     if is_two_group:
-    out_str = cont_bayes_two_group_linear_cr_str
+        out_str = cont_bayes_two_group_linear_cr_str
         if cr == "none":
             out_str = out_str.replace("beta0 ~ dnorm(0.0,precnorm)", "")
-        if num_covs:
-            out_str = out_str.replace("mu[i] <- delta + beta0 *(theta.c[i] - muc)",  "mu[i] <- delta" +  cov_str)
-            out_str +=  build_assignments_for_covs(num_covs)
+            if num_covs:
+                out_str = out_str.replace("mu[i] <- delta + beta0 *(theta.c[i] - muc)",  "mu[i] <- delta" +  cov_str)
+                out_str +=  build_assignments_for_covs(num_covs)
+            else:
+                # no control rate, no covariates. 
+                out_str = out_str.replace("delta.star[i] ~ dnorm(mu[i], inv.tau2 )", "delta.star[i] ~ dnorm(delta, inv.tau2 )")
+                out_str = out_str.replace("mu[i] <- delta + beta0 *(theta.c[i] - muc)", "mu[i] <- delta")
         else:
-            # no control rate, no covariates. 
-        out_str = out_str.replace("delta.star[i] ~ dnorm(mu[i], inv.tau2 )", "delta.star[i] ~ dnorm(delta, inv.tau2 )")
-        out_str = out_str.replace("mu[i] <- delta + beta0 *(theta.c[i] - muc)", "mu[i] <- delta")
-        else:
-        if num_covs:
-            out_str = out_str.replace("mu[i] <- delta + beta0 *(theta.c[i] - muc)", "mu[i] <- delta + beta0 *(theta.c[i] - muc)" + cov_str)
-            out_str += build_assignments_for_covs(num_covs)
+            if num_covs:
+                out_str = out_str.replace("mu[i] <- delta + beta0 *(theta.c[i] - muc)", "mu[i] <- delta + beta0 *(theta.c[i] - muc)" + cov_str)
+                out_str += build_assignments_for_covs(num_covs)
         
     else:
-    # one group
+        # one group
         out_str = cont_bayes_str_one_group
         if generic:
             out_str = cont_bayes_str_generic
-    if num_covs:
-        out_str = out_str.replace("mu[i] <- Ysum ", "mu[i] <- Ysum " + cov_str)
-        out_str += build_assignments_for_covs(num_covs)
+        if num_covs:
+            out_str = out_str.replace("mu[i] <- Ysum ", "mu[i] <- Ysum " + cov_str)
+            out_str += build_assignments_for_covs(num_covs)
         
     out_str += "\n}"
     f = open(out_path, 'w')
@@ -730,7 +730,7 @@ def generate_data_file_cont(out_path, num_studies, yt_vec, yc_vec, sdt_vec, sdc_
     '''
     precnorm = "%15.10f" % precnorm
     cont_data = []
-    f = file(out_path, 'w')
+    f = open(out_path, 'w')
     f.write("list(")
     yt = build_brugs_list_from_vector("y.t", yt_vec)
     yc = build_brugs_list_from_vector("y.c", yc_vec)
@@ -763,7 +763,7 @@ def generate_data_file_cont_generic(out_path, num_studies, yt_vec,  yt_var_vec, 
     '''	
     precnorm = "%15.10f" % precnorm
     cont_data = []
-    f = file(out_path, 'w')
+    f = open(out_path, 'w')
     f.write("list(")
     yt = build_brugs_list_from_vector("y.t", yt_vec)
     yt_var= build_brugs_list_from_vector("var.y", yt_var_vec)
@@ -794,7 +794,7 @@ def generate_data_file_cont_one_group(out_path, num_studies, yt_vec, sdt_vec, nt
     '''	
     precnorm = "%15.10f" % precnorm
     cont_data = []
-    f = file(out_path, 'w')
+    f = open(out_path, 'w')
     f.write("list(")
     yt = build_brugs_list_from_vector("y.t", yt_vec)
     sdt = build_brugs_list_from_vector("sd.t", sdt_vec)
@@ -821,8 +821,8 @@ def get_col(d, col_index):
     
 def bugs_cmd(s, brugs_wrapper_path):
     clr.AddReferenceToFileAndPath(brugs_wrapper_path)
-    from BRUGSWrapper import *
-    b = BRUGS()
+    import BRUGSWrapper
+    b = BRUGSWrapper.BRUGS()
     return b.ExecuteCmdBRUGS(s)
     
     

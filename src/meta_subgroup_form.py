@@ -1,4 +1,4 @@
-from PyQt4.Qt import *
+from PyQt5.QtWidgets import QDialog
 
 import forms.ui_cov_subgroup_dlg
 from meta_globals import FACTOR
@@ -10,15 +10,15 @@ class MetaSubgroupForm(QDialog, forms.ui_cov_subgroup_dlg.Ui_cov_subgroup_dialog
         self.model = model
         self.setupUi(self)
         self._populate_combo_box()
-        QObject.connect(self.buttonBox, SIGNAL("rejected()"), self.cancel)
-        QObject.connect(self.buttonBox, SIGNAL("accepted()"), self.get_selected_cov)
+        self.buttonBox.rejected.connect(self.cancel)
+        self.buttonBox.accepted.connect(self.get_selected_cov)
         
     def cancel(self):
-        print "(cancel)"
+        print("(cancel)")
         self.reject()
         
     def get_selected_cov(self):
-        selected_cov = unicode(self.cov_subgroup_cbo_box.currentText().toUtf8(), "utf-8") 
+        selected_cov = str(self.cov_subgroup_cbo_box.currentText())
         self.parent().meta_subgroup(selected_cov)
         self.accept()
         

@@ -16,7 +16,7 @@
    </font>
   </property>
   <property name="windowTitle">
-   <string>results / analysis</string>
+   <string>Results / Analysis</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">

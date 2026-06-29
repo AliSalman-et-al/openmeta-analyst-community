@@ -15,24 +15,29 @@
 #                                           #
 #############################################
 
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
-from PyQt4 import QtCore, QtGui
+from PyQt5 import QtCore, QtWidgets
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
+    QGridLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+)
 
 import copy
+import sys
 
 import forms.ui_ma_specs
-#import meta_py_r
+import meta_py_r
 from meta_globals import *
 from settings import *
 import diagnostic_explain
 
-###
-# ack.. string encoding messiness
-try:
-    _fromUtf8 = QtCore.QString.fromUtf8
-except AttributeError:
-    _fromUtf8 = lambda s: s
+_fromUtf8 = lambda s: s
     
 
 class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
@@ -44,6 +49,8 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         super(MA_Specs, self).__init__(parent)
         self.setupUi(self)
+        global meta_py_r
+        meta_py_r = sys.modules.get("meta_py_r", meta_py_r)
 
         self.current_param_vals = external_params or {}
         self.model = model
@@ -56,14 +63,13 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         # method 
         self.meta_f_str = meta_f_str
 
-        QObject.connect(self.buttonBox, SIGNAL("accepted()"), self.run_ma)
-        QObject.connect(self.buttonBox, SIGNAL("rejected()"), self.cancel)
-        QObject.connect(self.save_btn, SIGNAL("pressed()"), self.select_out_path)
-        QObject.connect(self.method_cbo_box, SIGNAL("currentIndexChanged(QString)"),
-                                             self.method_changed)
+        self.buttonBox.accepted.connect(self.run_ma)
+        self.buttonBox.rejected.connect(self.cancel)
+        self.save_btn.pressed.connect(self.select_out_path)
+        self.method_cbo_box.currentIndexChanged[str].connect(lambda _text: self.method_changed())
 
         self.data_type = self.model.get_current_outcome_type()
-        print "data type: %s" % self.data_type
+        print("data type: %s" % self.data_type)
         if self.meta_f_str is not None:
             # we pre-prend the data type to the meta-method function
             # name. thus the caller (meta_form) needn't worry about
@@ -124,20 +130,24 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.populate_cbo_box()
 
     def cancel(self):
-        print "(cancel)"
+        print("(cancel)")
         self.reject()
 
     def select_out_path(self):
         out_f = "."
-        out_f = unicode(QFileDialog.getSaveFileName(self, "OpenMeta[analyst] - Plot Path",
-                                                    out_f, "png image files: (.png)"))
+        out_f, _selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "OpenMetaAnalyst - Plot Path",
+            out_f,
+            "png image files: (.png)",
+        )
         if out_f == "" or out_f == None:
             return None
         else:
             self.image_path.setText(out_f)
         
     def make_indefinite_progress_bar(self):
-        bar = QtGui.QProgressBar(parent=self)
+        bar = QtWidgets.QProgressBar(parent=self)
         bar.setWindowTitle("running analysis...")
         bar.setRange(0, 0) # makes it indefinite
         #specs_form_pos = self.pos()
@@ -255,7 +265,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                 # regular meta-analysis
                 try:
                     result = meta_py_r.run_diagnostic_multi(method_names, list_of_param_vals)
-                except Exception, e:
+                except Exception as e:
                     error_message = \
                         "sorry, something has gone wrong with your analysis. here is a stack trace that probably won't be terribly useful.\n %s"  \
                                             % e
@@ -265,6 +275,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                     # reset Rs working directory 
                     meta_py_r.reset_Rs_working_dir()
                     self.accept()
+                    return
                 #_writeout_test_data(self.meta_f_str, method_names, list_of_param_vals, result, diag=True) # FOR MAKING TESTS
             else:
                 # in the case of diagnostic, we pass in lists
@@ -298,7 +309,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
     def method_changed(self):
         if self.parameter_grp_box.layout() is not None:
-            print("Layout items count before: %d" % self.parameter_grp_box.layout().count())
+            print(("Layout items count before: %d" % self.parameter_grp_box.layout().count()))
         self.clear_param_ui()
         self.current_widgets= []
         self.current_method = self.available_method_d[str(self.method_cbo_box.currentText())]
@@ -347,7 +358,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.available_method_d = meta_py_r.get_available_methods(for_data_type=self.data_type,\
                                          data_obj_name=tmp_obj_name, metric=metric)
 
-        print "\n\navailable %s methods: %s" % (self.data_type, ", ".join(self.available_method_d.keys()))
+        print("\n\navailable %s methods: %s" % (self.data_type, ", ".join(list(self.available_method_d.keys()))))
         
         
         #print("----------------------------------\nAvailable methods dictionary:",self.available_method_d)
@@ -356,7 +367,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         # -- we sort here in reverse because this will put .random
         # first. otherwise, the default is that R provides the functions
         # in alphabetical (ascending). 
-        method_names = self.available_method_d.keys()
+        method_names = list(self.available_method_d.keys())
        
 
         ###
@@ -365,9 +376,12 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         if self.data_type == "diagnostic":
             biv_ml_name = "Bivariate (Maximum Likelihood)"
             for biv_method in (biv_ml_name, "HSROC"):
-                if metric != "Sens" and biv_method in method_names or\
-                         self.meta_f_str is not None or\
-                         not ("sens" in self.diag_metrics and "spec" in self.diag_metrics):
+                should_remove_bivariate_method = (
+                    metric != "Sens" or
+                    self.meta_f_str is not None or
+                    not ("sens" in self.diag_metrics and "spec" in self.diag_metrics)
+                )
+                if biv_method in method_names and should_remove_bivariate_method:
                     method_names.remove(biv_method)
             # Fix for issue # 175            
             if set(["lr","dor"]) <= set(self.diag_metrics):    
@@ -385,11 +399,17 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             method_names.remove(biv_ml_name)
             method_names.insert(0, biv_ml_name)
  
-        for method in method_names:
-            cbo_box.addItem(method)
+        signals_were_blocked = cbo_box.blockSignals(True)
+        try:
+            for method in method_names:
+                cbo_box.addItem(method)
+        finally:
+            cbo_box.blockSignals(signals_were_blocked)
         self.current_method = self.available_method_d[str(cbo_box.currentText())]
         self.setup_params()
         param_box.setTitle(self.current_method)
+        if cbo_box is self.method_cbo_box:
+            self.ui_for_params()
 
 
     def clear_param_ui(self):
@@ -435,7 +455,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                              lambda x: isinstance(x, str) and x.lower()=="float"]
 
             for is_right_type in ordered_types:
-                for key, val in self.current_params.items():
+                for key, val in list(self.current_params.items()):
                     if is_right_type(val):
                         self.add_param(self.parameter_grp_box.layout(), cur_grid_row, key, val)
                         cur_grid_row+=1
@@ -452,7 +472,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             self.plot_tab.setEnabled(True)
                         
     def add_param(self, layout, cur_grid_row, name, value):
-        print "adding param. name: %s, value: %s" % (name, value)
+        print("adding param. name: %s, value: %s" % (name, value))
         if isinstance(value, list):
             # then it's an enumeration of values
             self.add_enum(layout, cur_grid_row, name, value)
@@ -464,8 +484,8 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         elif value.lower() == "string":
             self.add_text_box(layout, cur_grid_row, name)
         else:
-            print "unknown type! throwing up. bleccch."
-            print "name:%s. value: %s" % (name, value)
+            print("unknown type! throwing up. bleccch.")
+            print("name:%s. value: %s" % (name, value))
             # throw exception here
 
     def add_enum(self, layout, cur_grid_row, name, values):
@@ -482,14 +502,15 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         for index, value in enumerate(values):
             name_str = self._get_enum_item_pretty_name(name,value)
             cbo_box.addItem(name_str)  # TODO: replace value with pretty values
-            cbo_box.setItemData(index, QVariant(value))
+            cbo_box.setItemData(index, value)
 
-        if self.current_defaults.has_key(name):
-            cbo_box.setCurrentIndex(cbo_box.findData(self.current_defaults[name]))
+        if name in self.current_defaults:
+            default_index = self._find_enum_item_index(cbo_box, self.current_defaults[name])
+            if default_index >= 0:
+                cbo_box.setCurrentIndex(default_index)
             self.current_param_vals[name] = self.current_defaults[name]
 
-        QObject.connect(cbo_box, QtCore.SIGNAL("currentIndexChanged(int)"),
-                                 self.set_param_f_from_itemdata(name))
+        cbo_box.currentIndexChanged[int].connect(self.set_param_f_from_itemdata(name))
 
         self.current_widgets.append(cbo_box)
         layout.addWidget(cbo_box, cur_grid_row, 1)
@@ -499,8 +520,20 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             if item_name in self.param_d[enum_name]["rm.method.names"]:
                 return item_name + ": " + str(self.param_d[enum_name]["rm.method.names"][item_name])
         return item_name
+
+    def _find_enum_item_index(self, cbo_box, value):
+        for index in range(cbo_box.count()):
+            if self._enum_item_value(cbo_box.itemData(index)) == str(value):
+                return index
+        return -1
+
+    def _enum_item_value(self, item_data):
+        if hasattr(item_data, "value"):
+            item_data = item_data.value()
+        elif hasattr(item_data, "toString"):
+            item_data = item_data.toString()
+        return str(item_data)
     
-    @QtCore.pyqtSlot()
     def set_param_f_from_itemdata(self, name, to_type=str):
         '''
         hackier version....
@@ -510,9 +543,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         
         def set_param(index):
             combo_box = self.sender()
-            x = combo_box.itemData(index).toString()
+            x = self._enum_item_value(combo_box.itemData(index))
             self.current_param_vals[name] = to_type(x)
-            print str(self.current_param_vals) + " -> weirdo sender thing"
+            print(str(self.current_param_vals) + " -> weirdo sender thing")
 
         return set_param
 
@@ -523,14 +556,13 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         finput = QLineEdit()
 
         # if a default value has been specified, use it
-        if self.current_defaults.has_key(name):
+        if name in self.current_defaults:
             finput.setText(str(self.current_defaults[name]))
             self.current_param_vals[name] = self.current_defaults[name]
 
 
         finput.setMaximumWidth(50)
-        QObject.connect(finput, QtCore.SIGNAL("textChanged(QString)"),
-                                 self.set_param_f(name, to_type=float))
+        finput.textChanged.connect(self.set_param_f(name, to_type=float))
         self.current_widgets.append(finput)
         layout.addWidget(finput, cur_grid_row, 1)
         
@@ -541,13 +573,12 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         iinput = QLineEdit()
 
         # if a default value has been specified, use it
-        if self.current_defaults.has_key(name):
+        if name in self.current_defaults:
             iinput.setText(str(int(self.current_defaults[name])))
             self.current_param_vals[name] = self.current_defaults[name]
 
         iinput.setMaximumWidth(50)
-        QObject.connect(iinput, QtCore.SIGNAL("textChanged(QString)"),
-                                 self.set_param_f(name, to_type=int))
+        iinput.textChanged.connect(self.set_param_f(name, to_type=int))
         self.current_widgets.append(iinput)
         layout.addWidget(iinput, cur_grid_row, 1)
 
@@ -558,13 +589,12 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         txt_input = QLineEdit()
 
         # if a default value has been specified, use it
-        if self.current_defaults.has_key(name):
+        if name in self.current_defaults:
             txt_input.setText(str(self.current_defaults[name]))
             self.current_param_vals[name] = self.current_defaults[name]
 
         txt_input.setMaximumWidth(200)
-        QObject.connect(txt_input, QtCore.SIGNAL("textChanged(QString)"),
-                                 self.set_param_f(name, to_type=float))
+        txt_input.textChanged.connect(self.set_param_f(name, to_type=float))
         self.current_widgets.append(txt_input)
         layout.addWidget(txt_input, cur_grid_row, 1)
 
@@ -576,7 +606,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         '''
         def set_param(x):
             self.current_param_vals[name] = to_type(x)
-            print self.current_param_vals
+            print(self.current_param_vals)
 
         return set_param
 
@@ -609,7 +639,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         # override conf.level with global conf.level
         self.current_defaults['conf.level'] = self.conf_level
 
-        print self.current_defaults
+        print(self.current_defaults)
 
 
     def diag_next(self):
@@ -644,7 +674,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         # this was extracted earlier, ultimately from the checkboxes
         # selected by the user
-        metrics_to_run = self.diag_metrics_to_analysis_details.keys()
+        metrics_to_run = list(self.diag_metrics_to_analysis_details.keys())
 
         if self.sens_spec:
             for metric in [m for m in ("Sens", "Spec") if m in metrics_to_run]:
@@ -676,17 +706,20 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                 metrics_to_run.extend(DIAG_METRIC_NAMES_D[m])
 
             self.diag_metrics_to_analysis_details = \
-                dict(zip(metrics_to_run, [None for m in metrics_to_run]))
+                dict(list(zip(metrics_to_run, [None for m in metrics_to_run])))
                 
         if self.sens_spec and self.lr_dor:
             self.buttonBox.clear()    
-            next_button = self.buttonBox.addButton(QString("next >"), 0)
+            next_button = self.buttonBox.addButton("next >", QDialogButtonBox.AcceptRole)
 
 
             # if both sets of metrics are selected, we need to next prompt the
             # user for parameters regarding the second
-            QObject.disconnect(self.buttonBox, SIGNAL("accepted()"), self.run_ma)
-            QObject.connect(self.buttonBox, SIGNAL("accepted()"), self.diag_next)
+            try:
+                self.buttonBox.accepted.disconnect(self.run_ma)
+            except TypeError:
+                pass
+            self.buttonBox.accepted.connect(self.diag_next)
 
             # in the case that both 'families' of metrics are selected,
             # we prompt the user for two different methods (because different
@@ -707,8 +740,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             window_title = "Method & Parameters for DOR/LR"
             method_label = "method for DOR/LR"
 
-        self.setWindowTitle(QtGui.QApplication.translate("Dialog", window_title, \
-                None, QtGui.QApplication.UnicodeUTF8))
+        self.setWindowTitle(QtCore.QCoreApplication.translate("Dialog", window_title))
         self.method_lbl.setText(method_label)
         
 ###
@@ -719,32 +751,37 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 ###
 def add_plot_params(specs_form):
     specs_form.current_param_vals["fp_show_col1"] = specs_form.show_1.isChecked()
-    specs_form.current_param_vals["fp_col1_str"] = unicode(specs_form.col1_str_edit.text().toUtf8(), "utf-8")
+    specs_form.current_param_vals["fp_col1_str"] = _text_value(specs_form.col1_str_edit)
     specs_form.current_param_vals["fp_show_col2"] = specs_form.show_2.isChecked()
-    specs_form.current_param_vals["fp_col2_str"] = unicode(specs_form.col2_str_edit.text().toUtf8(), "utf-8")
+    specs_form.current_param_vals["fp_col2_str"] = _text_value(specs_form.col2_str_edit)
     specs_form.current_param_vals["fp_show_col3"] = specs_form.show_3.isChecked()
-    specs_form.current_param_vals["fp_col3_str"] = unicode(specs_form.col3_str_edit.text().toUtf8(), "utf-8")
+    specs_form.current_param_vals["fp_col3_str"] = _text_value(specs_form.col3_str_edit)
     specs_form.current_param_vals["fp_show_col4"] = specs_form.show_4.isChecked()
-    specs_form.current_param_vals["fp_col4_str"] = unicode(specs_form.col4_str_edit.text().toUtf8(), "utf-8")
-    specs_form.current_param_vals["fp_xlabel"] = unicode(specs_form.x_lbl_le.text().toUtf8(), "utf-8")
-    specs_form.current_param_vals["fp_outpath"] = unicode(specs_form.image_path.text().toUtf8(), "utf-8")
+    specs_form.current_param_vals["fp_col4_str"] = _text_value(specs_form.col4_str_edit)
+    specs_form.current_param_vals["fp_xlabel"] = _text_value(specs_form.x_lbl_le)
+    specs_form.current_param_vals["fp_outpath"] = _text_value(specs_form.image_path)
     
-    plot_lb = unicode(specs_form.plot_lb_le.text().toUtf8(), "utf-8")
+    plot_lb = _text_value(specs_form.plot_lb_le)
     specs_form.current_param_vals["fp_plot_lb"] = "[default]"
     if plot_lb != "[default]" and check_plot_bound(plot_lb):
         specs_form.current_param_vals["fp_plot_lb"] = plot_lb
 
-    plot_ub = unicode(specs_form.plot_ub_le.text().toUtf8(), "utf-8")
+    plot_ub = _text_value(specs_form.plot_ub_le)
     specs_form.current_param_vals["fp_plot_ub"] = "[default]"
     if plot_ub != "[default]" and check_plot_bound(plot_ub):
         specs_form.current_param_vals["fp_plot_ub"] = plot_ub
 
-    xticks = unicode(specs_form.x_ticks_le.text().toUtf8(), "utf-8")
+    xticks = _text_value(specs_form.x_ticks_le)
     specs_form.current_param_vals["fp_xticks"] = "[default]"
     if xticks != "[default]" and seems_sane(xticks):
         specs_form.current_param_vals["fp_xticks"] = xticks
     
     specs_form.current_param_vals["fp_show_summary_line"] = specs_form.show_summary_line.isChecked()
+
+
+def _text_value(widget):
+    text = widget.text()
+    return str(text.toUtf8(), "utf-8") if hasattr(text, "toUtf8") else str(text)
 
 
 def _writeout_test_data(meta_f_str, method, params, results, diag=False):

@@ -11,7 +11,20 @@
 #############################################
 
 import random
-from PyQt4.Qt import *
+from PyQt5.QtCore import QByteArray, QPoint, QRectF, Qt
+from PyQt5.QtGui import QFont, QFontMetricsF, QImage, QPixmap, QTransform
+from PyQt5.QtWidgets import (
+    QAction,
+    QApplication,
+    QFileDialog,
+    QGraphicsItem,
+    QGraphicsPixmapItem,
+    QGraphicsScene,
+    QGraphicsTextItem,
+    QMainWindow,
+    QMenu,
+    QTreeWidgetItem,
+)
 import os
 import sys
 import ui_results_window
@@ -28,6 +41,7 @@ SCALE_P = .5 # percent images are to be scaled
 # require to re-generate them (and we invoke a different method!)
 SIDE_BY_SIDE_FOREST_PLOTS = ("NLR and PLR Forest Plot", "Sensitivity and Specificity", "Cumulative Forest Plot")
 ROW_HEIGHT = 15 # by trial-and-error; seems to work very well
+SECTION_SPACING = ROW_HEIGHT
 
 class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
@@ -41,22 +55,19 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self.buffer_size = 2
         self.prev_point = QPoint()
         self.borders = []
-        self.printer = QPrinter(QPrinter.HighResolution)
-        self.printer.setPageSize(QPrinter.Letter)
 
-        QObject.connect(self.nav_tree, SIGNAL("itemClicked(QTreeWidgetItem*, int)"),
-                                       self.item_clicked)
+        self.nav_tree.itemClicked.connect(self.item_clicked)
                        
         self.psuedo_console.blockSignals(False)              
-        QObject.connect(self.psuedo_console, SIGNAL("returnPressed(void)"),
-                                       self.process_console_input)
-        QObject.connect(self.psuedo_console, SIGNAL("upArrowPressed()"),
-                                       self.f)
-        QObject.connect(self.psuedo_console, SIGNAL("downArrowPressed()"),
-                                       self.f)
+        if hasattr(self.psuedo_console, "returnPressed"):
+            self.psuedo_console.returnPressed.connect(self.process_console_input)
+        if hasattr(self.psuedo_console, "upArrowPressed"):
+            self.psuedo_console.upArrowPressed.connect(self.f)
+        if hasattr(self.psuedo_console, "downArrowPressed"):
+            self.psuedo_console.downArrowPressed.connect(self.f)
                                        
                               
-        self.nav_tree.setHeaderLabels(["results"])
+        self.nav_tree.setHeaderLabels(["Results"])
         self.nav_tree.setItemsExpandable(True)
         self.x_coord = 5
         self.y_coord = 5
@@ -68,11 +79,11 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self.scene = QGraphicsScene(self)
 
         self.images = results["images"]
-        print "images returned from analytic routine: %s" % self.images
+        print("images returned from analytic routine: %s" % self.images)
         self.image_order = None
         if "image_order" in results:
             self.image_order = results["image_order"]
-            print "image display order: %s" % self.image_order
+            print("image display order: %s" % self.image_order)
 
         self.params_paths = {}
         if "image_params_paths" in results:
@@ -105,21 +116,21 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
 
     def f(self):
-        print self.current_line()
+        print(self.current_line())
 
     def set_psuedo_console_text(self):
         text = ["\t\tOpenMeta(analyst)",
                "This is a pipe to the R console. The image names are as follows:"]
         if self.image_var_names is not None:
-            for image_var_name in self.image_var_names.values():
+            for image_var_name in list(self.image_var_names.values()):
                 text.append(image_var_name)
-        self.psuedo_console.setPlainText(QString("\n".join(text)))
+        self.psuedo_console.setPlainText("\n".join(text))
         self.psuedo_console.append(">> ")
 
 
     def add_images(self):
         # temporary fix!
-        image_order = self.images.keys()
+        image_order = list(self.images.keys())
         
         if self.image_order is not None:
             image_order = self.image_order
@@ -137,9 +148,9 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         
         
         for title,image in ordered_images:
-            print "title: %s; image: %s" % (title, image)
+            print("title: %s; image: %s" % (title, image))
             cur_y = max(0, self.y_coord)
-            print "cur_y: %s" % cur_y
+            print("cur_y: %s" % cur_y)
             # first add the title
             qt_item = self.add_title(title)
 
@@ -156,7 +167,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             img_shape, pos, pixmap_item = self.create_pixmap_item(pixmap, self.position(),\
                                                 title, image, params_path=params_path)
             
-            self.items_to_coords[qt_item] = pos
+            self.items_to_coords[id(qt_item)] = pos
             
 
 
@@ -168,8 +179,8 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         # we scale to address issue #23.
         # should probably pick a 'target' width/height, in case
         # others generate smaller images by default.
-        scaled_width = SCALE_P*pixmap.width()
-        scaled_height = SCALE_P*pixmap.height()
+        scaled_width = int(SCALE_P*pixmap.width())
+        scaled_height = int(SCALE_P*pixmap.height())
         
 
         if scaled_width > self.scene.width():
@@ -188,21 +199,21 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         
         # add to the arguments to make more groups, also make sure to add them
         # in add_images
-        grouped_items = self._group_items(self.texts.items(),
+        grouped_items = self._group_items(list(self.texts.items()),
                                           ["Likelihood","nlr","plr"],
                                           ["sens","spec"])
         
         for title, text in grouped_items:
             try:
-                print "title: %s; text: %s" % (title, text)
+                print("title: %s; text: %s" % (title, text))
                 cur_y = max(0, self.y_coord)
-                print "cur_y: %s" % cur_y
+                print("cur_y: %s" % cur_y)
                 # first add the title
                 qt_item = self.add_title(title)
 
                 # now the text
-                text_item_rect, pos = self.create_text_item(unicode(text), self.position())
-                self.items_to_coords[qt_item] =  pos
+                text_item_rect, pos = self.create_text_item(str(text), self.position())
+                self.items_to_coords[id(qt_item)] =  pos
             except:
                 pass
     
@@ -252,33 +263,43 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         html_str = '<p style="font-size: 14pt; color: black; face:verdana">%s</p>' % title
         text.setHtml(html_str)
         #text.setPos(self.position())
-        print "  title at: %s" % self.y_coord
+        print("  title at: %s" % self.y_coord)
         self.scene.addItem(text)
         qt_item = QTreeWidgetItem(self.nav_tree, [title])
         self.scene.setSceneRect(0, 0, self.scene.width(), self.y_coord + text.boundingRect().height() + padding)
-        print("  Setting position at (%d,%d)" % (self.x_coord, self.y_coord))                        
+        print(("  Setting position at (%d,%d)" % (self.x_coord, self.y_coord)))                        
         text.setPos(self.position()) #####
         self.y_coord += text.boundingRect().height()
         return qt_item
 
+    def _advance_past_text_item(self, txt_item, text):
+        bounding_height = txt_item.boundingRect().height()
+        document_height = txt_item.document().size().height()
+        line_count = max(1, str(text).count("\n") + 1)
+        font_metrics = QFontMetricsF(txt_item.font())
+        line_height = (line_count * font_metrics.lineSpacing()
+                       + 2 * txt_item.document().documentMargin())
+        return max(bounding_height, document_height, line_height)
+
     def item_clicked(self, item, column):
-        print self.items_to_coords[item]
-        self.graphics_view.centerOn(self.items_to_coords[item])
+        print(self.items_to_coords[id(item)])
+        self.graphics_view.centerOn(self.items_to_coords[id(item)])
 
     def create_text_item(self, text, position):
-        txt_item = QGraphicsTextItem(QString(text))
+        txt_item = QGraphicsTextItem(text)
         txt_item.setFont(QFont("courier", 12))
         txt_item.setToolTip("To copy the text:\n1) Right click on the text and choose \"Select All\".\n2) Right click again and choose \"Copy\".")
-        txt_item.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        txt_item.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
         self.scene.addItem(txt_item)
         # fix for issue #149; was formerly txt_item.boundingRect().size().height()
         
         #self.y_coord += txt_item.boundingRect.height()  #ROW_HEIGHT*text.count("\n")
+        text_height = self._advance_past_text_item(txt_item, text)
         self.scene.setSceneRect(0, 0, max(self.scene.width(),
                                           txt_item.boundingRect().size().width()),
-                                          self.y_coord+txt_item.boundingRect().height()+padding)
+                                          self.y_coord + text_height + SECTION_SPACING + padding)
         
-        self.y_coord += txt_item.boundingRect().height() ###
+        self.y_coord += text_height + SECTION_SPACING
         txt_item.setPos(position)
         
         return (txt_item.boundingRect(), position)
@@ -287,7 +308,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         res = str(meta_py_r.execute_r_string(self.current_line()))
 
         # echo the result
-        self.psuedo_console.append(QString(res))
+        self.psuedo_console.append(res)
         self.psuedo_console.append(">> ")
 
     def current_line(self):
@@ -309,13 +330,13 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             plot_type = "regression"
         return plot_type
 
-    def create_pixmap_item(self, pixmap, position, title, image_path,\
-                             params_path=None, matrix=QMatrix()):
+    def create_pixmap_item(self, pixmap, position, title, image_path,
+                             params_path=None, matrix=QTransform()):
         item = QGraphicsPixmapItem(pixmap)
         item.setToolTip("To save the image:\nright-click on the image and choose \"save image as\".\nSave as png will correctly render non-latin fonts but does not respect changes to plot made through 'edit_plot ...'")
         
         
-        self.y_coord += item.boundingRect().size().height()
+        self.y_coord += item.boundingRect().size().height() + SECTION_SPACING
 #        item.setFlags(QGraphicsItem.ItemIsSelectable|
 #                      QGraphicsItem.ItemIsMovable)
         item.setFlags(QGraphicsItem.ItemIsSelectable)
@@ -326,7 +347,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                                    item.boundingRect().size().width()),\
                                    self.y_coord + item.boundingRect().size().height() + padding)
 
-        print "creating item @:%s" % position
+        print("creating item @:%s" % position)
         
         #item.setMatrix(matrix)
         self.scene.clearSelection()
@@ -354,26 +375,25 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         
         def _graphics_item_context_menu(event):
             def add_save_as_pdf_menu_action(menu):
-                action = QAction("save pdf image as...", self)
-                QObject.connect(action, SIGNAL("triggered()"),
-                                lambda : self.save_image_as(params_path, title, 
-                                plot_type=plot_type, format="pdf"))
+                action = QAction("save pdf image as", self)
+                action.triggered.connect(
+                    lambda _checked=False: self.save_image_as(params_path, title,
+                    plot_type=plot_type, format="pdf"))
                 menu.addAction(action)
             def add_save_as_png_menu_action(menu):
-                action = QAction("save png image as...", self)
-                QObject.connect(action, SIGNAL("triggered()"),
-                            lambda : self.save_image_as(params_path, title, 
-                                            plot_type=plot_type,
-                                            unscaled_image = plot_img, format="png"))
+                action = QAction("save png image as", self)
+                action.triggered.connect(
+                    lambda _checked=False: self.save_image_as(params_path, title,
+                    plot_type=plot_type, unscaled_image=plot_img, format="png"))
                 menu.addAction(action)
             def add_edit_plot_menu_action(menu):
                 # only know how to edit *simple* (i.e., _not_ side-by-side, as 
                 # in sens and spec plotted on the same canvass) forest plots for now
                 if plot_type == "forest" and not self._is_side_by_side_fp(title):
-                    action = QAction("edit plot...", self)
-                    QObject.connect(action, SIGNAL("triggered()"),
-                            lambda : self.edit_image(params_path, title,
-                                                     png_path, qpixmap_item))
+                    action = QAction("edit plot", self)
+                    action.triggered.connect(
+                        lambda _checked=False: self.edit_image(params_path, title,
+                                                               png_path, qpixmap_item))
                     menu.addAction(action)
             
             context_menu = QMenu(self)
@@ -409,9 +429,11 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                             "regression":"regression.pdf"}[plot_type]
     
             # where to save the graphic?
-            file_path = unicode(QFileDialog.getSaveFileName(self, 
-                                                            "OpenMeta[Analyst] -- save plot as", 
-                                                            QString(default_path)))
+            file_path, _selected_filter = QFileDialog.getSaveFileName(
+                self,
+                "OpenMeta[Analyst] -- save plot as",
+                default_path,
+            )
     
             # now we re-generate it, unless they canceled, of course
             if file_path != "":
@@ -423,11 +445,15 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                 elif plot_type == "regression":
                     meta_py_r.generate_reg_plot(file_path)
                 else:
-                    print "sorry -- I don't know how to draw %s plots!" % plot_type
+                    print("sorry -- I don't know how to draw %s plots!" % plot_type)
         else: # case where we just have the png and can't regenerate the pdf from plot data
             default_path = '.'.join([title.replace(' ','_'),"png"])
-            file_path = unicode(QFileDialog.getSaveFileName(self, "OpenMeta[Analyst] -- save plot as", QString(default_path)))
-            unscaled_image.save(QString(file_path),"PNG")
+            file_path, _selected_filter = QFileDialog.getSaveFileName(
+                self,
+                "OpenMeta[Analyst] -- save plot as",
+                default_path,
+            )
+            unscaled_image.save(file_path, "PNG")
             
 
     def edit_image(self, params_path, title, png_path, pixmap_item):
@@ -438,10 +464,10 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             plot_editor_window.show()
         else:
             # TODO show a warning
-            print "sorry - can't edit"
+            print("sorry - can't edit")
         
     def position(self):
-        point = QPoint(self.x_coord, self.y_coord)
+        point = QPoint(int(self.x_coord), int(self.y_coord))
         return self.graphics_view.mapToScene(point)
 
 

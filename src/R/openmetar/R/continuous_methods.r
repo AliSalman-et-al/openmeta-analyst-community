@@ -190,7 +190,7 @@ continuous.fixed <- function(cont.data, params){
       # list of changed params values
       params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
       changed.params <- c(changed.params, params.changed.in.forest.plot)
-      params[names(changed.params)] <- changed.params
+      params <- update.changed.plot.params(params, changed.params)
       # dump the forest plot params to disk; return path to
       # this .Rdata for later use
       forest.plot.params.path <- save.data(cont.data, res, params, plot.data)
@@ -214,7 +214,7 @@ continuous.fixed <- function(cont.data, params){
           "plot_params_paths"=plot.params.paths,
           "res"=pure.res,
           "res.info"=continuous.fixed.value.info(),
-          "weights"=weights(res))
+          "Weights"=weights(res))
   }
 	
   # removing 
@@ -243,7 +243,7 @@ continuous.fixed.pretty.names <- function() {
      "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
      "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
      "to"=list("pretty.name"="Add correction factor to", "description"="When Add correction factor is set to \"only 0\", the correction factor
-               is added to all cells of each two-by-two table that contains at leason one zero. When set to \"all\", the correction factor
+               is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor
                is added to all two-by-two tables if at least one table contains a zero.")
       )
 }
@@ -298,7 +298,7 @@ continuous.random <- function(cont.data, params) {
       # list of changed params values
       params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
       changed.params <- c(changed.params, params.changed.in.forest.plot)
-      params[names(changed.params)] <- changed.params
+      params <- update.changed.plot.params(params, changed.params)
       # dump the forest plot params to disk; return path to
       # this .Rdata for later use
       forest.plot.params.path <- save.data(cont.data, res, params, plot.data)
@@ -322,7 +322,7 @@ continuous.random <- function(cont.data, params) {
       "plot_params_paths"=plot.params.paths,
       "res"=pure.res,
       "res.info"=continuous.random.value.info(),
-      "weights"=weights(res))
+      "Weights"=weights(res))
   }
 	
   # possible reference below; for now just removing the 'references' section. we may want to revisit this at some point.
@@ -369,10 +369,10 @@ continuous.random.pretty.names <- function() {
     "description" = "Performs random-effects meta-analysis.",
     "rm.method"=list("pretty.name"="Random-Effects method", "description"="Method for estimating between-studies heterogeneity", "rm.method.names"=rm_method_names),
     "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"),
-    "digits"=list("pretty.name"="Number of digits of precision to display", "description"="Number of digits to display in results"),
+    "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
     "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
-    "to"=list("pretty.name"="Cells to which correction factor should be added", "description"="When Add correction factor is set to \"only 0\", the correction factor
-             is added to all cells of each two-by-two table that contains at leason one zero. When set to \"all\", the correction factor
+    "to"=list("pretty.name"="Correction factor target", "description"="When Add correction factor is set to \"only 0\", the correction factor
+             is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor
              is added to all two-by-two tables if at least one table contains a zero.")
     )
 }

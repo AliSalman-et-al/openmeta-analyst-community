@@ -2,7 +2,7 @@
 ' admittedly, kind of silly. '
 ''''''''''''''''''''''''''''''
 
-from PyQt4.Qt import QDialog
+from PyQt5.QtWidgets import QDialog
 #import pdb
 import forms.ui_running
 

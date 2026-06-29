@@ -1,8 +1,4 @@
-#import pdb
-#import os
-
-from PyQt4.Qt import QObject, SIGNAL
-from PyQt4.QtGui import QDialog, QDialogButtonBox
+from PyQt5.QtWidgets import QDialog, QDialogButtonBox
 
 import forms.ui_edit_forest_plot
 import ma_specs
@@ -18,7 +14,7 @@ class EditPlotWindow(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
         # img_params is a string that is the variable
         # name for the R object 
         self.img_params_path = img_params_path
-        print "parameters: %s" % self.img_params_path
+        print("parameters: %s" % self.img_params_path)
 
         # if we're unable to load the required R data files,
         # e.g., because they were moved or deleted, then fail
@@ -27,7 +23,7 @@ class EditPlotWindow(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
 
 
         if not self.params_d:
-            print "can't load R data for plot editing!"
+            print("can't load R data for plot editing!")
             return None
 
         # @TODO reflect current params in UI at launch
@@ -48,7 +44,7 @@ class EditPlotWindow(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
 
         # get the button object
         self.apply_button = self.buttonBox.button(QDialogButtonBox.Apply)
-        QObject.connect(self.apply_button, SIGNAL("clicked()"), self.regenerate_graph)
+        self.apply_button.clicked.connect(self.regenerate_graph)
         self.populate_params()
 
 
@@ -56,7 +52,7 @@ class EditPlotWindow(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
         _to_bool = lambda x: True if x=="TRUE" else False
 
         # first fill in the col strs and show fields
-        for col_i in [i+1 for i in xrange(4)]:
+        for col_i in [i+1 for i in range(4)]:
             cur_col_edit_box = eval("self.col%s_str_edit" % col_i)
             cur_col_edit_box.setText(str(self.params_d["fp_col%s_str" % col_i]))
 
@@ -94,27 +90,27 @@ class EditPlotWindow(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
         fill in parameters will current values
         '''
         self.current_param_vals["fp_show_col1"] = self.show_1.isChecked()
-        self.current_param_vals["fp_col1_str"] = unicode(self.col1_str_edit.text().toUtf8(), "utf-8")
+        self.current_param_vals["fp_col1_str"] = str(self.col1_str_edit.text().toUtf8(), "utf-8")
         self.current_param_vals["fp_show_col2"] = self.show_2.isChecked()
-        self.current_param_vals["fp_col2_str"] = unicode(self.col2_str_edit.text().toUtf8(), "utf-8")
+        self.current_param_vals["fp_col2_str"] = str(self.col2_str_edit.text().toUtf8(), "utf-8")
         self.current_param_vals["fp_show_col3"] = self.show_3.isChecked()
-        self.current_param_vals["fp_col3_str"] = unicode(self.col3_str_edit.text().toUtf8(), "utf-8")
+        self.current_param_vals["fp_col3_str"] = str(self.col3_str_edit.text().toUtf8(), "utf-8")
         self.current_param_vals["fp_show_col4"] = self.show_4.isChecked()
-        self.current_param_vals["fp_col4_str"] = unicode(self.col4_str_edit.text().toUtf8(), "utf-8")
-        self.current_param_vals["fp_xlabel"] = unicode(self.x_lbl_le.text().toUtf8(), "utf-8")
-        self.current_param_vals["fp_outpath"] = unicode(self.image_path.text().toUtf8(), "utf-8")
+        self.current_param_vals["fp_col4_str"] = str(self.col4_str_edit.text().toUtf8(), "utf-8")
+        self.current_param_vals["fp_xlabel"] = str(self.x_lbl_le.text().toUtf8(), "utf-8")
+        self.current_param_vals["fp_outpath"] = str(self.image_path.text().toUtf8(), "utf-8")
     
-        plot_lb = unicode(self.plot_lb_le.text().toUtf8(), "utf-8")
+        plot_lb = str(self.plot_lb_le.text().toUtf8(), "utf-8")
         self.current_param_vals["fp_plot_lb"] = "[default]"
         if plot_lb != "[default]" and meta_globals.check_plot_bound(plot_lb):
             self.current_param_vals["fp_plot_lb"] = plot_lb
 
-        plot_ub = unicode(self.plot_ub_le.text().toUtf8(), "utf-8")
+        plot_ub = str(self.plot_ub_le.text().toUtf8(), "utf-8")
         self.current_param_vals["fp_plot_ub"] = "[default]"
         if plot_ub != "[default]" and meta_globals.check_plot_bound(plot_ub):
             self.current_param_vals["fp_plot_ub"] = plot_ub
 
-        xticks = unicode(self.x_ticks_le.text().toUtf8(), "utf-8")
+        xticks = str(self.x_ticks_le.text().toUtf8(), "utf-8")
         self.current_param_vals["fp_xticks"] = "[default]"
         if xticks != "[default]" and meta_globals.seems_sane(xticks):
             self.current_param_vals["fp_xticks"] = xticks
@@ -126,7 +122,7 @@ class EditPlotWindow(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
     def swap_graphic(self):
         new_pixmap = self.results_window.generate_pixmap(self.png_path)
         self.pixmap_item.setPixmap(new_pixmap)
-        print "ok -- plot updated in ui"
+        print("ok -- plot updated in ui")
         # maybe do something pretty here... ?
 
     def update_plot(self):
@@ -168,7 +164,7 @@ class EditPlotWindow(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
 
         # will need to tell it to 
         #meta_py_r.generate_forest_plot(self.png_path)
-        print "OK!"
+        print("OK!")
 
    
     

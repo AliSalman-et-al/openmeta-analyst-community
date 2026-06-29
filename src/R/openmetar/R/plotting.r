@@ -767,26 +767,26 @@ pretty.metric.name <- function(metric) {
     RD = "Risk Difference",
     MD = "Mean Difference",
     SMD = "Standardized Mean Difference",
-    RR = "Relative Risk",
-    AS = "Arcsine Risk Difference",
+    RR = "Risk Ratio",
+    AS = "Arcsine Difference",
     PR = "Proportion",
-    PLN = "Log Proportion",  
+    PLN = "Natural Logarithm transformed Proportion",
     PLO = "Logit Proportion",
-    PAS = "Arcsine of Square Root Proportion",
-    PFT  = "Freeman-Tukey Double Arcsine Proportion",                
+    PAS = "Arcsine transformed Proportion",
+    PFT  = "Freeman-Tukey transformed Proportion",
     PETO = "Peto",
     YUQ = "Yule's Q",
-    YUY = "Yules Y",
-    Sens = "Sensitivity", 
+    YUY = "Yule's Y",
+    Sens = "Sensitivity",
     Spec = "Specificity",
     # pos. predictive value
     PPV =  "Positive Predictive Value",
     #neg. predictive value
-    NPV =  "Negative Predictive value",
+    NPV =  "Negative Predictive Value",
     # accuracy
     Acc = "Accuracy",
     # positive likelihood ratio
-    PLR = "Positive Likelihood Ratio", 
+    PLR = "Positive Likelihood Ratio",
     # negative likelihood ratio
     NLR = "Negative Likelihood Ratio",
     # diagnostic odds ratio
