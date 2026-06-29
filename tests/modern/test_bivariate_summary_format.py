@@ -40,7 +40,15 @@ _BIVARIATE_SUMMARY_DRIVER = textwrap.dedent(
         correlation = 0.2421
       )
     }
-    plot.bivariate <- function(...) invisible(NULL)
+    plot.bivariate <- function(..., filepath="./r_tmp/bivariate") {
+      png(file = paste(filepath, ".png", sep=""), height=240, width=240)
+      plot.new()
+      dev.off()
+      pdf(file = paste(filepath, ".pdf", sep=""))
+      plot.new()
+      dev.off()
+      invisible(NULL)
+    }
 
     diagnostic.data <- new(
       "DiagnosticData",
@@ -54,6 +62,15 @@ _BIVARIATE_SUMMARY_DRIVER = textwrap.dedent(
     result <- diagnostic.bivariate.ml(diagnostic.data, params)
     if (!is.list(result$Summary) || !"Bivariate Summary" %in% names(result$Summary)) {
       stop("bivariate result did not expose a named Bivariate Summary section")
+    }
+    if (!"ROC Plot" %in% names(result$images)) {
+      stop("bivariate result did not expose a named ROC Plot artifact")
+    }
+    if (!grepl("\\.png$", result$images[["ROC Plot"]])) {
+      stop(paste("ROC Plot should point to the generated PNG artifact, got:", result$images[["ROC Plot"]]))
+    }
+    if (!file.exists(result$images[["ROC Plot"]])) {
+      stop(paste("ROC Plot artifact path does not exist:", result$images[["ROC Plot"]]))
     }
 
     rendered <- result$Summary[["Bivariate Summary"]]

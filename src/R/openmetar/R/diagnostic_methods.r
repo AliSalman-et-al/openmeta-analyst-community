@@ -1072,12 +1072,12 @@ diagnostic.bivariate.ml <- function(diagnostic.data, params){
 
 
     # generate the plot
-    path.to.roc.plot <- "./r_tmp/bivariate" # just hard-coding for now
+    path.to.roc.plot.base <- "./r_tmp/bivariate" # just hard-coding for now
     plot.bivariate(biv.results, adjusted.counts$TP, adjusted.counts$FP, 
                                  adjusted.counts$FN, adjusted.counts$TN,
-                                 filepath=path.to.roc.plot)
+                                 filepath=path.to.roc.plot.base)
 
-    images <- c("ROC Plot"=path.to.roc.plot)
+    images <- c("ROC Plot"=paste(path.to.roc.plot.base, ".png", sep=""))
 
 	references <- "this is a placeholder for bivariate references"
     results <- list("images"=images,

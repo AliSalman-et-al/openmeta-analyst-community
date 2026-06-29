@@ -1426,18 +1426,22 @@ def _format_text_table(headers, rows):
 def make_weights_str(results):
     ''' Make a string representing the weights due to each study in the meta analysis '''
     
-    # This function assumes that 'weights' and 'input_data' are actually in the results
     if "weights" not in results and "Weights" in results:
         results["weights"] = results["Weights"]
-    if not ("weights" in results and "input_data" in results and "input_params" in results):
+    if "weights" not in results:
         print("Uh oh")
-        raise Exception("make_weights_str() requires 'weights','input_data', and 'input_params' in the results")
+        raise Exception("make_weights_str() requires 'weights' in the results")
     
-    digits = results["input_params"].rx2("digits")[0]
+    digits = 3
+    if "input_params" in results:
+        digits = results["input_params"].rx2("digits")[0]
     digits = int(round(digits))
     weights = list(results["weights"])
     weights = ["{0:.{digits}f}%".format(x, digits=digits) for x in weights]
-    study_names = list(results["input_data"].do_slot("study.names"))
+    if "input_data" in results:
+        study_names = list(results["input_data"].do_slot("study.names"))
+    else:
+        study_names = ["Study %d" % (index + 1) for index in range(len(weights))]
     
     table,widths = tabulate([study_names, weights],
                             sep=": ", return_col_widths=True,
