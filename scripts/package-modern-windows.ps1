@@ -1,5 +1,6 @@
 param(
     [string]$ArtifactName = "OpenMetaAnalyst-modern-windows-x64",
+    [string]$RRuntimeRoot,
     [string]$RPackageCacheRoot,
     [switch]$RecreateVenv,
     [switch]$SkipClean,
@@ -21,6 +22,25 @@ function Write-Step {
     Write-Host ("[{0}] {1}" -f (Get-Date -Format "HH:mm:ss"), $Message)
 }
 
+function Resolve-RRuntimeRoot {
+    if ($RRuntimeRoot) { return (Resolve-Path -LiteralPath $RRuntimeRoot).ProviderPath }
+    if ($env:OMA_R_HOME) { return (Resolve-Path -LiteralPath $env:OMA_R_HOME).ProviderPath }
+    if ($env:R_HOME) { return (Resolve-Path -LiteralPath $env:R_HOME).ProviderPath }
+    $programFilesR = Join-Path $env:ProgramFiles "R"
+    if (Test-Path $programFilesR) {
+        $latestR = Get-ChildItem -Path $programFilesR -Directory | Sort-Object Name -Descending | Select-Object -First 1
+        if ($latestR) { return (Resolve-Path -LiteralPath $latestR.FullName).ProviderPath }
+    }
+    throw "No source R runtime was found. Pass -RRuntimeRoot or set OMA_R_HOME/R_HOME."
+}
+
+function Resolve-RscriptFromRuntime {
+    param([string]$Root)
+    $rscript = Join-Path $Root "bin\Rscript.exe"
+    if (-not (Test-Path $rscript)) { throw "Rscript was not found in selected R runtime at '$rscript'." }
+    return (Resolve-Path -LiteralPath $rscript).ProviderPath
+}
+
 Push-Location $repoRoot
 try {
     if ($RecreateVenv -and (Test-Path $venvRoot)) {
@@ -32,9 +52,12 @@ try {
     uv sync --locked
     if ($LASTEXITCODE -ne 0) { throw "uv failed to sync the locked modern environment." }
 
+    $resolvedRRuntimeRoot = Resolve-RRuntimeRoot
+    $resolvedRscript = Resolve-RscriptFromRuntime -Root $resolvedRRuntimeRoot
+
     if (-not $SkipVerification) {
         Write-Step "Verifying Full R Stack Evidence"
-        uv run python scripts\verify_openmetar_r_stack.py --r-library-cache-root $RPackageCacheRoot
+        uv run python scripts\verify_openmetar_r_stack.py --rscript $resolvedRscript --r-library-cache-root $RPackageCacheRoot
         if ($LASTEXITCODE -ne 0) { throw "Full R Stack Evidence failed." }
     }
 
@@ -42,6 +65,7 @@ try {
     $buildArgs = @{
         ArtifactName = $ArtifactName
         PythonExe = $pythonExe
+        RRuntimeRoot = $resolvedRRuntimeRoot
         RPackageCacheRoot = $RPackageCacheRoot
         SkipDependencyInstall = $true
     }

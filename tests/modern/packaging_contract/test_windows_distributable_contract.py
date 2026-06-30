@@ -92,6 +92,7 @@ def test_modern_windows_distributable_contract_is_declared():
         "Invoke-PackagedAppSmokeTest",
         "Get-RPackageCacheKey",
         "Test-BundledRPackages",
+        "Copy-RLibraryPackages",
         "Assert-OpenMetaRSummaryFormatting",
         "Install-LocalRPackagesFromSource",
         "Install-BundledRPackages",
@@ -118,9 +119,16 @@ def test_modern_windows_r_cache_reinstalls_local_packages_after_cache_restore():
 
     assert relative_order(
         script,
-        "Test-BundledRPackages -RscriptExe $rscriptExe -Library $cacheLibrary",
-        "Copy-RLibrary -Source $cacheLibrary -Destination $rLibrary",
+        "Test-RDependencyPackages -RscriptExe $rscriptExe -Library $cacheLibrary",
+        "Copy-RLibraryPackages -Source $cacheLibrary -Destination $rLibrary",
         "Install-LocalRPackagesFromSource -Root $Root",
+    )
+    assert relative_order(
+        script,
+        "Installing bundled R package dependencies",
+        "Test-RDependencyPackages -RscriptExe $rscriptExe -Library $rLibrary",
+        "Caching bundled R dependency library at $cacheLibrary",
+        "Installing local OpenMetaR package",
     )
 
 
@@ -179,7 +187,10 @@ def test_lane_named_local_scripts_replace_old_workflow_wrappers():
 
     assert {"Sync", "RecreateVenv", "RequireREvidence"} <= smoke["params"]
     assert {"Sync", "RecreateVenv", "RequireREvidence", "StrictTaxonomy", "FastWorkers"} <= fast["params"]
-    assert "RPackageCacheRoot" in package["params"]
+    assert {"RPackageCacheRoot", "RRuntimeRoot"} <= package["params"]
+    assert {"Resolve-RRuntimeRoot", "Resolve-RscriptFromRuntime"} <= package["functions"]
+    assert "--rscript" in package["text"]
+    assert "RRuntimeRoot = $resolvedRRuntimeRoot" in package["text"]
     assert {"tests\\modern\\fast", "tests\\modern\\golden", "tests\\modern\\packaging_contract"} <= pytest_path_tokens(fast["text"])
     assert {"--dist", "loadfile", "-n", "4"} <= pytest_option_tokens(fast["text"])
     assert "pytest-xdist==3.8.0" in project_dependencies()
@@ -199,7 +210,16 @@ def test_modern_macos_distributable_contract_is_declared():
     script = sh_contract("scripts", "build-modern-macos-binary.sh")
 
     assert {"--architecture", "--bundle-identifier", "--r-package-cache-root"} <= script["case_options"]
-    assert {"require_free_space_gb", "repo_path", "resolve_existing_dir", "copy_tree"} <= script["functions"]
+    assert {
+        "require_free_space_gb",
+        "repo_path",
+        "resolve_existing_dir",
+        "copy_tree",
+        "sha256_file",
+        "sha256_stdin_12",
+        "test_r_dependency_packages",
+        "copy_r_library_packages",
+    } <= script["functions"]
     assert {"--windowed", "--target-architecture", "--osx-bundle-identifier"} <= script["pyinstaller_options"]
     assert {"QT_QPA_PLATFORM", "OMA_REQUIRE_IN_PROCESS_RPY2", "OMA_STARTUP_PROJECT_SMOKE", "RPY2_CFFI_MODE"} <= script["env_names"]
     assert {
@@ -214,11 +234,12 @@ def test_modern_macos_distributable_contract_is_declared():
 def test_local_modern_macos_package_script_uses_shared_build_script():
     script = sh_contract("scripts", "package-modern-macos.sh")
 
-    assert {"--architecture", "--artifact-name", "--bundle-identifier", "--r-package-cache-root"} <= script["case_options"]
+    assert {"--architecture", "--artifact-name", "--bundle-identifier", "--r-package-cache-root", "--r-runtime-root"} <= script["case_options"]
     assert relative_order(
         script["text"],
         "uv sync --locked",
         "uv run pytest tests/modern/fast/test_pyqt5_ci_path.py tests/modern/fast/test_pyqt5_generated_ui_imports.py tests/modern/fast/test_project_pickle_loader.py",
+        '--r-runtime-root "$r_runtime_root"',
         "bash \"$repo_root/scripts/build-modern-macos-binary.sh\"",
     )
 
@@ -233,8 +254,9 @@ def test_shared_modern_r_dependency_installer_is_used_by_packagers():
 
     assert cran_default == "https://cloud.r-project.org"
     assert archive_url.endswith("/Archive/HSROC/HSROC_2.1.9.tar.gz")
-    assert "Get-RPackageCacheKey" in windows["functions"]
+    assert {"Get-RPackageCacheKey", "Test-RDependencyPackages"} <= windows["functions"]
     assert "docs\\modernization\\OpenMetaR-r-dependencies.json" in windows["paths"]
+    assert ".Hash.ToLowerInvariant()" in windows["text"]
     assert "OpenMetaR/DESCRIPTION" in macos["text"]
     assert "OMA_CRAN_REPO" in windows["text"]
     assert "OMA_CRAN_REPO" in macos["text"]

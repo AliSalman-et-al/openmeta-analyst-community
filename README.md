@@ -75,7 +75,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\package-modern-windows.ps1 -A
 
 The packaging script syncs the committed `uv.lock`, runs Full R Stack Evidence unless skipped, and builds the modern Windows artifact through PyInstaller.
 
-Full R Stack Evidence and packaging share the R dependency cache under `artifacts\r-library-cache` by default. Delete that cache only when debugging dependency acquisition or intentionally forcing a cold R package install.
+Full R Stack Evidence and packaging share the R dependency cache under `artifacts\r-library-cache` by default. The package wrapper uses one source R runtime for both verification and artifact assembly, then reinstalls only the local `OpenMetaR` package into the bundle. Delete that cache only when debugging dependency acquisition or intentionally forcing a cold R package install.
 
 ## macOS Binary Builds
 

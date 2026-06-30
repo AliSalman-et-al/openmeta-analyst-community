@@ -166,15 +166,23 @@ function Get-RPackageCacheKey {
     $manifest = Join-Path $repoRoot "docs\modernization\OpenMetaR-r-dependencies.json"
     $description = Join-Path $repoRoot "src\R\OpenMetaR\DESCRIPTION"
     $hashInput = @(
-        (Get-FileHash -Algorithm SHA256 -LiteralPath $installDeps).Hash
-        (Get-FileHash -Algorithm SHA256 -LiteralPath $manifest).Hash
-        (Get-FileHash -Algorithm SHA256 -LiteralPath $description).Hash
+        (Get-FileHash -Algorithm SHA256 -LiteralPath $installDeps).Hash.ToLowerInvariant()
+        (Get-FileHash -Algorithm SHA256 -LiteralPath $manifest).Hash.ToLowerInvariant()
+        (Get-FileHash -Algorithm SHA256 -LiteralPath $description).Hash.ToLowerInvariant()
         $cranRepo
     ) -join ""
     $policyHash = [System.BitConverter]::ToString(
         [System.Security.Cryptography.SHA256]::Create().ComputeHash([System.Text.Encoding]::UTF8.GetBytes($hashInput))
     ).Replace("-", "").Substring(0, 12).ToLowerInvariant()
     return (($version.Trim() + "-rdeps-" + $policyHash) -replace "[^A-Za-z0-9_.-]", "_")
+}
+
+function Test-RDependencyPackages {
+    param([string]$RscriptExe, [string]$Library)
+    if (-not (Test-Path $Library)) { return $false }
+    $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','metafor','lme4','pdftools','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }; if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
+    & $RscriptExe -e $verify
+    return ($LASTEXITCODE -eq 0)
 }
 
 function Test-BundledRPackages {
@@ -233,6 +241,15 @@ function Copy-RLibrary {
     Copy-DirectoryTree -Source $Source -Destination $Destination
 }
 
+function Copy-RLibraryPackages {
+    param([string]$Source, [string]$Destination)
+    Assert-PathExists -Path $Source -Description "Source R library"
+    New-Item -ItemType Directory -Force -Path $Destination | Out-Null
+    foreach ($package in Get-ChildItem -Path $Source -Directory) {
+        Copy-DirectoryTree -Source $package.FullName -Destination (Join-Path $Destination $package.Name)
+    }
+}
+
 function Install-LocalRPackagesFromSource {
     param([string]$Root)
     $rExe = Join-Path $Root "R\bin\R.exe"
@@ -271,15 +288,19 @@ function Install-BundledRPackages {
 
     $rPackageCacheKey = Get-RPackageCacheKey -RscriptExe $rscriptExe
     $cacheLibrary = Join-Path (Join-Path $RPackageCacheRoot $rPackageCacheKey) "library"
-    if (Test-BundledRPackages -RscriptExe $rscriptExe -Library $cacheLibrary) {
+    if (Test-RDependencyPackages -RscriptExe $rscriptExe -Library $cacheLibrary) {
         Write-Host "Using cached bundled R library from $cacheLibrary"
-        Copy-RLibrary -Source $cacheLibrary -Destination $rLibrary
+        Copy-RLibraryPackages -Source $cacheLibrary -Destination $rLibrary
     }
     else {
         Write-Step "Installing bundled R package dependencies"
         $installDeps = Join-Path $repoRoot "scripts\install-modern-r-deps.R"
         & $rscriptExe $installDeps
         if ($LASTEXITCODE -ne 0) { throw "Modern R dependency install failed." }
+        if (Test-RDependencyPackages -RscriptExe $rscriptExe -Library $rLibrary) {
+            Write-Host "Caching bundled R dependency library at $cacheLibrary"
+            Copy-RLibrary -Source $rLibrary -Destination $cacheLibrary
+        }
     }
 
     Write-Step "Installing local OpenMetaR package"
@@ -287,10 +308,7 @@ function Install-BundledRPackages {
     & $rscriptExe -e "pkgs <- c('HSROC','OpenMetaR','metafor','lme4','pdftools','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
     if ($LASTEXITCODE -ne 0) { throw "Bundled R package verification failed." }
 
-    if (Test-BundledRPackages -RscriptExe $rscriptExe -Library $rLibrary) {
-        Write-Host "Caching bundled R library at $cacheLibrary"
-        Copy-RLibrary -Source $rLibrary -Destination $cacheLibrary
-    }
+    if (-not (Test-BundledRPackages -RscriptExe $rscriptExe -Library $rLibrary)) { throw "Bundled R package verification failed after local OpenMetaR install." }
 }
 
 if (-not $SkipDependencyInstall) {

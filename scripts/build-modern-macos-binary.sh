@@ -262,13 +262,36 @@ if [ ! -x "$rscript" ] || [ ! -x "$r_binary" ]; then
 fi
 
 r_version_cache_key="$("$rscript" -e "cat(paste0('R-', getRversion()))")"
-if command -v sha256sum >/dev/null 2>&1; then
-  r_dependency_policy_hash="$({ cat "$repo_root/scripts/install-modern-r-deps.R" "$repo_root/docs/modernization/OpenMetaR-r-dependencies.json" "$repo_root/src/R/OpenMetaR/DESCRIPTION"; printf '%s' "${OMA_CRAN_REPO:-https://cloud.r-project.org}"; } | sha256sum | awk '{print substr($1, 1, 12)}')"
-else
-  r_dependency_policy_hash="$({ cat "$repo_root/scripts/install-modern-r-deps.R" "$repo_root/docs/modernization/OpenMetaR-r-dependencies.json" "$repo_root/src/R/OpenMetaR/DESCRIPTION"; printf '%s' "${OMA_CRAN_REPO:-https://cloud.r-project.org}"; } | shasum -a 256 | awk '{print substr($1, 1, 12)}')"
-fi
+sha256_file() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print $1}'
+  else
+    shasum -a 256 "$1" | awk '{print $1}'
+  fi
+}
+
+sha256_stdin_12() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum | awk '{print substr($1, 1, 12)}'
+  else
+    shasum -a 256 | awk '{print substr($1, 1, 12)}'
+  fi
+}
+
+r_dependency_policy_hash="$({
+  printf '%s' "$(sha256_file "$repo_root/scripts/install-modern-r-deps.R")"
+  printf '%s' "$(sha256_file "$repo_root/docs/modernization/OpenMetaR-r-dependencies.json")"
+  printf '%s' "$(sha256_file "$repo_root/src/R/OpenMetaR/DESCRIPTION")"
+  printf '%s' "${OMA_CRAN_REPO:-https://cloud.r-project.org}"
+} | sha256_stdin_12)"
 r_package_cache_key="${r_version_cache_key}-rdeps-${r_dependency_policy_hash}"
 cache_library="$r_package_cache_root/$r_package_cache_key/library"
+
+test_r_dependency_packages() {
+  local library="$1"
+  [ -d "$library" ] || return 1
+  R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" "$rscript" -e "lib <- normalizePath('$library', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','metafor','lme4','pdftools','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)" >/dev/null 2>&1
+}
 
 test_bundled_r_packages() {
   local library="$1"
@@ -282,6 +305,20 @@ copy_r_library() {
   copy_tree "$source" "$destination"
 }
 
+copy_r_library_packages() {
+  local source="$1"
+  local destination="$2"
+  if [ ! -d "$source" ]; then
+    echo "Source R library was not found: $source" >&2
+    exit 1
+  fi
+  mkdir -p "$destination"
+  for package in "$source"/*; do
+    [ -d "$package" ] || continue
+    copy_tree "$package" "$destination/$(basename "$package")"
+  done
+}
+
 install_local_r_packages() {
   local package_build_root="$work_root/r-package-build"
   rm -rf "$package_build_root"
@@ -292,21 +329,25 @@ install_local_r_packages() {
   R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$r_binary" CMD INSTALL --library="$r_lib" "$package_build_root/OpenMetaR"
 }
 
-if test_bundled_r_packages "$cache_library"; then
+if test_r_dependency_packages "$cache_library"; then
   echo "Using cached bundled R library from $cache_library"
-  copy_r_library "$cache_library" "$r_lib"
+  copy_r_library_packages "$cache_library" "$r_lib"
 else
   step "Installing bundled R package dependencies"
   R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$rscript" "$repo_root/scripts/install-modern-r-deps.R"
+  if test_r_dependency_packages "$r_lib"; then
+    echo "Caching bundled R dependency library at $cache_library"
+    copy_r_library "$r_lib" "$cache_library"
+  fi
 fi
 
 step "Installing local OpenMetaR package"
 install_local_r_packages
 R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$rscript" -e "pkgs <- c('HSROC','OpenMetaR','metafor','lme4','pdftools','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
 
-if test_bundled_r_packages "$r_lib"; then
-  echo "Caching bundled R library at $cache_library"
-  copy_r_library "$r_lib" "$cache_library"
+if ! test_bundled_r_packages "$r_lib"; then
+  echo "Bundled R package verification failed after local OpenMetaR install." >&2
+  exit 1
 fi
 
 cat > "$app_root/LaunchOpenMetaAnalyst.command" <<'SH'

@@ -4,6 +4,7 @@ set -euo pipefail
 architecture=""
 artifact_name=""
 r_package_cache_root=""
+r_runtime_root="${OMA_R_HOME:-${R_HOME:-}}"
 recreate_venv=0
 skip_tests=0
 skip_clean=0
@@ -22,6 +23,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --r-package-cache-root)
       r_package_cache_root="$2"
+      shift 2
+      ;;
+    --r-runtime-root)
+      r_runtime_root="$2"
       shift 2
       ;;
     --bundle-identifier)
@@ -85,6 +90,15 @@ esac
 
 artifact_name="${artifact_name:-$default_artifact}"
 
+if [ -z "$r_runtime_root" ]; then
+  r_runtime_root="$(R RHOME)"
+fi
+if [ -z "$r_runtime_root" ] || [ ! -d "$r_runtime_root" ]; then
+  echo "No source R runtime was found. Pass --r-runtime-root or set OMA_R_HOME/R_HOME." >&2
+  exit 1
+fi
+r_runtime_root="$(cd "$r_runtime_root" && pwd -P)"
+
 cd "$repo_root"
 
 if [ "$recreate_venv" -eq 1 ] && [ -d "$venv_root" ]; then
@@ -105,6 +119,7 @@ build_args=(
   --artifact-name "$artifact_name"
   --bundle-identifier "$bundle_identifier"
   --python-exe "$python_exe"
+  --r-runtime-root "$r_runtime_root"
   --r-package-cache-root "$r_package_cache_root"
   --skip-dependency-install
 )
