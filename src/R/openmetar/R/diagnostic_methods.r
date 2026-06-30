@@ -50,6 +50,13 @@ adjust.raw.data <- function(diagnostic.data, params) {
 
 compute.diag.point.estimates <- function(diagnostic.data, params) {
     # Computes point estimates based on raw data and adds them to diagnostic.data
+    if (length(diagnostic.data@TP) == 0) {
+        if (length(diagnostic.data@y) > 0 && length(diagnostic.data@SE) > 0) {
+            return(diagnostic.data)
+        }
+        stop("Diagnostic point estimates require either TP/FN/TN/FP counts or entered effect estimates and standard errors.")
+    }
+
     data.adj <- adjust.raw.data(diagnostic.data, params)
     terms <- compute.diagnostic.terms(raw.data=data.adj, params)
     metric <- params$measure    

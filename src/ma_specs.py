@@ -257,14 +257,18 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                 method_names.append(method)
                 list_of_param_vals.append(param_vals)
             
-            # create the DiagnosticData object on the R side -- this is going 
-            # to be the same for all analyses
-            meta_py_r.ma_dataset_to_simple_diagnostic_robj(self.model)
-
             if self.meta_f_str is None:
                 # regular meta-analysis
                 try:
-                    result = meta_py_r.run_diagnostic_multi(method_names, list_of_param_vals)
+                    if _diagnostic_direct_effects_need_metric_specific_data(self.model, list_of_param_vals):
+                        result = _run_diagnostic_with_metric_specific_data(
+                            self.model, method_names, list_of_param_vals)
+                    else:
+                        # Count-based diagnostic data can use the existing R
+                        # wrapper, which computes each requested metric from the
+                        # same 2x2 tables and preserves side-by-side plots.
+                        meta_py_r.ma_dataset_to_simple_diagnostic_robj(self.model)
+                        result = meta_py_r.run_diagnostic_multi(method_names, list_of_param_vals)
                 except Exception as e:
                     error_message = \
                         "sorry, something has gone wrong with your analysis. here is a stack trace that probably won't be terribly useful.\n %s"  \
@@ -280,8 +284,14 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             else:
                 # in the case of diagnostic, we pass in lists
                 # of param values to the meta_method 
-                result = meta_py_r.run_meta_method_diag(
-                                self.meta_f_str, method_names, list_of_param_vals)
+                if _diagnostic_direct_effects_need_metric_specific_data(self.model, list_of_param_vals):
+                    result = _run_diagnostic_with_metric_specific_data(
+                        self.model, method_names, list_of_param_vals,
+                        meta_f_str=self.meta_f_str)
+                else:
+                    meta_py_r.ma_dataset_to_simple_diagnostic_robj(self.model)
+                    result = meta_py_r.run_meta_method_diag(
+                                    self.meta_f_str, method_names, list_of_param_vals)
                 #_writeout_test_data(self.meta_f_str, method_names, list_of_param_vals, result, diag=True) # FOR MAKING TESTS
 
         bar.hide()
@@ -782,6 +792,64 @@ def add_plot_params(specs_form):
 def _text_value(widget):
     text = widget.text()
     return str(text.toUtf8(), "utf-8") if hasattr(text, "toUtf8") else str(text)
+
+
+def _diagnostic_direct_effects_need_metric_specific_data(model, list_of_param_vals):
+    if model.included_studies_have_raw_data():
+        return False
+
+    missing_metrics = [
+        params["measure"] for params in list_of_param_vals
+        if not model.included_studies_have_point_estimates(effect=params["measure"])
+    ]
+    if missing_metrics:
+        raise ValueError(
+            "Diagnostic analysis requires complete TP/FN/FP/TN counts or "
+            "complete entered effect estimates and confidence intervals for "
+            "each selected metric. Missing entered estimates for: %s." %
+            ", ".join(missing_metrics)
+        )
+
+    return True
+
+
+def _run_diagnostic_with_metric_specific_data(model, method_names, list_of_param_vals,
+                                             meta_f_str=None):
+    merged_result = _empty_diagnostic_result()
+    for method_name, param_vals in zip(method_names, list_of_param_vals):
+        metric = param_vals["measure"]
+        meta_py_r.ma_dataset_to_simple_diagnostic_robj(model, metric=metric)
+        if meta_f_str is None:
+            metric_result = meta_py_r.run_diagnostic_multi([method_name], [param_vals])
+        else:
+            metric_result = meta_py_r.run_meta_method_diag(
+                meta_f_str, [method_name], [param_vals])
+        _merge_diagnostic_result(merged_result, metric_result)
+    if not merged_result["image_order"]:
+        merged_result["image_order"] = None
+    return merged_result
+
+
+def _empty_diagnostic_result():
+    return {
+        "texts": {},
+        "images": {},
+        "image_var_names": {},
+        "image_params_paths": {},
+        "image_order": [],
+    }
+
+
+def _merge_diagnostic_result(merged_result, metric_result):
+    for key in ("texts", "images", "image_var_names", "image_params_paths"):
+        merged_result[key].update(metric_result.get(key, {}))
+
+    image_order = metric_result.get("image_order")
+    if image_order:
+        if isinstance(image_order, (list, tuple)):
+            merged_result["image_order"].extend(image_order)
+        else:
+            merged_result["image_order"].append(image_order)
 
 
 def _writeout_test_data(meta_f_str, method, params, results, diag=False):

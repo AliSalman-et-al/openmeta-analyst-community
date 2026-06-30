@@ -36,6 +36,10 @@ _Avoid_: R subprocess hack, external script
 The statistical inputs, model choices, numerical outputs, result summaries, and generated analysis artifacts that users rely on when conducting meta-analyses.
 _Avoid_: Exact functionality, analysis functionality
 
+**Entered Diagnostic Effect Estimate**:
+A diagnostic sensitivity, specificity, likelihood-ratio, or diagnostic-odds-ratio estimate entered directly with its confidence interval instead of being computed from TP/FN/FP/TN counts.
+_Avoid_: Pre-computed diagnostic data, manual diagnostic value
+
 **Golden Analysis Test**:
 A regression test that compares modernized analysis behavior against outputs captured from the Reference Implementation using representative project data.
 _Avoid_: Snapshot test, golden master
