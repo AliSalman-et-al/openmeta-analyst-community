@@ -29,6 +29,8 @@ import meta_py_r
 DUMMY_ROWS = 20
 
 def _item_data(value=None):
+    if value is None:
+        return QtCore.QVariant()
     return value
 
 
@@ -328,10 +330,8 @@ class DatasetModel(QAbstractTableModel):
                                 return _item_data(str(self.format_float(val, num_digits=num_digits)))
                             else:
                                 return _item_data(round(val, self.NUM_DIGITS))
-                        except:
-                            #pyqtRemoveInputHook()
-                            #pdb.set_trace()
-                            pass
+                        except (TypeError, ValueError):
+                            return _item_data(_to_native_text(val))
                     else:
                         return _item_data("")
                 else:
@@ -425,6 +425,8 @@ class DatasetModel(QAbstractTableModel):
                 return _item_data(QColor(Qt.gray))
             else:
                 return _item_data(QColor(Qt.white))
+
+        return _item_data()
 
 
     def get_cur_group_str(self):
@@ -1117,6 +1119,8 @@ class DatasetModel(QAbstractTableModel):
                 # this is the vertical -- non-table header -- case.    
                 # we just show row numbers (not zero-based; hence the +1).
                 return _item_data(int(section+1))
+
+        return _item_data()
             
 
         

@@ -580,6 +580,87 @@ def test_required_advanced_analysis_actions_open_real_gui_dialogs(monkeypatch):
             os.chdir(REPO_ROOT)
 
 
+def test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe(monkeypatch):
+    from PyQt5 import QtCore
+    import launch
+    import meta_reg_form
+
+    app, window = launch.start_automation()
+    form = None
+    meta_form = sys.modules["meta_form"]
+    meta_py_r = sys.modules["meta_py_r"]
+    shown = []
+
+    class ResultDialog(object):
+        def __init__(self, result, parent=None):
+            shown.append((result, parent))
+
+        def show(self):
+            shown.append("shown")
+
+    def run_meta_regression(dataset, studies, covariates, metric, **kwargs):
+        shown.append((
+            "run-meta-regression",
+            [cov.name for cov in covariates],
+            [study.name for study in studies],
+            metric,
+            kwargs.get("fixed_effects"),
+            kwargs.get("conf_level"),
+        ))
+        return {
+            "texts": {"Summary": "factor meta-regression"},
+            "images": {},
+            "image_var_names": {},
+        }
+
+    monkeypatch.setattr(meta_form.results_window, "ResultsWindow", ResultDialog)
+    monkeypatch.setattr(meta_py_r, "ma_dataset_to_simple_binary_robj", lambda *args, **kwargs: None, raising=False)
+    monkeypatch.setattr(meta_py_r, "run_meta_regression", run_meta_regression, raising=False)
+
+    try:
+        assert window.open(os.path.abspath(os.path.join("sample_data", "amino.oma"))) is True
+        group_values = {
+            study.name: "East" if index % 2 else "West"
+            for index, study in enumerate(window.model.dataset.studies)
+        }
+        window.model.add_covariate("region", "factor", group_values)
+
+        form = meta_reg_form.MetaRegForm(window.model, parent=window)
+        for cov, check_box in form.covs_and_check_boxes:
+            check_box.setChecked(cov.name == "region")
+
+        form.run_meta_reg()
+
+        assert shown[0] == (
+            "run-meta-regression",
+            ["region"],
+            [study.name for study in window.model.dataset.studies if study.include],
+            "OR",
+            False,
+            window.model.get_global_conf_level(),
+        )
+        assert shown[-2:] == [
+            ({"texts": {"Summary": "factor meta-regression"}, "images": {}, "image_var_names": {}}, window),
+            "shown",
+        ]
+
+        factor_column = window.model.columnCount() - 1
+        factor_index = window.model.index(0, factor_column)
+        assert window.model.data(factor_index, QtCore.Qt.DisplayRole) in ("East", "West")
+
+        for role in (QtCore.Qt.DecorationRole, QtCore.Qt.ForegroundRole, QtCore.Qt.FontRole, QtCore.Qt.SizeHintRole):
+            value = window.model.data(factor_index, role)
+            assert isinstance(value, QtCore.QVariant)
+            assert not value.isValid()
+    finally:
+        window.current_data_unsaved = False
+        if form is not None:
+            form.close()
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
 def test_subgroup_covariate_dialog_constructs_with_factor_covariate():
     import launch
     import meta_subgroup_form
