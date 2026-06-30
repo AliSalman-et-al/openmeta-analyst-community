@@ -263,9 +263,9 @@ fi
 
 r_version_cache_key="$("$rscript" -e "cat(paste0('R-', getRversion()))")"
 if command -v sha256sum >/dev/null 2>&1; then
-  r_dependency_policy_hash="$(cat "$repo_root/scripts/install-modern-r-deps.R" "$repo_root/docs/modernization/OpenMetaR-r-dependencies.json" | sha256sum | awk '{print substr($1, 1, 12)}')"
+  r_dependency_policy_hash="$({ cat "$repo_root/scripts/install-modern-r-deps.R" "$repo_root/docs/modernization/OpenMetaR-r-dependencies.json" "$repo_root/src/R/OpenMetaR/DESCRIPTION"; printf '%s' "${OMA_CRAN_REPO:-https://cloud.r-project.org}"; } | sha256sum | awk '{print substr($1, 1, 12)}')"
 else
-  r_dependency_policy_hash="$(cat "$repo_root/scripts/install-modern-r-deps.R" "$repo_root/docs/modernization/OpenMetaR-r-dependencies.json" | shasum -a 256 | awk '{print substr($1, 1, 12)}')"
+  r_dependency_policy_hash="$({ cat "$repo_root/scripts/install-modern-r-deps.R" "$repo_root/docs/modernization/OpenMetaR-r-dependencies.json" "$repo_root/src/R/OpenMetaR/DESCRIPTION"; printf '%s' "${OMA_CRAN_REPO:-https://cloud.r-project.org}"; } | shasum -a 256 | awk '{print substr($1, 1, 12)}')"
 fi
 r_package_cache_key="${r_version_cache_key}-rdeps-${r_dependency_policy_hash}"
 cache_library="$r_package_cache_root/$r_package_cache_key/library"

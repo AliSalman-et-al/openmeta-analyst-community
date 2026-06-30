@@ -10,11 +10,19 @@ Sync the locked modern environment from the repository root:
 uv sync --locked
 ```
 
+Warm local verification skips dependency sync by default. Run the Smoke Verification Lane for the fastest first check:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-modern-smoke.ps1
+```
+
 Daily local verification uses the Fast Verification Lane:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-modern-fast.ps1
 ```
+
+Use `-Sync` when dependency inputs changed, or `-RecreateVenv` for a clean environment rebuild. GitHub calls smoke and fast verification with `-Sync`.
 
 Run lane-specific tests when working in an area:
 
@@ -30,6 +38,8 @@ Run Full R Stack Evidence before R Stack changes:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-modern-r-stack-full.ps1
 ```
+
+Full R Stack Evidence uses `artifacts\r-library-cache` by default to avoid repeated CRAN downloads on warm runs. Set `OMA_CRAN_REPO` to choose a faster reliable CRAN-compatible mirror when needed.
 
 Build the Windows package only when packaging evidence is needed:
 

@@ -56,6 +56,10 @@ on:
 permissions:
   contents: read
 
+env:
+  OMA_CRAN_REPO: https://cloud.r-project.org
+  OMA_CRAN_REPO_KEY: cloud-r-project-org
+
 concurrency:
   group: modern-package-${{ github.ref }}
   cancel-in-progress: true
@@ -71,7 +75,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
@@ -87,10 +91,10 @@ jobs:
           r-version: release
 
       - name: Cache bundled R package library
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: artifacts\r-library-cache
-          key: modern-r-library-windows-${{ hashFiles('scripts/install-modern-r-deps.R', 'docs/modernization/OpenMetaR-r-dependencies.json', 'src/R/OpenMetaR/DESCRIPTION') }}
+          key: modern-r-library-windows-${{ env.OMA_CRAN_REPO_KEY }}-${{ hashFiles('scripts/install-modern-r-deps.R', 'docs/modernization/OpenMetaR-r-dependencies.json', 'src/R/OpenMetaR/DESCRIPTION') }}
           restore-keys: |
             modern-r-library-windows-
 
@@ -98,7 +102,7 @@ jobs:
         run: .\scripts\package-modern-windows.ps1 -ArtifactName OpenMetaAnalyst-modern-windows-x64
 
       - name: Upload modern Windows binary artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: OpenMetaAnalyst-modern-windows-x64
           path: artifacts\OpenMetaAnalyst-modern-windows-x64.zip
@@ -108,7 +112,7 @@ jobs:
 
       - name: Upload Windows packaging diagnostics
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: OpenMetaAnalyst-modern-windows-x64-diagnostics
           path: |
@@ -132,7 +136,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
@@ -148,10 +152,10 @@ jobs:
           r-version: release
 
       - name: Cache bundled R package library
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: artifacts/r-library-cache
-          key: modern-r-library-macos-x64-${{ hashFiles('scripts/install-modern-r-deps.R', 'docs/modernization/OpenMetaR-r-dependencies.json', 'src/R/OpenMetaR/DESCRIPTION') }}
+          key: modern-r-library-macos-x64-${{ env.OMA_CRAN_REPO_KEY }}-${{ hashFiles('scripts/install-modern-r-deps.R', 'docs/modernization/OpenMetaR-r-dependencies.json', 'src/R/OpenMetaR/DESCRIPTION') }}
           restore-keys: |
             modern-r-library-macos-x64-
 
@@ -159,7 +163,7 @@ jobs:
         run: bash scripts/package-modern-macos.sh --architecture x64 --artifact-name OpenMetaAnalyst-modern-macos-x64
 
       - name: Upload modern macOS binary artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: OpenMetaAnalyst-modern-macos-x64
           path: artifacts/OpenMetaAnalyst-modern-macos-x64.zip
@@ -169,7 +173,7 @@ jobs:
 
       - name: Upload macOS Intel packaging diagnostics
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: OpenMetaAnalyst-modern-macos-x64-diagnostics
           path: |
@@ -190,7 +194,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
@@ -206,10 +210,10 @@ jobs:
           r-version: release
 
       - name: Cache bundled R package library
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: artifacts/r-library-cache
-          key: modern-r-library-macos-arm64-${{ hashFiles('scripts/install-modern-r-deps.R', 'docs/modernization/OpenMetaR-r-dependencies.json', 'src/R/OpenMetaR/DESCRIPTION') }}
+          key: modern-r-library-macos-arm64-${{ env.OMA_CRAN_REPO_KEY }}-${{ hashFiles('scripts/install-modern-r-deps.R', 'docs/modernization/OpenMetaR-r-dependencies.json', 'src/R/OpenMetaR/DESCRIPTION') }}
           restore-keys: |
             modern-r-library-macos-arm64-
 
@@ -222,7 +226,7 @@ jobs:
         run: bash scripts/package-modern-macos.sh --architecture arm64 --artifact-name OpenMetaAnalyst-modern-macos-arm64
 
       - name: Upload modern macOS binary artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: OpenMetaAnalyst-modern-macos-arm64
           path: artifacts/OpenMetaAnalyst-modern-macos-arm64.zip
@@ -232,7 +236,7 @@ jobs:
 
       - name: Upload macOS Apple Silicon packaging diagnostics
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: OpenMetaAnalyst-modern-macos-arm64-diagnostics
           path: |

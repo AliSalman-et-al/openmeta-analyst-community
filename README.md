@@ -17,10 +17,11 @@ uv run python src\launch.py
 
 Normal desktop users do not need to manually install R or R packages before running the Windows distributable. Developer source runs need an R installation with the packages used by the analysis backend.
 
-Install the required R packages:
+Install the required R packages. The installer uses `OMA_CRAN_REPO` when set and defaults to `https://cloud.r-project.org`.
 
 ```r
 Sys.setenv(R_LIBS_USER = "path/to/local/r-library")
+Sys.setenv(OMA_CRAN_REPO = "https://cloud.r-project.org")
 source("scripts/install-modern-r-deps.R")
 ```
 
@@ -34,11 +35,19 @@ R CMD INSTALL OpenMetaR_1.0.tar.gz
 
 ## Tests
 
+Warm local verification skips dependency sync by default. Run the Smoke Verification Lane for the fastest first check:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-modern-smoke.ps1
+```
+
 Daily source verification uses the Fast Verification Lane:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-modern-fast.ps1
 ```
+
+Use `-Sync` when dependency inputs changed, or `-RecreateVenv` for a clean environment rebuild. CI always calls the lane scripts with `-Sync`.
 
 Run GUI or R Stack lanes directly when working in those areas:
 
@@ -65,6 +74,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\package-modern-windows.ps1 -A
 ```
 
 The packaging script syncs the committed `uv.lock`, runs Full R Stack Evidence unless skipped, and builds the modern Windows artifact through PyInstaller.
+
+Full R Stack Evidence and packaging share the R dependency cache under `artifacts\r-library-cache` by default. Delete that cache only when debugging dependency acquisition or intentionally forcing a cold R package install.
 
 ## macOS Binary Builds
 

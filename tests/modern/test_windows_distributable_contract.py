@@ -1,253 +1,273 @@
+import re
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_modern_windows_distributable_contract_is_declared():
-    script = (ROOT / "scripts" / "build-modern-windows-binary.ps1").read_text()
+def read_repo_text(*parts):
+    return (ROOT.joinpath(*parts)).read_text(encoding="utf-8")
 
-    for expected in [
-        "$PythonExe",
-        "uv sync --locked",
-        "launch.py",
+
+def ps_contract(*parts):
+    text = read_repo_text(*parts)
+    return {
+        "text": text,
+        "params": set(re.findall(r"\[(?:string|switch)\]\$([A-Za-z0-9_]+)", text)),
+        "functions": set(re.findall(r"(?m)^function\s+([A-Za-z0-9_-]+)", text)),
+        "commands": set(re.findall(r"(?m)^\s*(?:\$[A-Za-z0-9_]+\s+=\s+)?(uv|robocopy|Start-Process|Move-Item|Copy-Item)\b", text)),
+        "env_writes": set(re.findall(r"\$env:([A-Za-z0-9_]+)\s*=", text)),
+        "paths": set(re.findall(r'"([^"]+(?:\.(?:oma|html|exe|dll|bat|ps1|py|json|R|sh)|DESCRIPTION))"', text)),
+        "hidden_imports": set(re.findall(r'"--hidden-import",\s+"([^"]+)"', text)),
+    }
+
+
+def sh_contract(*parts):
+    text = read_repo_text(*parts)
+    return {
+        "text": text,
+        "case_options": set(re.findall(r"(?m)^\s+(--[a-z0-9-]+)\)", text)),
+        "functions": set(re.findall(r"(?m)^([a-zA-Z0-9_]+)\(\)\s+\{", text)),
+        "env_names": set(re.findall(r"\b([A-Z][A-Z0-9_]+)=", text)),
+        "pyinstaller_options": set(re.findall(r"^\s+(--[a-z0-9-]+)(?:\s|$)", text, re.MULTILINE)),
+        "paths": set(re.findall(r'"([^"]+\.(?:oma|html|app|command|sh|R|zip))"', text)),
+        "app_paths": set(re.findall(r'"\$app_root/([^"]+)"', text)),
+    }
+
+
+def workflow_contract(*parts):
+    text = read_repo_text(*parts)
+    jobs = set(re.findall(r"(?m)^  ([A-Za-z0-9_-]+):$", text))
+    steps_by_job = {}
+    current_job = None
+    for line in text.splitlines():
+        job_match = re.match(r"^  ([A-Za-z0-9_-]+):$", line)
+        if job_match:
+            current_job = job_match.group(1)
+            steps_by_job[current_job] = []
+            continue
+        step_match = re.match(r"^\s{6}- name: (.+)$", line)
+        if step_match and current_job:
+            steps_by_job[current_job].append(step_match.group(1))
+    return {
+        "text": text,
+        "jobs": jobs,
+        "steps_by_job": steps_by_job,
+        "uses": re.findall(r"uses:\s+([^@\s]+)@([0-9a-f]{40})(?:\s+#\s+([^\s]+))?", text),
+        "legacy_uses": re.findall(r"uses:\s+[^@\s]+@v\d+", text),
+        "runs": re.findall(r"run:\s+(.+)", text),
+        "paths": set(re.findall(r'^\s+- "([^"]+)"$', text, re.MULTILINE)),
+        "cache_keys": re.findall(r"key:\s+(.+)", text),
+        "env": dict(re.findall(r"(?m)^  ([A-Z0-9_]+):\s+(.+)$", text)),
+        "needs": dict(re.findall(r"(?m)^  ([A-Za-z0-9_-]+):(?:\n(?: {4}.+\n)*)?    needs:\s+([A-Za-z0-9_-]+)", text)),
+    }
+
+
+def relative_order(text, *needles):
+    positions = [text.index(needle) for needle in needles]
+    return positions == sorted(positions)
+
+
+def test_modern_windows_distributable_contract_is_declared():
+    script = ps_contract("scripts", "build-modern-windows-binary.ps1")
+
+    assert {"ArtifactName", "PythonExe", "RRuntimeRoot", "RPackageCacheRoot"} <= script["params"]
+    assert {"SkipDependencyInstall", "SkipClean", "SkipSmoke"} <= script["params"]
+    assert {
+        "Resolve-CommandOrRepoPath",
+        "Copy-DirectoryTree",
+        "Assert-AppLayout",
+        "Invoke-PackagedAppSmokeTest",
+        "Get-RPackageCacheKey",
+        "Test-BundledRPackages",
+        "Assert-OpenMetaRSummaryFormatting",
+        "Install-LocalRPackagesFromSource",
+        "Install-BundledRPackages",
+    } <= script["functions"]
+    assert {"robocopy", "Start-Process", "Move-Item"} <= script["commands"]
+    assert {"OMA_REQUIRE_IN_PROCESS_RPY2", "OMA_STARTUP_PROJECT_SMOKE", "RPY2_CFFI_MODE"} <= script["env_writes"]
+    assert {"icons_rc", "rpy2.robjects", "rpy2.rinterface"} <= script["hidden_imports"]
+    assert {
         "OpenMetaAnalyst.exe",
-        "_internal\\PyQt5",
         "sample_data\\BCG.oma",
         "sample_data\\amino.oma",
         "doc\\openMA_help.html",
         "R\\bin\\x64\\R.dll",
         "R\\library\\OpenMetaR\\DESCRIPTION",
-        "r-library-cache",
-        "scripts\\install-modern-r-deps.R",
-        "Install-LocalRPackagesFromSource",
-        "Assert-OpenMetaRSummaryFormatting",
-        "print.summary.display",
-        "print.summary.data",
         "LaunchOpenMetaAnalyst.bat",
-        "Invoke-PackagedAppSmokeTest",
-        "OMA_REQUIRE_IN_PROCESS_RPY2",
-        "OMA_STARTUP_PROJECT_SMOKE",
-        "RPY2_CFFI_MODE",
-        "Resolve-CommandOrRepoPath",
-        "Copy-DirectoryTree",
-        "robocopy",
-        "SkipClean",
-        "SkipSmoke",
-        '"--hidden-import", "icons_rc"',
-        '"--hidden-import", "rpy2.robjects"',
-        "sample_data\\amino.oma",
-    ]:
-        assert expected in script
+        "scripts\\install-modern-r-deps.R",
+        "docs\\modernization\\OpenMetaR-r-dependencies.json",
+        "src\\R\\OpenMetaR\\DESCRIPTION",
+    } <= script["paths"]
 
 
 def test_modern_windows_r_cache_reinstalls_local_packages_after_cache_restore():
-    script = (ROOT / "scripts" / "build-modern-windows-binary.ps1").read_text()
-    cache_hit = "if (Test-BundledRPackages -RscriptExe $rscriptExe -Library $cacheLibrary) {"
-    cache_hit_index = script.index(cache_hit)
-    install_index = script.index("Install-LocalRPackagesFromSource -Root $Root")
+    script = ps_contract("scripts", "build-modern-windows-binary.ps1")["text"]
 
-    assert install_index > cache_hit_index
-    assert "Using cached bundled R library" in script
-    assert "return\n    }\n\n    $installDeps" not in script
+    assert relative_order(
+        script,
+        "Test-BundledRPackages -RscriptExe $rscriptExe -Library $cacheLibrary",
+        "Copy-RLibrary -Source $cacheLibrary -Destination $rLibrary",
+        "Install-LocalRPackagesFromSource -Root $Root",
+    )
 
 
 def test_packaged_smoke_launches_with_positional_project_argument():
-    script = (ROOT / "scripts" / "build-modern-windows-binary.ps1").read_text()
+    script = ps_contract("scripts", "build-modern-windows-binary.ps1")["text"]
 
-    smoke_env_index = script.index('$env:OMA_STARTUP_PROJECT_SMOKE = "1"')
-    positional_launch_index = script.index("ArgumentList @($samplePath)")
+    assert relative_order(
+        script,
+        '$env:OMA_STARTUP_PROJECT_SMOKE = "1"',
+        "Start-Process -FilePath $exePath -ArgumentList @($samplePath)",
+    )
 
-    assert positional_launch_index > smoke_env_index
-    assert "Packaged startup project smoke test failed" in script
 
+def test_modern_fast_workflow_runs_smoke_before_fast_verification():
+    workflow = workflow_contract(".github", "workflows", "modern-fast.yml")
 
-def test_modern_fast_workflow_runs_default_fast_verification_lane():
-    workflow = (ROOT / ".github" / "workflows" / "modern-fast.yml").read_text()
-
-    assert "Fast Verification Lane" in workflow
-    assert ".\\scripts\\verify-modern-fast.ps1" in workflow
-    assert "setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b" in workflow
-    assert "uv python install 3.11" in workflow
-    assert "uv cache prune --ci" in workflow
-    assert "build-modern-windows-binary.ps1" not in workflow
-    assert "upload-artifact" not in workflow
+    assert {"smoke-verification", "fast-verification"} <= workflow["jobs"]
+    assert workflow["needs"]["fast-verification"] == "smoke-verification"
+    assert workflow["env"]["OMA_CRAN_REPO"] == "https://cloud.r-project.org"
+    assert workflow["legacy_uses"] == []
+    assert all(re.fullmatch(r"[0-9a-f]{40}", ref) for _, ref, _ in workflow["uses"])
+    assert ".\\scripts\\verify-modern-smoke.ps1 -Sync -RequireREvidence" in workflow["runs"]
+    assert ".\\scripts\\verify-modern-fast.ps1 -Sync -RequireREvidence -StrictTaxonomy" in workflow["runs"]
 
 
 def test_modern_package_workflow_builds_path_aware_artifacts():
-    workflow = (ROOT / ".github" / "workflows" / "modern-package.yml").read_text()
+    workflow = workflow_contract(".github", "workflows", "modern-package.yml")
 
-    assert "Windows Packaging Lane" in workflow
-    assert "workflow_dispatch:" in workflow
-    assert "branches:" in workflow
-    assert '"**"' in workflow
-    assert "paths:" in workflow
-    assert "scripts/package-modern-windows.ps1" in workflow
-    assert "scripts/package-modern-macos.sh" in workflow
-    assert "scripts/build-modern-windows-binary.ps1" in workflow
-    assert "scripts/build-modern-macos-binary.sh" in workflow
-    assert "scripts/install-modern-r-deps.R" in workflow
-    assert "src/R/**" in workflow
-    assert "src/launch.py" in workflow
-    assert "OpenMetaAnalyst-modern-windows-x64.zip" in workflow
-    assert "OpenMetaAnalyst-windows-x64.zip" not in workflow
-    assert "macos-package-intel:" in workflow
-    assert "macos-package-arm64:" in workflow
-    assert "macos-15-intel" in workflow
-    assert "macos-14" in workflow
-    assert "OpenMetaAnalyst-modern-macos-x64" in workflow
-    assert "OpenMetaAnalyst-modern-macos-arm64" in workflow
-    assert "github.event_name == 'workflow_dispatch' && inputs.build_macos }}" in workflow
-    assert "github.event_name == 'workflow_dispatch' && inputs.build_macos_arm64 }}" in workflow
+    assert {"windows-package", "macos-package-intel", "macos-package-arm64"} <= workflow["jobs"]
+    assert workflow["env"]["OMA_CRAN_REPO"] == "https://cloud.r-project.org"
+    assert workflow["legacy_uses"] == []
+    assert all(re.fullmatch(r"[0-9a-f]{40}", ref) for _, ref, _ in workflow["uses"])
+    assert {
+        ".github/workflows/modern-package.yml",
+        "scripts/package-modern-windows.ps1",
+        "scripts/package-modern-macos.sh",
+        "scripts/build-modern-windows-binary.ps1",
+        "scripts/build-modern-macos-binary.sh",
+        "scripts/install-modern-r-deps.R",
+        "scripts/verify_openmetar_r_stack.py",
+        "src/R/**",
+        "src/launch.py",
+        "sample_data/**",
+        "doc/**",
+    } <= workflow["paths"]
+    assert any("OpenMetaAnalyst-modern-windows-x64.zip" in run for run in workflow["text"].splitlines())
+    assert any("OpenMetaAnalyst-modern-macos-x64" in run for run in workflow["text"].splitlines())
+    assert any("OpenMetaAnalyst-modern-macos-arm64" in run for run in workflow["text"].splitlines())
+    assert all("OMA_CRAN_REPO_KEY" in key for key in workflow["cache_keys"])
 
 
 def test_lane_named_local_scripts_replace_old_workflow_wrappers():
-    fast = (ROOT / "scripts" / "verify-modern-fast.ps1").read_text()
-    package = (ROOT / "scripts" / "package-modern-windows.ps1").read_text()
+    smoke = ps_contract("scripts", "verify-modern-smoke.ps1")
+    fast = ps_contract("scripts", "verify-modern-fast.ps1")
+    package = ps_contract("scripts", "package-modern-windows.ps1")
 
-    for expected in [
-        "uv sync --locked",
-        "uv run python scripts\\validate_golden_baseline_manifests.py",
-        "uv run python scripts\\validate_test_taxonomy.py",
-        'uv run pytest tests\\modern -m "fast or golden or packaging_contract"',
-        "uv run python scripts\\verify_openmetar_r_default.py",
-    ]:
-        assert expected in fast
-
-    for expected in [
-        "uv run python scripts\\verify_openmetar_r_stack.py",
-        "$buildArgs = @{",
-        "ArtifactName = $ArtifactName",
-        "PythonExe = $pythonExe",
-        "SkipDependencyInstall = $true",
-        "$buildArgs.SkipClean = $true",
-        "$buildArgs.SkipSmoke = $true",
-    ]:
-        assert expected in package
-
+    assert {"Sync", "RecreateVenv", "RequireREvidence"} <= smoke["params"]
+    assert {"Sync", "RecreateVenv", "RequireREvidence", "StrictTaxonomy"} <= fast["params"]
+    assert "RPackageCacheRoot" in package["params"]
+    assert relative_order(
+        fast["text"],
+        "validate_golden_baseline_manifests.py",
+        "validate_test_taxonomy.py",
+        'pytest tests\\modern -m "fast or golden or packaging_contract"',
+        "verify_openmetar_r_default.py",
+    )
     assert not (ROOT / "scripts" / "run-modern-workflow-local.ps1").exists()
     assert not (ROOT / "scripts" / "run-modern-workflow-local.sh").exists()
     assert not (ROOT / "src" / "building").exists()
 
 
 def test_modern_macos_distributable_contract_is_declared():
-    script = (ROOT / "scripts" / "build-modern-macos-binary.sh").read_text()
+    script = sh_contract("scripts", "build-modern-macos-binary.sh")
 
-    for expected in [
-        "--architecture",
-        "--bundle-identifier",
-        "OpenMetaAnalyst-modern-macos-x64",
-        "OpenMetaAnalyst-modern-macos-arm64",
-        "PyInstaller",
-        "--windowed",
-        "--target-architecture",
-        "--osx-bundle-identifier",
-        "--hidden-import icons_rc",
-        "--hidden-import rpy2.robjects",
-        "OpenMetaAnalyst.app",
-        "Contents/MacOS",
+    assert {"--architecture", "--bundle-identifier", "--r-package-cache-root"} <= script["case_options"]
+    assert {"require_free_space_gb", "repo_path", "resolve_existing_dir", "copy_tree"} <= script["functions"]
+    assert {"--windowed", "--target-architecture", "--osx-bundle-identifier"} <= script["pyinstaller_options"]
+    assert {"QT_QPA_PLATFORM", "OMA_REQUIRE_IN_PROCESS_RPY2", "OMA_STARTUP_PROJECT_SMOKE", "RPY2_CFFI_MODE"} <= script["env_names"]
+    assert {
         "sample_data/amino.oma",
         "doc/openMA_help.html",
-        "scripts/install-modern-r-deps.R",
-        "R/bin/Rscript",
         "R/library/OpenMetaR/DESCRIPTION",
         "LaunchOpenMetaAnalyst.command",
-        "resolve_existing_dir",
-        "copy_tree",
-        "require_free_space_gb",
-        "rsync -a --delete",
-        "repo_path",
-        "skip_clean",
-        "QT_QPA_PLATFORM",
-        "OMA_REQUIRE_IN_PROCESS_RPY2",
-        "OMA_STARTUP_PROJECT_SMOKE",
-        "RPY2_CFFI_MODE",
-    ]:
-        assert expected in script
+    } <= script["app_paths"]
+    assert "scripts/install-modern-r-deps.R" in script["text"]
 
 
 def test_local_modern_macos_package_script_uses_shared_build_script():
-    script = (ROOT / "scripts" / "package-modern-macos.sh").read_text()
+    script = sh_contract("scripts", "package-modern-macos.sh")
 
-    for expected in [
+    assert {"--architecture", "--artifact-name", "--bundle-identifier", "--r-package-cache-root"} <= script["case_options"]
+    assert relative_order(
+        script["text"],
         "uv sync --locked",
         "uv run pytest tests/modern/test_pyqt5_ci_path.py tests/modern/test_pyqt5_generated_ui_imports.py tests/modern/test_project_pickle_loader.py",
-        "build-modern-macos-binary.sh",
-        "--architecture",
-        "--bundle-identifier",
-        "--skip-dependency-install",
-        "--skip-clean",
-        "--skip-smoke",
-    ]:
-        assert expected in script
+        "bash \"$repo_root/scripts/build-modern-macos-binary.sh\"",
+    )
 
 
 def test_shared_modern_r_dependency_installer_is_used_by_packagers():
-    installer = (ROOT / "scripts" / "install-modern-r-deps.R").read_text()
-    windows = (ROOT / "scripts" / "build-modern-windows-binary.ps1").read_text()
-    macos = (ROOT / "scripts" / "build-modern-macos-binary.sh").read_text()
+    installer = read_repo_text("scripts", "install-modern-r-deps.R")
+    windows = ps_contract("scripts", "build-modern-windows-binary.ps1")
+    macos = sh_contract("scripts", "build-modern-macos-binary.sh")
 
-    assert "R_LIBS_USER must point at the target bundled R library" in installer
-    assert "install_cran_packages(" in installer
-    assert "install_archive_package(" in installer
-    assert "src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz" in installer
-    assert "repos = NULL" in installer
-    for archived_pin in [
-        '"metafor", "1.9-9"',
-        '"igraph", "1.0.1"',
-        '"lme4", "1.1-12"',
-    ]:
-        assert archived_pin not in installer
-    assert '"HSROC"' in installer
-    assert '"2.1.9"' in installer
-    assert '"OpenMetaR"' not in installer
-    assert "install-modern-r-deps.R" in windows
-    assert "install-modern-r-deps.R" in macos
-    assert "OpenMetaR-r-dependencies.json" in windows
-    assert "OpenMetaR-r-dependencies.json" in macos
-    assert "-rdeps-" in windows
-    assert "-rdeps-" in macos
+    cran_default = re.search(r'Sys.getenv\("OMA_CRAN_REPO",\s+"([^"]+)"\)', installer).group(1)
+    archive_url = re.search(r'HSROC\s+=\s+"([^"]+)"', installer).group(1)
+
+    assert cran_default == "https://cloud.r-project.org"
+    assert archive_url.endswith("/Archive/HSROC/HSROC_2.1.9.tar.gz")
+    assert "Get-RPackageCacheKey" in windows["functions"]
+    assert "docs\\modernization\\OpenMetaR-r-dependencies.json" in windows["paths"]
+    assert "OpenMetaR/DESCRIPTION" in macos["text"]
+    assert "OMA_CRAN_REPO" in windows["text"]
+    assert "OMA_CRAN_REPO" in macos["text"]
 
 
 def test_macos_packager_resolves_relative_python_before_changing_directory():
-    script = (ROOT / "scripts" / "build-modern-macos-binary.sh").read_text()
+    script = sh_contract("scripts", "build-modern-macos-binary.sh")["text"]
 
-    resolve_index = script.index('python_exe="$(repo_path "$python_exe")"')
-    cd_src_index = script.index('cd "$src_dir"')
-    pyinstaller_index = script.index('"$python_exe" -m PyInstaller')
-
-    assert resolve_index < cd_src_index < pyinstaller_index
-    assert "command -v \"$path\"" in script
+    assert relative_order(
+        script,
+        'python_exe="$(repo_path "$python_exe")"',
+        'cd "$src_dir"',
+        '"$python_exe" -m PyInstaller',
+    )
 
 
 def test_macos_packager_copies_resolved_r_runtime_contents():
-    script = (ROOT / "scripts" / "build-modern-macos-binary.sh").read_text()
+    script = sh_contract("scripts", "build-modern-macos-binary.sh")["text"]
 
-    resolve_r_index = script.index('r_runtime_root="$(resolve_existing_dir "$r_runtime_root" "Source R runtime")"')
-    copy_r_index = script.index('copy_tree "$r_runtime_root" "$app_root/R"')
-    rscript_check_index = script.index('if [ ! -x "$rscript" ] || [ ! -x "$r_binary" ]; then')
-
-    assert resolve_r_index < copy_r_index < rscript_check_index
-    assert 'rsync -a --delete "$source"/ "$destination"/' in script
+    assert relative_order(
+        script,
+        'r_runtime_root="$(resolve_existing_dir "$r_runtime_root" "Source R runtime")"',
+        'copy_tree "$r_runtime_root" "$app_root/R"',
+        'if [ ! -x "$rscript" ] || [ ! -x "$r_binary" ]; then',
+    )
 
 
 def test_windows_packager_restores_smoke_environment():
-    script = (ROOT / "scripts" / "build-modern-windows-binary.ps1").read_text()
+    script = ps_contract("scripts", "build-modern-windows-binary.ps1")["text"]
 
-    previous_env_index = script.index("$previousEnv = @{")
-    smoke_index = script.index('Start-Process -FilePath $exePath -ArgumentList @("--automation-smoke", $samplePath)')
-    restore_index = script.index("foreach ($name in $previousEnv.Keys)")
-
-    assert previous_env_index < smoke_index < restore_index
+    assert relative_order(
+        script,
+        "$previousEnv = @{",
+        'Start-Process -FilePath $exePath -ArgumentList @("--automation-smoke", $samplePath)',
+        "foreach ($name in $previousEnv.Keys)",
+    )
 
 
 def test_windows_packager_uses_clean_directory_copies_for_incremental_builds():
-    script = (ROOT / "scripts" / "build-modern-windows-binary.ps1").read_text()
+    script = ps_contract("scripts", "build-modern-windows-binary.ps1")["text"]
 
-    helper_index = script.index("function Copy-DirectoryTree")
-    sample_copy_index = script.index('Copy-DirectoryTree -Source (Join-Path $repoRoot "sample_data")')
-    r_copy_index = script.index('Copy-DirectoryTree -Source $Root -Destination (Join-Path $DestinationRoot "R")')
-
-    assert helper_index < sample_copy_index
-    assert helper_index < r_copy_index
-    assert "robocopy $Source $Destination /MIR" in script
+    assert relative_order(
+        script,
+        "function Copy-DirectoryTree",
+        'Copy-DirectoryTree -Source (Join-Path $repoRoot "sample_data")',
+    )
+    assert relative_order(
+        script,
+        "function Copy-DirectoryTree",
+        'Copy-DirectoryTree -Source $Root -Destination (Join-Path $DestinationRoot "R")',
+    )

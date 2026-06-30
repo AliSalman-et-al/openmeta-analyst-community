@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -20,6 +21,7 @@ BRIDGE_TESTS = (
     Path("tests") / "modern" / "test_inprocess_rpy2_backend.py",
     Path("tests") / "modern" / "test_openmetar_r_manifest_validation.py",
 )
+DEFAULT_CRAN_REPO = "https://cloud.r-project.org"
 
 
 class VerificationError(Exception):
@@ -122,6 +124,88 @@ def isolated_r_env(base_env: dict[str, str], library: Path, r_home: Path | None 
     return env
 
 
+def file_digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def r_version_key(rscript: Path, root: Path, env: dict[str, str]) -> str:
+    result = subprocess.run(
+        [str(rscript), "-e", "cat(paste0('R-', getRversion()))"],
+        cwd=root,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        raise VerificationError(result.stderr.strip() or "could not resolve R version")
+    return "".join(character if character.isalnum() or character in "._-" else "_" for character in result.stdout.strip())
+
+
+def dependency_cache_key(root: Path, rscript: Path, env: dict[str, str], cran_repo: str) -> str:
+    digest = hashlib.sha256()
+    for relative_path in (
+        R_DEP_INSTALLER,
+        Path("docs") / "modernization" / "OpenMetaR-r-dependencies.json",
+        OPENMETAR_PACKAGE / "DESCRIPTION",
+    ):
+        digest.update(file_digest(root / relative_path).encode("ascii"))
+    digest.update(cran_repo.encode("utf-8"))
+    return f"{r_version_key(rscript, root, env)}-rdeps-{digest.hexdigest()[:12]}"
+
+
+def copy_library(source: Path, destination: Path) -> None:
+    if destination.exists():
+        shutil.rmtree(destination)
+    shutil.copytree(source, destination)
+
+
+def ensure_dependency_library(
+    root: Path,
+    rscript: Path,
+    env: dict[str, str],
+    python: str,
+    cran_repo: str,
+    cache_root: Path | None,
+    work_dir: Path,
+) -> Path:
+    if cache_root is None:
+        r_library = work_dir / "library"
+        r_library.mkdir(parents=True)
+        install_env = isolated_r_env(env, r_library)
+        install_env["OMA_CRAN_REPO"] = cran_repo
+        step(f"Installing R dependencies into isolated library at {r_library}")
+        run([rscript, R_DEP_INSTALLER], cwd=root, env=install_env)
+        verify_manifest_versions(root, python, rscript, install_env)
+        return r_library
+
+    cache_library = cache_root / dependency_cache_key(root, rscript, env, cran_repo) / "library"
+    if cache_library.exists():
+        try:
+            cache_env = isolated_r_env(env, cache_library)
+            cache_env["OMA_CRAN_REPO"] = cran_repo
+            verify_manifest_versions(root, python, rscript, cache_env)
+            step(f"Using cached R dependency library at {cache_library}")
+        except VerificationError:
+            shutil.rmtree(cache_library)
+        else:
+            r_library = work_dir / "library"
+            copy_library(cache_library, r_library)
+            return r_library
+
+    cache_library.mkdir(parents=True, exist_ok=True)
+    cache_env = isolated_r_env(env, cache_library)
+    cache_env["OMA_CRAN_REPO"] = cran_repo
+    step(f"Installing R dependencies into cache library at {cache_library}")
+    run([rscript, R_DEP_INSTALLER], cwd=root, env=cache_env)
+    verify_manifest_versions(root, python, rscript, cache_env)
+
+    r_library = work_dir / "library"
+    copy_library(cache_library, r_library)
+    return r_library
+
+
 def built_OpenMetaR_tarball(work_dir: Path) -> Path:
     tarballs = sorted(work_dir.glob("OpenMetaR_*.tar.gz"), key=lambda path: path.stat().st_mtime)
     if not tarballs:
@@ -167,20 +251,25 @@ def verify(args: argparse.Namespace) -> None:
     python = str(Path(args.python).resolve()) if Path(args.python).exists() else args.python
     rscript = resolve_rscript(args.rscript)
     base_env = dict(os.environ)
+    cran_repo = args.cran_repo or base_env.get("OMA_CRAN_REPO") or DEFAULT_CRAN_REPO
+    base_env["OMA_CRAN_REPO"] = cran_repo
 
     run([python, R_MANIFEST_VALIDATOR, "--root", root], cwd=root, env=base_env)
 
     with tempfile.TemporaryDirectory(prefix="OpenMetaR-r-stack-", dir=args.work_dir) as temp_name:
         work_dir = Path(temp_name)
-        r_library = work_dir / "library"
-        r_library.mkdir(parents=True)
-        env = isolated_r_env(base_env, r_library)
+        bootstrap_library = work_dir / "bootstrap-library"
+        bootstrap_library.mkdir(parents=True)
+        env = isolated_r_env(base_env, bootstrap_library)
         r_exe = resolve_r_exe(rscript, root, env)
         r_home = resolve_r_home(rscript, root, env)
+        env = isolated_r_env(base_env, bootstrap_library, r_home)
+        cache_root = args.r_library_cache_root.resolve() if args.r_library_cache_root else None
+        r_library = ensure_dependency_library(root, rscript, env, python, cran_repo, cache_root, work_dir)
         env = isolated_r_env(base_env, r_library, r_home)
+        env["OMA_CRAN_REPO"] = cran_repo
 
-        step(f"Using isolated R library at {r_library}")
-        run([rscript, R_DEP_INSTALLER], cwd=root, env=env)
+        step(f"Using isolated R verification library at {r_library}")
 
         run([r_exe, "CMD", "build", "--no-build-vignettes", root / OPENMETAR_PACKAGE], cwd=work_dir, env=env)
         tarball = built_OpenMetaR_tarball(work_dir)
@@ -217,6 +306,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--rscript", default="Rscript")
     parser.add_argument("--pytest-runner", default="uv", choices=("uv", "pytest"))
     parser.add_argument("--work-dir", type=Path, default=None)
+    parser.add_argument("--r-library-cache-root", type=Path, default=None)
+    parser.add_argument("--cran-repo", default=None)
     return parser.parse_args(argv)
 
 

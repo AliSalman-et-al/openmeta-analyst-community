@@ -1,5 +1,6 @@
 param(
     [string]$ArtifactName = "OpenMetaAnalyst-modern-windows-x64",
+    [string]$RPackageCacheRoot,
     [switch]$RecreateVenv,
     [switch]$SkipClean,
     [switch]$SkipSmoke,
@@ -11,6 +12,9 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $venvRoot = Join-Path $repoRoot ".venv"
 $pythonExe = Join-Path $venvRoot "Scripts\python.exe"
+if (-not $RPackageCacheRoot) {
+    $RPackageCacheRoot = Join-Path (Join-Path $repoRoot "artifacts") "r-library-cache"
+}
 
 function Write-Step {
     param([string]$Message)
@@ -30,7 +34,7 @@ try {
 
     if (-not $SkipVerification) {
         Write-Step "Verifying Full R Stack Evidence"
-        uv run python scripts\verify_openmetar_r_stack.py
+        uv run python scripts\verify_openmetar_r_stack.py --r-library-cache-root $RPackageCacheRoot
         if ($LASTEXITCODE -ne 0) { throw "Full R Stack Evidence failed." }
     }
 
@@ -38,6 +42,7 @@ try {
     $buildArgs = @{
         ArtifactName = $ArtifactName
         PythonExe = $pythonExe
+        RPackageCacheRoot = $RPackageCacheRoot
         SkipDependencyInstall = $true
     }
     if ($SkipClean) { $buildArgs.SkipClean = $true }

@@ -28,8 +28,12 @@ _Avoid_: New workflow, preview build
 The pull-request and push path of the Modern CI Path that proves source changes against locked dependencies, manifests, modern tests, and R Stack verification without producing a full distributable.
 _Avoid_: Quick build, lightweight CI
 
+**Smoke Verification Lane**:
+The smallest required Modern CI Path gate that fails quickly on broken collection, manifest sanity, representative compatibility parsing, project-load compatibility, or required Default R Evidence prerequisites before the broader Fast Verification Lane runs.
+_Avoid_: Mini build, partial CI
+
 **Fast Feedback Budget**:
-The target that the default local and pull-request Fast Verification Lane should return automated pass/fail feedback in under ten minutes.
+The target that the Fast Verification Lane should return automated pass/fail feedback in under ten minutes on GitHub and under two minutes locally after dependencies are warm.
 _Avoid_: Nice-to-have speed goal, rough timing target
 
 **Packaging Lane**:
@@ -52,9 +56,21 @@ _Avoid_: Full R dependency refresh, all CRAN transitive dependency migration
 The small R Stack check included in the Fast Verification Lane, intended to prove manifest validity and a deterministic OpenMetaR load or smoke path without running the full package/build/distributable verification sequence.
 _Avoid_: R Stack verification, quick R test
 
+**Degraded Local R Evidence**:
+A local-only Default R Evidence mode that reports missing or mismatched R dependencies without satisfying CI-required R evidence.
+_Avoid_: Passing CI evidence, soft CI failure
+
 **Full R Stack Evidence**:
 The opt-in, scheduled, release, or packaging-gated verification that installs the R dependency bundle, builds and checks OpenMetaR, validates installed package versions, runs R analysis smoke coverage, and exercises real rpy2 bridge behavior.
 _Avoid_: Required PR R check, default R test
+
+**R Dependency Cache**:
+A cache of installed R package dependency inputs keyed by R runtime version, R dependency policy, package metadata, and repository policy, used to avoid repeated CRAN downloads without trusting assembled application outputs.
+_Avoid_: Cached distributable, cached build output
+
+**CRAN Repository Policy**:
+The configured CRAN-compatible package repository or mirror used by R dependency installation, recorded as part of R dependency acquisition so slow or unreliable package downloads can be improved without hidden behavior changes.
+_Avoid_: Hard-coded CRAN mirror, implicit package source
 
 **Out-of-Process R Bridge**:
 A process boundary where the Python 3 application invokes analysis code running in a separate R-capable environment instead of embedding R through in-process rpy2.
@@ -136,6 +152,10 @@ _Avoid_: Test cleanup, new tests
 The review pass that classifies modern tests by evidence type, execution cost, external dependencies, and CI lane before the Modern CI Path is restructured around selective execution.
 _Avoid_: Test cleanup, marker pass
 
+**Taxonomy Enforcement Backlog**:
+The Test Taxonomy & Audit manifest when it is used to record keep, rewrite, merge, move, and remove decisions before every cleanup action has been implemented.
+_Avoid_: Aspirational test list, all-keep inventory
+
 **Evidence-Carrying Test**:
 A test whose failure would identify a meaningful regression against Analysis Behavior, GUI compatibility, R Stack integration, packaging contract, or migration infrastructure.
 _Avoid_: Useful test, important test
@@ -143,6 +163,10 @@ _Avoid_: Useful test, important test
 **Low-Value Test**:
 A test that mainly asserts implementation text, duplicates stronger coverage, preserves obsolete behavior, or creates CI cost without carrying distinct compatibility or release-readiness evidence.
 _Avoid_: Useless test, bad test
+
+**Structured Contract Test**:
+A packaging, workflow, manifest, or script contract test that inspects parsed structure, function behavior, command outcomes, or stable data models instead of asserting raw source text substrings.
+_Avoid_: Raw string assertion, source-text check
 
 **Compatibility Report**:
 A CI artifact that records the datasets, analysis methods, metrics, tolerances, and observed drift values from Golden Analysis Tests.

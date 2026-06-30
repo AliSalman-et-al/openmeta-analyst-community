@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -14,6 +15,7 @@ from pathlib import Path
 
 OPENMETAR_PACKAGE = Path("src") / "R" / "OpenMetaR"
 R_MANIFEST_VALIDATOR = Path("scripts") / "validate_openmetar_r_manifests.py"
+DEFAULT_CRAN_REPO = "https://cloud.r-project.org"
 
 
 class DefaultREvidenceError(Exception):
@@ -84,6 +86,23 @@ def resolve_r_exe(root: Path, rscript: Path, env: dict[str, str]) -> Path:
     return r_exe
 
 
+def r_version_key(root: Path, rscript: Path, env: dict[str, str]) -> str:
+    result = run([rscript, "-e", "cat(paste0('R-', getRversion()))"], cwd=root, env=env)
+    require_success(result, "R version resolution")
+    return "".join(character if character.isalnum() or character in "._-" else "_" for character in result.stdout.strip())
+
+
+def dependency_cache_key(root: Path, rscript: Path, env: dict[str, str], cran_repo: str) -> str:
+    digest = hashlib.sha256()
+    for relative_path in (
+        Path("docs") / "modernization" / "OpenMetaR-r-dependencies.json",
+        OPENMETAR_PACKAGE / "DESCRIPTION",
+    ):
+        digest.update((root / relative_path).read_bytes())
+    digest.update(cran_repo.encode("utf-8"))
+    return f"{r_version_key(root, rscript, env)}-default-rdeps-{digest.hexdigest()[:12]}"
+
+
 def direct_archive_versions(root: Path) -> dict[str, str]:
     manifest = json.loads(
         (root / Path("docs") / "modernization" / "OpenMetaR-r-dependencies.json").read_text(encoding="utf-8")
@@ -93,6 +112,62 @@ def direct_archive_versions(root: Path) -> dict[str, str]:
         for dependency in manifest["direct_OpenMetaR_dependencies"]
         if dependency.get("source") == "cran-archive"
     }
+
+
+def direct_dependency_policy(root: Path) -> tuple[list[str], dict[str, str]]:
+    manifest = json.loads(
+        (root / Path("docs") / "modernization" / "OpenMetaR-r-dependencies.json").read_text(encoding="utf-8")
+    )
+    cran_packages = []
+    archive_packages = {}
+    for dependency in manifest["direct_OpenMetaR_dependencies"]:
+        source = dependency.get("source")
+        name = dependency["name"]
+        if source == "cran":
+            cran_packages.append(name)
+        elif source == "cran-archive":
+            archive_packages[name] = dependency["installed_version"]
+    return sorted(cran_packages), archive_packages
+
+
+def install_direct_dependencies(root: Path, rscript: Path, library: Path, cran_repo: str, env: dict[str, str]) -> None:
+    cran_packages, archive_packages = direct_dependency_policy(root)
+    archive_url_by_package = {
+        "HSROC": "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz"
+    }
+    r_code = "\n".join(
+        [
+            "args <- commandArgs(trailingOnly = TRUE)",
+            "lib <- normalizePath(args[[1]], winslash='/', mustWork=FALSE)",
+            "repo <- args[[2]]",
+            "dir.create(lib, recursive=TRUE, showWarnings=FALSE)",
+            ".libPaths(c(lib, .libPaths()))",
+            "options(repos=c(CRAN=repo), timeout=600, install.packages.check.source='no')",
+            "cran <- strsplit(args[[3]], ',', fixed=TRUE)[[1]]",
+            "cran <- cran[nzchar(cran)]",
+            "missing <- cran[!vapply(cran, requireNamespace, logical(1), quietly=TRUE)]",
+            "if (length(missing)) install.packages(missing, lib=lib, dependencies=NA, type=if (.Platform$OS.type == 'windows') 'binary' else 'source')",
+            "archives <- args[-(1:3)]",
+            "if (length(archives)) {",
+            "  for (entry in archives) {",
+            "    parts <- strsplit(entry, '=', fixed=TRUE)[[1]]",
+            "    package <- parts[[1]]; expected <- parts[[2]]; url <- parts[[3]]",
+            "    installed <- utils::installed.packages(lib.loc=lib)",
+            "    if (!package %in% rownames(installed) || installed[package, 'Version'] != expected) install.packages(url, lib=lib, repos=NULL, type='source')",
+            "  }",
+            "}",
+        ]
+    )
+    archive_args = [
+        f"{name}={version}={archive_url_by_package[name]}"
+        for name, version in sorted(archive_packages.items())
+    ]
+    result = run(
+        [rscript, "-e", r_code, library, cran_repo, ",".join(cran_packages), *archive_args],
+        cwd=root,
+        env=env,
+    )
+    require_success(result, "direct R dependency install")
 
 
 def install_and_load_openmetar(root: Path, rscript: Path, env: dict[str, str]) -> None:
@@ -140,6 +215,8 @@ def verify(args: argparse.Namespace) -> None:
     root = args.root.resolve()
     python = str(Path(args.python).resolve()) if Path(args.python).exists() else args.python
     base_env = dict(os.environ)
+    cran_repo = args.cran_repo or base_env.get("OMA_CRAN_REPO") or DEFAULT_CRAN_REPO
+    base_env["OMA_CRAN_REPO"] = cran_repo
 
     manifest_result = run([python, R_MANIFEST_VALIDATOR, "--root", root], cwd=root, env=base_env)
     require_success(manifest_result, "manifest validation")
@@ -151,6 +228,16 @@ def verify(args: argparse.Namespace) -> None:
             raise DefaultREvidenceError(message)
         step(message)
         return
+
+    if args.r_library_cache_root:
+        cache_library = (
+            args.r_library_cache_root.resolve()
+            / dependency_cache_key(root, rscript, base_env, cran_repo)
+            / "library"
+        )
+        cache_library.mkdir(parents=True, exist_ok=True)
+        base_env["R_LIBS"] = str(cache_library)
+        base_env["R_LIBS_USER"] = str(cache_library)
 
     report = installed_version_report(root, python, rscript, base_env)
     missing = sorted(name for name, version in report["packages"].items() if version is None)
@@ -166,6 +253,20 @@ def verify(args: argparse.Namespace) -> None:
         if wrong_versions:
             message_parts.append("wrong direct R package versions: " + json.dumps(wrong_versions, sort_keys=True))
         message = "; ".join(message_parts) + "; Default R Evidence limited to manifest validation"
+        if args.install_missing and args.r_library_cache_root:
+            step(message + "; installing direct R dependencies into cache")
+            install_direct_dependencies(root, rscript, Path(base_env["R_LIBS_USER"]), cran_repo, base_env)
+            report = installed_version_report(root, python, rscript, base_env)
+            missing = sorted(name for name, version in report["packages"].items() if version is None)
+            wrong_versions = {
+                name: {"expected": expected, "actual": report["packages"].get(name)}
+                for name, expected in direct_archive_versions(root).items()
+                if report["packages"].get(name) != expected
+            }
+            if not missing and not wrong_versions:
+                install_and_load_openmetar(root, rscript, base_env)
+                step("Default R Evidence complete")
+                return
         if args.require_installed_packages:
             raise DefaultREvidenceError(message)
         step(message)
@@ -182,6 +283,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--rscript", default="Rscript")
     parser.add_argument("--require-r", action="store_true")
     parser.add_argument("--require-installed-packages", action="store_true")
+    parser.add_argument("--r-library-cache-root", type=Path, default=None)
+    parser.add_argument("--install-missing", action="store_true")
+    parser.add_argument("--cran-repo", default=None)
     args = parser.parse_args(argv)
     try:
         verify(args)

@@ -8,7 +8,7 @@ The rebuilt test layout should use both directories and registered pytest marker
 
 The Test Taxonomy & Audit should produce both a committed machine-readable manifest and a human-readable audit report. The manifest should classify each pytest node by size, evidence type, lane, external dependencies, runtime class, and keep/rewrite/remove/move decision; the report should summarize cleanup themes and sequencing.
 
-Tests should not assert raw script, YAML, or source text except in a narrow `packaging_contract` lane with an explicit contract reason. Preferred tests execute behavior or parse structured files; source-text assertions outside `packaging_contract` are rewrite or removal candidates unless they protect a documented release failure mode.
+Tests should not assert raw script, YAML, or source text. Packaging and workflow contract tests should be Structured Contract Tests that execute behavior, parse structured files, inspect stable function outputs, or use dedicated script/workflow parsers; existing source-text assertions are rewrite or removal candidates.
 
 Taxonomy enforcement should be phased. The first milestone records the manifest and audit without failing CI, the second reports unclassified or incorrectly marked tests as warnings, and the third fails CI when collected pytest nodes are missing from the taxonomy manifest, missing registered markers, or violating lane rules.
 

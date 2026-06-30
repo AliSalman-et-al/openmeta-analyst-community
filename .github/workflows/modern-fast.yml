@@ -7,13 +7,17 @@ on:
 permissions:
   contents: read
 
+env:
+  OMA_CRAN_REPO: https://cloud.r-project.org
+  OMA_CRAN_REPO_KEY: cloud-r-project-org
+
 concurrency:
   group: modern-fast-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  fast-verification:
-    name: Fast Verification Lane
+  smoke-verification:
+    name: Smoke Verification Lane
     runs-on: windows-latest
     defaults:
       run:
@@ -21,7 +25,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
@@ -36,8 +40,56 @@ jobs:
         with:
           r-version: release
 
+      - name: Cache R dependency library
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: artifacts\r-library-cache
+          key: modern-r-library-windows-${{ env.OMA_CRAN_REPO_KEY }}-${{ hashFiles('docs/modernization/OpenMetaR-r-dependencies.json', 'src/R/OpenMetaR/DESCRIPTION') }}
+          restore-keys: |
+            modern-r-library-windows-
+
+      - name: Run Smoke Verification Lane
+        run: .\scripts\verify-modern-smoke.ps1 -Sync -RequireREvidence
+
+      - name: Prune uv cache
+        if: ${{ always() }}
+        run: uv cache prune --ci
+
+  fast-verification:
+    name: Fast Verification Lane
+    needs: smoke-verification
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: powershell
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install 3.11
+
+      - name: Set up R for Default R Evidence
+        uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
+        with:
+          r-version: release
+
+      - name: Cache R dependency library
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: artifacts\r-library-cache
+          key: modern-r-library-windows-${{ env.OMA_CRAN_REPO_KEY }}-${{ hashFiles('docs/modernization/OpenMetaR-r-dependencies.json', 'src/R/OpenMetaR/DESCRIPTION') }}
+          restore-keys: |
+            modern-r-library-windows-
+
       - name: Run Fast Verification Lane
-        run: .\scripts\verify-modern-fast.ps1
+        run: .\scripts\verify-modern-fast.ps1 -Sync -RequireREvidence -StrictTaxonomy
 
       - name: Prune uv cache
         if: ${{ always() }}

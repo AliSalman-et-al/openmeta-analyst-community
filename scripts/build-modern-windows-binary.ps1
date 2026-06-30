@@ -161,11 +161,15 @@ function Get-RPackageCacheKey {
     param([string]$RscriptExe)
     $version = & $RscriptExe -e "cat(paste0('R-', getRversion()))"
     if ($LASTEXITCODE -ne 0 -or -not $version) { throw "Could not determine R runtime version." }
+    $cranRepo = if ($env:OMA_CRAN_REPO) { $env:OMA_CRAN_REPO } else { "https://cloud.r-project.org" }
     $installDeps = Join-Path $repoRoot "scripts\install-modern-r-deps.R"
     $manifest = Join-Path $repoRoot "docs\modernization\OpenMetaR-r-dependencies.json"
+    $description = Join-Path $repoRoot "src\R\OpenMetaR\DESCRIPTION"
     $hashInput = @(
         (Get-FileHash -Algorithm SHA256 -LiteralPath $installDeps).Hash
         (Get-FileHash -Algorithm SHA256 -LiteralPath $manifest).Hash
+        (Get-FileHash -Algorithm SHA256 -LiteralPath $description).Hash
+        $cranRepo
     ) -join ""
     $policyHash = [System.BitConverter]::ToString(
         [System.Security.Cryptography.SHA256]::Create().ComputeHash([System.Text.Encoding]::UTF8.GetBytes($hashInput))

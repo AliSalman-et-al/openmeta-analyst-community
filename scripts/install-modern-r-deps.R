@@ -1,5 +1,5 @@
 options(
-  repos = c(CRAN = "https://cran.r-project.org"),
+  repos = c(CRAN = Sys.getenv("OMA_CRAN_REPO", "https://cloud.r-project.org")),
   timeout = 600,
   install.packages.check.source = "no"
 )

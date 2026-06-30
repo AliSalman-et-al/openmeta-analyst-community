@@ -1,171 +1,223 @@
 # Modern Build and Test Workflow Plan
 
-This plan turns the Modern CI Path optimization decisions into small, reviewable implementation slices. It is governed by [ADR 0078](../adr/0078-split-modern-ci-verification-from-packaging.md) and [ADR 0079](../adr/0079-audit-modern-tests-before-restructuring-ci.md).
+This plan turns the Modern CI Path optimization decisions into small, reviewable implementation slices. It is governed by [ADR 0078](../adr/0078-split-modern-ci-verification-from-packaging.md), [ADR 0079](../adr/0079-audit-modern-tests-before-restructuring-ci.md), [ADR 0080](../adr/0080-fail-closed-on-ci-r-evidence.md), and the [Test Taxonomy & Audit](test-taxonomy-audit.md).
 
 ## Goals
 
-- Keep default local and pull-request feedback under the Fast Feedback Budget of ten minutes.
-- Make the Fast Verification Lane deterministic, no-network by default, and focused on source correctness.
-- Move distributable assembly into an explicit Packaging Lane.
-- Rebuild the modern pytest workflow around evidence, runtime, dependencies, and lane selection.
-- Keep packaging clean and idempotent by caching dependency inputs and rebuilding outputs.
-- Improve macOS packaging scripts as opt-in ad-hoc artifact producers, without treating them as signed release distribution.
+- Keep required pull-request feedback under ten minutes on GitHub.
+- Keep warm local smoke/fast verification under two minutes, with smoke under thirty seconds.
+- Make CI fail closed while preserving explicitly named local degraded modes.
+- Remove CRAN download speed from default local and pull-request feedback.
+- Cache dependency inputs, not assembled application outputs.
+- Rebuild packaging outputs cleanly and deterministically enough for layout/content reproducibility.
+- Replace low-value source-text assertions with Structured Contract Tests.
+- Rebuild the modern pytest workflow around evidence, runtime, dependencies, and lane ownership.
 
-## External Standards
+## Adopted Standards
 
-- DORA test automation: fast, reliable automated feedback, with local and CI feedback expected within minutes.
-- pytest documentation: registered custom markers and `-m` selection for intentional lane execution.
-- uv GitHub integration: `uv sync --locked`, `uv run`, setup-uv caching, and CI cache pruning.
-- GitHub Actions caching and security guidance: lockfile-derived cache keys, least permissions, and SHA-pinned third-party actions.
-- SLSA, OpenSSF Scorecard, and Reproducible Builds guidance: locked inputs, explicit provenance direction, stable metadata, and documented non-determinism.
-- PyInstaller macOS guidance and Apple notarization guidance: ad-hoc macOS artifacts are distinct from Developer ID signing and notarized release distribution.
+- pytest registered markers and `-m` marker expressions for selectable lanes.
+- Separate fast required PR checks from slower GUI, R Stack, packaging, scheduled, and release-gated evidence.
+- GitHub Actions dependency caching keyed by lockfiles and dependency manifests.
+- GitHub Actions path filters and concurrency cancellation for expensive workflows.
+- Commit-SHA-pinned third-party GitHub Actions in required CI and packaging workflows.
+- SLSA-style explicit inputs, minimized default-network behavior, clean output rebuilds, and documented non-determinism.
 
-## Phase 1: Test Taxonomy & Audit
+## Redundant Work and Bottleneck Audit
 
-Deliverables:
+- R dependency installation now uses `OMA_CRAN_REPO`, defaulting to `https://cloud.r-project.org`, instead of hard-coding the CRAN origin mirror.
+- Full R Stack Evidence now accepts an R dependency cache root and copies cached dependencies into a clean per-run verification library before building, checking, and installing OpenMetaR.
+- Windows and macOS packaging wrappers pass a shared R package cache root into Full R Stack Evidence and package assembly.
+- R package cache keys now include R version, installer script, dependency manifest, OpenMetaR package metadata, and CRAN repository policy.
+- Warm local smoke/fast verification now skips `uv sync --locked` unless `-Sync` or `-RecreateVenv` is requested.
+- GitHub smoke/fast verification calls strict R evidence and taxonomy flags explicitly.
+- Packaging contract tests now use structured parsers for workflows and scripts; the rewritten nodes are marked `move` in the taxonomy backlog.
 
-- `docs/modernization/test-taxonomy.json`
-- `docs/modernization/test-taxonomy-audit.md`
-- Registered pytest markers in `pyproject.toml`
-
-Steps:
-
-1. Collect pytest node IDs with `uv run pytest tests\modern --collect-only -q`.
-2. Measure runtime with `uv run pytest tests\modern --durations=0 --durations-min=0.1`.
-3. Classify every test by size, evidence type, lane, external dependencies, runtime class, and decision.
-4. Identify Low-Value Tests for remove, rewrite, merge, or move.
-5. Register markers: `fast`, `gui`, `r_stack`, `golden`, `packaging_contract`, `packaged_smoke`, and `slow`.
-6. Add an audit script that can compare collected pytest nodes against the taxonomy manifest in report-only mode.
-
-Acceptance:
-
-- Every currently collected modern test appears in the taxonomy manifest.
-- The markdown audit names the main cleanup themes and the first rewrite/removal candidates.
-- CI does not fail on taxonomy drift yet.
-
-## Phase 2: Fast Verification Lane
+## Phase 1: Smoke Lane and Local Sync Split
 
 Deliverables:
 
-- `scripts/verify-modern-fast.ps1`
-- `scripts/verify-modern-fast.sh`
-- `.github/workflows/modern-fast.yml`
+- `scripts/verify-modern-smoke.ps1`
+- `scripts/verify-modern-smoke.sh`
+- Updated `scripts/verify-modern-fast.ps1`
+- Updated `scripts/verify-modern-fast.sh`
+- Updated `.github/workflows/modern-fast.yml`
 - Updated README and `docs/agents/testing.md` command matrix
 
 Steps:
 
-1. Create lane-named local scripts for locked sync, manifest validation, selected pytest lanes, and Default R Evidence.
-2. Replace filename-based test selection with marker selection.
-3. Keep Fast Verification no-network by default except trusted setup/cache restoration.
-4. Add a `modern-fast` workflow for push and pull request.
-5. Retire `run-modern-workflow-local.*` instead of preserving compatibility wrappers.
+1. Add smoke verification scripts with sync and strict R evidence options.
+2. Update fast verification scripts so local runs skip dependency sync by default, sync flags perform `uv sync --locked`, and recreate flags rebuild `.venv` before syncing.
+3. Make GitHub call smoke and fast scripts with sync and strict evidence flags.
+4. Run Smoke Verification Lane as a separate required GitHub job, with Fast Verification Lane depending on it.
+5. Keep smoke focused on collection, manifest sanity, one representative golden/parser check, one project-load compatibility check, and Default R Evidence prerequisites.
 
 Acceptance:
 
-- The fast lane is the documented daily local command.
-- The fast lane excludes PyInstaller, bundled R runtime assembly, packaged smoke tests, ZIP creation, and artifact upload.
-- The lane is designed to stay under ten minutes; any over-budget check is moved or split.
+- Warm local smoke runs under thirty seconds.
+- Warm local fast verification runs under two minutes.
+- GitHub still performs locked dependency sync every run.
+- Broken collection or missing required R prerequisites fail early.
 
-## Phase 3: R Evidence Split
+## Phase 2: R Package Download and Cache Optimization
 
 Deliverables:
 
-- `scripts/verify-modern-r-default.ps1` or shared helper used by the fast lane
-- `scripts/verify-modern-r-stack-full.ps1`
-- `scripts/verify-modern-r-stack-full.sh`
+- Configurable CRAN repository policy in `scripts/install-modern-r-deps.R`
+- Shared R dependency cache policy for Full R Stack Evidence and Packaging Lane
+- Updated workflow cache keys
+- Documentation for local R package cache setup
 
 Steps:
 
-1. Extract Default R Evidence from `scripts/verify_openmetar_r_stack.py`.
-2. Keep broad R dependency installation, `R CMD build`, `R CMD check`, analysis smoke, installed-version verification, and real rpy2 bridge tests in Full R Stack Evidence.
-3. Make full R Stack verification opt-in, scheduled, release-triggered, or packaging-gated.
-4. Ensure cache keys include R version and R dependency policy hash.
+1. Replace the hard-coded CRAN origin with a configurable repository value, such as `OMA_CRAN_REPO`, defaulting to a documented reliable binary-capable mirror.
+2. Evaluate and document using Posit Package Manager or another reliable CRAN mirror for faster binary/package resolution where appropriate.
+3. Include CRAN repository policy, R version, installer script hash, dependency manifest hash, and `src/R/OpenMetaR/DESCRIPTION` hash in R cache keys.
+4. Use a persistent local R package cache root for Full R Stack Evidence so local re-runs do not always rebuild from an empty temporary library.
+5. Keep CI cache restoration explicit and visible. Cache dependency libraries; never cache final app directories or ZIPs as trusted outputs.
+6. Keep archived `HSROC` pinned to the exact archive URL/version unless a future ADR changes it.
 
 Acceptance:
 
-- Default PR verification does not perform broad live CRAN package installation.
-- Full R Stack Evidence still protects the OpenMetaR R Stack Slice.
+- Full R Stack Evidence and Packaging Lane can reuse cached R dependency inputs on warm runs.
+- Cold CRAN downloads are isolated to explicit R Stack or Packaging Lane runs, not default smoke/fast verification.
+- Cache misses are obvious in logs.
+- Changing R dependency policy invalidates the relevant cache.
 
-## Phase 4: Packaging Lane
+## Phase 3: CI Fail-Closed R Evidence
 
 Deliverables:
 
-- `scripts/package-modern-windows.ps1`
-- `scripts/package-modern-macos.sh`
-- `.github/workflows/modern-package.yml`
-- Removed or retired `scripts/run-modern-workflow-local.*`
+- Required CI Default R Evidence that fails when R or direct required packages are missing/wrong.
+- Local Degraded Local R Evidence mode remains explicitly named.
+- Lane-level R Stack prerequisite check before selected R Stack pytest tests run.
 
 Steps:
 
-1. Split packaging workflows from fast verification.
-2. Run packaging on `workflow_dispatch`, release/tag events, and packaging-relevant path changes.
-3. Cache dependency inputs only: uv cache, R package cache, and explicitly invalidated PyInstaller cache where safe.
-4. Rebuild assembled app directories and ZIPs cleanly every packaging run.
-5. Keep Windows as the default package target.
-6. Improve macOS scripts as explicit ad-hoc x64 and arm64 artifact producers with target architecture, bundle identifier, disk checks, clean temp/output handling, layout assertions, and smoke checks.
-7. Leave Developer ID signing, hardened runtime, notarization, stapling, and release secrets to a later release-stage design.
+1. Make CI call Default R Evidence with strict requirements for R and installed direct package versions.
+2. Keep local degraded behavior as the default warm local mode, with strict mode available through explicit flags.
+3. Move R/rpy2/package availability checks to lane setup before pytest starts.
+4. Replace selected R Stack `pytest.skip()` paths with hard setup failures for required lanes.
 
 Acceptance:
 
-- Packaging no longer runs on every ordinary PR/push.
-- Windows packaging remains available as the maintained distributable target.
-- macOS packaging is manual and architecture-specific.
-- Final artifacts are rebuilt from clean outputs, not restored from cached assembled directories.
+- CI cannot pass required R evidence as manifest-only evidence.
+- Selected R Stack lanes either run in the expected environment or fail before pytest starts.
+- Local missing-dependency output is clearly labeled as degraded and not CI-equivalent.
 
-## Phase 5: Test Restructure and Cleanup
+## Phase 4: Packaging Contract Rewrite
 
 Deliverables:
 
-- Directory layout under `tests/modern/fast`, `gui`, `r_stack`, `golden`, `packaging_contract`, and `packaged_smoke`
-- Rewritten or removed Low-Value Tests
-- Updated GUI verification evidence links where files move
+- Structured Contract Tests replacing the first batch of raw string assertions.
+- Updated `docs/modernization/test-taxonomy.json` decisions for rewrite/merge/remove candidates.
 
 Steps:
 
-1. Move tests according to the taxonomy.
-2. Remove tests made obsolete by ADRs or stronger evidence.
-3. Rewrite raw text assertions outside `packaging_contract`.
-4. Keep packaging-contract text assertions only when they guard an explicit release failure mode.
-5. Replace ad hoc skip behavior with lane-aware dependency checks.
-6. Isolate shared state: cwd, environment variables, QSettings, QApplication, `r_tmp`, build directories, and artifacts.
+1. Start with `tests/modern/test_windows_distributable_contract.py`.
+2. Replace workflow string assertions with structured workflow parsing.
+3. Replace script substring checks with structured function, parameter, environment, path, option, and ordering checks.
+4. Mark rewritten packaging contract tests for the lane-directory move in the taxonomy manifest.
 
 Acceptance:
 
-- The suite layout matches the taxonomy.
-- Fast tests are mostly small or medium and isolated.
-- GUI, R Stack, and packaged smoke tests have clear lane ownership.
+- No newly added packaging contract test asserts raw script/YAML/source substrings as its primary contract shape.
+- First rewritten tests still protect the same packaging and workflow contracts.
+- The taxonomy manifest stops reporting every node as `keep`.
 
-## Phase 6: Enforcement and Parallelism
+## Phase 5: GitHub Workflow Hardening
 
 Deliverables:
 
-- Taxonomy validation script in warning mode, then hard-fail mode
-- pytest-xdist or equivalent parallel execution for isolated fast tests
+- SHA-pinned third-party GitHub Actions.
+- Strict taxonomy validation in GitHub after the first backlog classification pass.
+- Path-aware Packaging Lane remains scoped to packaging-relevant PR changes.
 
 Steps:
 
-1. Add CI warning output for missing taxonomy entries or marker mismatches.
-2. Turn taxonomy validation into a hard gate after the suite is moved and cleaned.
-3. Add parallel execution for isolated fast tests.
-4. Keep GUI, R Stack, and packaged smoke serialized or process-isolated until proven safe.
+1. Resolve exact commit SHAs for the currently intended action releases.
+2. Pin checkout, cache, setup, and artifact upload actions by SHA.
+3. Keep workflow permissions minimal.
+4. Enable `validate_test_taxonomy.py --strict` in GitHub after manifest decisions are updated.
 
 Acceptance:
 
-- New tests cannot silently bypass taxonomy classification.
-- Parallelism improves fast-lane runtime without introducing shared-state flakes.
+- Required CI and packaging workflows use SHA-pinned actions.
+- Taxonomy drift fails in GitHub after the first classification pass.
+- Packaging still runs for release/manual requests and packaging-relevant PR paths.
+
+## Phase 6: Test Layout and Cleanup
+
+Deliverables:
+
+- Lane/ownership directories under `tests/modern`.
+- Rewritten, merged, moved, or removed Low-Value Tests.
+- Updated GUI and R Stack evidence ownership.
+
+Steps:
+
+1. Move tests only after the taxonomy manifest is accurate.
+2. Use directories for ownership and markers for selection.
+3. Defer GUI/R pruning until compatibility evidence is reviewed carefully.
+4. Isolate shared state: cwd, environment variables, QSettings, QApplication, `r_tmp`, R libraries, build directories, and artifacts.
+
+Acceptance:
+
+- Suite layout matches the taxonomy.
+- Fast tests are mostly small/medium and isolated.
+- GUI, R Stack, golden, packaging, and packaged smoke evidence have clear ownership.
+
+## Phase 7: Parallelism Later
+
+Deliverables:
+
+- pytest-xdist or equivalent only after isolation cleanup.
+
+Steps:
+
+1. Prove fast tests are isolated from shared global state.
+2. Add parallelism only for isolated fast tests.
+3. Keep GUI, R Stack, and packaged smoke serialized or process-isolated until proven safe.
+
+Acceptance:
+
+- Parallelism improves fast-lane runtime without introducing flakes.
+- Shared-state lanes remain serialized unless explicitly isolated.
+
+## First Milestone Issue Slices
+
+1. **Add Smoke Verification Lane and local sync controls** - implemented in this slice.
+   - Blocked by: None.
+   - Covers: smoke script, `-Sync`/`-RecreateVenv`, separate GitHub smoke job, fast job dependency.
+
+2. **Make R dependency acquisition cache-aware and mirror-configurable** - implemented in this slice.
+   - Blocked by: None.
+   - Covers: CRAN mirror policy, R cache keys, local persistent cache option, no redundant CRAN downloads on warm R/package runs.
+
+3. **Fail closed on required CI R evidence** - implemented for smoke/fast CI entry points in this slice.
+   - Blocked by: R cache/mirror policy can proceed in parallel but should land before hardening if CI reliability depends on it.
+   - Covers: strict Default R Evidence in CI, lane-level R prerequisites, removal of opportunistic selected-lane skips.
+
+4. **Rewrite first packaging contract tests as Structured Contract Tests** - implemented for the Windows/package workflow contract cluster in this slice.
+   - Blocked by: None.
+   - Covers: YAML parsing, script contract parsing/dry-run checks, taxonomy decisions for rewritten nodes.
+
+5. **Pin GitHub Actions and enable strict taxonomy after manifest updates** - implemented for current fast/package workflows in this slice.
+   - Blocked by: first taxonomy backlog classification update.
+   - Covers: SHA-pinned actions, strict CI taxonomy validation.
+
+6. **Reclassify taxonomy backlog for first cleanup batch** - implemented for the packaging contract cluster in this slice.
+   - Blocked by: packaging contract rewrite findings.
+   - Covers: `keep`, `rewrite`, `merge`, `move`, and `remove` decisions for the first low-value cluster.
 
 ## Suggested Commit Sequence
 
-1. Add taxonomy manifest/report generator and marker registration.
-2. Commit the first taxonomy audit.
-3. Add `verify-modern-fast` scripts and `modern-fast.yml`.
-4. Split Default R Evidence from Full R Stack Evidence.
-5. Add full R Stack verification scripts.
-6. Add packaging scripts and `modern-package.yml`.
-7. Retire `run-modern-workflow-local.*` and update docs.
-8. Move tests into taxonomy directories.
-9. Remove or rewrite Low-Value Tests.
-10. Add taxonomy warning gate.
-11. Add taxonomy hard gate.
-12. Add fast-lane parallelism.
-
+1. Update docs with smoke, fail-closed R evidence, R cache/mirror policy, and first milestone plan.
+2. Add smoke script and local sync controls.
+3. Add R mirror/cache policy and update cache keys.
+4. Make CI-required Default R Evidence strict.
+5. Rewrite first packaging contract tests.
+6. Update taxonomy manifest decisions for the first cleanup batch.
+7. Pin GitHub Actions by SHA.
+8. Enable strict taxonomy in GitHub.
+9. Move tests into lane directories after manifest accuracy is proven.
+10. Add fast-lane parallelism only after isolation cleanup.

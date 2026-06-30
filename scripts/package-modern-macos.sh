@@ -3,6 +3,7 @@ set -euo pipefail
 
 architecture=""
 artifact_name=""
+r_package_cache_root=""
 recreate_venv=0
 skip_tests=0
 skip_clean=0
@@ -17,6 +18,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --artifact-name)
       artifact_name="$2"
+      shift 2
+      ;;
+    --r-package-cache-root)
+      r_package_cache_root="$2"
       shift 2
       ;;
     --bundle-identifier)
@@ -50,6 +55,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
 venv_root="$repo_root/.venv"
 python_exe="$venv_root/bin/python"
+r_package_cache_root="${r_package_cache_root:-$repo_root/artifacts/r-library-cache}"
 
 step() {
   printf '[%s] %s\n' "$(date '+%H:%M:%S')" "$1"
@@ -99,6 +105,7 @@ build_args=(
   --artifact-name "$artifact_name"
   --bundle-identifier "$bundle_identifier"
   --python-exe "$python_exe"
+  --r-package-cache-root "$r_package_cache_root"
   --skip-dependency-install
 )
 if [ "$skip_clean" -eq 1 ]; then

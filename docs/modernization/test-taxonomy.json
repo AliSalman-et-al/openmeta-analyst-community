@@ -1785,7 +1785,7 @@
       "size": "medium"
     },
     {
-      "decision": "keep",
+      "decision": "move",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1795,12 +1795,12 @@
       ],
       "lane": "packaging_contract",
       "nodeid": "tests/modern/test_windows_distributable_contract.py::test_modern_windows_distributable_contract_is_declared",
-      "reason": "Guards explicit packaging and workflow contract decisions while scripts are split.",
+      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "keep",
+      "decision": "move",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1810,12 +1810,12 @@
       ],
       "lane": "packaging_contract",
       "nodeid": "tests/modern/test_windows_distributable_contract.py::test_modern_windows_r_cache_reinstalls_local_packages_after_cache_restore",
-      "reason": "Guards explicit packaging and workflow contract decisions while scripts are split.",
+      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "keep",
+      "decision": "move",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1825,12 +1825,12 @@
       ],
       "lane": "packaging_contract",
       "nodeid": "tests/modern/test_windows_distributable_contract.py::test_packaged_smoke_launches_with_positional_project_argument",
-      "reason": "Guards explicit packaging and workflow contract decisions while scripts are split.",
+      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "keep",
+      "decision": "move",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1839,13 +1839,13 @@
         "filesystem"
       ],
       "lane": "packaging_contract",
-      "nodeid": "tests/modern/test_windows_distributable_contract.py::test_modern_fast_workflow_runs_default_fast_verification_lane",
-      "reason": "Guards explicit packaging and workflow contract decisions while scripts are split.",
+      "nodeid": "tests/modern/test_windows_distributable_contract.py::test_modern_fast_workflow_runs_smoke_before_fast_verification",
+      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "keep",
+      "decision": "move",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1855,12 +1855,12 @@
       ],
       "lane": "packaging_contract",
       "nodeid": "tests/modern/test_windows_distributable_contract.py::test_modern_package_workflow_builds_path_aware_artifacts",
-      "reason": "Guards explicit packaging and workflow contract decisions while scripts are split.",
+      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "keep",
+      "decision": "move",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1870,12 +1870,12 @@
       ],
       "lane": "packaging_contract",
       "nodeid": "tests/modern/test_windows_distributable_contract.py::test_lane_named_local_scripts_replace_old_workflow_wrappers",
-      "reason": "Guards explicit packaging and workflow contract decisions while scripts are split.",
+      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "keep",
+      "decision": "move",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1885,12 +1885,12 @@
       ],
       "lane": "packaging_contract",
       "nodeid": "tests/modern/test_windows_distributable_contract.py::test_modern_macos_distributable_contract_is_declared",
-      "reason": "Guards explicit packaging and workflow contract decisions while scripts are split.",
+      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "keep",
+      "decision": "move",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1900,12 +1900,12 @@
       ],
       "lane": "packaging_contract",
       "nodeid": "tests/modern/test_windows_distributable_contract.py::test_local_modern_macos_package_script_uses_shared_build_script",
-      "reason": "Guards explicit packaging and workflow contract decisions while scripts are split.",
+      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "keep",
+      "decision": "move",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1915,12 +1915,12 @@
       ],
       "lane": "packaging_contract",
       "nodeid": "tests/modern/test_windows_distributable_contract.py::test_shared_modern_r_dependency_installer_is_used_by_packagers",
-      "reason": "Guards explicit packaging and workflow contract decisions while scripts are split.",
+      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "keep",
+      "decision": "move",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1930,12 +1930,12 @@
       ],
       "lane": "packaging_contract",
       "nodeid": "tests/modern/test_windows_distributable_contract.py::test_macos_packager_resolves_relative_python_before_changing_directory",
-      "reason": "Guards explicit packaging and workflow contract decisions while scripts are split.",
+      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "keep",
+      "decision": "move",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1945,12 +1945,12 @@
       ],
       "lane": "packaging_contract",
       "nodeid": "tests/modern/test_windows_distributable_contract.py::test_macos_packager_copies_resolved_r_runtime_contents",
-      "reason": "Guards explicit packaging and workflow contract decisions while scripts are split.",
+      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "keep",
+      "decision": "move",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1960,12 +1960,12 @@
       ],
       "lane": "packaging_contract",
       "nodeid": "tests/modern/test_windows_distributable_contract.py::test_windows_packager_restores_smoke_environment",
-      "reason": "Guards explicit packaging and workflow contract decisions while scripts are split.",
+      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "keep",
+      "decision": "move",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1975,7 +1975,7 @@
       ],
       "lane": "packaging_contract",
       "nodeid": "tests/modern/test_windows_distributable_contract.py::test_windows_packager_uses_clean_directory_copies_for_incremental_builds",
-      "reason": "Guards explicit packaging and workflow contract decisions while scripts are split.",
+      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
       "runtime_class": "subsecond",
       "size": "small"
     }

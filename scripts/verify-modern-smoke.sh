@@ -4,7 +4,6 @@ set -euo pipefail
 recreate_venv=0
 sync=0
 require_r_evidence=0
-strict_taxonomy=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --sync)
@@ -18,10 +17,6 @@ while [ "$#" -gt 0 ]; do
       ;;
     --require-r-evidence)
       require_r_evidence=1
-      shift
-      ;;
-    --strict-taxonomy)
-      strict_taxonomy=1
       shift
       ;;
     *)
@@ -51,27 +46,25 @@ if [ "$sync" -eq 1 ]; then
   step "Syncing locked modern environment with uv"
   uv sync --locked
 else
-  step "Skipping dependency sync for warm local verification"
+  step "Skipping dependency sync for warm local smoke verification"
 fi
 
-step "Validating Comprehensive Golden Baseline manifests"
+step "Collecting modern pytest nodes"
+uv run pytest tests/modern --collect-only -q
+
+step "Validating manifest sanity"
 uv run python scripts/validate_golden_baseline_manifests.py
 
-step "Checking modern test taxonomy"
-taxonomy_args=(scripts/validate_test_taxonomy.py)
-if [ "$strict_taxonomy" -eq 1 ]; then
-  taxonomy_args+=(--strict)
-fi
-uv run python "${taxonomy_args[@]}"
+step "Running smoke pytest nodes"
+uv run pytest \
+  tests/modern/test_modern_golden_compare.py::test_golden_summary_parser_reads_current_openmetar_summary_display \
+  tests/modern/test_project_pickle_loader.py::test_loader_opens_representative_qt4_project_without_pyqt4_module
 
-step "Running fast pytest lanes"
-uv run pytest tests/modern -m "fast or golden or packaging_contract"
-
-step "Verifying Default R Evidence"
+step "Checking Default R Evidence prerequisites"
 r_evidence_args=(scripts/verify_openmetar_r_default.py)
 if [ "$require_r_evidence" -eq 1 ]; then
   r_evidence_args+=(--require-r --require-installed-packages --install-missing --r-library-cache-root "$r_package_cache_root")
 fi
 uv run python "${r_evidence_args[@]}"
 
-step "Fast Verification Lane complete"
+step "Smoke Verification Lane complete"
