@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import QDialog
 
 import forms.ui_diagnostic_metrics
 import ma_specs
+from meta_globals import DIAG_METRIC_NAMES_D
 
 class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
 
@@ -15,6 +16,9 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
         self.external_params = external_params
         self.meta_f_str = meta_f_str
         self.btn_ok.pressed.connect(self.ok)
+        self._configure_metric_checkboxes()
+        for metric in self.SELECTABLE_METRICS:
+            self._metric_checkbox(metric).toggled.connect(self._refresh_ok_enabled)
 
     def ok(self):
         # Route the Method & Parameters dialog through the parent's
@@ -45,11 +49,47 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
         # boxes on the form and see if they're checked. 
 
         for metric in self.SELECTABLE_METRICS:
-            if eval("self.chk_box_%s.isChecked()" % metric):
+            checkbox = self._metric_checkbox(metric)
+            if checkbox.isEnabled() and checkbox.isChecked():
                 print(metric)
                 selected_metrics.append(metric)
 
   
         return selected_metrics
+
+    def _configure_metric_checkboxes(self):
+        raw_data_available = self.model.included_studies_have_raw_data()
+        for metric in self.SELECTABLE_METRICS:
+            checkbox = self._metric_checkbox(metric)
+            metric_available = (
+                raw_data_available or
+                self._entered_estimates_available_for_metric(metric)
+            )
+            checkbox.setEnabled(metric_available)
+            checkbox.setChecked(checkbox.isChecked() and metric_available)
+            if metric_available:
+                checkbox.setToolTip("")
+            else:
+                checkbox.setToolTip(
+                    "Requires complete TP/FN/FP/TN counts or complete entered "
+                    "effect estimates and confidence intervals for this metric."
+                )
+        self._refresh_ok_enabled()
+
+    def _entered_estimates_available_for_metric(self, metric):
+        return all(
+            self.model.included_studies_have_point_estimates(effect=effect)
+            for effect in DIAG_METRIC_NAMES_D[metric]
+        )
+
+    def _refresh_ok_enabled(self):
+        self.btn_ok.setEnabled(any(
+            self._metric_checkbox(metric).isEnabled() and
+            self._metric_checkbox(metric).isChecked()
+            for metric in self.SELECTABLE_METRICS
+        ))
+
+    def _metric_checkbox(self, metric):
+        return getattr(self, "chk_box_%s" % metric)
 
 

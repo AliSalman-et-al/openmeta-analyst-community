@@ -40,6 +40,10 @@ _Avoid_: Exact functionality, analysis functionality
 A diagnostic sensitivity, specificity, likelihood-ratio, or diagnostic-odds-ratio estimate entered directly with its confidence interval instead of being computed from TP/FN/FP/TN counts.
 _Avoid_: Pre-computed diagnostic data, manual diagnostic value
 
+**Count-Based Diagnostic Accuracy Method**:
+A diagnostic method that needs complete TP/FN/FP/TN counts for each included study because direct entered estimates do not carry the paired count information the model requires.
+_Avoid_: Direct-effect bivariate method, manual HSROC
+
 **Golden Analysis Test**:
 A regression test that compares modernized analysis behavior against outputs captured from the Reference Implementation using representative project data.
 _Avoid_: Snapshot test, golden master
