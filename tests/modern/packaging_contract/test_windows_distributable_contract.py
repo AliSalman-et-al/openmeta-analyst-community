@@ -157,6 +157,7 @@ def test_modern_fast_workflow_runs_smoke_before_fast_verification():
     assert workflow["restore_keys"] == []
     assert workflow["cache_paths"] == {"artifacts\\r-default-library-cache"}
     assert all(key.startswith("modern-default-r-library-v2-windows-") for key in workflow["cache_keys"])
+    assert all("scripts/verify_openmetar_r_default.py" in key for key in workflow["cache_keys"])
 
 
 def test_modern_package_workflow_builds_path_aware_artifacts():

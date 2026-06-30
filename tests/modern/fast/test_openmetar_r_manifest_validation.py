@@ -198,7 +198,11 @@ def test_default_r_dependency_install_uses_script_file_and_archive_triples(monke
     assert captured["cwd"] == REPO_ROOT
     assert captured["env"]["R_LIBS_USER"] == str(library)
     assert captured["command"][0] == Path("Rscript")
-    assert captured["command"][2:5] == [library, "https://cloud.r-project.org", "metafor,testthat"]
+    assert captured["command"][2:5] == [
+        library,
+        "https://cloud.r-project.org",
+        "MCMCpack,coda,metafor,testthat",
+    ]
     assert captured["command"][5:] == [
         "HSROC",
         "2.1.9",

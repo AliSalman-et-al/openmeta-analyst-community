@@ -14,6 +14,7 @@ from pathlib import Path
 
 
 OPENMETAR_PACKAGE = Path("src") / "R" / "OpenMetaR"
+DEFAULT_R_VERIFIER = Path("scripts") / "verify_openmetar_r_default.py"
 R_MANIFEST_VALIDATOR = Path("scripts") / "validate_openmetar_r_manifests.py"
 DEFAULT_CRAN_REPO = "https://cloud.r-project.org"
 
@@ -110,6 +111,7 @@ def r_version_key(root: Path, rscript: Path, env: dict[str, str]) -> str:
 def dependency_cache_key(root: Path, rscript: Path, env: dict[str, str], cran_repo: str) -> str:
     digest = hashlib.sha256()
     for relative_path in (
+        DEFAULT_R_VERIFIER,
         Path("docs") / "modernization" / "OpenMetaR-r-dependencies.json",
         OPENMETAR_PACKAGE / "DESCRIPTION",
     ):
@@ -150,6 +152,19 @@ def install_direct_dependencies(root: Path, rscript: Path, library: Path, cran_r
     archive_url_by_package = {
         "HSROC": "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz"
     }
+    archive_cran_dependencies = {
+        "HSROC": ["coda", "MCMCpack"],
+    }
+    cran_packages = sorted(
+        {
+            *cran_packages,
+            *(
+                dependency
+                for package in archive_packages
+                for dependency in archive_cran_dependencies.get(package, [])
+            ),
+        }
+    )
     r_code = """
 args <- commandArgs(trailingOnly = TRUE)
 lib <- normalizePath(args[[1]], winslash = "/", mustWork = FALSE)
