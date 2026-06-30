@@ -787,6 +787,32 @@ def test_results_window_separates_tall_text_sections():
         app.processEvents()
 
 
+def test_results_window_ignores_missing_image_order_entries():
+    import launch
+    import modern_compat
+
+    modern_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    window = results_window.ResultsWindow({
+        "texts": {"Summary": "HSROC summary"},
+        "images": {},
+        "image_var_names": {},
+        "image_params_paths": {},
+        "image_order": ["Summary ROC"],
+    })
+
+    try:
+        nav_titles = [window.nav_tree.topLevelItem(index).text(0) for index in range(window.nav_tree.topLevelItemCount())]
+
+        assert nav_titles == ["Summary"]
+        assert not any(isinstance(item, results_window.QGraphicsPixmapItem) for item in window.scene.items())
+    finally:
+        window.close()
+        app.processEvents()
+
+
 def test_real_metaform_save_as_round_trips_representative_projects(tmp_path, monkeypatch):
     import launch
 

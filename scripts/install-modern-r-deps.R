@@ -13,7 +13,7 @@ dir.create(lib, recursive = TRUE, showWarnings = FALSE)
 .libPaths(c(lib, .libPaths()))
 
 OpenMetaR_cran_packages <- c(
-  "metafor", "lme4", "roxygen2", "testthat"
+  "metafor", "lme4", "pdftools", "roxygen2", "testthat"
 )
 
 OpenMetaR_archive_packages <- list(

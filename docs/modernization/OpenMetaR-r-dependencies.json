@@ -84,6 +84,18 @@
       "installed_version": "2.1.9"
     },
     {
+      "name": "pdftools",
+      "source": "cran",
+      "scope": ["runtime"],
+      "declared_in": ["src/R/OpenMetaR/DESCRIPTION"],
+      "evidence": [
+        "src/R/OpenMetaR/R/diagnostic_methods.r: hsroc.rasterize.pdf converts stock HSROC PDF plots into PNG images for the Results window",
+        "scripts/install-modern-r-deps.R"
+      ],
+      "reason": "Stock archived HSROC writes PDF plots; OpenMetaR rasterizes them so the PyQt Results window can display HSROC plots as images.",
+      "installed_version": "3.9.0"
+    },
+    {
       "name": "lme4",
       "source": "cran",
       "scope": ["runtime"],

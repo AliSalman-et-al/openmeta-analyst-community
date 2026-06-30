@@ -21,6 +21,7 @@ Imports:
     lme4,
     methods,
     metafor,
+    pdftools,
     stats,
     utils
 Suggests:

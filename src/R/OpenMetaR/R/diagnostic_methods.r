@@ -923,6 +923,110 @@ run.hsroc.with.recovery <- function(diag.data.frame, params, chain.out.dir) {
     list("result"=retry.res, "path"=retry.out.dir)
 }
 
+hsroc.retained.iterations <- function(params) {
+    round((params$num.iters * params$num.chains - params$burn.in * params$num.chains) / params$thin, 0)
+}
+
+hsroc.rasterize.pdf <- function(pdf.path) {
+    if (!file.exists(pdf.path)) {
+        return(NULL)
+    }
+
+    png.path <- sub("[.]pdf$", ".png", pdf.path)
+    if (file.exists(png.path)) {
+        return(png.path)
+    }
+
+    if (!requireNamespace("pdftools", quietly=TRUE)) {
+        stop(paste("HSROC produced a PDF plot, but the pdftools R package is not installed to convert it for display:", pdf.path))
+    }
+
+    converted <- pdftools::pdf_convert(
+        pdf=pdf.path,
+        format="png",
+        pages=1,
+        filenames=png.path,
+        dpi=144,
+        verbose=FALSE
+    )
+    if (length(converted) > 0 && file.exists(converted[[1]])) {
+        return(converted[[1]])
+    }
+    if (!file.exists(png.path)) {
+        stop(paste("Could not convert HSROC PDF plot for display:", pdf.path))
+    }
+    png.path
+}
+
+hsroc.display.image.path <- function(image.path) {
+    if (is.null(image.path) || length(image.path) == 0 || is.na(image.path)) {
+        return(NULL)
+    }
+    image.path <- as.character(image.path[[1]])
+    extension <- ""
+    if (grepl("[.]", basename(image.path))) {
+        extension <- tolower(sub("^.*[.]", "", image.path))
+    }
+
+    if (extension %in% c("png", "jpg", "jpeg", "bmp", "gif", "tif", "tiff") && file.exists(image.path)) {
+        return(image.path)
+    }
+    if (extension == "pdf") {
+        return(hsroc.rasterize.pdf(image.path))
+    }
+    NULL
+}
+
+hsroc.path.in.out.dir <- function(out.dir, maybe.relative.path) {
+    path <- as.character(maybe.relative.path[[1]])
+    if (grepl("^([A-Za-z]:)?(/|\\\\)", path)) {
+        return(path)
+    }
+    file.path(out.dir, path)
+}
+
+hsroc.stock.pdf.plots <- function(out.dir, params) {
+    retained.iterations <- hsroc.retained.iterations(params)
+    list(
+        "Summary ROC"=file.path(out.dir, "Summary ROC curve.pdf"),
+        "Density plots"=file.path(out.dir, paste("Density plots for N =", retained.iterations, ".pdf")),
+        "Trace plots"=file.path(out.dir, paste("Trace plots for N =", retained.iterations, ".pdf"))
+    )
+}
+
+hsroc.display.images <- function(hsroc.sum, out.dir, params) {
+    images <- list()
+
+    if (!is.null(hsroc.sum$image.list) && length(hsroc.sum$image.list) > 0) {
+        for (img.name in names(hsroc.sum$image.list)) {
+            image.path <- hsroc.path.in.out.dir(out.dir, hsroc.sum$image.list[[img.name]])
+            display.path <- hsroc.display.image.path(image.path)
+            if (!is.null(display.path)) {
+                images[[img.name]] <- display.path
+            }
+        }
+        if (length(images) > 0) {
+            return(images)
+        }
+    }
+
+    stock.pdfs <- hsroc.stock.pdf.plots(out.dir, params)
+    for (img.name in names(stock.pdfs)) {
+        display.path <- hsroc.display.image.path(stock.pdfs[[img.name]])
+        if (!is.null(display.path)) {
+            images[[img.name]] <- display.path
+        }
+    }
+    images
+}
+
+hsroc.summary.path.argument <- function(out.dir) {
+    if ("summary.path" %in% names(formals(HSROCSummary))) {
+        return(list("summary.path"=out.dir))
+    }
+    list("path"=out.dir)
+}
+
 ##################################
 #       diagnostic hsroc         #
 ##################################
@@ -964,30 +1068,34 @@ diagnostic.hsroc <- function(diagnostic.data, params){
         chain.out.dirs <- c(chain.out.dirs, chain.res$path)
     }
 
-    hsroc.sum <- HSROCSummary(data=diag.data.frame , burn_in=params$burn.in, Thin=params$thin, print_plot=T ,
-             summary.path=out.dir, chain=chain.out.dirs )
+    summary.args <- c(list(data=diag.data.frame, burn_in=params$burn.in, Thin=params$thin, print_plot=T,
+                           chain=chain.out.dirs),
+                      hsroc.summary.path.argument(out.dir))
+    hsroc.sum <- do.call(HSROCSummary, summary.args)
 
     #### 
     # pull out the summary
-    summary <- c(hsroc.sum[1], hsroc.sum[2])
+    required.summary.names <- c("Between-study parameters", "Within-study parameters")
+    missing.summary.names <- required.summary.names[!required.summary.names %in% names(hsroc.sum)]
+    if (length(missing.summary.names) > 0) {
+        stop(paste("HSROC summary did not contain expected section(s):", paste(missing.summary.names, collapse=", ")))
+    }
+    summary.names <- intersect(c(required.summary.names, "Reference standard"), names(hsroc.sum))
+    summary <- hsroc.sum[summary.names]
 
     ####
     # and the images
-    images <- list()
-    image.list <- hsroc.sum$image.list
-
-    for (img.name in names(image.list)){
-        cur.img.name <- image.list[[img.name]]
-        image.list[[img.name]] <- paste(out.dir, cur.img.name, sep="/")
-    }
-
-    images <- image.list
+    images <- hsroc.display.images(hsroc.sum, out.dir, params)
 
     # we don't want the SROC plot to be mixed in with 
     # the density plots...
     roc.plot.name <- "Summary ROC"
     image.names <- names(images)
-    image.order <- append(roc.plot.name, image.names[image.names!=roc.plot.name])
+    image.order <- c()
+    if (roc.plot.name %in% image.names) {
+        image.order <- c(image.order, roc.plot.name)
+    }
+    image.order <- c(image.order, image.names[image.names!=roc.plot.name])
 	references <- "HSROC: C. M. Rutter and C. A. Gatsonis. A hierarchical regression approach to meta-analysis of diagnostic accuracy evaluations. Statistics in Medicine, 20(19):2865-2884, 2001."
     results <- list("images"=images,
 			        "image_order"=image.order,

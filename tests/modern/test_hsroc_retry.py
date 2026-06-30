@@ -12,14 +12,8 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 _HSROC_RETRY_DRIVER = textwrap.dedent(
     r"""
     repo <- normalizePath(__REPO_ROOT__, winslash = "/")
-    required <- c("OpenMetaR", "metafor", "HSROC")
-    missing <- required[!vapply(required, requireNamespace, logical(1), quietly=TRUE)]
-    if (length(missing) > 0) {
-      cat("SKIP missing R packages:", paste(missing, collapse=", "), "\n")
-      quit(status=42)
-    }
-
-    suppressPackageStartupMessages(library(OpenMetaR))
+    suppressPackageStartupMessages(source(file.path(repo, "src/R/OpenMetaR/R/classes.r")))
+    suppressPackageStartupMessages(source(file.path(repo, "src/R/OpenMetaR/R/utilities.r")))
     suppressPackageStartupMessages(source(file.path(repo, "src/R/OpenMetaR/R/diagnostic_methods.r")))
 
     work <- tempfile("hsroc_retry_")
@@ -47,12 +41,24 @@ _HSROC_RETRY_DRIVER = textwrap.dedent(
       result
     }
 
-    HSROCSummary <- function(..., chain) {
+    hsroc.rasterize.pdf <- function(pdf.path) {
+      png.path <- sub("[.]pdf$", ".png", pdf.path)
+      png(filename=png.path, width=120, height=120)
+      par(mar=c(0, 0, 0, 0))
+      plot.new()
+      dev.off()
+      png.path
+    }
+
+    HSROCSummary <- function(..., chain, summary.path) {
       summary.chains <<- chain
+      file.create(file.path(summary.path, "Summary ROC curve.pdf"))
+      file.create(file.path(summary.path, "Density plots for N = 9 .pdf"))
+      file.create(file.path(summary.path, "Trace plots for N = 9 .pdf"))
       list(
         `Between-study parameters` = matrix(1:4, nrow=2),
         `Within-study parameters` = array(1:8, dim=c(2, 2, 2)),
-        image.list = list("Summary ROC" = "roc.png")
+        "See summary directory for complete results"
       )
     }
 
@@ -87,6 +93,22 @@ _HSROC_RETRY_DRIVER = textwrap.dedent(
     }
     if (!identical(summary.chains, calls[[2]])) {
       stop("HSROCSummary did not use the successful retry directory")
+    }
+    expected.images <- c("Summary ROC", "Density plots", "Trace plots")
+    if (!identical(names(result$images), expected.images)) {
+      stop(paste("diagnostic.hsroc did not expose the expected HSROC plots:", paste(names(result$images), collapse=", ")))
+    }
+    if (!identical(result$image_order, expected.images)) {
+      stop(paste("diagnostic.hsroc image_order did not match available images:", paste(result$image_order, collapse=", ")))
+    }
+    if (any(grepl("[.]pdf$", unlist(result$images)))) {
+      stop(paste("diagnostic.hsroc should expose rasterized plot paths, got:", paste(unlist(result$images), collapse=", ")))
+    }
+    if (!all(file.exists(unlist(result$images)))) {
+      stop(paste("diagnostic.hsroc exposed missing plot paths:", paste(unlist(result$images), collapse=", ")))
+    }
+    if (!all(c("Between-study parameters", "Within-study parameters") %in% names(result$Summary))) {
+      stop("diagnostic.hsroc did not preserve the stock HSROC summary sections")
     }
 
     result <- try(run.case("fatal"), silent=TRUE)

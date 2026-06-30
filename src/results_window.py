@@ -135,7 +135,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         if self.image_order is not None:
             image_order = self.image_order
         
-        ungrouped_images = [(title, self.images[title]) for title in image_order]
+        ungrouped_images = [(title, self.images[title]) for title in image_order if title in self.images]
         ordered_images = ungrouped_images
         
         if self.image_order is None:
@@ -151,11 +151,13 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             print("title: %s; image: %s" % (title, image))
             cur_y = max(0, self.y_coord)
             print("cur_y: %s" % cur_y)
+            pixmap = self.generate_pixmap(image)
+            if pixmap.isNull():
+                print("Skipping image that Qt could not load: %s" % image)
+                continue
             # first add the title
             qt_item = self.add_title(title)
 
-            pixmap = self.generate_pixmap(image)
-            
             # if there is a parameters object associated with this object
             # (i.e., it is a forest plot of some variety), we pass it along
             # to the create_pixmap_item method to for the context_menu 

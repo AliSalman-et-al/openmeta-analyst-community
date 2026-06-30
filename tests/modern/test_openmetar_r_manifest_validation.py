@@ -221,6 +221,7 @@ def test_openmetar_description_declares_only_direct_package_dependencies():
         "lme4",
         "methods",
         "metafor",
+        "pdftools",
         "stats",
         "utils",
     }
