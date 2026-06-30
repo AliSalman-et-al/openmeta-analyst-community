@@ -756,11 +756,8 @@ calc.plot.range <- function(effects, plot.options) {
 }
 
 pretty.metric.name <- function(metric) {
-  # sub out the space in TX Mean
-  metric <- gsub(" ", ".", metric)
-
   # labels for plot axes
-  metric.name <- list(
+  metric.names <- list(
     OR = "Odds Ratio",
     RD = "Risk Difference",
     MD = "Mean Difference",
@@ -792,7 +789,13 @@ pretty.metric.name <- function(metric) {
     # tx mean is already pretty.
     TXMean = "TX Mean",
     # Generic Effect
-    GEN = "Generic Effect")[[metric]]
+    GEN = "Generic Effect")
+
+  metric.key <- gsub("[[:space:].]+", "", trimws(metric))
+  metric.name <- metric.names[[metric.key]]
+  if (is.null(metric.name) && metric %in% unlist(metric.names, use.names=FALSE)) {
+    metric.name <- metric
+  }
 
   metric.name
 }

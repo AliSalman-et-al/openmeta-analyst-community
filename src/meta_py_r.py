@@ -903,7 +903,8 @@ def ma_dataset_to_simple_diagnostic_robj(table_model, var_name="tmp_obj",
 
     study_names = ", ".join(["\"" + study.name + "\"" for study in studies])
     # issue #139 -- also grab the years
-    study_years = ", ".join(["as.integer(%s)" % study.year for study in studies])
+    none_to_str = lambda n: str(n) if n is not None else ""
+    study_years = ", ".join(["as.integer(%s)" % none_to_str(study.year) for study in studies])
 
     y_ests, y_SEs = table_model.get_cur_ests_and_SEs(only_if_included=True, effect=metric)
 
@@ -922,7 +923,7 @@ def ma_dataset_to_simple_diagnostic_robj(table_model, var_name="tmp_obj",
         
         # grab the raw data; the order is 
         # tp, fn, fp, tn
-        raw_data = table_model.get_cur_raw_data()
+        raw_data = table_model.get_cur_raw_data(only_these_studies=study_ids)
 
         ### assembling TP, FP, TN and FN strings ...
         tps_str = ", ".join(_to_strs(_get_col(raw_data, 0)))
@@ -947,8 +948,11 @@ def ma_dataset_to_simple_diagnostic_robj(table_model, var_name="tmp_obj",
                             % (var_name, y_ests_str, y_SEs_str, study_names, study_years, cov_str)
                             
     else:
-        print("there is neither sufficient raw data nor entered effects/CIs. I cannot run an analysis.")
-        # @TODO complain to the user here
+        raise ValueError(
+            "Diagnostic analysis requires either complete TP/FN/FP/TN counts "
+            "or complete entered effect estimates and confidence intervals "
+            "for %s." % metric
+        )
     
     # character (unicode) encodings for R
     r_str = _sanitize_for_R(r_str)

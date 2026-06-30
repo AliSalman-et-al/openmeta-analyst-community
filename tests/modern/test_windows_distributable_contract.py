@@ -123,12 +123,21 @@ def test_local_modern_workflow_uses_uv():
         "--ignore=tests\\modern\\test_metaform_automation_launch.py",
         "uv run python scripts\\verify_openmetar_r_stack.py",
         "OpenMetaR R Stack Slice verification failed.",
-        '"-PythonExe", $pythonExe',
-        "-SkipDependencyInstall",
-        "-SkipClean",
-        "-SkipSmoke",
+        "$buildArgs = @{",
+        "ArtifactName = $ArtifactName",
+        "PythonExe = $pythonExe",
+        "SkipDependencyInstall = $true",
+        "$buildArgs.SkipClean = $true",
+        "$buildArgs.SkipSmoke = $true",
+        "[switch]$SkipClean",
+        "[switch]$SkipSmoke",
+
     ]:
         assert expected in script
+
+    assert "$buildArgs = @(" not in script
+    assert '"-ArtifactName", $ArtifactName' not in script
+    assert '"-PythonExe", $pythonExe' not in script
 
 
 def test_modern_macos_distributable_contract_is_declared():
