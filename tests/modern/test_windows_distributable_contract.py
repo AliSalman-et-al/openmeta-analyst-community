@@ -119,12 +119,20 @@ def test_local_modern_workflow_uses_uv():
         "uv run pytest tests\\modern\\test_metaform_automation_launch.py",
         "uv run pytest tests\\modern",
         "--ignore=tests\\modern\\test_metaform_automation_launch.py",
-        '"-PythonExe", $pythonExe',
-        "-SkipDependencyInstall",
-        "-SkipClean",
-        "-SkipSmoke",
+        "$buildArgs = @{",
+        "ArtifactName = $ArtifactName",
+        "PythonExe = $pythonExe",
+        "SkipDependencyInstall = $true",
+        "$buildArgs.SkipClean = $true",
+        "$buildArgs.SkipSmoke = $true",
+        "[switch]$SkipClean",
+        "[switch]$SkipSmoke",
     ]:
         assert expected in script
+
+    assert "$buildArgs = @(" not in script
+    assert '"-ArtifactName", $ArtifactName' not in script
+    assert '"-PythonExe", $pythonExe' not in script
 
 
 def test_modern_macos_distributable_contract_is_declared():

@@ -36,13 +36,13 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Modern pytest tests failed." }
 
     Write-Step "Building modern Windows artifact with PyInstaller"
-    $buildArgs = @(
-        "-ArtifactName", $ArtifactName,
-        "-PythonExe", $pythonExe,
-        "-SkipDependencyInstall"
-    )
-    if ($SkipClean) { $buildArgs += "-SkipClean" }
-    if ($SkipSmoke) { $buildArgs += "-SkipSmoke" }
+    $buildArgs = @{
+        ArtifactName = $ArtifactName
+        PythonExe = $pythonExe
+        SkipDependencyInstall = $true
+    }
+    if ($SkipClean) { $buildArgs.SkipClean = $true }
+    if ($SkipSmoke) { $buildArgs.SkipSmoke = $true }
     & (Join-Path $repoRoot "scripts\build-modern-windows-binary.ps1") @buildArgs
     if ($LASTEXITCODE -ne 0) { throw "Modern Windows binary build failed." }
 
