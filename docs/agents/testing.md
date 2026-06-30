@@ -70,7 +70,7 @@ aborts the process with exit code `0xC0000409` and no traceback.
 Two mechanisms guard this class of bug; keep both working when touching table models or
 delegates:
 
-- `tests/modern/test_metaform_automation_launch.py::test_table_paint_roles_do_not_raise_across_all_cells`
+- `tests/modern/gui/test_metaform_automation_launch.py::test_table_paint_roles_do_not_raise_across_all_cells`
   sweeps every cell and header section against all paint roles in-process, turning a
   paint-time abort into a clean test failure. Extend it when a model gains new roles.
 - The packaged smoke test (`launch.start_automation_smoke` via `Invoke-PackagedAppSmokeTest`)

@@ -16,7 +16,7 @@
         "filesystem"
       ],
       "lane": "r_stack",
-      "nodeid": "tests/modern/test_bivariate_summary_format.py::test_bivariate_summary_is_preformatted_without_r_placeholder_headers",
+      "nodeid": "tests/modern/r_stack/test_bivariate_summary_format.py::test_bivariate_summary_is_preformatted_without_r_placeholder_headers",
       "reason": "Exercises R-level behavior that belongs outside default fast verification.",
       "runtime_class": "seconds",
       "size": "large"
@@ -30,7 +30,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_dataset_ordering.py::test_dataset_group_and_follow_up_order_is_stable_across_hash_seeds",
+      "nodeid": "tests/modern/fast/test_dataset_ordering.py::test_dataset_group_and_follow_up_order_is_stable_across_hash_seeds",
       "reason": "Fast modernization guard suitable for default feedback.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -44,7 +44,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_dataset_ordering.py::test_dataset_model_sort_studies_uses_python3_key_sort",
+      "nodeid": "tests/modern/fast/test_dataset_ordering.py::test_dataset_model_sort_studies_uses_python3_key_sort",
       "reason": "Fast modernization guard suitable for default feedback.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -60,7 +60,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_diagnostic_analysis_workflow.py::test_diagnostic_next_surfaces_backend_failure_instead_of_silent_dead_end",
+      "nodeid": "tests/modern/gui/test_diagnostic_analysis_workflow.py::test_diagnostic_next_surfaces_backend_failure_instead_of_silent_dead_end",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "medium"
@@ -76,7 +76,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_diagnostic_analysis_workflow.py::test_diagnostic_method_dialog_builds_with_working_backend",
+      "nodeid": "tests/modern/gui/test_diagnostic_analysis_workflow.py::test_diagnostic_method_dialog_builds_with_working_backend",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "medium"
@@ -92,7 +92,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_diagnostic_analysis_workflow.py::test_diagnostic_backend_failure_does_not_open_empty_results",
+      "nodeid": "tests/modern/gui/test_diagnostic_analysis_workflow.py::test_diagnostic_backend_failure_does_not_open_empty_results",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "medium"
@@ -108,7 +108,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_diagnostic_analysis_workflow.py::test_diagnostic_direct_effects_build_analysis_data_per_metric",
+      "nodeid": "tests/modern/gui/test_diagnostic_analysis_workflow.py::test_diagnostic_direct_effects_build_analysis_data_per_metric",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "medium"
@@ -124,7 +124,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_diagnostic_analysis_workflow.py::test_diagnostic_metric_dialog_defaults_to_supported_direct_effects",
+      "nodeid": "tests/modern/gui/test_diagnostic_analysis_workflow.py::test_diagnostic_metric_dialog_defaults_to_supported_direct_effects",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "medium"
@@ -140,7 +140,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_diagnostic_analysis_workflow.py::test_diagnostic_direct_effects_do_not_offer_count_based_methods",
+      "nodeid": "tests/modern/gui/test_diagnostic_analysis_workflow.py::test_diagnostic_direct_effects_do_not_offer_count_based_methods",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "medium"
@@ -157,7 +157,7 @@
         "filesystem"
       ],
       "lane": "r_stack",
-      "nodeid": "tests/modern/test_diagnostic_method_feasibility.py::test_count_based_diagnostic_methods_require_counts",
+      "nodeid": "tests/modern/r_stack/test_diagnostic_method_feasibility.py::test_count_based_diagnostic_methods_require_counts",
       "reason": "Exercises R-level behavior that belongs outside default fast verification.",
       "runtime_class": "seconds",
       "size": "large"
@@ -171,7 +171,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_full_app_import_path.py::test_full_app_import_path_has_no_python2_syntax",
+      "nodeid": "tests/modern/fast/test_full_app_import_path.py::test_full_app_import_path_has_no_python2_syntax",
       "reason": "Fast modernization guard suitable for default feedback.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -187,7 +187,7 @@
         "subprocess"
       ],
       "lane": "golden",
-      "nodeid": "tests/modern/test_golden_baseline_manifest_validation.py::test_manifest_completeness_mode_reports_no_pending_trace_entries",
+      "nodeid": "tests/modern/golden/test_golden_baseline_manifest_validation.py::test_manifest_completeness_mode_reports_no_pending_trace_entries",
       "reason": "Protects golden baseline comparison and manifest tooling.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -203,7 +203,7 @@
         "subprocess"
       ],
       "lane": "golden",
-      "nodeid": "tests/modern/test_golden_baseline_manifest_validation.py::test_strict_no_pending_mode_accepts_current_traceability",
+      "nodeid": "tests/modern/golden/test_golden_baseline_manifest_validation.py::test_strict_no_pending_mode_accepts_current_traceability",
       "reason": "Protects golden baseline comparison and manifest tooling.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -219,7 +219,7 @@
         "subprocess"
       ],
       "lane": "golden",
-      "nodeid": "tests/modern/test_golden_baseline_manifest_validation.py::test_non_pending_trace_must_point_to_known_target",
+      "nodeid": "tests/modern/golden/test_golden_baseline_manifest_validation.py::test_non_pending_trace_must_point_to_known_target",
       "reason": "Protects golden baseline comparison and manifest tooling.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -235,7 +235,7 @@
         "subprocess"
       ],
       "lane": "golden",
-      "nodeid": "tests/modern/test_golden_baseline_manifest_validation.py::test_baseline_manifest_requires_capture_metadata_contract",
+      "nodeid": "tests/modern/golden/test_golden_baseline_manifest_validation.py::test_baseline_manifest_requires_capture_metadata_contract",
       "reason": "Protects golden baseline comparison and manifest tooling.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -251,7 +251,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_gui_binary_slice.py::test_real_metaform_opens_binary_continuous_and_diagnostic_projects",
+      "nodeid": "tests/modern/gui/test_gui_binary_slice.py::test_real_metaform_opens_binary_continuous_and_diagnostic_projects",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -266,7 +266,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_gui_binary_slice.py::test_real_metaform_standard_binary_action_opens_specs_dialog",
+      "nodeid": "tests/modern/gui/test_gui_binary_slice.py::test_real_metaform_standard_binary_action_opens_specs_dialog",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -281,7 +281,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_gui_binary_slice.py::test_real_metaform_preserves_standard_binary_rows",
+      "nodeid": "tests/modern/gui/test_gui_binary_slice.py::test_real_metaform_preserves_standard_binary_rows",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -296,7 +296,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_gui_binary_slice.py::test_representative_projects_round_trip_without_byte_identical_expectations",
+      "nodeid": "tests/modern/gui/test_gui_binary_slice.py::test_representative_projects_round_trip_without_byte_identical_expectations",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -313,7 +313,7 @@
         "filesystem"
       ],
       "lane": "r_stack",
-      "nodeid": "tests/modern/test_hsroc_retry.py::test_hsroc_retries_failed_chain_once_in_clean_directory",
+      "nodeid": "tests/modern/r_stack/test_hsroc_retry.py::test_hsroc_retries_failed_chain_once_in_clean_directory",
       "reason": "Exercises R-level behavior that belongs outside default fast verification.",
       "runtime_class": "minutes",
       "size": "large"
@@ -330,7 +330,7 @@
         "filesystem"
       ],
       "lane": "r_stack",
-      "nodeid": "tests/modern/test_hsroc_retry.py::test_hsroc_summary_namespace_imports_as_mcmc",
+      "nodeid": "tests/modern/r_stack/test_hsroc_retry.py::test_hsroc_summary_namespace_imports_as_mcmc",
       "reason": "Exercises R-level behavior that belongs outside default fast verification.",
       "runtime_class": "minutes",
       "size": "large"
@@ -348,7 +348,7 @@
         "filesystem"
       ],
       "lane": "r_stack",
-      "nodeid": "tests/modern/test_inprocess_rpy2_backend.py::test_inprocess_rpy2_backend_python3_porting_fixes",
+      "nodeid": "tests/modern/r_stack/test_inprocess_rpy2_backend.py::test_inprocess_rpy2_backend_python3_porting_fixes",
       "reason": "Exercises real in-process R/rpy2 bridge behavior and full R Stack evidence.",
       "runtime_class": "minutes",
       "size": "large"
@@ -366,7 +366,7 @@
         "filesystem"
       ],
       "lane": "r_stack",
-      "nodeid": "tests/modern/test_inprocess_rpy2_backend.py::test_openmetar_summary_capture_uses_formatted_print_methods",
+      "nodeid": "tests/modern/r_stack/test_inprocess_rpy2_backend.py::test_openmetar_summary_capture_uses_formatted_print_methods",
       "reason": "Exercises real in-process R/rpy2 bridge behavior and full R Stack evidence.",
       "runtime_class": "minutes",
       "size": "large"
@@ -384,7 +384,7 @@
         "filesystem"
       ],
       "lane": "r_stack",
-      "nodeid": "tests/modern/test_inprocess_rpy2_backend.py::test_hsroc_direct_table_summaries_expand_to_formatted_sections",
+      "nodeid": "tests/modern/r_stack/test_inprocess_rpy2_backend.py::test_hsroc_direct_table_summaries_expand_to_formatted_sections",
       "reason": "Exercises real in-process R/rpy2 bridge behavior and full R Stack evidence.",
       "runtime_class": "minutes",
       "size": "large"
@@ -402,7 +402,7 @@
         "filesystem"
       ],
       "lane": "r_stack",
-      "nodeid": "tests/modern/test_inprocess_rpy2_backend.py::test_openmetar_advanced_bootstrap_and_permutation_paths_execute",
+      "nodeid": "tests/modern/r_stack/test_inprocess_rpy2_backend.py::test_openmetar_advanced_bootstrap_and_permutation_paths_execute",
       "reason": "Exercises real in-process R/rpy2 bridge behavior and full R Stack evidence.",
       "runtime_class": "minutes",
       "size": "large"
@@ -417,7 +417,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_full_app_imports_representative_csv_into_dataset",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_full_app_imports_representative_csv_into_dataset",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -432,7 +432,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_automation_launch_creates_and_closes_real_metaform_shell",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_automation_launch_creates_and_closes_real_metaform_shell",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -447,7 +447,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_automation_launch_shows_default_confidence_level_at_startup",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_automation_launch_shows_default_confidence_level_at_startup",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -462,7 +462,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_automation_launch_opens_sample_project_in_real_data_table",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_automation_launch_opens_sample_project_in_real_data_table",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -477,7 +477,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_frozen_startup_argv_falls_back_to_native_windows_command_line",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_frozen_startup_argv_falls_back_to_native_windows_command_line",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -492,7 +492,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_frozen_startup_argv_keeps_existing_project_argument",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_frozen_startup_argv_keeps_existing_project_argument",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -507,7 +507,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_startup_smoke_opens_positional_project_without_wizard",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_startup_smoke_opens_positional_project_without_wizard",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -522,7 +522,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_meantime_sample_project_loads_legacy_qstring_factor_covariate",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_meantime_sample_project_loads_legacy_qstring_factor_covariate",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -538,7 +538,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_automation_launch_opens_meantime_project_and_enables_subgroup_analysis",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_automation_launch_opens_meantime_project_and_enables_subgroup_analysis",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -553,7 +553,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_opened_sample_projects_return_native_table_values_for_pyqt5_rendering",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_opened_sample_projects_return_native_table_values_for_pyqt5_rendering",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -568,7 +568,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_edit_list_models_return_native_values_and_accept_native_edits",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_edit_list_models_return_native_values_and_accept_native_edits",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -583,7 +583,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_change_covariate_type_model_returns_native_values_and_accepts_native_edits",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_change_covariate_type_model_returns_native_values_and_accepts_native_edits",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -598,7 +598,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_factor_covariate_edits_render_as_native_paint_text",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_factor_covariate_edits_render_as_native_paint_text",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -614,7 +614,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_sequential_analysis_actions_open_real_specs_dialog",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_sequential_analysis_actions_open_real_specs_dialog",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -630,7 +630,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_standard_meta_analysis_opens_specs_and_runs_through_backend",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_standard_meta_analysis_opens_specs_and_runs_through_backend",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -645,53 +645,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_method_parameters_dialog_displays_enum_defaults",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "minutes",
-      "size": "large"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "analysis_behavior"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_required_advanced_analysis_actions_open_real_gui_dialogs",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "minutes",
-      "size": "large"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "minutes",
-      "size": "large"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_subgroup_covariate_dialog_constructs_with_factor_covariate",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_method_parameters_dialog_displays_enum_defaults",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -707,7 +661,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_sequential_analysis_results_use_results_window",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_required_advanced_analysis_actions_open_real_gui_dialogs",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -722,7 +676,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_results_window_renders_summary_text_and_plot_navigation",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -737,202 +691,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_results_window_separates_tall_text_sections",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "minutes",
-      "size": "large"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_results_window_ignores_missing_image_order_entries",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "minutes",
-      "size": "large"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_real_metaform_save_as_round_trips_representative_projects",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "minutes",
-      "size": "large"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_recent_files_persist_through_pyqt5_settings",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "minutes",
-      "size": "large"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_welcome_wizard_recent_action_selects_project",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "minutes",
-      "size": "large"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_welcome_wizard_open_existing_selects_project",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "minutes",
-      "size": "large"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_data_type_page_multiline_buttons_fit_icon_and_caption",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "minutes",
-      "size": "large"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_data_type_page_records_every_supported_selection[onearm_proportion_Button-expected0]",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "minutes",
-      "size": "large"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_data_type_page_records_every_supported_selection[onearm_mean_Button-expected1]",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "minutes",
-      "size": "large"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_data_type_page_records_every_supported_selection[onearm_single_reg_coef_Button-expected2]",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "minutes",
-      "size": "large"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_data_type_page_records_every_supported_selection[onearm_generic_effect_size_Button-expected3]",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "minutes",
-      "size": "large"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_data_type_page_records_every_supported_selection[twoarm_proportions_Button-expected4]",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "minutes",
-      "size": "large"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_data_type_page_records_every_supported_selection[twoarm_means_Button-expected5]",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "minutes",
-      "size": "large"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_data_type_page_records_every_supported_selection[twoarm_smds_Button-expected6]",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_subgroup_covariate_dialog_constructs_with_factor_covariate",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -948,7 +707,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_data_type_page_records_every_supported_selection[diagnostic_Button-expected7]",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_sequential_analysis_results_use_results_window",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -963,7 +722,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_new_project_data_type_selection_populates_metric_defaults_and_results",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_results_window_renders_summary_text_and_plot_navigation",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -978,7 +737,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_open_existing_dialog_starts_in_sample_data_even_when_cwd_is_app_data",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_results_window_separates_tall_text_sections",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -993,7 +752,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_welcome_wizard_open_existing_dialog_starts_in_sample_data_when_no_recent_project",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_results_window_ignores_missing_image_order_entries",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -1008,7 +767,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_help_action_opens_bundled_help",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_real_metaform_save_as_round_trips_representative_projects",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -1023,7 +782,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_load_r_libraries_runs_against_stub_bridge",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_recent_files_persist_through_pyqt5_settings",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -1038,7 +797,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_stub_backend_exposes_data_entry_imputation_methods",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_welcome_wizard_recent_action_selects_project",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -1053,7 +812,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_data_entry_dialogs_construct_with_stub_backend",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_welcome_wizard_open_existing_selects_project",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -1068,7 +827,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_csv_import_wizard_accepts_representative_csv",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_data_type_page_multiline_buttons_fit_icon_and_caption",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -1083,7 +842,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_csv_import_file_selection_enables_finish_button",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_data_type_page_records_every_supported_selection[onearm_proportion_Button-expected0]",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -1098,7 +857,82 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_automation_launch.py::test_table_paint_roles_do_not_raise_across_all_cells",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_data_type_page_records_every_supported_selection[onearm_mean_Button-expected1]",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_data_type_page_records_every_supported_selection[onearm_single_reg_coef_Button-expected2]",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_data_type_page_records_every_supported_selection[onearm_generic_effect_size_Button-expected3]",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_data_type_page_records_every_supported_selection[twoarm_proportions_Button-expected4]",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_data_type_page_records_every_supported_selection[twoarm_means_Button-expected5]",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_data_type_page_records_every_supported_selection[twoarm_smds_Button-expected6]",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -1114,7 +948,173 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_data_workflows.py::test_real_metaform_creates_binary_continuous_and_diagnostic_datasets",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_data_type_page_records_every_supported_selection[diagnostic_Button-expected7]",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_new_project_data_type_selection_populates_metric_defaults_and_results",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_open_existing_dialog_starts_in_sample_data_even_when_cwd_is_app_data",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_welcome_wizard_open_existing_dialog_starts_in_sample_data_when_no_recent_project",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_help_action_opens_bundled_help",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_load_r_libraries_runs_against_stub_bridge",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_stub_backend_exposes_data_entry_imputation_methods",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_data_entry_dialogs_construct_with_stub_backend",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_csv_import_wizard_accepts_representative_csv",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_csv_import_file_selection_enables_finish_button",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_table_paint_roles_do_not_raise_across_all_cells",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_data_workflows.py::test_real_metaform_creates_binary_continuous_and_diagnostic_datasets",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "medium"
@@ -1129,7 +1129,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_data_workflows.py::test_dataset_model_rejects_missing_or_unknown_outcome_data_type",
+      "nodeid": "tests/modern/gui/test_metaform_data_workflows.py::test_dataset_model_rejects_missing_or_unknown_outcome_data_type",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "medium"
@@ -1144,7 +1144,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_data_workflows.py::test_data_table_editing_preserves_project_state_and_round_trips",
+      "nodeid": "tests/modern/gui/test_metaform_data_workflows.py::test_data_table_editing_preserves_project_state_and_round_trips",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "medium"
@@ -1159,7 +1159,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_data_workflows.py::test_copy_paste_undo_and_redo_work_through_real_table_path",
+      "nodeid": "tests/modern/gui/test_metaform_data_workflows.py::test_copy_paste_undo_and_redo_work_through_real_table_path",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "medium"
@@ -1174,7 +1174,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_data_workflows.py::test_metaform_dialog_text_slots_accept_pyqt5_line_edit_strings",
+      "nodeid": "tests/modern/gui/test_metaform_data_workflows.py::test_metaform_dialog_text_slots_accept_pyqt5_line_edit_strings",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "medium"
@@ -1189,7 +1189,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_metaform_data_workflows.py::test_metric_selection_and_confidence_level_are_preserved_in_model_state",
+      "nodeid": "tests/modern/gui/test_metaform_data_workflows.py::test_metric_selection_and_confidence_level_are_preserved_in_model_state",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "medium"
@@ -1203,7 +1203,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_modern_compat.py::test_modern_compat_installs_stub_backend",
+      "nodeid": "tests/modern/fast/test_modern_compat.py::test_modern_compat_installs_stub_backend",
       "reason": "Fast modernization guard suitable for default feedback.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1218,7 +1218,7 @@
         "filesystem"
       ],
       "lane": "golden",
-      "nodeid": "tests/modern/test_modern_golden_compare.py::test_modern_comparison_classifies_compatible_capture_as_pass",
+      "nodeid": "tests/modern/golden/test_modern_golden_compare.py::test_modern_comparison_classifies_compatible_capture_as_pass",
       "reason": "Protects golden baseline comparison and manifest tooling.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -1233,7 +1233,7 @@
         "filesystem"
       ],
       "lane": "golden",
-      "nodeid": "tests/modern/test_modern_golden_compare.py::test_modern_comparison_classifies_numeric_drift_with_row_context",
+      "nodeid": "tests/modern/golden/test_modern_golden_compare.py::test_modern_comparison_classifies_numeric_drift_with_row_context",
       "reason": "Protects golden baseline comparison and manifest tooling.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -1248,7 +1248,7 @@
         "filesystem"
       ],
       "lane": "golden",
-      "nodeid": "tests/modern/test_modern_golden_compare.py::test_modern_comparison_classifies_non_numeric_result_drift",
+      "nodeid": "tests/modern/golden/test_modern_golden_compare.py::test_modern_comparison_classifies_non_numeric_result_drift",
       "reason": "Protects golden baseline comparison and manifest tooling.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -1263,7 +1263,7 @@
         "filesystem"
       ],
       "lane": "golden",
-      "nodeid": "tests/modern/test_modern_golden_compare.py::test_modern_comparison_classifies_missing_output_unsupported_and_capture_error",
+      "nodeid": "tests/modern/golden/test_modern_golden_compare.py::test_modern_comparison_classifies_missing_output_unsupported_and_capture_error",
       "reason": "Protects golden baseline comparison and manifest tooling.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -1278,7 +1278,7 @@
         "filesystem"
       ],
       "lane": "golden",
-      "nodeid": "tests/modern/test_modern_golden_compare.py::test_modern_comparison_consumes_committed_manifest_ids",
+      "nodeid": "tests/modern/golden/test_modern_golden_compare.py::test_modern_comparison_consumes_committed_manifest_ids",
       "reason": "Protects golden baseline comparison and manifest tooling.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -1293,7 +1293,7 @@
         "filesystem"
       ],
       "lane": "golden",
-      "nodeid": "tests/modern/test_modern_golden_compare.py::test_modern_comparison_marks_only_matching_exception_as_accepted",
+      "nodeid": "tests/modern/golden/test_modern_golden_compare.py::test_modern_comparison_marks_only_matching_exception_as_accepted",
       "reason": "Protects golden baseline comparison and manifest tooling.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -1308,7 +1308,7 @@
         "filesystem"
       ],
       "lane": "golden",
-      "nodeid": "tests/modern/test_modern_golden_compare.py::test_modern_comparison_cli_writes_report",
+      "nodeid": "tests/modern/golden/test_modern_golden_compare.py::test_modern_comparison_cli_writes_report",
       "reason": "Protects golden baseline comparison and manifest tooling.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -1323,7 +1323,7 @@
         "filesystem"
       ],
       "lane": "golden",
-      "nodeid": "tests/modern/test_modern_golden_compare.py::test_curated_golden_set_includes_sequential_binary_and_continuous_workflows",
+      "nodeid": "tests/modern/golden/test_modern_golden_compare.py::test_curated_golden_set_includes_sequential_binary_and_continuous_workflows",
       "reason": "Protects golden baseline comparison and manifest tooling.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -1338,7 +1338,7 @@
         "filesystem"
       ],
       "lane": "golden",
-      "nodeid": "tests/modern/test_modern_golden_compare.py::test_golden_summary_parser_reads_current_openmetar_summary_display",
+      "nodeid": "tests/modern/golden/test_modern_golden_compare.py::test_golden_summary_parser_reads_current_openmetar_summary_display",
       "reason": "Protects golden baseline comparison and manifest tooling.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -1353,7 +1353,7 @@
         "filesystem"
       ],
       "lane": "golden",
-      "nodeid": "tests/modern/test_modern_golden_compare.py::test_compare_bundle_requires_expected_plot_artifacts",
+      "nodeid": "tests/modern/golden/test_modern_golden_compare.py::test_compare_bundle_requires_expected_plot_artifacts",
       "reason": "Protects golden baseline comparison and manifest tooling.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -1368,7 +1368,7 @@
         "filesystem"
       ],
       "lane": "golden",
-      "nodeid": "tests/modern/test_modern_golden_compare.py::test_headless_analysis_dispatches_sequential_binary_and_continuous_workflows",
+      "nodeid": "tests/modern/golden/test_modern_golden_compare.py::test_headless_analysis_dispatches_sequential_binary_and_continuous_workflows",
       "reason": "Protects golden baseline comparison and manifest tooling.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -1383,7 +1383,7 @@
         "filesystem"
       ],
       "lane": "golden",
-      "nodeid": "tests/modern/test_modern_golden_compare.py::test_headless_analysis_dispatches_meta_regression_with_selected_covariates",
+      "nodeid": "tests/modern/golden/test_modern_golden_compare.py::test_headless_analysis_dispatches_meta_regression_with_selected_covariates",
       "reason": "Protects golden baseline comparison and manifest tooling.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -1398,7 +1398,7 @@
         "filesystem"
       ],
       "lane": "golden",
-      "nodeid": "tests/modern/test_modern_golden_compare.py::test_comprehensive_golden_baseline_capture_writes_reproducible_bundle",
+      "nodeid": "tests/modern/golden/test_modern_golden_compare.py::test_comprehensive_golden_baseline_capture_writes_reproducible_bundle",
       "reason": "Protects golden baseline comparison and manifest tooling.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -1413,7 +1413,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_openmetar_r_manifest_validation.py::test_openmetar_r_manifests_validate",
+      "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_openmetar_r_manifests_validate",
       "reason": "Validates R dependency and drift manifest contracts without installing broad R packages.",
       "runtime_class": "seconds",
       "size": "small"
@@ -1428,7 +1428,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_openmetar_r_manifest_validation.py::test_direct_and_app_bundle_dependencies_must_stay_separate",
+      "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_direct_and_app_bundle_dependencies_must_stay_separate",
       "reason": "Validates R dependency and drift manifest contracts without installing broad R packages.",
       "runtime_class": "seconds",
       "size": "small"
@@ -1443,7 +1443,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_openmetar_r_manifest_validation.py::test_drift_manifest_preserves_review_record_schema",
+      "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_drift_manifest_preserves_review_record_schema",
       "reason": "Validates R dependency and drift manifest contracts without installing broad R packages.",
       "runtime_class": "seconds",
       "size": "small"
@@ -1458,7 +1458,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_openmetar_r_manifest_validation.py::test_manifest_records_empty_direct_build_dependency_scope",
+      "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_manifest_records_empty_direct_build_dependency_scope",
       "reason": "Validates R dependency and drift manifest contracts without installing broad R packages.",
       "runtime_class": "seconds",
       "size": "small"
@@ -1473,7 +1473,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_openmetar_r_manifest_validation.py::test_cran_archive_dependencies_must_pin_exact_versions",
+      "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_cran_archive_dependencies_must_pin_exact_versions",
       "reason": "Validates R dependency and drift manifest contracts without installing broad R packages.",
       "runtime_class": "seconds",
       "size": "small"
@@ -1488,7 +1488,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_openmetar_r_manifest_validation.py::test_installed_version_report_parses_rscript_output",
+      "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_installed_version_report_parses_rscript_output",
       "reason": "Validates R dependency and drift manifest contracts without installing broad R packages.",
       "runtime_class": "seconds",
       "size": "small"
@@ -1503,7 +1503,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_openmetar_r_manifest_validation.py::test_report_installed_versions_surfaces_rscript_failure",
+      "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_report_installed_versions_surfaces_rscript_failure",
       "reason": "Validates R dependency and drift manifest contracts without installing broad R packages.",
       "runtime_class": "seconds",
       "size": "small"
@@ -1518,7 +1518,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_openmetar_r_manifest_validation.py::test_openmetar_description_declares_only_direct_package_dependencies",
+      "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_openmetar_description_declares_only_direct_package_dependencies",
       "reason": "Validates R dependency and drift manifest contracts without installing broad R packages.",
       "runtime_class": "seconds",
       "size": "small"
@@ -1533,7 +1533,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_openmetar_r_manifest_validation.py::test_openmetar_source_uses_namespace_imports_instead_of_attach_calls",
+      "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_openmetar_source_uses_namespace_imports_instead_of_attach_calls",
       "reason": "Validates R dependency and drift manifest contracts without installing broad R packages.",
       "runtime_class": "seconds",
       "size": "small"
@@ -1548,7 +1548,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_openmetar_r_manifest_validation.py::test_openmetar_namespace_preserves_legacy_export_surface_explicitly",
+      "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_openmetar_namespace_preserves_legacy_export_surface_explicitly",
       "reason": "Validates R dependency and drift manifest contracts without installing broad R packages.",
       "runtime_class": "seconds",
       "size": "small"
@@ -1563,7 +1563,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_openmetar_r_manifest_validation.py::test_openmetar_namespace_preserves_s4_classes_explicitly",
+      "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_openmetar_namespace_preserves_s4_classes_explicitly",
       "reason": "Validates R dependency and drift manifest contracts without installing broad R packages.",
       "runtime_class": "seconds",
       "size": "small"
@@ -1577,7 +1577,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_project_pickle_loader.py::test_loader_converts_sip_qt4_qstring_to_python3_str",
+      "nodeid": "tests/modern/fast/test_project_pickle_loader.py::test_loader_converts_sip_qt4_qstring_to_python3_str",
       "reason": "Fast modernization guard suitable for default feedback.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1591,7 +1591,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_project_pickle_loader.py::test_loader_converts_direct_qt4_qstring_constructor_to_python3_str",
+      "nodeid": "tests/modern/fast/test_project_pickle_loader.py::test_loader_converts_direct_qt4_qstring_constructor_to_python3_str",
       "reason": "Fast modernization guard suitable for default feedback.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1605,7 +1605,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_project_pickle_loader.py::test_loader_converts_qt4_qstring_list_and_qvariant_to_native_values",
+      "nodeid": "tests/modern/fast/test_project_pickle_loader.py::test_loader_converts_qt4_qstring_list_and_qvariant_to_native_values",
       "reason": "Fast modernization guard suitable for default feedback.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1619,7 +1619,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_project_pickle_loader.py::test_loader_maps_qt4_qbytearray_to_pyqt5_qbytearray",
+      "nodeid": "tests/modern/fast/test_project_pickle_loader.py::test_loader_maps_qt4_qbytearray_to_pyqt5_qbytearray",
       "reason": "Fast modernization guard suitable for default feedback.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1633,7 +1633,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_project_pickle_loader.py::test_loader_maps_other_qt4_qtcore_types_to_pyqt5_classes",
+      "nodeid": "tests/modern/fast/test_project_pickle_loader.py::test_loader_maps_other_qt4_qtcore_types_to_pyqt5_classes",
       "reason": "Fast modernization guard suitable for default feedback.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1647,7 +1647,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_project_pickle_loader.py::test_loader_opens_representative_qt4_project_without_pyqt4_module",
+      "nodeid": "tests/modern/fast/test_project_pickle_loader.py::test_loader_opens_representative_qt4_project_without_pyqt4_module",
       "reason": "Fast modernization guard suitable for default feedback.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1661,7 +1661,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_pyqt5_ci_path.py::test_modern_ci_uses_pyqt5",
+      "nodeid": "tests/modern/fast/test_pyqt5_ci_path.py::test_modern_ci_uses_pyqt5",
       "reason": "Fast modernization guard suitable for default feedback.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1675,7 +1675,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_pyqt5_ci_path.py::test_modern_ci_uses_same_qt5_runtime_version_everywhere",
+      "nodeid": "tests/modern/fast/test_pyqt5_ci_path.py::test_modern_ci_uses_same_qt5_runtime_version_everywhere",
       "reason": "Fast modernization guard suitable for default feedback.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1689,7 +1689,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_pyqt5_generated_ui_imports.py::test_representative_generated_ui_modules_import_with_pyqt5",
+      "nodeid": "tests/modern/fast/test_pyqt5_generated_ui_imports.py::test_representative_generated_ui_modules_import_with_pyqt5",
       "reason": "Fast modernization guard suitable for default feedback.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1706,7 +1706,7 @@
         "filesystem"
       ],
       "lane": "r_stack",
-      "nodeid": "tests/modern/test_r_metric_labels.py::test_pretty_metric_name_handles_tx_mean_separator_variants",
+      "nodeid": "tests/modern/r_stack/test_r_metric_labels.py::test_pretty_metric_name_handles_tx_mean_separator_variants",
       "reason": "Exercises R-level behavior that belongs outside default fast verification.",
       "runtime_class": "seconds",
       "size": "large"
@@ -1720,7 +1720,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_two_way_dict_python3.py::test_two_way_dict_uses_python3_dict_views_and_reverse_lookup",
+      "nodeid": "tests/modern/fast/test_two_way_dict_python3.py::test_two_way_dict_uses_python3_dict_views_and_reverse_lookup",
       "reason": "Fast modernization guard suitable for default feedback.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1734,7 +1734,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/test_two_way_dict_python3.py::test_two_way_dict_replaces_existing_reverse_mapping_under_python3",
+      "nodeid": "tests/modern/fast/test_two_way_dict_python3.py::test_two_way_dict_replaces_existing_reverse_mapping_under_python3",
       "reason": "Fast modernization guard suitable for default feedback.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1749,7 +1749,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_user_facing_text_regressions.py::test_issue_94_current_outcome_and_follow_up_labels_can_expand",
+      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_issue_94_current_outcome_and_follow_up_labels_can_expand",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -1764,7 +1764,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_user_facing_text_regressions.py::test_issue_76_to_105_reported_bad_user_facing_strings_are_absent",
+      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_issue_76_to_105_reported_bad_user_facing_strings_are_absent",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -1779,13 +1779,13 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/test_user_facing_text_regressions.py::test_issue_76_to_105_corrected_user_facing_strings_are_present",
+      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_issue_76_to_105_corrected_user_facing_strings_are_present",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "seconds",
       "size": "medium"
     },
     {
-      "decision": "move",
+      "decision": "keep",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1794,13 +1794,13 @@
         "filesystem"
       ],
       "lane": "packaging_contract",
-      "nodeid": "tests/modern/test_windows_distributable_contract.py::test_modern_windows_distributable_contract_is_declared",
-      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
+      "nodeid": "tests/modern/packaging_contract/test_windows_distributable_contract.py::test_modern_windows_distributable_contract_is_declared",
+      "reason": "Structured packaging contract coverage is lane-owned under tests/modern/packaging_contract.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "move",
+      "decision": "keep",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1809,13 +1809,13 @@
         "filesystem"
       ],
       "lane": "packaging_contract",
-      "nodeid": "tests/modern/test_windows_distributable_contract.py::test_modern_windows_r_cache_reinstalls_local_packages_after_cache_restore",
-      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
+      "nodeid": "tests/modern/packaging_contract/test_windows_distributable_contract.py::test_modern_windows_r_cache_reinstalls_local_packages_after_cache_restore",
+      "reason": "Structured packaging contract coverage is lane-owned under tests/modern/packaging_contract.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "move",
+      "decision": "keep",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1824,13 +1824,13 @@
         "filesystem"
       ],
       "lane": "packaging_contract",
-      "nodeid": "tests/modern/test_windows_distributable_contract.py::test_packaged_smoke_launches_with_positional_project_argument",
-      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
+      "nodeid": "tests/modern/packaging_contract/test_windows_distributable_contract.py::test_packaged_smoke_launches_with_positional_project_argument",
+      "reason": "Structured packaging contract coverage is lane-owned under tests/modern/packaging_contract.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "move",
+      "decision": "keep",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1839,13 +1839,13 @@
         "filesystem"
       ],
       "lane": "packaging_contract",
-      "nodeid": "tests/modern/test_windows_distributable_contract.py::test_modern_fast_workflow_runs_smoke_before_fast_verification",
-      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
+      "nodeid": "tests/modern/packaging_contract/test_windows_distributable_contract.py::test_modern_fast_workflow_runs_smoke_before_fast_verification",
+      "reason": "Structured packaging contract coverage is lane-owned under tests/modern/packaging_contract.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "move",
+      "decision": "keep",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1854,13 +1854,13 @@
         "filesystem"
       ],
       "lane": "packaging_contract",
-      "nodeid": "tests/modern/test_windows_distributable_contract.py::test_modern_package_workflow_builds_path_aware_artifacts",
-      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
+      "nodeid": "tests/modern/packaging_contract/test_windows_distributable_contract.py::test_modern_package_workflow_builds_path_aware_artifacts",
+      "reason": "Structured packaging contract coverage is lane-owned under tests/modern/packaging_contract.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "move",
+      "decision": "keep",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1869,13 +1869,13 @@
         "filesystem"
       ],
       "lane": "packaging_contract",
-      "nodeid": "tests/modern/test_windows_distributable_contract.py::test_lane_named_local_scripts_replace_old_workflow_wrappers",
-      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
+      "nodeid": "tests/modern/packaging_contract/test_windows_distributable_contract.py::test_lane_named_local_scripts_replace_old_workflow_wrappers",
+      "reason": "Structured packaging contract coverage is lane-owned under tests/modern/packaging_contract.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "move",
+      "decision": "keep",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1884,13 +1884,13 @@
         "filesystem"
       ],
       "lane": "packaging_contract",
-      "nodeid": "tests/modern/test_windows_distributable_contract.py::test_modern_macos_distributable_contract_is_declared",
-      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
+      "nodeid": "tests/modern/packaging_contract/test_windows_distributable_contract.py::test_modern_macos_distributable_contract_is_declared",
+      "reason": "Structured packaging contract coverage is lane-owned under tests/modern/packaging_contract.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "move",
+      "decision": "keep",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1899,13 +1899,13 @@
         "filesystem"
       ],
       "lane": "packaging_contract",
-      "nodeid": "tests/modern/test_windows_distributable_contract.py::test_local_modern_macos_package_script_uses_shared_build_script",
-      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
+      "nodeid": "tests/modern/packaging_contract/test_windows_distributable_contract.py::test_local_modern_macos_package_script_uses_shared_build_script",
+      "reason": "Structured packaging contract coverage is lane-owned under tests/modern/packaging_contract.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "move",
+      "decision": "keep",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1914,13 +1914,13 @@
         "filesystem"
       ],
       "lane": "packaging_contract",
-      "nodeid": "tests/modern/test_windows_distributable_contract.py::test_shared_modern_r_dependency_installer_is_used_by_packagers",
-      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
+      "nodeid": "tests/modern/packaging_contract/test_windows_distributable_contract.py::test_shared_modern_r_dependency_installer_is_used_by_packagers",
+      "reason": "Structured packaging contract coverage is lane-owned under tests/modern/packaging_contract.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "move",
+      "decision": "keep",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1929,13 +1929,13 @@
         "filesystem"
       ],
       "lane": "packaging_contract",
-      "nodeid": "tests/modern/test_windows_distributable_contract.py::test_macos_packager_resolves_relative_python_before_changing_directory",
-      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
+      "nodeid": "tests/modern/packaging_contract/test_windows_distributable_contract.py::test_macos_packager_resolves_relative_python_before_changing_directory",
+      "reason": "Structured packaging contract coverage is lane-owned under tests/modern/packaging_contract.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "move",
+      "decision": "keep",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1944,13 +1944,13 @@
         "filesystem"
       ],
       "lane": "packaging_contract",
-      "nodeid": "tests/modern/test_windows_distributable_contract.py::test_macos_packager_copies_resolved_r_runtime_contents",
-      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
+      "nodeid": "tests/modern/packaging_contract/test_windows_distributable_contract.py::test_macos_packager_copies_resolved_r_runtime_contents",
+      "reason": "Structured packaging contract coverage is lane-owned under tests/modern/packaging_contract.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "move",
+      "decision": "keep",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1959,13 +1959,13 @@
         "filesystem"
       ],
       "lane": "packaging_contract",
-      "nodeid": "tests/modern/test_windows_distributable_contract.py::test_windows_packager_restores_smoke_environment",
-      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
+      "nodeid": "tests/modern/packaging_contract/test_windows_distributable_contract.py::test_windows_packager_restores_smoke_environment",
+      "reason": "Structured packaging contract coverage is lane-owned under tests/modern/packaging_contract.",
       "runtime_class": "subsecond",
       "size": "small"
     },
     {
-      "decision": "move",
+      "decision": "keep",
       "evidence": [
         "packaging_contract",
         "release_readiness"
@@ -1974,8 +1974,8 @@
         "filesystem"
       ],
       "lane": "packaging_contract",
-      "nodeid": "tests/modern/test_windows_distributable_contract.py::test_windows_packager_uses_clean_directory_copies_for_incremental_builds",
-      "reason": "Structured packaging contract coverage should move into the packaging_contract lane directory after taxonomy layout cleanup.",
+      "nodeid": "tests/modern/packaging_contract/test_windows_distributable_contract.py::test_windows_packager_uses_clean_directory_copies_for_incremental_builds",
+      "reason": "Structured packaging contract coverage is lane-owned under tests/modern/packaging_contract.",
       "runtime_class": "subsecond",
       "size": "small"
     }

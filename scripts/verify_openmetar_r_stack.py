@@ -18,8 +18,8 @@ R_DEP_INSTALLER = Path("scripts") / "install-modern-r-deps.R"
 R_SMOKE_TEST = Path("scripts") / "analysis-smoke-test.R"
 R_MANIFEST_VALIDATOR = Path("scripts") / "validate_openmetar_r_manifests.py"
 BRIDGE_TESTS = (
-    Path("tests") / "modern" / "test_inprocess_rpy2_backend.py",
-    Path("tests") / "modern" / "test_openmetar_r_manifest_validation.py",
+    Path("tests") / "modern" / "r_stack" / "test_inprocess_rpy2_backend.py",
+    Path("tests") / "modern" / "fast" / "test_openmetar_r_manifest_validation.py",
 )
 DEFAULT_CRAN_REPO = "https://cloud.r-project.org"
 

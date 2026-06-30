@@ -7,7 +7,7 @@ Initial audit for ADR 0079. This file records the starting classification used t
 - Collected pytest nodes: 130
 - Lanes: fast=26, golden=17, gui=65, packaging_contract=13, r_stack=9
 - Sizes: large=59, medium=32, small=39
-- Decisions: keep=117, move=13 after the first packaging contract reclassification.
+- Decisions: keep=130 after the first packaging contract reclassification and lane-directory move.
 
 ## Audit Posture
 
@@ -54,7 +54,7 @@ References:
 ## Cleanup Themes
 
 - The GUI and real R Stack tests are large integration evidence and should not define the default fast feedback loop.
-- Packaging contract tests were the first rewrite target; the current contract tests now use structured parsers and are marked to move into the `packaging_contract` lane directory.
+- Packaging contract tests were the first rewrite target; the current contract tests now use structured parsers and live in the `packaging_contract` lane directory.
 - Removed three low-signal source-text checks that duplicated behavior covered by focused GUI startup, packaging smoke, and R-stack verification tests.
 - Tests with opportunistic R skips should move behind Default R Evidence or Full R Stack Evidence instead of being treated as ordinary fast tests.
 - Replace opportunistic R Stack `pytest.skip()` paths with lane-level prerequisite checks.
@@ -70,7 +70,7 @@ References:
 - Continue improving R dependency cache behavior after measuring warm and cold Full R Stack Evidence and Packaging Lane runs.
 - Keep Packaging Lane triggers path-aware for pull requests and unconditional for release/manual packaging runs.
 - Continue packaging contract cleanup as new script/workflow contracts are added; GUI and R Stack pruning should wait until their compatibility evidence is reviewed more carefully.
-- Move tests into lane and ownership directories after the manifest is accurate.
-- Identify duplicate GUI coverage during and after the directory move.
+- Keep lane and ownership directories aligned with the taxonomy manifest.
+- Identify duplicate GUI coverage after the directory move.
 - Mark raw string assertion tests for rewrite or removal during packaging contract cleanup.
 - Add R Stack lane setup checks before converting R Stack skips into hard failures.

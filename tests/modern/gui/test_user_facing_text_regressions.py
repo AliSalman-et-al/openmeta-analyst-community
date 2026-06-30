@@ -4,7 +4,7 @@ import sys
 from PyQt5 import QtWidgets
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 HELP_HTML = sorted(
     path.relative_to(ROOT).as_posix() for path in (ROOT / "doc").glob("*.html")
 )

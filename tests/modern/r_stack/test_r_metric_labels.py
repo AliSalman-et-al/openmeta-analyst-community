@@ -6,7 +6,7 @@ import textwrap
 import pytest
 
 
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 
 _METRIC_LABEL_DRIVER = textwrap.dedent(

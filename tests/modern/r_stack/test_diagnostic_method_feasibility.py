@@ -6,7 +6,7 @@ import textwrap
 import pytest
 
 
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 
 _DIAGNOSTIC_FEASIBILITY_DRIVER = textwrap.dedent(

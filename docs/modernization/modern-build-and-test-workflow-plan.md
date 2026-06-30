@@ -30,7 +30,8 @@ This plan turns the Modern CI Path optimization decisions into small, reviewable
 - R package cache keys now include R version, installer script, dependency manifest, OpenMetaR package metadata, and CRAN repository policy.
 - Warm local smoke/fast verification now skips `uv sync --locked` unless `-Sync` or `-RecreateVenv` is requested.
 - GitHub smoke/fast verification calls strict R evidence and taxonomy flags explicitly.
-- Packaging contract tests now use structured parsers for workflows and scripts; the rewritten nodes are marked `move` in the taxonomy backlog.
+- Packaging contract tests now use structured parsers for workflows and scripts; the rewritten nodes live under the `packaging_contract` lane directory.
+- Modern tests now live under lane/ownership directories: `fast`, `golden`, `gui`, `r_stack`, `packaging_contract`, and reserved `packaged_smoke`.
 
 ## Phase 1: Smoke Lane and Local Sync Split
 
@@ -113,7 +114,7 @@ Deliverables:
 
 Steps:
 
-1. Start with `tests/modern/test_windows_distributable_contract.py`.
+1. Start with `tests/modern/packaging_contract/test_windows_distributable_contract.py`.
 2. Replace workflow string assertions with structured workflow parsing.
 3. Replace script substring checks with structured function, parameter, environment, path, option, and ordering checks.
 4. Mark rewritten packaging contract tests for the lane-directory move in the taxonomy manifest.

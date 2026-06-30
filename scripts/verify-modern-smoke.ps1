@@ -42,8 +42,8 @@ try {
 
     Write-Step "Running smoke pytest nodes"
     uv run pytest `
-        tests\modern\test_modern_golden_compare.py::test_golden_summary_parser_reads_current_openmetar_summary_display `
-        tests\modern\test_project_pickle_loader.py::test_loader_opens_representative_qt4_project_without_pyqt4_module
+        tests\modern\golden\test_modern_golden_compare.py::test_golden_summary_parser_reads_current_openmetar_summary_display `
+        tests\modern\fast\test_project_pickle_loader.py::test_loader_opens_representative_qt4_project_without_pyqt4_module
     if ($LASTEXITCODE -ne 0) { throw "Smoke pytest nodes failed." }
 
     Write-Step "Checking Default R Evidence prerequisites"

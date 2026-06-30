@@ -2,7 +2,7 @@ import re
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 
 
 def read_repo_text(*parts):
@@ -203,7 +203,7 @@ def test_local_modern_macos_package_script_uses_shared_build_script():
     assert relative_order(
         script["text"],
         "uv sync --locked",
-        "uv run pytest tests/modern/test_pyqt5_ci_path.py tests/modern/test_pyqt5_generated_ui_imports.py tests/modern/test_project_pickle_loader.py",
+        "uv run pytest tests/modern/fast/test_pyqt5_ci_path.py tests/modern/fast/test_pyqt5_generated_ui_imports.py tests/modern/fast/test_project_pickle_loader.py",
         "bash \"$repo_root/scripts/build-modern-macos-binary.sh\"",
     )
 
