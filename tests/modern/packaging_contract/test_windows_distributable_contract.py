@@ -37,14 +37,27 @@ def sh_contract(*parts):
 
 def workflow_contract(*parts):
     text = read_repo_text(*parts)
+    trigger_text = text[text.index("on:") : text.index("\npermissions:")]
     jobs = set(re.findall(r"(?m)^  ([A-Za-z0-9_-]+):$", text))
     steps_by_job = {}
+    needs_by_job = {}
     current_job = None
     for line in text.splitlines():
         job_match = re.match(r"^  ([A-Za-z0-9_-]+):$", line)
         if job_match:
             current_job = job_match.group(1)
             steps_by_job[current_job] = []
+            continue
+        needs_scalar_match = re.match(r"^    needs:\s+([A-Za-z0-9_-]+)$", line)
+        if needs_scalar_match and current_job:
+            needs_by_job[current_job] = {needs_scalar_match.group(1)}
+            continue
+        needs_list_match = re.match(r"^      - ([A-Za-z0-9_-]+)$", line)
+        if needs_list_match and current_job and current_job in needs_by_job:
+            needs_by_job[current_job].add(needs_list_match.group(1))
+            continue
+        if re.match(r"^    needs:\s*$", line) and current_job:
+            needs_by_job[current_job] = set()
             continue
         step_match = re.match(r"^\s{6}- name: (.+)$", line)
         if step_match and current_job:
@@ -57,11 +70,12 @@ def workflow_contract(*parts):
         "legacy_uses": re.findall(r"uses:\s+[^@\s]+@v\d+", text),
         "runs": re.findall(r"run:\s+(.+)", text),
         "paths": set(re.findall(r'^\s+- "([^"]+)"$', text, re.MULTILINE)),
+        "events": set(re.findall(r"(?m)^  ([a-z_]+):(?:$|\n)", trigger_text)),
         "cache_keys": re.findall(r"key:\s+(.+)", text),
         "cache_paths": set(re.findall(r"(?m)^\s+path:\s+(.+)$", text)),
         "restore_keys": re.findall(r"restore-keys:", text),
         "env": dict(re.findall(r"(?m)^  ([A-Z0-9_]+):\s+(.+)$", text)),
-        "needs": dict(re.findall(r"(?m)^  ([A-Za-z0-9_-]+):(?:\n(?: {4}.+\n)*)?    needs:\s+([A-Za-z0-9_-]+)", text)),
+        "needs": needs_by_job,
     }
 
 
@@ -147,17 +161,31 @@ def test_packaged_smoke_launches_with_positional_project_argument():
 def test_modern_fast_workflow_runs_smoke_before_fast_verification():
     workflow = workflow_contract(".github", "workflows", "modern-fast.yml")
 
-    assert {"smoke-verification", "fast-verification"} <= workflow["jobs"]
-    assert workflow["needs"]["fast-verification"] == "smoke-verification"
+    assert {"change-classifier", "smoke-verification", "fast-verification", "modern-fast-gate"} <= workflow["jobs"]
+    assert workflow["needs"]["smoke-verification"] == {"change-classifier"}
+    assert workflow["needs"]["fast-verification"] == {"change-classifier", "smoke-verification"}
+    assert workflow["needs"]["modern-fast-gate"] == {"change-classifier", "smoke-verification", "fast-verification"}
     assert workflow["env"]["OMA_CRAN_REPO"] == "https://cloud.r-project.org"
+    assert workflow["events"] == {"workflow_dispatch", "pull_request"}
     assert workflow["legacy_uses"] == []
     assert all(re.fullmatch(r"[0-9a-f]{40}", ref) for _, ref, _ in workflow["uses"])
+    assert "src/*" in workflow["text"]
+    assert "tests/modern/*" in workflow["text"]
+    assert "docs/modernization/OpenMetaR-r-dependencies.json" in workflow["text"]
+    assert "docs/modernization/test-taxonomy.json" in workflow["text"]
     assert ".\\scripts\\verify-modern-smoke.ps1 -Sync -RequireREvidence" in workflow["runs"]
     assert ".\\scripts\\verify-modern-fast.ps1 -Sync -RequireREvidence -StrictTaxonomy" in workflow["runs"]
     assert workflow["restore_keys"] == []
     assert workflow["cache_paths"] == {"artifacts\\r-default-library-cache"}
     assert all(key.startswith("modern-default-r-library-v2-windows-") for key in workflow["cache_keys"])
     assert all("scripts/verify_openmetar_r_default.py" in key for key in workflow["cache_keys"])
+    assert all("steps.r-cache-key.outputs.version" in key for key in workflow["cache_keys"])
+    assert "Modern Fast Change Classifier" in workflow["text"]
+    assert "Modern Fast Gate" in workflow["text"]
+    assert "pull-requests: read" in workflow["text"]
+    assert "gh api --paginate" in workflow["text"]
+    assert "No modern fast inputs changed; Windows lanes intentionally skipped." in workflow["text"]
+    assert "timeout-minutes: 20" in workflow["text"]
 
 
 def test_modern_package_workflow_builds_path_aware_artifacts():
@@ -165,27 +193,21 @@ def test_modern_package_workflow_builds_path_aware_artifacts():
 
     assert {"windows-package", "macos-package-intel", "macos-package-arm64"} <= workflow["jobs"]
     assert workflow["env"]["OMA_CRAN_REPO"] == "https://cloud.r-project.org"
+    assert workflow["events"] == {"workflow_dispatch", "push"}
     assert workflow["legacy_uses"] == []
     assert all(re.fullmatch(r"[0-9a-f]{40}", ref) for _, ref, _ in workflow["uses"])
-    assert {
-        ".github/workflows/modern-package.yml",
-        "scripts/package-modern-windows.ps1",
-        "scripts/package-modern-macos.sh",
-        "scripts/build-modern-windows-binary.ps1",
-        "scripts/build-modern-macos-binary.sh",
-        "scripts/install-modern-r-deps.R",
-        "scripts/verify_openmetar_r_stack.py",
-        "src/R/**",
-        "src/launch.py",
-        "sample_data/**",
-        "doc/**",
-    } <= workflow["paths"]
+    assert workflow["paths"] == {"v*"}
     assert any("OpenMetaAnalyst-modern-windows-x64.zip" in run for run in workflow["text"].splitlines())
     assert any("OpenMetaAnalyst-modern-macos-x64" in run for run in workflow["text"].splitlines())
     assert any("OpenMetaAnalyst-modern-macos-arm64" in run for run in workflow["text"].splitlines())
     assert all("OMA_CRAN_REPO_KEY" in key for key in workflow["cache_keys"])
     assert workflow["restore_keys"] == []
     assert all(key.startswith("modern-bundled-r-library-v2-") for key in workflow["cache_keys"])
+    assert all("steps.r-cache-key.outputs.version" in key for key in workflow["cache_keys"])
+    assert "-RRuntimeRoot" in workflow["text"]
+    assert "--r-runtime-root" in workflow["text"]
+    assert "timeout-minutes: 45" in workflow["text"]
+    assert "timeout-minutes: 60" in workflow["text"]
 
 
 def test_lane_named_local_scripts_replace_old_workflow_wrappers():

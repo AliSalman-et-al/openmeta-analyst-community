@@ -32,6 +32,11 @@ This plan turns the Modern CI Path optimization decisions into small, reviewable
 - R package cache keys now include R version, installer script, dependency manifest, OpenMetaR package metadata, and CRAN repository policy.
 - Warm local smoke/fast verification now skips `uv sync --locked` unless `-Sync` or `-RecreateVenv` is requested.
 - GitHub smoke/fast verification calls strict R evidence and taxonomy flags explicitly.
+- GitHub smoke/fast verification runs on pull requests and manual dispatch rather than every feature-branch push.
+- GitHub pull requests always run a lightweight Modern Fast Gate classifier so required checks do not get stuck pending when Windows lanes are intentionally skipped.
+- GitHub package verification runs only by manual dispatch or release tags, so ordinary PR iteration does not build distributable artifacts unless explicitly requested.
+- GitHub R library cache keys include the R version resolved from the runner after `setup-r`, so a new R release cannot primary-hit an old outer cache while rebuilding a different inner dependency directory.
+- GitHub jobs use explicit timeouts to cap runaway runner usage.
 - Packaging contract tests now use structured parsers for workflows and scripts; the rewritten nodes live under the `packaging_contract` lane directory.
 - Modern tests now live under lane/ownership directories: `fast`, `golden`, `gui`, `r_stack`, `packaging_contract`, and reserved `packaged_smoke`.
 - Fast verification now runs the required fast feedback directories with a bounded pytest-xdist worker count while keeping GUI, R Stack, and packaged smoke evidence out of parallel execution.

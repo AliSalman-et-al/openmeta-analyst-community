@@ -19,39 +19,8 @@ on:
         default: false
         type: boolean
   push:
-    branches:
-      - "**"
     tags:
       - "v*"
-    paths:
-      - ".github/workflows/modern-package.yml"
-      - "pyproject.toml"
-      - "uv.lock"
-      - "scripts/build-modern-windows-binary.ps1"
-      - "scripts/build-modern-macos-binary.sh"
-      - "scripts/package-modern-windows.ps1"
-      - "scripts/package-modern-macos.sh"
-      - "scripts/install-modern-r-deps.R"
-      - "scripts/verify_openmetar_r_stack.py"
-      - "src/R/**"
-      - "src/launch.py"
-      - "sample_data/**"
-      - "doc/**"
-  pull_request:
-    paths:
-      - ".github/workflows/modern-package.yml"
-      - "pyproject.toml"
-      - "uv.lock"
-      - "scripts/build-modern-windows-binary.ps1"
-      - "scripts/build-modern-macos-binary.sh"
-      - "scripts/package-modern-windows.ps1"
-      - "scripts/package-modern-macos.sh"
-      - "scripts/install-modern-r-deps.R"
-      - "scripts/verify_openmetar_r_stack.py"
-      - "src/R/**"
-      - "src/launch.py"
-      - "sample_data/**"
-      - "doc/**"
 
 permissions:
   contents: read
@@ -69,6 +38,7 @@ jobs:
     name: Windows Packaging Lane
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_windows }}
     runs-on: windows-latest
+    timeout-minutes: 45
     defaults:
       run:
         shell: powershell
@@ -90,14 +60,22 @@ jobs:
         with:
           r-version: release
 
+      - name: Resolve R cache version
+        id: r-cache-key
+        run: |
+          $version = Rscript -e "cat(paste0('R-', getRversion()))"
+          $runtimeRoot = Rscript -e "cat(normalizePath(R.home(), winslash='/', mustWork=TRUE))"
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "runtime-root=$runtimeRoot" >> $env:GITHUB_OUTPUT
+
       - name: Cache bundled R package library
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: artifacts\r-library-cache
-          key: modern-bundled-r-library-v2-windows-${{ env.OMA_CRAN_REPO_KEY }}-${{ hashFiles('scripts/install-modern-r-deps.R', 'docs/modernization/OpenMetaR-r-dependencies.json', 'src/R/OpenMetaR/DESCRIPTION') }}
+          key: modern-bundled-r-library-v2-windows-${{ steps.r-cache-key.outputs.version }}-${{ env.OMA_CRAN_REPO_KEY }}-${{ hashFiles('scripts/install-modern-r-deps.R', 'docs/modernization/OpenMetaR-r-dependencies.json', 'src/R/OpenMetaR/DESCRIPTION') }}
 
       - name: Build modern Windows package
-        run: .\scripts\package-modern-windows.ps1 -ArtifactName OpenMetaAnalyst-modern-windows-x64
+        run: .\scripts\package-modern-windows.ps1 -ArtifactName OpenMetaAnalyst-modern-windows-x64 -RRuntimeRoot "${{ steps.r-cache-key.outputs.runtime-root }}"
 
       - name: Upload modern Windows binary artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -128,6 +106,7 @@ jobs:
     name: macOS Packaging Lane (Intel)
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_macos }}
     runs-on: macos-15-intel
+    timeout-minutes: 60
     defaults:
       run:
         shell: bash
@@ -149,14 +128,22 @@ jobs:
         with:
           r-version: release
 
+      - name: Resolve R cache version
+        id: r-cache-key
+        run: |
+          version="$(Rscript -e "cat(paste0('R-', getRversion()))")"
+          runtime_root="$(Rscript -e "cat(normalizePath(R.home(), winslash='/', mustWork=TRUE))")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "runtime-root=$runtime_root" >> "$GITHUB_OUTPUT"
+
       - name: Cache bundled R package library
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: artifacts/r-library-cache
-          key: modern-bundled-r-library-v2-macos-x64-${{ env.OMA_CRAN_REPO_KEY }}-${{ hashFiles('scripts/install-modern-r-deps.R', 'docs/modernization/OpenMetaR-r-dependencies.json', 'src/R/OpenMetaR/DESCRIPTION') }}
+          key: modern-bundled-r-library-v2-macos-x64-${{ steps.r-cache-key.outputs.version }}-${{ env.OMA_CRAN_REPO_KEY }}-${{ hashFiles('scripts/install-modern-r-deps.R', 'docs/modernization/OpenMetaR-r-dependencies.json', 'src/R/OpenMetaR/DESCRIPTION') }}
 
       - name: Build modern macOS package
-        run: bash scripts/package-modern-macos.sh --architecture x64 --artifact-name OpenMetaAnalyst-modern-macos-x64
+        run: bash scripts/package-modern-macos.sh --architecture x64 --artifact-name OpenMetaAnalyst-modern-macos-x64 --r-runtime-root "${{ steps.r-cache-key.outputs.runtime-root }}"
 
       - name: Upload modern macOS binary artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -183,6 +170,7 @@ jobs:
     name: macOS Packaging Lane (Apple Silicon)
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_macos_arm64 }}
     runs-on: macos-14
+    timeout-minutes: 60
     continue-on-error: true
     defaults:
       run:
@@ -205,11 +193,19 @@ jobs:
         with:
           r-version: release
 
+      - name: Resolve R cache version
+        id: r-cache-key
+        run: |
+          version="$(Rscript -e "cat(paste0('R-', getRversion()))")"
+          runtime_root="$(Rscript -e "cat(normalizePath(R.home(), winslash='/', mustWork=TRUE))")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "runtime-root=$runtime_root" >> "$GITHUB_OUTPUT"
+
       - name: Cache bundled R package library
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: artifacts/r-library-cache
-          key: modern-bundled-r-library-v2-macos-arm64-${{ env.OMA_CRAN_REPO_KEY }}-${{ hashFiles('scripts/install-modern-r-deps.R', 'docs/modernization/OpenMetaR-r-dependencies.json', 'src/R/OpenMetaR/DESCRIPTION') }}
+          key: modern-bundled-r-library-v2-macos-arm64-${{ steps.r-cache-key.outputs.version }}-${{ env.OMA_CRAN_REPO_KEY }}-${{ hashFiles('scripts/install-modern-r-deps.R', 'docs/modernization/OpenMetaR-r-dependencies.json', 'src/R/OpenMetaR/DESCRIPTION') }}
 
       - name: Explain current Apple Silicon dependency limitation
         run: |
@@ -217,7 +213,7 @@ jobs:
           echo "The shared lock currently pins PyQt5-Qt5==5.15.2, which has no macOS arm64 wheel."
 
       - name: Build modern macOS package
-        run: bash scripts/package-modern-macos.sh --architecture arm64 --artifact-name OpenMetaAnalyst-modern-macos-arm64
+        run: bash scripts/package-modern-macos.sh --architecture arm64 --artifact-name OpenMetaAnalyst-modern-macos-arm64 --r-runtime-root "${{ steps.r-cache-key.outputs.runtime-root }}"
 
       - name: Upload modern macOS binary artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

@@ -86,7 +86,7 @@ bash ./scripts/package-modern-macos.sh --architecture x64
 bash ./scripts/package-modern-macos.sh --architecture arm64
 ```
 
-The GitHub fast workflow runs on push and pull request. Package jobs run from `workflow_dispatch`, release tags, and packaging-relevant path changes. macOS package jobs remain manual opt-in.
+The GitHub fast workflow runs on pull requests and manual dispatch, not every feature-branch push. Pull requests always run a lightweight classifier and stable gate check; the Windows smoke/fast lanes run only when modern source, tests, dependency files, or validated manifests changed. Package jobs run from `workflow_dispatch` and release tags; macOS package jobs remain manual opt-in.
 
 Apple Silicon packaging is present as an opt-in CI target. With the current single Qt runtime policy (`PyQt5-Qt5==5.15.2` everywhere), it is experimental because the common PyPI Qt wheel is Intel-only on macOS; the job is isolated from the default Windows build.
 

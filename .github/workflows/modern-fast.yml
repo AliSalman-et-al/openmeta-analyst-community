@@ -1,11 +1,12 @@
 name: Modern Fast Verification
 
 on:
-  push:
+  workflow_dispatch:
   pull_request:
 
 permissions:
   contents: read
+  pull-requests: read
 
 env:
   OMA_CRAN_REPO: https://cloud.r-project.org
@@ -16,9 +17,54 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  change-classifier:
+    name: Modern Fast Change Classifier
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run-windows: ${{ steps.classify.outputs.run-windows }}
+      reason: ${{ steps.classify.outputs.reason }}
+
+    steps:
+      - name: Classify changed paths
+        id: classify
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "run-windows=true" >> "$GITHUB_OUTPUT"
+            echo "reason=manual dispatch" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          changed_files="$(gh api --paginate "repos/$REPOSITORY/pulls/$PR_NUMBER/files" --jq '.[].filename')"
+          run_windows=false
+          reason="no modern fast inputs changed"
+          while IFS= read -r file; do
+            case "$file" in
+              .github/workflows/modern-fast.yml|pyproject.toml|uv.lock|src/*|tests/modern/*|scripts/verify-modern-smoke.ps1|scripts/verify-modern-fast.ps1|scripts/verify_openmetar_r_default.py|scripts/validate_openmetar_r_manifests.py|scripts/validate_golden_baseline_manifests.py|scripts/validate_test_taxonomy.py|docs/modernization/OpenMetaR-r-dependencies.json|docs/modernization/OpenMetaR-statistical-drift.json|docs/modernization/comprehensive-golden-baseline-manifest.json|docs/modernization/golden-coverage-manifest.json|docs/modernization/workflow-traceability.json|docs/modernization/test-taxonomy.json)
+                run_windows=true
+                reason="matched $file"
+                break
+                ;;
+            esac
+          done <<< "$changed_files"
+
+          echo "run-windows=$run_windows" >> "$GITHUB_OUTPUT"
+          echo "reason=$reason" >> "$GITHUB_OUTPUT"
+          echo "$reason"
+
   smoke-verification:
     name: Smoke Verification Lane
+    needs: change-classifier
+    if: ${{ needs.change-classifier.outputs.run-windows == 'true' }}
     runs-on: windows-latest
+    timeout-minutes: 20
     defaults:
       run:
         shell: powershell
@@ -40,11 +86,17 @@ jobs:
         with:
           r-version: release
 
+      - name: Resolve R cache version
+        id: r-cache-key
+        run: |
+          $version = Rscript -e "cat(paste0('R-', getRversion()))"
+          "version=$version" >> $env:GITHUB_OUTPUT
+
       - name: Cache default R evidence library
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: artifacts\r-default-library-cache
-          key: modern-default-r-library-v2-windows-${{ env.OMA_CRAN_REPO_KEY }}-${{ hashFiles('scripts/verify_openmetar_r_default.py', 'docs/modernization/OpenMetaR-r-dependencies.json', 'src/R/OpenMetaR/DESCRIPTION') }}
+          key: modern-default-r-library-v2-windows-${{ steps.r-cache-key.outputs.version }}-${{ env.OMA_CRAN_REPO_KEY }}-${{ hashFiles('scripts/verify_openmetar_r_default.py', 'docs/modernization/OpenMetaR-r-dependencies.json', 'src/R/OpenMetaR/DESCRIPTION') }}
 
       - name: Run Smoke Verification Lane
         run: .\scripts\verify-modern-smoke.ps1 -Sync -RequireREvidence
@@ -55,8 +107,12 @@ jobs:
 
   fast-verification:
     name: Fast Verification Lane
-    needs: smoke-verification
+    needs:
+      - change-classifier
+      - smoke-verification
+    if: ${{ needs.change-classifier.outputs.run-windows == 'true' && needs.smoke-verification.result == 'success' }}
     runs-on: windows-latest
+    timeout-minutes: 20
     defaults:
       run:
         shell: powershell
@@ -78,11 +134,17 @@ jobs:
         with:
           r-version: release
 
+      - name: Resolve R cache version
+        id: r-cache-key
+        run: |
+          $version = Rscript -e "cat(paste0('R-', getRversion()))"
+          "version=$version" >> $env:GITHUB_OUTPUT
+
       - name: Cache default R evidence library
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: artifacts\r-default-library-cache
-          key: modern-default-r-library-v2-windows-${{ env.OMA_CRAN_REPO_KEY }}-${{ hashFiles('scripts/verify_openmetar_r_default.py', 'docs/modernization/OpenMetaR-r-dependencies.json', 'src/R/OpenMetaR/DESCRIPTION') }}
+          key: modern-default-r-library-v2-windows-${{ steps.r-cache-key.outputs.version }}-${{ env.OMA_CRAN_REPO_KEY }}-${{ hashFiles('scripts/verify_openmetar_r_default.py', 'docs/modernization/OpenMetaR-r-dependencies.json', 'src/R/OpenMetaR/DESCRIPTION') }}
 
       - name: Run Fast Verification Lane
         run: .\scripts\verify-modern-fast.ps1 -Sync -RequireREvidence -StrictTaxonomy
@@ -90,3 +152,38 @@ jobs:
       - name: Prune uv cache
         if: ${{ always() }}
         run: uv cache prune --ci
+
+  modern-fast-gate:
+    name: Modern Fast Gate
+    needs:
+      - change-classifier
+      - smoke-verification
+      - fast-verification
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check required lane results
+        shell: bash
+        env:
+          RUN_WINDOWS: ${{ needs.change-classifier.outputs.run-windows }}
+          REASON: ${{ needs.change-classifier.outputs.reason }}
+          SMOKE_RESULT: ${{ needs.smoke-verification.result }}
+          FAST_RESULT: ${{ needs.fast-verification.result }}
+        run: |
+          set -euo pipefail
+          echo "Modern fast classifier: $REASON"
+          if [ "$RUN_WINDOWS" != "true" ]; then
+            echo "No modern fast inputs changed; Windows lanes intentionally skipped."
+            exit 0
+          fi
+          if [ "$SMOKE_RESULT" != "success" ]; then
+            echo "Smoke Verification Lane result: $SMOKE_RESULT" >&2
+            exit 1
+          fi
+          if [ "$FAST_RESULT" != "success" ]; then
+            echo "Fast Verification Lane result: $FAST_RESULT" >&2
+            exit 1
+          fi
+          echo "Modern fast verification passed."
