@@ -40,9 +40,24 @@ def run(command: list[str | Path], *, cwd: Path, env: dict[str, str] | None = No
     )
 
 
+def run_streamed(command: list[str | Path], *, cwd: Path, env: dict[str, str] | None = None) -> None:
+    printable = " ".join(str(part) for part in command)
+    step(printable)
+    result = subprocess.run(
+        [str(part) for part in command],
+        cwd=cwd,
+        env=env,
+        text=True,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise DefaultREvidenceError(f"R dependency installation failed with exit code {result.returncode}: {printable}")
+
+
 def require_success(result: subprocess.CompletedProcess[str], label: str) -> None:
     if result.returncode != 0:
-        output = result.stderr.strip() or result.stdout.strip()
+        output = "\n".join(part for part in (result.stdout.strip(), result.stderr.strip()) if part)
         raise DefaultREvidenceError(f"{label} failed with exit code {result.returncode}: {output}")
 
 
@@ -135,39 +150,73 @@ def install_direct_dependencies(root: Path, rscript: Path, library: Path, cran_r
     archive_url_by_package = {
         "HSROC": "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz"
     }
-    r_code = "\n".join(
-        [
-            "args <- commandArgs(trailingOnly = TRUE)",
-            "lib <- normalizePath(args[[1]], winslash='/', mustWork=FALSE)",
-            "repo <- args[[2]]",
-            "dir.create(lib, recursive=TRUE, showWarnings=FALSE)",
-            ".libPaths(c(lib, .libPaths()))",
-            "options(repos=c(CRAN=repo), timeout=600, install.packages.check.source='no')",
-            "cran <- strsplit(args[[3]], ',', fixed=TRUE)[[1]]",
-            "cran <- cran[nzchar(cran)]",
-            "missing <- cran[!vapply(cran, requireNamespace, logical(1), quietly=TRUE)]",
-            "if (length(missing)) install.packages(missing, lib=lib, dependencies=NA, type=if (.Platform$OS.type == 'windows') 'binary' else 'source')",
-            "archives <- args[-(1:3)]",
-            "if (length(archives)) {",
-            "  for (entry in archives) {",
-            "    parts <- strsplit(entry, '=', fixed=TRUE)[[1]]",
-            "    package <- parts[[1]]; expected <- parts[[2]]; url <- parts[[3]]",
-            "    installed <- utils::installed.packages(lib.loc=lib)",
-            "    if (!package %in% rownames(installed) || installed[package, 'Version'] != expected) install.packages(url, lib=lib, repos=NULL, type='source')",
-            "  }",
-            "}",
-        ]
-    )
-    archive_args = [
-        f"{name}={version}={archive_url_by_package[name]}"
-        for name, version in sorted(archive_packages.items())
-    ]
-    result = run(
-        [rscript, "-e", r_code, library, cran_repo, ",".join(cran_packages), *archive_args],
-        cwd=root,
-        env=env,
-    )
-    require_success(result, "direct R dependency install")
+    r_code = """
+args <- commandArgs(trailingOnly = TRUE)
+lib <- normalizePath(args[[1]], winslash = "/", mustWork = FALSE)
+repo <- args[[2]]
+cran <- strsplit(args[[3]], ",", fixed = TRUE)[[1]]
+cran <- cran[nzchar(cran)]
+archive_args <- args[-(1:3)]
+
+dir.create(lib, recursive = TRUE, showWarnings = FALSE)
+.libPaths(c(lib, .libPaths()))
+options(repos = c(CRAN = repo), timeout = 600, install.packages.check.source = "no")
+
+installed_names <- function() {
+  rownames(utils::installed.packages(lib.loc = lib))
+}
+
+missing <- setdiff(cran, installed_names())
+if (length(missing)) {
+  message("Installing CRAN packages into Default R Evidence cache: ", paste(missing, collapse = ", "))
+  utils::install.packages(
+    missing,
+    lib = lib,
+    dependencies = NA,
+    type = if (.Platform$OS.type == "windows") "binary" else "source"
+  )
+}
+
+missing <- setdiff(cran, installed_names())
+if (length(missing)) {
+  stop("CRAN packages still missing after install: ", paste(missing, collapse = ", "))
+}
+
+if (length(archive_args)) {
+  if (length(archive_args) %% 3 != 0) {
+    stop("Archive package arguments must be package/version/url triples")
+  }
+  for (index in seq(1, length(archive_args), by = 3)) {
+    package <- archive_args[[index]]
+    expected <- archive_args[[index + 1]]
+    url <- archive_args[[index + 2]]
+    installed <- utils::installed.packages(lib.loc = lib)
+    if (!package %in% rownames(installed) || installed[package, "Version"] != expected) {
+      message("Installing archived package into Default R Evidence cache: ", package, " ", expected)
+      utils::install.packages(url, lib = lib, repos = NULL, type = "source")
+    }
+    installed <- utils::installed.packages(lib.loc = lib)
+    if (!package %in% rownames(installed)) {
+      stop(package, " was not installed from ", url)
+    }
+    actual <- installed[package, "Version"]
+    if (actual != expected) {
+      stop(package, " installed at version ", actual, ", expected ", expected)
+    }
+  }
+}
+"""
+    archive_args: list[str] = []
+    for name, version in sorted(archive_packages.items()):
+        archive_args.extend([name, version, archive_url_by_package[name]])
+    with tempfile.TemporaryDirectory(prefix="OpenMetaR-default-r-install-") as temp_name:
+        install_script = Path(temp_name) / "install-default-r-deps.R"
+        install_script.write_text(r_code, encoding="utf-8")
+        run_streamed(
+            [rscript, install_script, library, cran_repo, ",".join(cran_packages), *archive_args],
+            cwd=root,
+            env=env,
+        )
 
 
 def install_and_load_openmetar(root: Path, rscript: Path, env: dict[str, str]) -> None:

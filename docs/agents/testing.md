@@ -39,7 +39,7 @@ Run Full R Stack Evidence before R Stack changes:
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-modern-r-stack-full.ps1
 ```
 
-Full R Stack Evidence uses `artifacts\r-library-cache` by default to avoid repeated CRAN downloads on warm runs. Set `OMA_CRAN_REPO` to choose a faster reliable CRAN-compatible mirror when needed. The package wrappers resolve one source R runtime and pass that same runtime into R Stack Evidence and artifact assembly, so the dependency cache can be reused before only the local `OpenMetaR` package is reinstalled into the bundle.
+Smoke/Fast Default R Evidence uses `artifacts\r-default-library-cache`; Full R Stack Evidence and packaging use `artifacts\r-library-cache`. Keeping those caches separate prevents fast verification from restoring the larger bundled-R packaging cache. Set `OMA_CRAN_REPO` to choose a faster reliable CRAN-compatible mirror when needed. The package wrappers resolve one source R runtime and pass that same runtime into R Stack Evidence and artifact assembly, so the dependency cache can be reused before only the local `OpenMetaR` package is reinstalled into the bundle.
 
 Build the Windows package only when packaging evidence is needed:
 

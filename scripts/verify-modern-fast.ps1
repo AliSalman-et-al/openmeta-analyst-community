@@ -10,7 +10,7 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $venvRoot = Join-Path $repoRoot ".venv"
-$rPackageCacheRoot = Join-Path (Join-Path $repoRoot "artifacts") "r-library-cache"
+$rDefaultPackageCacheRoot = Join-Path (Join-Path $repoRoot "artifacts") "r-default-library-cache"
 
 function Write-Step {
     param([string]$Message)
@@ -57,7 +57,7 @@ try {
     Write-Step "Verifying Default R Evidence"
     $rEvidenceArgs = @("run", "python", "scripts\verify_openmetar_r_default.py")
     if ($RequireREvidence) {
-        $rEvidenceArgs += @("--require-r", "--require-installed-packages", "--install-missing", "--r-library-cache-root", $rPackageCacheRoot)
+        $rEvidenceArgs += @("--require-r", "--require-installed-packages", "--install-missing", "--r-library-cache-root", $rDefaultPackageCacheRoot)
     }
     uv @rEvidenceArgs
     if ($LASTEXITCODE -ne 0) { throw "Default R Evidence failed." }

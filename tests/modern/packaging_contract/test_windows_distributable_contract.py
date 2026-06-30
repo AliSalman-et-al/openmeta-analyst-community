@@ -58,6 +58,8 @@ def workflow_contract(*parts):
         "runs": re.findall(r"run:\s+(.+)", text),
         "paths": set(re.findall(r'^\s+- "([^"]+)"$', text, re.MULTILINE)),
         "cache_keys": re.findall(r"key:\s+(.+)", text),
+        "cache_paths": set(re.findall(r"(?m)^\s+path:\s+(.+)$", text)),
+        "restore_keys": re.findall(r"restore-keys:", text),
         "env": dict(re.findall(r"(?m)^  ([A-Z0-9_]+):\s+(.+)$", text)),
         "needs": dict(re.findall(r"(?m)^  ([A-Za-z0-9_-]+):(?:\n(?: {4}.+\n)*)?    needs:\s+([A-Za-z0-9_-]+)", text)),
     }
@@ -152,6 +154,9 @@ def test_modern_fast_workflow_runs_smoke_before_fast_verification():
     assert all(re.fullmatch(r"[0-9a-f]{40}", ref) for _, ref, _ in workflow["uses"])
     assert ".\\scripts\\verify-modern-smoke.ps1 -Sync -RequireREvidence" in workflow["runs"]
     assert ".\\scripts\\verify-modern-fast.ps1 -Sync -RequireREvidence -StrictTaxonomy" in workflow["runs"]
+    assert workflow["restore_keys"] == []
+    assert workflow["cache_paths"] == {"artifacts\\r-default-library-cache"}
+    assert all(key.startswith("modern-default-r-library-v2-windows-") for key in workflow["cache_keys"])
 
 
 def test_modern_package_workflow_builds_path_aware_artifacts():
@@ -178,6 +183,8 @@ def test_modern_package_workflow_builds_path_aware_artifacts():
     assert any("OpenMetaAnalyst-modern-macos-x64" in run for run in workflow["text"].splitlines())
     assert any("OpenMetaAnalyst-modern-macos-arm64" in run for run in workflow["text"].splitlines())
     assert all("OMA_CRAN_REPO_KEY" in key for key in workflow["cache_keys"])
+    assert workflow["restore_keys"] == []
+    assert all(key.startswith("modern-bundled-r-library-v2-") for key in workflow["cache_keys"])
 
 
 def test_lane_named_local_scripts_replace_old_workflow_wrappers():
@@ -191,6 +198,10 @@ def test_lane_named_local_scripts_replace_old_workflow_wrappers():
     assert {"Resolve-RRuntimeRoot", "Resolve-RscriptFromRuntime"} <= package["functions"]
     assert "--rscript" in package["text"]
     assert "RRuntimeRoot = $resolvedRRuntimeRoot" in package["text"]
+    assert "r-default-library-cache" in smoke["text"]
+    assert "r-default-library-cache" in fast["text"]
+    assert '"r-library-cache"' not in smoke["text"]
+    assert '"r-library-cache"' not in fast["text"]
     assert {"tests\\modern\\fast", "tests\\modern\\golden", "tests\\modern\\packaging_contract"} <= pytest_path_tokens(fast["text"])
     assert {"--dist", "loadfile", "-n", "4"} <= pytest_option_tokens(fast["text"])
     assert "pytest-xdist==3.8.0" in project_dependencies()

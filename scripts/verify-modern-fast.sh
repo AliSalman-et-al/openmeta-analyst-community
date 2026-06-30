@@ -43,7 +43,7 @@ done
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
 venv_root="$repo_root/.venv"
-r_package_cache_root="$repo_root/artifacts/r-library-cache"
+r_default_package_cache_root="$repo_root/artifacts/r-default-library-cache"
 
 step() {
   printf '[%s] %s\n' "$(date '+%H:%M:%S')" "$1"
@@ -83,7 +83,7 @@ uv run pytest "${fast_pytest_args[@]}"
 step "Verifying Default R Evidence"
 r_evidence_args=(scripts/verify_openmetar_r_default.py)
 if [ "$require_r_evidence" -eq 1 ]; then
-  r_evidence_args+=(--require-r --require-installed-packages --install-missing --r-library-cache-root "$r_package_cache_root")
+  r_evidence_args+=(--require-r --require-installed-packages --install-missing --r-library-cache-root "$r_default_package_cache_root")
 fi
 uv run python "${r_evidence_args[@]}"
 

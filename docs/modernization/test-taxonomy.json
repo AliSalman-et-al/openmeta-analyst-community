@@ -1428,6 +1428,21 @@
         "filesystem"
       ],
       "lane": "fast",
+      "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_default_r_dependency_install_uses_script_file_and_archive_triples",
+      "reason": "Guards Default R Evidence dependency installation against fragile inline Rscript argument handling.",
+      "runtime_class": "seconds",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
       "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_direct_and_app_bundle_dependencies_must_stay_separate",
       "reason": "Validates R dependency and drift manifest contracts without installing broad R packages.",
       "runtime_class": "seconds",

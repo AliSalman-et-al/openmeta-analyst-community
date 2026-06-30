@@ -160,6 +160,52 @@ def test_report_installed_versions_surfaces_rscript_failure(monkeypatch):
         validator.report_installed_versions("Rscript", ["metafor"])
 
 
+def test_default_r_dependency_install_uses_script_file_and_archive_triples(monkeypatch, tmp_path):
+    import importlib.util
+
+    verifier_path = REPO_ROOT / "scripts" / "verify_openmetar_r_default.py"
+    spec = importlib.util.spec_from_file_location("verify_openmetar_r_default", verifier_path)
+    verifier = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(verifier)
+
+    monkeypatch.setattr(
+        verifier,
+        "direct_dependency_policy",
+        lambda root: (["metafor", "testthat"], {"HSROC": "2.1.9"}),
+    )
+    captured = {}
+
+    def fake_run_streamed(command, cwd, env):
+        install_script = Path(command[1])
+        assert install_script.exists()
+        assert install_script.suffix == ".R"
+        captured["command"] = command
+        captured["cwd"] = cwd
+        captured["env"] = env
+
+    monkeypatch.setattr(verifier, "run_streamed", fake_run_streamed)
+
+    library = tmp_path / "library"
+    verifier.install_direct_dependencies(
+        REPO_ROOT,
+        Path("Rscript"),
+        library,
+        "https://cloud.r-project.org",
+        {"R_LIBS_USER": str(library)},
+    )
+
+    assert captured["cwd"] == REPO_ROOT
+    assert captured["env"]["R_LIBS_USER"] == str(library)
+    assert captured["command"][0] == Path("Rscript")
+    assert captured["command"][2:5] == [library, "https://cloud.r-project.org", "metafor,testthat"]
+    assert captured["command"][5:] == [
+        "HSROC",
+        "2.1.9",
+        "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz",
+    ]
+
+
 def read_description_fields():
     fields = {}
     current_key = None
