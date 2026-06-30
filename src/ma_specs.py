@@ -38,6 +38,11 @@ from settings import *
 import diagnostic_explain
 
 _fromUtf8 = lambda s: s
+
+COUNT_BASED_DIAGNOSTIC_METHODS = set([
+    "diagnostic.bivariate.ml",
+    "diagnostic.hsroc",
+])
     
 
 class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
@@ -386,10 +391,13 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         if self.data_type == "diagnostic":
             biv_ml_name = "Bivariate (Maximum Likelihood)"
             for biv_method in (biv_ml_name, "HSROC"):
+                method_function = self.available_method_d.get(biv_method)
                 should_remove_bivariate_method = (
                     metric != "Sens" or
                     self.meta_f_str is not None or
-                    not ("sens" in self.diag_metrics and "spec" in self.diag_metrics)
+                    not ("sens" in self.diag_metrics and "spec" in self.diag_metrics) or
+                    (method_function in COUNT_BASED_DIAGNOSTIC_METHODS and
+                     not self.model.included_studies_have_raw_data())
                 )
                 if biv_method in method_names and should_remove_bivariate_method:
                     method_names.remove(biv_method)
