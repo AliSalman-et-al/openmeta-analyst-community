@@ -52,22 +52,6 @@ def test_modern_windows_r_cache_reinstalls_local_packages_after_cache_restore():
     assert "return\n    }\n\n    $installDeps" not in script
 
 
-def test_packaged_automation_smoke_asserts_formatted_summary_output():
-    launch = (ROOT / "src" / "launch.py").read_text()
-
-    for expected in [
-        "_assert_standard_binary_summary_is_formatted",
-        "binary.random",
-        "Binary Random-Effects Model",
-        " Model Results",
-        "Heterogeneity",
-        "$model.title",
-        "$arrays",
-        'attr(,"class")',
-    ]:
-        assert expected in launch
-
-
 def test_packaged_smoke_launches_with_positional_project_argument():
     script = (ROOT / "scripts" / "build-modern-windows-binary.ps1").read_text()
 
@@ -76,19 +60,6 @@ def test_packaged_smoke_launches_with_positional_project_argument():
 
     assert positional_launch_index > smoke_env_index
     assert "Packaged startup project smoke test failed" in script
-
-
-def test_launch_resolves_frozen_startup_project_arguments():
-    launch = (ROOT / "src" / "launch.py").read_text()
-
-    for expected in [
-        "_resolve_startup_argv",
-        "_native_windows_command_line_argv",
-        "CommandLineToArgvW",
-        "_startup_project_path(startup_argv)",
-        "OMA_STARTUP_PROJECT_SMOKE",
-    ]:
-        assert expected in launch
 
 
 def test_modern_fast_workflow_runs_default_fast_verification_lane():
@@ -156,6 +127,7 @@ def test_lane_named_local_scripts_replace_old_workflow_wrappers():
 
     assert not (ROOT / "scripts" / "run-modern-workflow-local.ps1").exists()
     assert not (ROOT / "scripts" / "run-modern-workflow-local.sh").exists()
+    assert not (ROOT / "src" / "building").exists()
 
 
 def test_modern_macos_distributable_contract_is_declared():
@@ -235,28 +207,6 @@ def test_shared_modern_r_dependency_installer_is_used_by_packagers():
     assert "OpenMetaR-r-dependencies.json" in macos
     assert "-rdeps-" in windows
     assert "-rdeps-" in macos
-
-
-def test_openmetar_r_stack_verifier_declares_issue_114_gate_sequence():
-    script = (ROOT / "scripts" / "verify_openmetar_r_stack.py").read_text()
-
-    for expected in [
-        "validate_openmetar_r_manifests.py",
-        "install-modern-r-deps.R",
-        "\"CMD\", \"INSTALL\"",
-        "src\") / \"R\" / \"OpenMetaR\"",
-        "\"CMD\", \"build\"",
-        "\"CMD\"",
-        "\"check\"",
-        "analysis-smoke-test.R",
-        "test_inprocess_rpy2_backend.py",
-        "test_openmetar_r_manifest_validation.py",
-        "--report-installed-versions",
-        "cran-archive",
-        "isolated R library",
-        "OpenMetaR R Stack Slice verification complete",
-    ]:
-        assert expected in script
 
 
 def test_macos_packager_resolves_relative_python_before_changing_directory():

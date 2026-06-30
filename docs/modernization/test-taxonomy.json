@@ -1824,37 +1824,7 @@
         "filesystem"
       ],
       "lane": "packaging_contract",
-      "nodeid": "tests/modern/test_windows_distributable_contract.py::test_packaged_automation_smoke_asserts_formatted_summary_output",
-      "reason": "Guards explicit packaging and workflow contract decisions while scripts are split.",
-      "runtime_class": "subsecond",
-      "size": "small"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "packaging_contract",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "filesystem"
-      ],
-      "lane": "packaging_contract",
       "nodeid": "tests/modern/test_windows_distributable_contract.py::test_packaged_smoke_launches_with_positional_project_argument",
-      "reason": "Guards explicit packaging and workflow contract decisions while scripts are split.",
-      "runtime_class": "subsecond",
-      "size": "small"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "packaging_contract",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "filesystem"
-      ],
-      "lane": "packaging_contract",
-      "nodeid": "tests/modern/test_windows_distributable_contract.py::test_launch_resolves_frozen_startup_project_arguments",
       "reason": "Guards explicit packaging and workflow contract decisions while scripts are split.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1945,21 +1915,6 @@
       ],
       "lane": "packaging_contract",
       "nodeid": "tests/modern/test_windows_distributable_contract.py::test_shared_modern_r_dependency_installer_is_used_by_packagers",
-      "reason": "Guards explicit packaging and workflow contract decisions while scripts are split.",
-      "runtime_class": "subsecond",
-      "size": "small"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "packaging_contract",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "filesystem"
-      ],
-      "lane": "packaging_contract",
-      "nodeid": "tests/modern/test_windows_distributable_contract.py::test_openmetar_r_stack_verifier_declares_issue_114_gate_sequence",
       "reason": "Guards explicit packaging and workflow contract decisions while scripts are split.",
       "runtime_class": "subsecond",
       "size": "small"
