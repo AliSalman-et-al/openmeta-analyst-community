@@ -9,7 +9,8 @@
 ####################################
 
 
-print.summary.display <- function(summary.disp,...) {
+print.summary.display <- function(x, ...) {
+  summary.disp <- x
   #
   # Prints a summary results
   # summary.disp is a list containing the following named items
@@ -34,7 +35,8 @@ print.summary.display <- function(summary.disp,...) {
    }
 }
 
-print.summary.data <- function(table.data,...) {
+print.summary.data <- function(x, ...) {
+  table.data <- x
   # Prints an array table.data.
   num.rows <- length(table.data[,1])
   num.cols <- length(table.data[1,])

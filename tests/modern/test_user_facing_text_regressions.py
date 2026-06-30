@@ -73,7 +73,6 @@ def test_issue_76_to_105_reported_bad_user_facing_strings_are_absent():
             "src/R/OpenMetaR/R/meta_methods.r",
             "src/R/OpenMetaR/R/plotting.r",
             "src/R/OpenMetaR/R/utilities.r",
-            "src/R/HSROC/R/HSROCSummary.R",
             *HELP_HTML,
         ]
     )
@@ -100,8 +99,6 @@ def test_issue_76_to_105_reported_bad_user_facing_strings_are_absent():
         "leason",
         "Cells to which correction factor should be added",
         "Number of digits of precision to display",
-        "HPD.low",
-        "HPD.high",
         "Fixed-effect Model",
         "248-254.)",
         "(1959) Statistical",
@@ -196,7 +193,6 @@ def test_issue_76_to_105_corrected_user_facing_strings_are_present():
             "src/R/OpenMetaR/R/meta_methods.r",
             "src/R/OpenMetaR/R/plotting.r",
             "src/R/OpenMetaR/R/utilities.r",
-            "src/R/HSROC/R/HSROCSummary.R",
             *HELP_HTML,
         ]
     )
@@ -214,8 +210,6 @@ def test_issue_76_to_105_corrected_user_facing_strings_are_present():
         "Ctrl+Z",
         "Correction factor target",
         "Number of digits",
-        "HPD lower",
-        "HPD upper",
         "Fixed-Effect Model",
         "Outcomes must be numeric.",
         "Negative Predictive Value",

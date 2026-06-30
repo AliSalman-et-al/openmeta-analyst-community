@@ -20,18 +20,15 @@ Normal desktop users do not need to manually install R or R packages before runn
 Install the required R packages:
 
 ```r
-install.packages(c("metafor", "lme4", "MCMCpack", "igraph"))
+Sys.setenv(R_LIBS_USER = "path/to/local/r-library")
+source("scripts/install-modern-r-deps.R")
 ```
 
-Build and install the bundled `HSROC` package and the bundled `OpenMetaR` package from `src/R`.
-
-These packages are distributed with the source tree. Use the bundled `HSROC` package, not the CRAN package.
+Build and install the local `OpenMetaR` package from `src/R`. `HSROC` is installed from the CRAN Archive by `scripts/install-modern-r-deps.R`; `OpenMetaR` is the only local R package.
 
 ```sh
 cd src/R
-R CMD build HSROC
 R CMD build OpenMetaR
-R CMD INSTALL HSROC_2.0.5.tar.gz
 R CMD INSTALL OpenMetaR_1.0.tar.gz
 ```
 

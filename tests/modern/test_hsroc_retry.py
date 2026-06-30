@@ -116,22 +116,15 @@ _HSROC_NAMESPACE_DRIVER = textwrap.dedent(
       quit(status=42)
     }
 
-    r.lib <- tempfile("hsroc_lib_")
-    dir.create(r.lib)
-    install <- system2(
-      file.path(R.home("bin"), "R"),
-      c("CMD", "INSTALL", paste0("--library=", r.lib), file.path(repo, "src/R/HSROC")),
-      stdout=TRUE,
-      stderr=TRUE
-    )
-    status <- attr(install, "status")
-    if (!is.null(status) && status != 0) {
-      cat("SKIP R CMD INSTALL HSROC failed\n", paste(tail(install, 40), collapse="\n"), "\n")
+    missing <- c("HSROC")[!vapply(c("HSROC"), requireNamespace, logical(1), quietly=TRUE)]
+    if (length(missing) > 0) {
+      cat("SKIP missing R packages:", paste(missing, collapse=", "), "\n")
       quit(status=42)
     }
-
-    .libPaths(c(r.lib, .libPaths()))
-    requireNamespace("HSROC")
+    if (as.character(utils::packageVersion("HSROC")) != "2.1.9") {
+      cat("SKIP HSROC 2.1.9 is not installed\n")
+      quit(status=42)
+    }
     if (!exists("as.mcmc", envir=asNamespace("HSROC"), inherits=TRUE)) {
       stop("HSROC namespace did not import coda::as.mcmc")
     }

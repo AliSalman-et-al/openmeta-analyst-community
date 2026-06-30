@@ -393,7 +393,7 @@ binary.fixed.mh.value.info <- function() {
         QEp      = list(type="vector", description='p-value for the test of (residual) heterogeneity.'),
         MH       = list(type="vector", description='Cochran-Mantel-Haenszel test statistic (measure="OR") or Mantel-Haenszel test statistic (measure="IRR").'),
         MHp      = list(type="vector", description='corresponding p-value'),
-        TA       = list(type="vector", description='Tarone’s heterogeneity test statistic (only when measure="OR").'), 
+        TA       = list(type="vector", description="Tarone's heterogeneity test statistic (only when measure=\"OR\")."), 
         TAp      = list(type="vector", description='corresponding p-value (only when measure="OR").'), 
         k        = list(type="vector", description='number of tables included in the analysis.'), 
         yi       = list(type="vector", description='the vector of outcomes'),

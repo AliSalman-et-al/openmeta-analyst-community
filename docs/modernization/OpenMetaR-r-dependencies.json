@@ -17,7 +17,6 @@
     }
   },
   "empty_scope_rationale": {
-    "test": "The current OpenMetaR R unit test file uses base R plus library(OpenMetaR) and does not declare a direct R test framework such as testthat or RUnit.",
     "build": "No compiled OpenMetaR code or LinkingTo dependency is present in the current package metadata; roxygen2 is listed because the parent modernization slice requires generated documentation and NAMESPACE output."
   },
   "direct_OpenMetaR_dependencies": [
@@ -26,7 +25,7 @@
       "source": "base-runtime",
       "scope": ["runtime"],
       "declared_in": ["src/R/OpenMetaR/DESCRIPTION"],
-      "evidence": ["src/R/OpenMetaR/DESCRIPTION: Depends: R (>= 2.9.2)"],
+      "evidence": ["src/R/OpenMetaR/DESCRIPTION: Depends: R (>= 4.6.0)"],
       "reason": "OpenMetaR is an R package and declares a minimum R runtime.",
       "installed_version": "4.6.0"
     },
@@ -73,15 +72,16 @@
     },
     {
       "name": "HSROC",
-      "source": "bundled-local",
+      "source": "cran-archive",
       "scope": ["runtime"],
       "declared_in": ["src/R/OpenMetaR/DESCRIPTION"],
       "evidence": [
         "src/R/OpenMetaR/R/diagnostic_methods.r: diagnostic.hsroc delegates to HSROC(...) and HSROCSummary(...)",
-        "src/R/HSROC/DESCRIPTION"
+        "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz",
+        "scripts/install-modern-r-deps.R"
       ],
-      "reason": "Diagnostic HSROC analysis delegates sampling and summaries to the bundled HSROC package.",
-      "installed_version": "2.0.5"
+      "reason": "Diagnostic HSROC analysis delegates sampling and summaries to the latest available archived HSROC package.",
+      "installed_version": "2.1.9"
     },
     {
       "name": "lme4",
@@ -140,6 +140,19 @@
       "evidence": ["docs/adr/0057-convert-openmetar-to-roxygen2-in-the-first-r-stack-slice.md"],
       "reason": "The modernization slice requires roxygen2-generated documentation and NAMESPACE output.",
       "installed_version": "8.0.0"
+    },
+    {
+      "name": "testthat",
+      "source": "cran",
+      "scope": ["test"],
+      "declared_in": ["src/R/OpenMetaR/DESCRIPTION"],
+      "evidence": [
+        "src/R/OpenMetaR/DESCRIPTION",
+        "src/R/OpenMetaR/tests/testthat.R",
+        "src/R/OpenMetaR/tests/testthat"
+      ],
+      "reason": "OpenMetaR package-native tests use testthat and run during R CMD check.",
+      "installed_version": "3.3.2"
     }
   ],
   "app_r_bundle_dependencies": [
@@ -248,7 +261,7 @@
     {
       "name": "igraph",
       "source": "cran",
-      "reason": "Currently declared by OpenMetaR metadata and bundled by the app, but no direct OpenMetaR call site has been identified in this slice.",
+      "reason": "Bundled as an app-level dependency retained outside direct OpenMetaR metadata; no direct OpenMetaR call site has been identified in this slice.",
       "evidence": ["src/R/OpenMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
     },
     {
@@ -260,31 +273,31 @@
     {
       "name": "ape",
       "source": "cran",
-      "reason": "Currently declared by OpenMetaR metadata and bundled by the app, but no direct OpenMetaR call site has been identified in this slice.",
+      "reason": "Bundled as an app-level dependency retained outside direct OpenMetaR metadata; no direct OpenMetaR call site has been identified in this slice.",
       "evidence": ["src/R/OpenMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
     },
     {
       "name": "Hmisc",
       "source": "cran",
-      "reason": "Currently declared by OpenMetaR metadata and bundled by the app, but no direct OpenMetaR call site has been identified in this slice.",
+      "reason": "Bundled as an app-level dependency retained outside direct OpenMetaR metadata; no direct OpenMetaR call site has been identified in this slice.",
       "evidence": ["src/R/OpenMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
     },
     {
       "name": "mice",
       "source": "cran",
-      "reason": "Currently declared by OpenMetaR metadata and bundled by the app, but no direct OpenMetaR call site has been identified in this slice.",
+      "reason": "Bundled as an app-level dependency retained outside direct OpenMetaR metadata; no direct OpenMetaR call site has been identified in this slice.",
       "evidence": ["src/R/OpenMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
     },
     {
       "name": "ggplot2",
       "source": "cran",
-      "reason": "Currently declared by OpenMetaR metadata and bundled by the app, but no direct OpenMetaR call site has been identified in this slice.",
+      "reason": "Bundled as an app-level dependency retained outside direct OpenMetaR metadata; no direct OpenMetaR call site has been identified in this slice.",
       "evidence": ["src/R/OpenMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
     },
     {
       "name": "RColorBrewer",
       "source": "cran",
-      "reason": "Currently declared by OpenMetaR metadata and bundled by the app, but no direct OpenMetaR call site has been identified in this slice.",
+      "reason": "Bundled as an app-level dependency retained outside direct OpenMetaR metadata; no direct OpenMetaR call site has been identified in this slice.",
       "evidence": ["src/R/OpenMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
     },
     {
@@ -308,19 +321,19 @@
     {
       "name": "nlme",
       "source": "recommended",
-      "reason": "Currently declared by OpenMetaR metadata and bundled by the app, but no direct OpenMetaR call site has been identified in this slice.",
+      "reason": "Bundled as an app-level dependency retained outside direct OpenMetaR metadata; no direct OpenMetaR call site has been identified in this slice.",
       "evidence": ["src/R/OpenMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
     },
     {
       "name": "splines",
       "source": "base-runtime",
-      "reason": "Currently declared by OpenMetaR metadata, but no direct OpenMetaR call site has been identified in this slice.",
+      "reason": "Retained outside direct OpenMetaR metadata; no direct OpenMetaR call site has been identified in this slice.",
       "evidence": ["src/R/OpenMetaR/DESCRIPTION"]
     },
     {
       "name": "survival",
       "source": "recommended",
-      "reason": "Currently declared by OpenMetaR metadata and installed by the app bundle, but no direct OpenMetaR call site has been identified in this slice.",
+      "reason": "Installed by the app bundle outside direct OpenMetaR metadata; no direct OpenMetaR call site has been identified in this slice.",
       "evidence": ["src/R/OpenMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
     },
     {

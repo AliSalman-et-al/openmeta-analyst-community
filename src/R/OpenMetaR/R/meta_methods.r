@@ -373,8 +373,8 @@ boot.ma.output.results <- function(boot.results, params, bootstrap.plot.path) {
 	mean.msg <- paste("The observed value of the effect size was ", round(boot.results$t0, digits=params$digits), ", while the mean over the replicates was ", round(mean_boot,digits=params$digits), ".", sep="")
 	summary.msg <- paste(conf.interval.msg, "\n", mean.msg, sep="")
 	# Make histogram
-	png(file=bootstrap.plot.path)
-	plot.custom.boot(boot.results, title=as.character(params$histogram.title), xlab=c(as.character(params$histogram.xlab)), ci.lb=conf.interval$norm[2], ci.ub=conf.interval$norm[3])
+	png(filename=bootstrap.plot.path)
+	plot.custom.boot(boot.results, title=as.character(params$histogram.title), xlabs=c(as.character(params$histogram.xlab)), ci.lb=conf.interval$norm[2], ci.ub=conf.interval$norm[3])
 	graphics.off()
 	
 	images <- c("Histogram"=bootstrap.plot.path)
@@ -430,7 +430,7 @@ boot.meta.reg.output.results <- function(boot.results, params, bootstrap.plot.pa
 	xlabels <- paste(xlabels, "Coefficient")
 	
 	# Make histograms
-	png(file=bootstrap.plot.path, width = 480, height = 480*length(xlabels))
+	png(filename=bootstrap.plot.path, width = 480, height = 480*length(xlabels))
 	plot.custom.boot(boot.results,
 					 title=as.character(params$histogram.title),
 					 xlabs=xlabels,
@@ -458,7 +458,7 @@ boot.meta.reg.cond.means.output.results <- function(omdata, boot.results, params
 	xlabels.clean <- xlabels
 	xlabels <- paste("Conditional Mean of", xlabels)
 	
-	png(file=bootstrap.plot.path, width = 480, height = 480*length(xlabels))
+	png(filename=bootstrap.plot.path, width = 480, height = 480*length(xlabels))
 	plot.custom.boot(boot.results,
 			title=as.character(params$histogram.title),
 			xlabs=xlabels,

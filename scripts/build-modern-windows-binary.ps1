@@ -176,7 +176,7 @@ function Get-RPackageCacheKey {
 function Test-BundledRPackages {
     param([string]$RscriptExe, [string]$Library)
     if (-not (Test-Path $Library)) { return $false }
-    $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','OpenMetaR','metafor','lme4','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }"
+    $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','OpenMetaR','metafor','lme4','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }; if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
     & $RscriptExe -e $verify
     return ($LASTEXITCODE -eq 0)
 }
@@ -237,12 +237,9 @@ function Install-LocalRPackagesFromSource {
     $packageBuildRoot = Join-Path $workRoot "r-package-build"
     if (Test-Path $packageBuildRoot) { Remove-Item -LiteralPath $packageBuildRoot -Recurse -Force }
     New-Item -ItemType Directory -Force -Path $packageBuildRoot | Out-Null
-    Copy-Item -Path (Join-Path $srcDir "R\HSROC") -Destination (Join-Path $packageBuildRoot "HSROC") -Recurse -Force
     Copy-Item -Path (Join-Path $srcDir "R\OpenMetaR") -Destination (Join-Path $packageBuildRoot "OpenMetaR") -Recurse -Force
     Get-ChildItem -Path $packageBuildRoot -Recurse -Include *.o,*.so,*.dll | Remove-Item -Force
 
-    & $rExe CMD INSTALL --library="$rLibrary" (Join-Path $packageBuildRoot "HSROC")
-    if ($LASTEXITCODE -ne 0) { throw "R CMD INSTALL HSROC failed." }
     & $rExe CMD INSTALL --library="$rLibrary" (Join-Path $packageBuildRoot "OpenMetaR")
     if ($LASTEXITCODE -ne 0) { throw "R CMD INSTALL OpenMetaR failed." }
 
@@ -281,9 +278,9 @@ function Install-BundledRPackages {
         if ($LASTEXITCODE -ne 0) { throw "Modern R dependency install failed." }
     }
 
-    Write-Step "Installing local OpenMeta R packages"
+    Write-Step "Installing local OpenMetaR package"
     Install-LocalRPackagesFromSource -Root $Root
-    & $rscriptExe -e "pkgs <- c('HSROC','OpenMetaR','metafor','lme4','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1)"
+    & $rscriptExe -e "pkgs <- c('HSROC','OpenMetaR','metafor','lme4','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
     if ($LASTEXITCODE -ne 0) { throw "Bundled R package verification failed." }
 
     if (Test-BundledRPackages -RscriptExe $rscriptExe -Library $rLibrary) {

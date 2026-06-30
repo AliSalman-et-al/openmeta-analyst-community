@@ -18,6 +18,7 @@ OPENMETAR_DESCRIPTION = OPENMETAR_PACKAGE / "DESCRIPTION"
 OPENMETAR_NAMESPACE = OPENMETAR_PACKAGE / "NAMESPACE"
 
 LEGACY_EXPORT_PATTERN = re.compile(r"^([A-Za-z][A-Za-z0-9._]*)\s*<-\s*function\s*\(", re.MULTILINE)
+LEGACY_ALIAS_PATTERN = re.compile(r"^([A-Za-z][A-Za-z0-9._]*)\s*<-\s*([A-Za-z][A-Za-z0-9._]*)\s*$", re.MULTILINE)
 S4_CLASS_PATTERN = re.compile(r"setClass\(\s*[\"']([^\"']+)[\"']")
 
 
@@ -78,17 +79,36 @@ def test_drift_manifest_preserves_review_record_schema(tmp_path):
     assert "reviewed_drift_required_fields missing independent_validation_signal" in result.stderr
 
 
-def test_manifest_records_empty_direct_test_dependency_scope(tmp_path):
+def test_manifest_records_empty_direct_build_dependency_scope(tmp_path):
     root = copy_modernization_docs(tmp_path)
     manifest_path = root / DEPENDENCY_MANIFEST
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    del manifest["empty_scope_rationale"]["test"]
+    for dependency in manifest["direct_OpenMetaR_dependencies"]:
+        if dependency["name"] == "roxygen2":
+            dependency["scope"] = ["documentation"]
+    del manifest["empty_scope_rationale"]["build"]
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
     result = run_validator(root)
 
     assert result.returncode == 1
-    assert "empty_scope_rationale.test" in result.stderr
+    assert "empty_scope_rationale.build" in result.stderr
+
+
+def test_cran_archive_dependencies_must_pin_exact_versions(tmp_path):
+    root = copy_modernization_docs(tmp_path)
+    manifest_path = root / DEPENDENCY_MANIFEST
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    for dependency in manifest["direct_OpenMetaR_dependencies"]:
+        if dependency["name"] == "HSROC":
+            dependency["installed_version"] = "latest-compatible"
+            break
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    result = run_validator(root)
+
+    assert result.returncode == 1
+    assert "archived CRAN packages must declare an exact version" in result.stderr
 
 
 def test_installed_version_report_parses_rscript_output(monkeypatch):
@@ -167,7 +187,9 @@ def parse_packages(field_value):
 def legacy_exported_functions_from_source():
     names = set()
     for path in OPENMETAR_R_DIR.glob("*.r"):
-        names.update(LEGACY_EXPORT_PATTERN.findall(path.read_text(encoding="utf-8")))
+        text = path.read_text(encoding="utf-8")
+        names.update(LEGACY_EXPORT_PATTERN.findall(text))
+        names.update(match.group(1) for match in LEGACY_ALIAS_PATTERN.finditer(text))
     return names
 
 
@@ -202,7 +224,7 @@ def test_openmetar_description_declares_only_direct_package_dependencies():
         "stats",
         "utils",
     }
-    assert parse_packages(fields["Suggests"]) == {"roxygen2"}
+    assert parse_packages(fields["Suggests"]) == {"roxygen2", "testthat"}
     assert "igraph" not in fields["Imports"]
     assert "Hmisc" not in fields["Imports"]
     assert "exportPattern" not in OPENMETAR_NAMESPACE.read_text(encoding="utf-8")

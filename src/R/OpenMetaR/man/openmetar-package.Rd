@@ -136,6 +136,7 @@
 \alias{diagnostic.fixed.peto.parameters}
 \alias{diagnostic.fixed.peto.pretty.names}
 \alias{diagnostic.hsroc}
+\alias{diagnostic.hsroc.is.feasible}
 \alias{diagnostic.hsroc.ml.is.feasible}
 \alias{diagnostic.hsroc.parameters}
 \alias{diagnostic.hsroc.pretty.names}

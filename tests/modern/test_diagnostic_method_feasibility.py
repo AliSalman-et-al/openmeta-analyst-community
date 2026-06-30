@@ -19,9 +19,9 @@ _DIAGNOSTIC_FEASIBILITY_DRIVER = textwrap.dedent(
       quit(status=42)
     }
 
-    suppressPackageStartupMessages(source(file.path(repo, "src/R/openmetar/R/classes.r")))
-    suppressPackageStartupMessages(source(file.path(repo, "src/R/openmetar/R/utilities.r")))
-    suppressPackageStartupMessages(source(file.path(repo, "src/R/openmetar/R/diagnostic_methods.r")))
+    suppressPackageStartupMessages(source(file.path(repo, "src/R/OpenMetaR/R/classes.r")))
+    suppressPackageStartupMessages(source(file.path(repo, "src/R/OpenMetaR/R/utilities.r")))
+    suppressPackageStartupMessages(source(file.path(repo, "src/R/OpenMetaR/R/diagnostic_methods.r")))
 
     entered.effects <- new(
       "DiagnosticData",

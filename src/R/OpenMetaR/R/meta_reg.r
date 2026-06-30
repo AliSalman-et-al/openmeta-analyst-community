@@ -649,8 +649,11 @@ g.bootstrap.meta.regression <- function(data, mods, method, level, digits,
 						failures <<- failures + 1
 						indices <- sample.int(nrow(data), size=length(indices), replace=TRUE)
 						cat("Error in regression wrapper: ",e$message,"\n")
-						next
+						NULL
 					  })
+			if (is.null(res.tmp)) {
+				next
+			}
 			# Everything worked alright
 			ok <- TRUE
 		} # end while
@@ -694,7 +697,7 @@ g.bootstrap.meta.regression <- function(data, mods, method, level, digits,
 	
 	# Make histograms
 	xlabels <- coeff.names
-	png(file=bootstrap.plot.path, width = 480, height = 480*length(xlabels))
+	png(filename=bootstrap.plot.path, width = 480, height = 480*length(xlabels))
 	plot.custom.boot(res.boot,
 			title=as.character(histogram.title),
 			xlabs=xlabels,
@@ -756,8 +759,11 @@ g.bootstrap.meta.regression.cond.means <- function(
 						failures <<- failures + 1
 						indices <- sample.int(nrow(data), size=length(indices), replace=TRUE)
 						cat("Error in regression wrapper: ",e$message,"\n")
-						next
+						NULL
 					})
+			if (is.null(res.tmp)) {
+				next
+			}
 			# Everything worked alright
 			ok <- TRUE
 		} # end while
@@ -816,7 +822,7 @@ g.bootstrap.meta.regression.cond.means <- function(
 	
 	# Make histograms
 	xlabels <- coeff.names
-	png(file=bootstrap.plot.path, width = 480, height = 480*length(xlabels))
+	png(filename=bootstrap.plot.path, width = 480, height = 480*length(xlabels))
 	plot.custom.boot(res.boot,
 			title=as.character(histogram.title),
 			xlabs=xlabels,

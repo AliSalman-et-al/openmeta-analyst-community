@@ -195,16 +195,17 @@ def test_shared_modern_r_dependency_installer_is_used_by_packagers():
 
     assert "R_LIBS_USER must point at the target bundled R library" in installer
     assert "install_cran_packages(" in installer
-    assert "install_archive" not in installer
-    assert "src/contrib/Archive" not in installer
-    assert "repos = NULL" not in installer
+    assert "install_archive_package(" in installer
+    assert "src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz" in installer
+    assert "repos = NULL" in installer
     for archived_pin in [
         '"metafor", "1.9-9"',
         '"igraph", "1.0.1"',
         '"lme4", "1.1-12"',
     ]:
         assert archived_pin not in installer
-    assert '"HSROC"' not in installer
+    assert '"HSROC"' in installer
+    assert '"2.1.9"' in installer
     assert '"OpenMetaR"' not in installer
     assert "install-modern-r-deps.R" in windows
     assert "install-modern-r-deps.R" in macos
@@ -221,7 +222,6 @@ def test_openmetar_r_stack_verifier_declares_issue_114_gate_sequence():
         "validate_openmetar_r_manifests.py",
         "install-modern-r-deps.R",
         "\"CMD\", \"INSTALL\"",
-        "src\") / \"R\" / \"HSROC\"",
         "src\") / \"R\" / \"OpenMetaR\"",
         "\"CMD\", \"build\"",
         "\"CMD\"",
@@ -230,6 +230,7 @@ def test_openmetar_r_stack_verifier_declares_issue_114_gate_sequence():
         "test_inprocess_rpy2_backend.py",
         "test_openmetar_r_manifest_validation.py",
         "--report-installed-versions",
+        "cran-archive",
         "isolated R library",
         "OpenMetaR R Stack Slice verification complete",
     ]:

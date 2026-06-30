@@ -13,7 +13,6 @@ from pathlib import Path
 
 
 OPENMETAR_PACKAGE = Path("src") / "R" / "OpenMetaR"
-HSROC_PACKAGE = Path("src") / "R" / "HSROC"
 R_DEP_INSTALLER = Path("scripts") / "install-modern-r-deps.R"
 R_SMOKE_TEST = Path("scripts") / "analysis-smoke-test.R"
 R_MANIFEST_VALIDATOR = Path("scripts") / "validate_openmetar_r_manifests.py"
@@ -147,6 +146,19 @@ def verify_manifest_versions(root: Path, python: str, rscript: Path, env: dict[s
     missing = sorted(name for name, version in report["packages"].items() if version is None)
     if missing:
         raise VerificationError("manifest dependency packages are not installed: " + ", ".join(missing))
+    manifest = json.loads((root / Path("docs") / "modernization" / "OpenMetaR-r-dependencies.json").read_text(encoding="utf-8"))
+    exact_versions = {
+        dependency["name"]: dependency["installed_version"]
+        for dependency in manifest["direct_OpenMetaR_dependencies"]
+        if dependency.get("source") == "cran-archive"
+    }
+    wrong_versions = {
+        name: {"expected": expected, "actual": report["packages"].get(name)}
+        for name, expected in exact_versions.items()
+        if report["packages"].get(name) != expected
+    }
+    if wrong_versions:
+        raise VerificationError("manifest dependency versions do not match: " + json.dumps(wrong_versions, sort_keys=True))
     step("Manifest dependency versions are installed: " + json.dumps(report, sort_keys=True))
 
 
@@ -170,7 +182,6 @@ def verify(args: argparse.Namespace) -> None:
         step(f"Using isolated R library at {r_library}")
         run([rscript, R_DEP_INSTALLER], cwd=root, env=env)
 
-        run([r_exe, "CMD", "INSTALL", f"--library={r_library}", root / HSROC_PACKAGE], cwd=root, env=env)
         run([r_exe, "CMD", "build", "--no-build-vignettes", root / OPENMETAR_PACKAGE], cwd=work_dir, env=env)
         tarball = built_OpenMetaR_tarball(work_dir)
         run(

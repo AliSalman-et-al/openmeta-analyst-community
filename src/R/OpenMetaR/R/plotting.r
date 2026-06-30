@@ -584,7 +584,7 @@ create.subgroup.plot.data.cont <- function(subgroup.data, params) {
 }
 
 # create regression plot data
-create.plot.data.reg <- function(reg.data, params, fitted.line) {
+create.plot.data.reg <- function(reg.data, params, fitted.line, selected.cov=NULL) {
      scale.str <- get.scale(params)
      cov.name <- reg.data@covariates[[1]]@cov.name
      cov.vals <- reg.data@covariates[[1]]@cov.vals
@@ -872,7 +872,7 @@ forest.plot <- function(forest.data, outpath) {
   # to save an iamge to my.pngimg.pdf, it will save it instead
   # as a png. on the other hand, why would someone do that?
   if (length(grep(".png", outpath)) != 0){
-      png(file=outpath, width = how.wide, height = how.tall+2 , units = "in", res = 144) 
+      png(filename=outpath, width = how.wide, height = how.tall+2 , units = "in", res = 144) 
   }
   else{
       pdf(file=outpath, width = how.wide+1, height = how.tall+2) 
@@ -1549,7 +1549,7 @@ two.forest.plots <- function(forest.data, outpath) {
        x.pos <- 1 + (how.wide1 - how.wide2) / how.wide1
    }
    if (length(grep(".png", outpath)) != 0){
-      png(file=outpath, width = how.wide1 + how.wide2, height = how.tall+1 , units = "in", res = 144) 
+      png(filename=outpath, width = how.wide1 + how.wide2, height = how.tall+1 , units = "in", res = 144) 
    } else{
       pdf(file=outpath, width = how.wide1 + how.wide2 + 1, height = how.tall+2) 
    }
@@ -1570,7 +1570,7 @@ two.forest.plots <- function(forest.data, outpath) {
 #######################################
 #       meta-regression scatter       #
 #######################################
-meta.regression.plot <- function(plot.data, outpath) {
+meta.regression.plot <- function(plot.data, outpath, ...) {
 	png(filename=paste("r_tmp","INTER",sep="/")) # to fix windows popping out at you issue
 
     lweight = 1
@@ -1596,7 +1596,7 @@ meta.regression.plot <- function(plot.data, outpath) {
     y.max <- y.range.max + (y.range / 5)
 
     if (length(grep(".png", outpath)) != 0){
-        png(file=outpath, width=10 , height=5, units="in", res=144)
+        png(filename=outpath, width=10 , height=5, units="in", res=144)
     } else {
         pdf(file=outpath, width=10 , height=5)
     }
@@ -1641,7 +1641,7 @@ sroc.plot <- function(plot.data, outpath){
     ylab="Sensitivity"
     s.range <- plot.data$s.range
     if (length(grep(".png", outpath)) != 0){
-        png(file=outpath, height=5, width=5, units="in", res=144)
+        png(filename=outpath, height=5, width=5, units="in", res=144)
     } else {
         pdf(file=outpath, height=5, width=5)
     }

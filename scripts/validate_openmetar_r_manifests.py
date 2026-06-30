@@ -110,12 +110,23 @@ def validate_dependency_manifest(manifest: dict) -> list[str]:
     empty_scope_rationale = manifest["empty_scope_rationale"]
     if not isinstance(empty_scope_rationale, dict):
         raise ValidationError(f"{DEPENDENCY_MANIFEST}: empty_scope_rationale must be an object")
-    require_non_empty_string(empty_scope_rationale.get("test"), f"{DEPENDENCY_MANIFEST}:empty_scope_rationale.test")
-
     direct_dependencies = require_list(
         manifest["direct_OpenMetaR_dependencies"],
         f"{DEPENDENCY_MANIFEST}:direct_OpenMetaR_dependencies",
     )
+    scopes_present = {
+        scope
+        for dependency in direct_dependencies
+        if isinstance(dependency, dict)
+        for scope in dependency.get("scope", [])
+    }
+    for optional_scope in ("test", "build"):
+        if optional_scope not in scopes_present:
+            require_non_empty_string(
+                empty_scope_rationale.get(optional_scope),
+                f"{DEPENDENCY_MANIFEST}:empty_scope_rationale.{optional_scope}",
+            )
+
     app_dependencies = require_list(
         manifest["app_r_bundle_dependencies"],
         f"{DEPENDENCY_MANIFEST}:app_r_bundle_dependencies",
@@ -141,6 +152,8 @@ def validate_dependency_manifest(manifest: dict) -> list[str]:
         if not require_list(dependency["evidence"], f"{label}.evidence"):
             raise ValidationError(f"{label}.evidence: expected at least one evidence entry")
         require_non_empty_string(dependency["reason"], f"{label}.reason")
+        if dependency["source"] == "cran-archive" and dependency["installed_version"] == "latest-compatible":
+            raise ValidationError(f"{label}.installed_version: archived CRAN packages must declare an exact version")
 
     seen_app: set[str] = set()
     overlap = set()

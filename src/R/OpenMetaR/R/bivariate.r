@@ -112,7 +112,7 @@ plot.bivariate <- function(meta.results, TP, FP, FN, TN, plot.points=TRUE,
     }
         
     if (plot.points == TRUE) {
-        png(file = paste(filepath, ".png", sep=""), height=960, width=960)
+        png(filename = paste(filepath, ".png", sep=""), height=960, width=960)
         plot(sens ~ fnr , asp=1, ylim = c(0,1) , xlim = c(0,1), ylab = "Sensitivity", xlab              = "1 - Specificity", cex = scale*total) 
         curve(    1/ ( 1 +  exp(-(intercept + slope*log(x/(1-x)  )   )   )  )   
                     , add = TRUE, xlim = c(low, high) , col = line.color)
@@ -125,7 +125,7 @@ plot.bivariate <- function(meta.results, TP, FP, FN, TN, plot.points=TRUE,
         dev.off()
     }  
     if (plot.points == FALSE) {
-        png(file = paste(filepath, ".png", sep=""), height=960, width=960)
+        png(filename = paste(filepath, ".png", sep=""), height=960, width=960)
         plot(sens ~ fnr , asp=1, ylim = c(0,1) , xlim = c(0,1), ylab = "Sensitivity", xlab              = "1 - Specificity", col = "white" )    
         curve(    1/ ( 1 +  exp(-(intercept + slope*log(x/(1-x)  )   )   )  ), xlim = c(low, high), ylab = "", xlab = "", add = TRUE, col = line.color )
         dev.off()   

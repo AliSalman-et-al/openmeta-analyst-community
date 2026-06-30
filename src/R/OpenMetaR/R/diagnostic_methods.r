@@ -965,7 +965,7 @@ diagnostic.hsroc <- function(diagnostic.data, params){
     }
 
     hsroc.sum <- HSROCSummary(data=diag.data.frame , burn_in=params$burn.in, Thin=params$thin, print_plot=T ,
-             path=out.dir, chain=chain.out.dirs )
+             summary.path=out.dir, chain=chain.out.dirs )
 
     #### 
     # pull out the summary
