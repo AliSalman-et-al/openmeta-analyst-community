@@ -234,6 +234,96 @@ def test_diagnostic_direct_effects_build_analysis_data_per_metric(monkeypatch):
         _close_without_prompt(app, window)
 
 
+def test_diagnostic_metric_dialog_defaults_to_supported_direct_effects(monkeypatch):
+    import launch
+
+    app, window = launch.start_automation()
+    import diag_metrics
+
+    captured = []
+
+    class _ShownForm(object):
+        def show(self):
+            pass
+
+    try:
+        _create_diagnostic_dataset(window)
+
+        monkeypatch.setattr(window.model, "included_studies_have_raw_data",
+                            lambda: False)
+        monkeypatch.setattr(window.model, "included_studies_have_point_estimates",
+                            lambda effect=None: effect in ("Sens", "Spec"))
+        monkeypatch.setattr(
+            window,
+            "_build_analysis_specs_dialog",
+            lambda **kwargs: captured.append(kwargs) or _ShownForm(),
+        )
+
+        form = diag_metrics.Diag_Metrics(window.model, parent=window)
+
+        assert form.get_selected_metrics() == ["sens", "spec"]
+        assert not form.chk_box_lr.isChecked()
+        assert not form.chk_box_lr.isEnabled()
+        assert not form.chk_box_dor.isChecked()
+        assert not form.chk_box_dor.isEnabled()
+
+        form.ok()
+
+        assert captured[0]["diag_metrics"] == ["sens", "spec"]
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_diagnostic_direct_effects_do_not_offer_count_based_methods(monkeypatch):
+    import launch
+
+    app, window = launch.start_automation()
+    import ma_specs
+
+    backend = ma_specs.meta_py_r
+    saved = {name: getattr(backend, name) for name in
+             ("get_available_methods", "get_params", "get_method_description",
+              "ma_dataset_to_simple_diagnostic_robj")}
+    try:
+        _create_diagnostic_dataset(window)
+
+        monkeypatch.setattr(window.model, "included_studies_have_raw_data",
+                            lambda: False)
+        monkeypatch.setattr(window.model, "included_studies_have_point_estimates",
+                            lambda effect=None: effect in ("Sens", "Spec"))
+
+        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
+        backend.get_available_methods = lambda **kwargs: {
+            "Bivariate (Maximum Likelihood)": "diagnostic.bivariate.ml",
+            "HSROC": "diagnostic.hsroc",
+            "Diagnostic Random-Effects": "diagnostic.random",
+            "Diagnostic Fixed-Effect Inverse Variance": "diagnostic.fixed.inv.var",
+        }
+        backend.get_params = lambda method: ({}, {}, [], {})
+        backend.get_method_description = lambda method: "stub method"
+
+        form = window._build_analysis_specs_dialog(
+            diag_metrics=["sens", "spec"],
+            conf_level=window.model.get_global_conf_level(),
+        )
+
+        method_names = [
+            str(form.method_cbo_box.itemText(index))
+            for index in range(form.method_cbo_box.count())
+        ]
+
+        assert "HSROC" not in method_names
+        assert "Bivariate (Maximum Likelihood)" not in method_names
+        assert method_names == [
+            "Diagnostic Random-Effects",
+            "Diagnostic Fixed-Effect Inverse Variance",
+        ]
+    finally:
+        for name, value in saved.items():
+            setattr(backend, name, value)
+        _close_without_prompt(app, window)
+
+
 def _close_without_prompt(app, window):
     window.current_data_unsaved = False
     window.close()
