@@ -1,21 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-target="macos"
+architecture=""
 artifact_name=""
 recreate_venv=0
 skip_tests=0
 skip_clean=0
 skip_smoke=0
+bundle_identifier="org.openmetaanalyst.community"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --target)
-      target="$2"
+    --architecture)
+      architecture="$2"
       shift 2
       ;;
     --artifact-name)
       artifact_name="$2"
+      shift 2
+      ;;
+    --bundle-identifier)
+      bundle_identifier="$2"
       shift 2
       ;;
     --recreate-venv)
@@ -51,21 +56,23 @@ step() {
 }
 
 if [ "$(uname -s)" != "Darwin" ]; then
-  echo "run-modern-workflow-local.sh currently supports macOS targets. Use run-modern-workflow-local.ps1 on Windows." >&2
+  echo "package-modern-macos.sh must run on macOS." >&2
   exit 1
 fi
 
-case "$target" in
-  macos|macos-intel|macos-x64)
-    architecture="x64"
+case "${architecture:-}" in
+  x64)
     default_artifact="OpenMetaAnalyst-modern-macos-x64"
     ;;
-  macos-arm64|macos-apple-silicon)
-    architecture="arm64"
+  arm64)
     default_artifact="OpenMetaAnalyst-modern-macos-arm64"
     ;;
+  "")
+    echo "--architecture is required and must be x64 or arm64." >&2
+    exit 2
+    ;;
   *)
-    echo "--target must be macos, macos-intel, macos-x64, macos-arm64, or macos-apple-silicon." >&2
+    echo "--architecture must be x64 or arm64." >&2
     exit 2
     ;;
 esac
@@ -83,17 +90,14 @@ step "Syncing locked modern environment with uv"
 uv sync --locked
 
 if [ "$skip_tests" -eq 0 ]; then
-  step "Running modern full-app automation tests"
-  uv run pytest tests/modern/test_metaform_automation_launch.py
-
-  step "Running remaining modern pytest suite"
-  uv run pytest tests/modern --ignore=tests/modern/test_metaform_automation_launch.py
+  step "Running focused macOS packaging tests"
+  uv run pytest tests/modern/test_pyqt5_ci_path.py tests/modern/test_pyqt5_generated_ui_imports.py tests/modern/test_project_pickle_loader.py
 fi
 
-step "Building modern macOS artifact with PyInstaller"
 build_args=(
   --architecture "$architecture"
   --artifact-name "$artifact_name"
+  --bundle-identifier "$bundle_identifier"
   --python-exe "$python_exe"
   --skip-dependency-install
 )
@@ -103,6 +107,7 @@ fi
 if [ "$skip_smoke" -eq 1 ]; then
   build_args+=(--skip-smoke)
 fi
-bash "$repo_root/scripts/build-modern-macos-binary.sh" "${build_args[@]}"
 
-step "Modern macOS workflow complete: artifacts/$artifact_name.zip"
+step "Building ad-hoc modern macOS artifact"
+bash "$repo_root/scripts/build-modern-macos-binary.sh" "${build_args[@]}"
+step "Modern macOS package complete: artifacts/$artifact_name.zip"

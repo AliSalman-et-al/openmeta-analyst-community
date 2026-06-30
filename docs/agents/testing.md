@@ -10,34 +10,41 @@ Sync the locked modern environment from the repository root:
 uv sync --locked
 ```
 
-Run the modern full-app automation test first when checking GUI launch behavior:
+Daily local verification uses the Fast Verification Lane:
 
 ```powershell
-uv run pytest tests\modern\test_metaform_automation_launch.py
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-modern-fast.ps1
 ```
 
-Run the remaining modern pytest suite with the automation test excluded:
+Run lane-specific tests when working in an area:
 
 ```powershell
-uv run pytest tests\modern --ignore=tests\modern\test_metaform_automation_launch.py
+uv run pytest tests\modern -m gui
+uv run pytest tests\modern -m r_stack
+uv run pytest tests\modern -m golden
+uv run pytest tests\modern -m packaging_contract
 ```
 
-For the full local modern verification and packaging path, use the repository script:
+Run Full R Stack Evidence before R Stack changes:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run-modern-workflow-local.ps1 -ArtifactName OpenMetaAnalyst-modern-windows-x64
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-modern-r-stack-full.ps1
 ```
 
-That script syncs `uv.lock` into `.venv`, runs the modern pytest suite through `uv run`, and builds the modern Windows PyInstaller artifact. Use this workflow for Python 3/PyQt5 work, modern GUI slices, and modern Windows packaging checks.
+Build the Windows package only when packaging evidence is needed:
 
-On macOS, use the shell workflow for the matching host architecture:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\package-modern-windows.ps1 -ArtifactName OpenMetaAnalyst-modern-windows-x64
+```
+
+On macOS, use the package script for the matching host architecture:
 
 ```bash
-bash ./scripts/run-modern-workflow-local.sh --target macos-intel
-bash ./scripts/run-modern-workflow-local.sh --target macos-arm64
+bash ./scripts/package-modern-macos.sh --architecture x64
+bash ./scripts/package-modern-macos.sh --architecture arm64
 ```
 
-Windows remains the default active CI package. macOS package jobs are opt-in through the GitHub Actions `workflow_dispatch` inputs.
+Windows remains the default active package target. macOS package jobs are opt-in through the GitHub Actions `workflow_dispatch` inputs.
 
 The Apple Silicon package job is currently experimental under the single Qt runtime policy because `PyQt5-Qt5==5.15.2` is the newest PyPI Qt5 runtime wheel with Windows support, but its macOS wheel is Intel-only.
 

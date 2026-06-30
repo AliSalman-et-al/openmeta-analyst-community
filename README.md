@@ -34,46 +34,48 @@ R CMD INSTALL OpenMetaR_1.0.tar.gz
 
 ## Tests
 
-Run the modern full-app automation test first when checking GUI launch behavior:
+Daily source verification uses the Fast Verification Lane:
 
 ```powershell
-uv run pytest tests\modern\test_metaform_automation_launch.py
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-modern-fast.ps1
 ```
 
-Run the remaining modern pytest suite with the automation test excluded:
+Run GUI or R Stack lanes directly when working in those areas:
 
 ```powershell
-uv run pytest tests\modern --ignore=tests\modern\test_metaform_automation_launch.py
+uv run pytest tests\modern -m gui
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-modern-r-stack-full.ps1
 ```
 
 ## Windows Binary Builds
 
-The maintained Windows build path is the modern Python 3/PyQt5 workflow:
+Fast verification and packaging are separate GitHub workflows:
 
 ```text
-.github/workflows/modern-python.yml
+.github/workflows/modern-fast.yml
+.github/workflows/modern-package.yml
 ```
 
 It packages `src/launch.py` through PyInstaller so the artifact starts the real `MetaForm` application path. The ZIP includes the PyQt5 runtime, bundled R package sources, sample data, bundled help, and a launcher script as `OpenMetaAnalyst-modern-windows-x64.zip`.
 
-Run the same modern workflow locally with `uv`:
+Build the modern Windows package locally only when packaging evidence is needed:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run-modern-workflow-local.ps1 -ArtifactName OpenMetaAnalyst-modern-windows-x64
+powershell -ExecutionPolicy Bypass -File .\scripts\package-modern-windows.ps1 -ArtifactName OpenMetaAnalyst-modern-windows-x64
 ```
 
-The local script syncs the committed `uv.lock` into `.venv`, runs `tests\modern` through `uv run`, and builds the modern Windows artifact through PyInstaller.
+The packaging script syncs the committed `uv.lock`, runs Full R Stack Evidence unless skipped, and builds the modern Windows artifact through PyInstaller.
 
 ## macOS Binary Builds
 
 macOS packaging is available as an explicit opt-in path for Intel and Apple Silicon runners:
 
 ```bash
-bash ./scripts/run-modern-workflow-local.sh --target macos-intel
-bash ./scripts/run-modern-workflow-local.sh --target macos-arm64
+bash ./scripts/package-modern-macos.sh --architecture x64
+bash ./scripts/package-modern-macos.sh --architecture arm64
 ```
 
-The GitHub workflow keeps Windows active by default on push and pull request. macOS package jobs run from `workflow_dispatch` when `build_macos` is enabled.
+The GitHub fast workflow runs on push and pull request. Package jobs run from `workflow_dispatch`, release tags, and packaging-relevant path changes. macOS package jobs remain manual opt-in.
 
 Apple Silicon packaging is present as an opt-in CI target. With the current single Qt runtime policy (`PyQt5-Qt5==5.15.2` everywhere), it is experimental because the common PyPI Qt wheel is Intel-only on macOS; the job is isolated from the default Windows build.
 

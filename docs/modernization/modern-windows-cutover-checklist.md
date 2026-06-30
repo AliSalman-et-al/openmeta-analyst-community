@@ -15,7 +15,7 @@ The modern Python 3 and Qt 5 path has replaced the legacy release path after sat
 
 ## Issue #34 release evidence
 
-- Local verification command: `scripts\run-modern-workflow-local.ps1` runs locked dependency sync, `tests\modern`, and the modern Windows packaging script.
+- Local verification command: `scripts\verify-modern-fast.ps1` runs the Fast Verification Lane; `scripts\package-modern-windows.ps1` runs the explicit Windows Packaging Lane.
 - Expected artifact: `OpenMetaAnalyst-modern-windows-x64.zip`.
 - Representative project-open samples: `sample_data\BCG.oma` and `sample_data\amino.oma`.
 - Bundled help target: `doc\openMA_help.html`.

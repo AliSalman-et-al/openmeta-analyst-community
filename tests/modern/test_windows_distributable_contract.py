@@ -91,20 +91,37 @@ def test_launch_resolves_frozen_startup_project_arguments():
         assert expected in launch
 
 
-def test_modern_windows_workflow_builds_separate_artifact():
-    workflow = (ROOT / ".github" / "workflows" / "modern-python.yml").read_text()
+def test_modern_fast_workflow_runs_default_fast_verification_lane():
+    workflow = (ROOT / ".github" / "workflows" / "modern-fast.yml").read_text()
 
-    assert "windows-modern" in workflow
-    assert "Verify OpenMetaR R Stack Slice" in workflow
-    assert "uv run python scripts/verify_openmetar_r_stack.py" in workflow
-    assert "build-modern-windows-binary.ps1" in workflow
+    assert "Fast Verification Lane" in workflow
+    assert ".\\scripts\\verify-modern-fast.ps1" in workflow
+    assert "setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b" in workflow
+    assert "uv python install 3.11" in workflow
+    assert "uv cache prune --ci" in workflow
+    assert "build-modern-windows-binary.ps1" not in workflow
+    assert "upload-artifact" not in workflow
+
+
+def test_modern_package_workflow_builds_path_aware_artifacts():
+    workflow = (ROOT / ".github" / "workflows" / "modern-package.yml").read_text()
+
+    assert "Windows Packaging Lane" in workflow
+    assert "workflow_dispatch:" in workflow
+    assert "branches:" in workflow
+    assert '"**"' in workflow
+    assert "paths:" in workflow
+    assert "scripts/package-modern-windows.ps1" in workflow
+    assert "scripts/package-modern-macos.sh" in workflow
+    assert "scripts/build-modern-windows-binary.ps1" in workflow
+    assert "scripts/build-modern-macos-binary.sh" in workflow
+    assert "scripts/install-modern-r-deps.R" in workflow
+    assert "src/R/**" in workflow
+    assert "src/launch.py" in workflow
     assert "OpenMetaAnalyst-modern-windows-x64.zip" in workflow
     assert "OpenMetaAnalyst-windows-x64.zip" not in workflow
-    assert "workflow_dispatch:" in workflow
-    assert "build_macos:" in workflow
-    assert "build_macos_arm64:" in workflow
-    assert "macos-modern-intel:" in workflow
-    assert "macos-modern-arm64:" in workflow
+    assert "macos-package-intel:" in workflow
+    assert "macos-package-arm64:" in workflow
     assert "macos-15-intel" in workflow
     assert "macos-14" in workflow
     assert "OpenMetaAnalyst-modern-macos-x64" in workflow
@@ -113,31 +130,32 @@ def test_modern_windows_workflow_builds_separate_artifact():
     assert "github.event_name == 'workflow_dispatch' && inputs.build_macos_arm64 }}" in workflow
 
 
-def test_local_modern_workflow_uses_uv():
-    script = (ROOT / "scripts" / "run-modern-workflow-local.ps1").read_text()
+def test_lane_named_local_scripts_replace_old_workflow_wrappers():
+    fast = (ROOT / "scripts" / "verify-modern-fast.ps1").read_text()
+    package = (ROOT / "scripts" / "package-modern-windows.ps1").read_text()
 
     for expected in [
         "uv sync --locked",
-        "uv run pytest tests\\modern\\test_metaform_automation_launch.py",
-        "uv run pytest tests\\modern",
-        "--ignore=tests\\modern\\test_metaform_automation_launch.py",
+        "uv run python scripts\\validate_golden_baseline_manifests.py",
+        "uv run python scripts\\validate_test_taxonomy.py",
+        'uv run pytest tests\\modern -m "fast or golden or packaging_contract"',
+        "uv run python scripts\\verify_openmetar_r_default.py",
+    ]:
+        assert expected in fast
+
+    for expected in [
         "uv run python scripts\\verify_openmetar_r_stack.py",
-        "OpenMetaR R Stack Slice verification failed.",
         "$buildArgs = @{",
         "ArtifactName = $ArtifactName",
         "PythonExe = $pythonExe",
         "SkipDependencyInstall = $true",
         "$buildArgs.SkipClean = $true",
         "$buildArgs.SkipSmoke = $true",
-        "[switch]$SkipClean",
-        "[switch]$SkipSmoke",
-
     ]:
-        assert expected in script
+        assert expected in package
 
-    assert "$buildArgs = @(" not in script
-    assert '"-ArtifactName", $ArtifactName' not in script
-    assert '"-PythonExe", $pythonExe' not in script
+    assert not (ROOT / "scripts" / "run-modern-workflow-local.ps1").exists()
+    assert not (ROOT / "scripts" / "run-modern-workflow-local.sh").exists()
 
 
 def test_modern_macos_distributable_contract_is_declared():
@@ -145,10 +163,13 @@ def test_modern_macos_distributable_contract_is_declared():
 
     for expected in [
         "--architecture",
+        "--bundle-identifier",
         "OpenMetaAnalyst-modern-macos-x64",
         "OpenMetaAnalyst-modern-macos-arm64",
         "PyInstaller",
         "--windowed",
+        "--target-architecture",
+        "--osx-bundle-identifier",
         "--hidden-import icons_rc",
         "--hidden-import rpy2.robjects",
         "OpenMetaAnalyst.app",
@@ -161,6 +182,7 @@ def test_modern_macos_distributable_contract_is_declared():
         "LaunchOpenMetaAnalyst.command",
         "resolve_existing_dir",
         "copy_tree",
+        "require_free_space_gb",
         "rsync -a --delete",
         "repo_path",
         "skip_clean",
@@ -172,15 +194,15 @@ def test_modern_macos_distributable_contract_is_declared():
         assert expected in script
 
 
-def test_local_modern_macos_workflow_uses_shared_build_script():
-    script = (ROOT / "scripts" / "run-modern-workflow-local.sh").read_text()
+def test_local_modern_macos_package_script_uses_shared_build_script():
+    script = (ROOT / "scripts" / "package-modern-macos.sh").read_text()
 
     for expected in [
         "uv sync --locked",
-        "uv run pytest tests/modern/test_metaform_automation_launch.py",
-        "uv run pytest tests/modern --ignore=tests/modern/test_metaform_automation_launch.py",
+        "uv run pytest tests/modern/test_pyqt5_ci_path.py tests/modern/test_pyqt5_generated_ui_imports.py tests/modern/test_project_pickle_loader.py",
         "build-modern-macos-binary.sh",
         "--architecture",
+        "--bundle-identifier",
         "--skip-dependency-install",
         "--skip-clean",
         "--skip-smoke",

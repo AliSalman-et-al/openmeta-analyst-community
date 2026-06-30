@@ -2,7 +2,8 @@ param(
     [string]$ArtifactName = "OpenMetaAnalyst-modern-windows-x64",
     [switch]$RecreateVenv,
     [switch]$SkipClean,
-    [switch]$SkipSmoke
+    [switch]$SkipSmoke,
+    [switch]$SkipVerification
 )
 
 $ErrorActionPreference = "Stop"
@@ -27,17 +28,11 @@ try {
     uv sync --locked
     if ($LASTEXITCODE -ne 0) { throw "uv failed to sync the locked modern environment." }
 
-    Write-Step "Running modern full-app automation tests"
-    uv run pytest tests\modern\test_metaform_automation_launch.py
-    if ($LASTEXITCODE -ne 0) { throw "Modern full-app automation tests failed." }
-
-    Write-Step "Running remaining modern pytest suite"
-    uv run pytest tests\modern --ignore=tests\modern\test_metaform_automation_launch.py
-    if ($LASTEXITCODE -ne 0) { throw "Modern pytest tests failed." }
-
-    Write-Step "Verifying OpenMetaR R Stack Slice"
-    uv run python scripts\verify_openmetar_r_stack.py
-    if ($LASTEXITCODE -ne 0) { throw "OpenMetaR R Stack Slice verification failed." }
+    if (-not $SkipVerification) {
+        Write-Step "Verifying Full R Stack Evidence"
+        uv run python scripts\verify_openmetar_r_stack.py
+        if ($LASTEXITCODE -ne 0) { throw "Full R Stack Evidence failed." }
+    }
 
     Write-Step "Building modern Windows artifact with PyInstaller"
     $buildArgs = @{
@@ -50,7 +45,7 @@ try {
     & (Join-Path $repoRoot "scripts\build-modern-windows-binary.ps1") @buildArgs
     if ($LASTEXITCODE -ne 0) { throw "Modern Windows binary build failed." }
 
-    Write-Step "Modern workflow complete: artifacts\$ArtifactName.zip"
+    Write-Step "Modern Windows package complete: artifacts\$ArtifactName.zip"
 }
 finally {
     Pop-Location

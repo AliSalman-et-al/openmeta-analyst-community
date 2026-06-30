@@ -14,3 +14,20 @@ dependencies = [
 
 [tool.uv]
 package = false
+
+[tool.pytest.ini_options]
+markers = [
+    "fast: default fast verification lane tests.",
+    "gui: offscreen Qt or MetaForm GUI workflow tests.",
+    "r_stack: tests that require or simulate R Stack behavior.",
+    "golden: golden baseline tooling and comparison tests.",
+    "packaging_contract: packaging and workflow contract tests.",
+    "packaged_smoke: tests that execute packaged application smoke checks.",
+    "slow: tests that are too costly for the default fast lane.",
+    "small: no Qt window, no R subprocess/rpy2, no packaging, fast and hermetic.",
+    "medium: Qt offscreen/model/dialog integration, subprocess helpers, or file fixtures.",
+    "large: real MetaForm workflows, real R/rpy2, or packaged application behavior.",
+    "analysis_behavior: evidence for preserved statistical analysis behavior.",
+    "gui_compatibility: evidence for GUI compatibility or workflow preservation.",
+    "release_readiness: evidence for release, packaging, or cutover readiness.",
+]

@@ -6,6 +6,7 @@ architecture=""
 python_exe=""
 r_runtime_root="${OMA_R_HOME:-${R_HOME:-}}"
 r_package_cache_root=""
+bundle_identifier="org.openmetaanalyst.community"
 skip_dependency_install=0
 skip_clean=0
 skip_smoke=0
@@ -30,6 +31,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --r-package-cache-root)
       r_package_cache_root="$2"
+      shift 2
+      ;;
+    --bundle-identifier)
+      bundle_identifier="$2"
       shift 2
       ;;
     --skip-dependency-install)
@@ -58,6 +63,19 @@ artifact_dir="$repo_root/artifacts"
 
 step() {
   printf '[%s] %s\n' "$(date '+%H:%M:%S')" "$1"
+}
+
+require_free_space_gb() {
+  local path="$1"
+  local required_gb="$2"
+  local available_kb
+  available_kb="$(df -Pk "$path" | awk 'NR==2 {print $4}')"
+  local required_kb=$((required_gb * 1024 * 1024))
+  if [ -z "$available_kb" ] || [ "$available_kb" -lt "$required_kb" ]; then
+    echo "At least ${required_gb}GB of free disk space is required under $path." >&2
+    df -h "$path" >&2 || true
+    exit 1
+  fi
 }
 
 repo_path() {
@@ -117,20 +135,24 @@ host_machine="$(uname -m)"
 case "${architecture:-}" in
   x64)
     expected_machine="x86_64"
+    pyinstaller_target_architecture="x86_64"
     default_artifact="OpenMetaAnalyst-modern-macos-x64"
     ;;
   arm64)
     expected_machine="arm64"
+    pyinstaller_target_architecture="arm64"
     default_artifact="OpenMetaAnalyst-modern-macos-arm64"
     ;;
   "")
     if [ "$host_machine" = "arm64" ]; then
       architecture="arm64"
       expected_machine="arm64"
+      pyinstaller_target_architecture="arm64"
       default_artifact="OpenMetaAnalyst-modern-macos-arm64"
     else
       architecture="x64"
       expected_machine="x86_64"
+      pyinstaller_target_architecture="x86_64"
       default_artifact="OpenMetaAnalyst-modern-macos-x64"
     fi
     ;;
@@ -194,6 +216,7 @@ if [ "$skip_clean" -eq 0 ]; then
 fi
 rm -rf "$zip_path" "$tmp_zip_path"
 mkdir -p "$artifact_dir"
+require_free_space_gb "$repo_root" 6
 
 (
   cd "$src_dir"
@@ -201,6 +224,8 @@ mkdir -p "$artifact_dir"
     --noconfirm
     --windowed
     --name OpenMetaAnalyst
+    --target-architecture "$pyinstaller_target_architecture"
+    --osx-bundle-identifier "$bundle_identifier"
     --distpath "$dist_root"
     --workpath "$work_root"
     --paths forms
@@ -212,7 +237,7 @@ mkdir -p "$artifact_dir"
   if [ "$skip_clean" -eq 0 ]; then
     pyinstaller_args=(--clean "${pyinstaller_args[@]}")
   fi
-  step "Building macOS app bundle with PyInstaller"
+  step "Building ad-hoc macOS app bundle with PyInstaller"
   R_HOME="$r_runtime_root" RPY2_CFFI_MODE=ABI "$python_exe" -m PyInstaller "${pyinstaller_args[@]}"
 )
 

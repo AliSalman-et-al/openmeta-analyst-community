@@ -24,6 +24,18 @@ _Avoid_: Active fallback, maintained legacy build
 The Python 3 and PyQt5 test/build workflow used for the maintained release path.
 _Avoid_: New workflow, preview build
 
+**Fast Verification Lane**:
+The pull-request and push path of the Modern CI Path that proves source changes against locked dependencies, manifests, modern tests, and R Stack verification without producing a full distributable.
+_Avoid_: Quick build, lightweight CI
+
+**Fast Feedback Budget**:
+The target that the default local and pull-request Fast Verification Lane should return automated pass/fail feedback in under ten minutes.
+_Avoid_: Nice-to-have speed goal, rough timing target
+
+**Packaging Lane**:
+The Modern CI Path route that produces a Windows Distributable or macOS application artifact through PyInstaller, bundled R runtime assembly, packaged smoke checks, and artifact upload.
+_Avoid_: Release test, build-all path
+
 **Release Cutover**:
 The point where the Modern CI Path replaces the Legacy CI Path as the accepted release path.
 _Avoid_: Migration complete, switch over
@@ -35,6 +47,14 @@ _Avoid_: R dependencies, statistical backend
 **OpenMetaR R Stack Slice**:
 The R Stack modernization increment scoped to the bundled `OpenMetaR` package, its direct runtime package declarations, and the external packages its functions call directly.
 _Avoid_: Full R dependency refresh, all CRAN transitive dependency migration
+
+**Default R Evidence**:
+The small R Stack check included in the Fast Verification Lane, intended to prove manifest validity and a deterministic OpenMetaR load or smoke path without running the full package/build/distributable verification sequence.
+_Avoid_: R Stack verification, quick R test
+
+**Full R Stack Evidence**:
+The opt-in, scheduled, release, or packaging-gated verification that installs the R dependency bundle, builds and checks OpenMetaR, validates installed package versions, runs R analysis smoke coverage, and exercises real rpy2 bridge behavior.
+_Avoid_: Required PR R check, default R test
 
 **Out-of-Process R Bridge**:
 A process boundary where the Python 3 application invokes analysis code running in a separate R-capable environment instead of embedding R through in-process rpy2.
@@ -111,6 +131,18 @@ _Avoid_: CI setting, interval percentage, confidence placeholder
 **Modern Test Runner**:
 The test runner used by Python 3 modernization tests and compatibility harness work.
 _Avoid_: Test cleanup, new tests
+
+**Test Taxonomy & Audit**:
+The review pass that classifies modern tests by evidence type, execution cost, external dependencies, and CI lane before the Modern CI Path is restructured around selective execution.
+_Avoid_: Test cleanup, marker pass
+
+**Evidence-Carrying Test**:
+A test whose failure would identify a meaningful regression against Analysis Behavior, GUI compatibility, R Stack integration, packaging contract, or migration infrastructure.
+_Avoid_: Useful test, important test
+
+**Low-Value Test**:
+A test that mainly asserts implementation text, duplicates stronger coverage, preserves obsolete behavior, or creates CI cost without carrying distinct compatibility or release-readiness evidence.
+_Avoid_: Useless test, bad test
 
 **Compatibility Report**:
 A CI artifact that records the datasets, analysis methods, metrics, tolerances, and observed drift values from Golden Analysis Tests.
