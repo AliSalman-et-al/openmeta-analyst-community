@@ -164,6 +164,76 @@ def test_diagnostic_backend_failure_does_not_open_empty_results(monkeypatch):
         _close_without_prompt(app, window)
 
 
+def test_diagnostic_direct_effects_build_analysis_data_per_metric(monkeypatch):
+    import launch
+
+    app, window = launch.start_automation()
+    import ma_specs
+
+    backend = ma_specs.meta_py_r
+    saved = {name: getattr(backend, name, None) for name in
+             ("get_available_methods", "get_params", "get_method_description",
+              "ma_dataset_to_simple_diagnostic_robj", "run_diagnostic_multi",
+              "run_diagnostic_multi_for_entered_effects")}
+    built_metrics = []
+    multi_calls = []
+    results = []
+    try:
+        _create_diagnostic_dataset(window)
+
+        monkeypatch.setattr(window.model, "included_studies_have_raw_data",
+                            lambda: False)
+        monkeypatch.setattr(window.model, "included_studies_have_point_estimates",
+                            lambda effect=None: effect in ("Sens", "Spec"))
+
+        backend.get_available_methods = lambda **kwargs: {
+            "Diagnostic Random-Effects": "diagnostic.random",
+        }
+        backend.get_params = lambda method: ({}, {}, [], {})
+        backend.get_method_description = lambda method: "stub method"
+
+        def build_metric(model, **kwargs):
+            built_metrics.append(kwargs.get("metric", "Sens"))
+
+        def run_metric(method_names, param_vals):
+            multi_calls.append((list(method_names), [dict(p) for p in param_vals]))
+            return {
+                "texts": {
+                    "%s Summary" % param_vals[0]["measure"]: "ok",
+                },
+                "images": {},
+                "image_var_names": {},
+                "image_params_paths": {},
+                "image_order": None,
+            }
+
+        backend.ma_dataset_to_simple_diagnostic_robj = build_metric
+        backend.run_diagnostic_multi = run_metric
+        monkeypatch.setattr(window, "analysis", lambda result: results.append(result))
+
+        form = window._build_analysis_specs_dialog(
+            diag_metrics=["sens", "spec"],
+            conf_level=window.model.get_global_conf_level(),
+        )
+        built_metrics[:] = []
+
+        form.run_ma()
+
+        assert built_metrics == ["Sens", "Spec"]
+        assert [call[1][0]["measure"] for call in multi_calls] == ["Sens", "Spec"]
+        assert results and sorted(results[0]["texts"]) == ["Sens Summary", "Spec Summary"]
+    finally:
+        for name, value in saved.items():
+            if value is None:
+                try:
+                    delattr(backend, name)
+                except AttributeError:
+                    pass
+            else:
+                setattr(backend, name, value)
+        _close_without_prompt(app, window)
+
+
 def _close_without_prompt(app, window):
     window.current_data_unsaved = False
     window.close()
