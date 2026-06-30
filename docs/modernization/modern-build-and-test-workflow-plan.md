@@ -32,6 +32,7 @@ This plan turns the Modern CI Path optimization decisions into small, reviewable
 - GitHub smoke/fast verification calls strict R evidence and taxonomy flags explicitly.
 - Packaging contract tests now use structured parsers for workflows and scripts; the rewritten nodes live under the `packaging_contract` lane directory.
 - Modern tests now live under lane/ownership directories: `fast`, `golden`, `gui`, `r_stack`, `packaging_contract`, and reserved `packaged_smoke`.
+- Fast verification now runs the required fast feedback directories with a bounded pytest-xdist worker count while keeping GUI, R Stack, and packaged smoke evidence out of parallel execution.
 
 ## Phase 1: Smoke Lane and Local Sync Split
 
@@ -167,11 +168,11 @@ Acceptance:
 - Fast tests are mostly small/medium and isolated.
 - GUI, R Stack, golden, packaging, and packaged smoke evidence have clear ownership.
 
-## Phase 7: Parallelism Later
+## Phase 7: Fast-Lane Parallelism
 
 Deliverables:
 
-- pytest-xdist or equivalent only after isolation cleanup.
+- pytest-xdist for the isolated fast feedback directories only.
 
 Steps:
 

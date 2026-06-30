@@ -5,6 +5,7 @@ recreate_venv=0
 sync=0
 require_r_evidence=0
 strict_taxonomy=0
+fast_workers="${OMA_FAST_WORKERS:-4}"
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --sync)
@@ -23,6 +24,14 @@ while [ "$#" -gt 0 ]; do
     --strict-taxonomy)
       strict_taxonomy=1
       shift
+      ;;
+    --fast-workers)
+      if [ "$#" -lt 2 ]; then
+        echo "--fast-workers requires a worker count" >&2
+        exit 2
+      fi
+      fast_workers="$2"
+      shift 2
       ;;
     *)
       echo "Unknown argument: $1" >&2
@@ -64,8 +73,12 @@ if [ "$strict_taxonomy" -eq 1 ]; then
 fi
 uv run python "${taxonomy_args[@]}"
 
-step "Running fast pytest lanes"
-uv run pytest tests/modern -m "fast or golden or packaging_contract"
+step "Running parallel fast verification pytest lanes"
+fast_pytest_args=(tests/modern/fast tests/modern/golden tests/modern/packaging_contract)
+if [ -n "$fast_workers" ] && [ "$fast_workers" != "0" ] && [ "$fast_workers" != "1" ]; then
+  fast_pytest_args+=(--dist loadfile -n "$fast_workers")
+fi
+uv run pytest "${fast_pytest_args[@]}"
 
 step "Verifying Default R Evidence"
 r_evidence_args=(scripts/verify_openmetar_r_default.py)

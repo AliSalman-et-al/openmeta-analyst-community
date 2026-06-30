@@ -9,6 +9,7 @@ dependencies = [
     "PyQt5-Qt5==5.15.2",
     "pyinstaller==6.21.0",
     "pytest==9.1.1",
+    "pytest-xdist==3.8.0",
     "rpy2==3.6.7",
 ]
 

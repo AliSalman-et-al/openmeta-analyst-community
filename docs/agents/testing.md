@@ -22,7 +22,7 @@ Daily local verification uses the Fast Verification Lane:
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-modern-fast.ps1
 ```
 
-Use `-Sync` when dependency inputs changed, or `-RecreateVenv` for a clean environment rebuild. GitHub calls smoke and fast verification with `-Sync`.
+Use `-Sync` when dependency inputs changed, or `-RecreateVenv` for a clean environment rebuild. The Fast Verification Lane runs `tests\modern\fast`, `tests\modern\golden`, and `tests\modern\packaging_contract` with a bounded pytest-xdist worker count by default. Use `-FastWorkers 1` when debugging a fast-lane failure without parallel workers. GitHub calls smoke and fast verification with `-Sync`.
 
 Run lane-specific tests when working in an area:
 

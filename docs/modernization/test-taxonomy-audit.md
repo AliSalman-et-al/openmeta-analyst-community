@@ -25,7 +25,7 @@ R package downloads from CRAN are a known productivity bottleneck. R dependency 
 
 Once the first backlog classification pass lands, GitHub should run taxonomy validation in strict mode so collected pytest nodes cannot drift from the manifest. Local Fast Verification Lane commands may remain non-strict during active cleanup so developers can iterate while they update classifications.
 
-After the manifest is accurate, reorganize `tests/modern` into lane and ownership directories such as `fast`, `gui`, `r_stack`, `golden`, `packaging_contract`, and `packaged_smoke`. Markers remain the selectable execution mechanism; directories make ownership, review scope, and duplicate coverage visible.
+After the manifest is accurate, reorganize `tests/modern` into lane and ownership directories such as `fast`, `gui`, `r_stack`, `golden`, `packaging_contract`, and `packaged_smoke`. Markers remain the selectable execution mechanism; directories make ownership, review scope, duplicate coverage, and safe parallelism boundaries visible.
 
 Selected R Stack evidence tests should not skip opportunistically when R, rpy2, or required R packages are missing. R Stack lane prerequisites should be checked before pytest starts, so a selected required lane either runs with the expected environment or fails at setup. Degraded Local R Evidence remains local-only and does not satisfy required CI evidence.
 
@@ -58,7 +58,7 @@ References:
 - Removed three low-signal source-text checks that duplicated behavior covered by focused GUI startup, packaging smoke, and R-stack verification tests.
 - Tests with opportunistic R skips should move behind Default R Evidence or Full R Stack Evidence instead of being treated as ordinary fast tests.
 - Replace opportunistic R Stack `pytest.skip()` paths with lane-level prerequisite checks.
-- Pytest parallelism and pytest-xdist are deferred until taxonomy classification, raw-string test rewrites, and R/Qt isolation cleanup are complete. Fast tests should first be isolated from shared cwd, environment, QApplication, QSettings, R temporary state, and package libraries.
+- pytest-xdist is enabled only for the required fast feedback directories: `tests/modern/fast`, `tests/modern/golden`, and `tests/modern/packaging_contract`. GUI, R Stack, and packaged smoke evidence remain serialized unless a future isolation review proves they are safe to parallelize.
 
 ## Next Audit Work
 
@@ -72,5 +72,5 @@ References:
 - Continue packaging contract cleanup as new script/workflow contracts are added; GUI and R Stack pruning should wait until their compatibility evidence is reviewed more carefully.
 - Keep lane and ownership directories aligned with the taxonomy manifest.
 - Identify duplicate GUI coverage after the directory move.
-- Mark raw string assertion tests for rewrite or removal during packaging contract cleanup.
+- Continue replacing raw string assertion tests with structured contracts during packaging contract cleanup.
 - Add R Stack lane setup checks before converting R Stack skips into hard failures.

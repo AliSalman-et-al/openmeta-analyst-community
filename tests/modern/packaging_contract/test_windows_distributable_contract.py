@@ -68,6 +68,18 @@ def relative_order(text, *needles):
     return positions == sorted(positions)
 
 
+def pytest_path_tokens(text):
+    return set(re.findall(r"tests[/\\]modern(?:[/\\][A-Za-z_]+)?", text))
+
+
+def pytest_option_tokens(text):
+    return set(re.findall(r"(?<![A-Za-z0-9_-])(--dist|-n|loadfile|4)(?![A-Za-z0-9_-])", text))
+
+
+def project_dependencies():
+    return set(re.findall(r'"([^"]+)"', read_repo_text("pyproject.toml")))
+
+
 def test_modern_windows_distributable_contract_is_declared():
     script = ps_contract("scripts", "build-modern-windows-binary.ps1")
 
@@ -166,13 +178,16 @@ def test_lane_named_local_scripts_replace_old_workflow_wrappers():
     package = ps_contract("scripts", "package-modern-windows.ps1")
 
     assert {"Sync", "RecreateVenv", "RequireREvidence"} <= smoke["params"]
-    assert {"Sync", "RecreateVenv", "RequireREvidence", "StrictTaxonomy"} <= fast["params"]
+    assert {"Sync", "RecreateVenv", "RequireREvidence", "StrictTaxonomy", "FastWorkers"} <= fast["params"]
     assert "RPackageCacheRoot" in package["params"]
+    assert {"tests\\modern\\fast", "tests\\modern\\golden", "tests\\modern\\packaging_contract"} <= pytest_path_tokens(fast["text"])
+    assert {"--dist", "loadfile", "-n", "4"} <= pytest_option_tokens(fast["text"])
+    assert "pytest-xdist==3.8.0" in project_dependencies()
     assert relative_order(
         fast["text"],
         "validate_golden_baseline_manifests.py",
         "validate_test_taxonomy.py",
-        'pytest tests\\modern -m "fast or golden or packaging_contract"',
+        "Running parallel fast verification pytest lanes",
         "verify_openmetar_r_default.py",
     )
     assert not (ROOT / "scripts" / "run-modern-workflow-local.ps1").exists()

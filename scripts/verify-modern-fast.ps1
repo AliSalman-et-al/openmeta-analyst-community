@@ -2,7 +2,8 @@ param(
     [switch]$Sync,
     [switch]$RecreateVenv,
     [switch]$RequireREvidence,
-    [switch]$StrictTaxonomy
+    [switch]$StrictTaxonomy,
+    [string]$FastWorkers = "4"
 )
 
 $ErrorActionPreference = "Stop"
@@ -45,9 +46,13 @@ try {
     uv @taxonomyArgs
     if ($LASTEXITCODE -ne 0) { throw "Modern test taxonomy validation failed." }
 
-    Write-Step "Running fast pytest lanes"
-    uv run pytest tests\modern -m "fast or golden or packaging_contract"
-    if ($LASTEXITCODE -ne 0) { throw "Fast pytest lanes failed." }
+    Write-Step "Running parallel fast verification pytest lanes"
+    $fastPytestArgs = @("run", "pytest", "tests\modern\fast", "tests\modern\golden", "tests\modern\packaging_contract")
+    if ($FastWorkers -and $FastWorkers -notin @("0", "1")) {
+        $fastPytestArgs += @("--dist", "loadfile", "-n", $FastWorkers)
+    }
+    uv @fastPytestArgs
+    if ($LASTEXITCODE -ne 0) { throw "Fast verification pytest lanes failed." }
 
     Write-Step "Verifying Default R Evidence"
     $rEvidenceArgs = @("run", "python", "scripts\verify_openmetar_r_default.py")
