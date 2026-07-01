@@ -310,6 +310,16 @@ def test_edit_list_models_return_native_values_and_accept_native_edits():
         outcomes_model = edit_list_models.OutcomesModel(dataset=dataset)
         assert outcomes_model.setData(outcomes_model.index(0, 0), "Renamed Outcome") is True
         assert outcomes_model.data(outcomes_model.index(0, 0), QtCore.Qt.DisplayRole) == "Renamed Outcome"
+
+        errors = []
+        studies_model.dataError.connect(errors.append)
+        assert studies_model.setData(studies_model.index(0, 0), "") is False
+        assert errors == ["Study names cannot be empty."]
+
+        errors = []
+        covariates_model.dataError.connect(errors.append)
+        assert covariates_model.setData(covariates_model.index(0, 0), "") is False
+        assert errors == ["Covariate names cannot be empty."]
     finally:
         window.close()
         app.processEvents()
@@ -320,6 +330,7 @@ def test_change_covariate_type_model_returns_native_values_and_accepts_native_ed
     from PyQt5 import QtCore
     import launch
     import change_cov_type_form
+    import ma_dataset
 
     app, window = launch.start_automation()
     try:
@@ -338,6 +349,28 @@ def test_change_covariate_type_model_returns_native_values_and_accepts_native_ed
 
         assert cov_model.setData(cov_model.index(0, cov_model.NEW_VAL), "High") is True
         assert cov_model.data(cov_model.index(0, cov_model.NEW_VAL), QtCore.Qt.DisplayRole) == "High"
+
+        dataset.add_covariate(ma_dataset.Covariate("Region", "factor"), dict(
+            (study.name, "North") for study in dataset.studies
+        ))
+        continuous_cov_model = change_cov_type_form.CovModel(dataset, dataset.covariates[-1])
+        errors = []
+        continuous_cov_model.dataError.connect(errors.append)
+        old_value = continuous_cov_model.data(
+            continuous_cov_model.index(0, continuous_cov_model.NEW_VAL),
+            QtCore.Qt.DisplayRole,
+        )
+
+        assert continuous_cov_model.setData(
+            continuous_cov_model.index(0, continuous_cov_model.NEW_VAL),
+            "not numeric",
+        ) is False
+
+        assert errors == ["Covariate values for continuous covariates need to be numeric."]
+        assert continuous_cov_model.data(
+            continuous_cov_model.index(0, continuous_cov_model.NEW_VAL),
+            QtCore.Qt.DisplayRole,
+        ) == old_value
     finally:
         window.current_data_unsaved = False
         window.close()

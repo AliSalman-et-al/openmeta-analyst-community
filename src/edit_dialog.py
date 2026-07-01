@@ -18,7 +18,7 @@
 
 #import pdb
 
-from PyQt5.QtWidgets import QDialog
+from PyQt5.QtWidgets import QDialog, QMessageBox
 
 import forms.ui_edit_dialog
 import edit_list_models
@@ -83,6 +83,15 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         
         
     def _setup_connections(self):
+        for model in [
+            self.groups_model,
+            self.outcomes_model,
+            self.follow_ups_model,
+            self.studies_model,
+            self.covariates_model,
+        ]:
+            model.dataError.connect(self.data_error)
+
         ###
         # groups
         self.add_group_btn.pressed.connect(self.add_group)
@@ -114,6 +123,9 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         self.remove_covariate_btn.pressed.connect(self.remove_covariate)
         self.covariate_list.clicked.connect(lambda _index: self.covariate_selected())
                                     
+    def data_error(self, msg):
+        QMessageBox.warning(self, "Whoops", msg)
+
                                   
     def add_group(self):
         form = add_new_dialogs.AddNewGroupForm(self)

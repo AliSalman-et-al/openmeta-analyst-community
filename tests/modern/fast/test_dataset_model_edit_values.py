@@ -80,3 +80,17 @@ def test_study_name_edit_on_placeholder_row_creates_study():
     assert len(model.dataset.studies) == 3
     assert model.dataset.studies[2].name == ""
     assert model.dataset.studies[2].include is False
+
+
+def test_invalid_continuous_covariate_edit_emits_error_and_preserves_value():
+    model = _diagnostic_model_with_empty_cells()
+    model.dataset.add_covariate(ma_dataset.Covariate("Dose", "continuous"), {"Alpha": 5.5})
+    model.update_column_indices()
+    errors = []
+    model.dataError.connect(errors.append)
+    covariate_index = model.index(0, model.columnCount() - 1)
+
+    assert model.setData(covariate_index, "not numeric") is False
+
+    assert errors == ["Covariate values for continuous covariates need to be numeric."]
+    assert model.dataset.studies[0].covariate_dict["Dose"] == 5.5

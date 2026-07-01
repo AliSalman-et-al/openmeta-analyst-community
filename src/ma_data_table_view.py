@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import (
     QItemDelegate,
     QLineEdit,
     QMenu,
+    QMessageBox,
     QTableView,
     QUndoCommand,
     QUndoStack,
@@ -523,6 +524,7 @@ class MADataTable(QtWidgets.QTableView):
         # temporarily disable sorting to prevent automatic sorting of pasted data.
         # (note: this is consistent with Excel's approach.)
         self.model().blockSignals(True)
+        failed_messages = []
 
         for src_row in range(len(source_content)):
             # do we need to append a row?
@@ -536,16 +538,29 @@ class MADataTable(QtWidgets.QTableView):
                     # one event; i.e., when undo is called, it undos the
                     # whole paste
                     index = self.model().createIndex(origin_row+src_row, origin_col+src_col)
-                    self.model().setData(index, source_content[src_row][src_col])
+                    if not self.model().setData(index, source_content[src_row][src_col]):
+                        failed_messages.append(self._model_data_error_message())
                 except Exception as e:
                     print("whoops, exception while pasting: %s" % e)
 
         self.model().blockSignals(False)
         self.model().reset()
+        if failed_messages:
+            self._report_model_data_error(failed_messages[0])
 
     def set_data_in_model(self, index, val):
-        self.model().setData(index, val)
+        if not self.model().setData(index, val):
+            self._report_model_data_error(self._model_data_error_message())
         self.model().reset()
+
+    def _model_data_error_message(self):
+        return getattr(self.model(), "last_data_error", None) or "The entered value could not be used."
+
+    def _report_model_data_error(self, msg):
+        if self.main_gui is not None and hasattr(self.main_gui, "data_error"):
+            self.main_gui.data_error(msg)
+        else:
+            QMessageBox.warning(self, "Whoops", msg)
 
     def column_widths(self):
         ''' returns the current column widths '''
@@ -737,11 +752,14 @@ class CommandCellEdit(QUndoCommand):
             # side of things, when the model emits
             # the data edited signal.
             model.blockSignals(True)
-            model.setData(index, self.new_content)
+            edit_ok = model.setData(index, self.new_content)
             self.added_study = self.ma_data_table_view.model().study_auto_added
             self.ma_data_table_view.model().study_auto_added = None
 
             model.blockSignals(False)
+            if not edit_ok:
+                self.ma_data_table_view._report_model_data_error(
+                    self.ma_data_table_view._model_data_error_message())
             # make the view reflect the update
             self.ma_data_table_view.model().reset()
         
@@ -765,9 +783,12 @@ class CommandCellEdit(QUndoCommand):
         # as in the redo method, we block signals before
         # editing the model data
         model.blockSignals(True)
-        model.setData(index, self.original_content, allow_empty_names=True)
+        edit_ok = model.setData(index, self.original_content, allow_empty_names=True)
 
         model.blockSignals(False)
+        if not edit_ok:
+            self.ma_data_table_view._report_model_data_error(
+                self.ma_data_table_view._model_data_error_message())
         self.ma_data_table_view.model().reset()
 
             

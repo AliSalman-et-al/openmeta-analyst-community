@@ -176,6 +176,11 @@ class DatasetModel(QAbstractTableModel):
         self.beginResetModel()
         self.endResetModel()
 
+    def _reject_edit(self, msg):
+        self.last_data_error = msg
+        self.dataError.emit(msg)
+        return False
+
     def set_current_metric(self, metric):
         self.current_effect = metric
         print("OK! metric updated.")
@@ -608,6 +613,7 @@ class DatasetModel(QAbstractTableModel):
         '''
         group_str = self.get_cur_group_str()
         study_added_due_to_edit = None
+        self.last_data_error = None
         if index.isValid() and 0 <= index.row() < self.rowCount():
             current_data_type = self.dataset.get_outcome_type(self.current_outcome)
             outcome_subtype = self.dataset.get_outcome_subtype(self.current_outcome)
@@ -616,33 +622,29 @@ class DatasetModel(QAbstractTableModel):
 
             if index.row() >= len(self.dataset):
                 if column != self.NAME:
-                    self.dataError.emit(STUDY_NAME_REQUIRED_MESSAGE)
-                    return False
+                    return self._reject_edit(STUDY_NAME_REQUIRED_MESSAGE)
 
                 name = str(_to_text_value(value).toUtf8(), encoding="utf8")
                 if name == "" and not allow_empty_names:
-                    self.dataError.emit(STUDY_NAME_REQUIRED_MESSAGE)
-                    return False
+                    return self._reject_edit(STUDY_NAME_REQUIRED_MESSAGE)
 
                 while len(self.dataset) <= index.row():
                     self.dataset.add_study(Study(self.max_study_id()+1))
 
             study = self.dataset.studies[index.row()]
         else:
-            return False
+            return self._reject_edit("Cannot edit that cell.")
             
         if column == self.NAME:
             # proposed study name
             name = str(_to_text_value(value).toUtf8(), encoding="utf8")
             
             if name == "" and not allow_empty_names:
-                self.dataError.emit(STUDY_NAME_REQUIRED_MESSAGE)
-                return False
+                return self._reject_edit(STUDY_NAME_REQUIRED_MESSAGE)
             # if we already have the name and the name is not just the current name
             if name in self.dataset.get_study_names() and name != study.name:
                 msg = "Duplicate study names not allowed"
-                self.dataError.emit(msg)
-                return False
+                return self._reject_edit(msg)
             # the second clause here is to address issue #233,
             # specifically we do not add a dummy study if the 
             # current study (as indexed by index.row()) is 'blank'.
@@ -672,8 +674,7 @@ class DatasetModel(QAbstractTableModel):
         elif column == self.YEAR:
             year_ok, msg = self._verify_year(_to_text_value(value))
             if not year_ok:
-                self.dataError.emit(msg)
-                return False
+                return self._reject_edit(msg)
             study.year = _to_int(value)[0]
         elif self.current_outcome is not None and column in self.RAW_DATA:
             data_ok, msg = self._verify_raw_data(_to_text_value(value), column, current_data_type, index)
@@ -681,8 +682,7 @@ class DatasetModel(QAbstractTableModel):
                 # this signal is (-- presumably --) handled by the UI
                 # i.e., meta_form, which reports the problem to the
                 # user. the model is not affected.
-                self.dataError.emit(msg)
-                return False
+                return self._reject_edit(msg)
 
             # @TODO make module-level constant?
             adjust_by = 3 # include study, study name, year columns
@@ -723,8 +723,7 @@ class DatasetModel(QAbstractTableModel):
                 # sanity check -- is this a number?
                 data_ok, msg = self._verify_outcome_data(_to_text_value(value), column, row, current_data_type)
                 if not data_ok and import_csv == False:
-                    self.dataError.emit(msg)
-                    return False
+                    return self._reject_edit(msg)
 
                 # the user can also explicitly set the effect size / CIs
                 # @TODO what to do if the entered estimate contradicts the raw data?
@@ -840,9 +839,13 @@ class DatasetModel(QAbstractTableModel):
                 new_value = _to_native_text(value)
             else:
                 # continuous
-                new_value, converted_ok = _to_double(value)
-                if not converted_ok: 
+                text_value = _to_text_value(value)
+                if text_value.trimmed() == "":
                     new_value = None
+                else:
+                    new_value, converted_ok = _to_double(value)
+                    if not converted_ok:
+                        return self._reject_edit("Covariate values for continuous covariates need to be numeric.")
             study.covariate_dict[cov_name] = new_value
             
         self.dataChanged.emit(index, index)

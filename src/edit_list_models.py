@@ -11,7 +11,7 @@
 #import pdb
 
 # core libraries
-from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt
+from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
 
 import qt_text
 
@@ -21,9 +21,15 @@ def _to_native_text(value):
 
 
 class ResettableTableModel(QAbstractTableModel):
+    dataError = pyqtSignal(str)
+
     def reset(self):
         self.beginResetModel()
         self.endResetModel()
+
+    def reject_edit(self, msg):
+        self.dataError.emit(msg)
+        return False
 
 
 class TXGroupsModel(ResettableTableModel):
@@ -69,7 +75,7 @@ class TXGroupsModel(ResettableTableModel):
         # we don't allow empty strings for group names; just pass
         # if this happens (typically this will be an accident on the user's part)
         if new_name == "":
-            return False
+            return self.reject_edit("Group names cannot be empty.")
         
         self.dataset.change_group_name(old_name, new_name)#, \
                         #outcome=self.current_outcome, follow_up=self.current_follow_up)
@@ -125,7 +131,7 @@ class OutcomesModel(ResettableTableModel):
         old_outcome_name = self.outcome_list[index.row()]
         new_outcome_name = _to_native_text(value)
         if new_outcome_name == "":
-            return False
+            return self.reject_edit("Outcome names cannot be empty.")
             
         self.dataset.change_outcome_name(old_outcome_name, new_outcome_name)
         # issue #130: if we change an outcome name, set the current outcome
@@ -181,6 +187,8 @@ class FollowUpsModel(ResettableTableModel):
     def setData(self, index, value, role=Qt.EditRole):
         old_follow_up_name = self.follow_up_list[index.row()]
         new_follow_up_name = _to_native_text(value)
+        if new_follow_up_name == "":
+            return self.reject_edit("Follow-up names cannot be empty.")
         self.dataset.change_follow_up_name(self.current_outcome, old_follow_up_name, new_follow_up_name)
         self.refresh_follow_up_list()
         return True
@@ -229,7 +237,7 @@ class StudiesModel(ResettableTableModel):
         # we don't allow empty strings for group names; just pass
         # if this happens (typically this will be an accident on the user's part)
         if new_name == "":
-            return False
+            return self.reject_edit("Study names cannot be empty.")
         
         study_object.name = new_name
         self.update_study_list()
@@ -278,8 +286,10 @@ class CovariatesModel(ResettableTableModel):
         # we don't allow empty strings for group names; just pass
         # if this happens (typically this will be an accident on the user's part).
         # nor do we allow covariates to have the same name.
-        if new_name == "" or new_name in self.dataset.get_cov_names():
-            return False
+        if new_name == "":
+            return self.reject_edit("Covariate names cannot be empty.")
+        if new_name in self.dataset.get_cov_names():
+            return self.reject_edit("Duplicate covariate names not allowed.")
         
         self.dataset.change_covariate_name(cov_object, new_name)
         self.update_covariates_list()

@@ -3,8 +3,8 @@ import string
 import math
 from functools import cmp_to_key
 
-from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt
-from PyQt5.QtWidgets import QDialog
+from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
+from PyQt5.QtWidgets import QDialog, QMessageBox
 
 from meta_globals import *
 import forms.ui_change_cov_type
@@ -32,11 +32,16 @@ class ChangeCovTypeForm(QDialog, Ui_ChangeCovTypeForm):
         self.setupUi(self)
         self.dataset = dataset
         self.cov_model = CovModel(dataset, cov)
+        self.cov_model.dataError.connect(self.data_error)
         self.cov_prev_table.setModel(self.cov_model)
         self.cov_prev_table.resizeColumnsToContents()
 
+    def data_error(self, msg):
+        QMessageBox.warning(self, "Whoops", msg)
+
 
 class CovModel(QAbstractTableModel):
+    dataError = pyqtSignal(str)
     '''
     This module mediates between the dataset class and 
     the TableView used in the ui.
@@ -65,6 +70,10 @@ class CovModel(QAbstractTableModel):
     def reset(self):
         self.beginResetModel()
         self.endResetModel()
+
+    def reject_edit(self, msg):
+        self.dataError.emit(msg)
+        return False
 
     def add_cov_with_new_type(self):
         new_name = self.covariate.name
@@ -206,14 +215,16 @@ class CovModel(QAbstractTableModel):
                     new_value = _to_native_text(value)
                 else:
                     # continuous
-                    new_value, converted_ok = _to_double(value)
-                    if not converted_ok: 
-                        print("whoops! can't convert %s to a number." % value)
+                    if _to_native_text(value).strip() == "":
                         new_value = None
+                    else:
+                        new_value, converted_ok = _to_double(value)
+                        if not converted_ok:
+                            return self.reject_edit("Covariate values for continuous covariates need to be numeric.")
                 study.covariate_dict[cov_name] = new_value
                 self.refresh_cov_values()
                 return True
-        return False
+        return self.reject_edit("Cannot edit that cell.")
         
     def flags(self, index):
         if not index.isValid():

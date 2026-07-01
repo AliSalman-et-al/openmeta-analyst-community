@@ -127,6 +127,28 @@ def test_copy_paste_undo_and_redo_work_through_real_table_path():
         _close_without_prompt(app, window)
 
 
+def test_invalid_paste_reports_validation_error_when_model_signals_are_blocked(monkeypatch):
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        model = window.model
+        table = window.tableView
+        shown = []
+        meta_form = sys.modules["meta_form"]
+        monkeypatch.setattr(meta_form.QMessageBox, "warning", lambda *args, **kwargs: shown.append(args))
+
+        table.set_data_in_model(model.index(0, model.NAME), _variant("Alpha"))
+        table.paste_contents(model.index(0, model.RAW_DATA[0]), [["not numeric"]])
+
+        assert shown
+        assert shown[-1][1:] == ("Whoops", "Raw data needs to be numeric.")
+        assert _cell_text(model, 0, model.RAW_DATA[0]) == ""
+    finally:
+        _close_without_prompt(app, window)
+
+
 def test_metaform_dialog_text_slots_accept_pyqt5_line_edit_strings(monkeypatch):
     import launch
     from PyQt5 import QtWidgets
