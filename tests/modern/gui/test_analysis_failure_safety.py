@@ -224,6 +224,61 @@ def test_results_window_accepts_incomplete_result_payload():
         app.processEvents()
 
 
+def test_results_window_build_failure_reports_display_error(monkeypatch):
+    import launch
+    import meta_form
+
+    app, window = launch.start_automation()
+    shown = []
+    try:
+        def _boom(*args, **kwargs):
+            raise RuntimeError("plot image could not be loaded")
+
+        monkeypatch.setattr(meta_form.results_window, "ResultsWindow", _boom)
+        monkeypatch.setattr(
+            meta_form.QMessageBox,
+            "critical",
+            lambda *args, **kwargs: shown.append(args),
+        )
+
+        window.analysis({"texts": {"Summary": "ok"}, "images": {}})
+
+        assert shown
+        assert shown[0][1] == "Could not display analysis results"
+        assert "plot image could not be loaded" in shown[0][2]
+        assert "analysis could not be completed" not in shown[0][2]
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_project_save_failure_reports_original_error(monkeypatch, tmp_path):
+    import launch
+    import meta_form
+
+    app, window = launch.start_automation()
+    shown = []
+    try:
+        window.out_path = str(tmp_path / "project.oma")
+
+        def _boom(*args, **kwargs):
+            raise OSError("disk is full")
+
+        monkeypatch.setattr(meta_form.pickle, "dump", _boom)
+        monkeypatch.setattr(
+            meta_form.QMessageBox,
+            "critical",
+            lambda *args, **kwargs: shown.append(args),
+        )
+
+        assert window.save() is False
+        assert shown
+        assert shown[0][1] == "Could not save project"
+        assert "disk is full" in shown[0][2]
+        assert "whoops" not in shown[0][2].lower()
+    finally:
+        _close_without_prompt(app, window)
+
+
 def test_global_exception_handler_logs_trace_and_shows_recoverable_dialog(
     monkeypatch, tmp_path
 ):

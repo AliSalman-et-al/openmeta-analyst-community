@@ -442,8 +442,9 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
             print(e)
             QMessageBox.warning(
                 self,
-                "Whoops",
-                "Something went wrong while trying to import the CSV. Try again.",
+                "Could not import CSV",
+                "OpenMeta[Analyst] could not preview the selected CSV file.\n\n"
+                "Details: %s: %s" % (e.__class__.__name__, e),
             )
             self.imported_data_ok = False
             return False

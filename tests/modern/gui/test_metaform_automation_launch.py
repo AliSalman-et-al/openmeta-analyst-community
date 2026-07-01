@@ -2166,6 +2166,54 @@ def test_csv_import_wizard_pads_ragged_rows_before_previewing(tmp_path, monkeypa
     assert wizard.get_csv_data()["data"][-1] == ["Beta", "2021", "3", "11", "4", ""]
 
 
+def test_csv_import_preview_failure_preserves_error_details(tmp_path, monkeypatch):
+    from PyQt5 import QtWidgets
+    import main_wizard
+
+    csv_path = tmp_path / "studies.csv"
+    csv_path.write_text(
+        "Study,Year,Tx A events,Tx A total,Tx B events,Tx B total\n"
+        "Alpha,2020,1,10,2,12\n"
+    )
+    shown = []
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    wizard = main_wizard.MainWizard(path="csv_import")
+    wizard.set_dataset_info(
+        {
+            "arms": "two",
+            "data_type": "binary",
+            "sub_type": "proportions",
+            "effect": "OR",
+            "metric_choices": [],
+        }
+    )
+    page = wizard.page(main_wizard.Page_CsvImport)
+    page.initializePage()
+    monkeypatch.setattr(
+        main_wizard.QFileDialog,
+        "getOpenFileName",
+        lambda **kwargs: (str(csv_path), "csv files (*.csv)"),
+    )
+    monkeypatch.setattr(
+        page,
+        "_validate_imported_data",
+        lambda: (_ for _ in ()).throw(ValueError("Year column is missing")),
+    )
+    monkeypatch.setattr(
+        main_wizard.QMessageBox,
+        "warning",
+        lambda *args, **kwargs: shown.append(args),
+    )
+
+    page._select_file()
+
+    assert shown
+    assert shown[0][1] == "Could not import CSV"
+    assert "Year column is missing" in shown[0][2]
+    assert "Try again" not in shown[0][2]
+    assert not page.isComplete()
+
+
 def test_csv_import_file_selection_enables_finish_button(tmp_path, monkeypatch):
     import launch
     from PyQt5 import QtWidgets

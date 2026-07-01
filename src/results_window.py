@@ -310,7 +310,9 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         txt_item = QGraphicsTextItem(text)
         txt_item.setFont(QFont("courier", 12))
         txt_item.setToolTip(
-            'To copy the text:\n1) Right click on the text and choose "Select All".\n2) Right click again and choose "Copy".'
+            "To copy the text:\n"
+            "1) Right click on the text and choose select all.\n"
+            "2) Right click again and choose copy."
         )
         txt_item.setTextInteractionFlags(
             Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard

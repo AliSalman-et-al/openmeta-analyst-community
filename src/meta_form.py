@@ -262,7 +262,8 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         if self.current_data_unsaved:
             choice = self.prompt_to_save_unsaved_data()
             if choice == QMessageBox.Yes:
-                self.save()
+                if self.save() is False:
+                    return
             elif choice == QMessageBox.No:
                 pass
             else:  # cancel
@@ -862,8 +863,9 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             app_error_handler.log_exception(type(e), e, e.__traceback__)
             QMessageBox.critical(
                 self,
-                "analysis failed",
-                "Sorry, this analysis could not be completed: %s" % e,
+                "Could not display analysis results",
+                "The analysis completed, but OpenMeta[Analyst] could not display "
+                "the results.\n\nDetails: %s: %s" % (e.__class__.__name__, e),
             )
             return
         form.show()
@@ -1211,7 +1213,8 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         if self.current_data_unsaved:
             choice = self.prompt_to_save_unsaved_data()
             if choice == QMessageBox.Yes:
-                self.save()
+                if self.save() is False:
+                    return
             elif choice == QMessageBox.No:
                 pass
             else:  # cancel
@@ -1240,9 +1243,13 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             data_model = _load_legacy_pickle(file_path)
             print("successfully loaded data")
         except Exception as e:
-            msg = "Could not open %s, error: %s" % (file_path, str(e))
+            msg = "Could not open %s.\n\nDetails: %s: %s" % (
+                file_path,
+                e.__class__.__name__,
+                e,
+            )
             print(msg)
-            QMessageBox.critical(self, "Whoops", msg)
+            QMessageBox.critical(self, "Could not open project", msg)
             return None
 
         ## cache current state for undo.
@@ -1488,7 +1495,8 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         if self.current_data_unsaved:
             choice = self.prompt_to_save_unsaved_data()
             if choice == QMessageBox.Yes:
-                self.save()
+                if self.save() is False:
+                    return
             elif choice == QMessageBox.No:
                 pass
             else:  # Cancel
@@ -1542,15 +1550,13 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
         try:
             print("trying to write data out to: %s" % self.out_path)
-            f = open(self.out_path, "wb")
-            pickle.dump(self.model.dataset, f, protocol=2)
-            f.close()
+            with open(self.out_path, "wb") as f:
+                pickle.dump(self.model.dataset, f, protocol=2)
             # also write out the 'state', which contains things
             # pertaining to the view
             d = self.model.get_stateful_dict()
-            f = open(self.out_path + ".state", "wb")
-            pickle.dump(d, f, protocol=2)
-            f.close()
+            with open(self.out_path + ".state", "wb") as f:
+                pickle.dump(d, f, protocol=2)
             self.model.analysis_source_path = self.out_path
 
             # add dataset to recent files
@@ -1559,10 +1565,16 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             self.dataset_file_lbl.setText("open file: %s" % self.out_path)
             qt_layout.fit_text_to_contents(self)
             self.current_data_unsaved = False
+            return True
         except Exception as e:
-            # @TODO handle this elegantly?
-            print(e)
-            raise Exception("whoops. exception thrown attempting to save.")
+            app_error_handler.log_exception(type(e), e, e.__traceback__)
+            QMessageBox.critical(
+                self,
+                "Could not save project",
+                "OpenMeta[Analyst] could not save %s.\n\nDetails: %s: %s"
+                % (self.out_path, e.__class__.__name__, e),
+            )
+            return False
 
     def _show_tom(self):
         tom_dlg = easter_egg.TomDialog(parent=self)
