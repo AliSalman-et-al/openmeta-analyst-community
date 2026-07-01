@@ -14,6 +14,7 @@ import meta_py_r_backend
 import meta_globals
 
 meta_py_r_backend.install_meta_py_r_backend()
+import app_error_handler
 import settings
 
 SPLASH_DISPLAY_TIME = 0  # TODO: change to 5 seconds in production version
@@ -118,6 +119,7 @@ def load_R_libraries(app, splash=None):
 
 
 def start():
+    app_error_handler.install_global_exception_handler()
     startup_argv = _resolve_startup_argv()
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-smoke":
         sample_path = (
@@ -173,6 +175,7 @@ def start():
 
 
 def start_automation():
+    app_error_handler.install_global_exception_handler()
     meta_form = _import_meta_form()
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
     app.setApplicationName(meta_globals.APPLICATION_NAME)

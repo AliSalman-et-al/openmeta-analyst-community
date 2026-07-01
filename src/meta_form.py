@@ -36,6 +36,7 @@ import meta_globals
 from meta_globals import *
 import ma_dataset
 import legacy_pickle
+import app_error_handler
 import qt_layout
 import qt_text
 from settings import *
@@ -804,9 +805,17 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def analysis(self, results):
         if results is None:
             return  # analysis failed
-        else:  # analysis succeeded
+        try:
             form = results_window.ResultsWindow(results, parent=self)
-            form.show()
+        except Exception as e:
+            app_error_handler.log_exception(type(e), e, e.__traceback__)
+            QMessageBox.critical(
+                self,
+                "analysis failed",
+                "Sorry, this analysis could not be completed: %s" % e,
+            )
+            return
+        form.show()
 
     def edit_group_name(self, cur_group_name):
         orig_group_name = copy.copy(cur_group_name)

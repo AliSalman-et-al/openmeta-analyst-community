@@ -33,6 +33,7 @@ import copy
 import sys
 
 import forms.ui_ma_specs
+import app_error_handler
 import meta_py_r
 import qt_layout
 import qt_text
@@ -215,33 +216,19 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         # dispatch on type; build an R object, then run the analysis
         if self.data_type == "binary":
-            # note that this call creates a tmp object in R called
-            # tmp_obj (though you can pass in whatever var name
-            # you'd like)
-            meta_py_r.ma_dataset_to_simple_binary_robj(self.model)
-            if self.meta_f_str is None:
-                result = meta_py_r.run_binary_ma(
-                    self.current_method, self.current_param_vals
-                )
-                # pass
-            else:
-                result = meta_py_r.run_workflow_analysis(
-                    self.meta_f_str, self.current_method, self.current_param_vals
-                )
+            result = _run_guarded_analysis(
+                self, bar, lambda: _run_binary_analysis(self)
+            )
+            if result is None:
+                return
 
             # _writeout_test_data(self.meta_f_str, self.current_method, self.current_param_vals, result) # FOR MAKING TESTS
         elif self.data_type == "continuous":
-            meta_py_r.ma_dataset_to_simple_continuous_robj(self.model)
-            if self.meta_f_str is None:
-                # run standard meta-analysis
-                result = meta_py_r.run_continuous_ma(
-                    self.current_method, self.current_param_vals
-                )
-            else:
-                # get meta!
-                result = meta_py_r.run_workflow_analysis(
-                    self.meta_f_str, self.current_method, self.current_param_vals
-                )
+            result = _run_guarded_analysis(
+                self, bar, lambda: _run_continuous_analysis(self)
+            )
+            if result is None:
+                return
 
             # _writeout_test_data(self.meta_f_str, self.current_method, self.current_param_vals, result) # FOR MAKING TESTS
         elif self.data_type == "diagnostic":
@@ -288,15 +275,16 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                         self.model, method_names, list_of_param_vals
                     )
                 except Exception as e:
+                    app_error_handler.log_exception(type(e), e, e.__traceback__)
                     error_message = (
-                        "sorry, something has gone wrong with your analysis. here is a stack trace that probably won't be terribly useful.\n %s"
+                        "Sorry, this analysis could not be completed:\n\n%s"
                         % e
                     )
 
                     QMessageBox.critical(self, "analysis failed", error_message)
                     bar.hide()
                     # reset Rs working directory
-                    meta_py_r.reset_Rs_working_dir()
+                    _reset_r_working_dir_safely()
                     self.accept()
                     return
                 # _writeout_test_data(self.meta_f_str, method_names, list_of_param_vals, result, diag=True) # FOR MAKING TESTS
@@ -311,15 +299,16 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                         meta_f_str=self.meta_f_str,
                     )
                 except Exception as e:
+                    app_error_handler.log_exception(type(e), e, e.__traceback__)
                     error_message = (
-                        "sorry, something has gone wrong with your analysis. here is a stack trace that probably won't be terribly useful.\n %s"
+                        "Sorry, this analysis could not be completed:\n\n%s"
                         % e
                     )
 
                     QMessageBox.critical(self, "analysis failed", error_message)
                     bar.hide()
                     # reset Rs working directory
-                    meta_py_r.reset_Rs_working_dir()
+                    _reset_r_working_dir_safely()
                     self.accept()
                     return
                 # _writeout_test_data(self.meta_f_str, method_names, list_of_param_vals, result, diag=True) # FOR MAKING TESTS
@@ -861,6 +850,52 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 # which isn't really a 'child' of ma_specs, so inheritance
 # didn't feel appropriate
 ###
+def _run_binary_analysis(specs_form):
+    # Creates a tmp object in R called tmp_obj unless a caller passes another name.
+    meta_py_r.ma_dataset_to_simple_binary_robj(specs_form.model)
+    if specs_form.meta_f_str is None:
+        return meta_py_r.run_binary_ma(
+            specs_form.current_method, specs_form.current_param_vals
+        )
+    return meta_py_r.run_workflow_analysis(
+        specs_form.meta_f_str, specs_form.current_method, specs_form.current_param_vals
+    )
+
+
+def _run_continuous_analysis(specs_form):
+    meta_py_r.ma_dataset_to_simple_continuous_robj(specs_form.model)
+    if specs_form.meta_f_str is None:
+        return meta_py_r.run_continuous_ma(
+            specs_form.current_method, specs_form.current_param_vals
+        )
+    return meta_py_r.run_workflow_analysis(
+        specs_form.meta_f_str, specs_form.current_method, specs_form.current_param_vals
+    )
+
+
+def _run_guarded_analysis(specs_form, progress_bar, run_analysis):
+    try:
+        return run_analysis()
+    except Exception as e:
+        app_error_handler.log_exception(type(e), e, e.__traceback__)
+        QMessageBox.critical(
+            specs_form,
+            "analysis failed",
+            "Sorry, this analysis could not be completed:\n\n%s" % e,
+        )
+        progress_bar.hide()
+        _reset_r_working_dir_safely()
+        specs_form.accept()
+        return None
+
+
+def _reset_r_working_dir_safely():
+    try:
+        meta_py_r.reset_Rs_working_dir()
+    except Exception:
+        pass
+
+
 def add_plot_params(specs_form):
     specs_form.current_param_vals["fp_show_col1"] = specs_form.show_1.isChecked()
     specs_form.current_param_vals["fp_col1_str"] = _text_value(specs_form.col1_str_edit)

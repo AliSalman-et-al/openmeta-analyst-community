@@ -45,6 +45,7 @@ SIDE_BY_SIDE_FOREST_PLOTS = (
     "Sensitivity and Specificity",
     "Cumulative Forest Plot",
 )
+NO_RESULTS_MESSAGE = "No results could be computed for this analysis."
 ROW_HEIGHT = 15  # by trial-and-error; seems to work very well
 SECTION_SPACING = ROW_HEIGHT
 
@@ -82,6 +83,8 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self.results_nav_splitter.setSizes([200, 500])
 
         self.scene = QGraphicsScene(self)
+
+        results = _normalize_results(results)
 
         self.images = results["images"]
         print("images returned from analytic routine: %s" % self.images)
@@ -179,6 +182,8 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
     def generate_pixmap(self, image):
         # now the image
         pixmap = QPixmap(image)
+        if pixmap.isNull():
+            return pixmap
 
         ###
         # we scale to address issue #23.
@@ -500,6 +505,33 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
     def position(self):
         point = QPoint(int(self.x_coord), int(self.y_coord))
         return self.graphics_view.mapToScene(point)
+
+
+def _normalize_results(results):
+    if not isinstance(results, dict):
+        return _empty_results()
+
+    normalized = dict(results)
+    normalized["texts"] = dict(normalized.get("texts") or {})
+    normalized["images"] = dict(normalized.get("images") or {})
+    normalized["image_var_names"] = dict(normalized.get("image_var_names") or {})
+    normalized["image_params_paths"] = dict(normalized.get("image_params_paths") or {})
+    normalized.setdefault("image_order", None)
+
+    if not normalized["texts"] and not normalized["images"]:
+        normalized["texts"]["No Results"] = NO_RESULTS_MESSAGE
+
+    return normalized
+
+
+def _empty_results():
+    return {
+        "texts": {"No Results": NO_RESULTS_MESSAGE},
+        "images": {},
+        "image_var_names": {},
+        "image_params_paths": {},
+        "image_order": None,
+    }
 
 
 if __name__ == "__main__":

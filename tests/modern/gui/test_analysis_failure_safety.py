@@ -1,0 +1,199 @@
+import os
+import sys
+
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ.setdefault("OMA_STUB_BACKEND", "1")
+sys.path.insert(0, os.path.abspath("src"))
+
+REPO_ROOT = os.getcwd()
+
+
+def _create_binary_dataset(window):
+    window._handle_wizard_results(
+        {
+            "path": "new_dataset",
+            "outcome_info": {
+                "arms": "two",
+                "data_type": "binary",
+                "sub_type": None,
+                "effect": "OR",
+                "metric_choices": [],
+                "name": "Binary",
+            },
+            "csv_data": None,
+            "selected_dataset": None,
+        }
+    )
+
+
+def test_binary_analysis_failure_shows_dialog_and_does_not_open_results(monkeypatch):
+    import launch
+    import ma_specs
+
+    app, window = launch.start_automation()
+    backend = ma_specs.meta_py_r
+    saved = {
+        name: getattr(backend, name)
+        for name in (
+            "get_available_methods",
+            "get_params",
+            "get_method_description",
+            "ma_dataset_to_simple_binary_robj",
+            "run_binary_ma",
+            "reset_Rs_working_dir",
+        )
+    }
+    shown = []
+    results = []
+    try:
+        _create_binary_dataset(window)
+
+        backend.ma_dataset_to_simple_binary_robj = lambda model, **kwargs: None
+        backend.get_available_methods = lambda **kwargs: {
+            "Binary Random-Effects": "binary.random"
+        }
+        backend.get_params = lambda method: ({}, {}, [], {})
+        backend.get_method_description = lambda method: "stub method"
+        backend.run_binary_ma = lambda *args, **kwargs: (_ for _ in ()).throw(
+            RuntimeError("simulated R failure")
+        )
+        backend.reset_Rs_working_dir = lambda: None
+
+        monkeypatch.setattr(
+            ma_specs.QMessageBox, "critical", lambda *args, **kwargs: shown.append(args)
+        )
+        monkeypatch.setattr(window, "analysis", lambda result: results.append(result))
+
+        form = window._build_analysis_specs_dialog(
+            conf_level=window.model.get_global_conf_level()
+        )
+        form.run_ma()
+
+        assert shown
+        assert shown[0][1] == "analysis failed"
+        assert "simulated R failure" in shown[0][2]
+        assert results == []
+    finally:
+        for name, value in saved.items():
+            setattr(backend, name, value)
+        _close_without_prompt(app, window)
+
+
+def test_continuous_workflow_failure_shows_dialog_and_does_not_open_results(
+    monkeypatch,
+):
+    import launch
+    import ma_specs
+
+    app, window = launch.start_automation()
+    backend = ma_specs.meta_py_r
+    saved = {
+        name: getattr(backend, name)
+        for name in (
+            "get_available_methods",
+            "get_params",
+            "get_method_description",
+            "ma_dataset_to_simple_continuous_robj",
+            "run_workflow_analysis",
+            "reset_Rs_working_dir",
+        )
+    }
+    shown = []
+    results = []
+    try:
+        window._handle_wizard_results(
+            {
+                "path": "new_dataset",
+                "outcome_info": {
+                    "arms": "two",
+                    "data_type": "continuous",
+                    "sub_type": None,
+                    "effect": "SMD",
+                    "metric_choices": [],
+                    "name": "Continuous",
+                },
+                "csv_data": None,
+                "selected_dataset": None,
+            }
+        )
+
+        backend.ma_dataset_to_simple_continuous_robj = lambda model, **kwargs: None
+        backend.get_available_methods = lambda **kwargs: {
+            "Continuous Random-Effects": "continuous.random"
+        }
+        backend.get_params = lambda method: ({}, {}, [], {})
+        backend.get_method_description = lambda method: "stub method"
+        backend.run_workflow_analysis = lambda *args, **kwargs: (
+            _ for _ in ()
+        ).throw(RuntimeError("simulated recompute failure"))
+        backend.reset_Rs_working_dir = lambda: None
+
+        monkeypatch.setattr(
+            ma_specs.QMessageBox, "critical", lambda *args, **kwargs: shown.append(args)
+        )
+        monkeypatch.setattr(window, "analysis", lambda result: results.append(result))
+
+        form = window._build_analysis_specs_dialog(
+            meta_f_str="leave-one-out",
+            conf_level=window.model.get_global_conf_level(),
+        )
+        form.run_ma()
+
+        assert shown
+        assert "simulated recompute failure" in shown[0][2]
+        assert results == []
+    finally:
+        for name, value in saved.items():
+            setattr(backend, name, value)
+        _close_without_prompt(app, window)
+
+
+def test_results_window_accepts_incomplete_result_payload():
+    from PyQt5.QtWidgets import QApplication
+
+    import results_window
+
+    app = QApplication.instance() or QApplication([])
+    window = results_window.ResultsWindow({"texts": {}})
+    try:
+        assert window.texts == {"No Results": results_window.NO_RESULTS_MESSAGE}
+        assert window.images == {}
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_global_exception_handler_logs_trace_and_shows_recoverable_dialog(
+    monkeypatch, tmp_path
+):
+    from PyQt5.QtWidgets import QApplication
+
+    import app_error_handler
+
+    app = QApplication.instance() or QApplication([])
+    log_path = tmp_path / "openmeta-analyst-error.log"
+    shown = []
+    monkeypatch.setattr(app_error_handler, "exception_log_path", lambda: str(log_path))
+    monkeypatch.setattr(
+        app_error_handler.QMessageBox,
+        "critical",
+        lambda *args, **kwargs: shown.append(args),
+    )
+
+    try:
+        raise RuntimeError("slot exploded")
+    except RuntimeError as e:
+        app_error_handler.handle_exception(type(e), e, e.__traceback__)
+
+    assert shown
+    assert shown[0][1] == app_error_handler.UNEXPECTED_ERROR_TITLE
+    assert "slot exploded" in log_path.read_text(encoding="utf-8")
+    app.processEvents()
+
+
+def _close_without_prompt(app, window):
+    window.current_data_unsaved = False
+    window.close()
+    app.processEvents()
+    os.chdir(REPO_ROOT)

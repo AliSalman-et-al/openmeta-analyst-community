@@ -1316,6 +1316,9 @@ def parse_out_results(result):
     image_var_name_d, image_params_paths_d, image_path_d = {}, {}, {}
     image_order = None
 
+    if _r_inherits(result, "try-error"):
+        raise RuntimeError(_r_error_message(result))
+
     # Turn result into a nice dictionary
     result = dict(list(zip(list(result.names), list(result))))
 
@@ -1385,6 +1388,22 @@ def parse_out_results(result):
     }
 
     return to_return
+
+
+def _r_inherits(r_object, class_name):
+    try:
+        return bool(execute_r_function("inherits", r_object, class_name)[0])
+    except Exception:
+        return False
+
+
+def _r_error_message(r_object):
+    try:
+        if len(r_object) > 0:
+            return str(r_object[0]).strip()
+    except Exception:
+        pass
+    return str(r_object).strip()
 
 
 def _is_table_summary(r_object):
