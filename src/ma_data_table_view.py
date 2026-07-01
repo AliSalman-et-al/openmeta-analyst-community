@@ -46,7 +46,7 @@ def _connect_action(action, callback):
 
 
 def _to_text(value):
-    if value is None:
+    if value is None or (isinstance(value, QtCore.QVariant) and not value.isValid()):
         return ""
     if hasattr(value, "toString"):
         return str(value.toString())

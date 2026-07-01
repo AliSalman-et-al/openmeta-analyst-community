@@ -34,6 +34,14 @@ def _item_data(value=None):
     return value
 
 
+def _editable_data(value=None):
+    if value is None:
+        return ""
+    if isinstance(value, QtCore.QVariant) and not value.isValid():
+        return ""
+    return value
+
+
 class _QtText(str):
     def toUtf8(self):
         return self.encode("utf8")
@@ -43,13 +51,15 @@ class _QtText(str):
 
 
 def _to_text_value(value):
+    if isinstance(value, QtCore.QVariant) and not value.isValid():
+        return _QtText("")
     if hasattr(value, "toString"):
         return value.toString()
     return _QtText("" if value is None else str(value))
 
 
 def _to_native_text(value):
-    if value is None:
+    if value is None or (isinstance(value, QtCore.QVariant) and not value.isValid()):
         return ""
     if hasattr(value, "toString"):
         value = value.toString()
@@ -301,9 +311,9 @@ class DatasetModel(QAbstractTableModel):
 
         if role in (Qt.DisplayRole, Qt.EditRole):
             if column == self.NAME:
-                return _item_data(study.name)
+                return _item_data(_editable_data(study.name))
             elif column == self.YEAR:
-                if study.year == 0:
+                if study.year in (None, "", 0):
                     return _item_data("")
                 else:
                     return _item_data(study.year)
@@ -315,7 +325,7 @@ class DatasetModel(QAbstractTableModel):
                     if len(cur_raw_data) > adjusted_index:
                         val = cur_raw_data[adjusted_index]
                         if val == "" or val is None:
-                            return _item_data(val)
+                            return _item_data("")
                         try:
                             # these are the continuous columns containing sample
                             # size; they will be integers, presumably
