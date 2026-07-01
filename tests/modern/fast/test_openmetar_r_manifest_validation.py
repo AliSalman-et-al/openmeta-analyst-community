@@ -290,6 +290,50 @@ def test_default_r_verifier_resolves_rscript_from_r_command(monkeypatch, tmp_pat
     assert resolved == rscript.resolve()
 
 
+def test_default_r_openmetar_install_preserves_dependency_libraries(
+    monkeypatch, tmp_path
+):
+    import importlib.util
+
+    verifier_path = REPO_ROOT / "scripts" / "verify_openmetar_r_default.py"
+    spec = importlib.util.spec_from_file_location(
+        "verify_openmetar_r_default", verifier_path
+    )
+    verifier = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(verifier)
+
+    dependency_library = tmp_path / "dependency-library"
+    dependency_library.mkdir()
+    r_exe = tmp_path / "R.exe"
+    r_exe.write_text("", encoding="utf-8")
+    captured_envs = []
+
+    monkeypatch.setattr(verifier, "resolve_r_exe", lambda root, rscript, env: r_exe)
+
+    def fake_run(command, cwd, env):
+        captured_envs.append(dict(env))
+        return subprocess.CompletedProcess(command, 0, stdout="OK\n", stderr="")
+
+    monkeypatch.setattr(verifier, "run", fake_run)
+
+    verifier.install_and_load_openmetar(
+        REPO_ROOT,
+        Path("Rscript"),
+        {
+            "R_LIBS": str(dependency_library),
+            "R_LIBS_USER": str(dependency_library),
+        },
+    )
+
+    assert len(captured_envs) == 2
+    install_env = captured_envs[0]
+    install_library, preserved_library = install_env["R_LIBS"].split(verifier.os.pathsep)
+    assert Path(install_library).name == "library"
+    assert preserved_library == str(dependency_library)
+    assert install_env["R_LIBS_USER"] == str(dependency_library)
+
+
 def read_description_fields():
     fields = {}
     current_key = None
