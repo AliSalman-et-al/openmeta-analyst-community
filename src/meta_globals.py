@@ -187,6 +187,11 @@ CONFIDENCE_LEVEL_DISPLAY_MAX = 99.9
 INVALID_CONFIDENCE_LEVEL_MESSAGE = (
     "Confidence level must be greater than 0 and less than 100."
 )
+ANALYSIS_DIGITS_MIN = 0
+ANALYSIS_DIGITS_MAX = 15
+INVALID_ANALYSIS_DIGITS_MESSAGE = (
+    "Number of digits must be a non-negative integer."
+)
 
 
 def validate_confidence_level(conf_level):
@@ -203,10 +208,28 @@ def validate_confidence_level(conf_level):
     return value
 
 
+def validate_analysis_digits(digits):
+    try:
+        value = float(digits)
+    except (TypeError, ValueError):
+        raise ValueError(INVALID_ANALYSIS_DIGITS_MESSAGE)
+
+    if (
+        not math.isfinite(value)
+        or not value.is_integer()
+        or not (ANALYSIS_DIGITS_MIN <= value <= ANALYSIS_DIGITS_MAX)
+    ):
+        raise ValueError(INVALID_ANALYSIS_DIGITS_MESSAGE)
+
+    return int(value)
+
+
 def normalize_confidence_level_params(params):
     normalized = dict(params)
     if "conf.level" in normalized:
         normalized["conf.level"] = validate_confidence_level(normalized["conf.level"])
+    if "digits" in normalized:
+        normalized["digits"] = validate_analysis_digits(normalized["digits"])
     return normalized
 
 

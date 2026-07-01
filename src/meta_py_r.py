@@ -1614,7 +1614,7 @@ def make_weights_str(results):
     digits = 3
     if "input_params" in results:
         digits = results["input_params"].rx2("digits")[0]
-    digits = int(round(digits))
+    digits = validate_analysis_digits(digits)
     weights = list(results["weights"])
     weights = ["{0:.{digits}f}%".format(x, digits=digits) for x in weights]
     if "input_data" in results:

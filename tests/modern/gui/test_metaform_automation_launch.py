@@ -765,11 +765,13 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         "rm.method": ["HE", "DL", "SJ", "ML", "REML", "EB"],
         "to": ["only0", "all"],
         "conf.level": "float",
+        "digits": "int",
     }
     defaults = {
         "rm.method": "DL",
         "to": "only0",
         "conf.level": 95.0,
+        "digits": 3,
     }
     pretty_names = {
         "rm.method": {
@@ -792,6 +794,10 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
             "pretty.name": "Confidence level",
             "description": "Level at which to compute confidence intervals",
         },
+        "digits": {
+            "pretty.name": "Number of digits",
+            "description": "Number of digits to display in results",
+        },
     }
 
     monkeypatch.setattr(
@@ -808,7 +814,7 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         lambda method: (
             dict(params),
             dict(defaults),
-            ["rm.method", "to", "conf.level"],
+            ["rm.method", "to", "conf.level", "digits"],
             pretty_names,
         ),
         raising=False,
@@ -859,19 +865,33 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         assert confidence_spinbox.maximum() == 99.9
         assert confidence_spinbox.value() == 95.0
 
+        digit_spinboxes = specs[0].parameter_grp_box.findChildren(QtWidgets.QSpinBox)
+        assert len(digit_spinboxes) == 1
+        digit_spinbox = digit_spinboxes[0]
+        digit_spinbox.lineEdit().setText("-5")
+        digit_spinbox.interpretText()
+        assert digit_spinbox.minimum() == 0
+        assert digit_spinbox.value() == 3
+
         parameter_labels = [
             label
             for label in specs[0].parameter_grp_box.findChildren(QtWidgets.QLabel)
             if str(label.text())
-            in {"Random-Effects method", "Correction factor target", "Confidence level"}
+            in {
+                "Random-Effects method",
+                "Correction factor target",
+                "Confidence level",
+                "Number of digits",
+            }
         ]
-        assert len(parameter_labels) == 3
+        assert len(parameter_labels) == 4
         for label in parameter_labels:
             assert label.minimumWidth() >= label.sizeHint().width()
 
         assert specs[0].current_param_vals["rm.method"] == "DL"
         assert specs[0].current_param_vals["to"] == "only0"
         assert specs[0].current_param_vals["conf.level"] == 95.0
+        assert specs[0].current_param_vals["digits"] == 3
     finally:
         window.close()
         app.processEvents()

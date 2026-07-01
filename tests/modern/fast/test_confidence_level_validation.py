@@ -7,7 +7,11 @@ import pytest
 
 sys.path.insert(0, os.path.abspath("src"))
 
-from meta_globals import normalize_confidence_level_params, validate_confidence_level
+from meta_globals import (
+    normalize_confidence_level_params,
+    validate_analysis_digits,
+    validate_confidence_level,
+)
 
 
 def test_validate_confidence_level_accepts_finite_exclusive_percentage():
@@ -33,3 +37,20 @@ def test_normalize_confidence_level_params_validates_analysis_dictionaries():
 def test_normalize_confidence_level_params_rejects_invalid_analysis_dictionaries():
     with pytest.raises(ValueError, match="greater than 0 and less than 100"):
         normalize_confidence_level_params({"conf.level": 100, "digits": 3})
+
+
+def test_validate_analysis_digits_accepts_non_negative_integer_precision():
+    assert validate_analysis_digits(0) == 0
+    assert validate_analysis_digits("5") == 5
+    assert validate_analysis_digits(3.0) == 3
+
+
+def test_validate_analysis_digits_rejects_negative_and_non_integer_values():
+    for value in (-1, "-5", 1.5, "2.5", math.inf, math.nan, None, "bad"):
+        with pytest.raises(ValueError, match="Number of digits"):
+            validate_analysis_digits(value)
+
+
+def test_normalize_confidence_level_params_rejects_invalid_digits():
+    with pytest.raises(ValueError, match="Number of digits"):
+        normalize_confidence_level_params({"conf.level": 95, "digits": -5})

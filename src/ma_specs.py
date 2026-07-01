@@ -27,6 +27,7 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QDoubleSpinBox,
+    QSpinBox,
 )
 
 import copy
@@ -672,16 +673,25 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             self.param_d[name]["pretty.name"],
             tool_tip_text=self.param_d[name]["description"],
         )
-        # now add the int input line edit
-        iinput = QLineEdit()
+        iinput = QSpinBox()
+        if name == "digits":
+            iinput.setRange(ANALYSIS_DIGITS_MIN, ANALYSIS_DIGITS_MAX)
+        else:
+            iinput.setRange(-2147483648, 2147483647)
+        iinput.setCorrectionMode(QtWidgets.QAbstractSpinBox.CorrectToPreviousValue)
 
         # if a default value has been specified, use it
         if name in self.current_defaults:
-            iinput.setText(str(int(self.current_defaults[name])))
-            self.current_param_vals[name] = self.current_defaults[name]
+            value = (
+                validate_analysis_digits(self.current_defaults[name])
+                if name == "digits"
+                else int(self.current_defaults[name])
+            )
+            iinput.setValue(value)
+            self.current_param_vals[name] = value
 
         iinput.setMaximumWidth(50)
-        iinput.textChanged.connect(
+        iinput.valueChanged[int].connect(
             app_error_handler.safe_slot(self.set_param_f(name, to_type=int), parent=self)
         )
         self.current_widgets.append(iinput)
