@@ -26,19 +26,21 @@ REPO_ROOT = os.getcwd()
 
 
 def _create_diagnostic_dataset(window):
-    window._handle_wizard_results({
-        "path": "new_dataset",
-        "outcome_info": {
-            "arms": "two",
-            "data_type": "diagnostic",
-            "sub_type": None,
-            "effect": "Sens",
-            "metric_choices": [],
-            "name": "Accuracy",
-        },
-        "csv_data": None,
-        "selected_dataset": None,
-    })
+    window._handle_wizard_results(
+        {
+            "path": "new_dataset",
+            "outcome_info": {
+                "arms": "two",
+                "data_type": "diagnostic",
+                "sub_type": None,
+                "effect": "Sens",
+                "metric_choices": [],
+                "name": "Accuracy",
+            },
+            "csv_data": None,
+            "selected_dataset": None,
+        }
+    )
 
 
 def test_diagnostic_next_surfaces_backend_failure_instead_of_silent_dead_end():
@@ -64,7 +66,8 @@ def test_diagnostic_next_surfaces_backend_failure_instead_of_silent_dead_end():
         # QMessageBox.critical (a modal exec) aborts under the offscreen
         # platform, so record the call instead of actually showing it.
         meta_form.QMessageBox.critical = staticmethod(
-            lambda *args, **kwargs: shown.append(args))
+            lambda *args, **kwargs: shown.append(args)
+        )
 
         form = diag_metrics.Diag_Metrics(window.model, parent=window)
 
@@ -86,9 +89,15 @@ def test_diagnostic_method_dialog_builds_with_working_backend():
     import ma_specs
 
     backend = ma_specs.meta_py_r
-    saved = {name: getattr(backend, name) for name in
-             ("get_available_methods", "get_params", "get_method_description",
-              "ma_dataset_to_simple_diagnostic_robj")}
+    saved = {
+        name: getattr(backend, name)
+        for name in (
+            "get_available_methods",
+            "get_params",
+            "get_method_description",
+            "ma_dataset_to_simple_diagnostic_robj",
+        )
+    }
     try:
         _create_diagnostic_dataset(window)
 
@@ -127,10 +136,17 @@ def test_diagnostic_backend_failure_does_not_open_empty_results(monkeypatch):
     import ma_specs
 
     backend = ma_specs.meta_py_r
-    saved = {name: getattr(backend, name) for name in
-             ("get_available_methods", "get_params", "get_method_description",
-              "ma_dataset_to_simple_diagnostic_robj", "run_diagnostic_multi",
-              "reset_Rs_working_dir")}
+    saved = {
+        name: getattr(backend, name)
+        for name in (
+            "get_available_methods",
+            "get_params",
+            "get_method_description",
+            "ma_dataset_to_simple_diagnostic_robj",
+            "run_diagnostic_multi",
+            "reset_Rs_working_dir",
+        )
+    }
     shown = []
     results = []
     try:
@@ -143,10 +159,12 @@ def test_diagnostic_backend_failure_does_not_open_empty_results(monkeypatch):
         backend.get_params = lambda method: ({}, {}, [], {})
         backend.get_method_description = lambda method: "stub method"
         backend.run_diagnostic_multi = lambda *args, **kwargs: (_ for _ in ()).throw(
-            RuntimeError("simulated diagnostic failure"))
+            RuntimeError("simulated diagnostic failure")
+        )
         backend.reset_Rs_working_dir = lambda: None
-        monkeypatch.setattr(ma_specs.QMessageBox, "critical",
-                            lambda *args, **kwargs: shown.append(args))
+        monkeypatch.setattr(
+            ma_specs.QMessageBox, "critical", lambda *args, **kwargs: shown.append(args)
+        )
         monkeypatch.setattr(window, "analysis", lambda result: results.append(result))
 
         form = window._build_analysis_specs_dialog(
@@ -171,10 +189,17 @@ def test_diagnostic_multi_metric_failure_keeps_independent_results(monkeypatch):
     import ma_specs
 
     backend = ma_specs.meta_py_r
-    saved = {name: getattr(backend, name) for name in
-             ("get_available_methods", "get_params", "get_method_description",
-              "ma_dataset_to_simple_diagnostic_robj", "run_diagnostic_multi",
-              "reset_Rs_working_dir")}
+    saved = {
+        name: getattr(backend, name)
+        for name in (
+            "get_available_methods",
+            "get_params",
+            "get_method_description",
+            "ma_dataset_to_simple_diagnostic_robj",
+            "run_diagnostic_multi",
+            "reset_Rs_working_dir",
+        )
+    }
     shown = []
     results = []
     try:
@@ -208,8 +233,9 @@ def test_diagnostic_multi_metric_failure_keeps_independent_results(monkeypatch):
             }
 
         backend.run_diagnostic_multi = run_metric
-        monkeypatch.setattr(ma_specs.QMessageBox, "critical",
-                            lambda *args, **kwargs: shown.append(args))
+        monkeypatch.setattr(
+            ma_specs.QMessageBox, "critical", lambda *args, **kwargs: shown.append(args)
+        )
         monkeypatch.setattr(window, "analysis", lambda result: results.append(result))
 
         form = window._build_analysis_specs_dialog(
@@ -234,7 +260,10 @@ def test_diagnostic_multi_metric_failure_keeps_independent_results(monkeypatch):
         assert results[0]["texts"]["PLR Summary"] == "PLR ok"
         assert results[0]["texts"]["NLR Summary"] == "NLR ok"
         assert results[0]["image_order"] == [
-            "NLR Forest plot", "PLR Forest plot", "DOR Forest plot"]
+            "NLR Forest plot",
+            "PLR Forest plot",
+            "DOR Forest plot",
+        ]
     finally:
         for name, value in saved.items():
             setattr(backend, name, value)
@@ -248,20 +277,31 @@ def test_diagnostic_direct_effects_build_analysis_data_per_metric(monkeypatch):
     import ma_specs
 
     backend = ma_specs.meta_py_r
-    saved = {name: getattr(backend, name, None) for name in
-             ("get_available_methods", "get_params", "get_method_description",
-              "ma_dataset_to_simple_diagnostic_robj", "run_diagnostic_multi",
-              "run_diagnostic_multi_for_entered_effects")}
+    saved = {
+        name: getattr(backend, name, None)
+        for name in (
+            "get_available_methods",
+            "get_params",
+            "get_method_description",
+            "ma_dataset_to_simple_diagnostic_robj",
+            "run_diagnostic_multi",
+            "run_diagnostic_multi_for_entered_effects",
+        )
+    }
     built_metrics = []
     multi_calls = []
     results = []
     try:
         _create_diagnostic_dataset(window)
 
-        monkeypatch.setattr(window.model, "included_studies_have_raw_data",
-                            lambda: False)
-        monkeypatch.setattr(window.model, "included_studies_have_point_estimates",
-                            lambda effect=None: effect in ("Sens", "Spec"))
+        monkeypatch.setattr(
+            window.model, "included_studies_have_raw_data", lambda: False
+        )
+        monkeypatch.setattr(
+            window.model,
+            "included_studies_have_point_estimates",
+            lambda effect=None: effect in ("Sens", "Spec"),
+        )
 
         backend.get_available_methods = lambda **kwargs: {
             "Diagnostic Random-Effects": "diagnostic.random",
@@ -298,7 +338,10 @@ def test_diagnostic_direct_effects_build_analysis_data_per_metric(monkeypatch):
 
         assert built_metrics == ["Sens", "Spec"]
         assert [call[1][0]["measure"] for call in multi_calls] == ["Sens", "Spec"]
-        assert results and sorted(results[0]["texts"]) == ["Sens Summary", "Spec Summary"]
+        assert results and sorted(results[0]["texts"]) == [
+            "Sens Summary",
+            "Spec Summary",
+        ]
     finally:
         for name, value in saved.items():
             if value is None:
@@ -326,10 +369,14 @@ def test_diagnostic_metric_dialog_defaults_to_supported_direct_effects(monkeypat
     try:
         _create_diagnostic_dataset(window)
 
-        monkeypatch.setattr(window.model, "included_studies_have_raw_data",
-                            lambda: False)
-        monkeypatch.setattr(window.model, "included_studies_have_point_estimates",
-                            lambda effect=None: effect in ("Sens", "Spec"))
+        monkeypatch.setattr(
+            window.model, "included_studies_have_raw_data", lambda: False
+        )
+        monkeypatch.setattr(
+            window.model,
+            "included_studies_have_point_estimates",
+            lambda effect=None: effect in ("Sens", "Spec"),
+        )
         monkeypatch.setattr(
             window,
             "_build_analysis_specs_dialog",
@@ -363,9 +410,19 @@ def test_diagnostic_metric_dialog_does_not_run_without_selected_metrics(monkeypa
     try:
         _create_diagnostic_dataset(window)
 
-        monkeypatch.setattr(window.model, "included_studies_have_raw_data", lambda: False)
-        monkeypatch.setattr(window.model, "included_studies_have_point_estimates", lambda effect=None: False)
-        monkeypatch.setattr(window, "_build_analysis_specs_dialog", lambda **kwargs: captured.append(kwargs))
+        monkeypatch.setattr(
+            window.model, "included_studies_have_raw_data", lambda: False
+        )
+        monkeypatch.setattr(
+            window.model,
+            "included_studies_have_point_estimates",
+            lambda effect=None: False,
+        )
+        monkeypatch.setattr(
+            window,
+            "_build_analysis_specs_dialog",
+            lambda **kwargs: captured.append(kwargs),
+        )
         monkeypatch.setattr(
             diag_metrics.QMessageBox,
             "warning",
@@ -396,16 +453,26 @@ def test_diagnostic_direct_effects_do_not_offer_count_based_methods(monkeypatch)
     import ma_specs
 
     backend = ma_specs.meta_py_r
-    saved = {name: getattr(backend, name) for name in
-             ("get_available_methods", "get_params", "get_method_description",
-              "ma_dataset_to_simple_diagnostic_robj")}
+    saved = {
+        name: getattr(backend, name)
+        for name in (
+            "get_available_methods",
+            "get_params",
+            "get_method_description",
+            "ma_dataset_to_simple_diagnostic_robj",
+        )
+    }
     try:
         _create_diagnostic_dataset(window)
 
-        monkeypatch.setattr(window.model, "included_studies_have_raw_data",
-                            lambda: False)
-        monkeypatch.setattr(window.model, "included_studies_have_point_estimates",
-                            lambda effect=None: effect in ("Sens", "Spec"))
+        monkeypatch.setattr(
+            window.model, "included_studies_have_raw_data", lambda: False
+        )
+        monkeypatch.setattr(
+            window.model,
+            "included_studies_have_point_estimates",
+            lambda effect=None: effect in ("Sens", "Spec"),
+        )
 
         backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
         backend.get_available_methods = lambda **kwargs: {

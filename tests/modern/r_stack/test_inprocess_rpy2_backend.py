@@ -411,9 +411,10 @@ def test_inprocess_rpy2_backend_python3_porting_fixes():
     )
     if result.returncode == 42:
         pytest.skip("in-process rpy2 backend unavailable: %s" % result.stdout.strip())
-    assert result.returncode == 0, (
-        "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s"
-        % (result.returncode, result.stdout[-2000:], result.stderr[-2000:])
+    assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
+        result.returncode,
+        result.stdout[-2000:],
+        result.stderr[-2000:],
     )
     assert "OK" in result.stdout
     combined_output = result.stdout + result.stderr
@@ -434,10 +435,13 @@ def test_openmetar_summary_capture_uses_formatted_print_methods():
         env=env,
     )
     if result.returncode == 42:
-        pytest.skip("OpenMetaR summary print regression unavailable: %s" % result.stdout.strip())
-    assert result.returncode == 0, (
-        "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s"
-        % (result.returncode, result.stdout[-2000:], result.stderr[-2000:])
+        pytest.skip(
+            "OpenMetaR summary print regression unavailable: %s" % result.stdout.strip()
+        )
+    assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
+        result.returncode,
+        result.stdout[-2000:],
+        result.stderr[-2000:],
     )
     assert "OK" in result.stdout
 
@@ -455,10 +459,14 @@ def test_hsroc_direct_table_summaries_expand_to_formatted_sections():
         env=env,
     )
     if result.returncode == 42:
-        pytest.skip("HSROC summary formatting regression unavailable: %s" % result.stdout.strip())
-    assert result.returncode == 0, (
-        "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s"
-        % (result.returncode, result.stdout[-2000:], result.stderr[-2000:])
+        pytest.skip(
+            "HSROC summary formatting regression unavailable: %s"
+            % result.stdout.strip()
+        )
+    assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
+        result.returncode,
+        result.stdout[-2000:],
+        result.stderr[-2000:],
     )
     assert "OK" in result.stdout
 
@@ -476,9 +484,13 @@ def test_openmetar_advanced_bootstrap_and_permutation_paths_execute():
         env=env,
     )
     if result.returncode == 42:
-        pytest.skip("advanced OpenMetaR workflow regression unavailable: %s" % result.stdout.strip())
-    assert result.returncode == 0, (
-        "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s"
-        % (result.returncode, result.stdout[-2000:], result.stderr[-2000:])
+        pytest.skip(
+            "advanced OpenMetaR workflow regression unavailable: %s"
+            % result.stdout.strip()
+        )
+    assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
+        result.returncode,
+        result.stdout[-2000:],
+        result.stderr[-2000:],
     )
     assert "OK" in result.stdout

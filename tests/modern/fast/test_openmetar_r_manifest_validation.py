@@ -17,8 +17,12 @@ OPENMETAR_R_DIR = OPENMETAR_PACKAGE / "R"
 OPENMETAR_DESCRIPTION = OPENMETAR_PACKAGE / "DESCRIPTION"
 OPENMETAR_NAMESPACE = OPENMETAR_PACKAGE / "NAMESPACE"
 
-LEGACY_EXPORT_PATTERN = re.compile(r"^([A-Za-z][A-Za-z0-9._]*)\s*<-\s*function\s*\(", re.MULTILINE)
-LEGACY_ALIAS_PATTERN = re.compile(r"^([A-Za-z][A-Za-z0-9._]*)\s*<-\s*([A-Za-z][A-Za-z0-9._]*)\s*$", re.MULTILINE)
+LEGACY_EXPORT_PATTERN = re.compile(
+    r"^([A-Za-z][A-Za-z0-9._]*)\s*<-\s*function\s*\(", re.MULTILINE
+)
+LEGACY_ALIAS_PATTERN = re.compile(
+    r"^([A-Za-z][A-Za-z0-9._]*)\s*<-\s*([A-Za-z][A-Za-z0-9._]*)\s*$", re.MULTILINE
+)
 S4_CLASS_PATTERN = re.compile(r"setClass\(\s*[\"']([^\"']+)[\"']")
 
 
@@ -76,7 +80,10 @@ def test_drift_manifest_preserves_review_record_schema(tmp_path):
     result = run_validator(root)
 
     assert result.returncode == 1
-    assert "reviewed_drift_required_fields missing independent_validation_signal" in result.stderr
+    assert (
+        "reviewed_drift_required_fields missing independent_validation_signal"
+        in result.stderr
+    )
 
 
 def test_manifest_records_empty_direct_build_dependency_scope(tmp_path):
@@ -114,7 +121,9 @@ def test_cran_archive_dependencies_must_pin_exact_versions(tmp_path):
 def test_installed_version_report_parses_rscript_output(monkeypatch):
     import importlib.util
 
-    spec = importlib.util.spec_from_file_location("validate_openmetar_r_manifests", VALIDATOR)
+    spec = importlib.util.spec_from_file_location(
+        "validate_openmetar_r_manifests", VALIDATOR
+    )
     validator = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(validator)
@@ -146,13 +155,17 @@ def test_installed_version_report_parses_rscript_output(monkeypatch):
 def test_report_installed_versions_surfaces_rscript_failure(monkeypatch):
     import importlib.util
 
-    spec = importlib.util.spec_from_file_location("validate_openmetar_r_manifests", VALIDATOR)
+    spec = importlib.util.spec_from_file_location(
+        "validate_openmetar_r_manifests", VALIDATOR
+    )
     validator = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(validator)
 
     def fake_run(command, text, stdout, stderr, check):
-        return subprocess.CompletedProcess(command, 1, stdout="", stderr="R is unavailable")
+        return subprocess.CompletedProcess(
+            command, 1, stdout="", stderr="R is unavailable"
+        )
 
     monkeypatch.setattr(validator.subprocess, "run", fake_run)
 
@@ -160,11 +173,15 @@ def test_report_installed_versions_surfaces_rscript_failure(monkeypatch):
         validator.report_installed_versions("Rscript", ["metafor"])
 
 
-def test_default_r_dependency_install_uses_script_file_and_archive_triples(monkeypatch, tmp_path):
+def test_default_r_dependency_install_uses_script_file_and_archive_triples(
+    monkeypatch, tmp_path
+):
     import importlib.util
 
     verifier_path = REPO_ROOT / "scripts" / "verify_openmetar_r_default.py"
-    spec = importlib.util.spec_from_file_location("verify_openmetar_r_default", verifier_path)
+    spec = importlib.util.spec_from_file_location(
+        "verify_openmetar_r_default", verifier_path
+    )
     verifier = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(verifier)
@@ -214,7 +231,9 @@ def test_default_r_verifier_resolves_rscript_from_r_home(tmp_path):
     import importlib.util
 
     verifier_path = REPO_ROOT / "scripts" / "verify_openmetar_r_default.py"
-    spec = importlib.util.spec_from_file_location("verify_openmetar_r_default", verifier_path)
+    spec = importlib.util.spec_from_file_location(
+        "verify_openmetar_r_default", verifier_path
+    )
     verifier = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(verifier)
@@ -224,7 +243,9 @@ def test_default_r_verifier_resolves_rscript_from_r_home(tmp_path):
     rscript.parent.mkdir(parents=True)
     rscript.write_text("", encoding="utf-8")
 
-    resolved = verifier.resolve_rscript("Rscript", env={"OMA_R_HOME": str(r_home), "PATH": ""})
+    resolved = verifier.resolve_rscript(
+        "Rscript", env={"OMA_R_HOME": str(r_home), "PATH": ""}
+    )
 
     assert resolved == rscript.resolve()
 
@@ -233,7 +254,9 @@ def test_default_r_verifier_resolves_rscript_from_r_command(monkeypatch, tmp_pat
     import importlib.util
 
     verifier_path = REPO_ROOT / "scripts" / "verify_openmetar_r_default.py"
-    spec = importlib.util.spec_from_file_location("verify_openmetar_r_default", verifier_path)
+    spec = importlib.util.spec_from_file_location(
+        "verify_openmetar_r_default", verifier_path
+    )
     verifier = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(verifier)
@@ -242,7 +265,11 @@ def test_default_r_verifier_resolves_rscript_from_r_command(monkeypatch, tmp_pat
     rscript = r_home / "bin" / verifier._candidate_rscript_names()[0]
     rscript.parent.mkdir(parents=True)
     rscript.write_text("", encoding="utf-8")
-    fake_r = tmp_path / "bin" / verifier._candidate_rscript_names()[0].replace("Rscript", "R")
+    fake_r = (
+        tmp_path
+        / "bin"
+        / verifier._candidate_rscript_names()[0].replace("Rscript", "R")
+    )
     fake_r.parent.mkdir(parents=True)
     fake_r.write_text("", encoding="utf-8")
 
@@ -307,7 +334,9 @@ def namespace_entries(directive):
     text = OPENMETAR_NAMESPACE.read_text(encoding="utf-8")
     entries = set()
     for match in re.finditer(rf"^{directive}\(([^)]*)\)$", text, flags=re.MULTILINE):
-        entries.update(name.strip() for name in match.group(1).split(",") if name.strip())
+        entries.update(
+            name.strip() for name in match.group(1).split(",") if name.strip()
+        )
     return entries
 
 
@@ -351,7 +380,11 @@ def test_openmetar_namespace_preserves_legacy_export_surface_explicitly():
 
     assert expected_functions
     assert actual_exports == expected_functions
-    assert {"binary.random.parameters", "diagnostic.hsroc.pretty.names", "gimpute.cont.data"} <= actual_exports
+    assert {
+        "binary.random.parameters",
+        "diagnostic.hsroc.pretty.names",
+        "gimpute.cont.data",
+    } <= actual_exports
 
 
 def test_openmetar_namespace_preserves_s4_classes_explicitly():

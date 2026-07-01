@@ -32,7 +32,9 @@ def step(message: str) -> None:
     print(f"[OpenMetaR-r-stack] {message}", flush=True)
 
 
-def run(command: list[str | Path], *, cwd: Path, env: dict[str, str] | None = None) -> None:
+def run(
+    command: list[str | Path], *, cwd: Path, env: dict[str, str] | None = None
+) -> None:
     printable = " ".join(str(part) for part in command)
     step(printable)
     result = subprocess.run(
@@ -44,10 +46,14 @@ def run(command: list[str | Path], *, cwd: Path, env: dict[str, str] | None = No
         check=False,
     )
     if result.returncode != 0:
-        raise VerificationError(f"command failed with exit code {result.returncode}: {printable}")
+        raise VerificationError(
+            f"command failed with exit code {result.returncode}: {printable}"
+        )
 
 
-def run_json(command: list[str | Path], *, cwd: Path, env: dict[str, str] | None = None) -> dict:
+def run_json(
+    command: list[str | Path], *, cwd: Path, env: dict[str, str] | None = None
+) -> dict:
     printable = " ".join(str(part) for part in command)
     step(printable)
     result = subprocess.run(
@@ -61,11 +67,15 @@ def run_json(command: list[str | Path], *, cwd: Path, env: dict[str, str] | None
     )
     if result.returncode != 0:
         output = result.stderr.strip() or result.stdout.strip()
-        raise VerificationError(f"command failed with exit code {result.returncode}: {printable}\n{output}")
+        raise VerificationError(
+            f"command failed with exit code {result.returncode}: {printable}\n{output}"
+        )
     try:
         return json.loads(result.stdout)
     except json.JSONDecodeError as exc:
-        raise VerificationError(f"command did not emit JSON: {printable}\n{result.stdout}") from exc
+        raise VerificationError(
+            f"command did not emit JSON: {printable}\n{result.stdout}"
+        ) from exc
 
 
 def _candidate_rscript_names() -> list[str]:
@@ -76,12 +86,8 @@ def _rscript_paths_for_r_home(r_home: str | Path | None) -> list[Path]:
     if not r_home:
         return []
     root = Path(r_home)
-    return [
-        root / "bin" / name
-        for name in _candidate_rscript_names()
-    ] + [
-        root / "bin" / "x64" / name
-        for name in _candidate_rscript_names()
+    return [root / "bin" / name for name in _candidate_rscript_names()] + [
+        root / "bin" / "x64" / name for name in _candidate_rscript_names()
     ]
 
 
@@ -132,7 +138,9 @@ def _windows_registry_r_homes() -> list[Path]:
                     if current_version:
                         try:
                             with winreg.OpenKey(key, current_version) as version_key:
-                                version_install_path, _ = winreg.QueryValueEx(version_key, "InstallPath")
+                                version_install_path, _ = winreg.QueryValueEx(
+                                    version_key, "InstallPath"
+                                )
                                 if version_install_path:
                                     homes.append(Path(version_install_path))
                         except OSError:
@@ -146,7 +154,9 @@ def _windows_registry_r_homes() -> list[Path]:
                         index += 1
                         try:
                             with winreg.OpenKey(key, version) as version_key:
-                                version_install_path, _ = winreg.QueryValueEx(version_key, "InstallPath")
+                                version_install_path, _ = winreg.QueryValueEx(
+                                    version_key, "InstallPath"
+                                )
                                 if version_install_path:
                                     homes.append(Path(version_install_path))
                         except OSError:
@@ -202,7 +212,9 @@ def resolve_r_exe(rscript: Path, root: Path, env: dict[str, str]) -> Path:
         check=False,
     )
     if result.returncode != 0 or not result.stdout.strip():
-        raise VerificationError(result.stderr.strip() or "could not resolve R home from Rscript")
+        raise VerificationError(
+            result.stderr.strip() or "could not resolve R home from Rscript"
+        )
     executable = "R.exe" if os.name == "nt" else "R"
     r_exe = Path(result.stdout.strip()) / executable
     if not r_exe.exists():
@@ -221,11 +233,15 @@ def resolve_r_home(rscript: Path, root: Path, env: dict[str, str]) -> Path:
         check=False,
     )
     if result.returncode != 0 or not result.stdout.strip():
-        raise VerificationError(result.stderr.strip() or "could not resolve R home from Rscript")
+        raise VerificationError(
+            result.stderr.strip() or "could not resolve R home from Rscript"
+        )
     return Path(result.stdout.strip())
 
 
-def isolated_r_env(base_env: dict[str, str], library: Path, r_home: Path | None = None) -> dict[str, str]:
+def isolated_r_env(
+    base_env: dict[str, str], library: Path, r_home: Path | None = None
+) -> dict[str, str]:
     env = dict(base_env)
     env["R_LIBS"] = str(library)
     env["R_LIBS_USER"] = str(library)
@@ -234,7 +250,9 @@ def isolated_r_env(base_env: dict[str, str], library: Path, r_home: Path | None 
         r_path_entries = [r_home / "bin"]
         if os.name == "nt":
             r_path_entries.insert(0, r_home / "bin" / "x64")
-        env["PATH"] = os.pathsep.join([*(str(path) for path in r_path_entries), env.get("PATH", "")])
+        env["PATH"] = os.pathsep.join(
+            [*(str(path) for path in r_path_entries), env.get("PATH", "")]
+        )
     env.setdefault("RPY2_CFFI_MODE", "ABI")
     env.setdefault("_R_CHECK_FORCE_SUGGESTS_", "false")
     return env
@@ -256,10 +274,15 @@ def r_version_key(rscript: Path, root: Path, env: dict[str, str]) -> str:
     )
     if result.returncode != 0 or not result.stdout.strip():
         raise VerificationError(result.stderr.strip() or "could not resolve R version")
-    return "".join(character if character.isalnum() or character in "._-" else "_" for character in result.stdout.strip())
+    return "".join(
+        character if character.isalnum() or character in "._-" else "_"
+        for character in result.stdout.strip()
+    )
 
 
-def dependency_cache_key(root: Path, rscript: Path, env: dict[str, str], cran_repo: str) -> str:
+def dependency_cache_key(
+    root: Path, rscript: Path, env: dict[str, str], cran_repo: str
+) -> str:
     digest = hashlib.sha256()
     for relative_path in (
         R_DEP_INSTALLER,
@@ -296,7 +319,9 @@ def ensure_dependency_library(
         verify_manifest_versions(root, python, rscript, install_env)
         return r_library
 
-    cache_library = cache_root / dependency_cache_key(root, rscript, env, cran_repo) / "library"
+    cache_library = (
+        cache_root / dependency_cache_key(root, rscript, env, cran_repo) / "library"
+    )
     if cache_library.exists():
         try:
             cache_env = isolated_r_env(env, cache_library)
@@ -323,13 +348,19 @@ def ensure_dependency_library(
 
 
 def built_OpenMetaR_tarball(work_dir: Path) -> Path:
-    tarballs = sorted(work_dir.glob("OpenMetaR_*.tar.gz"), key=lambda path: path.stat().st_mtime)
+    tarballs = sorted(
+        work_dir.glob("OpenMetaR_*.tar.gz"), key=lambda path: path.stat().st_mtime
+    )
     if not tarballs:
-        raise VerificationError(f"R CMD build did not create an OpenMetaR tarball in {work_dir}")
+        raise VerificationError(
+            f"R CMD build did not create an OpenMetaR tarball in {work_dir}"
+        )
     return tarballs[-1]
 
 
-def verify_manifest_versions(root: Path, python: str, rscript: Path, env: dict[str, str]) -> None:
+def verify_manifest_versions(
+    root: Path, python: str, rscript: Path, env: dict[str, str]
+) -> None:
     report = run_json(
         [
             python,
@@ -343,10 +374,18 @@ def verify_manifest_versions(root: Path, python: str, rscript: Path, env: dict[s
         cwd=root,
         env=env,
     )
-    missing = sorted(name for name, version in report["packages"].items() if version is None)
+    missing = sorted(
+        name for name, version in report["packages"].items() if version is None
+    )
     if missing:
-        raise VerificationError("manifest dependency packages are not installed: " + ", ".join(missing))
-    manifest = json.loads((root / Path("docs") / "modernization" / "OpenMetaR-r-dependencies.json").read_text(encoding="utf-8"))
+        raise VerificationError(
+            "manifest dependency packages are not installed: " + ", ".join(missing)
+        )
+    manifest = json.loads(
+        (
+            root / Path("docs") / "modernization" / "OpenMetaR-r-dependencies.json"
+        ).read_text(encoding="utf-8")
+    )
     exact_versions = {
         dependency["name"]: dependency["installed_version"]
         for dependency in manifest["direct_OpenMetaR_dependencies"]
@@ -358,13 +397,21 @@ def verify_manifest_versions(root: Path, python: str, rscript: Path, env: dict[s
         if report["packages"].get(name) != expected
     }
     if wrong_versions:
-        raise VerificationError("manifest dependency versions do not match: " + json.dumps(wrong_versions, sort_keys=True))
-    step("Manifest dependency versions are installed: " + json.dumps(report, sort_keys=True))
+        raise VerificationError(
+            "manifest dependency versions do not match: "
+            + json.dumps(wrong_versions, sort_keys=True)
+        )
+    step(
+        "Manifest dependency versions are installed: "
+        + json.dumps(report, sort_keys=True)
+    )
 
 
 def verify(args: argparse.Namespace) -> None:
     root = args.root.resolve()
-    python = str(Path(args.python).resolve()) if Path(args.python).exists() else args.python
+    python = (
+        str(Path(args.python).resolve()) if Path(args.python).exists() else args.python
+    )
     rscript = resolve_rscript(args.rscript)
     base_env = dict(os.environ)
     cran_repo = args.cran_repo or base_env.get("OMA_CRAN_REPO") or DEFAULT_CRAN_REPO
@@ -372,7 +419,9 @@ def verify(args: argparse.Namespace) -> None:
 
     run([python, R_MANIFEST_VALIDATOR, "--root", root], cwd=root, env=base_env)
 
-    with tempfile.TemporaryDirectory(prefix="OpenMetaR-r-stack-", dir=args.work_dir) as temp_name:
+    with tempfile.TemporaryDirectory(
+        prefix="OpenMetaR-r-stack-", dir=args.work_dir
+    ) as temp_name:
         work_dir = Path(temp_name)
         bootstrap_library = work_dir / "bootstrap-library"
         bootstrap_library.mkdir(parents=True)
@@ -380,14 +429,22 @@ def verify(args: argparse.Namespace) -> None:
         r_exe = resolve_r_exe(rscript, root, env)
         r_home = resolve_r_home(rscript, root, env)
         env = isolated_r_env(base_env, bootstrap_library, r_home)
-        cache_root = args.r_library_cache_root.resolve() if args.r_library_cache_root else None
-        r_library = ensure_dependency_library(root, rscript, env, python, cran_repo, cache_root, work_dir)
+        cache_root = (
+            args.r_library_cache_root.resolve() if args.r_library_cache_root else None
+        )
+        r_library = ensure_dependency_library(
+            root, rscript, env, python, cran_repo, cache_root, work_dir
+        )
         env = isolated_r_env(base_env, r_library, r_home)
         env["OMA_CRAN_REPO"] = cran_repo
 
         step(f"Using isolated R verification library at {r_library}")
 
-        run([r_exe, "CMD", "build", "--no-build-vignettes", root / OPENMETAR_PACKAGE], cwd=work_dir, env=env)
+        run(
+            [r_exe, "CMD", "build", "--no-build-vignettes", root / OPENMETAR_PACKAGE],
+            cwd=work_dir,
+            env=env,
+        )
         tarball = built_OpenMetaR_tarball(work_dir)
         run(
             [
@@ -402,7 +459,11 @@ def verify(args: argparse.Namespace) -> None:
             cwd=work_dir,
             env=env,
         )
-        run([r_exe, "CMD", "INSTALL", f"--library={r_library}", tarball], cwd=root, env=env)
+        run(
+            [r_exe, "CMD", "INSTALL", f"--library={r_library}", tarball],
+            cwd=root,
+            env=env,
+        )
 
         verify_manifest_versions(root, python, rscript, env)
         run([rscript, R_SMOKE_TEST], cwd=root, env=env)

@@ -19,7 +19,9 @@ class Ui_MainWindow(object):
         font.setFamily("Verdana")
         MainWindow.setFont(font)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(
+            QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
+        )
         MainWindow.setWindowIcon(icon)
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         font = QtGui.QFont()
@@ -44,7 +46,9 @@ class Ui_MainWindow(object):
         self.verticalLayout.setSpacing(0)
         self.verticalLayout.setObjectName("verticalLayout")
         self.tableView = QtWidgets.QTableView(self.nav_frame)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.tableView.sizePolicy().hasHeightForWidth())
@@ -65,7 +69,9 @@ class Ui_MainWindow(object):
         self.controlbutton_layot.setSpacing(0)
         self.controlbutton_layot.setObjectName("controlbutton_layot")
         self.frame_2 = QtWidgets.QFrame(self.frame)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.frame_2.sizePolicy().hasHeightForWidth())
@@ -79,7 +85,9 @@ class Ui_MainWindow(object):
         self.nav_left_btn.setGeometry(QtCore.QRect(0, 10, 20, 41))
         self.nav_left_btn.setText("")
         icon1 = QtGui.QIcon()
-        icon1.addPixmap(QtGui.QPixmap(":/misc/left_arrow.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon1.addPixmap(
+            QtGui.QPixmap(":/misc/left_arrow.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
+        )
         self.nav_left_btn.setIcon(icon1)
         self.nav_left_btn.setIconSize(QtCore.QSize(64, 64))
         self.nav_left_btn.setAutoRaise(True)
@@ -88,7 +96,9 @@ class Ui_MainWindow(object):
         self.nav_up_btn.setGeometry(QtCore.QRect(40, 0, 51, 20))
         self.nav_up_btn.setText("")
         icon2 = QtGui.QIcon()
-        icon2.addPixmap(QtGui.QPixmap(":/misc/up_arrow.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon2.addPixmap(
+            QtGui.QPixmap(":/misc/up_arrow.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
+        )
         self.nav_up_btn.setIcon(icon2)
         self.nav_up_btn.setIconSize(QtCore.QSize(64, 64))
         self.nav_up_btn.setAutoRaise(True)
@@ -97,7 +107,9 @@ class Ui_MainWindow(object):
         self.nav_down_btn.setGeometry(QtCore.QRect(40, 40, 51, 20))
         self.nav_down_btn.setText("")
         icon3 = QtGui.QIcon()
-        icon3.addPixmap(QtGui.QPixmap(":/misc/down_arrow.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon3.addPixmap(
+            QtGui.QPixmap(":/misc/down_arrow.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
+        )
         self.nav_down_btn.setIcon(icon3)
         self.nav_down_btn.setIconSize(QtCore.QSize(64, 64))
         self.nav_down_btn.setToolButtonStyle(QtCore.Qt.ToolButtonIconOnly)
@@ -118,7 +130,9 @@ class Ui_MainWindow(object):
         self.nav_right_btn.setGeometry(QtCore.QRect(110, 10, 20, 41))
         self.nav_right_btn.setText("")
         icon4 = QtGui.QIcon()
-        icon4.addPixmap(QtGui.QPixmap(":/misc/right_arrow.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon4.addPixmap(
+            QtGui.QPixmap(":/misc/right_arrow.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
+        )
         self.nav_right_btn.setIcon(icon4)
         self.nav_right_btn.setIconSize(QtCore.QSize(64, 64))
         self.nav_right_btn.setAutoRaise(True)
@@ -127,7 +141,11 @@ class Ui_MainWindow(object):
         self.nav_add_btn.setGeometry(QtCore.QRect(130, 10, 51, 41))
         self.nav_add_btn.setText("")
         icon5 = QtGui.QIcon()
-        icon5.addPixmap(QtGui.QPixmap(":/function_icon_set/function_icon_set/add_48.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon5.addPixmap(
+            QtGui.QPixmap(":/function_icon_set/function_icon_set/add_48.png"),
+            QtGui.QIcon.Normal,
+            QtGui.QIcon.Off,
+        )
         self.nav_add_btn.setIcon(icon5)
         self.nav_add_btn.setIconSize(QtCore.QSize(64, 64))
         self.nav_add_btn.setAutoRaise(True)
@@ -136,7 +154,9 @@ class Ui_MainWindow(object):
         self.gridLayout = QtWidgets.QGridLayout()
         self.gridLayout.setObjectName("gridLayout")
         self.label = QtWidgets.QLabel(self.frame)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.label.sizePolicy().hasHeightForWidth())
@@ -149,7 +169,9 @@ class Ui_MainWindow(object):
         self.label.setObjectName("label")
         self.gridLayout.addWidget(self.label, 0, 0, 1, 1)
         self.label_3 = QtWidgets.QLabel(self.frame)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.label_3.sizePolicy().hasHeightForWidth())
@@ -162,7 +184,9 @@ class Ui_MainWindow(object):
         self.label_3.setObjectName("label_3")
         self.gridLayout.addWidget(self.label_3, 1, 0, 1, 1)
         self.cur_time_lbl = QtWidgets.QLabel(self.frame)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.cur_time_lbl.sizePolicy().hasHeightForWidth())
@@ -175,10 +199,14 @@ class Ui_MainWindow(object):
         self.cur_time_lbl.setObjectName("cur_time_lbl")
         self.gridLayout.addWidget(self.cur_time_lbl, 1, 1, 1, 1)
         self.cur_outcome_lbl = QtWidgets.QLabel(self.frame)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.cur_outcome_lbl.sizePolicy().hasHeightForWidth())
+        sizePolicy.setHeightForWidth(
+            self.cur_outcome_lbl.sizePolicy().hasHeightForWidth()
+        )
         self.cur_outcome_lbl.setSizePolicy(sizePolicy)
         self.cur_outcome_lbl.setMinimumSize(QtCore.QSize(80, 25))
         font = QtGui.QFont()
@@ -189,7 +217,9 @@ class Ui_MainWindow(object):
         self.gridLayout.addWidget(self.cur_outcome_lbl, 0, 1, 1, 1)
         self.controlbutton_layot.addLayout(self.gridLayout)
         self.horizontalLayout.addLayout(self.controlbutton_layot)
-        spacerItem = QtWidgets.QSpacerItem(396, 18, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem = QtWidgets.QSpacerItem(
+            396, 18, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
+        )
         self.horizontalLayout.addItem(spacerItem)
         self.ci_layot = QtWidgets.QHBoxLayout()
         self.ci_layot.setObjectName("ci_layot")
@@ -231,22 +261,38 @@ class Ui_MainWindow(object):
         MainWindow.addToolBar(QtCore.Qt.TopToolBarArea, self.toolBar)
         self.action_save = QtWidgets.QAction(MainWindow)
         icon6 = QtGui.QIcon()
-        icon6.addPixmap(QtGui.QPixmap(":/function_icon_set/function_icon_set/floppy_disk_48.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon6.addPixmap(
+            QtGui.QPixmap(":/function_icon_set/function_icon_set/floppy_disk_48.png"),
+            QtGui.QIcon.Normal,
+            QtGui.QIcon.Off,
+        )
         self.action_save.setIcon(icon6)
         self.action_save.setObjectName("action_save")
         self.action_open = QtWidgets.QAction(MainWindow)
         icon7 = QtGui.QIcon()
-        icon7.addPixmap(QtGui.QPixmap(":/function_icon_set/function_icon_set/folder_48.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon7.addPixmap(
+            QtGui.QPixmap(":/function_icon_set/function_icon_set/folder_48.png"),
+            QtGui.QIcon.Normal,
+            QtGui.QIcon.Off,
+        )
         self.action_open.setIcon(icon7)
         self.action_open.setObjectName("action_open")
         self.action_quit = QtWidgets.QAction(MainWindow)
         icon8 = QtGui.QIcon()
-        icon8.addPixmap(QtGui.QPixmap(":/toolbar-icons/toolbar-icons/quit.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon8.addPixmap(
+            QtGui.QPixmap(":/toolbar-icons/toolbar-icons/quit.png"),
+            QtGui.QIcon.Normal,
+            QtGui.QIcon.Off,
+        )
         self.action_quit.setIcon(icon8)
         self.action_quit.setObjectName("action_quit")
         self.action_go = QtWidgets.QAction(MainWindow)
         icon9 = QtGui.QIcon()
-        icon9.addPixmap(QtGui.QPixmap(":/misc/meta_analysis.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon9.addPixmap(
+            QtGui.QPixmap(":/misc/meta_analysis.png"),
+            QtGui.QIcon.Normal,
+            QtGui.QIcon.Off,
+        )
         self.action_go.setIcon(icon9)
         self.action_go.setObjectName("action_go")
         self.action_edit = QtWidgets.QAction(MainWindow)
@@ -257,12 +303,20 @@ class Ui_MainWindow(object):
         self.action_add_covariate.setObjectName("action_add_covariate")
         self.action_cum_ma = QtWidgets.QAction(MainWindow)
         icon10 = QtGui.QIcon()
-        icon10.addPixmap(QtGui.QPixmap(":/misc/cum_meta_analysis.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon10.addPixmap(
+            QtGui.QPixmap(":/misc/cum_meta_analysis.png"),
+            QtGui.QIcon.Normal,
+            QtGui.QIcon.Off,
+        )
         self.action_cum_ma.setIcon(icon10)
         self.action_cum_ma.setObjectName("action_cum_ma")
         self.action_loo_ma = QtWidgets.QAction(MainWindow)
         icon11 = QtGui.QIcon()
-        icon11.addPixmap(QtGui.QPixmap(":/misc/leave_one_out.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon11.addPixmap(
+            QtGui.QPixmap(":/misc/leave_one_out.png"),
+            QtGui.QIcon.Normal,
+            QtGui.QIcon.Off,
+        )
         self.action_loo_ma.setIcon(icon11)
         self.action_loo_ma.setObjectName("action_loo_ma")
         self.actionOR = QtWidgets.QAction(MainWindow)
@@ -280,32 +334,50 @@ class Ui_MainWindow(object):
         self.action_new_dataset.setObjectName("action_new_dataset")
         self.action_meta_regression = QtWidgets.QAction(MainWindow)
         icon12 = QtGui.QIcon()
-        icon12.addPixmap(QtGui.QPixmap(":/misc/meta_reg.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon12.addPixmap(
+            QtGui.QPixmap(":/misc/meta_reg.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
+        )
         self.action_meta_regression.setIcon(icon12)
         self.action_meta_regression.setObjectName("action_meta_regression")
         self.action_undo = QtWidgets.QAction(MainWindow)
         icon13 = QtGui.QIcon()
-        icon13.addPixmap(QtGui.QPixmap(":/toolbar-icons/toolbar-icons/back.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon13.addPixmap(
+            QtGui.QPixmap(":/toolbar-icons/toolbar-icons/back.png"),
+            QtGui.QIcon.Normal,
+            QtGui.QIcon.Off,
+        )
         self.action_undo.setIcon(icon13)
         self.action_undo.setObjectName("action_undo")
         self.action_redo = QtWidgets.QAction(MainWindow)
         icon14 = QtGui.QIcon()
-        icon14.addPixmap(QtGui.QPixmap(":/toolbar-icons/toolbar-icons/forward.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon14.addPixmap(
+            QtGui.QPixmap(":/toolbar-icons/toolbar-icons/forward.png"),
+            QtGui.QIcon.Normal,
+            QtGui.QIcon.Off,
+        )
         self.action_redo.setIcon(icon14)
         self.action_redo.setObjectName("action_redo")
         self.action_copy = QtWidgets.QAction(MainWindow)
         icon15 = QtGui.QIcon()
-        icon15.addPixmap(QtGui.QPixmap(":/misc/copy.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon15.addPixmap(
+            QtGui.QPixmap(":/misc/copy.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
+        )
         self.action_copy.setIcon(icon15)
         self.action_copy.setObjectName("action_copy")
         self.action_paste = QtWidgets.QAction(MainWindow)
         icon16 = QtGui.QIcon()
-        icon16.addPixmap(QtGui.QPixmap(":/toolbar-icons/toolbar-icons/paste.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon16.addPixmap(
+            QtGui.QPixmap(":/toolbar-icons/toolbar-icons/paste.png"),
+            QtGui.QIcon.Normal,
+            QtGui.QIcon.Off,
+        )
         self.action_paste.setIcon(icon16)
         self.action_paste.setObjectName("action_paste")
         self.action_subgroup_ma = QtWidgets.QAction(MainWindow)
         icon17 = QtGui.QIcon()
-        icon17.addPixmap(QtGui.QPixmap(":/misc/subgroup_ma.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon17.addPixmap(
+            QtGui.QPixmap(":/misc/subgroup_ma.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
+        )
         self.action_subgroup_ma.setIcon(icon17)
         self.action_subgroup_ma.setObjectName("action_subgroup_ma")
         self.action_save_as = QtWidgets.QAction(MainWindow)
@@ -314,12 +386,18 @@ class Ui_MainWindow(object):
         self.action_open_help.setObjectName("action_open_help")
         self.action_change_conf_level = QtWidgets.QAction(MainWindow)
         icon18 = QtGui.QIcon()
-        icon18.addPixmap(QtGui.QPixmap(":/misc/ci_icon.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon18.addPixmap(
+            QtGui.QPixmap(":/misc/ci_icon.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
+        )
         self.action_change_conf_level.setIcon(icon18)
         self.action_change_conf_level.setObjectName("action_change_conf_level")
         self.action_import_csv = QtWidgets.QAction(MainWindow)
         icon19 = QtGui.QIcon()
-        icon19.addPixmap(QtGui.QPixmap(":/function_icon_set/function_icon_set/box_download_48.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon19.addPixmap(
+            QtGui.QPixmap(":/function_icon_set/function_icon_set/box_download_48.png"),
+            QtGui.QIcon.Normal,
+            QtGui.QIcon.Off,
+        )
         self.action_import_csv.setIcon(icon19)
         self.action_import_csv.setObjectName("action_import_csv")
         self.menu_file.addAction(self.action_save)
@@ -397,10 +475,14 @@ class Ui_MainWindow(object):
         self.action_view_network.setText(_translate("MainWindow", "view network"))
         self.action_add_covariate.setText(_translate("MainWindow", "add covariate"))
         self.action_cum_ma.setText(_translate("MainWindow", "cumulative meta-analysis"))
-        self.action_loo_ma.setText(_translate("MainWindow", "leave-one-out meta-analysis"))
+        self.action_loo_ma.setText(
+            _translate("MainWindow", "leave-one-out meta-analysis")
+        )
         self.actionOR.setText(_translate("MainWindow", "OR"))
         self.actionRR.setText(_translate("MainWindow", "RR"))
-        self.actionTX_Mean_one_arm.setText(_translate("MainWindow", "TX Mean (one-arm)"))
+        self.actionTX_Mean_one_arm.setText(
+            _translate("MainWindow", "TX Mean (one-arm)")
+        )
         self.actionYo.setText(_translate("MainWindow", "yo"))
         self.actionNew_dataset.setText(_translate("MainWindow", "new dataset"))
         self.action_new_dataset.setText(_translate("MainWindow", "new dataset"))
@@ -413,9 +495,15 @@ class Ui_MainWindow(object):
         self.action_copy.setShortcut(_translate("MainWindow", "Ctrl+C"))
         self.action_paste.setText(_translate("MainWindow", "paste"))
         self.action_paste.setShortcut(_translate("MainWindow", "Ctrl+V"))
-        self.action_subgroup_ma.setText(_translate("MainWindow", "subgroup meta-analysis"))
+        self.action_subgroup_ma.setText(
+            _translate("MainWindow", "subgroup meta-analysis")
+        )
         self.action_save_as.setText(_translate("MainWindow", "save as"))
         self.action_open_help.setText(_translate("MainWindow", "open help"))
-        self.action_change_conf_level.setText(_translate("MainWindow", "change confidence level"))
+        self.action_change_conf_level.setText(
+            _translate("MainWindow", "change confidence level")
+        )
         self.action_import_csv.setText(_translate("MainWindow", "import CSV"))
+
+
 import icons_rc

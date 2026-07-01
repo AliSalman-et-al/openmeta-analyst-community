@@ -11,7 +11,14 @@ from pathlib import Path
 
 DEFAULT_MANIFEST = Path("docs") / "modernization" / "test-taxonomy.json"
 VALID_SIZES = {"small", "medium", "large"}
-VALID_LANES = {"fast", "gui", "r_stack", "golden", "packaging_contract", "packaged_smoke"}
+VALID_LANES = {
+    "fast",
+    "gui",
+    "r_stack",
+    "golden",
+    "packaging_contract",
+    "packaged_smoke",
+}
 VALID_EVIDENCE = {
     "analysis_behavior",
     "gui_compatibility",
@@ -56,28 +63,40 @@ def require_list(value: object, label: str) -> list:
 def validate_entry(entry: object, index: int) -> str:
     if not isinstance(entry, dict):
         raise TaxonomyError(f"tests[{index}]: expected an object")
-    nodeid = require_string(entry.get("nodeid"), f"tests[{index}].nodeid").replace("\\", "/")
+    nodeid = require_string(entry.get("nodeid"), f"tests[{index}].nodeid").replace(
+        "\\", "/"
+    )
     size = require_string(entry.get("size"), f"{nodeid}.size")
     if size not in VALID_SIZES:
-        raise TaxonomyError(f"{nodeid}.size: expected one of {', '.join(sorted(VALID_SIZES))}")
+        raise TaxonomyError(
+            f"{nodeid}.size: expected one of {', '.join(sorted(VALID_SIZES))}"
+        )
     lane = require_string(entry.get("lane"), f"{nodeid}.lane")
     if lane not in VALID_LANES:
-        raise TaxonomyError(f"{nodeid}.lane: expected one of {', '.join(sorted(VALID_LANES))}")
+        raise TaxonomyError(
+            f"{nodeid}.lane: expected one of {', '.join(sorted(VALID_LANES))}"
+        )
     evidence = require_list(entry.get("evidence"), f"{nodeid}.evidence")
     if not evidence:
         raise TaxonomyError(f"{nodeid}.evidence: expected at least one evidence value")
     invalid_evidence = sorted(set(evidence) - VALID_EVIDENCE)
     if invalid_evidence:
-        raise TaxonomyError(f"{nodeid}.evidence: invalid values {', '.join(invalid_evidence)}")
+        raise TaxonomyError(
+            f"{nodeid}.evidence: invalid values {', '.join(invalid_evidence)}"
+        )
     require_list(entry.get("external_dependencies"), f"{nodeid}.external_dependencies")
-    runtime_class = require_string(entry.get("runtime_class"), f"{nodeid}.runtime_class")
+    runtime_class = require_string(
+        entry.get("runtime_class"), f"{nodeid}.runtime_class"
+    )
     if runtime_class not in VALID_RUNTIME_CLASSES:
         raise TaxonomyError(
             f"{nodeid}.runtime_class: expected one of {', '.join(sorted(VALID_RUNTIME_CLASSES))}"
         )
     decision = require_string(entry.get("decision"), f"{nodeid}.decision")
     if decision not in VALID_DECISIONS:
-        raise TaxonomyError(f"{nodeid}.decision: expected one of {', '.join(sorted(VALID_DECISIONS))}")
+        raise TaxonomyError(
+            f"{nodeid}.decision: expected one of {', '.join(sorted(VALID_DECISIONS))}"
+        )
     require_string(entry.get("reason"), f"{nodeid}.reason")
     return nodeid
 
@@ -119,7 +138,9 @@ def collect_pytest_nodeids(root: Path, tests_path: str) -> set[str]:
     return nodeids
 
 
-def validate(root: Path, manifest_path: Path, tests_path: str, strict: bool) -> tuple[set[str], set[str]]:
+def validate(
+    root: Path, manifest_path: Path, tests_path: str, strict: bool
+) -> tuple[set[str], set[str]]:
     manifest_nodeids = taxonomy_nodeids(load_manifest(root, manifest_path))
     collected_nodeids = collect_pytest_nodeids(root, tests_path)
     missing = collected_nodeids - manifest_nodeids
@@ -143,7 +164,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        missing, stale = validate(args.root.resolve(), args.manifest, args.tests_path, args.strict)
+        missing, stale = validate(
+            args.root.resolve(), args.manifest, args.tests_path, args.strict
+        )
     except TaxonomyError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

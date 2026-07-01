@@ -19,7 +19,7 @@ from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
 from PyQt5.QtGui import QColor, QIcon
 
 # home-grown
-from ma_dataset import Dataset,Outcome,Study,Covariate
+from ma_dataset import Dataset, Outcome, Study, Covariate
 from meta_globals import *
 import calculator_routines as calc_fncs
 import meta_py_r
@@ -29,6 +29,7 @@ import qt_text
 # following the last study.
 DUMMY_ROWS = 20
 STUDY_NAME_REQUIRED_MESSAGE = "Please enter a study name before entering study data."
+
 
 def _item_data(value=None):
     if value is None:
@@ -94,7 +95,9 @@ def DebugHelper(function):
         res = function(*args, **kw)
         print(("Left %s" % function.__name__))
         return res
+
     return _DebugHelper
+
 
 class DatasetModel(QAbstractTableModel):
     pyCellContentChanged = pyqtSignal(object, object, object, object)
@@ -103,7 +106,7 @@ class DatasetModel(QAbstractTableModel):
     dataError = pyqtSignal(str)
     editFocusRequested = pyqtSignal(QModelIndex)
     confLevelChanged = pyqtSignal()
-    '''
+    """
     This module mediates between the classes comprising a dataset
     (i.e., study & ma_unit objects) and the view. In particular, we
     subclass the QAbstractTableModel and provide the fields of interest
@@ -112,23 +115,22 @@ class DatasetModel(QAbstractTableModel):
     Apologies for the mixing of camelCase and lower_case style method
     names; the former are due to the QT framework, but I just couldn't
     bring myself to maintain this blighted style.
-    '''
-    
+    """
+
     #
     # column indices; these are a core component of this class,
     # as these indices are what maps the UI to the model. The following
-    # columns are constant across datatypes, but some (e.g., the 
+    # columns are constant across datatypes, but some (e.g., the
     # columns corresponding to raw data) are variable. see the
     # update_column_indices method for more.
     INCLUDE_STUDY = 0
-    NAME, YEAR = [col+1 for col in range(2)]
-    
+    NAME, YEAR = [col + 1 for col in range(2)]
+
     headers = ["include", "study name", "year"]
-    
-    
+
     def __init__(self, filename="", dataset=None, add_blank_study=True):
         super(DatasetModel, self).__init__()
-        
+
         self.conf_level = self.set_conf_level(DEFAULT_CONF_LEVEL)
 
         self.dataset = dataset
@@ -137,27 +139,26 @@ class DatasetModel(QAbstractTableModel):
 
         if add_blank_study:
             # include an extra blank study to begin with
-            self.dataset.studies.append(Study(self.max_study_id() +1))
+            self.dataset.studies.append(Study(self.max_study_id() + 1))
             # ... and mark this study as such.
             self.study_auto_added = self.dataset.studies[-1].id
-        
+
         # these variables track which meta-analytic unit,
         # i.e., outcome and time period, are being viewed
-        self.current_outcome = None   # Current outcome name, not an outcome object # SHOULD BE REFACTORED to self.current_outcome_name to be more accurate
+        self.current_outcome = None  # Current outcome name, not an outcome object # SHOULD BE REFACTORED to self.current_outcome_name to be more accurate
         self.current_time_point = 0
-        
+
         # we also track which groups are being viewed
         self.tx_index_a = 0
         self.tx_index_b = 1
 
         self.update_current_group_names()
-        
+
         print("calling update column indices from ma_data_table_model init")
         self.update_column_indices()
-         
-         
+
         # @TODO parameterize; make variable
-        self.current_effect = "OR" 
+        self.current_effect = "OR"
 
         # @TODO presumably the COVARIATES will contain the column
         # indices and the currently_displayed... will contain the names
@@ -167,7 +168,6 @@ class DatasetModel(QAbstractTableModel):
 
         # @TODO
         self.LABELS = None
-        
 
         self.NUM_DIGITS = 3
         self.dirty = False
@@ -184,7 +184,7 @@ class DatasetModel(QAbstractTableModel):
     def set_current_metric(self, metric):
         self.current_effect = metric
         print("OK! metric updated.")
-        
+
     def update_current_outcome(self):
         outcome_names = self.dataset.get_outcome_names()
         ###
@@ -192,24 +192,26 @@ class DatasetModel(QAbstractTableModel):
         # index here, as we do for groups (below), so that
         # when the user edits the currently displayed outcome,
         # the edited outcome is shown in its place
-        self.current_outcome = outcome_names[0] if len(outcome_names)>0 else None
+        self.current_outcome = outcome_names[0] if len(outcome_names) > 0 else None
         self.reset()
-        
+
     def update_current_time_points(self):
         if self.current_outcome is not None:
-            # note that the user cannot delete all follow-ups; so it's safe to assume this dictionary has 
+            # note that the user cannot delete all follow-ups; so it's safe to assume this dictionary has
             # at least one entry
-            self.current_time_point = list(self.dataset.outcome_names_to_follow_ups[self.current_outcome].keys())[0]
+            self.current_time_point = list(
+                self.dataset.outcome_names_to_follow_ups[self.current_outcome].keys()
+            )[0]
         else:
             self.current_time_point = 0
         self.reset()
-        
+
     def update_current_group_names(self):
-        '''
+        """
         This is to be called after the model has been
         edited (via, e.g., the edit_dialog module)
-        '''
-        group_names = self.dataset.get_group_names()        
+        """
+        group_names = self.dataset.get_group_names()
         n_groups = len(group_names)
         if n_groups > 1:
             # make sure the indices are within range -- the
@@ -222,79 +224,81 @@ class DatasetModel(QAbstractTableModel):
             self.tx_index_b = self.tx_index_b % n_groups
             while self.tx_index_a == self.tx_index_b:
                 self._next_group_indices(group_names)
-            self.current_txs = [group_names[self.tx_index_a], group_names[self.tx_index_b]]
+            self.current_txs = [
+                group_names[self.tx_index_a],
+                group_names[self.tx_index_b],
+            ]
         else:
             if not self.is_diag():
-                #self.current_txs = ["tx A", "tx B"]
+                # self.current_txs = ["tx A", "tx B"]
                 self.current_txs = DEFAULT_GROUP_NAMES
             else:
                 self.current_txs = ["test 1"]
         self.previous_txs = self.current_txs
         self.reset()
-        
+
     def update_column_indices(self):
-        # Here we update variable column indices, contingent on 
-        # the type data being displayed, the number of covariates, etc. 
+        # Here we update variable column indices, contingent on
+        # the type data being displayed, the number of covariates, etc.
         # It is extremely important that these are updated as necessary
         # from the view side of things
-        
+
         #######################################################################
         current_data_type = self.get_current_outcome_type()
         outcome_subtype = self.get_current_outcome_subtype()
 
-        self.RAW_DATA, self.OUTCOMES = self.get_column_indices(current_data_type, outcome_subtype)
-            
+        self.RAW_DATA, self.OUTCOMES = self.get_column_indices(
+            current_data_type, outcome_subtype
+        )
+
     @staticmethod
     def get_column_indices(data_type, sub_type):
-        '''
+        """
         Basically to support getting the column indices w/o having to
         instantiate an instance of the class
-        '''
-        
-        raws, outcomes = [],[] # Raw & outcome indices
-        
-        # offset corresponds to the first three columns, which 
+        """
+
+        raws, outcomes = [], []  # Raw & outcome indices
+
+        # offset corresponds to the first three columns, which
         # are include study, name, and year.
         offset = 3
         if data_type == "binary":
-            raws = [col+offset for col in range(4)]
+            raws = [col + offset for col in range(4)]
             outcomes = [7, 8, 9]
         elif data_type == "continuous":
-            raws = [col+offset for col in range(6)]
+            raws = [col + offset for col in range(6)]
             outcomes = [9, 10, 11]
-            if sub_type == 'generic_effect': # generic effect and se
+            if sub_type == "generic_effect":  # generic effect and se
                 print("Detected generic effect outcome in update_column_indices")
                 raws = []
-                outcomes = [offset, offset+1] #effect and se
-        else: # diagnostic
-            raws = [col+offset for col in range(4)]
-            outcomes = [7, 8, 9, 10, 11, 12] # sensitivity & specificity
-        
+                outcomes = [offset, offset + 1]  # effect and se
+        else:  # diagnostic
+            raws = [col + offset for col in range(4)]
+            outcomes = [7, 8, 9, 10, 11, 12]  # sensitivity & specificity
+
         return raws, outcomes
-        
-        
+
     def format_float(self, float_var, num_digits=None):
-        ''' this method assumes the input can be cast to a float! '''
+        """this method assumes the input can be cast to a float!"""
         float_var = float(float_var)
         precision = num_digits or self.NUM_DIGITS
-        formatted_str = "'%." + str(precision) + "f'" 
+        formatted_str = "'%." + str(precision) + "f'"
         # kind of hacky; I can't find a better way to make the
         # number of digits in the formatting parametric. oh well.
         return eval(formatted_str + "% float_var")
 
-
-
     def data(self, index, role=Qt.DisplayRole):
-        '''
-        Implements the required QTTableModel data method. There is a lot of switching on 
-        role/index/datatype here, but this seems consistent with the QT paradigm (see 
+        """
+        Implements the required QTTableModel data method. There is a lot of switching on
+        role/index/datatype here, but this seems consistent with the QT paradigm (see
         Summerfield's book)
-        '''
+        """
 
         # number of digits to show in edit mode. this, I think, is enough.
-        NUM_DIGITS_PRECISE = 12 
+        NUM_DIGITS_PRECISE = 12
         # by default, we'll use the global NUM_DIGITS; this is the default
-        # used by the format_float method unless num_digits is set to 
+        # used by the format_float method unless num_digits is set to
         # something else, i.e., NUM_DIGITS_PRECISE in the case of editing
         num_digits = None
 
@@ -304,7 +308,6 @@ class DatasetModel(QAbstractTableModel):
         current_data_type = self.dataset.get_outcome_type(self.current_outcome)
         outcome_subtype = self.dataset.get_outcome_subtype(self.current_outcome)
         column = index.column()
-
 
         if role in (Qt.DisplayRole, Qt.EditRole):
             if column == self.NAME:
@@ -318,7 +321,7 @@ class DatasetModel(QAbstractTableModel):
                 adjusted_index = column - 3
                 if self.current_outcome in study.outcomes_to_follow_ups:
                     ma_unit = self.get_current_ma_unit_for_study(index.row())
-                    cur_raw_data = ma_unit.get_raw_data_for_groups(self.current_txs)                            
+                    cur_raw_data = ma_unit.get_raw_data_for_groups(self.current_txs)
                     if len(cur_raw_data) > adjusted_index:
                         val = cur_raw_data[adjusted_index]
                         if val == "" or val is None:
@@ -329,12 +332,17 @@ class DatasetModel(QAbstractTableModel):
                             N_columns = (self.RAW_DATA[0], self.RAW_DATA[3])
 
                             # issue #31 -- make sure digits are consistent
-                            if current_data_type == CONTINUOUS and not column in N_columns:
+                            if (
+                                current_data_type == CONTINUOUS
+                                and not column in N_columns
+                            ):
                                 # issue #151 -- show greater precision on double-click
                                 if role == Qt.EditRole:
                                     # then we're editing, so show greater precision
-                                    num_digits = NUM_DIGITS_PRECISE 
-                                return _item_data(str(self.format_float(val, num_digits=num_digits)))
+                                    num_digits = NUM_DIGITS_PRECISE
+                                return _item_data(
+                                    str(self.format_float(val, num_digits=num_digits))
+                                )
                             else:
                                 return _item_data(round(val, self.NUM_DIGITS))
                         except (TypeError, ValueError):
@@ -347,7 +355,7 @@ class DatasetModel(QAbstractTableModel):
                 # more precision in edit moe -- issue #151
                 if role == Qt.EditRole:
                     # then we're editing, so show greater precision
-                    num_digits = NUM_DIGITS_PRECISE 
+                    num_digits = NUM_DIGITS_PRECISE
 
                 group_str = self.get_cur_group_str()
                 # either the point estimate, or the lower/upper
@@ -355,27 +363,42 @@ class DatasetModel(QAbstractTableModel):
                 outcome_index = column - self.OUTCOMES[0]
                 outcome_val = None
                 ma_unit = self.get_current_ma_unit_for_study(index.row())
-                
+
                 if not self.is_diag():
-                    eff,grp = self.current_effect, group_str
-                    
+                    eff, grp = self.current_effect, group_str
+
                     if current_data_type == BINARY:
-                        conv_to_disp_scale = lambda x: meta_py_r.binary_convert_scale(x, eff, convert_to="display.scale")
+                        conv_to_disp_scale = lambda x: meta_py_r.binary_convert_scale(
+                            x, eff, convert_to="display.scale"
+                        )
                     elif current_data_type == CONTINUOUS:
-                        conv_to_disp_scale = lambda x: meta_py_r.continuous_convert_scale(x, eff, convert_to="display.scale")
-                    
-                    if current_data_type == CONTINUOUS and outcome_subtype == 'generic_effect':
-                        d_est_and_se = ma_unit.get_display_effect_and_se(eff, grp, conv_to_disp_scale)
+                        conv_to_disp_scale = lambda x: (
+                            meta_py_r.continuous_convert_scale(
+                                x, eff, convert_to="display.scale"
+                            )
+                        )
+
+                    if (
+                        current_data_type == CONTINUOUS
+                        and outcome_subtype == "generic_effect"
+                    ):
+                        d_est_and_se = ma_unit.get_display_effect_and_se(
+                            eff, grp, conv_to_disp_scale
+                        )
                         print(("DEST AND SE: %s" % str(d_est_and_se)))
                         outcome_val = d_est_and_se[outcome_index]
-                    else: # normal case of no outcome subtype
-                        d_est_and_ci = ma_unit.get_display_effect_and_ci(eff, grp, conv_to_disp_scale)
+                    else:  # normal case of no outcome subtype
+                        d_est_and_ci = ma_unit.get_display_effect_and_ci(
+                            eff, grp, conv_to_disp_scale
+                        )
                         outcome_val = d_est_and_ci[outcome_index]
-                    
+
                     if outcome_val is None:
                         return _item_data("")
-                    return _item_data(self.format_float(outcome_val, num_digits=num_digits))  # issue #31
-                else: # This is the diagnostic case
+                    return _item_data(
+                        self.format_float(outcome_val, num_digits=num_digits)
+                    )  # issue #31
+                else:  # This is the diagnostic case
                     study_index = index.row()
                     # note that we do things quite differently in the diagnostic case,
                     # because there is no notion of a 'current effect'. instead,
@@ -384,57 +407,65 @@ class DatasetModel(QAbstractTableModel):
                     m_str = "Sens"
                     if column in self.OUTCOMES[3:]:
                         m_str = "Spec"
-                    
-                    #est_and_ci = ma_unit.get_effect_and_ci(m_str, group_str)
-                    #c_val = est_and_ci[outcome_index % 3]
-                    #outcome_val = meta_py_r.diagnostic_convert_scale(c_val, m_str, convert_to="display.scale") 
-                    
+
+                    # est_and_ci = ma_unit.get_effect_and_ci(m_str, group_str)
+                    # c_val = est_and_ci[outcome_index % 3]
+                    # outcome_val = meta_py_r.diagnostic_convert_scale(c_val, m_str, convert_to="display.scale")
+
                     d_est_and_ci = ma_unit.get_display_effect_and_ci(m_str, group_str)
                     outcome_val = d_est_and_ci[outcome_index % 3]
-                    
+
                     if outcome_val is None:
                         return _item_data("")
-         
-                    return _item_data(self.format_float(outcome_val, num_digits=num_digits)) # issue #31
-                
+
+                    return _item_data(
+                        self.format_float(outcome_val, num_digits=num_digits)
+                    )  # issue #31
+
             elif column != self.INCLUDE_STUDY and column > max(self.OUTCOMES):
                 # here the column is to the right of the outcomes (and not the 0th, or
                 # 'include study' column), and thus must correspond to a covariate.
                 cov_obj = self.get_cov(column)
                 if cov_obj is None:
                     return _item_data("")
-                    
+
                 cov_name = cov_obj.name
-                cov_value = study.covariate_dict[cov_name] if \
-                    cov_name in study.covariate_dict else None
+                cov_value = (
+                    study.covariate_dict[cov_name]
+                    if cov_name in study.covariate_dict
+                    else None
+                )
                 if cov_value is None:
                     cov_value = ""
-                
+
                 if cov_value != "" and cov_obj.data_type == CONTINUOUS:
-                    return _item_data(self.format_float(cov_value, num_digits=num_digits))
+                    return _item_data(
+                        self.format_float(cov_value, num_digits=num_digits)
+                    )
                 else:
                     # factor
                     return _item_data(_to_native_text(cov_value))
         elif role == Qt.TextAlignmentRole:
-            return _item_data(int(Qt.AlignLeft|Qt.AlignVCenter))
+            return _item_data(int(Qt.AlignLeft | Qt.AlignVCenter))
         elif role == Qt.CheckStateRole:
             # this is where we deal with the inclusion/exclusion of studies
             if column == self.INCLUDE_STUDY:
                 checked_state = Qt.Unchecked
-                if index.row() < self.rowCount()-1 and study.include:
+                if index.row() < self.rowCount() - 1 and study.include:
                     checked_state = Qt.Checked
                 return _item_data(checked_state)
         elif role == Qt.BackgroundColorRole:
             if column in self.OUTCOMES:
                 return _item_data(QColor(Qt.yellow))
-            elif column in self.RAW_DATA[len(self.RAW_DATA)//2:] and \
-                        self.current_effect in ONE_ARM_METRICS:
+            elif (
+                column in self.RAW_DATA[len(self.RAW_DATA) // 2 :]
+                and self.current_effect in ONE_ARM_METRICS
+            ):
                 return _item_data(QColor(Qt.gray))
             else:
                 return _item_data(QColor(Qt.white))
 
         return _item_data()
-
 
     def get_cur_group_str(self):
         # we have to build a key (string) here to index into the
@@ -445,11 +476,10 @@ class DatasetModel(QAbstractTableModel):
         # if we have a one group outcome, the string is just:
         #    tx A
         if self.current_effect in ONE_ARM_METRICS:
-            group_str = self.current_txs[0] 
+            group_str = self.current_txs[0]
         else:
             group_str = "-".join(self.current_txs)
         return group_str
-        
 
     def _verify_raw_data(self, s, col, data_type, index_of_s=None):
         def as_int(value):
@@ -464,77 +494,96 @@ class DatasetModel(QAbstractTableModel):
 
         if data_type in (BINARY, DIAGNOSTIC):
             if not is_an_int(s):
-                return False, "Expected a whole number (count), but a decimal value was entered."
+                return (
+                    False,
+                    "Expected a whole number (count), but a decimal value was entered.",
+                )
             if as_int(s) < 0:
                 return False, "Counts cannot be negative."
-        
+
         # fix for issue #193
         # do not allow TxA to be greater than N_A, or TxB to be greater than N_B
         msg = "Number of events cannot be greater than number of samples."
-        (row,col) = (index_of_s.row(), index_of_s.column())
+        (row, col) = (index_of_s.row(), index_of_s.column())
         if data_type == BINARY:
-            if col in [3,5]: # col is TxA or TxB
-                N_samples = _to_text_value(self.data(self.index(row, col+1))) # string representation of N_samples
+            if col in [3, 5]:  # col is TxA or TxB
+                N_samples = _to_text_value(
+                    self.data(self.index(row, col + 1))
+                )  # string representation of N_samples
                 if is_an_int(N_samples):
-                    if as_int(s) > as_int(N_samples): #uh oh
+                    if as_int(s) > as_int(N_samples):  # uh oh
                         return False, msg
-            elif col in [4,6]: # col is N_A or N_B
-                N_events = _to_text_value(self.data(self.index(row, col-1)))
+            elif col in [4, 6]:  # col is N_A or N_B
+                N_events = _to_text_value(self.data(self.index(row, col - 1)))
                 if is_an_int(N_events):
                     if as_int(s) < as_int(N_events):
                         return False, msg
-            
-        
+
         if data_type == CONTINUOUS:
             if float(s) <= 0:
-                if col in [3,6]:
-                    return False,"Count cannot be zero or negative"
-                if col in [5,8]:
-                    return False,"Standard Deviation cannot be zero or negative"
-            
-        return True, None
+                if col in [3, 6]:
+                    return False, "Count cannot be zero or negative"
+                if col in [5, 8]:
+                    return False, "Standard Deviation cannot be zero or negative"
 
+        return True, None
 
     def _verify_outcome_data(self, s, col, row, data_type):
         outcome_subtype = self.dataset.get_outcome_subtype(self.current_outcome)
-        
+
         if not is_a_float(s):
             return False, "Outcomes must be numeric."
 
         ma_unit = self.get_current_ma_unit_for_study(row)
         group_str = self.get_cur_group_str()
-        
+
         ###binary_display_scale = meta_py_r.binary_convert_scale(x, metric_name, convert_to)
         if self.current_effect == "PFT":
             e1, n1, e2, n2 = self.get_cur_raw_data_for_study(study_index=row)
-            binary_display_scale = lambda x: meta_py_r.binary_convert_scale(x, self.current_effect, convert_to="display.scale", n1=n1)
+            binary_display_scale = lambda x: meta_py_r.binary_convert_scale(
+                x, self.current_effect, convert_to="display.scale", n1=n1
+            )
         else:
-            binary_display_scale = lambda x: meta_py_r.binary_convert_scale(x, self.current_effect, convert_to="display.scale")
-        continuous_display_scale = lambda x: meta_py_r.continuous_convert_scale(x, self.current_effect, convert_to="display.scale")
-        
-        
-        if data_type in [BINARY, CONTINUOUS]: 
-            prev_est, prev_lower, prev_upper = ma_unit.get_effect_and_ci(self.current_effect, group_str, self.get_mult())
+            binary_display_scale = lambda x: meta_py_r.binary_convert_scale(
+                x, self.current_effect, convert_to="display.scale"
+            )
+        continuous_display_scale = lambda x: meta_py_r.continuous_convert_scale(
+            x, self.current_effect, convert_to="display.scale"
+        )
+
+        if data_type in [BINARY, CONTINUOUS]:
+            prev_est, prev_lower, prev_upper = ma_unit.get_effect_and_ci(
+                self.current_effect, group_str, self.get_mult()
+            )
         if data_type == BINARY:
-            prev_est, prev_lower, prev_upper = [binary_display_scale(x) for x in [prev_est, prev_lower, prev_upper]]
+            prev_est, prev_lower, prev_upper = [
+                binary_display_scale(x) for x in [prev_est, prev_lower, prev_upper]
+            ]
             print(("Previous binary: %s" % str([prev_est, prev_lower, prev_upper])))
         elif data_type == CONTINUOUS:
-            #prev_est, prev_lower, prev_upper = ma_unit.get_display_effect_and_ci(self.current_effect, group_str)
-            prev_est, prev_lower, prev_upper = [continuous_display_scale(x) for x in [prev_est, prev_lower, prev_upper]]
+            # prev_est, prev_lower, prev_upper = ma_unit.get_display_effect_and_ci(self.current_effect, group_str)
+            prev_est, prev_lower, prev_upper = [
+                continuous_display_scale(x) for x in [prev_est, prev_lower, prev_upper]
+            ]
             print(("Previous continuous: %s" % str([prev_est, prev_lower, prev_upper])))
         elif data_type == DIAGNOSTIC:
             m_str = "Sens" if col in self.OUTCOMES[:3] else "Spec"
-            #prev_est, prev_lower, prev_upper = ma_unit.get_display_effect_and_ci(m_str, group_str)
-            prev_est, prev_lower, prev_upper = ma_unit.get_effect_and_ci(m_str, group_str, self.get_mult())
-            prev_est, prev_lower, prev_upper = [meta_py_r.diagnostic_convert_scale(x, m_str, convert_to="display.scale") for x in [prev_est, prev_lower, prev_upper]]
+            # prev_est, prev_lower, prev_upper = ma_unit.get_display_effect_and_ci(m_str, group_str)
+            prev_est, prev_lower, prev_upper = ma_unit.get_effect_and_ci(
+                m_str, group_str, self.get_mult()
+            )
+            prev_est, prev_lower, prev_upper = [
+                meta_py_r.diagnostic_convert_scale(x, m_str, convert_to="display.scale")
+                for x in [prev_est, prev_lower, prev_upper]
+            ]
             print(("Previous diagnostic: %s" % str([prev_est, prev_lower, prev_upper])))
-            
-        # here we check if there is raw data for this study; 
+
+        # here we check if there is raw data for this study;
         # if there is, we don't allow entry of outcomes
         raw_data = self.get_cur_raw_data_for_study(row)
-    
+
         if not all([is_empty(s_i) for s_i in raw_data]):
-            # fix for issue #180 
+            # fix for issue #180
             # sort of hacky. we check here to see if the outcome
             # in fact was "changed", by which we mean the value
             # has been set to a 'sufficiently' different
@@ -554,47 +603,54 @@ class DatasetModel(QAbstractTableModel):
                 delta = abs(new_val - d[col])
                 print("new val {0}, prev val {1}".format(new_val, d[col]))
                 print("DELTA {0}".format(delta))
-            epsilon = 10E-6 
+            epsilon = 10e-6
             if delta > epsilon:
-                return False, '''You have already entered raw data for this study. If you want to enter the outcome directly, delete the raw data first.'''
+                return (
+                    False,
+                    """You have already entered raw data for this study. If you want to enter the outcome directly, delete the raw data first.""",
+                )
 
-        if s.trimmed() == '':
+        if s.trimmed() == "":
             # in this case, they've deleted a value
             # (i.e., left it blank) -- this is OK.
-            return True, None 
+            return True, None
         if self.current_effect in ("OR", "RR"):
             if float(s) < 0:
                 return False, "Ratios cannot be negative."
-        
-        #figure out why type of column we are in
-        fields = ["est","lower","upper"]
+
+        # figure out why type of column we are in
+        fields = ["est", "lower", "upper"]
         if data_type == DIAGNOSTIC:
             fields.extend(fields[:])
-        col_to_type = dict(list(zip(self.OUTCOMES,fields)))
+        col_to_type = dict(list(zip(self.OUTCOMES, fields)))
         val_str = col_to_type[col]
-        
+
         if outcome_subtype == "generic_effect":
-            if col == self.OUTCOMES[1]: # se column
+            if col == self.OUTCOMES[1]:  # se column
                 if float(s) < 0:
                     return False, "Standard Error cannot be negative"
         else:
+
             def is_between_bounds(est=prev_est, low=prev_lower, high=prev_upper):
                 return calc_fncs.between_bounds(est=est, low=low, high=high)
+
             good_result = None
             if val_str == "est":
-                (good_result,msg) = is_between_bounds(est=float(s))
+                (good_result, msg) = is_between_bounds(est=float(s))
             elif val_str == "lower":
-                (good_result,msg) = is_between_bounds(low=float(s))
+                (good_result, msg) = is_between_bounds(low=float(s))
             elif val_str == "upper":
-                (good_result,msg) = is_between_bounds(high=float(s))
-            assert not good_result is None, "Why don't we have a result for what outcome we're in?"
+                (good_result, msg) = is_between_bounds(high=float(s))
+            assert not good_result is None, (
+                "Why don't we have a result for what outcome we're in?"
+            )
             if not good_result:
                 return False, msg
 
         return True, None
 
     def _verify_year(self, s):
-        if s.trimmed() == '':
+        if s.trimmed() == "":
             return True, None
 
         if not is_an_int(s):
@@ -602,15 +658,16 @@ class DatasetModel(QAbstractTableModel):
 
         return True, None
 
-
-    def setData(self, index, value, role=Qt.EditRole, import_csv=False, allow_empty_names=False):
-        '''
+    def setData(
+        self, index, value, role=Qt.EditRole, import_csv=False, allow_empty_names=False
+    ):
+        """
         Implementation of the AbstractDataTable method. The view uses this method
         to request data to display. Thus we here return values to render in the table
         based on the index (row, column).
 
         For more, see: http://doc.trolltech.com/4.5/qabstracttablemodel.html
-        '''
+        """
         group_str = self.get_cur_group_str()
         study_added_due_to_edit = None
         self.last_data_error = None
@@ -629,16 +686,16 @@ class DatasetModel(QAbstractTableModel):
                     return self._reject_edit(STUDY_NAME_REQUIRED_MESSAGE)
 
                 while len(self.dataset) <= index.row():
-                    self.dataset.add_study(Study(self.max_study_id()+1))
+                    self.dataset.add_study(Study(self.max_study_id() + 1))
 
             study = self.dataset.studies[index.row()]
         else:
             return self._reject_edit("Cannot edit that cell.")
-            
+
         if column == self.NAME:
             # proposed study name
             name = str(_to_text_value(value).toUtf8(), encoding="utf8")
-            
+
             if name == "" and not allow_empty_names:
                 return self._reject_edit(STUDY_NAME_REQUIRED_MESSAGE)
             # if we already have the name and the name is not just the current name
@@ -646,38 +703,40 @@ class DatasetModel(QAbstractTableModel):
                 msg = "Duplicate study names not allowed"
                 return self._reject_edit(msg)
             # the second clause here is to address issue #233,
-            # specifically we do not add a dummy study if the 
+            # specifically we do not add a dummy study if the
             # current study (as indexed by index.row()) is 'blank'.
             # note that for us to have even gotten this far in such
             # a case means the allow_empty_names flag is True.
-            elif index.row() == self.rowCount()-DUMMY_ROWS-1 and not name=="":
+            elif index.row() == self.rowCount() - DUMMY_ROWS - 1 and not name == "":
                 # if the last study was just edited, append a
                 # new, blank study
                 # TODO bug: if a new tx group is added, and then a new study
                 # is added, the program throws up because the study doesn't have
                 # the new outcome in its meta-analytic unit object -- need to check
                 # for this at runtime as we do with follow-up and outcome
-                new_study = Study(self.max_study_id()+1)
+                new_study = Study(self.max_study_id() + 1)
                 # issue #133 fix; exclude newly added studies by default
-                new_study.include=False
+                new_study.include = False
                 self.dataset.add_study(new_study)
                 self.study_auto_added = int(new_study.id)
                 study_added_due_to_edit = int(new_study.id)
                 self.reset()
                 # new_index is where the user *should* be editing.
-                new_index = self.index(index.row(), index.column()+1)
+                new_index = self.index(index.row(), index.column() + 1)
                 self.editFocusRequested.emit(new_index)
-            
+
             # study name is good to go
             study.name = str(_to_text_value(value).toUtf8(), encoding="utf8")
-                
+
         elif column == self.YEAR:
             year_ok, msg = self._verify_year(_to_text_value(value))
             if not year_ok:
                 return self._reject_edit(msg)
             study.year = _to_int(value)[0]
         elif self.current_outcome is not None and column in self.RAW_DATA:
-            data_ok, msg = self._verify_raw_data(_to_text_value(value), column, current_data_type, index)
+            data_ok, msg = self._verify_raw_data(
+                _to_text_value(value), column, current_data_type, index
+            )
             if not data_ok:
                 # this signal is (-- presumably --) handled by the UI
                 # i.e., meta_form, which reports the problem to the
@@ -685,12 +744,12 @@ class DatasetModel(QAbstractTableModel):
                 return self._reject_edit(msg)
 
             # @TODO make module-level constant?
-            adjust_by = 3 # include study, study name, year columns
+            adjust_by = 3  # include study, study name, year columns
             ma_unit = self.get_current_ma_unit_for_study(index.row())
             group_name = self.current_txs[0]
             if current_data_type == BINARY:
                 if column in self.RAW_DATA[2:]:
-                    adjust_by += 2 
+                    adjust_by += 2
                     group_name = self.current_txs[1]
             elif current_data_type == CONTINUOUS:
                 if column in self.RAW_DATA[3:]:
@@ -699,36 +758,37 @@ class DatasetModel(QAbstractTableModel):
             else:
                 # diagnostic
                 pass
-                    
-            adjusted_index = column-adjust_by
+
+            adjusted_index = column - adjust_by
             double_value, converted_ok = _to_double(value)
             val = double_value if converted_ok else ""
             ma_unit.tx_groups[group_name].raw_data[adjusted_index] = val
-            
+
             # If a raw data column value is being edited, attempt to
             # update the corresponding outcome (if data permits)
             self.update_outcome_if_possible(index.row())
-            
-            
+
         elif column in self.OUTCOMES:
             print(("Value %s in outcomes" % str(_to_text_value(value))))
-            
+
             row = index.row()
-            
+
             if _to_text_value(value).trimmed() == "":
-                delete_value = True  
+                delete_value = True
                 display_scale_val = None
                 calc_scale_val = None
             else:
                 # sanity check -- is this a number?
-                data_ok, msg = self._verify_outcome_data(_to_text_value(value), column, row, current_data_type)
+                data_ok, msg = self._verify_outcome_data(
+                    _to_text_value(value), column, row, current_data_type
+                )
                 if not data_ok and import_csv == False:
                     return self._reject_edit(msg)
 
                 # the user can also explicitly set the effect size / CIs
                 # @TODO what to do if the entered estimate contradicts the raw data?
                 display_scale_val, converted_ok = _to_double(value)
-                
+
                 print(("Display scale value: %s" % str(display_scale_val)))
 
             if display_scale_val is None or converted_ok:
@@ -740,88 +800,118 @@ class DatasetModel(QAbstractTableModel):
                     print(("Input value is %s" % str(display_scale_val)))
 
                     if self.current_effect == "PFT":
-                        e1, n1, e2, n2 = self.get_cur_raw_data_for_study(study_index=row)
-                        calc_scale_val = self._get_calc_scale_value(display_scale_val,
-                                                                    data_type=current_data_type,
-                                                                    effect=self.current_effect,n1=n1)
-                        conv_to_disp_scale = self._get_conv_to_display_scale(data_type=current_data_type,
-                                                                             effect=self.current_effect, n1=n1)
+                        e1, n1, e2, n2 = self.get_cur_raw_data_for_study(
+                            study_index=row
+                        )
+                        calc_scale_val = self._get_calc_scale_value(
+                            display_scale_val,
+                            data_type=current_data_type,
+                            effect=self.current_effect,
+                            n1=n1,
+                        )
+                        conv_to_disp_scale = self._get_conv_to_display_scale(
+                            data_type=current_data_type,
+                            effect=self.current_effect,
+                            n1=n1,
+                        )
                     else:
-                        calc_scale_val = self._get_calc_scale_value(display_scale_val,
-                                                                data_type=current_data_type,
-                                                                effect=self.current_effect)
-                        conv_to_disp_scale = self._get_conv_to_display_scale(data_type=current_data_type,
-                                                                         effect=self.current_effect)
-                    
+                        calc_scale_val = self._get_calc_scale_value(
+                            display_scale_val,
+                            data_type=current_data_type,
+                            effect=self.current_effect,
+                        )
+                        conv_to_disp_scale = self._get_conv_to_display_scale(
+                            data_type=current_data_type, effect=self.current_effect
+                        )
+
                     ma_unit = self.get_current_ma_unit_for_study(index.row())
                     if outcome_subtype == "generic_effect":
-                        if column == self.OUTCOMES[0]: #estimate
-                            ma_unit.set_effect(self.current_effect, group_str, calc_scale_val)
-                            #ma_unit.set_display_effect(self.current_effect, group_str, display_scale_val)
-                        elif column == self.OUTCOMES[1]: # se
-                            ma_unit.set_SE(self.current_effect, group_str, calc_scale_val)
-                            #ma_unit.set_display_se(self.current_effect, group_str, display_scale_val)
-                    else: # normal case
-                        if column == self.OUTCOMES[0]: # estimate
+                        if column == self.OUTCOMES[0]:  # estimate
+                            ma_unit.set_effect(
+                                self.current_effect, group_str, calc_scale_val
+                            )
+                            # ma_unit.set_display_effect(self.current_effect, group_str, display_scale_val)
+                        elif column == self.OUTCOMES[1]:  # se
+                            ma_unit.set_SE(
+                                self.current_effect, group_str, calc_scale_val
+                            )
+                            # ma_unit.set_display_se(self.current_effect, group_str, display_scale_val)
+                    else:  # normal case
+                        if column == self.OUTCOMES[0]:  # estimate
                             print(("Setting estimate: %s" % str(calc_scale_val)))
-                            ma_unit.set_effect(self.current_effect, group_str, calc_scale_val)
-                            #ma_unit.set_display_effect(self.current_effect, group_str, display_scale_val)
-                        elif column == self.OUTCOMES[1]: #lower
-                            ma_unit.set_lower(self.current_effect, group_str, calc_scale_val)
-                            #ma_unit.set_display_lower(self.current_effect, group_str, display_scale_val)
-                        else: #upper
-                            ma_unit.set_upper(self.current_effect, group_str, calc_scale_val)
-                            #ma_unit.set_display_upper(self.current_effect, group_str, display_scale_val)
+                            ma_unit.set_effect(
+                                self.current_effect, group_str, calc_scale_val
+                            )
+                            # ma_unit.set_display_effect(self.current_effect, group_str, display_scale_val)
+                        elif column == self.OUTCOMES[1]:  # lower
+                            ma_unit.set_lower(
+                                self.current_effect, group_str, calc_scale_val
+                            )
+                            # ma_unit.set_display_lower(self.current_effect, group_str, display_scale_val)
+                        else:  # upper
+                            ma_unit.set_upper(
+                                self.current_effect, group_str, calc_scale_val
+                            )
+                            # ma_unit.set_display_upper(self.current_effect, group_str, display_scale_val)
                         print("calculating se")
-                        
+
                         # in normal case, only calculate SE when all data is filled in
-                        if None not in ma_unit.get_entered_effect_and_ci(self.current_effect, group_str):              
-                            se = ma_unit.calculate_SE_if_possible(self.current_effect, group_str, mult=self.mult)
+                        if None not in ma_unit.get_entered_effect_and_ci(
+                            self.current_effect, group_str
+                        ):
+                            se = ma_unit.calculate_SE_if_possible(
+                                self.current_effect, group_str, mult=self.mult
+                            )
                             print(("setting se to %s" % str(se)))
                         else:
                             se = None
                         ma_unit.set_SE(self.current_effect, group_str, se)
-                        
+
                     # Now calculate display_effect and CI
                     ma_unit.calculate_display_effect_and_ci(
-                                    self.current_effect, group_str,
-                                    conv_to_disp_scale,
-                                    conf_level=self.get_global_conf_level(),
-                                    mult=self.mult)
+                        self.current_effect,
+                        group_str,
+                        conv_to_disp_scale,
+                        conf_level=self.get_global_conf_level(),
+                        mult=self.mult,
+                    )
 
-                            
-                else: #outcome is diagnostic
+                else:  # outcome is diagnostic
                     ma_unit = self.get_current_ma_unit_for_study(index.row())
                     # figure out if this column is sensitivity or specificity
                     m_str = "Sens"
                     if column in self.OUTCOMES[3:]:
                         # by convention, the last three columns are specificity
                         m_str = "Spec"
-                        
-                    calc_scale_val = self._get_calc_scale_value(display_scale_val,
-                                                                data_type=current_data_type,
-                                                                effect=m_str)
-                    
+
+                    calc_scale_val = self._get_calc_scale_value(
+                        display_scale_val, data_type=current_data_type, effect=m_str
+                    )
+
                     # now we switch on what outcome column we're on ... kind of ugly, but eh.
                     if column in (self.OUTCOMES[0], self.OUTCOMES[3]):
                         ma_unit.set_effect(m_str, group_str, calc_scale_val)
-                        #ma_unit.set_display_effect(m_str, group_str, display_scale_val)
+                        # ma_unit.set_display_effect(m_str, group_str, display_scale_val)
                     elif column in (self.OUTCOMES[1], self.OUTCOMES[4]):
                         ma_unit.set_lower(m_str, group_str, calc_scale_val)
-                        #ma_unit.set_display_lower(m_str, group_str, display_scale_val)    
+                        # ma_unit.set_display_lower(m_str, group_str, display_scale_val)
                     else:
                         ma_unit.set_upper(m_str, group_str, calc_scale_val)
-                        #ma_unit.set_display_upper(m_str, group_str, display_scale_val)
-                    conv_to_display_scale = self._get_conv_to_display_scale(data_type=current_data_type,
-                                                                            effect=m_str)
+                        # ma_unit.set_display_upper(m_str, group_str, display_scale_val)
+                    conv_to_display_scale = self._get_conv_to_display_scale(
+                        data_type=current_data_type, effect=m_str
+                    )
                     ma_unit.calculate_display_effect_and_ci(
-                                    m_str, group_str, conv_to_display_scale,
-                                    conf_level=self.get_global_conf_level(),
-                                    mult=self.mult)
-                    
+                        m_str,
+                        group_str,
+                        conv_to_display_scale,
+                        conf_level=self.get_global_conf_level(),
+                        mult=self.mult,
+                    )
+
         elif column == self.INCLUDE_STUDY:
             study.include = _to_bool(value)
-            # we keep note if a study was manually 
+            # we keep note if a study was manually
             # excluded; this differs from just being
             # `included' because the latter is TRUE
             # automatically when a study first acquires
@@ -845,9 +935,11 @@ class DatasetModel(QAbstractTableModel):
                 else:
                     new_value, converted_ok = _to_double(value)
                     if not converted_ok:
-                        return self._reject_edit("Covariate values for continuous covariates need to be numeric.")
+                        return self._reject_edit(
+                            "Covariate values for continuous covariates need to be numeric."
+                        )
             study.covariate_dict[cov_name] = new_value
-            
+
         self.dataChanged.emit(index, index)
 
         # tell the view that an entry in the table has changed, and what the old
@@ -855,39 +947,61 @@ class DatasetModel(QAbstractTableModel):
         new_val = self.data(index)
 
         self.pyCellContentChanged.emit(index, old_val, new_val, study_added_due_to_edit)
-     
+
         if not self.is_diag():
             group_str = self.get_cur_group_str()
 
             print(group_str)
-            print("ok checking it; cur outcome: %s. cur group: %s" % (self.current_outcome, group_str))
+            print(
+                "ok checking it; cur outcome: %s. cur group: %s"
+                % (self.current_outcome, group_str)
+            )
             if self.current_outcome is not None:
-                effect_d = self.get_current_ma_unit_for_study(index.row()).effects_dict[self.current_effect][group_str]
+                effect_d = self.get_current_ma_unit_for_study(index.row()).effects_dict[
+                    self.current_effect
+                ][group_str]
                 print(effect_d)
-                
-                
+
                 # if the study has not been explicitly excluded by the user, then we automatically
                 # include it once it has sufficient data.
                 if not study.manually_excluded:
                     study.include = True
-                    
-                if current_data_type == CONTINUOUS and outcome_subtype == "generic_effect":
-                    if None in [effect_d[key] for key in ["est","SE"]]:
+
+                if (
+                    current_data_type == CONTINUOUS
+                    and outcome_subtype == "generic_effect"
+                ):
+                    if None in [effect_d[key] for key in ["est", "SE"]]:
                         study.include = False
-                else: # normal case, binary or continuous
+                else:  # normal case, binary or continuous
                     # if any of the effect values are empty, we cannot include this study in the analysis, so it
                     # is automatically excluded.
-                    if any([val is None for val in [effect_d[effect_key] for effect_key in ("upper", "lower", "est")]]):
+                    if any(
+                        [
+                            val is None
+                            for val in [
+                                effect_d[effect_key]
+                                for effect_key in ("upper", "lower", "est")
+                            ]
+                        ]
+                    ):
                         study.include = False
         return True
-        
-    
+
     @staticmethod
-    def helper_basic_horizontal_headerData(section, data_type, sub_type,
-            raw_columns, outcome_columns, current_effect, groups, outcome_not_None=True):
-        ''' Allows access to basic display role headerData information w/o
-        having to make a data model '''
-        
+    def helper_basic_horizontal_headerData(
+        section,
+        data_type,
+        sub_type,
+        raw_columns,
+        outcome_columns,
+        current_effect,
+        groups,
+        outcome_not_None=True,
+    ):
+        """Allows access to basic display role headerData information w/o
+        having to make a data model"""
+
         if section == DatasetModel.INCLUDE_STUDY:
             return _item_data(DatasetModel.headers[DatasetModel.INCLUDE_STUDY])
         elif section == DatasetModel.NAME:
@@ -897,12 +1011,12 @@ class DatasetModel(QAbstractTableModel):
         # note that we're assuming here that raw data
         # always shows only two tx groups at once.
         elif outcome_not_None and section in raw_columns:
-            # switch on the outcome type 
-            current_tx = groups[0] # i.e., the first group
+            # switch on the outcome type
+            current_tx = groups[0]  # i.e., the first group
             if data_type == BINARY:
                 if section in raw_columns[2:]:
                     current_tx = groups[1]
-                    
+
                 if section in (raw_columns[0], raw_columns[2]):
                     return _item_data(current_tx + " #evts")
                 else:
@@ -911,7 +1025,7 @@ class DatasetModel(QAbstractTableModel):
                 # continuous data
                 if len(raw_columns) < 6:
                     return _item_data("")
-                    
+
                 if sub_type == "generic_effect":
                     return _item_data("")
                 else:
@@ -935,7 +1049,7 @@ class DatasetModel(QAbstractTableModel):
                     return _item_data("FP")
                 else:
                     return _item_data("TN")
-                    
+
         elif section in outcome_columns:
             if data_type == BINARY:
                 # effect size, lower CI, upper CI
@@ -951,7 +1065,7 @@ class DatasetModel(QAbstractTableModel):
                         return _item_data(current_effect)
                     if section == outcome_columns[1]:
                         return _item_data("se")
-                else: # normal case with no outcome_subtype
+                else:  # normal case with no outcome_subtype
                     if section == outcome_columns[0]:
                         return _item_data(current_effect)
                     elif section == outcome_columns[1]:
@@ -959,67 +1073,76 @@ class DatasetModel(QAbstractTableModel):
                     elif section == outcome_columns[2]:
                         return _item_data("upper")
             elif data_type == DIAGNOSTIC:
-                #### 
+                ####
                 # we're going to do three columns per outcome
                 #   est, lower, upper
                 outcome_index = section - outcome_columns[0]
                 outcome_headers = ["sens.", "lower", "upper", "spec.", "lower", "upper"]
                 return _item_data(outcome_headers[outcome_index])
-        
-        return None # Only get here if section doesn't match
-            
 
-        
+        return None  # Only get here if section doesn't match
 
     def headerData(self, section, orientation, role=Qt.DisplayRole):
-        '''
+        """
         Implementation of the abstract method inherited from the base table
         model class. This is responsible for providing header data for the
         respective columns.
-        '''
+        """
         outcome_type = self.dataset.get_outcome_type(self.current_outcome)
         outcome_subtype = self.dataset.get_outcome_subtype(self.current_outcome)
         length_dataset = len(self.dataset)
-        
+
         sectionOK = section < length_dataset
         ############################### TOOLTIPS ###############################
         if role == Qt.ToolTipRole:
             if orientation == QtCore.Qt.Horizontal:
-                #return "Horizontal Header %s Tooltip" % str(section)
+                # return "Horizontal Header %s Tooltip" % str(section)
                 if section == self.INCLUDE_STUDY:
-                    return "Check if you want to include this study in the meta-analysis"
+                    return (
+                        "Check if you want to include this study in the meta-analysis"
+                    )
                 elif section == self.NAME:
                     return "Name to identify the study"
                 elif section == self.YEAR:
                     return "Year of publication"
                 elif self.current_outcome is not None and section in self.RAW_DATA:
-                    # switch on the outcome type 
-                    current_tx = self.current_txs[0] # i.e., the first group
-                    
+                    # switch on the outcome type
+                    current_tx = self.current_txs[0]  # i.e., the first group
+
                     rename_col_msg = "\nRename group by right-clicking the column header and selecting 'rename group <name>'"
                     sort_msg = "\nSort on this column by right-clicking the column header and selecting 'sort studies by <column>'"
                     if outcome_type == BINARY:
                         if section in self.RAW_DATA[2:]:
                             current_tx = self.current_txs[1]
-            
+
                         if section in (self.RAW_DATA[0], self.RAW_DATA[2]):
-                            num_events_msg = "# of Events in group {0} (numerator)".format(current_tx)
+                            num_events_msg = (
+                                "# of Events in group {0} (numerator)".format(
+                                    current_tx
+                                )
+                            )
                             return num_events_msg + rename_col_msg + sort_msg
                         else:
-                            num_sujets_msg = "# of Subjects in group {0} (numerator)".format(current_tx)
+                            num_sujets_msg = (
+                                "# of Subjects in group {0} (numerator)".format(
+                                    current_tx
+                                )
+                            )
                             return num_sujets_msg + rename_col_msg + sort_msg
                     elif outcome_type == CONTINUOUS:
                         # continuous data
                         if outcome_subtype == "generic_effect":
                             # Logic note: generic-effect continuous outcomes do not expose raw data columns.
                             return ""
-                            
-                        else: # normal case with no outcome subtype
+
+                        else:  # normal case with no outcome subtype
                             if section in self.RAW_DATA[3:]:
                                 current_tx = self.current_txs[1]
-                                
+
                             if section in (self.RAW_DATA[0], self.RAW_DATA[3]):
-                                N_sujets_msg = "# Subjects in group {0}".format(current_tx)
+                                N_sujets_msg = "# Subjects in group {0}".format(
+                                    current_tx
+                                )
                                 return N_sujets_msg + rename_col_msg + sort_msg
                             elif section in (self.RAW_DATA[1], self.RAW_DATA[4]):
                                 mean_msg = "Mean of group %s" % current_tx
@@ -1039,12 +1162,16 @@ class DatasetModel(QAbstractTableModel):
                 elif section in self.OUTCOMES:
                     help_msg = "For information about how the confidence interval was obtained,\n"
                     help_msg += "please consult the the help at {0}".format(HELP_URL)
-                    lower_msg = "Lower bound of {0:.1%} confidence interval".format(self.conf_level/100.0)
+                    lower_msg = "Lower bound of {0:.1%} confidence interval".format(
+                        self.conf_level / 100.0
+                    )
                     lower_msg += "\n" + help_msg
-                    upper_msg = "Upper bound of {0:.1%} confidence interval\n".format(self.conf_level/100.0)
+                    upper_msg = "Upper bound of {0:.1%} confidence interval\n".format(
+                        self.conf_level / 100.0
+                    )
                     upper_msg += "\n" + help_msg
                     se_msg = "Standard Error"
-                    
+
                     if outcome_type == BINARY:
                         # effect size, lower CI, upper CI
                         if section == self.OUTCOMES[0]:
@@ -1059,64 +1186,62 @@ class DatasetModel(QAbstractTableModel):
                                 return CONTINUOUS_METRIC_NAMES[self.current_effect]
                             if section == self.OUTCOMES[1]:
                                 return se_msg
-                        else: # normal case with no outcome_subtype
+                        else:  # normal case with no outcome_subtype
                             if section == self.OUTCOMES[0]:
                                 return CONTINUOUS_METRIC_NAMES[self.current_effect]
                             elif section == self.OUTCOMES[1]:
                                 return lower_msg
                             elif section == self.OUTCOMES[2]:
                                 return upper_msg
-   
-                        
+
                     elif outcome_type == DIAGNOSTIC:
-                        if section in (self.OUTCOMES[1],self.OUTCOMES[4]):
+                        if section in (self.OUTCOMES[1], self.OUTCOMES[4]):
                             return lower_msg
-                        elif section in (self.OUTCOMES[2],self.OUTCOMES[5]):
+                        elif section in (self.OUTCOMES[2], self.OUTCOMES[5]):
                             return upper_msg
-                        else: # in metric name
-                            if section == self.OUTCOMES[0]: # Sens
+                        else:  # in metric name
+                            if section == self.OUTCOMES[0]:  # Sens
                                 return DIAGNOSTIC_METRIC_NAMES["Sens"]
-                            elif section == self.OUTCOMES[3]: # Spec
+                            elif section == self.OUTCOMES[3]:  # Spec
                                 return DIAGNOSTIC_METRIC_NAMES["Spec"]
-                    
-            else: # vertical
+
+            else:  # vertical
                 if sectionOK:
                     return "Use calculator to fill-in missing information"
-                
+
         # For cool calculator icon
         if role == Qt.DecorationRole:
             if orientation == Qt.Vertical:
                 if sectionOK:
                     return QIcon(":/misc/calculator-34.png")
                 else:
-                    #print "\n\n----\n\n"
-                    #print section
-                    #print len(self.dataset)
-                    #print self.dataset.studies
-                    #print self.dataset.get_study_names()
-                    #pyqtRemoveInputHook()
-                    #pdb.set_trace()
+                    # print "\n\n----\n\n"
+                    # print section
+                    # print len(self.dataset)
+                    # print self.dataset.studies
+                    # print self.dataset.get_study_names()
+                    # pyqtRemoveInputHook()
+                    # pdb.set_trace()
                     return _item_data()
 
-        
         if role == Qt.TextAlignmentRole:
-            return _item_data(int(Qt.AlignLeft|Qt.AlignVCenter))
+            return _item_data(int(Qt.AlignLeft | Qt.AlignVCenter))
 
         ############################# DISPLAY ROLE #############################
         if role == Qt.DisplayRole:
             if orientation == Qt.Horizontal:
-                
                 res = self.helper_basic_horizontal_headerData(
-                            section,
-                            data_type=outcome_type,
-                            sub_type=outcome_subtype,
-                            raw_columns=self.RAW_DATA,
-                            outcome_columns=self.OUTCOMES,
-                            current_effect=self.current_effect,
-                            groups=self.current_txs,
-                            outcome_not_None=self.current_outcome is not None)
+                    section,
+                    data_type=outcome_type,
+                    sub_type=outcome_subtype,
+                    raw_columns=self.RAW_DATA,
+                    outcome_columns=self.OUTCOMES,
+                    current_effect=self.current_effect,
+                    groups=self.current_txs,
+                    outcome_not_None=self.current_outcome is not None,
+                )
                 if res:
-                    return res                
+                    return res
                 elif self.current_outcome is not None and section > max(self.OUTCOMES):
                     # then the column is to the right of the outcomes, and must
                     # be a covariate.
@@ -1124,7 +1249,7 @@ class DatasetModel(QAbstractTableModel):
                     cur_cov = self.get_cov(section)
                     if cur_cov == None:
                         return _item_data("")
-                    
+
                     cov_name = cur_cov.name
                     cov_type = cur_cov.get_type_str()
                     # note that I'm only returning the *first* letter
@@ -1134,26 +1259,24 @@ class DatasetModel(QAbstractTableModel):
                 else:
                     # pass, basically
                     return _item_data("")
-            else: # vertical case
-                # this is the vertical -- non-table header -- case.    
+            else:  # vertical case
+                # this is the vertical -- non-table header -- case.
                 # we just show row numbers (not zero-based; hence the +1).
-                return _item_data(int(section+1))
+                return _item_data(int(section + 1))
 
         return _item_data()
-            
-
-        
-        
-
 
     def flags(self, index):
         if not index.isValid():
             return Qt.ItemIsEnabled
         elif index.column() == self.INCLUDE_STUDY:
-            return Qt.ItemFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled |
-                                Qt.ItemIsUserCheckable | Qt.ItemIsSelectable)
-        return Qt.ItemFlags(QAbstractTableModel.flags(self, index)|
-                            Qt.ItemIsEditable)
+            return Qt.ItemFlags(
+                Qt.ItemIsUserCheckable
+                | Qt.ItemIsEnabled
+                | Qt.ItemIsUserCheckable
+                | Qt.ItemIsSelectable
+            )
+        return Qt.ItemFlags(QAbstractTableModel.flags(self, index) | Qt.ItemIsEditable)
 
     def rowCount(self, index=QModelIndex()):
         return self.dataset.num_studies() + DUMMY_ROWS
@@ -1166,13 +1289,17 @@ class DatasetModel(QAbstractTableModel):
         # index. if there is currently an outcome, this means we
         # subtract off the indices up to the last outcomes column; otherwise
         # we just subtract the include, study name and year columns (giving 3)
-        cov_index = table_col_index - (self.OUTCOMES[-1]+1) if self.current_outcome is not None else table_col_index - 3
+        cov_index = (
+            table_col_index - (self.OUTCOMES[-1] + 1)
+            if self.current_outcome is not None
+            else table_col_index - 3
+        )
         try:
             return self.dataset.covariates[cov_index]
         except:
             print("There is no covariate at that index")
             return None
-        
+
     def get_covariate_names(self):
         return [cov.name for cov in self.dataset.covariates]
 
@@ -1182,27 +1309,27 @@ class DatasetModel(QAbstractTableModel):
         self.reset()
 
     def _get_col_count(self):
-        '''
+        """
         Calculate how many columns to display; this is contingent on the data type,
         amongst other things (e.g., number of covariates).
-        '''
-        num_cols = 3 # we always show study name and year (and include studies)
+        """
+        num_cols = 3  # we always show study name and year (and include studies)
         if len(self.dataset.get_outcome_names()) > 0:
-            num_effect_size_fields = 3 # point estimate, low, high
+            num_effect_size_fields = 3  # point estimate, low, high
             outcome_type = self.dataset.get_outcome_type(self.current_outcome)
             outcome_subtype = self.dataset.get_outcome_subtype(self.current_outcome)
             if outcome_subtype == "generic_effect":
-                num_effect_size_fields = 2 # point estimate, se
+                num_effect_size_fields = 2  # point estimate, se
             if outcome_type == DIAGNOSTIC:
                 # we have two for diagnostic; sensitivity and specifity.
                 # we will display the est, lower, and upper for both of these.
                 num_effect_size_fields = 6
-            
+
             num_cols += num_effect_size_fields + self.num_data_cols_for_current_unit()
         # now add the covariates (if any)
         num_cols += len(self.dataset.covariates)
         return num_cols
-        
+
     def get_ordered_study_ids(self):
         return [study.id for study in self.dataset.studies]
 
@@ -1217,13 +1344,13 @@ class DatasetModel(QAbstractTableModel):
 
     def remove_outcome(self, outcome_name):
         self.dataset.remove_outcome(outcome_name)
-        
+
     def add_new_group(self, name):
         self.dataset.add_group(name, self.current_outcome)
-        
+
     def remove_group(self, group_name):
         self.dataset.remove_group(group_name)
-    
+
     def rename_group(self, old_group_name, new_group_name):
         self.dataset.change_group_name(old_group_name, new_group_name)
         if old_group_name in self.current_txs:
@@ -1235,19 +1362,20 @@ class DatasetModel(QAbstractTableModel):
 
     def add_follow_up_to_current_outcome(self, follow_up_name):
         self.dataset.add_follow_up_to_outcome(self.current_outcome, follow_up_name)
-        
+
     def remove_follow_up_from_outcome(self, follow_up_name, outcome_name):
         self.dataset.remove_follow_up_from_outcome(follow_up_name, outcome_name)
-        
+
     def add_covariate(self, covariate_name, covariate_type, cov_values=None):
-        self.dataset.add_covariate(Covariate(covariate_name, covariate_type),
-                                   cov_values=cov_values)
+        self.dataset.add_covariate(
+            Covariate(covariate_name, covariate_type), cov_values=cov_values
+        )
         self.reset()
-    
+
     def remove_covariate(self, covariate_name):
         self.dataset.remove_covariate(covariate_name)
         self.reset()
-        
+
     def remove_study(self, an_id):
         self.dataset.studies.pop(an_id)
         self.reset()
@@ -1258,22 +1386,24 @@ class DatasetModel(QAbstractTableModel):
     def get_next_outcome_name(self):
         outcomes = self.dataset.get_outcome_names()
         cur_index = outcomes.index(self.current_outcome)
-        next_outcome = outcomes[0] if cur_index == len(outcomes)-1\
-                                                        else outcomes[cur_index+1]
+        next_outcome = (
+            outcomes[0] if cur_index == len(outcomes) - 1 else outcomes[cur_index + 1]
+        )
         return next_outcome
 
     def get_prev_outcome_name(self):
         outcomes = self.dataset.get_outcome_names()
         cur_index = outcomes.index(self.current_outcome)
-        prev_outcome = outcomes[-1] if cur_index == 0 \
-                                                        else outcomes[cur_index-1]
+        prev_outcome = outcomes[-1] if cur_index == 0 else outcomes[cur_index - 1]
         return prev_outcome
 
     def get_next_follow_up(self):
         print("\nfollow-ups for outcome:")
         print(self.dataset.outcome_names_to_follow_ups[self.current_outcome])
         t_point = self.current_time_point
-        if self.current_time_point >= max(self.dataset.outcome_names_to_follow_ups[self.current_outcome].keys()):
+        if self.current_time_point >= max(
+            self.dataset.outcome_names_to_follow_ups[self.current_outcome].keys()
+        ):
             t_point = 0
         else:
             # WARNING if we delete a time point things might get screwed up here
@@ -1284,11 +1414,15 @@ class DatasetModel(QAbstractTableModel):
         follow_up_name = self.get_follow_up_name_for_t_point(t_point)
         print("\nt_point; name: %s, %s" % (t_point, follow_up_name))
         return (t_point, follow_up_name)
-        
+
     def get_previous_follow_up(self):
         t_point = self.current_time_point
-        if self.current_time_point <= min(self.dataset.outcome_names_to_follow_ups[self.current_outcome].keys()):
-            t_point = max(self.dataset.outcome_names_to_follow_ups[self.current_outcome].keys())
+        if self.current_time_point <= min(
+            self.dataset.outcome_names_to_follow_ups[self.current_outcome].keys()
+        ):
+            t_point = max(
+                self.dataset.outcome_names_to_follow_ups[self.current_outcome].keys()
+            )
         else:
             # WARNING if we delete a time point things might get screwed up here
             # as we're actually using the MAX when we insert new follow-ups
@@ -1296,78 +1430,84 @@ class DatasetModel(QAbstractTableModel):
             # assuming the current - 1 exists
             t_point -= 1
         return (t_point, self.get_follow_up_name_for_t_point(t_point))
-        
+
     def set_current_time_point(self, time_point):
         self.current_time_point = time_point
         self.followUpChanged.emit()
         self.reset()
-        
+
     def set_current_follow_up(self, follow_up_name):
-        t_point = self.dataset.outcome_names_to_follow_ups[self.current_outcome].get_key(follow_up_name)
+        t_point = self.dataset.outcome_names_to_follow_ups[
+            self.current_outcome
+        ].get_key(follow_up_name)
         self.set_current_time_point(t_point)
 
     def get_current_follow_up_name(self):
         if len(self.dataset.outcome_names_to_follow_ups) > 0:
             try:
-                return self.dataset.outcome_names_to_follow_ups[self.current_outcome][self.current_time_point]
+                return self.dataset.outcome_names_to_follow_ups[self.current_outcome][
+                    self.current_time_point
+                ]
             except:
                 return None
-            
+
     def get_follow_up_name_for_t_point(self, t_point):
         return self.dataset.outcome_names_to_follow_ups[self.current_outcome][t_point]
-        
+
     def get_t_point_for_follow_up_name(self, follow_up):
-        return self.dataset.outcome_names_to_follow_ups[self.current_outcome].get_key(follow_up)
-        
+        return self.dataset.outcome_names_to_follow_ups[self.current_outcome].get_key(
+            follow_up
+        )
+
     def get_current_groups(self):
         return self.current_txs
-        
+
     def get_previous_groups(self):
         return self.previous_txs
-        
+
     def next_groups(self):
-        ''' Returns a tuple with the next two group names (we just iterate round-robin) '''
+        """Returns a tuple with the next two group names (we just iterate round-robin)"""
         if len(self.dataset.get_group_names()) == 0:
             return []
-        
+
         ## notice that we only retrieve the group names that belong
         # to the current outcome/follow-up tuple
-        group_names = self.dataset.get_group_names_for_outcome_fu(self.current_outcome, self.get_current_follow_up_name())
-    
+        group_names = self.dataset.get_group_names_for_outcome_fu(
+            self.current_outcome, self.get_current_follow_up_name()
+        )
+
         self._next_group_indices(group_names)
-        
+
         if not self.is_diag():
             # shuffle over groups
             while self.tx_index_a == self.tx_index_b:
                 self._next_group_indices(group_names)
         else:
             self._next_group_index(group_names)
-            
+
         next_txs = [group_names[self.tx_index_a], group_names[self.tx_index_b]]
         print("new tx group indices a, b: %s, %s" % (self.tx_index_a, self.tx_index_b))
         return next_txs
-        
 
     def _next_group_indices(self, group_names):
         print("\ngroup names: %s" % group_names)
-        if self.tx_index_b < len(group_names)-1:
+        if self.tx_index_b < len(group_names) - 1:
             self.tx_index_b += 1
         else:
             # bump the a index
-            if self.tx_index_a < len(group_names)-1:
+            if self.tx_index_a < len(group_names) - 1:
                 self.tx_index_a += 1
             else:
                 self.tx_index_a = 0
             self.tx_index_b = 0
 
-
     def _next_group_index(self, group_names):
         # increments tx A; ignores B
-        if self.tx_index_a < len(group_names)-1:
+        if self.tx_index_a < len(group_names) - 1:
             self.tx_index_a += 1
         else:
             self.tx_index_a = 0
-            
+
     def outcome_has_follow_up(self, outcome, follow_up):
         if outcome is None:
             print("Tried to reference None outcome")
@@ -1375,23 +1515,25 @@ class DatasetModel(QAbstractTableModel):
         outcome_d = self.dataset.outcome_names_to_follow_ups[outcome]
 
         return follow_up in list(outcome_d.keys())
-        
+
     def outcome_fu_has_group(self, outcome, follow_up, group):
         ## we just pull the outcome from the first study; we tacitly
         # assume that all studies have the same outcomes/follow-ups.
-        # 
+        #
         outcome_d = self.dataset.studies[0].outcomes_to_follow_ups[outcome]
 
         ## we _assume_ that the follow_up is in this outcome!
         return group in list(outcome_d[follow_up].tx_groups.keys())
-    
+
     def set_current_groups(self, group_names):
         self.previous_txs = self.current_txs
         self.current_txs = group_names
         self.tx_index_a = self.dataset.get_group_names().index(group_names[0])
         self.tx_index_b = self.dataset.get_group_names().index(group_names[1])
-        print("\ncurrent tx group index a, b: %s, %s" % (self.tx_index_a, self.tx_index_b))
-        
+        print(
+            "\ncurrent tx group index a, b: %s, %s" % (self.tx_index_a, self.tx_index_b)
+        )
+
     def get_group_names(self):
         return self.dataset.get_group_names()
 
@@ -1410,27 +1552,32 @@ class DatasetModel(QAbstractTableModel):
         elif col == self.YEAR:
             self._sort_studies_with_cmp("year", reverse)
         elif col in self.RAW_DATA:
-            #data_type = self.dataset.get_outcome_type(self.current_outcome)
+            # data_type = self.dataset.get_outcome_type(self.current_outcome)
             # need this to dig down to find right ma_unit and data we're looking for to compare against
-            ma_unit_reference_info = {'outcome_name': self.current_outcome, 
-                                      'follow_up': self.get_follow_up_name_for_t_point(self.current_time_point),
-                                      'current_groups': self.get_current_groups(),
-                                      'data_index': col - min(self.RAW_DATA)}
+            ma_unit_reference_info = {
+                "outcome_name": self.current_outcome,
+                "follow_up": self.get_follow_up_name_for_t_point(
+                    self.current_time_point
+                ),
+                "current_groups": self.get_current_groups(),
+                "data_index": col - min(self.RAW_DATA),
+            }
             self._sort_studies_with_cmp("raw_data", reverse, ma_unit_reference_info)
         elif col in self.OUTCOMES:
             # need this to dig down to find right ma_unit and data we're looking for to compare against
             ma_unit_reference_info = {
-                'outcome_type': self.dataset.get_outcome_type(self.current_outcome),
-                'outcome_name': self.current_outcome, 
-                'follow_up': self.get_follow_up_name_for_t_point(self.current_time_point),
-                'current_groups': self.get_current_groups(),
-                'current_effect': self.current_effect,
-                'group_str': self.get_cur_group_str(),
-                'data_index': col - min(self.OUTCOMES)
+                "outcome_type": self.dataset.get_outcome_type(self.current_outcome),
+                "outcome_name": self.current_outcome,
+                "follow_up": self.get_follow_up_name_for_t_point(
+                    self.current_time_point
+                ),
+                "current_groups": self.get_current_groups(),
+                "current_effect": self.current_effect,
+                "group_str": self.get_cur_group_str(),
+                "data_index": col - min(self.OUTCOMES),
             }
             self._sort_studies_with_cmp("outcomes", reverse, ma_unit_reference_info)
-        
-            
+
         # covariates -- note that we assume anything to the right of the outcomes
         # is a covariate
         elif col > self.OUTCOMES[-1]:
@@ -1440,7 +1587,7 @@ class DatasetModel(QAbstractTableModel):
         self.reset()
 
     def order_studies(self, ids):
-        ''' Shuffles studies vector to the order specified by ids'''
+        """Shuffles studies vector to the order specified by ids"""
         ordered_studies = []
         for an_id in ids:
             for study in self.dataset.studies:
@@ -1456,7 +1603,7 @@ class DatasetModel(QAbstractTableModel):
         self.update_cur_tx_effect()
         self.outcomeChanged.emit()
         self.reset()
-        
+
     def update_cur_tx_effect(self):
         outcome_type = self.dataset.get_outcome_type(self.current_outcome)
         if outcome_type == BINARY:
@@ -1468,42 +1615,41 @@ class DatasetModel(QAbstractTableModel):
             # sensitivity/specificity; I don't think there's a
             # notion of a `current effect'...
             self.current_effect = None
-        
+
     def max_study_id(self):
         return self.dataset.max_study_id()
 
     def num_data_cols_for_current_unit(self):
-        '''
+        """
         Returns the number of columns needed to display the raw data
         given the current data type (binary, etc.)
-        
+
         Note again that outcome names are necessarily unique!
-        '''
+        """
         data_type = self.dataset.get_outcome_type(self.current_outcome)
-        sub_type  = self.dataset.get_outcome_subtype(self.current_outcome)
+        sub_type = self.dataset.get_outcome_subtype(self.current_outcome)
         if data_type is None:
             return 0
         elif data_type in [BINARY, DIAGNOSTIC, OTHER]:
             return 4
         elif data_type == CONTINUOUS:
             if sub_type == "generic_effect":
-                return 0 # no raw data for generic effect
+                return 0  # no raw data for generic effect
             else:
                 return 6
-            
 
     def get_current_outcome_type(self, get_str=True):
-        ''' Returns the type of the currently displayed (or 'active') outcome (e.g., binary).  '''
+        """Returns the type of the currently displayed (or 'active') outcome (e.g., binary)."""
         return self.dataset.get_outcome_type(self.current_outcome, get_string=get_str)
-    
+
     def get_outcome_type(self, outcome, get_str=True):
         return self.dataset.get_outcome_type(outcome, get_string=get_str)
-    
+
     def get_current_outcome_subtype(self):
         return self.dataset.get_outcome_subtype(self.current_outcome)
 
     def _set_standard_cols(self, d):
-        ''' these are immutable '''
+        """these are immutable"""
         # column indices
         d["NAME"] = self.NAME
         d["YEAR"] = self.YEAR
@@ -1518,14 +1664,13 @@ class DatasetModel(QAbstractTableModel):
 
         # now take guesses/pick randomly for the remaining
         # fields
-        d["current_outcome"] = data_model.get_outcome_names()[0] 
+        d["current_outcome"] = data_model.get_outcome_names()[0]
         d["current_time_point"] = data_model.get_follow_up_names()[0]
-
 
         # just pick a reasonable current effect,
         # given the outcome data type
         data_type = data_model.get_outcome_type(d["current_outcome"])
-        
+
         print(("data_type: ", data_type))
 
         all_txs = data_model.get_group_names()
@@ -1535,7 +1680,7 @@ class DatasetModel(QAbstractTableModel):
         else:
             d["current_txs"] = [all_txs[0], all_txs[1]]
 
-        effect = None # this is ignored for diagnostic
+        effect = None  # this is ignored for diagnostic
         if data_type == BINARY:
             effect = "OR"
         elif data_type == CONTINUOUS:
@@ -1543,18 +1688,17 @@ class DatasetModel(QAbstractTableModel):
         # make sure you call change_metric_if_appropriate
         # after setting this as the state_dict
         d["current_effect"] = effect
-        d["study_auto_added"] = False # hmm ?
-        
+        d["study_auto_added"] = False  # hmm ?
+
         d["conf_level"] = DEFAULT_CONF_LEVEL
-        
+
         return d
 
-
     def get_stateful_dict(self):
-        '''
+        """
         This captures the state of the model view; things like the current outcome
         and column indices that are on the QT side of the data table model.
-        '''
+        """
         d = {}
         d = self._set_standard_cols(d)
 
@@ -1565,42 +1709,42 @@ class DatasetModel(QAbstractTableModel):
         d["current_effect"] = self.current_effect
         d["study_auto_added"] = self.study_auto_added
         d["conf_level"] = self.conf_level
-        
+
         return d
 
     def is_diag(self):
-        ''' Convenience method -- just returns if the ma_dataset is a diagnostic dataset or not '''
+        """Convenience method -- just returns if the ma_dataset is a diagnostic dataset or not"""
         return self.dataset.is_diag
-        
+
     def set_state(self, state_dict):
         for key, val in list(state_dict.items()):
             if key == "conf_level":
                 self.set_conf_level(val)
             else:
                 exec("self.%s = val" % key)
-        
+
         if "conf_level" not in list(state_dict.keys()):
             self.set_conf_level(DEFAULT_CONF_LEVEL)
-        
+
         self.reset()
 
-    def raw_data_is_complete_for_study(self, study_index, first_arm_only=False):         
+    def raw_data_is_complete_for_study(self, study_index, first_arm_only=False):
         raw_data = self._get_raw_data_according_to_arms(study_index, first_arm_only)
-        
+
         raw_data_is_complete = not "" in raw_data and not None in raw_data
         return raw_data_is_complete
-    
+
     def _raw_data_is_not_empty_for_study(self, study_index, first_arm_only=False):
         raw_data = self._get_raw_data_according_to_arms(study_index, first_arm_only)
-    
+
         empty = True
         for x in raw_data:
             if x not in EMPTY_VALS:
                 empty = False
 
-        return not empty      
+        return not empty
 
-    def _get_raw_data_according_to_arms(self, study_index, first_arm_only = False):
+    def _get_raw_data_according_to_arms(self, study_index, first_arm_only=False):
         if self.current_outcome is None or self.current_time_point is None:
             return False
 
@@ -1608,7 +1752,7 @@ class DatasetModel(QAbstractTableModel):
         data_type = self.get_current_outcome_type(get_str=False)
         # if first_arm_only is true, we are only concerned with whether
         # or not there is sufficient raw data for the first arm of the study
-        
+
         if first_arm_only:
             if data_type == BINARY:
                 raw_data = raw_data[:2]
@@ -1617,9 +1761,9 @@ class DatasetModel(QAbstractTableModel):
         return raw_data
 
     def data_for_only_one_arm(self):
-        '''
+        """
         really this should read 'data for one *and only one* arm.
-        '''
+        """
         data_for_arm_one, data_for_arm_two = False, False
 
         data_type = self.get_current_outcome_type(get_str=False)
@@ -1627,21 +1771,39 @@ class DatasetModel(QAbstractTableModel):
 
         for study_index in range(len(self.dataset.studies)):
             cur_raw_data = self.get_cur_raw_data_for_study(study_index)
-            
-            if len([x for x in cur_raw_data[:per_group_raw_data_size] if x is not None and x!='']) > 0:
+
+            if (
+                len(
+                    [
+                        x
+                        for x in cur_raw_data[:per_group_raw_data_size]
+                        if x is not None and x != ""
+                    ]
+                )
+                > 0
+            ):
                 data_for_arm_one = True
-            if len([x for x in cur_raw_data[per_group_raw_data_size:] if x is not None and x!='']) > 0:
+            if (
+                len(
+                    [
+                        x
+                        for x in cur_raw_data[per_group_raw_data_size:]
+                        if x is not None and x != ""
+                    ]
+                )
+                > 0
+            ):
                 data_for_arm_two = True
 
-        return (data_for_arm_one and not data_for_arm_two) or\
-                 (data_for_arm_two and not data_for_arm_one)
+        return (data_for_arm_one and not data_for_arm_two) or (
+            data_for_arm_two and not data_for_arm_one
+        )
 
     @DebugHelper
     def try_to_update_outcomes(self):
         for study_index in range(len(self.dataset.studies)):
             self.update_outcome_if_possible(study_index)
 
-        
     def blank_all_studies(self, include_them):
         # note that we do *not* change the status of the
         # last study, because this is assumed to be an
@@ -1650,38 +1812,39 @@ class DatasetModel(QAbstractTableModel):
         # to true for the empty studies, causing issues.
         # this is a fix for issue #178
         for study in self.dataset.studies[:-1]:
-            study.include=include_them
-    
+            study.include = include_them
+
     ###
     # syntactic high-fructose corn syrup
     def include_all_studies(self):
         self.blank_all_studies(True)
-    
+
     def exclude_all_studies(self):
         self.blank_all_studies(False)
 
     def all_studies_are_included(self):
         return all([study.include for study in self.dataset.studies])
-    
+
     def all_studies_are_excluded(self):
         return all([not study.include for study in self.dataset.studies])
 
-
     def update_outcome_if_possible(self, study_index):
-        '''
+        """
         Rules:
             Checks the parametric study to ascertain if enough raw data has been
             entered to compute the outcome. If so, the outcome is computed and
             displayed.
-            
+
             If the raw data is not empty, the outcome should be blanked out.
             If the raw data is empty, the outcome should not be effected
-        '''
+        """
         est_and_ci_d = None
         # to index into the effect belonging to the currently displayed groups
-        group_str = self.get_cur_group_str() 
-        data_type = self.get_current_outcome_type(get_str=False) 
-        one_arm_effect = self.current_effect in BINARY_ONE_ARM_METRICS + CONTINUOUS_ONE_ARM_METRICS  
+        group_str = self.get_cur_group_str()
+        data_type = self.get_current_outcome_type(get_str=False)
+        one_arm_effect = (
+            self.current_effect in BINARY_ONE_ARM_METRICS + CONTINUOUS_ONE_ARM_METRICS
+        )
         ma_unit = self.get_current_ma_unit_for_study(study_index)
 
         ####
@@ -1694,9 +1857,10 @@ class DatasetModel(QAbstractTableModel):
 
         # we try to compute outcomes if either all raw data is there, or, if we have a one-arm
         # metric then if sufficient raw data exists to compute this
-        if self.raw_data_is_complete_for_study(study_index) or \
-                (one_arm_effect and self.raw_data_is_complete_for_study(study_index, first_arm_only=True)):
-            
+        if self.raw_data_is_complete_for_study(study_index) or (
+            one_arm_effect
+            and self.raw_data_is_complete_for_study(study_index, first_arm_only=True)
+        ):
             if not self.dataset.studies[study_index].manually_excluded:
                 # include the study -- note that if the user excluded the study, then
                 # edited the raw data, this will re-include it automatically
@@ -1705,158 +1869,219 @@ class DatasetModel(QAbstractTableModel):
             if data_type == BINARY:
                 e1, n1, e2, n2 = self.get_cur_raw_data_for_study(study_index)
                 if self.current_effect in BINARY_TWO_ARM_METRICS:
-                    est_and_ci_d = meta_py_r.effect_for_study(e1, n1, e2, n2,
-                                                              metric=self.current_effect,
-                                                              conf_level=self.conf_level)
+                    est_and_ci_d = meta_py_r.effect_for_study(
+                        e1,
+                        n1,
+                        e2,
+                        n2,
+                        metric=self.current_effect,
+                        conf_level=self.conf_level,
+                    )
                 else:
                     # binary, one-arm
-                    est_and_ci_d = meta_py_r.effect_for_study(e1, n1, 
-                                                              two_arm=False,
-                                                              metric=self.current_effect,
-                                                              conf_level=self.conf_level)
+                    est_and_ci_d = meta_py_r.effect_for_study(
+                        e1,
+                        n1,
+                        two_arm=False,
+                        metric=self.current_effect,
+                        conf_level=self.conf_level,
+                    )
             elif data_type == CONTINUOUS:
                 n1, m1, sd1, n2, m2, sd2 = self.get_cur_raw_data_for_study(study_index)
                 if self.current_effect in CONTINUOUS_TWO_ARM_METRICS:
-                    est_and_ci_d = meta_py_r.continuous_effect_for_study(n1, m1, sd1,
-                                        n2=n2, m2=m2, sd2=sd2, metric=self.current_effect, conf_level=self.conf_level)
+                    est_and_ci_d = meta_py_r.continuous_effect_for_study(
+                        n1,
+                        m1,
+                        sd1,
+                        n2=n2,
+                        m2=m2,
+                        sd2=sd2,
+                        metric=self.current_effect,
+                        conf_level=self.conf_level,
+                    )
                 else:
                     # continuous, one-arm metric
-                    est_and_ci_d = meta_py_r.continuous_effect_for_study(n1, m1, sd1,
-                                          two_arm=False, metric=self.current_effect, conf_level=self.conf_level)
-                
-            elif data_type == DIAGNOSTIC: 
+                    est_and_ci_d = meta_py_r.continuous_effect_for_study(
+                        n1,
+                        m1,
+                        sd1,
+                        two_arm=False,
+                        metric=self.current_effect,
+                        conf_level=self.conf_level,
+                    )
+
+            elif data_type == DIAGNOSTIC:
                 # diagnostic data
                 tp, fn, fp, tn = self.get_cur_raw_data_for_study(study_index)
 
                 # sensitivity and specificity
                 ests_and_cis = meta_py_r.diagnostic_effects_for_study(
-                                                  tp, fn, fp, tn,
-                                                  metrics=DIAGNOSTIC_METRICS,
-                                                  conf_level=self.conf_level)
-                
+                    tp,
+                    fn,
+                    fp,
+                    tn,
+                    metrics=DIAGNOSTIC_METRICS,
+                    conf_level=self.conf_level,
+                )
+
                 ###
                 # now we're going to set the effect estimate/CI on the MA object.
-                
+
                 for metric in DIAGNOSTIC_METRICS:
                     est, lower, upper = ests_and_cis[metric]["calc_scale"]
-                    ma_unit.set_effect_and_ci(metric, group_str, est, lower, upper, mult=self.mult)
-                    conv_to_disp_scale = self._get_conv_to_display_scale(data_type, effect=metric)
+                    ma_unit.set_effect_and_ci(
+                        metric, group_str, est, lower, upper, mult=self.mult
+                    )
+                    conv_to_disp_scale = self._get_conv_to_display_scale(
+                        data_type, effect=metric
+                    )
                     ma_unit.calculate_display_effect_and_ci(
-                                        metric, group_str, conv_to_disp_scale,
-                                        conf_level=self.get_global_conf_level(),
-                                        mult=self.mult)
-                
+                        metric,
+                        group_str,
+                        conv_to_disp_scale,
+                        conf_level=self.get_global_conf_level(),
+                        mult=self.mult,
+                    )
+
             ####
             # if we're dealing with continuous or binary data, here
-            # is where we update the point estimates -- we do this 
+            # is where we update the point estimates -- we do this
             # above in the case of diagnostic data, which needs to be
             # handled differently, because we're updating two
             # outcomes, in that case
             if data_type != DIAGNOSTIC:
                 est, lower, upper = None, None, None
                 if est_and_ci_d is not None:
-                    est, lower, upper = est_and_ci_d["calc_scale"] # calculation scale
+                    est, lower, upper = est_and_ci_d["calc_scale"]  # calculation scale
                 # now set the effect size & CIs
                 # note that we keep two versions around; a version on the 'calculation' scale
                 # (e.g., log) and a version on the continuous/display scale to present to the
                 # user via the UI.
-                ma_unit.set_effect_and_ci(self.current_effect, group_str, est, lower, upper, mult=self.mult)
-                conv_to_disp_scale = self._get_conv_to_display_scale(data_type, effect=self.current_effect, n1=n1)
+                ma_unit.set_effect_and_ci(
+                    self.current_effect, group_str, est, lower, upper, mult=self.mult
+                )
+                conv_to_disp_scale = self._get_conv_to_display_scale(
+                    data_type, effect=self.current_effect, n1=n1
+                )
                 ma_unit.calculate_display_effect_and_ci(
-                                self.current_effect, group_str,
-                                conv_to_disp_scale,
-                                conf_level=self.get_global_conf_level(),
-                                mult=self.mult)
-        elif self._raw_data_is_not_empty_for_study(study_index) or (one_arm_effect and self._raw_data_is_not_empty_for_study(study_index, first_arm_only=True)):
-            if data_type in [BINARY, CONTINUOUS]: # raw data is not blank but not full so clear outcome
+                    self.current_effect,
+                    group_str,
+                    conv_to_disp_scale,
+                    conf_level=self.get_global_conf_level(),
+                    mult=self.mult,
+                )
+        elif self._raw_data_is_not_empty_for_study(study_index) or (
+            one_arm_effect
+            and self._raw_data_is_not_empty_for_study(study_index, first_arm_only=True)
+        ):
+            if data_type in [
+                BINARY,
+                CONTINUOUS,
+            ]:  # raw data is not blank but not full so clear outcome
                 est, lower, upper, se = None, None, None, None
-                ma_unit.set_effect_and_ci(self.current_effect, group_str, est, lower, upper, mult=self.mult)
+                ma_unit.set_effect_and_ci(
+                    self.current_effect, group_str, est, lower, upper, mult=self.mult
+                )
                 ma_unit.set_SE(self.current_effect, group_str, se)
-                conv_to_disp_scale = self._get_conv_to_display_scale(data_type, effect=self.current_effect)
+                conv_to_disp_scale = self._get_conv_to_display_scale(
+                    data_type, effect=self.current_effect
+                )
                 ma_unit.calculate_display_effect_and_ci(
-                                self.current_effect, group_str,
-                                conv_to_disp_scale,
-                                conf_level=self.get_global_conf_level(),
-                                mult=self.mult)
-        else: # raw data is all blank, do nothing
+                    self.current_effect,
+                    group_str,
+                    conv_to_disp_scale,
+                    conf_level=self.get_global_conf_level(),
+                    mult=self.mult,
+                )
+        else:  # raw data is all blank, do nothing
             pass
-                
+
     def get_cur_raw_data(self, only_if_included=True, only_these_studies=None):
         raw_data = []
-        
+
         for study_index in range(len(self.dataset.studies)):
             if not only_if_included or self.dataset.studies[study_index].include:
-                if only_these_studies is None or self.dataset.studies[study_index].id in only_these_studies:
+                if (
+                    only_these_studies is None
+                    or self.dataset.studies[study_index].id in only_these_studies
+                ):
                     raw_data.append(self.get_cur_raw_data_for_study(study_index))
 
         return raw_data
-                
+
     def included_studies_have_raw_data(self):
-        ''' 
+        """
         True iff all _included_ studies have all raw data (e.g., 2x2 for binary) for the currently
         selected outcome and tx groups.
 
         Note that if the current metric is a *one-arm* metric, we only check the first
         arm; i.e., a study is considered to have raw data in this case if the active arm
         has data.
-        '''
+        """
 
         one_arm_data = self.current_effect in ONE_ARM_METRICS
 
         # the -1 is again accounting for the last (empty) appended study
-        for study_index in range(len(self.dataset.studies)-1):
+        for study_index in range(len(self.dataset.studies) - 1):
             if self.dataset.studies[study_index].include:
-                if not self.raw_data_is_complete_for_study(study_index,\
-                                                            first_arm_only=one_arm_data):
+                if not self.raw_data_is_complete_for_study(
+                    study_index, first_arm_only=one_arm_data
+                ):
                     return False
         return True
-
 
     def study_has_point_est(self, study_index, effect=None):
         group_str = self.get_cur_group_str()
         effect = effect or self.current_effect
         cur_ma_unit = self.get_current_ma_unit_for_study(study_index)
-        
+
         if None in cur_ma_unit.get_effect_and_se(effect, group_str, self.mult):
             print("study %s does not have a point estimate" % study_index)
             return False
-            
+
         return "ok -- has all point estimates"
         return True
-        
+
     def cur_point_est_and_SE_for_study(self, study_index, effect=None):
         group_str = self.get_cur_group_str()
         cur_ma_unit = self.get_current_ma_unit_for_study(study_index)
         effect = effect or self.current_effect
-        
+
         est = cur_ma_unit.get_estimate(effect, group_str)
         se = cur_ma_unit.get_se(effect, group_str, self.mult)
         return (est, se)
-        
-    def get_cur_ests_and_SEs(self, only_if_included=True, only_these_studies=None, effect=None):
+
+    def get_cur_ests_and_SEs(
+        self, only_if_included=True, only_these_studies=None, effect=None
+    ):
         ests, SEs = [], []
         effect = effect or self.current_effect
         for study_index in range(len(self.dataset.studies)):
-            if only_these_studies is None or self.dataset.studies[study_index].id in only_these_studies:
+            if (
+                only_these_studies is None
+                or self.dataset.studies[study_index].id in only_these_studies
+            ):
                 # issue #171 -- blank studies are *wrongly* set to be included after paste
                 if not only_if_included or self.dataset.studies[study_index].include:
-                    est, SE = self.cur_point_est_and_SE_for_study(study_index, effect=effect)
+                    est, SE = self.cur_point_est_and_SE_for_study(
+                        study_index, effect=effect
+                    )
                     ests.append(est)
                     SEs.append(SE)
         return (ests, SEs)
-        
+
     def included_studies_have_point_estimates(self, effect=None):
-        ''' 
+        """
         True iff all included studies have all point estiamtes (and CIs) for the
         the 'effect' outcome and currently displayed tx groups. (If effect is None,
         this sets the 'effect' to the currently selected effect).
-        '''
-        for study_index in range(len(self.dataset.studies)-1):
+        """
+        for study_index in range(len(self.dataset.studies) - 1):
             if self.dataset.studies[study_index].include:
                 if not self.study_has_point_est(study_index, effect=effect):
                     return False
-        return True    
-        
+        return True
+
     def get_studies(self, only_if_included=True):
         included_studies = []
 
@@ -1865,182 +2090,232 @@ class DatasetModel(QAbstractTableModel):
                 included_studies.append(study)
         # we lop off the last entry because it is always a blank line/study
         # 11/18/11 -- arg! previously we were explicitly lopping off
-        # the last study (presumed to be blank). this is not necessary! 
+        # the last study (presumed to be blank). this is not necessary!
         # we already check if it's included...
-        return list(included_studies)      
+        return list(included_studies)
 
     def get_cur_raw_data_for_study(self, study_index):
-        return self.get_current_ma_unit_for_study(study_index).get_raw_data_for_groups(self.current_txs)
+        return self.get_current_ma_unit_for_study(study_index).get_raw_data_for_groups(
+            self.current_txs
+        )
 
     def set_current_ma_unit_for_study(self, study_index, new_ma_unit):
         # note that we just assume this exists.
-        self.dataset.studies[study_index].outcomes_to_follow_ups[self.current_outcome][self.get_current_follow_up_name()]=new_ma_unit
-        
+        self.dataset.studies[study_index].outcomes_to_follow_ups[self.current_outcome][
+            self.get_current_follow_up_name()
+        ] = new_ma_unit
+
     def get_current_ma_unit_for_study(self, study_index):
-        '''
+        """
         Returns the MetaAnalytic unit for the study @ study_index. If no such Unit exists,
         it will be added. Thus when a new study is added to a dataset, there is no need
         to initially populate this study with empty MetaAnalytic units reflecting the known
         outcomes, time points & tx groups, as they will be added 'on-demand' here.
-        '''
-        
-        return self.get_ma_unit(study_index=study_index,
-                                outcome=self.current_outcome,
-                                follow_up=self.get_current_follow_up_name(),
-                                tx_groups=self.current_txs)
+        """
 
+        return self.get_ma_unit(
+            study_index=study_index,
+            outcome=self.current_outcome,
+            follow_up=self.get_current_follow_up_name(),
+            tx_groups=self.current_txs,
+        )
 
-    def get_ma_unit(self, study=None, study_index=None, outcome=None, follow_up=None, tx_groups=None):
-        '''
+    def get_ma_unit(
+        self, study=None, study_index=None, outcome=None, follow_up=None, tx_groups=None
+    ):
+        """
         Returns the MetaAnalytic unit for the study @ study_index. If no such Unit exists,
         it will be added. Thus when a new study is added to a dataset, there is no need
         to initially populate this study with empty MetaAnalytic units reflecting the known
         outcomes, time points & tx groups, as they will be added 'on-demand' here.
-        
+
         outcome and follow_up are the names, not ids or instances, of these objects
-        
-        '''
-        
+
+        """
+
         if None not in [study, study_index]:
             if study != self.dataset.studies[study_index]:
                 raise ValueError("study and study index don't match")
-        
-        if study is None: # you can specify a study OR a study index
+
+        if study is None:  # you can specify a study OR a study index
             study = self.dataset.studies[study_index]
-        
+
         # first check to see that the current outcome is contained in this study
         if not outcome in study.outcomes_to_follow_ups:
             ###
             # Issue 7 (RESOLVED) http://github.com/bwallace/OpenMeta-analyst-/issues/#issue/7
-            study.add_outcome(self.dataset.get_outcome_obj(outcome),
-                              group_names=self.dataset.get_group_names())
-        
-        # we must also make sure the time point exists. note that we use the *name* rather than the 
+            study.add_outcome(
+                self.dataset.get_outcome_obj(outcome),
+                group_names=self.dataset.get_group_names(),
+            )
+
+        # we must also make sure the time point exists. note that we use the *name* rather than the
         # index of the current time/follow up
-        if not self.get_current_follow_up_name() in study.outcomes_to_follow_ups[outcome]:
-            study.add_outcome_at_follow_up(self.dataset.get_outcome_obj(outcome),
-                                           follow_up)
-        
-        
+        if (
+            not self.get_current_follow_up_name()
+            in study.outcomes_to_follow_ups[outcome]
+        ):
+            study.add_outcome_at_follow_up(
+                self.dataset.get_outcome_obj(outcome), follow_up
+            )
+
         # finally, make sure the studies contain the currently selected tx groups; if not, add them
         if tx_groups is not None:
             ma_unit = study.outcomes_to_follow_ups[outcome][follow_up]
             for tx_group in tx_groups:
                 if not tx_group in ma_unit.get_group_names():
                     ma_unit.add_group(tx_group)
-        
+
         return ma_unit
-        
+
     def max_raw_data_cols_for_current_unit(self):
-        '''
+        """
         Returns the length of the biggest raw data list for the parametric ma_unit. e.g.,
         if a two group, binary outcome is the current ma_unit, then the studies should
         raw data vectors that contain, at most, 4 elements.
-        '''
-        return \
-          max([len(\
-            self.get_current_ma_unit_for_study(i).get_raw_data_for_groups(self.current_txs)\
-          ) for i, study in enumerate(self.dataset.studies) if self.current_outcome in study.outcomes_to_follow_ups])
+        """
+        return max(
+            [
+                len(
+                    self.get_current_ma_unit_for_study(i).get_raw_data_for_groups(
+                        self.current_txs
+                    )
+                )
+                for i, study in enumerate(self.dataset.studies)
+                if self.current_outcome in study.outcomes_to_follow_ups
+            ]
+        )
 
     def recalculate_display_scale(self):
         effect = self.current_effect
         group_str = self.get_cur_group_str()
         current_data_type = self.dataset.get_outcome_type(self.current_outcome)
-        
+
         ma_units = []
         # Gather ma_units for spreadsheet
-        for study_index in range(len(self.dataset.studies)-1): #-1 is because last study is always blank
+        for study_index in range(
+            len(self.dataset.studies) - 1
+        ):  # -1 is because last study is always blank
             ma_units.append(self.get_current_ma_unit_for_study(study_index))
-            
-        binary_display_scale = lambda x: meta_py_r.binary_convert_scale(x, self.current_effect, convert_to="display.scale")
-        continuous_display_scale = lambda x: meta_py_r.continuous_convert_scale(x, self.current_effect, convert_to="display.scale")
-                            
+
+        binary_display_scale = lambda x: meta_py_r.binary_convert_scale(
+            x, self.current_effect, convert_to="display.scale"
+        )
+        continuous_display_scale = lambda x: meta_py_r.continuous_convert_scale(
+            x, self.current_effect, convert_to="display.scale"
+        )
+
         def get_diagnostic_display_scale(m_str):
-            return lambda x: meta_py_r.diagnostic_convert_scale(x, m_str, convert_to="display.scale") 
-        
+            return lambda x: meta_py_r.diagnostic_convert_scale(
+                x, m_str, convert_to="display.scale"
+            )
+
         for index, x in enumerate(ma_units):
             print(("Recalculating display scale for ma_unit %d" % index))
 
-            if current_data_type in [BINARY,CONTINUOUS]:
+            if current_data_type in [BINARY, CONTINUOUS]:
                 if current_data_type == BINARY:
                     convert_to_display_scale = binary_display_scale
                 elif current_data_type == CONTINUOUS:
                     convert_to_display_scale = continuous_display_scale
-                x.calculate_display_effect_and_ci(effect, group_str,
-                                                  convert_to_display_scale,
-                                                  conf_level=self.get_global_conf_level(), mult=self.mult,
-                                                  check_if_necessary=True)
+                x.calculate_display_effect_and_ci(
+                    effect,
+                    group_str,
+                    convert_to_display_scale,
+                    conf_level=self.get_global_conf_level(),
+                    mult=self.mult,
+                    check_if_necessary=True,
+                )
             elif current_data_type == DIAGNOSTIC:
-                for m_str in ["Sens","Spec"]:
-                    x.calculate_display_effect_and_ci(m_str, group_str,
-                                                      convert_to_display_scale=get_diagnostic_display_scale(m_str),
-                                                      conf_level=self.get_global_conf_level(), mult=self.mult,
-                                                      check_if_necessary=True)
+                for m_str in ["Sens", "Spec"]:
+                    x.calculate_display_effect_and_ci(
+                        m_str,
+                        group_str,
+                        convert_to_display_scale=get_diagnostic_display_scale(m_str),
+                        conf_level=self.get_global_conf_level(),
+                        mult=self.mult,
+                        check_if_necessary=True,
+                    )
         print("Finished calculating display effect and cis")
 
     def _get_conv_to_display_scale(self, data_type, effect, n1=None):
-        ''' Returns appropriate conv_to_display_scale function '''
-        
+        """Returns appropriate conv_to_display_scale function"""
+
         if None in [data_type, effect]:
             print("_get_conv_to_display_scale got None for either data_type, or effect")
 
         if data_type == BINARY:
-            conv_to_disp_scale = lambda x: meta_py_r.binary_convert_scale(x, effect, convert_to="display.scale", n1=n1)
+            conv_to_disp_scale = lambda x: meta_py_r.binary_convert_scale(
+                x, effect, convert_to="display.scale", n1=n1
+            )
         elif data_type == CONTINUOUS:
-            conv_to_disp_scale = lambda x: meta_py_r.continuous_convert_scale(x, effect, convert_to="display.scale")
+            conv_to_disp_scale = lambda x: meta_py_r.continuous_convert_scale(
+                x, effect, convert_to="display.scale"
+            )
         elif data_type == DIAGNOSTIC:
-            conv_to_disp_scale = lambda x: meta_py_r.diagnostic_convert_scale(x, effect, convert_to="display.scale")
+            conv_to_disp_scale = lambda x: meta_py_r.diagnostic_convert_scale(
+                x, effect, convert_to="display.scale"
+            )
         else:
             raise Exception("_get_conv_to_display_scale: data type not recognized!")
-        
+
         return conv_to_disp_scale
-    
-    def _get_calc_scale_value(self, display_scale_val=None, data_type=None, effect=None, n1=None):
-        ''' Gets the calc-scale value of the given display_scale value'''
-        
+
+    def _get_calc_scale_value(
+        self, display_scale_val=None, data_type=None, effect=None, n1=None
+    ):
+        """Gets the calc-scale value of the given display_scale value"""
+
         if None in [display_scale_val, data_type, effect]:
-            print("_get_calc_scale_value got None for either display_scale_val, data_type, or effect")
-        
+            print(
+                "_get_calc_scale_value got None for either display_scale_val, data_type, or effect"
+            )
+
         calc_scale_val = None
         if data_type == BINARY:
-            calc_scale_val = meta_py_r.binary_convert_scale(display_scale_val, effect, convert_to="calc.scale", n1=n1)
+            calc_scale_val = meta_py_r.binary_convert_scale(
+                display_scale_val, effect, convert_to="calc.scale", n1=n1
+            )
         elif data_type == CONTINUOUS:
-            calc_scale_val = meta_py_r.continuous_convert_scale(display_scale_val, effect, convert_to="calc.scale")
+            calc_scale_val = meta_py_r.continuous_convert_scale(
+                display_scale_val, effect, convert_to="calc.scale"
+            )
         elif data_type == DIAGNOSTIC:
-            calc_scale_val = meta_py_r.diagnostic_convert_scale(display_scale_val, effect, convert_to="calc.scale")   
+            calc_scale_val = meta_py_r.diagnostic_convert_scale(
+                display_scale_val, effect, convert_to="calc.scale"
+            )
         else:
-                raise Exception("_get_calc_scale_value: data type not recognized!")
-            
+            raise Exception("_get_calc_scale_value: data type not recognized!")
+
         return calc_scale_val
 
-
     def set_conf_level(self, conf_lev):
-        ''' sets multiplier as well (~1.96 for 95% conf level) '''
-        
+        """sets multiplier as well (~1.96 for 95% conf level)"""
+
         invalid_conf_lev_msg = "Confidence level needs to be a number between 0 and 100"
         if conf_lev is None:
             raise ValueError(invalid_conf_lev_msg)
         elif not (0 < conf_lev < 100):
             raise ValueError(invalid_conf_lev_msg)
-        
+
         self.conf_level = float(conf_lev)
         print(("Set confidence level to: %f" % conf_lev))
-        
+
         self.mult = meta_py_r.get_mult_from_r(conf_lev)
         print(("mult is now: %s" % str(self.mult)))
-        
+
         # set in R as well
-        r_str = "set.global.conf.level("+str(float(conf_lev))+")"
+        r_str = "set.global.conf.level(" + str(float(conf_lev)) + ")"
         new_cl_in_R = meta_py_r.execute_r_string(r_str)[0]
         print(("Set confidence level in R to: %f" % new_cl_in_R))
 
         self.confLevelChanged.emit()
-        
+
         return conf_lev
-    
+
     def get_global_conf_level(self):
         return self.conf_level
-    
+
     def get_mult(self):
         print(("mult is %s" % str(self.mult)))
         return self.mult

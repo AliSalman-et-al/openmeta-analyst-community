@@ -55,8 +55,9 @@ def test_pretty_metric_name_handles_tx_mean_separator_variants():
         universal_newlines=True,
     )
 
-    assert result.returncode == 0, (
-        "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s"
-        % (result.returncode, result.stdout[-2000:], result.stderr[-2000:])
+    assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
+        result.returncode,
+        result.stdout[-2000:],
+        result.stderr[-2000:],
     )
     assert "OK" in result.stdout

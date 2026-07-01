@@ -27,7 +27,9 @@ def step(message: str) -> None:
     print(f"[OpenMetaR-default-r] {message}", flush=True)
 
 
-def run(command: list[str | Path], *, cwd: Path, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+def run(
+    command: list[str | Path], *, cwd: Path, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
     printable = " ".join(str(part) for part in command)
     step(printable)
     return subprocess.run(
@@ -41,7 +43,9 @@ def run(command: list[str | Path], *, cwd: Path, env: dict[str, str] | None = No
     )
 
 
-def run_streamed(command: list[str | Path], *, cwd: Path, env: dict[str, str] | None = None) -> None:
+def run_streamed(
+    command: list[str | Path], *, cwd: Path, env: dict[str, str] | None = None
+) -> None:
     printable = " ".join(str(part) for part in command)
     step(printable)
     result = subprocess.run(
@@ -53,13 +57,19 @@ def run_streamed(command: list[str | Path], *, cwd: Path, env: dict[str, str] | 
         check=False,
     )
     if result.returncode != 0:
-        raise DefaultREvidenceError(f"R dependency installation failed with exit code {result.returncode}: {printable}")
+        raise DefaultREvidenceError(
+            f"R dependency installation failed with exit code {result.returncode}: {printable}"
+        )
 
 
 def require_success(result: subprocess.CompletedProcess[str], label: str) -> None:
     if result.returncode != 0:
-        output = "\n".join(part for part in (result.stdout.strip(), result.stderr.strip()) if part)
-        raise DefaultREvidenceError(f"{label} failed with exit code {result.returncode}: {output}")
+        output = "\n".join(
+            part for part in (result.stdout.strip(), result.stderr.strip()) if part
+        )
+        raise DefaultREvidenceError(
+            f"{label} failed with exit code {result.returncode}: {output}"
+        )
 
 
 def _candidate_rscript_names() -> list[str]:
@@ -70,12 +80,8 @@ def _rscript_paths_for_r_home(r_home: str | Path | None) -> list[Path]:
     if not r_home:
         return []
     root = Path(r_home)
-    return [
-        root / "bin" / name
-        for name in _candidate_rscript_names()
-    ] + [
-        root / "bin" / "x64" / name
-        for name in _candidate_rscript_names()
+    return [root / "bin" / name for name in _candidate_rscript_names()] + [
+        root / "bin" / "x64" / name for name in _candidate_rscript_names()
     ]
 
 
@@ -126,7 +132,9 @@ def _windows_registry_r_homes() -> list[Path]:
                     if current_version:
                         try:
                             with winreg.OpenKey(key, current_version) as version_key:
-                                version_install_path, _ = winreg.QueryValueEx(version_key, "InstallPath")
+                                version_install_path, _ = winreg.QueryValueEx(
+                                    version_key, "InstallPath"
+                                )
                                 if version_install_path:
                                     homes.append(Path(version_install_path))
                         except OSError:
@@ -140,7 +148,9 @@ def _windows_registry_r_homes() -> list[Path]:
                         index += 1
                         try:
                             with winreg.OpenKey(key, version) as version_key:
-                                version_install_path, _ = winreg.QueryValueEx(version_key, "InstallPath")
+                                version_install_path, _ = winreg.QueryValueEx(
+                                    version_key, "InstallPath"
+                                )
                                 if version_install_path:
                                     homes.append(Path(version_install_path))
                         except OSError:
@@ -183,7 +193,9 @@ def resolve_rscript(name: str, env: dict[str, str] | None = None) -> Path | None
     return None
 
 
-def installed_version_report(root: Path, python: str, rscript: Path, env: dict[str, str]) -> dict:
+def installed_version_report(
+    root: Path, python: str, rscript: Path, env: dict[str, str]
+) -> dict:
     result = run(
         [
             python,
@@ -201,7 +213,9 @@ def installed_version_report(root: Path, python: str, rscript: Path, env: dict[s
     try:
         return json.loads(result.stdout)
     except json.JSONDecodeError as exc:
-        raise DefaultREvidenceError("installed package version report did not emit JSON") from exc
+        raise DefaultREvidenceError(
+            "installed package version report did not emit JSON"
+        ) from exc
 
 
 def resolve_r_exe(root: Path, rscript: Path, env: dict[str, str]) -> Path:
@@ -214,17 +228,24 @@ def resolve_r_exe(root: Path, rscript: Path, env: dict[str, str]) -> Path:
     executable = "R.exe" if os.name == "nt" else "R"
     r_exe = Path(result.stdout.strip()) / executable
     if not r_exe.exists():
-        raise DefaultREvidenceError(f"R executable was not found beside Rscript at {r_exe}")
+        raise DefaultREvidenceError(
+            f"R executable was not found beside Rscript at {r_exe}"
+        )
     return r_exe
 
 
 def r_version_key(root: Path, rscript: Path, env: dict[str, str]) -> str:
     result = run([rscript, "-e", "cat(paste0('R-', getRversion()))"], cwd=root, env=env)
     require_success(result, "R version resolution")
-    return "".join(character if character.isalnum() or character in "._-" else "_" for character in result.stdout.strip())
+    return "".join(
+        character if character.isalnum() or character in "._-" else "_"
+        for character in result.stdout.strip()
+    )
 
 
-def dependency_cache_key(root: Path, rscript: Path, env: dict[str, str], cran_repo: str) -> str:
+def dependency_cache_key(
+    root: Path, rscript: Path, env: dict[str, str], cran_repo: str
+) -> str:
     digest = hashlib.sha256()
     for relative_path in (
         DEFAULT_R_VERIFIER,
@@ -233,12 +254,16 @@ def dependency_cache_key(root: Path, rscript: Path, env: dict[str, str], cran_re
     ):
         digest.update((root / relative_path).read_bytes())
     digest.update(cran_repo.encode("utf-8"))
-    return f"{r_version_key(root, rscript, env)}-default-rdeps-{digest.hexdigest()[:12]}"
+    return (
+        f"{r_version_key(root, rscript, env)}-default-rdeps-{digest.hexdigest()[:12]}"
+    )
 
 
 def direct_archive_versions(root: Path) -> dict[str, str]:
     manifest = json.loads(
-        (root / Path("docs") / "modernization" / "OpenMetaR-r-dependencies.json").read_text(encoding="utf-8")
+        (
+            root / Path("docs") / "modernization" / "OpenMetaR-r-dependencies.json"
+        ).read_text(encoding="utf-8")
     )
     return {
         dependency["name"]: dependency["installed_version"]
@@ -249,7 +274,9 @@ def direct_archive_versions(root: Path) -> dict[str, str]:
 
 def direct_dependency_policy(root: Path) -> tuple[list[str], dict[str, str]]:
     manifest = json.loads(
-        (root / Path("docs") / "modernization" / "OpenMetaR-r-dependencies.json").read_text(encoding="utf-8")
+        (
+            root / Path("docs") / "modernization" / "OpenMetaR-r-dependencies.json"
+        ).read_text(encoding="utf-8")
     )
     cran_packages = []
     archive_packages = {}
@@ -263,7 +290,9 @@ def direct_dependency_policy(root: Path) -> tuple[list[str], dict[str, str]]:
     return sorted(cran_packages), archive_packages
 
 
-def install_direct_dependencies(root: Path, rscript: Path, library: Path, cran_repo: str, env: dict[str, str]) -> None:
+def install_direct_dependencies(
+    root: Path, rscript: Path, library: Path, cran_repo: str, env: dict[str, str]
+) -> None:
     cran_packages, archive_packages = direct_dependency_policy(root)
     archive_url_by_package = {
         "HSROC": "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz"
@@ -340,11 +369,20 @@ if (length(archive_args)) {
     archive_args: list[str] = []
     for name, version in sorted(archive_packages.items()):
         archive_args.extend([name, version, archive_url_by_package[name]])
-    with tempfile.TemporaryDirectory(prefix="OpenMetaR-default-r-install-") as temp_name:
+    with tempfile.TemporaryDirectory(
+        prefix="OpenMetaR-default-r-install-"
+    ) as temp_name:
         install_script = Path(temp_name) / "install-default-r-deps.R"
         install_script.write_text(r_code, encoding="utf-8")
         run_streamed(
-            [rscript, install_script, library, cran_repo, ",".join(cran_packages), *archive_args],
+            [
+                rscript,
+                install_script,
+                library,
+                cran_repo,
+                ",".join(cran_packages),
+                *archive_args,
+            ],
             cwd=root,
             env=env,
         )
@@ -357,7 +395,11 @@ def install_and_load_openmetar(root: Path, rscript: Path, env: dict[str, str]) -
         r_exe = resolve_r_exe(root, rscript, env)
         install_env = dict(env)
         existing_libs = install_env.get("R_LIBS")
-        install_env["R_LIBS"] = str(library) if not existing_libs else str(library) + os.pathsep + existing_libs
+        install_env["R_LIBS"] = (
+            str(library)
+            if not existing_libs
+            else str(library) + os.pathsep + existing_libs
+        )
         install_env["R_LIBS_USER"] = str(library)
         install_env.setdefault("RPY2_CFFI_MODE", "ABI")
 
@@ -393,12 +435,16 @@ def install_and_load_openmetar(root: Path, rscript: Path, env: dict[str, str]) -
 
 def verify(args: argparse.Namespace) -> None:
     root = args.root.resolve()
-    python = str(Path(args.python).resolve()) if Path(args.python).exists() else args.python
+    python = (
+        str(Path(args.python).resolve()) if Path(args.python).exists() else args.python
+    )
     base_env = dict(os.environ)
     cran_repo = args.cran_repo or base_env.get("OMA_CRAN_REPO") or DEFAULT_CRAN_REPO
     base_env["OMA_CRAN_REPO"] = cran_repo
 
-    manifest_result = run([python, R_MANIFEST_VALIDATOR, "--root", root], cwd=root, env=base_env)
+    manifest_result = run(
+        [python, R_MANIFEST_VALIDATOR, "--root", root], cwd=root, env=base_env
+    )
     require_success(manifest_result, "manifest validation")
 
     rscript = resolve_rscript(args.rscript)
@@ -420,7 +466,9 @@ def verify(args: argparse.Namespace) -> None:
         base_env["R_LIBS_USER"] = str(cache_library)
 
     report = installed_version_report(root, python, rscript, base_env)
-    missing = sorted(name for name, version in report["packages"].items() if version is None)
+    missing = sorted(
+        name for name, version in report["packages"].items() if version is None
+    )
     wrong_versions = {
         name: {"expected": expected, "actual": report["packages"].get(name)}
         for name, expected in direct_archive_versions(root).items()
@@ -431,13 +479,23 @@ def verify(args: argparse.Namespace) -> None:
         if missing:
             message_parts.append("missing direct R packages: " + ", ".join(missing))
         if wrong_versions:
-            message_parts.append("wrong direct R package versions: " + json.dumps(wrong_versions, sort_keys=True))
-        message = "; ".join(message_parts) + "; Default R Evidence limited to manifest validation"
+            message_parts.append(
+                "wrong direct R package versions: "
+                + json.dumps(wrong_versions, sort_keys=True)
+            )
+        message = (
+            "; ".join(message_parts)
+            + "; Default R Evidence limited to manifest validation"
+        )
         if args.install_missing and args.r_library_cache_root:
             step(message + "; installing direct R dependencies into cache")
-            install_direct_dependencies(root, rscript, Path(base_env["R_LIBS_USER"]), cran_repo, base_env)
+            install_direct_dependencies(
+                root, rscript, Path(base_env["R_LIBS_USER"]), cran_repo, base_env
+            )
             report = installed_version_report(root, python, rscript, base_env)
-            missing = sorted(name for name, version in report["packages"].items() if version is None)
+            missing = sorted(
+                name for name, version in report["packages"].items() if version is None
+            )
             wrong_versions = {
                 name: {"expected": expected, "actual": report["packages"].get(name)}
                 for name, expected in direct_archive_versions(root).items()

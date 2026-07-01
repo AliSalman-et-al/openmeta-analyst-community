@@ -22,7 +22,9 @@ class Ui_group_name_dialog(object):
         font.setFamily("Verdana")
         group_name_dialog.setFont(font)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/images/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(
+            QtGui.QPixmap(":/images/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
+        )
         group_name_dialog.setWindowIcon(icon)
         self.verticalLayout = QtWidgets.QVBoxLayout(group_name_dialog)
         self.verticalLayout.setObjectName("verticalLayout")
@@ -48,17 +50,23 @@ class Ui_group_name_dialog(object):
         font.setFamily("Verdana")
         self.buttonBox.setFont(font)
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setStandardButtons(
+            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
+        )
         self.buttonBox.setObjectName("buttonBox")
         self.verticalLayout.addWidget(self.buttonBox)
 
         self.retranslateUi(group_name_dialog)
-        self.buttonBox.accepted.connect(group_name_dialog.accept) # type: ignore
-        self.buttonBox.rejected.connect(group_name_dialog.reject) # type: ignore
+        self.buttonBox.accepted.connect(group_name_dialog.accept)  # type: ignore
+        self.buttonBox.rejected.connect(group_name_dialog.reject)  # type: ignore
         QtCore.QMetaObject.connectSlotsByName(group_name_dialog)
 
     def retranslateUi(self, group_name_dialog):
         _translate = QtCore.QCoreApplication.translate
-        group_name_dialog.setWindowTitle(_translate("group_name_dialog", "edit group name"))
+        group_name_dialog.setWindowTitle(
+            _translate("group_name_dialog", "edit group name")
+        )
         self.field_lbl.setText(_translate("group_name_dialog", "group name:"))
+
+
 import icons_rc

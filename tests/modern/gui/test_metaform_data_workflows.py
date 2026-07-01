@@ -31,12 +31,14 @@ def test_real_metaform_creates_binary_continuous_and_diagnostic_datasets():
                 "name": name,
             }
 
-            window._handle_wizard_results({
-                "path": "new_dataset",
-                "outcome_info": outcome_info,
-                "csv_data": None,
-                "selected_dataset": None,
-            })
+            window._handle_wizard_results(
+                {
+                    "path": "new_dataset",
+                    "outcome_info": outcome_info,
+                    "csv_data": None,
+                    "selected_dataset": None,
+                }
+            )
 
             assert window.model.get_current_outcome_type() == expected_type
             assert window.model.current_outcome == name
@@ -62,7 +64,9 @@ def test_dataset_model_rejects_missing_or_unknown_outcome_data_type():
         _close_without_prompt(app, window)
 
 
-def test_data_table_editing_preserves_project_state_and_round_trips(tmp_path, monkeypatch):
+def test_data_table_editing_preserves_project_state_and_round_trips(
+    tmp_path, monkeypatch
+):
     import launch
 
     app, window = launch.start_automation()
@@ -75,7 +79,9 @@ def test_data_table_editing_preserves_project_state_and_round_trips(tmp_path, mo
         table.set_data_in_model(model.index(0, model.NAME), _variant("Alpha"))
         table.set_data_in_model(model.index(0, model.YEAR), _variant("2020"))
         for offset, value in enumerate(["1", "10", "2", "12"]):
-            table.set_data_in_model(model.index(0, model.RAW_DATA[offset]), _variant(value))
+            table.set_data_in_model(
+                model.index(0, model.RAW_DATA[offset]), _variant(value)
+            )
 
         model.add_new_group("Tx C")
         model.add_new_outcome("Readmission", "binary", "proportions")
@@ -83,15 +89,21 @@ def test_data_table_editing_preserves_project_state_and_round_trips(tmp_path, mo
         model.add_covariate("Dose", "continuous", {"Alpha": 5.5})
 
         meta_form = sys.modules["meta_form"]
-        monkeypatch.setattr(meta_form.QFileDialog, "getSaveFileName", lambda **kwargs: (saved_path, ""))
+        monkeypatch.setattr(
+            meta_form.QFileDialog, "getSaveFileName", lambda **kwargs: (saved_path, "")
+        )
         window.save_as()
         reopened = meta_form._load_legacy_pickle(saved_path)
 
-        assert [(str(study.name), str(study.year)) for study in reopened.studies[:1]] == [("Alpha", "2020")]
+        assert [
+            (str(study.name), str(study.year)) for study in reopened.studies[:1]
+        ] == [("Alpha", "2020")]
         assert "Readmission" in reopened.get_outcome_names()
         assert "week 4" in reopened.outcome_names_to_follow_ups["Mortality"].values()
         assert "Tx C" in reopened.get_group_names()
-        assert [(cov.name, cov.data_type) for cov in reopened.covariates] == [("Dose", 1)]
+        assert [(cov.name, cov.data_type) for cov in reopened.covariates] == [
+            ("Dose", 1)
+        ]
         assert reopened.studies[0].covariate_dict["Dose"] == 5.5
     finally:
         _close_without_prompt(app, window)
@@ -106,8 +118,14 @@ def test_copy_paste_undo_and_redo_work_through_real_table_path():
         model = window.model
         table = window.tableView
 
-        table.paste_contents(model.index(0, model.NAME), [["Alpha", "2020", "1", "10", "2", "12"]])
-        copied = table.copy_contents_in_range(model.index(0, model.RAW_DATA[0]), model.index(0, model.RAW_DATA[-1]), to_clipboard=True)
+        table.paste_contents(
+            model.index(0, model.NAME), [["Alpha", "2020", "1", "10", "2", "12"]]
+        )
+        copied = table.copy_contents_in_range(
+            model.index(0, model.RAW_DATA[0]),
+            model.index(0, model.RAW_DATA[-1]),
+            to_clipboard=True,
+        )
 
         assert copied == "1.0\t10.0\t2.0\t12.0"
 
@@ -127,7 +145,9 @@ def test_copy_paste_undo_and_redo_work_through_real_table_path():
         _close_without_prompt(app, window)
 
 
-def test_invalid_paste_reports_validation_error_when_model_signals_are_blocked(monkeypatch):
+def test_invalid_paste_reports_validation_error_when_model_signals_are_blocked(
+    monkeypatch,
+):
     import launch
 
     app, window = launch.start_automation()
@@ -137,7 +157,9 @@ def test_invalid_paste_reports_validation_error_when_model_signals_are_blocked(m
         table = window.tableView
         shown = []
         meta_form = sys.modules["meta_form"]
-        monkeypatch.setattr(meta_form.QMessageBox, "warning", lambda *args, **kwargs: shown.append(args))
+        monkeypatch.setattr(
+            meta_form.QMessageBox, "warning", lambda *args, **kwargs: shown.append(args)
+        )
 
         table.set_data_in_model(model.index(0, model.NAME), _variant("Alpha"))
         table.paste_contents(model.index(0, model.RAW_DATA[0]), [["not numeric"]])
@@ -210,12 +232,24 @@ def test_metaform_dialog_text_slots_accept_pyqt5_line_edit_strings(monkeypatch):
             def exec_(self):
                 return True
 
-        monkeypatch.setattr(meta_form.edit_group_name_form, "EditGroupName", GroupNameDialog)
-        monkeypatch.setattr(meta_form.edit_group_name_form, "EditCovariateName", CovariateNameDialog)
-        monkeypatch.setattr(meta_form.add_new_dialogs, "AddNewCovariateForm", NewCovariateDialog)
-        monkeypatch.setattr(meta_form.add_new_dialogs, "AddNewOutcomeForm", NewOutcomeDialog)
-        monkeypatch.setattr(meta_form.add_new_dialogs, "AddNewGroupForm", NewGroupDialog)
-        monkeypatch.setattr(meta_form.add_new_dialogs, "AddNewFollowUpForm", NewFollowUpDialog)
+        monkeypatch.setattr(
+            meta_form.edit_group_name_form, "EditGroupName", GroupNameDialog
+        )
+        monkeypatch.setattr(
+            meta_form.edit_group_name_form, "EditCovariateName", CovariateNameDialog
+        )
+        monkeypatch.setattr(
+            meta_form.add_new_dialogs, "AddNewCovariateForm", NewCovariateDialog
+        )
+        monkeypatch.setattr(
+            meta_form.add_new_dialogs, "AddNewOutcomeForm", NewOutcomeDialog
+        )
+        monkeypatch.setattr(
+            meta_form.add_new_dialogs, "AddNewGroupForm", NewGroupDialog
+        )
+        monkeypatch.setattr(
+            meta_form.add_new_dialogs, "AddNewFollowUpForm", NewFollowUpDialog
+        )
 
         window.edit_group_name(window.model.get_current_groups()[0])
         window.add_covariate()
@@ -264,19 +298,21 @@ def test_metric_selection_and_confidence_level_are_preserved_in_model_state():
 
 
 def _create_binary_dataset(window):
-    window._handle_wizard_results({
-        "path": "new_dataset",
-        "outcome_info": {
-            "arms": "two",
-            "data_type": "binary",
-            "sub_type": "proportions",
-            "effect": "OR",
-            "metric_choices": [],
-            "name": "Mortality",
-        },
-        "csv_data": None,
-        "selected_dataset": None,
-    })
+    window._handle_wizard_results(
+        {
+            "path": "new_dataset",
+            "outcome_info": {
+                "arms": "two",
+                "data_type": "binary",
+                "sub_type": "proportions",
+                "effect": "OR",
+                "metric_choices": [],
+                "name": "Mortality",
+            },
+            "csv_data": None,
+            "selected_dataset": None,
+        }
+    )
 
 
 def _metric_action(window, metric):
@@ -286,7 +322,11 @@ def _metric_action(window, metric):
             continue
         for action in menu.actions():
             action_data = action.data()
-            action_metric = str(action_data.toString()) if hasattr(action_data, "toString") else str(action_data)
+            action_metric = (
+                str(action_data.toString())
+                if hasattr(action_data, "toString")
+                else str(action_data)
+            )
             if action_metric == metric:
                 return action
     raise AssertionError("Metric action not found: %s" % metric)

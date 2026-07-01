@@ -84,7 +84,9 @@ def test_study_name_edit_on_placeholder_row_creates_study():
 
 def test_invalid_continuous_covariate_edit_emits_error_and_preserves_value():
     model = _diagnostic_model_with_empty_cells()
-    model.dataset.add_covariate(ma_dataset.Covariate("Dose", "continuous"), {"Alpha": 5.5})
+    model.dataset.add_covariate(
+        ma_dataset.Covariate("Dose", "continuous"), {"Alpha": 5.5}
+    )
     model.update_column_indices()
     errors = []
     model.dataError.connect(errors.append)

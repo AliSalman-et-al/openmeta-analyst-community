@@ -1,10 +1,10 @@
-'''
+"""
 This file should only be used when launching a windows build, not during
 developement
 
 @author: George Dietz
          CEBM@Brown
-'''
+"""
 
 import os
 import sys
@@ -29,7 +29,10 @@ def _set_r_environment():
         os.path.join(base_dir, "R"),
         os.path.join(contents_dir, "Resources", "R"),
     ]
-    r_home = next((path for path in r_home_candidates if os.path.isdir(path)), r_home_candidates[0])
+    r_home = next(
+        (path for path in r_home_candidates if os.path.isdir(path)),
+        r_home_candidates[0],
+    )
     if not os.path.isdir(r_home):
         return
 
@@ -56,6 +59,7 @@ def _set_r_environment():
         existing = [path for path in runtime_paths if os.path.isdir(path)]
         os.environ[library_path_variable] = os.pathsep.join(existing + [old_value])
 
+
 # # Set R environment variables
 # oldpath = os.environ["PATH"]
 # cwd = os.getcwd()
@@ -63,17 +67,18 @@ def _set_r_environment():
 # # just adding the 64-bit path version for now
 # os.environ["PATH"] = os.path.join(rpath, "bin","x64") + os.pathsep + oldpath
 # print("new path is: %s" % os.environ["PATH"])
-# 
+#
 # #os.environ["R"] = os.path.join(cwd, rpath, "bin")
 # os.environ["R_HOME"] = os.path.join(cwd, rpath)
 # #os.environ["R_HOME"] = os.path.join(rpath, "bin","x64")
 # print("R_HOME: %s" % os.environ["R_HOME"])
-# 
-# os.environ["R_USER"] = "oma" 
+#
+# os.environ["R_USER"] = "oma"
 
 _set_r_environment()
 
 # we are ready to start the main program loop
 import launch
+
 if __name__ == "__main__":
     launch.start()

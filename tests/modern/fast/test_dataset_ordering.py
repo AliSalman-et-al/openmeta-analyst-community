@@ -122,7 +122,9 @@ def _study_names(model):
 
 def test_dataset_model_sort_studies_uses_python3_key_sort(monkeypatch):
     model = _sortable_dataset_model()
-    monkeypatch.setattr(meta_py_r, "binary_convert_scale", lambda value, *args, **kwargs: value)
+    monkeypatch.setattr(
+        meta_py_r, "binary_convert_scale", lambda value, *args, **kwargs: value
+    )
     monkeypatch.delattr(builtins, "cmp", raising=False)
 
     sort_cases = [

@@ -92,24 +92,43 @@ def validate_dependency_manifest(manifest: dict) -> list[str]:
         str(DEPENDENCY_MANIFEST),
     )
     if manifest["manifest"] != "OpenMetaR-r-dependencies":
-        raise ValidationError(f"{DEPENDENCY_MANIFEST}: manifest must be OpenMetaR-r-dependencies")
+        raise ValidationError(
+            f"{DEPENDENCY_MANIFEST}: manifest must be OpenMetaR-r-dependencies"
+        )
     if manifest["schema_version"] != 1:
         raise ValidationError(f"{DEPENDENCY_MANIFEST}: schema_version must be 1")
     target_runtime = manifest["target_runtime"]
-    if not isinstance(target_runtime, dict) or target_runtime.get("r") != EXPECTED_R_TARGET:
-        raise ValidationError(f"{DEPENDENCY_MANIFEST}: target_runtime.r must be {EXPECTED_R_TARGET}")
+    if (
+        not isinstance(target_runtime, dict)
+        or target_runtime.get("r") != EXPECTED_R_TARGET
+    ):
+        raise ValidationError(
+            f"{DEPENDENCY_MANIFEST}: target_runtime.r must be {EXPECTED_R_TARGET}"
+        )
     if target_runtime.get("cran_policy") != "latest-compatible":
-        raise ValidationError(f"{DEPENDENCY_MANIFEST}: target_runtime.cran_policy must be latest-compatible")
+        raise ValidationError(
+            f"{DEPENDENCY_MANIFEST}: target_runtime.cran_policy must be latest-compatible"
+        )
 
     package_metadata = manifest["package_metadata"]
     if not isinstance(package_metadata, dict):
-        raise ValidationError(f"{DEPENDENCY_MANIFEST}: package_metadata must be an object")
-    require_keys(package_metadata, {"package", "description", "dependency_fields"}, f"{DEPENDENCY_MANIFEST}:package_metadata")
+        raise ValidationError(
+            f"{DEPENDENCY_MANIFEST}: package_metadata must be an object"
+        )
+    require_keys(
+        package_metadata,
+        {"package", "description", "dependency_fields"},
+        f"{DEPENDENCY_MANIFEST}:package_metadata",
+    )
     if package_metadata["package"] != "OpenMetaR":
-        raise ValidationError(f"{DEPENDENCY_MANIFEST}: package_metadata.package must be OpenMetaR")
+        raise ValidationError(
+            f"{DEPENDENCY_MANIFEST}: package_metadata.package must be OpenMetaR"
+        )
     empty_scope_rationale = manifest["empty_scope_rationale"]
     if not isinstance(empty_scope_rationale, dict):
-        raise ValidationError(f"{DEPENDENCY_MANIFEST}: empty_scope_rationale must be an object")
+        raise ValidationError(
+            f"{DEPENDENCY_MANIFEST}: empty_scope_rationale must be an object"
+        )
     direct_dependencies = require_list(
         manifest["direct_OpenMetaR_dependencies"],
         f"{DEPENDENCY_MANIFEST}:direct_OpenMetaR_dependencies",
@@ -132,7 +151,9 @@ def validate_dependency_manifest(manifest: dict) -> list[str]:
         f"{DEPENDENCY_MANIFEST}:app_r_bundle_dependencies",
     )
     if not direct_dependencies:
-        raise ValidationError(f"{DEPENDENCY_MANIFEST}: direct_OpenMetaR_dependencies must not be empty")
+        raise ValidationError(
+            f"{DEPENDENCY_MANIFEST}: direct_OpenMetaR_dependencies must not be empty"
+        )
 
     direct_names: list[str] = []
     seen_direct: set[str] = set()
@@ -143,17 +164,28 @@ def validate_dependency_manifest(manifest: dict) -> list[str]:
         require_keys(dependency, DIRECT_DEPENDENCY_REQUIRED_FIELDS, label)
         require_non_empty_string(dependency["name"], f"{label}.name")
         if dependency["name"] in seen_direct:
-            raise ValidationError(f"{label}: duplicate direct dependency {dependency['name']}")
+            raise ValidationError(
+                f"{label}: duplicate direct dependency {dependency['name']}"
+            )
         seen_direct.add(dependency["name"])
         direct_names.append(dependency["name"])
         scope = require_list(dependency["scope"], f"{label}.scope")
         if not scope or not set(scope) <= {"runtime", "build", "test", "documentation"}:
-            raise ValidationError(f"{label}.scope: expected runtime/build/test/documentation values")
+            raise ValidationError(
+                f"{label}.scope: expected runtime/build/test/documentation values"
+            )
         if not require_list(dependency["evidence"], f"{label}.evidence"):
-            raise ValidationError(f"{label}.evidence: expected at least one evidence entry")
+            raise ValidationError(
+                f"{label}.evidence: expected at least one evidence entry"
+            )
         require_non_empty_string(dependency["reason"], f"{label}.reason")
-        if dependency["source"] == "cran-archive" and dependency["installed_version"] == "latest-compatible":
-            raise ValidationError(f"{label}.installed_version: archived CRAN packages must declare an exact version")
+        if (
+            dependency["source"] == "cran-archive"
+            and dependency["installed_version"] == "latest-compatible"
+        ):
+            raise ValidationError(
+                f"{label}.installed_version: archived CRAN packages must declare an exact version"
+            )
 
     seen_app: set[str] = set()
     overlap = set()
@@ -164,12 +196,16 @@ def validate_dependency_manifest(manifest: dict) -> list[str]:
         require_keys(dependency, APP_BUNDLE_REQUIRED_FIELDS, label)
         require_non_empty_string(dependency["name"], f"{label}.name")
         if dependency["name"] in seen_app:
-            raise ValidationError(f"{label}: duplicate app bundle dependency {dependency['name']}")
+            raise ValidationError(
+                f"{label}: duplicate app bundle dependency {dependency['name']}"
+            )
         seen_app.add(dependency["name"])
         if dependency["name"] in seen_direct:
             overlap.add(dependency["name"])
         if not require_list(dependency["evidence"], f"{label}.evidence"):
-            raise ValidationError(f"{label}.evidence: expected at least one evidence entry")
+            raise ValidationError(
+                f"{label}.evidence: expected at least one evidence entry"
+            )
         require_non_empty_string(dependency["reason"], f"{label}.reason")
     if overlap:
         raise ValidationError(
@@ -194,27 +230,44 @@ def validate_drift_manifest(manifest: dict) -> None:
         str(DRIFT_MANIFEST),
     )
     if manifest["manifest"] != "OpenMetaR-statistical-drift":
-        raise ValidationError(f"{DRIFT_MANIFEST}: manifest must be OpenMetaR-statistical-drift")
+        raise ValidationError(
+            f"{DRIFT_MANIFEST}: manifest must be OpenMetaR-statistical-drift"
+        )
     if manifest["schema_version"] != 1:
         raise ValidationError(f"{DRIFT_MANIFEST}: schema_version must be 1")
-    required_fields = set(require_list(manifest["reviewed_drift_required_fields"], f"{DRIFT_MANIFEST}:reviewed_drift_required_fields"))
+    required_fields = set(
+        require_list(
+            manifest["reviewed_drift_required_fields"],
+            f"{DRIFT_MANIFEST}:reviewed_drift_required_fields",
+        )
+    )
     missing = DRIFT_RECORD_REQUIRED_FIELDS - required_fields
     if missing:
-        raise ValidationError(f"{DRIFT_MANIFEST}: reviewed_drift_required_fields missing {', '.join(sorted(missing))}")
+        raise ValidationError(
+            f"{DRIFT_MANIFEST}: reviewed_drift_required_fields missing {', '.join(sorted(missing))}"
+        )
     statuses = set(require_list(manifest["statuses"], f"{DRIFT_MANIFEST}:statuses"))
     if statuses != {"reviewed", "superseded"}:
-        raise ValidationError(f"{DRIFT_MANIFEST}: statuses must be reviewed and superseded")
-    for index, record in enumerate(require_list(manifest["drift_records"], f"{DRIFT_MANIFEST}:drift_records")):
+        raise ValidationError(
+            f"{DRIFT_MANIFEST}: statuses must be reviewed and superseded"
+        )
+    for index, record in enumerate(
+        require_list(manifest["drift_records"], f"{DRIFT_MANIFEST}:drift_records")
+    ):
         label = f"{DRIFT_MANIFEST}:drift_records[{index}]"
         if not isinstance(record, dict):
             raise ValidationError(f"{label}: expected an object")
         require_keys(record, DRIFT_RECORD_REQUIRED_FIELDS, label)
         if record["status"] not in statuses:
-            raise ValidationError(f"{label}.status: expected one of {', '.join(sorted(statuses))}")
+            raise ValidationError(
+                f"{label}.status: expected one of {', '.join(sorted(statuses))}"
+            )
 
 
 def validate(root: Path) -> list[str]:
-    direct_dependencies = validate_dependency_manifest(load_json(root, DEPENDENCY_MANIFEST))
+    direct_dependencies = validate_dependency_manifest(
+        load_json(root, DEPENDENCY_MANIFEST)
+    )
     validate_drift_manifest(load_json(root, DRIFT_MANIFEST))
     return direct_dependencies
 
@@ -236,7 +289,9 @@ def report_installed_versions(rscript: str, package_names: list[str]) -> dict:
         check=False,
     )
     if result.returncode != 0:
-        raise ValidationError(f"R version report failed: {result.stderr.strip() or result.stdout.strip()}")
+        raise ValidationError(
+            f"R version report failed: {result.stderr.strip() or result.stdout.strip()}"
+        )
     versions: dict[str, str | None] = {}
     runtime_version = None
     for line in result.stdout.splitlines():
@@ -259,7 +314,13 @@ def main(argv: list[str] | None = None) -> int:
     try:
         direct_dependencies = validate(args.root)
         if args.report_installed_versions:
-            print(json.dumps(report_installed_versions(args.rscript, direct_dependencies), indent=2, sort_keys=True))
+            print(
+                json.dumps(
+                    report_installed_versions(args.rscript, direct_dependencies),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
         else:
             print("validated OpenMetaR R dependency and drift manifests")
     except ValidationError as exc:

@@ -22,7 +22,9 @@ class Ui_new_study_dialog(object):
         font.setFamily("Verdana")
         new_study_dialog.setFont(font)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/images/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(
+            QtGui.QPixmap(":/images/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
+        )
         new_study_dialog.setWindowIcon(icon)
         self.buttonBox = QtWidgets.QDialogButtonBox(new_study_dialog)
         self.buttonBox.setGeometry(QtCore.QRect(10, 90, 281, 32))
@@ -30,7 +32,9 @@ class Ui_new_study_dialog(object):
         font.setFamily("Verdana")
         self.buttonBox.setFont(font)
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setStandardButtons(
+            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
+        )
         self.buttonBox.setObjectName("buttonBox")
         self.layoutWidget = QtWidgets.QWidget(new_study_dialog)
         self.layoutWidget.setGeometry(QtCore.QRect(10, 10, 281, 71))
@@ -54,12 +58,14 @@ class Ui_new_study_dialog(object):
         self.gridLayout.addWidget(self.study_lbl, 0, 1, 1, 1)
 
         self.retranslateUi(new_study_dialog)
-        self.buttonBox.accepted.connect(new_study_dialog.accept) # type: ignore
-        self.buttonBox.rejected.connect(new_study_dialog.reject) # type: ignore
+        self.buttonBox.accepted.connect(new_study_dialog.accept)  # type: ignore
+        self.buttonBox.rejected.connect(new_study_dialog.reject)  # type: ignore
         QtCore.QMetaObject.connectSlotsByName(new_study_dialog)
 
     def retranslateUi(self, new_study_dialog):
         _translate = QtCore.QCoreApplication.translate
         new_study_dialog.setWindowTitle(_translate("new_study_dialog", "add new study"))
         self.label_2.setText(_translate("new_study_dialog", "study "))
+
+
 import icons_rc

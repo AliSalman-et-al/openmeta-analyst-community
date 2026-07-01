@@ -58,8 +58,7 @@ def test_option_group_forms_fit_checkbox_and_radio_labels():
     for module_name in module_names:
         module = importlib.import_module(module_name)
         ui_class = next(
-            value for name, value in vars(module).items()
-            if name.startswith("Ui_")
+            value for name, value in vars(module).items() if name.startswith("Ui_")
         )
         root = (
             QtWidgets.QWizardPage()
@@ -76,12 +75,13 @@ def test_option_group_forms_fit_checkbox_and_radio_labels():
             root.layout().activate()
 
         for group_box in root.findChildren(QtWidgets.QGroupBox):
-            option_buttons = (
-                group_box.findChildren(QtWidgets.QCheckBox) +
-                group_box.findChildren(QtWidgets.QRadioButton)
-            )
-            if not any(button.isVisible() and str(button.text()).strip()
-                       for button in option_buttons):
+            option_buttons = group_box.findChildren(
+                QtWidgets.QCheckBox
+            ) + group_box.findChildren(QtWidgets.QRadioButton)
+            if not any(
+                button.isVisible() and str(button.text()).strip()
+                for button in option_buttons
+            ):
                 continue
             assert group_box.height() >= group_box.sizeHint().height(), module_name
 
@@ -182,7 +182,7 @@ def test_issue_76_to_105_reported_bad_user_facing_strings_are_absent():
         "Random-Effects.</b>.",
         "meta-analyis",
         "and and follow-up",
-        'be default',
+        "be default",
         "Please select a csv file to import:",
         '"Undo"',
         '"Redo"',
@@ -196,23 +196,23 @@ def test_issue_76_to_105_reported_bad_user_facing_strings_are_absent():
         "Yule's Q is equal to",
         "Yule's Y is equal to",
         '"weights"=weights(res)',
-        "setHeaderLabels([\"results\"])",
+        'setHeaderLabels(["results"])',
         "results / analysis",
-        "_translate(\"MainWindow\", \"open recent...\")",
-        "_translate(\"MainWindow\", \"open...\")",
-        "_translate(\"MainWindow\", \"save as...\")",
-        "_translate(\"MainWindow\", \"meta-analysis...\")",
-        "_translate(\"MainWindow\", \"edit...\")",
-        "_translate(\"MainWindow\", \"view network...\")",
-        "_translate(\"MainWindow\", \"add covariate...\")",
-        "_translate(\"MainWindow\", \"cumulative meta-analysis...\")",
-        "_translate(\"MainWindow\", \"leave-one-out meta-analysis...\")",
-        "_translate(\"MainWindow\", \"new dataset...\")",
-        "QAction(\"rename group %s...\"",
-        "QAction(\"rename covariate %s...\"",
-        "QAction(\"save pdf image as...\"",
-        "QAction(\"save png image as...\"",
-        "QAction(\"edit plot...\"",
+        '_translate("MainWindow", "open recent...")',
+        '_translate("MainWindow", "open...")',
+        '_translate("MainWindow", "save as...")',
+        '_translate("MainWindow", "meta-analysis...")',
+        '_translate("MainWindow", "edit...")',
+        '_translate("MainWindow", "view network...")',
+        '_translate("MainWindow", "add covariate...")',
+        '_translate("MainWindow", "cumulative meta-analysis...")',
+        '_translate("MainWindow", "leave-one-out meta-analysis...")',
+        '_translate("MainWindow", "new dataset...")',
+        'QAction("rename group %s..."',
+        'QAction("rename covariate %s..."',
+        'QAction("save pdf image as..."',
+        'QAction("save png image as..."',
+        'QAction("edit plot..."',
     ]
 
     for bad_string in bad_strings:
@@ -289,23 +289,23 @@ def test_issue_76_to_105_corrected_user_facing_strings_are_present():
         "Yule's Q",
         "Yule's Y",
         '"Weights"=weights(res)',
-        "setHeaderLabels([\"Results\"])",
+        'setHeaderLabels(["Results"])',
         "Results / Analysis",
-        "_translate(\"MainWindow\", \"open recent\")",
-        "_translate(\"MainWindow\", \"open\")",
-        "_translate(\"MainWindow\", \"save as\")",
-        "_translate(\"MainWindow\", \"meta-analysis\")",
-        "_translate(\"MainWindow\", \"edit\")",
-        "_translate(\"MainWindow\", \"view network\")",
-        "_translate(\"MainWindow\", \"add covariate\")",
-        "_translate(\"MainWindow\", \"cumulative meta-analysis\")",
-        "_translate(\"MainWindow\", \"leave-one-out meta-analysis\")",
-        "_translate(\"MainWindow\", \"new dataset\")",
-        "QAction(\"rename group %s\"",
-        "QAction(\"rename covariate %s\"",
-        "QAction(\"save pdf image as\"",
-        "QAction(\"save png image as\"",
-        "QAction(\"edit plot\"",
+        '_translate("MainWindow", "open recent")',
+        '_translate("MainWindow", "open")',
+        '_translate("MainWindow", "save as")',
+        '_translate("MainWindow", "meta-analysis")',
+        '_translate("MainWindow", "edit")',
+        '_translate("MainWindow", "view network")',
+        '_translate("MainWindow", "add covariate")',
+        '_translate("MainWindow", "cumulative meta-analysis")',
+        '_translate("MainWindow", "leave-one-out meta-analysis")',
+        '_translate("MainWindow", "new dataset")',
+        'QAction("rename group %s"',
+        'QAction("rename covariate %s"',
+        'QAction("save pdf image as"',
+        'QAction("save png image as"',
+        'QAction("edit plot"',
     ]
 
     for expected_string in expected_strings:

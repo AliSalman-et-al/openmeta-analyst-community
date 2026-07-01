@@ -22,7 +22,9 @@ class Ui_new_covariate_dialog(object):
         font.setFamily("Verdana")
         new_covariate_dialog.setFont(font)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/images/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(
+            QtGui.QPixmap(":/images/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
+        )
         new_covariate_dialog.setWindowIcon(icon)
         self.buttonBox = QtWidgets.QDialogButtonBox(new_covariate_dialog)
         self.buttonBox.setGeometry(QtCore.QRect(10, 90, 281, 32))
@@ -30,7 +32,9 @@ class Ui_new_covariate_dialog(object):
         font.setFamily("Verdana")
         self.buttonBox.setFont(font)
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setStandardButtons(
+            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
+        )
         self.buttonBox.setObjectName("buttonBox")
         self.layoutWidget = QtWidgets.QWidget(new_covariate_dialog)
         self.layoutWidget.setGeometry(QtCore.QRect(10, 10, 281, 71))
@@ -67,13 +71,17 @@ class Ui_new_covariate_dialog(object):
         self.gridLayout.addWidget(self.datatype_cbo_box, 1, 1, 1, 1)
 
         self.retranslateUi(new_covariate_dialog)
-        self.buttonBox.accepted.connect(new_covariate_dialog.accept) # type: ignore
-        self.buttonBox.rejected.connect(new_covariate_dialog.reject) # type: ignore
+        self.buttonBox.accepted.connect(new_covariate_dialog.accept)  # type: ignore
+        self.buttonBox.rejected.connect(new_covariate_dialog.reject)  # type: ignore
         QtCore.QMetaObject.connectSlotsByName(new_covariate_dialog)
 
     def retranslateUi(self, new_covariate_dialog):
         _translate = QtCore.QCoreApplication.translate
-        new_covariate_dialog.setWindowTitle(_translate("new_covariate_dialog", "add new covariate"))
+        new_covariate_dialog.setWindowTitle(
+            _translate("new_covariate_dialog", "add new covariate")
+        )
         self.label_2.setText(_translate("new_covariate_dialog", "covariate name:"))
         self.label.setText(_translate("new_covariate_dialog", "type of covariate:"))
+
+
 import icons_rc

@@ -18,7 +18,9 @@ def test_real_metaform_opens_binary_continuous_and_diagnostic_projects():
     ]:
         app, window = launch.start_automation()
         try:
-            assert window.open(os.path.abspath(os.path.join("sample_data", name))) is True
+            assert (
+                window.open(os.path.abspath(os.path.join("sample_data", name))) is True
+            )
 
             model = window.tableView.model()
             assert model.get_current_outcome_type() == family
@@ -40,7 +42,9 @@ def test_real_metaform_standard_binary_action_opens_specs_dialog(monkeypatch):
 
     class SpecsDialog(object):
         def __init__(self, model, meta_f_str=None, parent=None, conf_level=None):
-            calls.append((meta_f_str, parent, conf_level, model.get_current_outcome_type()))
+            calls.append(
+                (meta_f_str, parent, conf_level, model.get_current_outcome_type())
+            )
 
         def show(self):
             pass
@@ -79,17 +83,25 @@ def test_real_metaform_preserves_standard_binary_rows():
         os.chdir(REPO_ROOT)
 
 
-def test_representative_projects_round_trip_without_byte_identical_expectations(tmp_path, monkeypatch):
+def test_representative_projects_round_trip_without_byte_identical_expectations(
+    tmp_path, monkeypatch
+):
     import launch
 
     for name in ["amino.oma", "continuous.oma", "lymph.oma", "BCG.oma"]:
         app, window = launch.start_automation()
         saved_path = str(tmp_path / name)
         try:
-            assert window.open(os.path.abspath(os.path.join("sample_data", name))) is True
+            assert (
+                window.open(os.path.abspath(os.path.join("sample_data", name))) is True
+            )
             expected = _dataset_summary(window.model.dataset)
             meta_form = sys.modules["meta_form"]
-            monkeypatch.setattr(meta_form.QFileDialog, "getSaveFileName", lambda **kwargs: (saved_path, ""))
+            monkeypatch.setattr(
+                meta_form.QFileDialog,
+                "getSaveFileName",
+                lambda **kwargs: (saved_path, ""),
+            )
 
             window.save_as()
             reopened = meta_form._load_legacy_pickle(saved_path)
@@ -110,5 +122,7 @@ def _dataset_summary(dataset):
     return {
         "title": dataset.title,
         "studies": [(str(study.name), str(study.year)) for study in dataset.studies],
-        "outcomes": sorted(str(name) for name in dataset.outcome_names_to_follow_ups.keys()),
+        "outcomes": sorted(
+            str(name) for name in dataset.outcome_names_to_follow_ups.keys()
+        ),
     }

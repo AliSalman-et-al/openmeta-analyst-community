@@ -36,11 +36,13 @@ def _option_group_boxes(root):
 
 
 def _has_visible_option_button(group_box):
-    option_buttons = (
-        group_box.findChildren(QCheckBox) +
-        group_box.findChildren(QRadioButton)
+    option_buttons = group_box.findChildren(QCheckBox) + group_box.findChildren(
+        QRadioButton
     )
-    return any(not button.isHidden() and str(button.text()).strip() for button in option_buttons)
+    return any(
+        not button.isHidden() and str(button.text()).strip()
+        for button in option_buttons
+    )
 
 
 def _raise_maximum_height(widget, height):

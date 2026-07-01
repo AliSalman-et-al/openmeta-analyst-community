@@ -15,17 +15,23 @@ class Ui_ContinuousDataForm(object):
     def setupUi(self, ContinuousDataForm):
         ContinuousDataForm.setObjectName("ContinuousDataForm")
         ContinuousDataForm.resize(570, 565)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Minimum)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Minimum
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(ContinuousDataForm.sizePolicy().hasHeightForWidth())
+        sizePolicy.setHeightForWidth(
+            ContinuousDataForm.sizePolicy().hasHeightForWidth()
+        )
         ContinuousDataForm.setSizePolicy(sizePolicy)
         ContinuousDataForm.setMinimumSize(QtCore.QSize(570, 0))
         font = QtGui.QFont()
         font.setFamily("Verdana")
         ContinuousDataForm.setFont(font)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(
+            QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
+        )
         ContinuousDataForm.setWindowIcon(icon)
         self.verticalLayout_2 = QtWidgets.QVBoxLayout(ContinuousDataForm)
         self.verticalLayout_2.setObjectName("verticalLayout_2")
@@ -66,10 +72,14 @@ class Ui_ContinuousDataForm(object):
         self.simple_table.setHorizontalHeaderItem(7, item)
         self.verticalLayout_2.addWidget(self.simple_table)
         self.grp_box_pre_post = QtWidgets.QGroupBox(ContinuousDataForm)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Minimum)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Minimum
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.grp_box_pre_post.sizePolicy().hasHeightForWidth())
+        sizePolicy.setHeightForWidth(
+            self.grp_box_pre_post.sizePolicy().hasHeightForWidth()
+        )
         self.grp_box_pre_post.setSizePolicy(sizePolicy)
         self.grp_box_pre_post.setObjectName("grp_box_pre_post")
         self.verticalLayout = QtWidgets.QVBoxLayout(self.grp_box_pre_post)
@@ -83,7 +93,9 @@ class Ui_ContinuousDataForm(object):
         self.g1_pre_post_table.setFrameShape(QtWidgets.QFrame.NoFrame)
         self.g1_pre_post_table.setFrameShadow(QtWidgets.QFrame.Plain)
         self.g1_pre_post_table.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.g1_pre_post_table.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.g1_pre_post_table.setHorizontalScrollBarPolicy(
+            QtCore.Qt.ScrollBarAlwaysOff
+        )
         self.g1_pre_post_table.setAlternatingRowColors(True)
         self.g1_pre_post_table.setShowGrid(True)
         self.g1_pre_post_table.setGridStyle(QtCore.Qt.DashLine)
@@ -125,7 +137,9 @@ class Ui_ContinuousDataForm(object):
         self.g2_pre_post_table.setFrameShape(QtWidgets.QFrame.NoFrame)
         self.g2_pre_post_table.setFrameShadow(QtWidgets.QFrame.Plain)
         self.g2_pre_post_table.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.g2_pre_post_table.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.g2_pre_post_table.setHorizontalScrollBarPolicy(
+            QtCore.Qt.ScrollBarAlwaysOff
+        )
         self.g2_pre_post_table.setAlternatingRowColors(True)
         self.g2_pre_post_table.setGridStyle(QtCore.Qt.DashLine)
         self.g2_pre_post_table.setRowCount(2)
@@ -161,7 +175,9 @@ class Ui_ContinuousDataForm(object):
         self.verticalLayout.addWidget(self.grp_2_lbl)
         self.horizontalLayout_3 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_3.setObjectName("horizontalLayout_3")
-        spacerItem = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem = QtWidgets.QSpacerItem(
+            40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
+        )
         self.horizontalLayout_3.addItem(spacerItem)
         self.label = QtWidgets.QLabel(self.grp_box_pre_post)
         self.label.setObjectName("label")
@@ -178,7 +194,9 @@ class Ui_ContinuousDataForm(object):
         self.clear_Btn = QtWidgets.QPushButton(ContinuousDataForm)
         self.clear_Btn.setObjectName("clear_Btn")
         self.horizontalLayout_6.addWidget(self.clear_Btn)
-        spacerItem1 = QtWidgets.QSpacerItem(108, 18, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem1 = QtWidgets.QSpacerItem(
+            108, 18, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
+        )
         self.horizontalLayout_6.addItem(spacerItem1)
         self.back_calc_btn = QtWidgets.QPushButton(ContinuousDataForm)
         self.back_calc_btn.setEnabled(False)
@@ -191,7 +209,9 @@ class Ui_ContinuousDataForm(object):
         font = QtGui.QFont()
         font.setFamily("Verdana")
         self.label_13.setFont(font)
-        self.label_13.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
+        self.label_13.setAlignment(
+            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
+        )
         self.label_13.setObjectName("label_13")
         self.horizontalLayout_2.addWidget(self.label_13)
         self.effect_cbo_box = QtWidgets.QComboBox(ContinuousDataForm)
@@ -199,17 +219,23 @@ class Ui_ContinuousDataForm(object):
         self.effect_cbo_box.setMaximumSize(QtCore.QSize(76, 20))
         self.effect_cbo_box.setObjectName("effect_cbo_box")
         self.horizontalLayout_2.addWidget(self.effect_cbo_box)
-        spacerItem2 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem2 = QtWidgets.QSpacerItem(
+            40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
+        )
         self.horizontalLayout_2.addItem(spacerItem2)
         self.verticalLayout_2.addLayout(self.horizontalLayout_2)
         self.gridLayout = QtWidgets.QGridLayout()
         self.gridLayout.setObjectName("gridLayout")
-        spacerItem3 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem3 = QtWidgets.QSpacerItem(
+            40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
+        )
         self.gridLayout.addItem(spacerItem3, 0, 0, 2, 1)
         self.ci_label = QtWidgets.QLabel(ContinuousDataForm)
         self.ci_label.setObjectName("ci_label")
         self.gridLayout.addWidget(self.ci_label, 0, 2, 1, 1)
-        spacerItem4 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem4 = QtWidgets.QSpacerItem(
+            40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
+        )
         self.gridLayout.addItem(spacerItem4, 0, 3, 2, 1)
         self.horizontalLayout_4 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_4.setObjectName("horizontalLayout_4")
@@ -219,7 +245,9 @@ class Ui_ContinuousDataForm(object):
         font = QtGui.QFont()
         font.setFamily("Verdana")
         self.label_14.setFont(font)
-        self.label_14.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
+        self.label_14.setAlignment(
+            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
+        )
         self.label_14.setObjectName("label_14")
         self.horizontalLayout_4.addWidget(self.label_14)
         self.effect_txt_box = QtWidgets.QLineEdit(ContinuousDataForm)
@@ -235,7 +263,9 @@ class Ui_ContinuousDataForm(object):
         font = QtGui.QFont()
         font.setFamily("Verdana")
         self.label_15.setFont(font)
-        self.label_15.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
+        self.label_15.setAlignment(
+            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
+        )
         self.label_15.setObjectName("label_15")
         self.horizontalLayout_5.addWidget(self.label_15)
         self.low_txt_box = QtWidgets.QLineEdit(ContinuousDataForm)
@@ -256,25 +286,31 @@ class Ui_ContinuousDataForm(object):
         font = QtGui.QFont()
         font.setFamily("Verdana")
         self.label_16.setFont(font)
-        self.label_16.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
+        self.label_16.setAlignment(
+            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
+        )
         self.label_16.setObjectName("label_16")
         self.horizontalLayout_5.addWidget(self.label_16)
         self.gridLayout.addLayout(self.horizontalLayout_5, 1, 2, 1, 1)
         self.verticalLayout_2.addLayout(self.gridLayout)
         self.buttonBox = QtWidgets.QDialogButtonBox(ContinuousDataForm)
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setStandardButtons(
+            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
+        )
         self.buttonBox.setObjectName("buttonBox")
         self.verticalLayout_2.addWidget(self.buttonBox)
 
         self.retranslateUi(ContinuousDataForm)
-        self.buttonBox.accepted.connect(ContinuousDataForm.accept) # type: ignore
-        self.buttonBox.rejected.connect(ContinuousDataForm.reject) # type: ignore
+        self.buttonBox.accepted.connect(ContinuousDataForm.accept)  # type: ignore
+        self.buttonBox.rejected.connect(ContinuousDataForm.reject)  # type: ignore
         QtCore.QMetaObject.connectSlotsByName(ContinuousDataForm)
 
     def retranslateUi(self, ContinuousDataForm):
         _translate = QtCore.QCoreApplication.translate
-        ContinuousDataForm.setWindowTitle(_translate("ContinuousDataForm", "Continuous Data"))
+        ContinuousDataForm.setWindowTitle(
+            _translate("ContinuousDataForm", "Continuous Data")
+        )
         item = self.simple_table.verticalHeaderItem(0)
         item.setText(_translate("ContinuousDataForm", "group 1"))
         item = self.simple_table.verticalHeaderItem(1)
@@ -314,11 +350,16 @@ class Ui_ContinuousDataForm(object):
         item.setText(_translate("ContinuousDataForm", "low"))
         item = self.g1_pre_post_table.horizontalHeaderItem(6)
         item.setText(_translate("ContinuousDataForm", "high"))
-        self.grp_1_lbl.setText(_translate("ContinuousDataForm", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
-"<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
-"p, li { white-space: pre-wrap; }\n"
-"</style></head><body style=\" font-family:\'Verdana\'; font-size:8pt; font-weight:600; font-style:italic;\">\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:7pt;\">group 1</span></p></body></html>"))
+        self.grp_1_lbl.setText(
+            _translate(
+                "ContinuousDataForm",
+                '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd">\n'
+                '<html><head><meta name="qrichtext" content="1" /><style type="text/css">\n'
+                "p, li { white-space: pre-wrap; }\n"
+                "</style></head><body style=\" font-family:'Verdana'; font-size:8pt; font-weight:600; font-style:italic;\">\n"
+                '<p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><span style=" font-size:7pt;">group 1</span></p></body></html>',
+            )
+        )
         item = self.g2_pre_post_table.verticalHeaderItem(0)
         item.setText(_translate("ContinuousDataForm", "pre"))
         item = self.g2_pre_post_table.verticalHeaderItem(1)
@@ -337,19 +378,30 @@ class Ui_ContinuousDataForm(object):
         item.setText(_translate("ContinuousDataForm", "low"))
         item = self.g2_pre_post_table.horizontalHeaderItem(6)
         item.setText(_translate("ContinuousDataForm", "high"))
-        self.grp_2_lbl.setText(_translate("ContinuousDataForm", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
-"<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
-"p, li { white-space: pre-wrap; }\n"
-"</style></head><body style=\" font-family:\'Verdana\'; font-size:8pt; font-weight:600; font-style:italic;\">\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:7pt;\">group 2</span></p></body></html>"))
+        self.grp_2_lbl.setText(
+            _translate(
+                "ContinuousDataForm",
+                '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd">\n'
+                '<html><head><meta name="qrichtext" content="1" /><style type="text/css">\n'
+                "p, li { white-space: pre-wrap; }\n"
+                "</style></head><body style=\" font-family:'Verdana'; font-size:8pt; font-weight:600; font-style:italic;\">\n"
+                '<p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><span style=" font-size:7pt;">group 2</span></p></body></html>',
+            )
+        )
         self.label.setText(_translate("ContinuousDataForm", "correlation:"))
         self.correlation_pre_post.setText(_translate("ContinuousDataForm", "0.0"))
         self.clear_Btn.setText(_translate("ContinuousDataForm", "Clear Form"))
-        self.back_calc_btn.setText(_translate("ContinuousDataForm", "back-calculate table"))
+        self.back_calc_btn.setText(
+            _translate("ContinuousDataForm", "back-calculate table")
+        )
         self.label_13.setText(_translate("ContinuousDataForm", "effect"))
-        self.ci_label.setText(_translate("ContinuousDataForm", "(X% confidence interval)"))
+        self.ci_label.setText(
+            _translate("ContinuousDataForm", "(X% confidence interval)")
+        )
         self.label_14.setText(_translate("ContinuousDataForm", "est."))
         self.label_15.setText(_translate("ContinuousDataForm", "["))
         self.label_2.setText(_translate("ContinuousDataForm", ","))
         self.label_16.setText(_translate("ContinuousDataForm", "]"))
+
+
 import icons_rc

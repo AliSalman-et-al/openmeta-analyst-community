@@ -8,7 +8,16 @@ import meta_py_r
 
 
 class HeadlessAnalysisCase:
-    def __init__(self, dataset_path, method, parameters, metric=None, data_type=None, analysis_type=None, covariates=None):
+    def __init__(
+        self,
+        dataset_path,
+        method,
+        parameters,
+        metric=None,
+        data_type=None,
+        analysis_type=None,
+        covariates=None,
+    ):
         self.dataset_path = dataset_path
         self.method = method
         self.parameters = parameters
@@ -35,21 +44,31 @@ def load_dataset_model(dataset_path):
     else:
         state = model.make_reasonable_stateful_dict(dataset)
     if isinstance(state.get("current_time_point"), str):
-        state["current_time_point"] = dataset.outcome_names_to_follow_ups[state["current_outcome"]].get_key(state["current_time_point"])
+        state["current_time_point"] = dataset.outcome_names_to_follow_ups[
+            state["current_outcome"]
+        ].get_key(state["current_time_point"])
     model.set_state(state)
     return model
 
 
 def _add_case_covariates(model, covariates):
     for covariate in covariates:
-        model.dataset.add_covariate(ma_dataset.Covariate(covariate["name"], covariate["type"]), covariate["values"])
+        model.dataset.add_covariate(
+            ma_dataset.Covariate(covariate["name"], covariate["type"]),
+            covariate["values"],
+        )
 
 
 def run_headless_analysis(case):
     model = load_dataset_model(case.dataset_path)
     _add_case_covariates(model, case.covariates)
-    selected_covariates = [ma_dataset.Covariate(covariate["name"], covariate["type"]) for covariate in case.covariates]
-    covariate_kwargs = {"covs_to_include": selected_covariates} if selected_covariates else {}
+    selected_covariates = [
+        ma_dataset.Covariate(covariate["name"], covariate["type"])
+        for covariate in case.covariates
+    ]
+    covariate_kwargs = (
+        {"covs_to_include": selected_covariates} if selected_covariates else {}
+    )
     if not os.path.exists("r_tmp"):
         os.mkdir("r_tmp")
     if case.metric is not None:
@@ -59,22 +78,53 @@ def run_headless_analysis(case):
     if data_type == meta_globals.BINARY:
         meta_py_r.ma_dataset_to_simple_binary_robj(model, **covariate_kwargs)
         if case.analysis_type in ["cumulative", "leave-one-out"]:
-            return meta_py_r.run_meta_method({"cumulative": "cum.ma.binary", "leave-one-out": "loo.ma.binary"}[case.analysis_type], case.method, case.parameters)
+            return meta_py_r.run_meta_method(
+                {"cumulative": "cum.ma.binary", "leave-one-out": "loo.ma.binary"}[
+                    case.analysis_type
+                ],
+                case.method,
+                case.parameters,
+            )
         if case.analysis_type == "meta_regression":
-            return meta_py_r.run_meta_regression(model.dataset, [], selected_covariates, case.metric, conf_level=case.parameters.get("conf.level"))
+            return meta_py_r.run_meta_regression(
+                model.dataset,
+                [],
+                selected_covariates,
+                case.metric,
+                conf_level=case.parameters.get("conf.level"),
+            )
         if case.analysis_type == "subgroup":
-            return meta_py_r.run_meta_method("subgroup.ma.binary", case.method, case.parameters)
+            return meta_py_r.run_meta_method(
+                "subgroup.ma.binary", case.method, case.parameters
+            )
         return meta_py_r.run_binary_ma(case.method, case.parameters)
     if data_type == meta_globals.CONTINUOUS:
         meta_py_r.ma_dataset_to_simple_continuous_robj(model, **covariate_kwargs)
         if case.analysis_type in ["cumulative", "leave-one-out"]:
-            return meta_py_r.run_meta_method({"cumulative": "cum.ma.continuous", "leave-one-out": "loo.ma.continuous"}[case.analysis_type], case.method, case.parameters)
+            return meta_py_r.run_meta_method(
+                {
+                    "cumulative": "cum.ma.continuous",
+                    "leave-one-out": "loo.ma.continuous",
+                }[case.analysis_type],
+                case.method,
+                case.parameters,
+            )
         if case.analysis_type == "meta_regression":
-            return meta_py_r.run_meta_regression(model.dataset, [], selected_covariates, case.metric, conf_level=case.parameters.get("conf.level"))
+            return meta_py_r.run_meta_regression(
+                model.dataset,
+                [],
+                selected_covariates,
+                case.metric,
+                conf_level=case.parameters.get("conf.level"),
+            )
         if case.analysis_type == "subgroup":
-            return meta_py_r.run_meta_method("subgroup.ma.continuous", case.method, case.parameters)
+            return meta_py_r.run_meta_method(
+                "subgroup.ma.continuous", case.method, case.parameters
+            )
         return meta_py_r.run_continuous_ma(case.method, case.parameters)
     if data_type == meta_globals.DIAGNOSTIC:
         meta_py_r.ma_dataset_to_simple_diagnostic_robj(model)
         return meta_py_r.run_diagnostic_multi(case.method, case.parameters)
-    raise ValueError("Headless harness only covers binary, continuous, and diagnostic analyses.")
+    raise ValueError(
+        "Headless harness only covers binary, continuous, and diagnostic analyses."
+    )

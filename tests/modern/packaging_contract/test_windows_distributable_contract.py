@@ -15,9 +15,19 @@ def ps_contract(*parts):
         "text": text,
         "params": set(re.findall(r"\[(?:string|switch)\]\$([A-Za-z0-9_]+)", text)),
         "functions": set(re.findall(r"(?m)^function\s+([A-Za-z0-9_-]+)", text)),
-        "commands": set(re.findall(r"(?m)^\s*(?:\$[A-Za-z0-9_]+\s+=\s+)?(uv|robocopy|Start-Process|Move-Item|Copy-Item)\b", text)),
+        "commands": set(
+            re.findall(
+                r"(?m)^\s*(?:\$[A-Za-z0-9_]+\s+=\s+)?(uv|robocopy|Start-Process|Move-Item|Copy-Item)\b",
+                text,
+            )
+        ),
         "env_writes": set(re.findall(r"\$env:([A-Za-z0-9_]+)\s*=", text)),
-        "paths": set(re.findall(r'"([^"]+(?:\.(?:oma|html|exe|dll|bat|ps1|py|json|R|sh)|DESCRIPTION))"', text)),
+        "paths": set(
+            re.findall(
+                r'"([^"]+(?:\.(?:oma|html|exe|dll|bat|ps1|py|json|R|sh)|DESCRIPTION))"',
+                text,
+            )
+        ),
         "hidden_imports": set(re.findall(r'"--hidden-import",\s+"([^"]+)"', text)),
     }
 
@@ -29,7 +39,9 @@ def sh_contract(*parts):
         "case_options": set(re.findall(r"(?m)^\s+(--[a-z0-9-]+)\)", text)),
         "functions": set(re.findall(r"(?m)^([a-zA-Z0-9_]+)\(\)\s+\{", text)),
         "env_names": set(re.findall(r"\b([A-Z][A-Z0-9_]+)=", text)),
-        "pyinstaller_options": set(re.findall(r"^\s+(--[a-z0-9-]+)(?:\s|$)", text, re.MULTILINE)),
+        "pyinstaller_options": set(
+            re.findall(r"^\s+(--[a-z0-9-]+)(?:\s|$)", text, re.MULTILINE)
+        ),
         "paths": set(re.findall(r'"([^"]+\.(?:oma|html|app|command|sh|R|zip))"', text)),
         "app_paths": set(re.findall(r'"\$app_root/([^"]+)"', text)),
     }
@@ -66,7 +78,9 @@ def workflow_contract(*parts):
         "text": text,
         "jobs": jobs,
         "steps_by_job": steps_by_job,
-        "uses": re.findall(r"uses:\s+([^@\s]+)@([0-9a-f]{40})(?:\s+#\s+([^\s]+))?", text),
+        "uses": re.findall(
+            r"uses:\s+([^@\s]+)@([0-9a-f]{40})(?:\s+#\s+([^\s]+))?", text
+        ),
         "legacy_uses": re.findall(r"uses:\s+[^@\s]+@v\d+", text),
         "runs": re.findall(r"run:\s+(.+)", text),
         "paths": set(re.findall(r'^\s+- "([^"]+)"$', text, re.MULTILINE)),
@@ -89,7 +103,9 @@ def pytest_path_tokens(text):
 
 
 def pytest_option_tokens(text):
-    return set(re.findall(r"(?<![A-Za-z0-9_-])(--dist|-n|loadfile|4)(?![A-Za-z0-9_-])", text))
+    return set(
+        re.findall(r"(?<![A-Za-z0-9_-])(--dist|-n|loadfile|4)(?![A-Za-z0-9_-])", text)
+    )
 
 
 def project_dependencies():
@@ -99,7 +115,9 @@ def project_dependencies():
 def test_modern_windows_distributable_contract_is_declared():
     script = ps_contract("scripts", "build-modern-windows-binary.ps1")
 
-    assert {"ArtifactName", "PythonExe", "RRuntimeRoot", "RPackageCacheRoot"} <= script["params"]
+    assert {"ArtifactName", "PythonExe", "RRuntimeRoot", "RPackageCacheRoot"} <= script[
+        "params"
+    ]
     assert {"SkipDependencyInstall", "SkipClean", "SkipSmoke"} <= script["params"]
     assert {
         "Resolve-CommandOrRepoPath",
@@ -114,7 +132,11 @@ def test_modern_windows_distributable_contract_is_declared():
         "Install-BundledRPackages",
     } <= script["functions"]
     assert {"robocopy", "Start-Process", "Move-Item"} <= script["commands"]
-    assert {"OMA_REQUIRE_IN_PROCESS_RPY2", "OMA_STARTUP_PROJECT_SMOKE", "RPY2_CFFI_MODE"} <= script["env_writes"]
+    assert {
+        "OMA_REQUIRE_IN_PROCESS_RPY2",
+        "OMA_STARTUP_PROJECT_SMOKE",
+        "RPY2_CFFI_MODE",
+    } <= script["env_writes"]
     assert {"icons_rc", "rpy2.robjects", "rpy2.rinterface"} <= script["hidden_imports"]
     assert {
         "OpenMetaAnalyst.exe",
@@ -161,10 +183,22 @@ def test_packaged_smoke_launches_with_positional_project_argument():
 def test_modern_fast_workflow_runs_smoke_before_fast_verification():
     workflow = workflow_contract(".github", "workflows", "modern-fast.yml")
 
-    assert {"change-classifier", "smoke-verification", "fast-verification", "modern-fast-gate"} <= workflow["jobs"]
+    assert {
+        "change-classifier",
+        "smoke-verification",
+        "fast-verification",
+        "modern-fast-gate",
+    } <= workflow["jobs"]
     assert workflow["needs"]["smoke-verification"] == {"change-classifier"}
-    assert workflow["needs"]["fast-verification"] == {"change-classifier", "smoke-verification"}
-    assert workflow["needs"]["modern-fast-gate"] == {"change-classifier", "smoke-verification", "fast-verification"}
+    assert workflow["needs"]["fast-verification"] == {
+        "change-classifier",
+        "smoke-verification",
+    }
+    assert workflow["needs"]["modern-fast-gate"] == {
+        "change-classifier",
+        "smoke-verification",
+        "fast-verification",
+    }
     assert workflow["env"]["OMA_CRAN_REPO"] == "https://cloud.r-project.org"
     assert workflow["events"] == {"workflow_dispatch", "pull_request"}
     assert workflow["legacy_uses"] == []
@@ -173,37 +207,70 @@ def test_modern_fast_workflow_runs_smoke_before_fast_verification():
     assert "tests/modern/*" in workflow["text"]
     assert "docs/modernization/OpenMetaR-r-dependencies.json" in workflow["text"]
     assert "docs/modernization/test-taxonomy.json" in workflow["text"]
-    assert ".\\scripts\\verify-modern-smoke.ps1 -Sync -RequireREvidence" in workflow["runs"]
-    assert ".\\scripts\\verify-modern-fast.ps1 -Sync -RequireREvidence -StrictTaxonomy" in workflow["runs"]
+    assert (
+        ".\\scripts\\verify-modern-smoke.ps1 -Sync -RequireREvidence"
+        in workflow["runs"]
+    )
+    assert (
+        ".\\scripts\\verify-modern-fast.ps1 -Sync -RequireREvidence -StrictTaxonomy"
+        in workflow["runs"]
+    )
     assert workflow["restore_keys"] == []
     assert workflow["cache_paths"] == {"artifacts\\r-default-library-cache"}
-    assert all(key.startswith("modern-default-r-library-v2-windows-") for key in workflow["cache_keys"])
-    assert all("scripts/verify_openmetar_r_default.py" in key for key in workflow["cache_keys"])
-    assert all("steps.r-cache-key.outputs.version" in key for key in workflow["cache_keys"])
+    assert all(
+        key.startswith("modern-default-r-library-v2-windows-")
+        for key in workflow["cache_keys"]
+    )
+    assert all(
+        "scripts/verify_openmetar_r_default.py" in key for key in workflow["cache_keys"]
+    )
+    assert all(
+        "steps.r-cache-key.outputs.version" in key for key in workflow["cache_keys"]
+    )
     assert "Modern Fast Change Classifier" in workflow["text"]
     assert "Modern Fast Gate" in workflow["text"]
     assert "pull-requests: read" in workflow["text"]
     assert "gh api --paginate" in workflow["text"]
-    assert "No modern fast inputs changed; Windows lanes intentionally skipped." in workflow["text"]
+    assert (
+        "No modern fast inputs changed; Windows lanes intentionally skipped."
+        in workflow["text"]
+    )
     assert "timeout-minutes: 20" in workflow["text"]
 
 
 def test_modern_package_workflow_builds_path_aware_artifacts():
     workflow = workflow_contract(".github", "workflows", "modern-package.yml")
 
-    assert {"windows-package", "macos-package-intel", "macos-package-arm64"} <= workflow["jobs"]
+    assert {
+        "windows-package",
+        "macos-package-intel",
+        "macos-package-arm64",
+    } <= workflow["jobs"]
     assert workflow["env"]["OMA_CRAN_REPO"] == "https://cloud.r-project.org"
     assert workflow["events"] == {"workflow_dispatch", "push"}
     assert workflow["legacy_uses"] == []
     assert all(re.fullmatch(r"[0-9a-f]{40}", ref) for _, ref, _ in workflow["uses"])
     assert workflow["paths"] == {"v*"}
-    assert any("OpenMetaAnalyst-modern-windows-x64.zip" in run for run in workflow["text"].splitlines())
-    assert any("OpenMetaAnalyst-modern-macos-x64" in run for run in workflow["text"].splitlines())
-    assert any("OpenMetaAnalyst-modern-macos-arm64" in run for run in workflow["text"].splitlines())
+    assert any(
+        "OpenMetaAnalyst-modern-windows-x64.zip" in run
+        for run in workflow["text"].splitlines()
+    )
+    assert any(
+        "OpenMetaAnalyst-modern-macos-x64" in run
+        for run in workflow["text"].splitlines()
+    )
+    assert any(
+        "OpenMetaAnalyst-modern-macos-arm64" in run
+        for run in workflow["text"].splitlines()
+    )
     assert all("OMA_CRAN_REPO_KEY" in key for key in workflow["cache_keys"])
     assert workflow["restore_keys"] == []
-    assert all(key.startswith("modern-bundled-r-library-v2-") for key in workflow["cache_keys"])
-    assert all("steps.r-cache-key.outputs.version" in key for key in workflow["cache_keys"])
+    assert all(
+        key.startswith("modern-bundled-r-library-v2-") for key in workflow["cache_keys"]
+    )
+    assert all(
+        "steps.r-cache-key.outputs.version" in key for key in workflow["cache_keys"]
+    )
     assert "-RRuntimeRoot" in workflow["text"]
     assert "--r-runtime-root" in workflow["text"]
     assert "timeout-minutes: 45" in workflow["text"]
@@ -217,8 +284,22 @@ def test_lane_named_local_scripts_replace_old_workflow_wrappers():
     fast_sh = sh_contract("scripts", "verify-modern-fast.sh")
     package = ps_contract("scripts", "package-modern-windows.ps1")
 
-    assert {"Sync", "RecreateVenv", "RequireREvidence", "RRuntimeRoot", "Rscript"} <= smoke["params"]
-    assert {"Sync", "RecreateVenv", "RequireREvidence", "StrictTaxonomy", "FastWorkers", "RRuntimeRoot", "Rscript"} <= fast["params"]
+    assert {
+        "Sync",
+        "RecreateVenv",
+        "RequireREvidence",
+        "RRuntimeRoot",
+        "Rscript",
+    } <= smoke["params"]
+    assert {
+        "Sync",
+        "RecreateVenv",
+        "RequireREvidence",
+        "StrictTaxonomy",
+        "FastWorkers",
+        "RRuntimeRoot",
+        "Rscript",
+    } <= fast["params"]
     assert {"--rscript", "--r-runtime-root"} <= smoke_sh["case_options"]
     assert {"--rscript", "--r-runtime-root"} <= fast_sh["case_options"]
     assert "RHOME" in smoke["text"]
@@ -228,14 +309,20 @@ def test_lane_named_local_scripts_replace_old_workflow_wrappers():
     assert "ProgramFiles" not in smoke["text"]
     assert "ProgramFiles" not in fast["text"]
     assert {"RPackageCacheRoot", "RRuntimeRoot"} <= package["params"]
-    assert {"Resolve-RRuntimeRoot", "Resolve-RscriptFromRuntime"} <= package["functions"]
+    assert {"Resolve-RRuntimeRoot", "Resolve-RscriptFromRuntime"} <= package[
+        "functions"
+    ]
     assert "--rscript" in package["text"]
     assert "RRuntimeRoot = $resolvedRRuntimeRoot" in package["text"]
     assert "r-default-library-cache" in smoke["text"]
     assert "r-default-library-cache" in fast["text"]
     assert '"r-library-cache"' not in smoke["text"]
     assert '"r-library-cache"' not in fast["text"]
-    assert {"tests\\modern\\fast", "tests\\modern\\golden", "tests\\modern\\packaging_contract"} <= pytest_path_tokens(fast["text"])
+    assert {
+        "tests\\modern\\fast",
+        "tests\\modern\\golden",
+        "tests\\modern\\packaging_contract",
+    } <= pytest_path_tokens(fast["text"])
     assert {"--dist", "loadfile", "-n", "4"} <= pytest_option_tokens(fast["text"])
     assert "pytest-xdist==3.8.0" in project_dependencies()
     assert relative_order(
@@ -253,7 +340,11 @@ def test_lane_named_local_scripts_replace_old_workflow_wrappers():
 def test_modern_macos_distributable_contract_is_declared():
     script = sh_contract("scripts", "build-modern-macos-binary.sh")
 
-    assert {"--architecture", "--bundle-identifier", "--r-package-cache-root"} <= script["case_options"]
+    assert {
+        "--architecture",
+        "--bundle-identifier",
+        "--r-package-cache-root",
+    } <= script["case_options"]
     assert {
         "require_free_space_gb",
         "repo_path",
@@ -264,8 +355,15 @@ def test_modern_macos_distributable_contract_is_declared():
         "test_r_dependency_packages",
         "copy_r_library_packages",
     } <= script["functions"]
-    assert {"--windowed", "--target-architecture", "--osx-bundle-identifier"} <= script["pyinstaller_options"]
-    assert {"QT_QPA_PLATFORM", "OMA_REQUIRE_IN_PROCESS_RPY2", "OMA_STARTUP_PROJECT_SMOKE", "RPY2_CFFI_MODE"} <= script["env_names"]
+    assert {"--windowed", "--target-architecture", "--osx-bundle-identifier"} <= script[
+        "pyinstaller_options"
+    ]
+    assert {
+        "QT_QPA_PLATFORM",
+        "OMA_REQUIRE_IN_PROCESS_RPY2",
+        "OMA_STARTUP_PROJECT_SMOKE",
+        "RPY2_CFFI_MODE",
+    } <= script["env_names"]
     assert {
         "sample_data/amino.oma",
         "doc/openMA_help.html",
@@ -278,13 +376,19 @@ def test_modern_macos_distributable_contract_is_declared():
 def test_local_modern_macos_package_script_uses_shared_build_script():
     script = sh_contract("scripts", "package-modern-macos.sh")
 
-    assert {"--architecture", "--artifact-name", "--bundle-identifier", "--r-package-cache-root", "--r-runtime-root"} <= script["case_options"]
+    assert {
+        "--architecture",
+        "--artifact-name",
+        "--bundle-identifier",
+        "--r-package-cache-root",
+        "--r-runtime-root",
+    } <= script["case_options"]
     assert relative_order(
         script["text"],
         "uv sync --locked",
         "uv run pytest tests/modern/fast/test_pyqt5_ci_path.py tests/modern/fast/test_pyqt5_generated_ui_imports.py tests/modern/fast/test_project_pickle_loader.py",
         '--r-runtime-root "$r_runtime_root"',
-        "bash \"$repo_root/scripts/build-modern-macos-binary.sh\"",
+        'bash "$repo_root/scripts/build-modern-macos-binary.sh"',
     )
 
 
@@ -293,7 +397,9 @@ def test_shared_modern_r_dependency_installer_is_used_by_packagers():
     windows = ps_contract("scripts", "build-modern-windows-binary.ps1")
     macos = sh_contract("scripts", "build-modern-macos-binary.sh")
 
-    cran_default = re.search(r'Sys.getenv\("OMA_CRAN_REPO",\s+"([^"]+)"\)', installer).group(1)
+    cran_default = re.search(
+        r'Sys.getenv\("OMA_CRAN_REPO",\s+"([^"]+)"\)', installer
+    ).group(1)
     archive_url = re.search(r'HSROC\s+=\s+"([^"]+)"', installer).group(1)
 
     assert cran_default == "https://cloud.r-project.org"

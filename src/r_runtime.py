@@ -6,10 +6,13 @@ _DLL_DIRECTORY_HANDLES = []
 
 def configure_bundled_r_environment(app_root=None):
     root = app_root or _app_root()
-    r_home = _first_existing([
-        os.environ.get("OMA_R_HOME"),
-        os.path.join(root, "R"),
-    ], required_child=os.path.join("bin"))
+    r_home = _first_existing(
+        [
+            os.environ.get("OMA_R_HOME"),
+            os.path.join(root, "R"),
+        ],
+        required_child=os.path.join("bin"),
+    )
     if r_home:
         os.environ["R_HOME"] = r_home
         r_parent = os.path.dirname(r_home)
@@ -26,10 +29,13 @@ def configure_bundled_r_environment(app_root=None):
         _prepend_path(dll_paths)
         _add_dll_directories(dll_paths)
 
-    r_libs = _first_existing([
-        os.environ.get("OMA_R_LIBS"),
-        os.path.join(root, "R", "library"),
-    ], required_child=os.path.join("OpenMetaR"))
+    r_libs = _first_existing(
+        [
+            os.environ.get("OMA_R_LIBS"),
+            os.path.join(root, "R", "library"),
+        ],
+        required_child=os.path.join("OpenMetaR"),
+    )
     if r_libs:
         os.environ["R_LIBS"] = r_libs
         os.environ["R_LIBS_USER"] = r_libs
@@ -54,7 +60,9 @@ def _first_existing(candidates, required_child=None):
             continue
         if required_child is None and os.path.exists(candidate):
             return candidate
-        if required_child is not None and os.path.exists(os.path.join(candidate, required_child)):
+        if required_child is not None and os.path.exists(
+            os.path.join(candidate, required_child)
+        ):
             return candidate
     return None
 

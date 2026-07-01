@@ -20,9 +20,7 @@ def test_loader_converts_sip_qt4_qstring_to_python3_str():
 
 
 def test_loader_converts_direct_qt4_qstring_constructor_to_python3_str():
-    value = legacy_pickle.loads_project_pickle(
-        b"cPyQt4.QtCore\nQString\n(Vhello\ntR."
-    )
+    value = legacy_pickle.loads_project_pickle(b"cPyQt4.QtCore\nQString\n(Vhello\ntR.")
 
     assert value == "hello"
     assert type(value) is str
@@ -63,7 +61,9 @@ def test_loader_maps_other_qt4_qtcore_types_to_pyqt5_classes():
 def test_loader_opens_representative_qt4_project_without_pyqt4_module():
     sys.modules.pop("PyQt4", None)
 
-    dataset = legacy_pickle.load_project_pickle(os.path.abspath("sample_data/meantime.oma"))
+    dataset = legacy_pickle.load_project_pickle(
+        os.path.abspath("sample_data/meantime.oma")
+    )
     values = [study.covariate_dict["treatment group"] for study in dataset.studies]
 
     assert set(value for value in values if value is not None) == {"1", "2", "3", "4"}

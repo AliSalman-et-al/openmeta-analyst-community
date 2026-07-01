@@ -25,7 +25,15 @@ def load_project_pickle(path):
 def loads_project_pickle(data):
     try:
         return _loads(data)
-    except (pickle.UnpicklingError, EOFError, ValueError, TypeError, AttributeError, ImportError, UnicodeError):
+    except (
+        pickle.UnpicklingError,
+        EOFError,
+        ValueError,
+        TypeError,
+        AttributeError,
+        ImportError,
+        UnicodeError,
+    ):
         return _loads(data.replace(b"\r\n", b"\n"))
 
 

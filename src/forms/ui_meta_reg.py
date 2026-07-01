@@ -19,19 +19,25 @@ class Ui_cov_reg_dialog(object):
         font.setFamily("Verdana")
         cov_reg_dialog.setFont(font)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/images/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(
+            QtGui.QPixmap(":/images/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
+        )
         cov_reg_dialog.setWindowIcon(icon)
         self.verticalLayout = QtWidgets.QVBoxLayout(cov_reg_dialog)
         self.verticalLayout.setObjectName("verticalLayout")
         self.label = QtWidgets.QLabel(cov_reg_dialog)
         self.label.setObjectName("label")
         self.verticalLayout.addWidget(self.label)
-        spacerItem = QtWidgets.QSpacerItem(20, 10, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        spacerItem = QtWidgets.QSpacerItem(
+            20, 10, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed
+        )
         self.verticalLayout.addItem(spacerItem)
         self.cov_grp_box = QtWidgets.QGroupBox(cov_reg_dialog)
         self.cov_grp_box.setObjectName("cov_grp_box")
         self.verticalLayout.addWidget(self.cov_grp_box)
-        spacerItem1 = QtWidgets.QSpacerItem(20, 30, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        spacerItem1 = QtWidgets.QSpacerItem(
+            20, 30, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding
+        )
         self.verticalLayout.addItem(spacerItem1)
         self.diagnostic_group_box = QtWidgets.QGroupBox(cov_reg_dialog)
         self.diagnostic_group_box.setObjectName("diagnostic_group_box")
@@ -66,7 +72,9 @@ class Ui_cov_reg_dialog(object):
         font.setFamily("Verdana")
         self.buttonBox.setFont(font)
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setStandardButtons(
+            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
+        )
         self.buttonBox.setObjectName("buttonBox")
         self.verticalLayout.addWidget(self.buttonBox)
 
@@ -76,13 +84,19 @@ class Ui_cov_reg_dialog(object):
     def retranslateUi(self, cov_reg_dialog):
         _translate = QtCore.QCoreApplication.translate
         cov_reg_dialog.setWindowTitle(_translate("cov_reg_dialog", "select covariates"))
-        self.label.setText(_translate("cov_reg_dialog", "select covariates for regression:"))
+        self.label.setText(
+            _translate("cov_reg_dialog", "select covariates for regression:")
+        )
         self.cov_grp_box.setTitle(_translate("cov_reg_dialog", "available covariates"))
         self.diagnostic_group_box.setTitle(_translate("cov_reg_dialog", "metric"))
         self.dor_radio.setText(_translate("cov_reg_dialog", "diagnostic odds ratio"))
         self.sensitivity_radio.setText(_translate("cov_reg_dialog", "sensitivity"))
         self.fixed_radio.setText(_translate("cov_reg_dialog", "specificity"))
         self.groupBox.setTitle(_translate("cov_reg_dialog", "model type"))
-        self.random_effects_radio.setText(_translate("cov_reg_dialog", "random effects"))
+        self.random_effects_radio.setText(
+            _translate("cov_reg_dialog", "random effects")
+        )
         self.fixed_effects_radio.setText(_translate("cov_reg_dialog", "fixed effects"))
+
+
 import icons_rc

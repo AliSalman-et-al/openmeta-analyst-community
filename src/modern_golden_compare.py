@@ -20,53 +20,100 @@ def compare_golden_baseline(reference, modern, exceptions=None, manifest=None):
     reference_by_id = _by_id(reference_rows)
     rows = []
     for missing_id in sorted(set(manifest_rows) - set(reference_by_id)):
-        rows.append({
-            "id": missing_id,
-            "dataset": None,
-            "metric": None,
-            "method": None,
-            "classification": MISSING_OUTPUT,
-            "detail": "Committed manifest row is missing from the reference curated golden set.",
-        })
+        rows.append(
+            {
+                "id": missing_id,
+                "dataset": None,
+                "metric": None,
+                "method": None,
+                "classification": MISSING_OUTPUT,
+                "detail": "Committed manifest row is missing from the reference curated golden set.",
+            }
+        )
     for expected in reference_rows:
         row_id = expected["id"]
         actual = modern_by_id.get(row_id)
         if actual is None:
-            rows.append(_row(expected, MISSING_OUTPUT, "No modern output for curated golden bundle."))
+            rows.append(
+                _row(
+                    expected,
+                    MISSING_OUTPUT,
+                    "No modern output for curated golden bundle.",
+                )
+            )
             continue
         rows.extend(_compare_row(expected, actual, exceptions))
-    return {"mode": "modern-golden-comparison", "rows": rows, "passed": all(row["classification"] in [PASS, ACCEPTED_EXCEPTION] for row in rows)}
+    return {
+        "mode": "modern-golden-comparison",
+        "rows": rows,
+        "passed": all(
+            row["classification"] in [PASS, ACCEPTED_EXCEPTION] for row in rows
+        ),
+    }
 
 
 def _compare_row(expected, actual, exceptions):
     row_id = expected["id"]
     accepted = _accepted_exception(row_id, exceptions)
     if actual.get("status") == "unsupported":
-        return [_row(expected, _maybe_accepted(UNSUPPORTED_WORKFLOW, accepted), actual.get("reason", "Workflow is not supported by the modern path."), accepted)]
+        return [
+            _row(
+                expected,
+                _maybe_accepted(UNSUPPORTED_WORKFLOW, accepted),
+                actual.get("reason", "Workflow is not supported by the modern path."),
+                accepted,
+            )
+        ]
     if actual.get("status") == "failure" or actual.get("failure"):
         failure = actual.get("failure", {})
-        return [_row(expected, _maybe_accepted(CAPTURE_ERROR, accepted), failure.get("message", "Modern capture failed."), accepted)]
+        return [
+            _row(
+                expected,
+                _maybe_accepted(CAPTURE_ERROR, accepted),
+                failure.get("message", "Modern capture failed."),
+                accepted,
+            )
+        ]
 
     rows = []
     rows.extend(_compare_numbers(expected, actual, accepted))
     rows.extend(_compare_texts_and_artifacts(expected, actual, accepted))
-    return rows or [_row(expected, PASS, "Modern output matches the curated golden bundle.")]
+    return rows or [
+        _row(expected, PASS, "Modern output matches the curated golden bundle.")
+    ]
 
 
 def _compare_numbers(expected, actual, accepted):
     rows = []
     tolerances = expected.get("tolerances", {})
     actual_outputs = actual.get("outputs", {})
-    for section, metrics in expected.get("outputs", expected.get("expected", {})).items():
+    for section, metrics in expected.get(
+        "outputs", expected.get("expected", {})
+    ).items():
         for metric, expected_value in metrics.items():
             actual_value = actual_outputs.get(section, {}).get(metric)
             if actual_value is None:
-                rows.append(_row(expected, _maybe_accepted(MISSING_OUTPUT, accepted), "%s.%s is missing." % (section, metric), accepted))
+                rows.append(
+                    _row(
+                        expected,
+                        _maybe_accepted(MISSING_OUTPUT, accepted),
+                        "%s.%s is missing." % (section, metric),
+                        accepted,
+                    )
+                )
                 continue
             drift = abs(actual_value - expected_value)
             tolerance = tolerances.get(metric, 0)
             if drift > tolerance:
-                rows.append(_row(expected, _maybe_accepted(NUMERIC_DRIFT, accepted), "%s.%s drifted by %s with tolerance %s." % (section, metric, drift, tolerance), accepted))
+                rows.append(
+                    _row(
+                        expected,
+                        _maybe_accepted(NUMERIC_DRIFT, accepted),
+                        "%s.%s drifted by %s with tolerance %s."
+                        % (section, metric, drift, tolerance),
+                        accepted,
+                    )
+                )
     return rows
 
 
@@ -74,22 +121,58 @@ def _compare_texts_and_artifacts(expected, actual, accepted):
     rows = []
     for section in expected.get("texts", {}):
         if section not in actual.get("texts", {}):
-            rows.append(_row(expected, _maybe_accepted(MISSING_OUTPUT, accepted), "Text section %s is missing." % section, accepted))
+            rows.append(
+                _row(
+                    expected,
+                    _maybe_accepted(MISSING_OUTPUT, accepted),
+                    "Text section %s is missing." % section,
+                    accepted,
+                )
+            )
         elif actual["texts"][section] != expected["texts"][section]:
-            rows.append(_row(expected, _maybe_accepted(TEXT_ARTIFACT_DRIFT, accepted), "Text section %s changed." % section, accepted))
-    expected_artifacts = dict((item["label"], item) for item in expected.get("artifacts", []))
-    actual_artifacts = dict((item["label"], item) for item in actual.get("artifacts", []))
+            rows.append(
+                _row(
+                    expected,
+                    _maybe_accepted(TEXT_ARTIFACT_DRIFT, accepted),
+                    "Text section %s changed." % section,
+                    accepted,
+                )
+            )
+    expected_artifacts = dict(
+        (item["label"], item) for item in expected.get("artifacts", [])
+    )
+    actual_artifacts = dict(
+        (item["label"], item) for item in actual.get("artifacts", [])
+    )
     for label, expected_artifact in expected_artifacts.items():
         actual_artifact = actual_artifacts.get(label)
         if actual_artifact is None:
-            rows.append(_row(expected, _maybe_accepted(MISSING_OUTPUT, accepted), "Artifact %s is missing." % label, accepted))
-        elif _artifact_metadata(actual_artifact) != _artifact_metadata(expected_artifact):
-            rows.append(_row(expected, _maybe_accepted(TEXT_ARTIFACT_DRIFT, accepted), "Artifact %s metadata changed." % label, accepted))
+            rows.append(
+                _row(
+                    expected,
+                    _maybe_accepted(MISSING_OUTPUT, accepted),
+                    "Artifact %s is missing." % label,
+                    accepted,
+                )
+            )
+        elif _artifact_metadata(actual_artifact) != _artifact_metadata(
+            expected_artifact
+        ):
+            rows.append(
+                _row(
+                    expected,
+                    _maybe_accepted(TEXT_ARTIFACT_DRIFT, accepted),
+                    "Artifact %s metadata changed." % label,
+                    accepted,
+                )
+            )
     return rows
 
 
 def _artifact_metadata(artifact):
-    return dict((key, value) for key, value in artifact.items() if key not in ["path", "sha256"])
+    return dict(
+        (key, value) for key, value in artifact.items() if key not in ["path", "sha256"]
+    )
 
 
 def _accepted_exception(row_id, exceptions):
@@ -131,7 +214,9 @@ def _load_json(path):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Compare modern analysis captures against the curated golden baseline.")
+    parser = argparse.ArgumentParser(
+        description="Compare modern analysis captures against the curated golden baseline."
+    )
     parser.add_argument("reference")
     parser.add_argument("modern")
     parser.add_argument("--exceptions")

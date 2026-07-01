@@ -18,30 +18,60 @@ def test_full_app_imports_representative_csv_into_dataset():
     meta_form = launch._import_meta_form()
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     window = meta_form.MetaForm()
-    window._handle_wizard_results({
-        "path": "csv_import",
-        "outcome_info": {
-            "arms": "two",
-            "data_type": "binary",
-            "sub_type": "proportions",
-            "effect": "OR",
-            "metric_choices": [],
-            "name": "Mortality",
-        },
-        "csv_data": {
-            "headers": ["Study", "Year", "Tx A events", "Tx A total", "Tx B events", "Tx B total", "OR", "Lower", "Upper", "Dose", "Region"],
-            "expected_headers": ["Study", "Year", "Tx A events", "Tx A total", "Tx B events", "Tx B total", "OR", "Lower", "Upper"],
-            "data": [["Alpha", "2020", "1", "10", "2", "12", "", "", "", "5.5", "North"], ["Beta", "2021", "3", "11", "4", "13", "", "", "", "7", "South"]],
-            "covariate_names": ["Dose", "Region"],
-            "covariate_types": ["continuous", "factor"],
-        },
-        "selected_dataset": None,
-    })
+    window._handle_wizard_results(
+        {
+            "path": "csv_import",
+            "outcome_info": {
+                "arms": "two",
+                "data_type": "binary",
+                "sub_type": "proportions",
+                "effect": "OR",
+                "metric_choices": [],
+                "name": "Mortality",
+            },
+            "csv_data": {
+                "headers": [
+                    "Study",
+                    "Year",
+                    "Tx A events",
+                    "Tx A total",
+                    "Tx B events",
+                    "Tx B total",
+                    "OR",
+                    "Lower",
+                    "Upper",
+                    "Dose",
+                    "Region",
+                ],
+                "expected_headers": [
+                    "Study",
+                    "Year",
+                    "Tx A events",
+                    "Tx A total",
+                    "Tx B events",
+                    "Tx B total",
+                    "OR",
+                    "Lower",
+                    "Upper",
+                ],
+                "data": [
+                    ["Alpha", "2020", "1", "10", "2", "12", "", "", "", "5.5", "North"],
+                    ["Beta", "2021", "3", "11", "4", "13", "", "", "", "7", "South"],
+                ],
+                "covariate_names": ["Dose", "Region"],
+                "covariate_types": ["continuous", "factor"],
+            },
+            "selected_dataset": None,
+        }
+    )
 
     assert _cell_text(window.model, 0, window.model.NAME) == "Alpha"
     assert _cell_text(window.model, 1, window.model.YEAR) == "2021"
     assert _cell_text(window.model, 0, window.model.RAW_DATA[0]) == "1.0"
-    assert [(cov.name, cov.data_type) for cov in window.model.dataset.covariates] == [("Dose", 1), ("Region", 4)]
+    assert [(cov.name, cov.data_type) for cov in window.model.dataset.covariates] == [
+        ("Dose", 1),
+        ("Region", 4),
+    ]
     assert str(window.model.dataset.studies[1].covariate_dict["Region"]) == "South"
 
 
@@ -88,8 +118,14 @@ def test_automation_launch_opens_sample_project_in_real_data_table():
         assert model.columnCount() >= 7
         assert _cell_text(model, 0, 1) == "Gonzalez"
         assert _cell_text(model, 0, 2) == "1993"
-        assert [_cell_text(model, 0, column) for column in range(3, 7)] in (["6.0", "27.0", "9.0", "27.0"], ["9.0", "27.0", "6.0", "27.0"])
-        assert window.cur_outcome_lbl.text() == "<font color='Blue'>clinical failure</font>"
+        assert [_cell_text(model, 0, column) for column in range(3, 7)] in (
+            ["6.0", "27.0", "9.0", "27.0"],
+            ["9.0", "27.0", "6.0", "27.0"],
+        )
+        assert (
+            window.cur_outcome_lbl.text()
+            == "<font color='Blue'>clinical failure</font>"
+        )
         assert window.cur_time_lbl.text() == "<font color='Blue'>first</font>"
     finally:
         window.close()
@@ -170,8 +206,14 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch):
         def finish(self, window):
             pass
 
-    monkeypatch.setattr(launch, "_resolve_startup_argv", lambda: ["OpenMetaAnalyst.exe", sample_project])
-    monkeypatch.setattr(launch, "_import_meta_form", lambda: type("MetaFormModule", (), {"MetaForm": Window}))
+    monkeypatch.setattr(
+        launch, "_resolve_startup_argv", lambda: ["OpenMetaAnalyst.exe", sample_project]
+    )
+    monkeypatch.setattr(
+        launch,
+        "_import_meta_form",
+        lambda: type("MetaFormModule", (), {"MetaForm": Window}),
+    )
     monkeypatch.setattr(launch.QtWidgets, "QApplication", lambda argv: app)
     monkeypatch.setattr(launch, "QPixmap", lambda path: object())
     monkeypatch.setattr(launch, "QSplashScreen", Splash)
@@ -188,13 +230,18 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch):
 
 def test_meantime_sample_project_loads_legacy_qstring_factor_covariate():
     import modern_compat
+
     modern_compat.install()
     import headless_analysis
 
-    model = headless_analysis.load_dataset_model(os.path.abspath(os.path.join("sample_data", "meantime.oma")))
+    model = headless_analysis.load_dataset_model(
+        os.path.abspath(os.path.join("sample_data", "meantime.oma"))
+    )
     dataset = model.dataset
 
-    assert ("treatment group", 4) in [(cov.name, cov.data_type) for cov in dataset.covariates]
+    assert ("treatment group", 4) in [
+        (cov.name, cov.data_type) for cov in dataset.covariates
+    ]
     values = [study.covariate_dict["treatment group"] for study in dataset.studies]
     present_values = [value for value in values if value is not None]
     assert present_values
@@ -207,12 +254,18 @@ def test_automation_launch_opens_meantime_project_and_enables_subgroup_analysis(
 
     app, window = launch.start_automation()
     try:
-        assert window.open(os.path.abspath(os.path.join("sample_data", "meantime.oma"))) is True
+        assert (
+            window.open(os.path.abspath(os.path.join("sample_data", "meantime.oma")))
+            is True
+        )
 
         assert window.tableView.model() is window.model
         assert window.model.rowCount() >= 1
         assert window.action_subgroup_ma.isEnabled()
-        values = [study.covariate_dict["treatment group"] for study in window.model.dataset.studies]
+        values = [
+            study.covariate_dict["treatment group"]
+            for study in window.model.dataset.studies
+        ]
         assert all(type(value) is str for value in values if value is not None)
     finally:
         window.close()
@@ -225,32 +278,89 @@ def test_opened_sample_projects_return_native_table_values_for_pyqt5_rendering()
     import launch
 
     cases = [
-        ("amino.oma", "Gonzalez", lambda groups: [groups[0] + " #evts", groups[0] + " #total", groups[1] + " #evts", groups[1] + " #total"]),
-        ("continuous.oma", "Carroll", lambda groups: [groups[0] + " N", groups[0] + " mean", groups[0] + " SD", groups[1] + " N", groups[1] + " mean", groups[1] + " SD"]),
+        (
+            "amino.oma",
+            "Gonzalez",
+            lambda groups: [
+                groups[0] + " #evts",
+                groups[0] + " #total",
+                groups[1] + " #evts",
+                groups[1] + " #total",
+            ],
+        ),
+        (
+            "continuous.oma",
+            "Carroll",
+            lambda groups: [
+                groups[0] + " N",
+                groups[0] + " mean",
+                groups[0] + " SD",
+                groups[1] + " N",
+                groups[1] + " mean",
+                groups[1] + " SD",
+            ],
+        ),
     ]
 
     for project_name, first_study, raw_headers_for_groups in cases:
         app, window = launch.start_automation()
         try:
-            assert window.open(os.path.abspath(os.path.join("sample_data", project_name))) is True
+            assert (
+                window.open(os.path.abspath(os.path.join("sample_data", project_name)))
+                is True
+            )
             model = window.tableView.model()
 
-            assert model.headerData(model.NAME, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole) == "study name"
-            assert model.headerData(model.YEAR, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole) == "year"
+            assert (
+                model.headerData(
+                    model.NAME, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole
+                )
+                == "study name"
+            )
+            assert (
+                model.headerData(
+                    model.YEAR, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole
+                )
+                == "year"
+            )
             raw_headers = raw_headers_for_groups(model.current_txs)
-            assert [model.headerData(column, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole) for column in model.RAW_DATA] == raw_headers
+            assert [
+                model.headerData(column, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole)
+                for column in model.RAW_DATA
+            ] == raw_headers
             assert model.headerData(0, QtCore.Qt.Vertical, QtCore.Qt.DisplayRole) == 1
 
-            assert model.data(model.index(0, model.NAME), QtCore.Qt.DisplayRole) == first_study
-            assert isinstance(model.data(model.index(0, model.YEAR), QtCore.Qt.DisplayRole), int)
-            assert model.data(model.index(0, model.INCLUDE_STUDY), QtCore.Qt.CheckStateRole) == QtCore.Qt.Checked
-            assert model.data(model.index(0, model.NAME), QtCore.Qt.TextAlignmentRole) == int(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-            assert isinstance(model.data(model.index(0, model.OUTCOMES[0]), QtCore.Qt.BackgroundColorRole), QtGui.QColor)
+            assert (
+                model.data(model.index(0, model.NAME), QtCore.Qt.DisplayRole)
+                == first_study
+            )
+            assert isinstance(
+                model.data(model.index(0, model.YEAR), QtCore.Qt.DisplayRole), int
+            )
+            assert (
+                model.data(
+                    model.index(0, model.INCLUDE_STUDY), QtCore.Qt.CheckStateRole
+                )
+                == QtCore.Qt.Checked
+            )
+            assert model.data(
+                model.index(0, model.NAME), QtCore.Qt.TextAlignmentRole
+            ) == int(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+            assert isinstance(
+                model.data(
+                    model.index(0, model.OUTCOMES[0]), QtCore.Qt.BackgroundColorRole
+                ),
+                QtGui.QColor,
+            )
 
             visible_values = [
-                model.headerData(model.NAME, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole),
+                model.headerData(
+                    model.NAME, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole
+                ),
                 model.data(model.index(0, model.NAME), QtCore.Qt.DisplayRole),
-                model.data(model.index(0, model.INCLUDE_STUDY), QtCore.Qt.CheckStateRole),
+                model.data(
+                    model.index(0, model.INCLUDE_STUDY), QtCore.Qt.CheckStateRole
+                ),
             ]
             assert all(not hasattr(value, "value") for value in visible_values)
         finally:
@@ -266,15 +376,32 @@ def test_edit_list_models_return_native_values_and_accept_native_edits():
 
     app, window = launch.start_automation()
     try:
-        assert window.open(os.path.abspath(os.path.join("sample_data", "amino.oma"))) is True
+        assert (
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            is True
+        )
         dataset = window.model.dataset
-        window.model.add_covariate("Dose", "continuous", dict((study.name, index + 1) for index, study in enumerate(dataset.studies)))
-        follow_up_name = dataset.get_follow_up_names_for_outcome(window.model.current_outcome)[0]
+        window.model.add_covariate(
+            "Dose",
+            "continuous",
+            dict(
+                (study.name, index + 1) for index, study in enumerate(dataset.studies)
+            ),
+        )
+        follow_up_name = dataset.get_follow_up_names_for_outcome(
+            window.model.current_outcome
+        )[0]
 
         models = [
-            edit_list_models.TXGroupsModel(dataset=dataset, outcome=window.model.current_outcome, follow_up=follow_up_name),
+            edit_list_models.TXGroupsModel(
+                dataset=dataset,
+                outcome=window.model.current_outcome,
+                follow_up=follow_up_name,
+            ),
             edit_list_models.OutcomesModel(dataset=dataset),
-            edit_list_models.FollowUpsModel(dataset=dataset, outcome=window.model.current_outcome),
+            edit_list_models.FollowUpsModel(
+                dataset=dataset, outcome=window.model.current_outcome
+            ),
             edit_list_models.StudiesModel(dataset=dataset),
             edit_list_models.CovariatesModel(dataset=dataset),
         ]
@@ -288,28 +415,55 @@ def test_edit_list_models_return_native_values_and_accept_native_edits():
             assert not hasattr(display_value, "value")
             assert alignment_value == int(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
 
-        group_model = edit_list_models.TXGroupsModel(dataset=dataset, outcome=window.model.current_outcome, follow_up=follow_up_name)
+        group_model = edit_list_models.TXGroupsModel(
+            dataset=dataset,
+            outcome=window.model.current_outcome,
+            follow_up=follow_up_name,
+        )
         assert group_model.setData(group_model.index(0, 0), "Renamed Group") is True
         assert "Renamed Group" in [
             group_model.data(group_model.index(row, 0), QtCore.Qt.DisplayRole)
             for row in range(group_model.rowCount())
         ]
 
-        follow_up_model = edit_list_models.FollowUpsModel(dataset=dataset, outcome=window.model.current_outcome)
-        assert follow_up_model.setData(follow_up_model.index(0, 0), "Renamed Follow Up") is True
-        assert follow_up_model.data(follow_up_model.index(0, 0), QtCore.Qt.DisplayRole) == "Renamed Follow Up"
+        follow_up_model = edit_list_models.FollowUpsModel(
+            dataset=dataset, outcome=window.model.current_outcome
+        )
+        assert (
+            follow_up_model.setData(follow_up_model.index(0, 0), "Renamed Follow Up")
+            is True
+        )
+        assert (
+            follow_up_model.data(follow_up_model.index(0, 0), QtCore.Qt.DisplayRole)
+            == "Renamed Follow Up"
+        )
 
         studies_model = edit_list_models.StudiesModel(dataset=dataset)
         assert studies_model.setData(studies_model.index(0, 0), "Renamed Study") is True
-        assert studies_model.data(studies_model.index(0, 0), QtCore.Qt.DisplayRole) == "Renamed Study"
+        assert (
+            studies_model.data(studies_model.index(0, 0), QtCore.Qt.DisplayRole)
+            == "Renamed Study"
+        )
 
         covariates_model = edit_list_models.CovariatesModel(dataset=dataset)
-        assert covariates_model.setData(covariates_model.index(0, 0), "Renamed Dose") is True
-        assert covariates_model.data(covariates_model.index(0, 0), QtCore.Qt.DisplayRole) == "Renamed Dose"
+        assert (
+            covariates_model.setData(covariates_model.index(0, 0), "Renamed Dose")
+            is True
+        )
+        assert (
+            covariates_model.data(covariates_model.index(0, 0), QtCore.Qt.DisplayRole)
+            == "Renamed Dose"
+        )
 
         outcomes_model = edit_list_models.OutcomesModel(dataset=dataset)
-        assert outcomes_model.setData(outcomes_model.index(0, 0), "Renamed Outcome") is True
-        assert outcomes_model.data(outcomes_model.index(0, 0), QtCore.Qt.DisplayRole) == "Renamed Outcome"
+        assert (
+            outcomes_model.setData(outcomes_model.index(0, 0), "Renamed Outcome")
+            is True
+        )
+        assert (
+            outcomes_model.data(outcomes_model.index(0, 0), QtCore.Qt.DisplayRole)
+            == "Renamed Outcome"
+        )
 
         errors = []
         studies_model.dataError.connect(errors.append)
@@ -334,26 +488,55 @@ def test_change_covariate_type_model_returns_native_values_and_accepts_native_ed
 
     app, window = launch.start_automation()
     try:
-        assert window.open(os.path.abspath(os.path.join("sample_data", "amino.oma"))) is True
+        assert (
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            is True
+        )
         dataset = window.model.dataset
-        window.model.add_covariate("Dose", "continuous", dict((study.name, index + 1) for index, study in enumerate(dataset.studies)))
+        window.model.add_covariate(
+            "Dose",
+            "continuous",
+            dict(
+                (study.name, index + 1) for index, study in enumerate(dataset.studies)
+            ),
+        )
 
         cov_model = change_cov_type_form.CovModel(dataset, dataset.covariates[0])
-        assert cov_model.headerData(cov_model.STUDY_COL, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole) == "study"
-        assert cov_model.headerData(cov_model.NEW_VAL, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole) == "Dose (factor)"
-        assert cov_model.headerData(cov_model.NEW_VAL, QtCore.Qt.Horizontal, QtCore.Qt.TextAlignmentRole) == int(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        assert (
+            cov_model.headerData(
+                cov_model.STUDY_COL, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole
+            )
+            == "study"
+        )
+        assert (
+            cov_model.headerData(
+                cov_model.NEW_VAL, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole
+            )
+            == "Dose (factor)"
+        )
+        assert cov_model.headerData(
+            cov_model.NEW_VAL, QtCore.Qt.Horizontal, QtCore.Qt.TextAlignmentRole
+        ) == int(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
 
-        display_value = cov_model.data(cov_model.index(0, cov_model.STUDY_COL), QtCore.Qt.DisplayRole)
+        display_value = cov_model.data(
+            cov_model.index(0, cov_model.STUDY_COL), QtCore.Qt.DisplayRole
+        )
         assert display_value not in (None, "")
         assert not hasattr(display_value, "value")
 
         assert cov_model.setData(cov_model.index(0, cov_model.NEW_VAL), "High") is True
-        assert cov_model.data(cov_model.index(0, cov_model.NEW_VAL), QtCore.Qt.DisplayRole) == "High"
+        assert (
+            cov_model.data(cov_model.index(0, cov_model.NEW_VAL), QtCore.Qt.DisplayRole)
+            == "High"
+        )
 
-        dataset.add_covariate(ma_dataset.Covariate("Region", "factor"), dict(
-            (study.name, "North") for study in dataset.studies
-        ))
-        continuous_cov_model = change_cov_type_form.CovModel(dataset, dataset.covariates[-1])
+        dataset.add_covariate(
+            ma_dataset.Covariate("Region", "factor"),
+            dict((study.name, "North") for study in dataset.studies),
+        )
+        continuous_cov_model = change_cov_type_form.CovModel(
+            dataset, dataset.covariates[-1]
+        )
         errors = []
         continuous_cov_model.dataError.connect(errors.append)
         old_value = continuous_cov_model.data(
@@ -361,16 +544,24 @@ def test_change_covariate_type_model_returns_native_values_and_accepts_native_ed
             QtCore.Qt.DisplayRole,
         )
 
-        assert continuous_cov_model.setData(
-            continuous_cov_model.index(0, continuous_cov_model.NEW_VAL),
-            "not numeric",
-        ) is False
+        assert (
+            continuous_cov_model.setData(
+                continuous_cov_model.index(0, continuous_cov_model.NEW_VAL),
+                "not numeric",
+            )
+            is False
+        )
 
-        assert errors == ["Covariate values for continuous covariates need to be numeric."]
-        assert continuous_cov_model.data(
-            continuous_cov_model.index(0, continuous_cov_model.NEW_VAL),
-            QtCore.Qt.DisplayRole,
-        ) == old_value
+        assert errors == [
+            "Covariate values for continuous covariates need to be numeric."
+        ]
+        assert (
+            continuous_cov_model.data(
+                continuous_cov_model.index(0, continuous_cov_model.NEW_VAL),
+                QtCore.Qt.DisplayRole,
+            )
+            == old_value
+        )
     finally:
         window.current_data_unsaved = False
         window.close()
@@ -384,7 +575,10 @@ def test_factor_covariate_edits_render_as_native_paint_text():
 
     app, window = launch.start_automation()
     try:
-        assert window.open(os.path.abspath(os.path.join("sample_data", "amino.oma"))) is True
+        assert (
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            is True
+        )
         model = window.tableView.model()
         model.add_covariate("Region", "factor")
         factor_column = model.columnCount() - 1
@@ -419,7 +613,9 @@ def test_sequential_analysis_actions_open_real_specs_dialog(monkeypatch):
 
     class SpecsDialog(object):
         def __init__(self, model, meta_f_str=None, parent=None, conf_level=None):
-            calls.append((meta_f_str, parent, conf_level, model.get_current_outcome_type()))
+            calls.append(
+                (meta_f_str, parent, conf_level, model.get_current_outcome_type())
+            )
 
         def show(self):
             pass
@@ -468,16 +664,40 @@ def test_standard_meta_analysis_opens_specs_and_runs_through_backend(monkeypatch
         meta_form = sys.modules["meta_form"]
         meta_py_r = sys.modules["meta_py_r"]
         monkeypatch.setattr(meta_form.results_window, "ResultsWindow", ResultDialog)
-        monkeypatch.setattr(meta_py_r, "get_available_methods", lambda **kwargs: {method_label: method_name}, raising=False)
-        monkeypatch.setattr(meta_py_r, "get_params", lambda method: ({}, {}, None, {}), raising=False)
-        monkeypatch.setattr(meta_py_r, "get_method_description", lambda method: "Random-effects analysis", raising=False)
-        monkeypatch.setattr(meta_py_r, "ma_dataset_to_simple_binary_robj", lambda model, **kwargs: None, raising=False)
-        monkeypatch.setattr(meta_py_r, "ma_dataset_to_simple_continuous_robj", lambda model, **kwargs: None, raising=False)
+        monkeypatch.setattr(
+            meta_py_r,
+            "get_available_methods",
+            lambda **kwargs: {method_label: method_name},
+            raising=False,
+        )
+        monkeypatch.setattr(
+            meta_py_r, "get_params", lambda method: ({}, {}, None, {}), raising=False
+        )
+        monkeypatch.setattr(
+            meta_py_r,
+            "get_method_description",
+            lambda method: "Random-effects analysis",
+            raising=False,
+        )
+        monkeypatch.setattr(
+            meta_py_r,
+            "ma_dataset_to_simple_binary_robj",
+            lambda model, **kwargs: None,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            meta_py_r,
+            "ma_dataset_to_simple_continuous_robj",
+            lambda model, **kwargs: None,
+            raising=False,
+        )
         monkeypatch.setattr(meta_py_r, "run_binary_ma", run, raising=False)
         monkeypatch.setattr(meta_py_r, "run_continuous_ma", run, raising=False)
 
         try:
-            assert window.open(os.path.abspath(os.path.join("sample_data", name))) is True
+            assert (
+                window.open(os.path.abspath(os.path.join("sample_data", name))) is True
+            )
 
             window.action_go.trigger()
             specs = window.findChildren(meta_form.ma_specs.MA_Specs)
@@ -486,7 +706,13 @@ def test_standard_meta_analysis_opens_specs_and_runs_through_backend(monkeypatch
             specs[0].run_ma()
 
             assert calls[-1] == method_name
-            assert shown[-2:] == [({"texts": {"Summary": "%s model" % method_name}, "images": {}}, window), "shown"]
+            assert shown[-2:] == [
+                (
+                    {"texts": {"Summary": "%s model" % method_name}, "images": {}},
+                    window,
+                ),
+                "shown",
+            ]
         finally:
             window.close()
             app.processEvents()
@@ -529,27 +755,51 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         },
     }
 
-    monkeypatch.setattr(meta_py_r, "get_available_methods", lambda **kwargs: {
-        "Binary Random-Effects": "binary.random",
-    }, raising=False)
-    monkeypatch.setattr(meta_py_r, "get_params", lambda method: (
-        dict(params),
-        dict(defaults),
-        ["rm.method", "to"],
-        pretty_names,
-    ), raising=False)
-    monkeypatch.setattr(meta_py_r, "get_method_description", lambda method: "Random-effects analysis", raising=False)
-    monkeypatch.setattr(meta_py_r, "ma_dataset_to_simple_binary_robj", lambda model, **kwargs: None, raising=False)
+    monkeypatch.setattr(
+        meta_py_r,
+        "get_available_methods",
+        lambda **kwargs: {
+            "Binary Random-Effects": "binary.random",
+        },
+        raising=False,
+    )
+    monkeypatch.setattr(
+        meta_py_r,
+        "get_params",
+        lambda method: (
+            dict(params),
+            dict(defaults),
+            ["rm.method", "to"],
+            pretty_names,
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        meta_py_r,
+        "get_method_description",
+        lambda method: "Random-effects analysis",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        meta_py_r,
+        "ma_dataset_to_simple_binary_robj",
+        lambda model, **kwargs: None,
+        raising=False,
+    )
 
     try:
-        assert window.open(os.path.abspath(os.path.join("sample_data", "amino.oma"))) is True
+        assert (
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            is True
+        )
 
         window.action_go.trigger()
         specs = window.findChildren(meta_form.ma_specs.MA_Specs)
         assert len(specs) == 1
 
         enum_combos = [
-            combo for combo in specs[0].parameter_grp_box.findChildren(QtWidgets.QComboBox)
+            combo
+            for combo in specs[0].parameter_grp_box.findChildren(QtWidgets.QComboBox)
             if combo is not specs[0].method_cbo_box
         ]
         assert [str(combo.currentText()) for combo in enum_combos] == [
@@ -583,16 +833,29 @@ def test_required_advanced_analysis_actions_open_real_gui_dialogs(monkeypatch):
         def show(self):
             pass
 
-    for name, outcome_type in [("amino.oma", "binary"), ("continuous.oma", "continuous")]:
+    for name, outcome_type in [
+        ("amino.oma", "binary"),
+        ("continuous.oma", "continuous"),
+    ]:
         app, window = launch.start_automation()
         meta_form = sys.modules["meta_form"]
         monkeypatch.setattr(meta_form.meta_reg_form, "MetaRegForm", MetaRegDialog)
-        monkeypatch.setattr(meta_form.meta_subgroup_form, "MetaSubgroupForm", SubgroupDialog)
+        monkeypatch.setattr(
+            meta_form.meta_subgroup_form, "MetaSubgroupForm", SubgroupDialog
+        )
 
         try:
-            assert window.open(os.path.abspath(os.path.join("sample_data", name))) is True
-            cov_values = {study.name: index for index, study in enumerate(window.model.dataset.studies)}
-            group_values = {study.name: "A" if index % 2 else "B" for index, study in enumerate(window.model.dataset.studies)}
+            assert (
+                window.open(os.path.abspath(os.path.join("sample_data", name))) is True
+            )
+            cov_values = {
+                study.name: index
+                for index, study in enumerate(window.model.dataset.studies)
+            }
+            group_values = {
+                study.name: "A" if index % 2 else "B"
+                for index, study in enumerate(window.model.dataset.studies)
+            }
             window.model.add_covariate("dose", "continuous", cov_values)
             window.model.add_covariate("region", "factor", group_values)
             window._enable_action_subgroup_ma()
@@ -632,7 +895,9 @@ def test_meta_regression_action_stays_disabled_without_covariates_when_data_are_
         os.chdir(REPO_ROOT)
 
 
-def test_meta_regression_dialog_disables_ok_and_does_not_run_without_covariates(monkeypatch):
+def test_meta_regression_dialog_disables_ok_and_does_not_run_without_covariates(
+    monkeypatch,
+):
     import launch
     import meta_reg_form
 
@@ -681,7 +946,10 @@ def test_diagnostic_meta_regression_dialog_fits_radio_group_labels():
     form = None
 
     try:
-        assert window.open(os.path.abspath(os.path.join("sample_data", "lymph.oma"))) is True
+        assert (
+            window.open(os.path.abspath(os.path.join("sample_data", "lymph.oma")))
+            is True
+        )
         cov_values = {
             study.name: index + 1
             for index, study in enumerate(window.model.dataset.studies)
@@ -715,7 +983,10 @@ def test_diagnostic_metric_dialog_fits_checkbox_group_labels():
     form = None
 
     try:
-        assert window.open(os.path.abspath(os.path.join("sample_data", "lymph.oma"))) is True
+        assert (
+            window.open(os.path.abspath(os.path.join("sample_data", "lymph.oma")))
+            is True
+        )
 
         form = diag_metrics.Diag_Metrics(window.model, parent=window)
         form.show()
@@ -761,7 +1032,10 @@ def test_deleting_last_covariate_refreshes_advanced_analysis_actions():
     app, window = launch.start_automation()
 
     try:
-        assert window.open(os.path.abspath(os.path.join("sample_data", "amino.oma"))) is True
+        assert (
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            is True
+        )
         window._add_new_covariate("region", "factor")
 
         assert window.action_meta_regression.isEnabled()
@@ -785,7 +1059,9 @@ def test_deleting_last_covariate_refreshes_advanced_analysis_actions():
         os.chdir(REPO_ROOT)
 
 
-def test_subgroup_dialog_disables_ok_and_does_not_run_without_factor_covariates(monkeypatch):
+def test_subgroup_dialog_disables_ok_and_does_not_run_without_factor_covariates(
+    monkeypatch,
+):
     import launch
     import meta_subgroup_form
 
@@ -798,7 +1074,9 @@ def test_subgroup_dialog_disables_ok_and_does_not_run_without_factor_covariates(
         "warning",
         lambda *args: warnings.append(args),
     )
-    monkeypatch.setattr(window, "meta_subgroup", lambda selected_cov: calls.append(selected_cov))
+    monkeypatch.setattr(
+        window, "meta_subgroup", lambda selected_cov: calls.append(selected_cov)
+    )
 
     try:
         window._add_new_covariate("dose", "continuous")
@@ -841,14 +1119,16 @@ def test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe(monke
             shown.append("shown")
 
     def run_meta_regression(dataset, studies, covariates, metric, **kwargs):
-        shown.append((
-            "run-meta-regression",
-            [cov.name for cov in covariates],
-            [study.name for study in studies],
-            metric,
-            kwargs.get("fixed_effects"),
-            kwargs.get("conf_level"),
-        ))
+        shown.append(
+            (
+                "run-meta-regression",
+                [cov.name for cov in covariates],
+                [study.name for study in studies],
+                metric,
+                kwargs.get("fixed_effects"),
+                kwargs.get("conf_level"),
+            )
+        )
         return {
             "texts": {"Summary": "factor meta-regression"},
             "images": {},
@@ -856,11 +1136,21 @@ def test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe(monke
         }
 
     monkeypatch.setattr(meta_form.results_window, "ResultsWindow", ResultDialog)
-    monkeypatch.setattr(meta_py_r, "ma_dataset_to_simple_binary_robj", lambda *args, **kwargs: None, raising=False)
-    monkeypatch.setattr(meta_py_r, "run_meta_regression", run_meta_regression, raising=False)
+    monkeypatch.setattr(
+        meta_py_r,
+        "ma_dataset_to_simple_binary_robj",
+        lambda *args, **kwargs: None,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        meta_py_r, "run_meta_regression", run_meta_regression, raising=False
+    )
 
     try:
-        assert window.open(os.path.abspath(os.path.join("sample_data", "amino.oma"))) is True
+        assert (
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            is True
+        )
         group_values = {
             study.name: "East" if index % 2 else "West"
             for index, study in enumerate(window.model.dataset.studies)
@@ -882,15 +1172,30 @@ def test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe(monke
             window.model.get_global_conf_level(),
         )
         assert shown[-2:] == [
-            ({"texts": {"Summary": "factor meta-regression"}, "images": {}, "image_var_names": {}}, window),
+            (
+                {
+                    "texts": {"Summary": "factor meta-regression"},
+                    "images": {},
+                    "image_var_names": {},
+                },
+                window,
+            ),
             "shown",
         ]
 
         factor_column = window.model.columnCount() - 1
         factor_index = window.model.index(0, factor_column)
-        assert window.model.data(factor_index, QtCore.Qt.DisplayRole) in ("East", "West")
+        assert window.model.data(factor_index, QtCore.Qt.DisplayRole) in (
+            "East",
+            "West",
+        )
 
-        for role in (QtCore.Qt.DecorationRole, QtCore.Qt.ForegroundRole, QtCore.Qt.FontRole, QtCore.Qt.SizeHintRole):
+        for role in (
+            QtCore.Qt.DecorationRole,
+            QtCore.Qt.ForegroundRole,
+            QtCore.Qt.FontRole,
+            QtCore.Qt.SizeHintRole,
+        ):
             value = window.model.data(factor_index, role)
             assert isinstance(value, QtCore.QVariant)
             assert not value.isValid()
@@ -909,7 +1214,10 @@ def test_subgroup_covariate_dialog_constructs_with_factor_covariate():
 
     app, window = launch.start_automation()
     try:
-        assert window.open(os.path.abspath(os.path.join("sample_data", "amino.oma"))) is True
+        assert (
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            is True
+        )
         group_values = {
             study.name: "north" if index % 2 else "south"
             for index, study in enumerate(window.model.dataset.studies)
@@ -936,7 +1244,10 @@ def test_sequential_analysis_results_use_results_window(monkeypatch):
     app, window = launch.start_automation()
     meta_form = sys.modules["meta_form"]
     shown = []
-    results = {"texts": {"Cumulative Summary": "Binary Random-Effects Model"}, "images": {"Cumulative Forest Plot": "forest.png"}}
+    results = {
+        "texts": {"Cumulative Summary": "Binary Random-Effects Model"},
+        "images": {"Cumulative Forest Plot": "forest.png"},
+    }
 
     class ResultDialog(object):
         def __init__(self, result, parent=None):
@@ -970,21 +1281,34 @@ def test_results_window_renders_summary_text_and_plot_navigation(tmp_path):
     image.fill(results_window.Qt.white)
     assert image.save(str(plot_path), "PNG")
 
-    window = results_window.ResultsWindow({
-        "texts": {"Summary": "Binary Random-Effects Model\n\nEstimate Lower bound Upper bound"},
-        "images": {"Forest Plot": str(plot_path)},
-        "image_var_names": {"Forest Plot": "forest_plot"},
-        "image_params_paths": {"Forest Plot": str(tmp_path / "forest_params")},
-        "image_order": ["Forest Plot"],
-    })
+    window = results_window.ResultsWindow(
+        {
+            "texts": {
+                "Summary": "Binary Random-Effects Model\n\nEstimate Lower bound Upper bound"
+            },
+            "images": {"Forest Plot": str(plot_path)},
+            "image_var_names": {"Forest Plot": "forest_plot"},
+            "image_params_paths": {"Forest Plot": str(tmp_path / "forest_params")},
+            "image_order": ["Forest Plot"],
+        }
+    )
 
     try:
-        nav_titles = [window.nav_tree.topLevelItem(index).text(0) for index in range(window.nav_tree.topLevelItemCount())]
+        nav_titles = [
+            window.nav_tree.topLevelItem(index).text(0)
+            for index in range(window.nav_tree.topLevelItemCount())
+        ]
 
         assert nav_titles == ["Summary", "Forest Plot"]
         assert "forest_plot" in window.psuedo_console.toPlainText()
-        assert any(isinstance(item, results_window.QGraphicsTextItem) for item in window.scene.items())
-        assert any(isinstance(item, results_window.QGraphicsPixmapItem) for item in window.scene.items())
+        assert any(
+            isinstance(item, results_window.QGraphicsTextItem)
+            for item in window.scene.items()
+        )
+        assert any(
+            isinstance(item, results_window.QGraphicsPixmapItem)
+            for item in window.scene.items()
+        )
         assert window.graphics_view.scene() is window.scene
     finally:
         window.close()
@@ -999,17 +1323,21 @@ def test_results_window_separates_tall_text_sections():
     import results_window
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-    tall_section = "\n".join("Study %02d  0.123  0.456  0.789" % index for index in range(1, 40))
-    window = results_window.ResultsWindow({
-        "texts": {
-            "Within-study parameters": tall_section,
-            "Odds Ratio Summary": "Diagnostic Random-Effects Model\n\nEstimate Lower bound Upper bound",
-        },
-        "images": {},
-        "image_var_names": {},
-        "image_params_paths": {},
-        "image_order": [],
-    })
+    tall_section = "\n".join(
+        "Study %02d  0.123  0.456  0.789" % index for index in range(1, 40)
+    )
+    window = results_window.ResultsWindow(
+        {
+            "texts": {
+                "Within-study parameters": tall_section,
+                "Odds Ratio Summary": "Diagnostic Random-Effects Model\n\nEstimate Lower bound Upper bound",
+            },
+            "images": {},
+            "image_var_names": {},
+            "image_params_paths": {},
+            "image_order": [],
+        }
+    )
 
     try:
         sections = {
@@ -1037,25 +1365,35 @@ def test_results_window_ignores_missing_image_order_entries():
     import results_window
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-    window = results_window.ResultsWindow({
-        "texts": {"Summary": "HSROC summary"},
-        "images": {},
-        "image_var_names": {},
-        "image_params_paths": {},
-        "image_order": ["Summary ROC"],
-    })
+    window = results_window.ResultsWindow(
+        {
+            "texts": {"Summary": "HSROC summary"},
+            "images": {},
+            "image_var_names": {},
+            "image_params_paths": {},
+            "image_order": ["Summary ROC"],
+        }
+    )
 
     try:
-        nav_titles = [window.nav_tree.topLevelItem(index).text(0) for index in range(window.nav_tree.topLevelItemCount())]
+        nav_titles = [
+            window.nav_tree.topLevelItem(index).text(0)
+            for index in range(window.nav_tree.topLevelItemCount())
+        ]
 
         assert nav_titles == ["Summary"]
-        assert not any(isinstance(item, results_window.QGraphicsPixmapItem) for item in window.scene.items())
+        assert not any(
+            isinstance(item, results_window.QGraphicsPixmapItem)
+            for item in window.scene.items()
+        )
     finally:
         window.close()
         app.processEvents()
 
 
-def test_real_metaform_save_as_round_trips_representative_projects(tmp_path, monkeypatch):
+def test_real_metaform_save_as_round_trips_representative_projects(
+    tmp_path, monkeypatch
+):
     import launch
 
     for name in ["amino.oma", "continuous.oma", "lymph.oma", "meantime.oma"]:
@@ -1063,10 +1401,16 @@ def test_real_metaform_save_as_round_trips_representative_projects(tmp_path, mon
         saved_path = str(tmp_path / name)
 
         try:
-            assert window.open(os.path.abspath(os.path.join("sample_data", name))) is True
+            assert (
+                window.open(os.path.abspath(os.path.join("sample_data", name))) is True
+            )
             expected = _dataset_summary(window.model.dataset)
             meta_form = sys.modules["meta_form"]
-            monkeypatch.setattr(meta_form.QFileDialog, "getSaveFileName", lambda **kwargs: (saved_path, ""))
+            monkeypatch.setattr(
+                meta_form.QFileDialog,
+                "getSaveFileName",
+                lambda **kwargs: (saved_path, ""),
+            )
 
             window.save_as()
             assert os.path.exists(saved_path)
@@ -1075,7 +1419,10 @@ def test_real_metaform_save_as_round_trips_representative_projects(tmp_path, mon
             reopened = meta_form._load_legacy_pickle(saved_path)
             assert _dataset_summary(reopened) == expected
             if name == "meantime.oma":
-                values = [study.covariate_dict["treatment group"] for study in reopened.studies]
+                values = [
+                    study.covariate_dict["treatment group"]
+                    for study in reopened.studies
+                ]
                 assert all(type(value) is str for value in values if value is not None)
         finally:
             window.close()
@@ -1088,7 +1435,9 @@ def test_recent_files_persist_through_pyqt5_settings(tmp_path):
     import launch
     import settings
 
-    QtCore.QSettings.setPath(QtCore.QSettings.IniFormat, QtCore.QSettings.UserScope, str(tmp_path))
+    QtCore.QSettings.setPath(
+        QtCore.QSettings.IniFormat, QtCore.QSettings.UserScope, str(tmp_path)
+    )
     QtCore.QSettings.setDefaultFormat(QtCore.QSettings.IniFormat)
     settings.reset_settings()
 
@@ -1128,7 +1477,11 @@ def test_welcome_wizard_open_existing_selects_project(monkeypatch):
     wizard = main_wizard.MainWizard()
     try:
         page = wizard.page(main_wizard.Page_Welcome)
-        monkeypatch.setattr(main_wizard.QFileDialog, "getOpenFileName", lambda **kwargs: ("chosen.oma", ""))
+        monkeypatch.setattr(
+            main_wizard.QFileDialog,
+            "getOpenFileName",
+            lambda **kwargs: ("chosen.oma", ""),
+        )
 
         page.open_dataset()
 
@@ -1168,14 +1521,86 @@ def test_data_type_page_multiline_buttons_fit_icon_and_caption():
 @pytest.mark.parametrize(
     ("button_name", "expected"),
     [
-        ("onearm_proportion_Button", {"arms": "one", "data_type": "binary", "sub_type": "proportion", "effect": "PR", "metric_choices_name": "BINARY_ONE_ARM_METRICS"}),
-        ("onearm_mean_Button", {"arms": "one", "data_type": "continuous", "sub_type": "mean", "effect_name": "DEFAULT_CONTINUOUS_ONE_ARM", "metric_choices_name": "CONTINUOUS_ONE_ARM_METRICS"}),
-        ("onearm_single_reg_coef_Button", {"arms": "one", "data_type": "continuous", "sub_type": "reg_coef", "effect_name": "DEFAULT_CONTINUOUS_ONE_ARM", "metric_choices_name": "CONTINUOUS_ONE_ARM_METRICS"}),
-        ("onearm_generic_effect_size_Button", {"arms": "one", "data_type": "continuous", "sub_type": "generic_effect", "effect_name": "DEFAULT_CONTINUOUS_ONE_ARM", "metric_choices_name": "CONTINUOUS_ONE_ARM_METRICS"}),
-        ("twoarm_proportions_Button", {"arms": "two", "data_type": "binary", "sub_type": "proportions", "effect": "OR", "metric_choices_name": "BINARY_TWO_ARM_METRICS"}),
-        ("twoarm_means_Button", {"arms": "two", "data_type": "continuous", "sub_type": "means", "effect": "MD", "metric_choices_name": "CONTINUOUS_TWO_ARM_METRICS"}),
-        ("twoarm_smds_Button", {"arms": "two", "data_type": "continuous", "sub_type": "smd", "effect": "SMD", "metric_choices_name": "CONTINUOUS_TWO_ARM_METRICS"}),
-        ("diagnostic_Button", {"arms": None, "data_type": "diagnostic", "sub_type": None, "effect": None, "metric_choices": []}),
+        (
+            "onearm_proportion_Button",
+            {
+                "arms": "one",
+                "data_type": "binary",
+                "sub_type": "proportion",
+                "effect": "PR",
+                "metric_choices_name": "BINARY_ONE_ARM_METRICS",
+            },
+        ),
+        (
+            "onearm_mean_Button",
+            {
+                "arms": "one",
+                "data_type": "continuous",
+                "sub_type": "mean",
+                "effect_name": "DEFAULT_CONTINUOUS_ONE_ARM",
+                "metric_choices_name": "CONTINUOUS_ONE_ARM_METRICS",
+            },
+        ),
+        (
+            "onearm_single_reg_coef_Button",
+            {
+                "arms": "one",
+                "data_type": "continuous",
+                "sub_type": "reg_coef",
+                "effect_name": "DEFAULT_CONTINUOUS_ONE_ARM",
+                "metric_choices_name": "CONTINUOUS_ONE_ARM_METRICS",
+            },
+        ),
+        (
+            "onearm_generic_effect_size_Button",
+            {
+                "arms": "one",
+                "data_type": "continuous",
+                "sub_type": "generic_effect",
+                "effect_name": "DEFAULT_CONTINUOUS_ONE_ARM",
+                "metric_choices_name": "CONTINUOUS_ONE_ARM_METRICS",
+            },
+        ),
+        (
+            "twoarm_proportions_Button",
+            {
+                "arms": "two",
+                "data_type": "binary",
+                "sub_type": "proportions",
+                "effect": "OR",
+                "metric_choices_name": "BINARY_TWO_ARM_METRICS",
+            },
+        ),
+        (
+            "twoarm_means_Button",
+            {
+                "arms": "two",
+                "data_type": "continuous",
+                "sub_type": "means",
+                "effect": "MD",
+                "metric_choices_name": "CONTINUOUS_TWO_ARM_METRICS",
+            },
+        ),
+        (
+            "twoarm_smds_Button",
+            {
+                "arms": "two",
+                "data_type": "continuous",
+                "sub_type": "smd",
+                "effect": "SMD",
+                "metric_choices_name": "CONTINUOUS_TWO_ARM_METRICS",
+            },
+        ),
+        (
+            "diagnostic_Button",
+            {
+                "arms": None,
+                "data_type": "diagnostic",
+                "sub_type": None,
+                "effect": None,
+                "metric_choices": [],
+            },
+        ),
     ],
 )
 def test_data_type_page_records_every_supported_selection(button_name, expected):
@@ -1194,7 +1619,11 @@ def test_data_type_page_records_every_supported_selection(button_name, expected)
         getattr(data_type_page, button_name).click()
         app.processEvents()
 
-        expected_effect = expected["effect"] if "effect" in expected else getattr(meta_globals, expected["effect_name"])
+        expected_effect = (
+            expected["effect"]
+            if "effect" in expected
+            else getattr(meta_globals, expected["effect_name"])
+        )
         expected_metric_choices = (
             expected["metric_choices"]
             if "metric_choices" in expected
@@ -1248,7 +1677,9 @@ def test_new_project_data_type_selection_populates_metric_defaults_and_results()
         app.processEvents()
 
         metric_page = wizard.page(main_wizard.Page_ChooseMetric)
-        assert metric_page.metric_cbo_box.count() == len(meta_globals.BINARY_TWO_ARM_METRICS)
+        assert metric_page.metric_cbo_box.count() == len(
+            meta_globals.BINARY_TWO_ARM_METRICS
+        )
         assert metric_page.metric_cbo_box.currentData() == "OR"
         assert "(DEFAULT)" in metric_page.metric_cbo_box.currentText()
         assert wizard.get_effect() == "OR"
@@ -1268,7 +1699,9 @@ def test_new_project_data_type_selection_populates_metric_defaults_and_results()
         app.processEvents()
 
 
-def test_open_existing_dialog_starts_in_sample_data_even_when_cwd_is_app_data(tmp_path, monkeypatch):
+def test_open_existing_dialog_starts_in_sample_data_even_when_cwd_is_app_data(
+    tmp_path, monkeypatch
+):
     import launch
 
     app_data = tmp_path / "app-data"
@@ -1278,6 +1711,7 @@ def test_open_existing_dialog_starts_in_sample_data_even_when_cwd_is_app_data(tm
     app, window = launch.start_automation()
     meta_form = sys.modules["meta_form"]
     import settings
+
     settings.reset_settings()
     calls = []
 
@@ -1296,7 +1730,9 @@ def test_open_existing_dialog_starts_in_sample_data_even_when_cwd_is_app_data(tm
         os.chdir(REPO_ROOT)
 
 
-def test_welcome_wizard_open_existing_dialog_starts_in_sample_data_when_no_recent_project(tmp_path, monkeypatch):
+def test_welcome_wizard_open_existing_dialog_starts_in_sample_data_when_no_recent_project(
+    tmp_path, monkeypatch
+):
     import launch
     from PyQt5 import QtWidgets
     import main_wizard
@@ -1332,6 +1768,7 @@ def test_help_action_opens_bundled_help(monkeypatch):
     opened = []
     app, window = launch.start_automation()
     import meta_globals
+
     meta_form = sys.modules["meta_form"]
     monkeypatch.setattr(meta_form.webbrowser, "open", opened.append)
 
@@ -1379,15 +1816,29 @@ def test_stub_backend_exposes_data_entry_imputation_methods():
     modern_compat.install()
     meta_py_r = sys.modules["meta_py_r"]
 
-    for name in ("impute_bin_data", "impute_cont_data", "impute_pre_post_cont_data",
-                 "impute_diag_data", "back_calc_cont_data"):
+    for name in (
+        "impute_bin_data",
+        "impute_cont_data",
+        "impute_pre_post_cont_data",
+        "impute_diag_data",
+        "back_calc_cont_data",
+    ):
         assert hasattr(meta_py_r, name), name
 
     assert "FAIL" in meta_py_r.impute_bin_data({"Ev_A": 1})
     assert meta_py_r.impute_cont_data({"n": 10}, 0.05)["succeeded"] is False
-    assert meta_py_r.impute_pre_post_cont_data({"n": 10}, 0.5, 0.05)["succeeded"] is False
-    assert meta_py_r.impute_diag_data({"TP": 1}) == {"TP": None, "TN": None, "FP": None, "FN": None}
-    assert "FAIL" in meta_py_r.back_calc_cont_data({"n": 10}, {"n": 12}, {"est": 1.0}, 95.0)
+    assert (
+        meta_py_r.impute_pre_post_cont_data({"n": 10}, 0.5, 0.05)["succeeded"] is False
+    )
+    assert meta_py_r.impute_diag_data({"TP": 1}) == {
+        "TP": None,
+        "TN": None,
+        "FP": None,
+        "FN": None,
+    }
+    assert "FAIL" in meta_py_r.back_calc_cont_data(
+        {"n": 10}, {"n": 12}, {"est": 1.0}, 95.0
+    )
 
 
 def test_data_entry_dialogs_construct_with_stub_backend(monkeypatch):
@@ -1402,10 +1853,15 @@ def test_data_entry_dialogs_construct_with_stub_backend(monkeypatch):
     import continuous_data_form
     import diagnostic_data_form
 
-    monkeypatch.setattr(continuous_data_form.ChooseBackCalcResultForm, "exec_", lambda self: False)
+    monkeypatch.setattr(
+        continuous_data_form.ChooseBackCalcResultForm, "exec_", lambda self: False
+    )
 
     try:
-        assert window.open(os.path.abspath(os.path.join("sample_data", "amino.oma"))) is True
+        assert (
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            is True
+        )
         model = window.model
         binary_dialog = binary_data_form.BinaryDataForm2(
             copy.deepcopy(model.get_current_ma_unit_for_study(0)),
@@ -1417,7 +1873,10 @@ def test_data_entry_dialogs_construct_with_stub_backend(monkeypatch):
         )
         binary_dialog.close()
 
-        assert window.open(os.path.abspath(os.path.join("sample_data", "continuous.oma"))) is True
+        assert (
+            window.open(os.path.abspath(os.path.join("sample_data", "continuous.oma")))
+            is True
+        )
         model = window.model
         continuous_dialog = continuous_data_form.ContinuousDataForm(
             copy.deepcopy(model.get_current_ma_unit_for_study(0)),
@@ -1429,7 +1888,10 @@ def test_data_entry_dialogs_construct_with_stub_backend(monkeypatch):
         )
         continuous_dialog.close()
 
-        assert window.open(os.path.abspath(os.path.join("sample_data", "lymph.oma"))) is True
+        assert (
+            window.open(os.path.abspath(os.path.join("sample_data", "lymph.oma")))
+            is True
+        )
         model = window.model
         diagnostic_dialog = diagnostic_data_form.DiagnosticDataForm(
             copy.deepcopy(model.get_current_ma_unit_for_study(0)),
@@ -1458,10 +1920,22 @@ def test_csv_import_wizard_accepts_representative_csv(tmp_path, monkeypatch):
     )
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     wizard = main_wizard.MainWizard(path="csv_import")
-    wizard.set_dataset_info({"arms": "two", "data_type": "binary", "sub_type": "proportions", "effect": "OR", "metric_choices": []})
+    wizard.set_dataset_info(
+        {
+            "arms": "two",
+            "data_type": "binary",
+            "sub_type": "proportions",
+            "effect": "OR",
+            "metric_choices": [],
+        }
+    )
     page = wizard.page(main_wizard.Page_CsvImport)
     page.initializePage()
-    monkeypatch.setattr(main_wizard.QFileDialog, "getOpenFileName", lambda **kwargs: (str(csv_path), "csv files (*.csv)"))
+    monkeypatch.setattr(
+        main_wizard.QFileDialog,
+        "getOpenFileName",
+        lambda **kwargs: (str(csv_path), "csv files (*.csv)"),
+    )
 
     page._select_file()
 
@@ -1482,7 +1956,15 @@ def test_csv_import_file_selection_enables_finish_button(tmp_path, monkeypatch):
     )
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     wizard = main_wizard.MainWizard(path="csv_import")
-    wizard.set_dataset_info({"arms": "two", "data_type": "binary", "sub_type": "proportions", "effect": "OR", "metric_choices": []})
+    wizard.set_dataset_info(
+        {
+            "arms": "two",
+            "data_type": "binary",
+            "sub_type": "proportions",
+            "effect": "OR",
+            "metric_choices": [],
+        }
+    )
     wizard.setStartId(main_wizard.Page_CsvImport)
     try:
         wizard.restart()
@@ -1491,7 +1973,11 @@ def test_csv_import_file_selection_enables_finish_button(tmp_path, monkeypatch):
         page = wizard.page(main_wizard.Page_CsvImport)
         finish_button = wizard.button(main_wizard.QWizard.FinishButton)
         assert not finish_button.isEnabled()
-        monkeypatch.setattr(main_wizard.QFileDialog, "getOpenFileName", lambda **kwargs: (str(csv_path), "csv files (*.csv)"))
+        monkeypatch.setattr(
+            main_wizard.QFileDialog,
+            "getOpenFileName",
+            lambda **kwargs: (str(csv_path), "csv files (*.csv)"),
+        )
 
         page._select_file()
         app.processEvents()
@@ -1526,7 +2012,10 @@ def test_table_paint_roles_do_not_raise_across_all_cells():
 
     app, window = launch.start_automation()
     try:
-        assert window.open(os.path.abspath(os.path.join("sample_data", "amino.oma"))) is True
+        assert (
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            is True
+        )
         model = window.tableView.model()
         for row in range(model.rowCount()):
             for column in range(model.columnCount()):
@@ -1561,5 +2050,7 @@ def _dataset_summary(dataset):
     return {
         "title": dataset.title,
         "studies": [(str(study.name), str(study.year)) for study in dataset.studies],
-        "outcomes": sorted(str(name) for name in dataset.outcome_names_to_follow_ups.keys()),
+        "outcomes": sorted(
+            str(name) for name in dataset.outcome_names_to_follow_ups.keys()
+        ),
     }

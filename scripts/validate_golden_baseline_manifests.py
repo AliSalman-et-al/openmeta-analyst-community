@@ -145,21 +145,37 @@ def validate_baseline_manifest(root: Path) -> None:
         str(GOLDEN_BASELINE),
     )
     if manifest["baseline"] != "comprehensive-golden":
-        raise ValidationError(f"{GOLDEN_BASELINE}: baseline must be comprehensive-golden")
+        raise ValidationError(
+            f"{GOLDEN_BASELINE}: baseline must be comprehensive-golden"
+        )
     for key in ("coverage_matrix", "coverage_manifest", "schema"):
         require_string(manifest[key], f"{GOLDEN_BASELINE}:{key}")
         if not (root / manifest[key]).exists():
-            raise ValidationError(f"{GOLDEN_BASELINE}:{key} points to missing file {manifest[key]}")
+            raise ValidationError(
+                f"{GOLDEN_BASELINE}:{key} points to missing file {manifest[key]}"
+            )
     if Path(manifest["coverage_matrix"]) != GOLDEN_MATRIX:
-        raise ValidationError(f"{GOLDEN_BASELINE}: coverage_matrix must point to {GOLDEN_MATRIX}")
+        raise ValidationError(
+            f"{GOLDEN_BASELINE}: coverage_matrix must point to {GOLDEN_MATRIX}"
+        )
     if Path(manifest["coverage_manifest"]) != GOLDEN_COVERAGE:
-        raise ValidationError(f"{GOLDEN_BASELINE}: coverage_manifest must point to {GOLDEN_COVERAGE}")
+        raise ValidationError(
+            f"{GOLDEN_BASELINE}: coverage_manifest must point to {GOLDEN_COVERAGE}"
+        )
     if Path(manifest["schema"]) != GOLDEN_SCHEMA:
-        raise ValidationError(f"{GOLDEN_BASELINE}: schema must point to {GOLDEN_SCHEMA}")
+        raise ValidationError(
+            f"{GOLDEN_BASELINE}: schema must point to {GOLDEN_SCHEMA}"
+        )
     if schema.get("title") != "Comprehensive Golden Baseline Manifest":
         raise ValidationError(f"{GOLDEN_SCHEMA}: unexpected schema title")
-    require_list(manifest["curated_golden_set"], f"{GOLDEN_BASELINE}:curated_golden_set")
-    require_keys(manifest["artifact_bundle"], ["path", "storage"], f"{GOLDEN_BASELINE}:artifact_bundle")
+    require_list(
+        manifest["curated_golden_set"], f"{GOLDEN_BASELINE}:curated_golden_set"
+    )
+    require_keys(
+        manifest["artifact_bundle"],
+        ["path", "storage"],
+        f"{GOLDEN_BASELINE}:artifact_bundle",
+    )
     validate_capture_metadata(manifest["capture_metadata"])
     require_list(manifest["bundle_contents"], f"{GOLDEN_BASELINE}:bundle_contents")
 
@@ -180,23 +196,43 @@ def validate_capture_metadata(metadata: object) -> None:
         ],
         f"{GOLDEN_BASELINE}:capture_metadata",
     )
-    fields = set(require_list(metadata["required_fields"], f"{GOLDEN_BASELINE}:capture_metadata.required_fields"))
+    fields = set(
+        require_list(
+            metadata["required_fields"],
+            f"{GOLDEN_BASELINE}:capture_metadata.required_fields",
+        )
+    )
     missing = REQUIRED_CAPTURE_METADATA_FIELDS - fields
     if missing:
         raise ValidationError(
             f"{GOLDEN_BASELINE}:capture_metadata.required_fields missing {', '.join(sorted(missing))}"
         )
     if metadata["local_default_capture_mode"] != "local-debug":
-        raise ValidationError(f"{GOLDEN_BASELINE}:capture_metadata.local_default_capture_mode must be local-debug")
+        raise ValidationError(
+            f"{GOLDEN_BASELINE}:capture_metadata.local_default_capture_mode must be local-debug"
+        )
     if metadata["authoritative_capture_mode"] != "authoritative":
-        raise ValidationError(f"{GOLDEN_BASELINE}:capture_metadata.authoritative_capture_mode must be authoritative")
-    authority_values = set(require_list(metadata["authority_values"], f"{GOLDEN_BASELINE}:capture_metadata.authority_values"))
+        raise ValidationError(
+            f"{GOLDEN_BASELINE}:capture_metadata.authoritative_capture_mode must be authoritative"
+        )
+    authority_values = set(
+        require_list(
+            metadata["authority_values"],
+            f"{GOLDEN_BASELINE}:capture_metadata.authority_values",
+        )
+    )
     if authority_values != {"authoritative", "local-debug"}:
-        raise ValidationError(f"{GOLDEN_BASELINE}:capture_metadata.authority_values must be authoritative and local-debug")
+        raise ValidationError(
+            f"{GOLDEN_BASELINE}:capture_metadata.authority_values must be authoritative and local-debug"
+        )
     if metadata["baseline"] != "modern-behavior":
-        raise ValidationError(f"{GOLDEN_BASELINE}:capture_metadata.baseline must be modern-behavior")
+        raise ValidationError(
+            f"{GOLDEN_BASELINE}:capture_metadata.baseline must be modern-behavior"
+        )
     if metadata["baseline_environment"] != EXPECTED_MODERN_BASELINE_ENVIRONMENT:
-        raise ValidationError(f"{GOLDEN_BASELINE}:capture_metadata.baseline_environment does not match the Modern Behavior Baseline")
+        raise ValidationError(
+            f"{GOLDEN_BASELINE}:capture_metadata.baseline_environment does not match the Modern Behavior Baseline"
+        )
     if metadata["authoritative_requires_baseline_environment_match"] is not True:
         raise ValidationError(
             f"{GOLDEN_BASELINE}:capture_metadata.authoritative_requires_baseline_environment_match must be true"
@@ -234,11 +270,18 @@ def validate_exception_manifest(data: dict, expected_name: str, label: str) -> s
             continue
         missing = [field for field in required if field not in exception]
         if missing:
-            raise ValidationError(f"{label}:exceptions[{index}] missing {', '.join(missing)}")
+            raise ValidationError(
+                f"{label}:exceptions[{index}] missing {', '.join(missing)}"
+            )
         if not any(field in exception for field in one_of):
-            raise ValidationError(f"{label}:exceptions[{index}] must include one of {', '.join(one_of)}")
+            raise ValidationError(
+                f"{label}:exceptions[{index}] must include one of {', '.join(one_of)}"
+            )
         require_string(exception["id"], f"{label}:exceptions[{index}].id")
-        require_list(exception["affected_workflows"], f"{label}:exceptions[{index}].affected_workflows")
+        require_list(
+            exception["affected_workflows"],
+            f"{label}:exceptions[{index}].affected_workflows",
+        )
         accepted_ids.add(exception["id"])
     return accepted_ids
 
@@ -253,15 +296,25 @@ def validate_golden_coverage(data: dict) -> tuple[set[str], set[str]]:
     for index, row in enumerate(rows):
         if not isinstance(row, dict):
             raise ValidationError(f"{GOLDEN_COVERAGE}:rows[{index}] must be an object")
-        require_keys(row, ["id", "workflow", "status"], f"{GOLDEN_COVERAGE}:rows[{index}]")
+        require_keys(
+            row, ["id", "workflow", "status"], f"{GOLDEN_COVERAGE}:rows[{index}]"
+        )
         require_string(row["id"], f"{GOLDEN_COVERAGE}:rows[{index}].id")
         row_ids.add(row["id"])
     omission_branches: set[str] = set()
     for index, omission in enumerate(omissions):
         if not isinstance(omission, dict):
-            raise ValidationError(f"{GOLDEN_COVERAGE}:omissions[{index}] must be an object")
-        require_keys(omission, ["branch", "reason", "follow_up"], f"{GOLDEN_COVERAGE}:omissions[{index}]")
-        require_string(omission["branch"], f"{GOLDEN_COVERAGE}:omissions[{index}].branch")
+            raise ValidationError(
+                f"{GOLDEN_COVERAGE}:omissions[{index}] must be an object"
+            )
+        require_keys(
+            omission,
+            ["branch", "reason", "follow_up"],
+            f"{GOLDEN_COVERAGE}:omissions[{index}]",
+        )
+        require_string(
+            omission["branch"], f"{GOLDEN_COVERAGE}:omissions[{index}].branch"
+        )
         omission_branches.add(omission["branch"])
     return row_ids, omission_branches
 
@@ -283,9 +336,13 @@ def validate_traceability(root: Path, strict_no_pending: bool) -> int:
         str(WORKFLOW_TRACEABILITY),
     )
     if traceability["manifest"] != "workflow-traceability":
-        raise ValidationError(f"{WORKFLOW_TRACEABILITY}: manifest must be workflow-traceability")
+        raise ValidationError(
+            f"{WORKFLOW_TRACEABILITY}: manifest must be workflow-traceability"
+        )
     if Path(traceability["source_inventory"]) != WORKFLOW_INVENTORY:
-        raise ValidationError(f"{WORKFLOW_TRACEABILITY}: source_inventory must point to {WORKFLOW_INVENTORY}")
+        raise ValidationError(
+            f"{WORKFLOW_TRACEABILITY}: source_inventory must point to {WORKFLOW_INVENTORY}"
+        )
     expected_targets = {
         "golden_coverage": GOLDEN_COVERAGE,
         "gui_evidence": GUI_EVIDENCE,
@@ -294,7 +351,9 @@ def validate_traceability(root: Path, strict_no_pending: bool) -> int:
     }
     for key, path in expected_targets.items():
         if Path(traceability["trace_targets"].get(key, "")) != path:
-            raise ValidationError(f"{WORKFLOW_TRACEABILITY}: trace_targets.{key} must point to {path}")
+            raise ValidationError(
+                f"{WORKFLOW_TRACEABILITY}: trace_targets.{key} must point to {path}"
+            )
 
     golden_rows, omissions = validate_golden_coverage(load_json(root, GOLDEN_COVERAGE))
     gui_entries = markdown_headings(root, GUI_EVIDENCE)
@@ -317,26 +376,42 @@ def validate_traceability(root: Path, strict_no_pending: bool) -> int:
         "gui_compatibility_exception": gui_exceptions,
     }
 
-    workflows = require_list(traceability["workflows"], f"{WORKFLOW_TRACEABILITY}:workflows")
+    workflows = require_list(
+        traceability["workflows"], f"{WORKFLOW_TRACEABILITY}:workflows"
+    )
     inventory_names = inventory_release_cutover_names(root)
     traced_names: set[str] = set()
     pending_count = 0
     for index, workflow in enumerate(workflows):
         if not isinstance(workflow, dict):
-            raise ValidationError(f"{WORKFLOW_TRACEABILITY}:workflows[{index}] must be an object")
-        require_keys(workflow, ["id", "name", "trace_type", "trace"], f"{WORKFLOW_TRACEABILITY}:workflows[{index}]")
+            raise ValidationError(
+                f"{WORKFLOW_TRACEABILITY}:workflows[{index}] must be an object"
+            )
+        require_keys(
+            workflow,
+            ["id", "name", "trace_type", "trace"],
+            f"{WORKFLOW_TRACEABILITY}:workflows[{index}]",
+        )
         require_string(workflow["id"], f"{WORKFLOW_TRACEABILITY}:workflows[{index}].id")
-        require_string(workflow["name"], f"{WORKFLOW_TRACEABILITY}:workflows[{index}].name")
+        require_string(
+            workflow["name"], f"{WORKFLOW_TRACEABILITY}:workflows[{index}].name"
+        )
         trace_type = workflow["trace_type"]
         if trace_type not in TRACE_TYPES:
-            raise ValidationError(f"{WORKFLOW_TRACEABILITY}:{workflow['id']} has unknown trace_type {trace_type}")
+            raise ValidationError(
+                f"{WORKFLOW_TRACEABILITY}:{workflow['id']} has unknown trace_type {trace_type}"
+            )
         traced_names.add(workflow["name"])
         if trace_type == "pending":
             if workflow["trace"] is not None:
-                raise ValidationError(f"{WORKFLOW_TRACEABILITY}:{workflow['id']} pending trace must be null")
+                raise ValidationError(
+                    f"{WORKFLOW_TRACEABILITY}:{workflow['id']} pending trace must be null"
+                )
             pending_count += 1
             continue
-        for target in trace_values(workflow["trace"], f"{WORKFLOW_TRACEABILITY}:{workflow['id']}.trace"):
+        for target in trace_values(
+            workflow["trace"], f"{WORKFLOW_TRACEABILITY}:{workflow['id']}.trace"
+        ):
             if target not in target_sets[trace_type]:
                 raise ValidationError(
                     f"{WORKFLOW_TRACEABILITY}:{workflow['id']} trace target {target!r} "
@@ -359,7 +434,9 @@ def validate_traceability(root: Path, strict_no_pending: bool) -> int:
             + "; ".join(missing_inventory)
         )
     if strict_no_pending and pending_count:
-        raise ValidationError(f"{WORKFLOW_TRACEABILITY}: {pending_count} pending trace entries remain")
+        raise ValidationError(
+            f"{WORKFLOW_TRACEABILITY}: {pending_count} pending trace entries remain"
+        )
     return pending_count
 
 
@@ -381,7 +458,11 @@ def main(argv: list[str] | None = None) -> int:
     except ValidationError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
-    mode = "strict no-pending mode" if args.strict_no_pending else "manifest-completeness mode"
+    mode = (
+        "strict no-pending mode"
+        if args.strict_no_pending
+        else "manifest-completeness mode"
+    )
     if pending_count:
         print(f"validated {mode}; {pending_count} pending trace entries allowed")
     else:

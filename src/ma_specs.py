@@ -6,7 +6,7 @@
 #  This is the code for the ui dialog       #
 #  that handles the method selection        #
 #  and algorithm specifications             #
-#                                           #                                                                            
+#                                           #
 #  OpenMeta[analyst]                        #
 #                                           #
 #  This is also where the calls to run      #
@@ -41,18 +41,26 @@ import diagnostic_explain
 
 _fromUtf8 = lambda s: s
 
-COUNT_BASED_DIAGNOSTIC_METHODS = set([
-    "diagnostic.bivariate.ml",
-    "diagnostic.hsroc",
-])
-    
+COUNT_BASED_DIAGNOSTIC_METHODS = set(
+    [
+        "diagnostic.bivariate.ml",
+        "diagnostic.hsroc",
+    ]
+)
+
 
 class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
-
-    def __init__(self, model, parent=None, meta_f_str=None,
-                 external_params=None, diag_metrics=None,
-                 diag_metrics_to_analysis_details_d=None,
-                 fp_specs_only=False, conf_level=None):
+    def __init__(
+        self,
+        model,
+        parent=None,
+        meta_f_str=None,
+        external_params=None,
+        diag_metrics=None,
+        diag_metrics_to_analysis_details_d=None,
+        fp_specs_only=False,
+        conf_level=None,
+    ):
 
         super(MA_Specs, self).__init__(parent)
         self.setupUi(self)
@@ -61,19 +69,21 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         self.current_param_vals = external_params or {}
         self.model = model
-        
+
         if conf_level is None:
             raise ValueError("CONFIDENCE LEVEL MUST BE SPECIFIED")
         self.conf_level = conf_level
 
         # if not none, we assume we're running a meta
-        # method 
+        # method
         self.meta_f_str = meta_f_str
 
         self.buttonBox.accepted.connect(self.run_ma)
         self.buttonBox.rejected.connect(self.cancel)
         self.save_btn.pressed.connect(self.select_out_path)
-        self.method_cbo_box.currentIndexChanged[str].connect(lambda _text: self.method_changed())
+        self.method_cbo_box.currentIndexChanged[str].connect(
+            lambda _text: self.method_changed()
+        )
 
         self.data_type = self.model.get_current_outcome_type()
         print("data type: %s" % self.data_type)
@@ -81,10 +91,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             # we pre-prend the data type to the meta-method function
             # name. thus the caller (meta_form) needn't worry about
             # the data type, only about the method name (e.g., cumulative)
-            if not self.meta_f_str.endswith(self.data_type): 
+            if not self.meta_f_str.endswith(self.data_type):
                 self.meta_f_str = ".".join((self.meta_f_str, self.data_type))
-            
-        
+
         if self.data_type != "binary":
             self.disable_bin_only_fields()
             if self.data_type == "diagnostic":
@@ -92,39 +101,37 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         # disable second arm display for one-arm analyses
         if self.model.current_effect in ONE_ARM_METRICS:
-            self.setup_fields_for_one_arm()    
-        
+            self.setup_fields_for_one_arm()
 
         self.current_widgets = []
         self.current_method = None
         self.current_params = None
         self.current_defaults = None
         self.var_order = None
-        
+
         ####
-        # the following are variables for the case of diagnostic 
+        # the following are variables for the case of diagnostic
         # data. in other cases, these are meaningless/None.
         # diagnostic data is special because we allow the user to
         # to run analyses on multiple metrics at once.
         #
         # this dictionary maps metrics to analysis methods and
-        # corresponding parameters. e.g., 
+        # corresponding parameters. e.g.,
         #   diag_metrics["sens"] -> (method, parameters)
         # for each metric selected by the user. note that
-        # the method and parameters will in fact be the same for 
+        # the method and parameters will in fact be the same for
         # sens/spec (and for lr/dor), but we map the metrics
         # to their own tuples for convenience.
-        self.diag_metrics_to_analysis_details = \
-                        diag_metrics_to_analysis_details_d or {}
+        self.diag_metrics_to_analysis_details = diag_metrics_to_analysis_details_d or {}
 
         # note that we assume the metrics for which analysis
-        # details have already been acquired (i.e,. those in 
+        # details have already been acquired (i.e,. those in
         # the above dictionary) are not included in the diag_metrics
         # list -- we do not explicitly check for this here.
-        self.diag_metrics = diag_metrics 
+        self.diag_metrics = diag_metrics
 
         # diagnostic data requires a different UI because multiple
-        # metrics can be selected. we handle this by allowing the 
+        # metrics can be selected. we handle this by allowing the
         # user to specify different methods for different groups
         # of metrics.
         if self.diag_metrics is not None:
@@ -153,44 +160,48 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             return None
         else:
             self.image_path.setText(out_f)
-        
+
     def make_indefinite_progress_bar(self):
         bar = QtWidgets.QProgressBar(parent=self)
         bar.setWindowTitle("running analysis...")
-        bar.setRange(0, 0) # makes it indefinite
-        #specs_form_pos = self.pos()
-        #specs_form_width, specs_form_height = self.width(), self.height()
+        bar.setRange(0, 0)  # makes it indefinite
+        # specs_form_pos = self.pos()
+        # specs_form_width, specs_form_height = self.width(), self.height()
 
-        bar_width = 250 # seems to look ok?
+        bar_width = 250  # seems to look ok?
         bar.setFixedWidth(bar_width)
-        #center_width = specs_form_pos.x() + specs_form_width/2 - bar_width/2
-        #center_height = specs_form_pos.y() + specs_form_height/2
+        # center_width = specs_form_pos.x() + specs_form_width/2 - bar_width/2
+        # center_height = specs_form_pos.y() + specs_form_height/2
 
         bar.setAlignment(Qt.AlignCenter)
-        #center_point = QPoint(center_width, center_height)
-        
-        #bar.move(center_point)
-    
+        # center_point = QPoint(center_width, center_height)
+
+        # bar.move(center_point)
+
         return bar
-    
+
     def run_network_analysis(self):
         # first, let's fire up a progress bar
         bar = MetaProgress(self)
         bar.show()
         result = None
-        
+
         if self.data_type == "binary":
             data_type = BINARY
-        
-        if self.data_type not in ["binary","continuous"]:
-            raise ValueError("Network Analysis can currently only be done with binary or continuous data")
-        
-        meta_py_r.ma_dataset_to_simple_network(table_model=self.model,
-                                     var_name="tmp_obj",
-                                     data_type=None,
-                                     outcome=None,
-                                     follow_up=None,
-                                     network_path='./r_tmp/network.png')
+
+        if self.data_type not in ["binary", "continuous"]:
+            raise ValueError(
+                "Network Analysis can currently only be done with binary or continuous data"
+            )
+
+        meta_py_r.ma_dataset_to_simple_network(
+            table_model=self.model,
+            var_name="tmp_obj",
+            data_type=None,
+            outcome=None,
+            follow_up=None,
+            network_path="./r_tmp/network.png",
+        )
 
     def run_ma(self):
         ###
@@ -198,7 +209,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         bar = MetaProgress(self)
         bar.show()
         result = None
-        
+
         # this method is defined statically, below
         add_plot_params(self)
 
@@ -206,8 +217,8 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         # -- this is for scaling
 
         if not self.data_type == "diagnostic":
-            self.current_param_vals["measure"] = self.model.current_effect 
-        
+            self.current_param_vals["measure"] = self.model.current_effect
+
         # dispatch on type; build an R object, then run the analysis
         if self.data_type == "binary":
             # note that this call creates a tmp object in R called
@@ -215,84 +226,78 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             # you'd like)
             meta_py_r.ma_dataset_to_simple_binary_robj(self.model)
             if self.meta_f_str is None:
-                result = meta_py_r.run_binary_ma(self.current_method, self.current_param_vals)
-                #pass
+                result = meta_py_r.run_binary_ma(
+                    self.current_method, self.current_param_vals
+                )
+                # pass
             else:
-                result = meta_py_r.run_meta_method(self.meta_f_str, self.current_method, self.current_param_vals)
-                
-            #_writeout_test_data(self.meta_f_str, self.current_method, self.current_param_vals, result) # FOR MAKING TESTS
+                result = meta_py_r.run_meta_method(
+                    self.meta_f_str, self.current_method, self.current_param_vals
+                )
+
+            # _writeout_test_data(self.meta_f_str, self.current_method, self.current_param_vals, result) # FOR MAKING TESTS
         elif self.data_type == "continuous":
             meta_py_r.ma_dataset_to_simple_continuous_robj(self.model)
             if self.meta_f_str is None:
                 # run standard meta-analysis
-                result = meta_py_r.run_continuous_ma(self.current_method, self.current_param_vals)
+                result = meta_py_r.run_continuous_ma(
+                    self.current_method, self.current_param_vals
+                )
             else:
                 # get meta!
-                result = meta_py_r.run_meta_method(self.meta_f_str, self.current_method, self.current_param_vals)
-            
-            #_writeout_test_data(self.meta_f_str, self.current_method, self.current_param_vals, result) # FOR MAKING TESTS
+                result = meta_py_r.run_meta_method(
+                    self.meta_f_str, self.current_method, self.current_param_vals
+                )
+
+            # _writeout_test_data(self.meta_f_str, self.current_method, self.current_param_vals, result) # FOR MAKING TESTS
         elif self.data_type == "diagnostic":
             # add the current metrics (e.g., PLR, etc.) to the method/params
             # dictionary
             self.add_cur_analysis_details()
-        
+
             method_names, list_of_param_vals = [], []
 
             if len(self.diag_metrics_to_analysis_details) == 0:
                 self.add_cur_analysis_details()
 
-
             ordered_metrics = ["Sens", "Spec", "NLR", "PLR", "DOR"]
-            for diag_metric in \
-                  [metric for metric in ordered_metrics \
-                    if metric in self.diag_metrics_to_analysis_details]:
+            for diag_metric in [
+                metric
+                for metric in ordered_metrics
+                if metric in self.diag_metrics_to_analysis_details
+            ]:
                 # pull out the method and parameters object specified for this
                 # metric.
                 method, param_vals = self.diag_metrics_to_analysis_details[diag_metric]
                 param_vals = copy.deepcopy(param_vals)
 
-                
                 # update the forest plot path
                 split_fp_path = self.current_param_vals["fp_outpath"].split(".")
-                new_str = split_fp_path[0] if len(split_fp_path) == 1 else \
-                          ".".join(split_fp_path[:-1])
+                new_str = (
+                    split_fp_path[0]
+                    if len(split_fp_path) == 1
+                    else ".".join(split_fp_path[:-1])
+                )
                 new_str = new_str + "_%s" % diag_metric.lower() + ".png"
                 param_vals["fp_outpath"] = new_str
 
-                # update the metric 
+                # update the metric
                 param_vals["measure"] = diag_metric
-                
+
                 method_names.append(method)
                 list_of_param_vals.append(param_vals)
-            
+
             if self.meta_f_str is None:
                 # regular meta-analysis
                 try:
                     result = _run_diagnostic_analysis_isolating_metric_failures(
-                        self.model, method_names, list_of_param_vals)
+                        self.model, method_names, list_of_param_vals
+                    )
                 except Exception as e:
-                    error_message = \
-                        "sorry, something has gone wrong with your analysis. here is a stack trace that probably won't be terribly useful.\n %s"  \
-                                            % e
-                
-                    QMessageBox.critical(self, "analysis failed", error_message)
-                    bar.hide()
-                    # reset Rs working directory 
-                    meta_py_r.reset_Rs_working_dir()
-                    self.accept()
-                    return
-                #_writeout_test_data(self.meta_f_str, method_names, list_of_param_vals, result, diag=True) # FOR MAKING TESTS
-            else:
-                # in the case of diagnostic, we pass in lists
-                # of param values to the meta_method 
-                try:
-                    result = _run_diagnostic_analysis_isolating_metric_failures(
-                        self.model, method_names, list_of_param_vals,
-                        meta_f_str=self.meta_f_str)
-                except Exception as e:
-                    error_message = \
-                        "sorry, something has gone wrong with your analysis. here is a stack trace that probably won't be terribly useful.\n %s"  \
-                                            % e
+                    error_message = (
+                        "sorry, something has gone wrong with your analysis. here is a stack trace that probably won't be terribly useful.\n %s"
+                        % e
+                    )
 
                     QMessageBox.critical(self, "analysis failed", error_message)
                     bar.hide()
@@ -300,7 +305,30 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                     meta_py_r.reset_Rs_working_dir()
                     self.accept()
                     return
-                #_writeout_test_data(self.meta_f_str, method_names, list_of_param_vals, result, diag=True) # FOR MAKING TESTS
+                # _writeout_test_data(self.meta_f_str, method_names, list_of_param_vals, result, diag=True) # FOR MAKING TESTS
+            else:
+                # in the case of diagnostic, we pass in lists
+                # of param values to the meta_method
+                try:
+                    result = _run_diagnostic_analysis_isolating_metric_failures(
+                        self.model,
+                        method_names,
+                        list_of_param_vals,
+                        meta_f_str=self.meta_f_str,
+                    )
+                except Exception as e:
+                    error_message = (
+                        "sorry, something has gone wrong with your analysis. here is a stack trace that probably won't be terribly useful.\n %s"
+                        % e
+                    )
+
+                    QMessageBox.critical(self, "analysis failed", error_message)
+                    bar.hide()
+                    # reset Rs working directory
+                    meta_py_r.reset_Rs_working_dir()
+                    self.accept()
+                    return
+                # _writeout_test_data(self.meta_f_str, method_names, list_of_param_vals, result, diag=True) # FOR MAKING TESTS
 
         bar.hide()
 
@@ -308,7 +336,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.accept()
 
     def enable_diagnostic_fields(self):
-        #self.col3_str_edit.setEnabled(True)
+        # self.col3_str_edit.setEnabled(True)
         self.col3_str_edit.setText("[default]")
         self.show_3.setEnabled(True)
         self.show_3.setChecked(True)
@@ -327,10 +355,17 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
     def method_changed(self):
         if self.parameter_grp_box.layout() is not None:
-            print(("Layout items count before: %d" % self.parameter_grp_box.layout().count()))
+            print(
+                (
+                    "Layout items count before: %d"
+                    % self.parameter_grp_box.layout().count()
+                )
+            )
         self.clear_param_ui()
-        self.current_widgets= []
-        self.current_method = self.available_method_d[str(self.method_cbo_box.currentText())]
+        self.current_widgets = []
+        self.current_method = self.available_method_d[
+            str(self.method_cbo_box.currentText())
+        ]
         self.setup_params()
         self.parameter_grp_box.setTitle(self.current_method)
         self.ui_for_params()
@@ -342,19 +377,24 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             cbo_box = self.method_cbo_box
             param_box = self.parameter_grp_box
 
-        # we first build an R object with the current data. this is to pass off         
+        # we first build an R object with the current data. this is to pass off
         # to the R side to check the feasibility of the methods over the current data.
-        # i.e., we do not display methods that cannot be performed over the 
+        # i.e., we do not display methods that cannot be performed over the
         # current data.
-        tmp_obj_name = "tmp_obj" 
+        tmp_obj_name = "tmp_obj"
         if self.data_type == "binary":
-            meta_py_r.ma_dataset_to_simple_binary_robj(self.model, var_name=tmp_obj_name)
+            meta_py_r.ma_dataset_to_simple_binary_robj(
+                self.model, var_name=tmp_obj_name
+            )
         elif self.data_type == "continuous":
-            meta_py_r.ma_dataset_to_simple_continuous_robj(self.model, var_name=tmp_obj_name)
+            meta_py_r.ma_dataset_to_simple_continuous_robj(
+                self.model, var_name=tmp_obj_name
+            )
         elif self.data_type == "diagnostic":
-            meta_py_r.ma_dataset_to_simple_diagnostic_robj(self.model, var_name=tmp_obj_name)
+            meta_py_r.ma_dataset_to_simple_diagnostic_robj(
+                self.model, var_name=tmp_obj_name
+            )
 
-        
         self.available_method_d = None
         ###
         # in the case of diagnostic data, the is.feasible methods need also to know
@@ -362,32 +402,33 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         # we're setting params for multiple metrics (e.g., sens./spec.) but the is.feasible
         # method only wants *one* metric. thus we arbitrarily select one or the other --
         # this is tacitly assuming that the *same* methods are feasible for, say, sens.
-        # as for spec. this is a reasonable assumption is all cases of which I'm aware, 
+        # as for spec. this is a reasonable assumption is all cases of which I'm aware,
         # but a more conservative/correct thing to do would be to pass in the *most restrictive*
         # metric to the _get_available_methods_routine
         ###
-        metric = self.model.current_effect 
+        metric = self.model.current_effect
         if self.data_type == "diagnostic":
             if self.meta_f_str is None:
                 metric = "Sens" if self.sens_spec else "DOR"
             else:
                 metric = "Sens"
 
-        
-        self.available_method_d = meta_py_r.get_available_methods(for_data_type=self.data_type,\
-                                         data_obj_name=tmp_obj_name, metric=metric)
+        self.available_method_d = meta_py_r.get_available_methods(
+            for_data_type=self.data_type, data_obj_name=tmp_obj_name, metric=metric
+        )
 
-        print("\n\navailable %s methods: %s" % (self.data_type, ", ".join(list(self.available_method_d.keys()))))
-        
-        
-        #print("----------------------------------\nAvailable methods dictionary:",self.available_method_d)
+        print(
+            "\n\navailable %s methods: %s"
+            % (self.data_type, ", ".join(list(self.available_method_d.keys())))
+        )
+
+        # print("----------------------------------\nAvailable methods dictionary:",self.available_method_d)
 
         # issue #110 -- this is NOT a general/good/flexible solution
         # -- we sort here in reverse because this will put .random
         # first. otherwise, the default is that R provides the functions
-        # in alphabetical (ascending). 
+        # in alphabetical (ascending).
         method_names = list(self.available_method_d.keys())
-       
 
         ###
         # removing bivariate (sens/spec) methods when it makes no sense
@@ -397,22 +438,26 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             for biv_method in (biv_ml_name, "HSROC"):
                 method_function = self.available_method_d.get(biv_method)
                 should_remove_bivariate_method = (
-                    metric != "Sens" or
-                    self.meta_f_str is not None or
-                    not ("sens" in self.diag_metrics and "spec" in self.diag_metrics) or
-                    (method_function in COUNT_BASED_DIAGNOSTIC_METHODS and
-                     not self.model.included_studies_have_raw_data())
+                    metric != "Sens"
+                    or self.meta_f_str is not None
+                    or not ("sens" in self.diag_metrics and "spec" in self.diag_metrics)
+                    or (
+                        method_function in COUNT_BASED_DIAGNOSTIC_METHODS
+                        and not self.model.included_studies_have_raw_data()
+                    )
                 )
                 if biv_method in method_names and should_remove_bivariate_method:
                     method_names.remove(biv_method)
-            # Fix for issue # 175            
-            if set(["lr","dor"]) <= set(self.diag_metrics):    
+            # Fix for issue # 175
+            if set(["lr", "dor"]) <= set(self.diag_metrics):
                 try:
-                    method_names.remove('Diagnostic Fixed-Effect Peto')
-                    #QMessageBox.warning(self.parent(), "whoops", "removed peto")
+                    method_names.remove("Diagnostic Fixed-Effect Peto")
+                    # QMessageBox.warning(self.parent(), "whoops", "removed peto")
                 except:
-                    print("Couldn't remove 'Diagnostic Fixed-Effect Peto' for some reason... don't know why")
-        
+                    print(
+                        "Couldn't remove 'Diagnostic Fixed-Effect Peto' for some reason... don't know why"
+                    )
+
         method_names.sort(reverse=True)
 
         ###
@@ -420,7 +465,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         if self.data_type == "diagnostic" and biv_ml_name in method_names:
             method_names.remove(biv_ml_name)
             method_names.insert(0, biv_ml_name)
- 
+
         signals_were_blocked = cbo_box.blockSignals(True)
         try:
             for method in method_names:
@@ -433,13 +478,10 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         if cbo_box is self.method_cbo_box:
             self.ui_for_params()
 
-
     def clear_param_ui(self):
         for widget in self.current_widgets:
             widget.deleteLater()
             widget = None
-        
-
 
     def ui_for_params(self):
         if self.parameter_grp_box.layout() is None:
@@ -447,20 +489,24 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             self.parameter_grp_box.setLayout(layout)
 
         cur_grid_row = 0
-        
+
         # add the method description
         method_description = meta_py_r.get_method_description(self.current_method)
-        
-        self.add_label(self.parameter_grp_box.layout(), cur_grid_row, \
-                            "Description: %s" % method_description)
+
+        self.add_label(
+            self.parameter_grp_box.layout(),
+            cur_grid_row,
+            "Description: %s" % method_description,
+        )
         cur_grid_row += 1
-        
 
         if self.var_order is not None:
             for var_name in self.var_order:
                 val = self.current_params[var_name]
-                self.add_param(self.parameter_grp_box.layout(), cur_grid_row, var_name, val)
-                cur_grid_row+=1
+                self.add_param(
+                    self.parameter_grp_box.layout(), cur_grid_row, var_name, val
+                )
+                cur_grid_row += 1
         else:
             # no ordering was provided; let's try and do something
             # sane with respect to the order in which parameters
@@ -473,14 +519,18 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             # type (float, list); if it is, we add it otherwise we pass. this isn't
             # the most efficient way to do things, but the number of parameters
             # is going to be relatively tiny anyway
-            ordered_types = [lambda x: isinstance(x, list),
-                             lambda x: isinstance(x, str) and x.lower()=="float"]
+            ordered_types = [
+                lambda x: isinstance(x, list),
+                lambda x: isinstance(x, str) and x.lower() == "float",
+            ]
 
             for is_right_type in ordered_types:
                 for key, val in list(self.current_params.items()):
                     if is_right_type(val):
-                        self.add_param(self.parameter_grp_box.layout(), cur_grid_row, key, val)
-                        cur_grid_row+=1
+                        self.add_param(
+                            self.parameter_grp_box.layout(), cur_grid_row, key, val
+                        )
+                        cur_grid_row += 1
 
         # do we need to set forest plot parameters? if not,
         # e.g., in the case of HSROC or other methdos that
@@ -493,7 +543,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         else:
             self.plot_tab.setEnabled(True)
         qt_layout.fit_option_groups_to_contents(self)
-                        
+
     def add_param(self, layout, cur_grid_row, name, value):
         print("adding param. name: %s, value: %s" % (name, value))
         if isinstance(value, list):
@@ -512,23 +562,29 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             # throw exception here
 
     def add_enum(self, layout, cur_grid_row, name, values):
-        '''
+        """
         Adds an enumeration to the UI, with the name and possible
         values as specified per the parameters.
-        '''
-       
-        ### 
+        """
+
+        ###
         # using the pretty name for the label now.
-        self.add_label(layout, cur_grid_row, self.param_d[name]["pretty.name"], \
-                                tool_tip_text=self.param_d[name]["description"])
+        self.add_label(
+            layout,
+            cur_grid_row,
+            self.param_d[name]["pretty.name"],
+            tool_tip_text=self.param_d[name]["description"],
+        )
         cbo_box = QComboBox()
         for index, value in enumerate(values):
-            name_str = self._get_enum_item_pretty_name(name,value)
+            name_str = self._get_enum_item_pretty_name(name, value)
             cbo_box.addItem(name_str)  # TODO: replace value with pretty values
             cbo_box.setItemData(index, value)
 
         if name in self.current_defaults:
-            default_index = self._find_enum_item_index(cbo_box, self.current_defaults[name])
+            default_index = self._find_enum_item_index(
+                cbo_box, self.current_defaults[name]
+            )
             if default_index >= 0:
                 cbo_box.setCurrentIndex(default_index)
             self.current_param_vals[name] = self.current_defaults[name]
@@ -537,11 +593,15 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         self.current_widgets.append(cbo_box)
         layout.addWidget(cbo_box, cur_grid_row, 1)
-        
+
     def _get_enum_item_pretty_name(self, enum_name, item_name):
         if "rm.method.names" in self.param_d[enum_name]:
             if item_name in self.param_d[enum_name]["rm.method.names"]:
-                return item_name + ": " + str(self.param_d[enum_name]["rm.method.names"][item_name])
+                return (
+                    item_name
+                    + ": "
+                    + str(self.param_d[enum_name]["rm.method.names"][item_name])
+                )
         return item_name
 
     def _find_enum_item_index(self, cbo_box, value):
@@ -554,14 +614,14 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         if hasattr(item_data, "value"):
             item_data = item_data.value()
         return qt_text.to_native_text(item_data)
-    
+
     def set_param_f_from_itemdata(self, name, to_type=str):
-        '''
+        """
         hackier version....
         Returns a function f(x) such that f(x) will set the key
         name in the parameters dictionary to the value x.
-        '''
-        
+        """
+
         def set_param(index):
             combo_box = self.sender()
             x = self._enum_item_value(combo_box.itemData(index))
@@ -571,8 +631,12 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         return set_param
 
     def add_float_box(self, layout, cur_grid_row, name):
-        self.add_label(layout, cur_grid_row, self.param_d[name]["pretty.name"],\
-                                tool_tip_text=self.param_d[name]["description"])
+        self.add_label(
+            layout,
+            cur_grid_row,
+            self.param_d[name]["pretty.name"],
+            tool_tip_text=self.param_d[name]["description"],
+        )
         # now add the float input line edit
         finput = QLineEdit()
 
@@ -581,15 +645,18 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             finput.setText(str(self.current_defaults[name]))
             self.current_param_vals[name] = self.current_defaults[name]
 
-
         finput.setMaximumWidth(50)
         finput.textChanged.connect(self.set_param_f(name, to_type=float))
         self.current_widgets.append(finput)
         layout.addWidget(finput, cur_grid_row, 1)
-        
+
     def add_int_box(self, layout, cur_grid_row, name):
-        self.add_label(layout, cur_grid_row, self.param_d[name]["pretty.name"],\
-                                tool_tip_text=self.param_d[name]["description"])
+        self.add_label(
+            layout,
+            cur_grid_row,
+            self.param_d[name]["pretty.name"],
+            tool_tip_text=self.param_d[name]["description"],
+        )
         # now add the int input line edit
         iinput = QLineEdit()
 
@@ -604,8 +671,12 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         layout.addWidget(iinput, cur_grid_row, 1)
 
     def add_text_box(self, layout, cur_grid_row, name):
-        self.add_label(layout, cur_grid_row, self.param_d[name]["pretty.name"],\
-                                tool_tip_text=self.param_d[name]["description"])
+        self.add_label(
+            layout,
+            cur_grid_row,
+            self.param_d[name]["pretty.name"],
+            tool_tip_text=self.param_d[name]["description"],
+        )
         # now add the text
         txt_input = QLineEdit()
 
@@ -619,12 +690,12 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.current_widgets.append(txt_input)
         layout.addWidget(txt_input, cur_grid_row, 1)
 
-
     def set_param_f(self, name, to_type=str):
-        '''
+        """
         Returns a function f(x) such that f(x) will set the key
         name in the parameters dictionary to the value x.
-        '''
+        """
+
         def set_param(x):
             self.current_param_vals[name] = to_type(x)
             print(self.current_param_vals)
@@ -643,25 +714,25 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         # param_d holds (meta) information about the parameter -- it's a each param
         # itself maps to a dictionary with a pretty name and description (assuming
         # they were provided for the given param)
-        self.current_params, self.current_defaults, self.var_order, self.param_d = \
-                    meta_py_r.get_params(self.current_method)
+        self.current_params, self.current_defaults, self.var_order, self.param_d = (
+            meta_py_r.get_params(self.current_method)
+        )
 
         ###
         # user selections overwrite the current parameter defaults.
         # ie., if the user has run this analysis before, the preferences
         # they selected then are automatically set as the defaults now.
-        # these defaults, if they exist, are stored in the user_preferences 
+        # these defaults, if they exist, are stored in the user_preferences
         # dictionary
-#         method_params = self.parent().user_prefs["method_params"]
-#         if self.current_method in method_params:
-#             print "loading default from user preferences!"
-#             self.current_defaults = method_params[self.current_method]
-            
+        #         method_params = self.parent().user_prefs["method_params"]
+        #         if self.current_method in method_params:
+        #             print "loading default from user preferences!"
+        #             self.current_defaults = method_params[self.current_method]
+
         # override conf.level with global conf.level
-        self.current_defaults['conf.level'] = self.conf_level
+        self.current_defaults["conf.level"] = self.conf_level
 
         print(self.current_defaults)
-
 
     def diag_next(self):
         add_plot_params(self)
@@ -672,26 +743,27 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         # note that we first add the forest plot parameters!
         self.add_cur_analysis_details()
 
-        
         # we're going to show another analysis details form for the
         # likelihood ratio and diagnostic odds ratio analyses.
         # we pass along the parameters acquired for sens/spec
         # in the diag_metrics* dictionary.
-        form =  MA_Specs(self.model, parent=self.parent(),
-                    diag_metrics=list(set(["lr", "dor"]) & set(self.diag_metrics)),
-                    meta_f_str = self.meta_f_str,
-                    diag_metrics_to_analysis_details_d=self.diag_metrics_to_analysis_details,
-                    conf_level=self.model.get_global_conf_level())
+        form = MA_Specs(
+            self.model,
+            parent=self.parent(),
+            diag_metrics=list(set(["lr", "dor"]) & set(self.diag_metrics)),
+            meta_f_str=self.meta_f_str,
+            diag_metrics_to_analysis_details_d=self.diag_metrics_to_analysis_details,
+            conf_level=self.model.get_global_conf_level(),
+        )
         form.show()
         self.hide()
 
-
     def add_cur_analysis_details(self):
-        ''' 
+        """
         this method only applicable for diagnostic data, wherein
-        we have multiple metrics. here the parameters/method for 
+        we have multiple metrics. here the parameters/method for
         these metrics are added to a dictionary.
-        '''
+        """
 
         # this was extracted earlier, ultimately from the checkboxes
         # selected by the user
@@ -699,22 +771,24 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         if self.sens_spec:
             for metric in [m for m in ("Sens", "Spec") if m in metrics_to_run]:
-                self.diag_metrics_to_analysis_details[metric] = \
-                        (self.current_method, self.current_param_vals)
+                self.diag_metrics_to_analysis_details[metric] = (
+                    self.current_method,
+                    self.current_param_vals,
+                )
         else:
             # lr/dor
             for metric in [m for m in ("DOR", "PLR", "NLR") if m in metrics_to_run]:
-                self.diag_metrics_to_analysis_details[metric] = \
-                        (self.current_method, self.current_param_vals)
-
-
+                self.diag_metrics_to_analysis_details[metric] = (
+                    self.current_method,
+                    self.current_param_vals,
+                )
 
     def setup_diagnostic_ui(self):
         ###
         # here is where we set the keys of the _to_analysis_details
         # dictionary to the metrics the user selected
-        
-        # the names of the metrics internally are different than those that 
+
+        # the names of the metrics internally are different than those that
         # are displayed to the user, e.g., the user selects Likelihood Ratio
         # instead of LR+/LR-. we map from the UI names to the internal names
         # here
@@ -726,13 +800,15 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             for m in self.diag_metrics:
                 metrics_to_run.extend(DIAG_METRIC_NAMES_D[m])
 
-            self.diag_metrics_to_analysis_details = \
-                dict(list(zip(metrics_to_run, [None for m in metrics_to_run])))
-                
-        if self.sens_spec and self.lr_dor:
-            self.buttonBox.clear()    
-            next_button = self.buttonBox.addButton("next >", QDialogButtonBox.AcceptRole)
+            self.diag_metrics_to_analysis_details = dict(
+                list(zip(metrics_to_run, [None for m in metrics_to_run]))
+            )
 
+        if self.sens_spec and self.lr_dor:
+            self.buttonBox.clear()
+            next_button = self.buttonBox.addButton(
+                "next >", QDialogButtonBox.AcceptRole
+            )
 
             # if both sets of metrics are selected, we need to next prompt the
             # user for parameters regarding the second
@@ -763,7 +839,8 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         self.setWindowTitle(QtCore.QCoreApplication.translate("Dialog", window_title))
         self.method_lbl.setText(method_label)
-        
+
+
 ###
 # the following methods are defined statically because
 # they are also used by the forest plot editing window,
@@ -781,7 +858,7 @@ def add_plot_params(specs_form):
     specs_form.current_param_vals["fp_col4_str"] = _text_value(specs_form.col4_str_edit)
     specs_form.current_param_vals["fp_xlabel"] = _text_value(specs_form.x_lbl_le)
     specs_form.current_param_vals["fp_outpath"] = _text_value(specs_form.image_path)
-    
+
     plot_lb = _text_value(specs_form.plot_lb_le)
     specs_form.current_param_vals["fp_plot_lb"] = "[default]"
     if plot_lb != "[default]" and check_plot_bound(plot_lb):
@@ -796,8 +873,10 @@ def add_plot_params(specs_form):
     specs_form.current_param_vals["fp_xticks"] = "[default]"
     if xticks != "[default]" and seems_sane(xticks):
         specs_form.current_param_vals["fp_xticks"] = xticks
-    
-    specs_form.current_param_vals["fp_show_summary_line"] = specs_form.show_summary_line.isChecked()
+
+    specs_form.current_param_vals["fp_show_summary_line"] = (
+        specs_form.show_summary_line.isChecked()
+    )
 
 
 def _text_value(widget):
@@ -810,62 +889,69 @@ def _diagnostic_direct_effects_need_metric_specific_data(model, list_of_param_va
         return False
 
     missing_metrics = [
-        params["measure"] for params in list_of_param_vals
+        params["measure"]
+        for params in list_of_param_vals
         if not model.included_studies_have_point_estimates(effect=params["measure"])
     ]
     if missing_metrics:
         raise ValueError(
             "Diagnostic analysis requires complete TP/FN/FP/TN counts or "
             "complete entered effect estimates and confidence intervals for "
-            "each selected metric. Missing entered estimates for: %s." %
-            ", ".join(missing_metrics)
+            "each selected metric. Missing entered estimates for: %s."
+            % ", ".join(missing_metrics)
         )
 
     return True
 
 
 def _run_diagnostic_analysis_isolating_metric_failures(
-        model, method_names, list_of_param_vals, meta_f_str=None):
+    model, method_names, list_of_param_vals, meta_f_str=None
+):
     if _diagnostic_direct_effects_need_metric_specific_data(model, list_of_param_vals):
         return _run_diagnostic_with_metric_specific_data(
-            model, method_names, list_of_param_vals, meta_f_str=meta_f_str)
+            model, method_names, list_of_param_vals, meta_f_str=meta_f_str
+        )
 
     meta_py_r.ma_dataset_to_simple_diagnostic_robj(model)
     try:
         if meta_f_str is None:
             return meta_py_r.run_diagnostic_multi(method_names, list_of_param_vals)
         return meta_py_r.run_meta_method_diag(
-            meta_f_str, method_names, list_of_param_vals)
+            meta_f_str, method_names, list_of_param_vals
+        )
     except Exception:
         return _run_diagnostic_with_shared_data_per_metric(
-            method_names, list_of_param_vals, meta_f_str=meta_f_str)
+            method_names, list_of_param_vals, meta_f_str=meta_f_str
+        )
 
 
-def _run_diagnostic_with_shared_data_per_metric(method_names, list_of_param_vals,
-                                               meta_f_str=None):
+def _run_diagnostic_with_shared_data_per_metric(
+    method_names, list_of_param_vals, meta_f_str=None
+):
     return _run_diagnostic_methods_per_metric(
         method_names,
         list_of_param_vals,
         lambda method_name, param_vals: (
             meta_py_r.run_diagnostic_multi([method_name], [param_vals])
-            if meta_f_str is None else
-            meta_py_r.run_meta_method_diag(meta_f_str, [method_name], [param_vals])
+            if meta_f_str is None
+            else meta_py_r.run_meta_method_diag(meta_f_str, [method_name], [param_vals])
         ),
     )
 
 
-def _run_diagnostic_with_metric_specific_data(model, method_names, list_of_param_vals,
-                                             meta_f_str=None):
+def _run_diagnostic_with_metric_specific_data(
+    model, method_names, list_of_param_vals, meta_f_str=None
+):
     def run_metric(method_name, param_vals):
         metric = param_vals["measure"]
         meta_py_r.ma_dataset_to_simple_diagnostic_robj(model, metric=metric)
         if meta_f_str is None:
             return meta_py_r.run_diagnostic_multi([method_name], [param_vals])
-        return meta_py_r.run_meta_method_diag(
-            meta_f_str, [method_name], [param_vals])
+        return meta_py_r.run_meta_method_diag(meta_f_str, [method_name], [param_vals])
 
-    return _run_diagnostic_methods_per_metric(method_names, list_of_param_vals,
-                                             run_metric)
+    return _run_diagnostic_methods_per_metric(
+        method_names, list_of_param_vals, run_metric
+    )
 
 
 def _run_diagnostic_methods_per_metric(method_names, list_of_param_vals, run_metric):
@@ -913,20 +999,16 @@ def _merge_diagnostic_result(merged_result, metric_result):
 
 def _diagnostic_result_has_successes(result):
     return bool(
-        result["images"] or
-        any(not key.endswith(" Error") for key in result["texts"])
+        result["images"] or any(not key.endswith(" Error") for key in result["texts"])
     )
 
 
 def _format_diagnostic_failures(failures):
-    return "\n".join(
-        "%s failed: %s" % (metric, error)
-        for metric, error in failures
-    )
+    return "\n".join("%s failed: %s" % (metric, error) for metric, error in failures)
 
 
 def _writeout_test_data(meta_f_str, method, params, results, diag=False):
-    with open('test_data.txt', 'a') as f:
+    with open("test_data.txt", "a") as f:
         f.write("method_and_params.append({\n")
         f.write("                          'meta_f_str': '%s',\n" % meta_f_str)
         if diag:
@@ -936,12 +1018,12 @@ def _writeout_test_data(meta_f_str, method, params, results, diag=False):
         f.write("                          'parameters': %s,\n" % str(params))
         f.write("                          'results': %s,\n" % str(results))
         f.write("                         })\n\n")
-        
+
         # Write the data to the disk for sure
         f.flush()
         os.fsync(f)
-        
-        
+
+
 #    method_and_params.append({'meta_f_str': u'loo.ma.binary',
 #                              'method'    : 'binary.random',
 #                              'parameters': {'conf.level': 95.0, 'digits': 3.0, 'fp_col2_str': u'[default]', 'fp_show_col4': True, 'to': 'only0', 'fp_col4_str': u'Ev/Ctrl', 'fp_xticks': '[default]', 'fp_col3_str': u'Ev/Trt', 'fp_show_col3': True, 'fp_show_col2': True, 'fp_show_col1': True, 'fp_plot_lb': '[default]', 'fp_outpath': u'./r_tmp/forest.png', 'rm.method': 'DL', 'adjust': 0.5, 'fp_plot_ub': '[default]', 'fp_col1_str': u'Studies', 'measure': 'OR', 'fp_xlabel': u'[default]', 'fp_show_summary_line': True},
@@ -952,8 +1034,9 @@ def _writeout_test_data(meta_f_str, method, params, results, diag=False):
 ####
 # simple progress bar
 import forms.ui_running
+
+
 class MetaProgress(QDialog, forms.ui_running.Ui_running):
-    
     def __init__(self, parent=None):
         super(MetaProgress, self).__init__(parent)
         self.setupUi(self)

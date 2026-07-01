@@ -73,8 +73,9 @@ def test_count_based_diagnostic_methods_require_counts():
     if result.returncode == 42:
         pytest.skip(result.stdout.strip())
 
-    assert result.returncode == 0, (
-        "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s"
-        % (result.returncode, result.stdout[-2000:], result.stderr[-2000:])
+    assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
+        result.returncode,
+        result.stdout[-2000:],
+        result.stderr[-2000:],
     )
     assert "OK" in result.stdout

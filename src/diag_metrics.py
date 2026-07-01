@@ -5,8 +5,8 @@ import ma_specs
 import qt_layout
 from meta_globals import DIAG_METRIC_NAMES_D
 
-class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
 
+class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
     SELECTABLE_METRICS = ["sens", "spec", "dor", "lr"]
 
     def __init__(self, model, parent=None, meta_f_str=None, external_params=None):
@@ -39,16 +39,21 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
         # slot and being silently swallowed by the event loop. See issue #53.
         builder = getattr(self.parent, "_build_analysis_specs_dialog", None)
         if builder is not None:
-            form = builder(meta_f_str=self.meta_f_str,
-                           external_params=self.external_params,
-                           diag_metrics=selected_metrics,
-                           conf_level=self.model.get_global_conf_level())
+            form = builder(
+                meta_f_str=self.meta_f_str,
+                external_params=self.external_params,
+                diag_metrics=selected_metrics,
+                conf_level=self.model.get_global_conf_level(),
+            )
         else:
-            form = ma_specs.MA_Specs(self.model, parent=self.parent,
-                                     meta_f_str=self.meta_f_str,
-                                     external_params=self.external_params,
-                                     diag_metrics=selected_metrics,
-                                     conf_level=self.model.get_global_conf_level())
+            form = ma_specs.MA_Specs(
+                self.model,
+                parent=self.parent,
+                meta_f_str=self.meta_f_str,
+                external_params=self.external_params,
+                diag_metrics=selected_metrics,
+                conf_level=self.model.get_global_conf_level(),
+            )
         if form is None:
             return
         form.show()
@@ -57,7 +62,7 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
     def get_selected_metrics(self):
         selected_metrics = []
         # just loop through all the check
-        # boxes on the form and see if they're checked. 
+        # boxes on the form and see if they're checked.
 
         for metric in self.SELECTABLE_METRICS:
             checkbox = self._metric_checkbox(metric)
@@ -65,7 +70,6 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
                 print(metric)
                 selected_metrics.append(metric)
 
-  
         return selected_metrics
 
     def _configure_metric_checkboxes(self):
@@ -73,8 +77,8 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
         for metric in self.SELECTABLE_METRICS:
             checkbox = self._metric_checkbox(metric)
             metric_available = (
-                raw_data_available or
-                self._entered_estimates_available_for_metric(metric)
+                raw_data_available
+                or self._entered_estimates_available_for_metric(metric)
             )
             checkbox.setEnabled(metric_available)
             checkbox.setChecked(checkbox.isChecked() and metric_available)
@@ -94,13 +98,13 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
         )
 
     def _refresh_ok_enabled(self):
-        self.btn_ok.setEnabled(any(
-            self._metric_checkbox(metric).isEnabled() and
-            self._metric_checkbox(metric).isChecked()
-            for metric in self.SELECTABLE_METRICS
-        ))
+        self.btn_ok.setEnabled(
+            any(
+                self._metric_checkbox(metric).isEnabled()
+                and self._metric_checkbox(metric).isChecked()
+                for metric in self.SELECTABLE_METRICS
+            )
+        )
 
     def _metric_checkbox(self, metric):
         return getattr(self, "chk_box_%s" % metric)
-
-
