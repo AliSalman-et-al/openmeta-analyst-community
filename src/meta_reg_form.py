@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QCheckBox, QDialog, QGridLayout, QMessageBox
+from PyQt5.QtWidgets import QCheckBox, QDialog, QDialogButtonBox, QGridLayout, QMessageBox
 
 import forms.ui_meta_reg
 import meta_py_r
@@ -11,6 +11,7 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
         self.setupUi(self)
         self.covs_and_check_boxes = None
         self._populate_chk_boxes()
+        self._update_ok_button()
 
         # as usual, diagnostic data is special
         self.is_diagnostic = self.model.get_current_outcome_type() == "diagnostic"
@@ -28,11 +29,16 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
     def run_meta_reg(self):
         at_least_one_study_does_not_have_vals = False
         cov_d = {}
-        selected_covariates = []
-        for cov, chk_box in self.covs_and_check_boxes:
-            if chk_box.isChecked():
-                selected_covariates.append(cov)
+        selected_covariates = self._selected_covariates()
+        if not selected_covariates:
+            QMessageBox.warning(
+                self,
+                "No covariates selected",
+                "Select at least one covariate before running meta-regression.",
+            )
+            return
 
+        for cov, chk_box in self.covs_and_check_boxes:
             # here we have to exclude studies that do not have values
             # for all of the selected covariates
             cov_d[cov.name] = \
@@ -106,6 +112,18 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
         else:
             self.parent().analysis(result)
             self.accept()
+
+    def _selected_covariates(self):
+        return [
+            cov
+            for cov, chk_box in self.covs_and_check_boxes
+            if chk_box.isChecked()
+        ]
+
+    def _update_ok_button(self):
+        ok_button = self.buttonBox.button(QDialogButtonBox.Ok)
+        if ok_button is not None:
+            ok_button.setEnabled(bool(self._selected_covariates()))
         
     def _populate_combo_box(self):
         studies = self.model.get_studies(only_if_included=True)
@@ -128,6 +146,7 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
                 # check the first covariate by default
                 # (this is arbitrary)
                 chk_box.setChecked(True)
+            chk_box.toggled.connect(self._update_ok_button)
             chk_box_layout.addWidget(chk_box)
             self.covs_and_check_boxes.append((cov, chk_box))
                 

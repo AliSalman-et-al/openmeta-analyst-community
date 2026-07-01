@@ -288,8 +288,15 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.action_go.setEnabled(enable)
         self.action_cum_ma.setEnabled(enable)
         self.action_loo_ma.setEnabled(enable)
-        self.action_meta_regression.setEnabled(enable)
+        self._enable_action_meta_regression(enable)
         self._enable_action_subgroup_ma()
+
+    def _enable_action_meta_regression(self, dataset_analysis_enabled=None):
+        ''' Enables action_meta_regression if analysis can run and covariates exist. '''
+        if dataset_analysis_enabled is None:
+            dataset_analysis_enabled = self.action_go.isEnabled()
+        has_covariates = bool(self.model and self.model.dataset.covariates)
+        self.action_meta_regression.setEnabled(dataset_analysis_enabled and has_covariates)
         
     def _enable_action_subgroup_ma(self):
         ''' Enables action_subgroup_ma if there are suitable covariate(s)
@@ -798,13 +805,13 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.model.add_covariate(cov_name, cov_type)
         print("new covariate name: %s with type %s" % (cov_name, cov_type))
         self.tableView.resizeColumnsToContents()
-        self.action_meta_regression.setEnabled(True)
+        self._enable_action_meta_regression()
         
     def _undo_add_new_covariate(self, cov_name):
         self.model.remove_covariate(cov_name)
         self.tableView.resizeColumnsToContents()
         if len(self.model.covariates) == 0:
-            self.action_meta_regression.setEnabled(False)
+            self._enable_action_meta_regression()
         
     def add_new(self, startup_outcome = None):
         redo_f, undo_f = None, None
@@ -1221,11 +1228,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         else:
             self.disable_menu_options_that_require_dataset()
         
-        # covariates?
-        if len(data_model.covariates) > 0:
-            self.action_meta_regression.setEnabled(True)
-        else:
-            self.action_meta_regression.setEnabled(False)
+        self._enable_action_meta_regression(len(data_model) >= 2)
 
         self.tableView.setModel(self.model)
 

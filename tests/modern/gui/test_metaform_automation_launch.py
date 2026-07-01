@@ -613,6 +613,66 @@ def test_required_advanced_analysis_actions_open_real_gui_dialogs(monkeypatch):
             os.chdir(REPO_ROOT)
 
 
+def test_meta_regression_action_stays_disabled_without_covariates_when_data_are_enabled():
+    import launch
+
+    app, window = launch.start_automation()
+
+    try:
+        assert window.model.dataset.covariates == []
+
+        window.enable_menu_options_that_require_dataset()
+
+        assert window.action_go.isEnabled()
+        assert window.action_subgroup_ma.isEnabled() is False
+        assert window.action_meta_regression.isEnabled() is False
+    finally:
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
+def test_meta_regression_dialog_disables_ok_and_does_not_run_without_covariates(monkeypatch):
+    import launch
+    import meta_reg_form
+
+    app, window = launch.start_automation()
+    meta_py_r = sys.modules["meta_py_r"]
+    warnings = []
+    calls = []
+
+    monkeypatch.setattr(
+        meta_reg_form.QMessageBox,
+        "warning",
+        lambda *args: warnings.append(args),
+    )
+    monkeypatch.setattr(
+        meta_py_r,
+        "run_meta_regression",
+        lambda *args, **kwargs: calls.append((args, kwargs)),
+        raising=False,
+    )
+
+    try:
+        form = meta_reg_form.MetaRegForm(window.model, parent=window)
+
+        assert form.covs_and_check_boxes == []
+        assert form.buttonBox.button(QtWidgets.QDialogButtonBox.Ok).isEnabled() is False
+
+        form.run_meta_reg()
+
+        assert calls == []
+        assert warnings
+        assert warnings[0][1:3] == (
+            "No covariates selected",
+            "Select at least one covariate before running meta-regression.",
+        )
+    finally:
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
 def test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe(monkeypatch):
     from PyQt5 import QtCore
     import launch
