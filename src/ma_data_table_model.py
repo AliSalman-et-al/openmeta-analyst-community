@@ -23,6 +23,7 @@ from ma_dataset import Dataset,Outcome,Study,Covariate
 from meta_globals import *
 import calculator_routines as calc_fncs
 import meta_py_r
+import qt_text
 
 # number of (empty) rows in the spreadsheet to show
 # following the last study.
@@ -35,9 +36,7 @@ def _item_data(value=None):
 
 
 def _editable_data(value=None):
-    if value is None:
-        return ""
-    if isinstance(value, QtCore.QVariant) and not value.isValid():
+    if value is None or qt_text.is_invalid_qvariant(value):
         return ""
     return value
 
@@ -51,7 +50,7 @@ class _QtText(str):
 
 
 def _to_text_value(value):
-    if isinstance(value, QtCore.QVariant) and not value.isValid():
+    if qt_text.is_invalid_qvariant(value):
         return _QtText("")
     if hasattr(value, "toString"):
         return value.toString()
@@ -59,15 +58,7 @@ def _to_text_value(value):
 
 
 def _to_native_text(value):
-    if value is None or (isinstance(value, QtCore.QVariant) and not value.isValid()):
-        return ""
-    if hasattr(value, "toString"):
-        value = value.toString()
-    if hasattr(value, "toUtf8"):
-        return str(value.toUtf8(), encoding="utf8")
-    if isinstance(value, bytes):
-        return str(value, encoding="utf8")
-    return str(value)
+    return qt_text.to_native_text(value)
 
 
 def _to_int(value):
@@ -2022,7 +2013,7 @@ class DatasetModel(QAbstractTableModel):
         
         # set in R as well
         r_str = "set.global.conf.level("+str(float(conf_lev))+")"
-        new_cl_in_R = meta_py_r.ro.r(r_str)[0]
+        new_cl_in_R = meta_py_r.execute_r_string(r_str)[0]
         print(("Set confidence level in R to: %f" % new_cl_in_R))
 
         self.confLevelChanged.emit()

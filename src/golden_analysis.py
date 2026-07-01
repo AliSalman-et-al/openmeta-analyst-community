@@ -603,7 +603,7 @@ def _sha256(path):
 def _tool_versions():
     versions = {"openmeta_analyst": str(meta_globals.VERSION), "python": sys.version.split()[0], "os": platform.system(), "platform": platform.platform()}
     try:
-        versions["r"] = str(meta_py_r.ro.r("R.version.string")[0])
+        versions["r"] = str(meta_py_r.execute_r_string("R.version.string")[0])
     except Exception:
         versions["r"] = None
     try:
@@ -636,7 +636,7 @@ def _package_versions(tool_versions):
 
 def _r_package_version(package_name):
     try:
-        return str(meta_py_r.ro.r("as.character(utils::packageVersion('%s'))" % package_name)[0])
+        return str(meta_py_r.execute_r_string("as.character(utils::packageVersion('%s'))" % package_name)[0])
     except Exception:
         return None
 

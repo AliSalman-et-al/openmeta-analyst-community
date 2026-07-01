@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import sys
 import threading
 
@@ -6,6 +7,20 @@ import threading
 sys.path.insert(0, os.path.abspath("src"))
 
 import r_call_serialization
+
+
+def test_application_code_does_not_bypass_serialized_r_backend_entrypoints():
+    root = Path(__file__).resolve().parents[3]
+    offenders = []
+
+    for path in (root / "src").glob("*.py"):
+        if path.name in {"meta_py_r.py", "meta_py_r_backend.py"}:
+            continue
+        text = path.read_text(encoding="utf-8")
+        if "meta_py_r.ro.r" in text:
+            offenders.append(str(path.relative_to(root)))
+
+    assert offenders == []
 
 
 def test_r_backend_calls_are_serialized_across_threads():

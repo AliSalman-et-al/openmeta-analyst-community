@@ -46,6 +46,8 @@ def install_stub_meta_py_r():
     meta_py_r.get_mult_from_r = lambda conf_level: 1.96
     meta_py_r.get_R_libpaths = lambda: []
     meta_py_r.reset_Rs_working_dir = lambda: None
+    meta_py_r.execute_r_string = lambda expression: [95.0]
+    meta_py_r.execute_r_function = lambda function_name, *args, **kwargs: [95.0]
     meta_py_r.binary_convert_scale = lambda value, *args, **kwargs: value
     meta_py_r.continuous_convert_scale = lambda value, *args, **kwargs: value
     meta_py_r.diagnostic_convert_scale = lambda value, *args, **kwargs: value

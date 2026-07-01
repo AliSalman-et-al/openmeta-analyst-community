@@ -36,6 +36,7 @@ import meta_globals
 from meta_globals import *
 import ma_dataset
 import legacy_pickle
+import qt_text
 from settings import *
 
 # additional forms
@@ -68,9 +69,7 @@ def _application_root():
 
 
 def _qt_item_text(value):
-    if hasattr(value, "toString"):
-        return str(value.toString())
-    return str(value)
+    return qt_text.to_native_text(value)
 
 
 def _resolve_open_file_path(file_path):
@@ -100,11 +99,11 @@ def _load_legacy_pickle(file_path):
 
 def _qt_dialog_path(value):
     value = value[0] if isinstance(value, tuple) else value
-    return str(value.toUtf8(), "utf8") if hasattr(value, "toUtf8") else str(value)
+    return qt_text.to_native_text(value)
 
 
 def _qt_text(value):
-    return str(value.toUtf8(), "utf8") if hasattr(value, "toUtf8") else str(value)
+    return qt_text.to_native_text(value)
 
 
 def _connect_action(action, callback):

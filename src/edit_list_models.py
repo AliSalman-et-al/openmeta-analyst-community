@@ -13,15 +13,11 @@
 # core libraries
 from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt
 
+import qt_text
+
 
 def _to_native_text(value):
-    if hasattr(value, "toString"):
-        value = value.toString()
-    if hasattr(value, "toUtf8"):
-        return str(value.toUtf8(), "utf-8")
-    if isinstance(value, bytes):
-        return str(value, "utf-8")
-    return "" if value is None else str(value)
+    return qt_text.to_native_text(value)
 
 
 class ResettableTableModel(QAbstractTableModel):

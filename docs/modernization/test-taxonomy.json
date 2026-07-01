@@ -53,6 +53,36 @@
       "decision": "keep",
       "evidence": [
         "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_dataset_model_edit_values.py::test_empty_editable_cells_return_blank_edit_text",
+      "reason": "Guards Qt model edit text normalization so empty cells do not surface invalid QVariant object representations.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_qt_text_boundaries.py::test_invalid_qvariant_is_blank_at_text_boundaries",
+      "reason": "Guards shared Qt text-boundary conversion against invalid QVariant object representations across GUI helpers.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
         "analysis_behavior"
       ],
       "external_dependencies": [
@@ -1706,6 +1736,36 @@
       "lane": "fast",
       "nodeid": "tests/modern/fast/test_pyqt5_generated_ui_imports.py::test_representative_generated_ui_modules_import_with_pyqt5",
       "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_r_call_serialization.py::test_application_code_does_not_bypass_serialized_r_backend_entrypoints",
+      "reason": "Prevents application code from bypassing the serialized in-process R backend boundary.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "threading"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_r_call_serialization.py::test_r_backend_calls_are_serialized_across_threads",
+      "reason": "Guards the process-wide serializer that prevents overlapping embedded R calls.",
       "runtime_class": "subsecond",
       "size": "small"
     },

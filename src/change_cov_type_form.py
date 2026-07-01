@@ -10,18 +10,11 @@ from meta_globals import *
 import forms.ui_change_cov_type
 from forms.ui_change_cov_type import Ui_ChangeCovTypeForm
 from ma_dataset import Covariate
+import qt_text
 
 
 def _to_native_text(value):
-    if value is None:
-        return ""
-    if hasattr(value, "toString"):
-        value = value.toString()
-    if hasattr(value, "toUtf8"):
-        return str(value.toUtf8(), encoding="utf8")
-    if isinstance(value, bytes):
-        return str(value, encoding="utf8")
-    return str(value)
+    return qt_text.to_native_text(value)
 
 
 def _to_double(value):

@@ -35,6 +35,7 @@ import diagnostic_data_form
 import ma_dataset
 from ma_dataset import *
 from meta_globals import *
+import qt_text
 
 # for issue #169 -- normalizing new lines, e.g., for pasting
 # use QRegExp to manipulate QStrings (rather than re)
@@ -46,11 +47,7 @@ def _connect_action(action, callback):
 
 
 def _to_text(value):
-    if value is None or (isinstance(value, QtCore.QVariant) and not value.isValid()):
-        return ""
-    if hasattr(value, "toString"):
-        return str(value.toString())
-    return str(value)
+    return qt_text.to_native_text(value)
 
 
 def DebugHelper(function):

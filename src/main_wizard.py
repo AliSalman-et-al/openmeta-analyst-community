@@ -18,6 +18,7 @@ from PyQt5.QtWidgets import (
     QWizardPage,
 )
 import meta_globals
+import qt_text
 from ma_data_table_model import DatasetModel
 from settings import get_default_open_directory
 
@@ -243,11 +244,7 @@ class ChooseMetricPage(QWizardPage, forms.ui_choose_metric_page.Ui_WizardPage):
 import csv
 
 def _qt_item_text(value):
-    if hasattr(value, "toString"):
-        value = value.toString()
-    if hasattr(value, "toUtf8"):
-        return str(value.toUtf8(), "utf8")
-    return str(value)
+    return qt_text.to_native_text(value)
 
 
 class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):

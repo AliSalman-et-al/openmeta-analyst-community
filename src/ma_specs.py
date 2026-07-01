@@ -33,6 +33,7 @@ import sys
 
 import forms.ui_ma_specs
 import meta_py_r
+import qt_text
 from meta_globals import *
 from settings import *
 import diagnostic_explain
@@ -548,9 +549,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
     def _enum_item_value(self, item_data):
         if hasattr(item_data, "value"):
             item_data = item_data.value()
-        elif hasattr(item_data, "toString"):
-            item_data = item_data.toString()
-        return str(item_data)
+        return qt_text.to_native_text(item_data)
     
     def set_param_f_from_itemdata(self, name, to_type=str):
         '''

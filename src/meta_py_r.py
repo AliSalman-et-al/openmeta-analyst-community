@@ -98,6 +98,11 @@ def execute_r_string(r_str):
         reset_Rs_working_dir()
         raise e
 
+
+@serialized_r_call
+def execute_r_function(function_name, *args, **kwargs):
+    return ro.r[function_name](*args, **kwargs)
+
 #################### R Library Loader ####################
 class RlibLoader:
     def __init__(self):
@@ -159,8 +164,7 @@ def reset_Rs_working_dir():
 
     print(("Trying to set base_path to %s" % base_path))
     r_str = "setwd('%s')" % base_path
-    # Executing r call with escaped backslashes
-    ro.r(r_str)
+    execute_r_string(r_str)
 
     print(("Set R's working directory to %s" % base_path))
 
@@ -419,7 +423,7 @@ def get_mult_from_r(confidence_level):
 @RfunctionCaller
 def none_to_null(x):
     if x is None:
-        return ro.r['as.null']()
+        return execute_r_function("as.null")
     return x
 
 def get_params(method_name):
@@ -1245,11 +1249,11 @@ def _is_table_summary(r_object):
 
 
 def _is_summary_display(r_object):
-    return bool(ro.r["inherits"](r_object, "summary.display")[0])
+    return bool(execute_r_function("inherits", r_object, "summary.display")[0])
 
 
 def _capture_formatted_summary(r_object):
-    return ro.r["capture.output.and.collapse"](r_object)[0]
+    return execute_r_function("capture.output.and.collapse", r_object)[0]
 
 
 def _format_table_summary(section_name, r_object, title=None):
@@ -1330,14 +1334,14 @@ def _is_r_string_vector(r_object):
 
 
 def _r_dims(r_object):
-    dims = ro.r["dim"](r_object)
+    dims = execute_r_function("dim", r_object)
     if _r_is_null(dims):
         return []
     return [int(dim) for dim in list(dims)]
 
 
 def _r_dimnames(r_object):
-    dimnames = ro.r["dimnames"](r_object)
+    dimnames = execute_r_function("dimnames", r_object)
     if _r_is_null(dimnames):
         return []
     return [

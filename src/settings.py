@@ -12,6 +12,7 @@ import os
 import sys
 from PyQt5 import QtCore, QtGui
 import meta_py_r
+import qt_text
 
 QColor = QtGui.QColor
 QDir = QtCore.QDir
@@ -87,7 +88,7 @@ def _get_setting_helper(field):
         foo_list = []
         for i in indexes:
             value = settings.value(i)
-            foo_list.append(str(value.toString().toUtf8(), 'utf8') if hasattr(value, "toString") else str(value))
+            foo_list.append(qt_text.to_native_text(value))
         settings.endGroup()
         setting_value = foo_list
     elif value_type == dict:
@@ -103,7 +104,7 @@ def _get_setting_helper(field):
             setting_value = bool(value)
     elif value_type == str:
         value = settings.value(field)
-        setting_value = value.toString() if hasattr(value, "toString") else str(value)
+        setting_value = qt_text.to_native_text(value)
     elif value_type == str:
         settings.setValue(field, value)
     elif value_type == int:
