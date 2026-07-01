@@ -15,6 +15,10 @@
     <family>Verdana</family>
    </font>
   </property>
+  <property name="windowIcon">
+   <iconset resource="../images/icons.qrc">
+    <normaloff>:/misc/meta.png</normaloff>:/misc/meta.png</iconset>
+  </property>
   <property name="windowTitle">
    <string>select covariate</string>
   </property>

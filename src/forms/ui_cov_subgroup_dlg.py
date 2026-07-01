@@ -18,15 +18,16 @@ class Ui_cov_subgroup_dialog(object):
         font = QtGui.QFont()
         font.setFamily("Verdana")
         cov_subgroup_dialog.setFont(font)
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        cov_subgroup_dialog.setWindowIcon(icon)
         self.buttonBox = QtWidgets.QDialogButtonBox(cov_subgroup_dialog)
         self.buttonBox.setGeometry(QtCore.QRect(10, 100, 281, 32))
         font = QtGui.QFont()
         font.setFamily("Verdana")
         self.buttonBox.setFont(font)
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(
-            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
-        )
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
         self.buttonBox.setObjectName("buttonBox")
         self.label = QtWidgets.QLabel(cov_subgroup_dialog)
         self.label.setGeometry(QtCore.QRect(20, 30, 121, 41))
@@ -47,9 +48,6 @@ class Ui_cov_subgroup_dialog(object):
 
     def retranslateUi(self, cov_subgroup_dialog):
         _translate = QtCore.QCoreApplication.translate
-        cov_subgroup_dialog.setWindowTitle(
-            _translate("cov_subgroup_dialog", "select covariate")
-        )
-        self.label.setText(
-            _translate("cov_subgroup_dialog", "covariate for \nsubgroups:")
-        )
+        cov_subgroup_dialog.setWindowTitle(_translate("cov_subgroup_dialog", "select covariate"))
+        self.label.setText(_translate("cov_subgroup_dialog", "covariate for \n"
+"subgroups:"))

@@ -15,23 +15,16 @@ class Ui_ChooseBackCalcResultForm(object):
     def setupUi(self, ChooseBackCalcResultForm):
         ChooseBackCalcResultForm.setObjectName("ChooseBackCalcResultForm")
         ChooseBackCalcResultForm.resize(482, 221)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.MinimumExpanding,
-            QtWidgets.QSizePolicy.MinimumExpanding,
-        )
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.MinimumExpanding)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(
-            ChooseBackCalcResultForm.sizePolicy().hasHeightForWidth()
-        )
+        sizePolicy.setHeightForWidth(ChooseBackCalcResultForm.sizePolicy().hasHeightForWidth())
         ChooseBackCalcResultForm.setSizePolicy(sizePolicy)
         ChooseBackCalcResultForm.setMinimumSize(QtCore.QSize(480, 0))
         self.verticalLayout = QtWidgets.QVBoxLayout(ChooseBackCalcResultForm)
         self.verticalLayout.setObjectName("verticalLayout")
         self.info_label = QtWidgets.QLabel(ChooseBackCalcResultForm)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Preferred
-        )
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.info_label.sizePolicy().hasHeightForWidth())
@@ -56,29 +49,20 @@ class Ui_ChooseBackCalcResultForm(object):
         self.verticalLayout.addLayout(self.horizontalLayout)
         self.buttonBox = QtWidgets.QDialogButtonBox(ChooseBackCalcResultForm)
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(
-            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
-        )
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
         self.buttonBox.setObjectName("buttonBox")
         self.verticalLayout.addWidget(self.buttonBox)
 
         self.retranslateUi(ChooseBackCalcResultForm)
-        self.buttonBox.accepted.connect(ChooseBackCalcResultForm.accept)  # type: ignore
-        self.buttonBox.rejected.connect(ChooseBackCalcResultForm.reject)  # type: ignore
+        self.buttonBox.accepted.connect(ChooseBackCalcResultForm.accept) # type: ignore
+        self.buttonBox.rejected.connect(ChooseBackCalcResultForm.reject) # type: ignore
         QtCore.QMetaObject.connectSlotsByName(ChooseBackCalcResultForm)
 
     def retranslateUi(self, ChooseBackCalcResultForm):
         _translate = QtCore.QCoreApplication.translate
-        ChooseBackCalcResultForm.setWindowTitle(
-            _translate("ChooseBackCalcResultForm", "Choose Back Calculation Result")
-        )
-        self.info_label.setText(
-            _translate(
-                "ChooseBackCalcResultForm",
-                "The back-calculation has resulted in two possible sets of choices for the counts.\n"
-                "\n"
-                "Please choose one from below:",
-            )
-        )
+        ChooseBackCalcResultForm.setWindowTitle(_translate("ChooseBackCalcResultForm", "Choose Back Calculation Result"))
+        self.info_label.setText(_translate("ChooseBackCalcResultForm", "The back-calculation has resulted in two possible sets of choices for the counts.\n"
+"\n"
+"Please choose one from below:"))
         self.choice1_btn.setText(_translate("ChooseBackCalcResultForm", "Choice 1"))
         self.choice2_btn.setText(_translate("ChooseBackCalcResultForm", "Choice 2"))

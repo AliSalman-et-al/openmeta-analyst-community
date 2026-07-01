@@ -38,11 +38,7 @@ class Ui_edit_dialog(object):
         self.add_outcome_btn.setMaximumSize(QtCore.QSize(32, 32))
         self.add_outcome_btn.setText("")
         icon = QtGui.QIcon()
-        icon.addPixmap(
-            QtGui.QPixmap(":/function_icon_set/function_icon_set/add_48.png"),
-            QtGui.QIcon.Normal,
-            QtGui.QIcon.Off,
-        )
+        icon.addPixmap(QtGui.QPixmap(":/function_icon_set/function_icon_set/add_48.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.add_outcome_btn.setIcon(icon)
         self.add_outcome_btn.setIconSize(QtCore.QSize(32, 32))
         self.add_outcome_btn.setObjectName("add_outcome_btn")
@@ -53,11 +49,7 @@ class Ui_edit_dialog(object):
         self.remove_outcome_btn.setMaximumSize(QtCore.QSize(32, 32))
         self.remove_outcome_btn.setText("")
         icon1 = QtGui.QIcon()
-        icon1.addPixmap(
-            QtGui.QPixmap(":/function_icon_set/function_icon_set/cancel_48.png"),
-            QtGui.QIcon.Normal,
-            QtGui.QIcon.Off,
-        )
+        icon1.addPixmap(QtGui.QPixmap(":/function_icon_set/function_icon_set/cancel_48.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.remove_outcome_btn.setIcon(icon1)
         self.remove_outcome_btn.setIconSize(QtCore.QSize(32, 32))
         self.remove_outcome_btn.setObjectName("remove_outcome_btn")
@@ -173,16 +165,14 @@ class Ui_edit_dialog(object):
         self.verticalLayout.addWidget(self.edit_tab)
         self.buttonBox = QtWidgets.QDialogButtonBox(edit_dialog)
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(
-            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
-        )
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
         self.buttonBox.setObjectName("buttonBox")
         self.verticalLayout.addWidget(self.buttonBox)
 
         self.retranslateUi(edit_dialog)
         self.edit_tab.setCurrentIndex(0)
-        self.buttonBox.accepted.connect(edit_dialog.accept)  # type: ignore
-        self.buttonBox.rejected.connect(edit_dialog.reject)  # type: ignore
+        self.buttonBox.accepted.connect(edit_dialog.accept) # type: ignore
+        self.buttonBox.rejected.connect(edit_dialog.reject) # type: ignore
         QtCore.QMetaObject.connectSlotsByName(edit_dialog)
 
     def retranslateUi(self, edit_dialog):
@@ -191,16 +181,7 @@ class Ui_edit_dialog(object):
         self.groupBox_2.setTitle(_translate("edit_dialog", "outcomes"))
         self.grpbox_follow_ups.setTitle(_translate("edit_dialog", "follow-ups"))
         self.groupBox.setTitle(_translate("edit_dialog", "tx groups"))
-        self.edit_tab.setTabText(
-            self.edit_tab.indexOf(self.tab),
-            _translate("edit_dialog", "outcomes/follow-ups/groups"),
-        )
-        self.edit_tab.setTabText(
-            self.edit_tab.indexOf(self.tab_2), _translate("edit_dialog", "studies")
-        )
-        self.edit_tab.setTabText(
-            self.edit_tab.indexOf(self.tab_3), _translate("edit_dialog", "covariates")
-        )
-
-
+        self.edit_tab.setTabText(self.edit_tab.indexOf(self.tab), _translate("edit_dialog", "outcomes/follow-ups/groups"))
+        self.edit_tab.setTabText(self.edit_tab.indexOf(self.tab_2), _translate("edit_dialog", "studies"))
+        self.edit_tab.setTabText(self.edit_tab.indexOf(self.tab_3), _translate("edit_dialog", "covariates"))
 import icons_rc

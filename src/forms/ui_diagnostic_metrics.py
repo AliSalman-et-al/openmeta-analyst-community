@@ -22,9 +22,7 @@ class Ui_diag_metric(object):
         font.setFamily("Verdana")
         diag_metric.setFont(font)
         icon = QtGui.QIcon()
-        icon.addPixmap(
-            QtGui.QPixmap(":/images/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
-        )
+        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         diag_metric.setWindowIcon(icon)
         self.gridLayout_2 = QtWidgets.QGridLayout(diag_metric)
         self.gridLayout_2.setObjectName("gridLayout_2")
@@ -50,17 +48,13 @@ class Ui_diag_metric(object):
         self.chk_box_dor.setChecked(True)
         self.chk_box_dor.setObjectName("chk_box_dor")
         self.gridLayout.addWidget(self.chk_box_dor, 2, 1, 1, 1)
-        spacerItem = QtWidgets.QSpacerItem(
-            20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding
-        )
+        spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.gridLayout.addItem(spacerItem, 1, 0, 1, 1)
         self.verticalLayout.addLayout(self.gridLayout)
         self.gridLayout_2.addWidget(self.metrics_grp_box, 0, 0, 1, 1)
         self.horizontalLayout = QtWidgets.QHBoxLayout()
         self.horizontalLayout.setObjectName("horizontalLayout")
-        spacerItem1 = QtWidgets.QSpacerItem(
-            200, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
-        )
+        spacerItem1 = QtWidgets.QSpacerItem(200, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.horizontalLayout.addItem(spacerItem1)
         self.btn_ok = QtWidgets.QPushButton(diag_metric)
         self.btn_ok.setMaximumSize(QtCore.QSize(75, 23))
@@ -74,14 +68,10 @@ class Ui_diag_metric(object):
     def retranslateUi(self, diag_metric):
         _translate = QtCore.QCoreApplication.translate
         diag_metric.setWindowTitle(_translate("diag_metric", "Diagnostic Metrics"))
-        self.metrics_grp_box.setTitle(
-            _translate("diag_metric", "select metrics for analysis")
-        )
+        self.metrics_grp_box.setTitle(_translate("diag_metric", "select metrics for analysis"))
         self.chk_box_sens.setText(_translate("diag_metric", "sensitivity"))
         self.chk_box_spec.setText(_translate("diag_metric", "specificity"))
         self.chk_box_lr.setText(_translate("diag_metric", "likelihood ratio"))
         self.chk_box_dor.setText(_translate("diag_metric", "diagnostic odds ratio"))
         self.btn_ok.setText(_translate("diag_metric", "next >"))
-
-
 import icons_rc

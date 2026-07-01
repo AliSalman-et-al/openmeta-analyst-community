@@ -22,9 +22,7 @@ class Ui_new_group_dialog(object):
         font.setFamily("Verdana")
         new_group_dialog.setFont(font)
         icon = QtGui.QIcon()
-        icon.addPixmap(
-            QtGui.QPixmap(":/images/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
-        )
+        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         new_group_dialog.setWindowIcon(icon)
         self.buttonBox = QtWidgets.QDialogButtonBox(new_group_dialog)
         self.buttonBox.setGeometry(QtCore.QRect(10, 90, 281, 32))
@@ -32,9 +30,7 @@ class Ui_new_group_dialog(object):
         font.setFamily("Verdana")
         self.buttonBox.setFont(font)
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(
-            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
-        )
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
         self.buttonBox.setObjectName("buttonBox")
         self.layoutWidget = QtWidgets.QWidget(new_group_dialog)
         self.layoutWidget.setGeometry(QtCore.QRect(10, 10, 281, 71))
@@ -58,16 +54,12 @@ class Ui_new_group_dialog(object):
         self.gridLayout.addWidget(self.group_name_le, 0, 1, 1, 1)
 
         self.retranslateUi(new_group_dialog)
-        self.buttonBox.accepted.connect(new_group_dialog.accept)  # type: ignore
-        self.buttonBox.rejected.connect(new_group_dialog.reject)  # type: ignore
+        self.buttonBox.accepted.connect(new_group_dialog.accept) # type: ignore
+        self.buttonBox.rejected.connect(new_group_dialog.reject) # type: ignore
         QtCore.QMetaObject.connectSlotsByName(new_group_dialog)
 
     def retranslateUi(self, new_group_dialog):
         _translate = QtCore.QCoreApplication.translate
-        new_group_dialog.setWindowTitle(
-            _translate("new_group_dialog", "add new tx group (arm)")
-        )
+        new_group_dialog.setWindowTitle(_translate("new_group_dialog", "add new tx group (arm)"))
         self.label_2.setText(_translate("new_group_dialog", "tx group name:"))
-
-
 import icons_rc

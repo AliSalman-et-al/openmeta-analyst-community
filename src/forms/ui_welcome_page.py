@@ -15,9 +15,7 @@ class Ui_WizardPage(object):
     def setupUi(self, WizardPage):
         WizardPage.setObjectName("WizardPage")
         WizardPage.resize(350, 230)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed
-        )
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(WizardPage.sizePolicy().hasHeightForWidth())
@@ -28,39 +26,25 @@ class Ui_WizardPage(object):
         self.verticalLayout_2.setObjectName("verticalLayout_2")
         self.horizontalLayout = QtWidgets.QHBoxLayout()
         self.horizontalLayout.setObjectName("horizontalLayout")
-        spacerItem = QtWidgets.QSpacerItem(
-            40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
-        )
+        spacerItem = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.horizontalLayout.addItem(spacerItem)
         self.verticalLayout = QtWidgets.QVBoxLayout()
         self.verticalLayout.setObjectName("verticalLayout")
         self.create_new_btn = QtWidgets.QPushButton(WizardPage)
         icon = QtGui.QIcon()
-        icon.addPixmap(
-            QtGui.QPixmap(":/function_icon_set/function_icon_set/add_48.png"),
-            QtGui.QIcon.Normal,
-            QtGui.QIcon.Off,
-        )
+        icon.addPixmap(QtGui.QPixmap(":/function_icon_set/function_icon_set/add_48.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.create_new_btn.setIcon(icon)
         self.create_new_btn.setObjectName("create_new_btn")
         self.verticalLayout.addWidget(self.create_new_btn)
         self.import_csv_btn = QtWidgets.QPushButton(WizardPage)
         icon1 = QtGui.QIcon()
-        icon1.addPixmap(
-            QtGui.QPixmap(":/function_icon_set/function_icon_set/box_download_48.png"),
-            QtGui.QIcon.Normal,
-            QtGui.QIcon.Off,
-        )
+        icon1.addPixmap(QtGui.QPixmap(":/function_icon_set/function_icon_set/box_download_48.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.import_csv_btn.setIcon(icon1)
         self.import_csv_btn.setObjectName("import_csv_btn")
         self.verticalLayout.addWidget(self.import_csv_btn)
         self.open_recent_btn = QtWidgets.QPushButton(WizardPage)
         icon2 = QtGui.QIcon()
-        icon2.addPixmap(
-            QtGui.QPixmap(":/function_icon_set/function_icon_set/folder_48.png"),
-            QtGui.QIcon.Normal,
-            QtGui.QIcon.Off,
-        )
+        icon2.addPixmap(QtGui.QPixmap(":/function_icon_set/function_icon_set/folder_48.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.open_recent_btn.setIcon(icon2)
         self.open_recent_btn.setObjectName("open_recent_btn")
         self.verticalLayout.addWidget(self.open_recent_btn)
@@ -69,14 +53,10 @@ class Ui_WizardPage(object):
         self.open_btn.setObjectName("open_btn")
         self.verticalLayout.addWidget(self.open_btn)
         self.horizontalLayout.addLayout(self.verticalLayout)
-        spacerItem1 = QtWidgets.QSpacerItem(
-            40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
-        )
+        spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.horizontalLayout.addItem(spacerItem1)
         self.verticalLayout_2.addLayout(self.horizontalLayout)
-        spacerItem2 = QtWidgets.QSpacerItem(
-            20, 9, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding
-        )
+        spacerItem2 = QtWidgets.QSpacerItem(20, 9, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.verticalLayout_2.addItem(spacerItem2)
         self.line = QtWidgets.QFrame(WizardPage)
         self.line.setFrameShape(QtWidgets.QFrame.HLine)
@@ -127,24 +107,7 @@ class Ui_WizardPage(object):
         self.import_csv_btn.setText(_translate("WizardPage", "Import CSV"))
         self.open_recent_btn.setText(_translate("WizardPage", "Open recent..."))
         self.open_btn.setText(_translate("WizardPage", "Open an existing dataset"))
-        self.oma_onlineLabel.setText(
-            _translate(
-                "WizardPage",
-                '<html><head/><body><p><a href="http://www.cebm.brown.edu/open_meta"><span style=" text-decoration: underline; color:#0000ff;">OpenMeta Website</span></a></p></body></html>',
-            )
-        )
-        self.how_to_citeLabel.setText(
-            _translate(
-                "WizardPage",
-                '<a href="https://www.jstatsoft.org/article/view/v049i05">How to cite</a>',
-            )
-        )
-        self.helpLabel.setText(
-            _translate(
-                "WizardPage",
-                '<a href="http://tuftscaes.org/open_meta/help/openMA_help.html">Help</a>',
-            )
-        )
-
-
+        self.oma_onlineLabel.setText(_translate("WizardPage", "<html><head/><body><p><a href=\"http://www.cebm.brown.edu/open_meta\"><span style=\" text-decoration: underline; color:#0000ff;\">OpenMeta Website</span></a></p></body></html>"))
+        self.how_to_citeLabel.setText(_translate("WizardPage", "<a href=\"https://www.jstatsoft.org/article/view/v049i05\">How to cite</a>"))
+        self.helpLabel.setText(_translate("WizardPage", "<a href=\"http://tuftscaes.org/open_meta/help/openMA_help.html\">Help</a>"))
 import icons_rc

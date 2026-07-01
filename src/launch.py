@@ -1,7 +1,7 @@
 import sys, time
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QThread
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtWidgets import QSplashScreen
 
 import os
@@ -17,6 +17,7 @@ meta_py_r_backend.install_meta_py_r_backend()
 import settings
 
 SPLASH_DISPLAY_TIME = 0  # TODO: change to 5 seconds in production version
+APPLICATION_ICON_PATH = ":/misc/meta.ico"
 
 
 def _native_windows_command_line_argv():
@@ -131,6 +132,7 @@ def start():
     app = QtWidgets.QApplication(list(sys.argv))
     app.setApplicationName(meta_globals.APPLICATION_NAME)
     app.setOrganizationName(meta_globals.ORGANIZATION_NAME)
+    _set_application_icon(app)
     settings.setup_directories()
 
     splash_pixmap = QPixmap(":/misc/splash.png")
@@ -175,12 +177,17 @@ def start_automation():
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
     app.setApplicationName(meta_globals.APPLICATION_NAME)
     app.setOrganizationName(meta_globals.ORGANIZATION_NAME)
+    _set_application_icon(app)
     settings.setup_directories()
     if os.environ.get("OMA_REQUIRE_IN_PROCESS_RPY2") == "1":
         load_R_libraries(app, None)
     meta = meta_form.MetaForm()
     meta.show()
     return app, meta
+
+
+def _set_application_icon(app):
+    app.setWindowIcon(QIcon(APPLICATION_ICON_PATH))
 
 
 def start_automation_smoke(sample_path):

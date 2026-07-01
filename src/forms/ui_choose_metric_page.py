@@ -15,9 +15,7 @@ class Ui_WizardPage(object):
     def setupUi(self, WizardPage):
         WizardPage.setObjectName("WizardPage")
         WizardPage.resize(400, 220)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed
-        )
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(WizardPage.sizePolicy().hasHeightForWidth())
@@ -39,14 +37,10 @@ class Ui_WizardPage(object):
         self.metric_cbo_box = QtWidgets.QComboBox(WizardPage)
         self.metric_cbo_box.setObjectName("metric_cbo_box")
         self.horizontalLayout.addWidget(self.metric_cbo_box)
-        spacerItem = QtWidgets.QSpacerItem(
-            40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
-        )
+        spacerItem = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.horizontalLayout.addItem(spacerItem)
         self.verticalLayout.addLayout(self.horizontalLayout)
-        spacerItem1 = QtWidgets.QSpacerItem(
-            20, 46, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding
-        )
+        spacerItem1 = QtWidgets.QSpacerItem(20, 46, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.verticalLayout.addItem(spacerItem1)
 
         self.retranslateUi(WizardPage)
@@ -56,12 +50,7 @@ class Ui_WizardPage(object):
         _translate = QtCore.QCoreApplication.translate
         WizardPage.setWindowTitle(_translate("WizardPage", "WizardPage"))
         WizardPage.setTitle(_translate("WizardPage", "Choose a metric..."))
-        self.label_2.setText(
-            _translate(
-                "WizardPage",
-                "Please choose the appropriate metric for the data type you just selected or just accept the listed default.\n"
-                "\n"
-                "Note, however, that if you are importing data via a CSV and you have effect data, it is ESSENTIAL that you choose the proper metric corresponding to your data now.",
-            )
-        )
+        self.label_2.setText(_translate("WizardPage", "Please choose the appropriate metric for the data type you just selected or just accept the listed default.\n"
+"\n"
+"Note, however, that if you are importing data via a CSV and you have effect data, it is ESSENTIAL that you choose the proper metric corresponding to your data now."))
         self.label.setText(_translate("WizardPage", "Metric:"))

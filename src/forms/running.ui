@@ -23,7 +23,7 @@
   </property>
   <property name="windowIcon">
    <iconset>
-    <normaloff>:/images/meta.png</normaloff>:/images/meta.png</iconset>
+    <normaloff>:/misc/meta.png</normaloff>:/misc/meta.png</iconset>
   </property>
   <property name="sizeGripEnabled">
    <bool>false</bool>

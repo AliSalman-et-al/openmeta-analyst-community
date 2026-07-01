@@ -22,9 +22,7 @@ class Ui_Dialog(object):
         font.setFamily("Verdana")
         Dialog.setFont(font)
         icon = QtGui.QIcon()
-        icon.addPixmap(
-            QtGui.QPixmap(":/images/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
-        )
+        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         Dialog.setWindowIcon(icon)
         self.buttonBox = QtWidgets.QDialogButtonBox(Dialog)
         self.buttonBox.setGeometry(QtCore.QRect(10, 90, 281, 32))
@@ -32,9 +30,7 @@ class Ui_Dialog(object):
         font.setFamily("Verdana")
         self.buttonBox.setFont(font)
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(
-            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
-        )
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
         self.buttonBox.setObjectName("buttonBox")
         self.layoutWidget = QtWidgets.QWidget(Dialog)
         self.layoutWidget.setGeometry(QtCore.QRect(10, 10, 281, 71))
@@ -71,8 +67,8 @@ class Ui_Dialog(object):
         self.gridLayout.addWidget(self.datatype_cbo_box, 1, 1, 1, 1)
 
         self.retranslateUi(Dialog)
-        self.buttonBox.accepted.connect(Dialog.accept)  # type: ignore
-        self.buttonBox.rejected.connect(Dialog.reject)  # type: ignore
+        self.buttonBox.accepted.connect(Dialog.accept) # type: ignore
+        self.buttonBox.rejected.connect(Dialog.reject) # type: ignore
         QtCore.QMetaObject.connectSlotsByName(Dialog)
 
     def retranslateUi(self, Dialog):
@@ -80,6 +76,4 @@ class Ui_Dialog(object):
         Dialog.setWindowTitle(_translate("Dialog", "add new outcome"))
         self.label_2.setText(_translate("Dialog", "outcome name:"))
         self.label.setText(_translate("Dialog", "type of outcome:"))
-
-
 import icons_rc

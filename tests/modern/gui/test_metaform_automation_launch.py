@@ -4,6 +4,7 @@ import sys
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("OMA_STUB_BACKEND", "1")
 sys.path.insert(0, os.path.abspath("src"))
+sys.path.insert(0, os.path.abspath(os.path.join("src", "forms")))
 
 import pytest
 from PyQt5 import QtWidgets
@@ -82,12 +83,45 @@ def test_automation_launch_creates_and_closes_real_metaform_shell():
     meta_form = sys.modules["meta_form"]
 
     assert app is QtWidgets.QApplication.instance()
+    assert app.windowIcon().isNull() is False
     assert isinstance(window, meta_form.MetaForm)
     assert window.isVisible()
 
     window.close()
     app.processEvents()
     os.chdir(REPO_ROOT)
+
+
+def test_openmeta_logo_resource_is_valid_and_used_consistently():
+    import icons_rc  # noqa: F401
+    from PyQt5 import QtGui
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app_icon = QtGui.QIcon(":/misc/meta.ico")
+    logo_pixmap = QtGui.QPixmap(":/misc/meta.png")
+
+    assert app_icon.isNull() is False
+    assert logo_pixmap.isNull() is False
+
+    checked_paths = [
+        os.path.join("src", "meta.ui"),
+        os.path.join("src", "results_window.ui"),
+    ]
+    checked_paths.extend(
+        os.path.join("src", "forms", file_name)
+        for file_name in os.listdir(os.path.join(REPO_ROOT, "src", "forms"))
+        if file_name.endswith((".ui", ".py"))
+    )
+    broken_logo_path = ":/images/" + "meta.png"
+
+    broken_logo_refs = [
+        path
+        for path in checked_paths
+        if os.path.exists(path)
+        and broken_logo_path in open(path, encoding="utf-8").read()
+    ]
+
+    assert broken_logo_refs == []
 
 
 def test_automation_launch_shows_default_confidence_level_at_startup():

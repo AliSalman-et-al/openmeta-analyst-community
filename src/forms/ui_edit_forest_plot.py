@@ -16,9 +16,7 @@ class Ui_edit_forest_plot_dlg(object):
         edit_forest_plot_dlg.setObjectName("edit_forest_plot_dlg")
         edit_forest_plot_dlg.resize(506, 434)
         icon = QtGui.QIcon()
-        icon.addPixmap(
-            QtGui.QPixmap(":/images/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
-        )
+        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         edit_forest_plot_dlg.setWindowIcon(icon)
         self.verticalLayout = QtWidgets.QVBoxLayout(edit_forest_plot_dlg)
         self.verticalLayout.setObjectName("verticalLayout")
@@ -126,23 +124,19 @@ class Ui_edit_forest_plot_dlg(object):
         self.verticalLayout.addWidget(self.buttonBox)
 
         self.retranslateUi(edit_forest_plot_dlg)
-        self.buttonBox.accepted.connect(edit_forest_plot_dlg.accept)  # type: ignore
-        self.buttonBox.rejected.connect(edit_forest_plot_dlg.reject)  # type: ignore
+        self.buttonBox.accepted.connect(edit_forest_plot_dlg.accept) # type: ignore
+        self.buttonBox.rejected.connect(edit_forest_plot_dlg.reject) # type: ignore
         QtCore.QMetaObject.connectSlotsByName(edit_forest_plot_dlg)
 
     def retranslateUi(self, edit_forest_plot_dlg):
         _translate = QtCore.QCoreApplication.translate
-        edit_forest_plot_dlg.setWindowTitle(
-            _translate("edit_forest_plot_dlg", "edit forest plot")
-        )
+        edit_forest_plot_dlg.setWindowTitle(_translate("edit_forest_plot_dlg", "edit forest plot"))
         self.groupBox.setTitle(_translate("edit_forest_plot_dlg", "column labels"))
         self.label_2.setText(_translate("edit_forest_plot_dlg", "col 1 label:"))
         self.col1_str_edit.setText(_translate("edit_forest_plot_dlg", "Studies"))
         self.show_1.setText(_translate("edit_forest_plot_dlg", "show"))
         self.label_4.setText(_translate("edit_forest_plot_dlg", "col 2 label:"))
-        self.col2_str_edit.setText(
-            _translate("edit_forest_plot_dlg", "Estimate (Conf. Int.)")
-        )
+        self.col2_str_edit.setText(_translate("edit_forest_plot_dlg", "Estimate (Conf. Int.)"))
         self.show_2.setText(_translate("edit_forest_plot_dlg", "show"))
         self.label_5.setText(_translate("edit_forest_plot_dlg", "col 3 label:"))
         self.col3_str_edit.setText(_translate("edit_forest_plot_dlg", "Ev/Trt"))
@@ -160,10 +154,6 @@ class Ui_edit_forest_plot_dlg(object):
         self.label_16.setText(_translate("edit_forest_plot_dlg", "show summary line:"))
         self.x_lbl_le.setText(_translate("edit_forest_plot_dlg", "[default]"))
         self.label_3.setText(_translate("edit_forest_plot_dlg", "save image to:"))
-        self.image_path.setText(
-            _translate("edit_forest_plot_dlg", "./r_tmp/forest.png")
-        )
+        self.image_path.setText(_translate("edit_forest_plot_dlg", "./r_tmp/forest.png"))
         self.save_btn.setText(_translate("edit_forest_plot_dlg", "..."))
-
-
 import icons_rc

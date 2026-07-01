@@ -21,9 +21,7 @@ class Ui_WizardPage(object):
         self.horizontalLayout = QtWidgets.QHBoxLayout(WizardPage)
         self.horizontalLayout.setObjectName("horizontalLayout")
         self.label = QtWidgets.QLabel(WizardPage)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed
-        )
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.label.sizePolicy().hasHeightForWidth())
@@ -43,7 +41,5 @@ class Ui_WizardPage(object):
     def retranslateUi(self, WizardPage):
         _translate = QtCore.QCoreApplication.translate
         WizardPage.setWindowTitle(_translate("WizardPage", "WizardPage"))
-        WizardPage.setTitle(
-            _translate("WizardPage", "What is the name of your outcome?")
-        )
+        WizardPage.setTitle(_translate("WizardPage", "What is the name of your outcome?"))
         self.label.setText(_translate("WizardPage", "Outcome Name:"))
