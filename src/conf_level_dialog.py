@@ -14,6 +14,7 @@ from PyQt5.QtWidgets import (
 )
 
 from meta_globals import DEFAULT_CONF_LEVEL
+import qt_layout
 
 
 class ChangeConfLevelDlg(QDialog):
@@ -45,6 +46,7 @@ class ChangeConfLevelDlg(QDialog):
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
         self.setWindowTitle("Change Confidence Level")
+        qt_layout.fit_text_to_contents(self)
 
     def get_value(self):
         return self.conf_level_spinbox.value()

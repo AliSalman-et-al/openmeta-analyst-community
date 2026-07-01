@@ -90,6 +90,107 @@ def test_option_group_forms_fit_checkbox_and_radio_labels():
     app.processEvents()
 
 
+def test_generated_ui_surfaces_do_not_cap_visible_text_widgets_below_contents():
+    sys.path.insert(0, str(ROOT / "src"))
+    sys.path.insert(0, str(ROOT / "src" / "forms"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    module_names = [
+        "forms.ui_binary_data_form",
+        "forms.ui_change_cov_type",
+        "forms.ui_choose_back_calc_result_form",
+        "forms.ui_choose_metric_page",
+        "forms.ui_cov_subgroup_dlg",
+        "forms.ui_csv_import_page",
+        "forms.ui_data_type_page",
+        "forms.ui_diagnostic_data_form",
+        "forms.ui_diagnostic_explain_dlg",
+        "forms.ui_diagnostic_metrics",
+        "forms.ui_edit_dialog",
+        "forms.ui_edit_forest_plot",
+        "forms.ui_edit_group_name",
+        "forms.ui_ma_specs",
+        "forms.ui_meta_reg",
+        "forms.ui_network_view",
+        "forms.ui_new_covariate",
+        "forms.ui_new_follow_up",
+        "forms.ui_new_group",
+        "forms.ui_new_outcome",
+        "forms.ui_new_study",
+        "forms.ui_outcome_name_page",
+        "forms.ui_running",
+        "forms.ui_tom_form",
+        "forms.ui_welcome_page",
+        "ui_meta",
+        "ui_results_window",
+    ]
+
+    for module_name in module_names:
+        module = importlib.import_module(module_name)
+        ui_class = next(
+            value for name, value in vars(module).items() if name.startswith("Ui_")
+        )
+        root = _root_for_ui_class(ui_class)
+        ui = ui_class()
+        ui.setupUi(root)
+        qt_layout.fit_text_to_contents(root)
+        root.show()
+        app.processEvents()
+
+        try:
+            _assert_visible_text_widgets_fit(root, module_name)
+        finally:
+            root.close()
+            root.deleteLater()
+    app.processEvents()
+
+
+def _root_for_ui_class(ui_class):
+    class_name = ui_class.__name__
+    if class_name in {"Ui_MainWindow", "Ui_ResultsWindow"}:
+        return QtWidgets.QMainWindow()
+    if "WizardPage" in class_name or "DataTypePage" in class_name:
+        return QtWidgets.QWizardPage()
+    return QtWidgets.QDialog()
+
+
+def _assert_visible_text_widgets_fit(root, module_name):
+    for label in root.findChildren(QtWidgets.QLabel):
+        if not _visible_text(label, root, label.text()):
+            continue
+        assert label.minimumWidth() >= label.sizeHint().width(), module_name
+        assert label.maximumWidth() >= label.sizeHint().width(), module_name
+
+    for button in root.findChildren(QtWidgets.QAbstractButton):
+        if isinstance(button, QtWidgets.QToolButton):
+            continue
+        if not _visible_text(button, root, button.text()):
+            continue
+        assert button.minimumWidth() >= button.sizeHint().width(), module_name
+        assert button.maximumWidth() >= button.sizeHint().width(), module_name
+
+    for combo_box in root.findChildren(QtWidgets.QComboBox):
+        if _hidden_for_fit(combo_box, root):
+            continue
+        assert combo_box.sizeAdjustPolicy() == QtWidgets.QComboBox.AdjustToContents
+        assert combo_box.minimumWidth() >= combo_box.sizeHint().width(), module_name
+        assert combo_box.maximumWidth() >= combo_box.sizeHint().width(), module_name
+
+
+def _visible_text(widget, root, text):
+    return not _hidden_for_fit(widget, root) and str(text).strip()
+
+
+def _hidden_for_fit(widget, root):
+    current = widget
+    while current is not None and current is not root:
+        if current.isHidden():
+            return True
+        current = current.parentWidget()
+    return False
+
+
 def test_dialog_width_fit_includes_labels_combos_and_window_title():
     sys.path.insert(0, str(ROOT / "src"))
     import qt_layout

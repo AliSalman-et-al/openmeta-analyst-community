@@ -30,6 +30,7 @@ import sys
 import ui_results_window
 import edit_forest_plot_form
 import meta_py_r
+import qt_layout
 # import shutil
 
 PageSize = (612, 792)
@@ -53,6 +54,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
         super(ResultsWindow, self).__init__(parent)
         self.setupUi(self)
+        qt_layout.fit_text_to_contents(self)
         self.copied_item = QByteArray()
         self.paste_offset = 5
         self.add_offset = 5

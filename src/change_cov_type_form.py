@@ -10,6 +10,7 @@ from meta_globals import *
 import forms.ui_change_cov_type
 from forms.ui_change_cov_type import Ui_ChangeCovTypeForm
 from ma_dataset import Covariate
+import qt_layout
 import qt_text
 
 
@@ -35,6 +36,7 @@ class ChangeCovTypeForm(QDialog, Ui_ChangeCovTypeForm):
         self.cov_model.dataError.connect(self.data_error)
         self.cov_prev_table.setModel(self.cov_model)
         self.cov_prev_table.resizeColumnsToContents()
+        qt_layout.fit_text_to_contents(self)
 
     def data_error(self, msg):
         QMessageBox.warning(self, "Whoops", msg)

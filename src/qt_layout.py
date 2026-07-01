@@ -1,9 +1,11 @@
 from PyQt5.QtCore import QSize
 from PyQt5.QtWidgets import (
+    QAbstractButton,
     QCheckBox,
     QComboBox,
     QGroupBox,
     QLabel,
+    QToolButton,
     QRadioButton,
     QSizePolicy,
 )
@@ -11,6 +13,11 @@ from PyQt5.QtWidgets import (
 
 def fit_option_groups_to_contents(root, adjust_root=True):
     """Prevent dialog contents from being compressed below visible text."""
+    fit_text_to_contents(root, adjust_root=adjust_root)
+
+
+def fit_text_to_contents(root, adjust_root=True):
+    """Prevent visible text-bearing widgets from being compressed below content."""
     if root.layout() is not None:
         root.layout().activate()
 
@@ -56,6 +63,13 @@ def _fit_text_widgets_to_contents(root):
         )
         if combo_box.view() is not None:
             combo_box.view().setMinimumWidth(combo_box.minimumWidth())
+
+    for button in root.findChildren(QAbstractButton):
+        if isinstance(button, QToolButton):
+            continue
+        if _is_hidden_for_fit(button, root) or not str(button.text()).strip():
+            continue
+        _fit_widget_width_to_hint(button, button.sizeHint().width())
 
 
 def _is_hidden_for_fit(widget, root):

@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import QDialog, QDialogButtonBox, QMessageBox
 
 import forms.ui_cov_subgroup_dlg
 from meta_globals import FACTOR
+import qt_layout
 
 
 class MetaSubgroupForm(QDialog, forms.ui_cov_subgroup_dlg.Ui_cov_subgroup_dialog):
@@ -11,6 +12,7 @@ class MetaSubgroupForm(QDialog, forms.ui_cov_subgroup_dlg.Ui_cov_subgroup_dialog
         self.setupUi(self)
         self._populate_combo_box()
         self._update_ok_button()
+        qt_layout.fit_text_to_contents(self)
         self.buttonBox.rejected.connect(self.cancel)
         self.buttonBox.accepted.connect(self.get_selected_cov)
 

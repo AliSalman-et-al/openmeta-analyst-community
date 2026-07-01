@@ -25,6 +25,7 @@ import edit_list_models
 import add_new_dialogs
 import meta_globals
 import ma_dataset
+import qt_layout
 
 
 class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
@@ -90,6 +91,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
 
         self._setup_connections()
         self.dataset = dataset
+        qt_layout.fit_text_to_contents(self)
 
     def _setup_connections(self):
         for model in [

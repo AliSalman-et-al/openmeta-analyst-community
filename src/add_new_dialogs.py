@@ -7,6 +7,7 @@ import forms.ui_new_follow_up
 import forms.ui_new_outcome
 import forms.ui_new_covariate
 import forms.ui_new_study
+import qt_layout
 
 # import pdb
 
@@ -15,12 +16,14 @@ class AddNewGroupForm(QDialog, forms.ui_new_group.Ui_new_group_dialog):
     def __init__(self, parent=None):
         super(AddNewGroupForm, self).__init__(parent)
         self.setupUi(self)
+        qt_layout.fit_text_to_contents(self)
 
 
 class AddNewFollowUpForm(QDialog, forms.ui_new_follow_up.Ui_new_follow_up_dialog):
     def __init__(self, parent=None):
         super(AddNewFollowUpForm, self).__init__(parent)
         self.setupUi(self)
+        qt_layout.fit_text_to_contents(self)
 
 
 class AddNewOutcomeForm(QDialog, forms.ui_new_outcome.Ui_Dialog):
@@ -33,6 +36,7 @@ class AddNewOutcomeForm(QDialog, forms.ui_new_outcome.Ui_Dialog):
 
         self.setupUi(self)
         self._populate_combo_box()
+        qt_layout.fit_text_to_contents(self)
 
     def _populate_combo_box(self):
         # diagnostic datasets can have only diagnostic outcomes
@@ -47,6 +51,7 @@ class AddNewStudyForm(QDialog, forms.ui_new_study.Ui_new_study_dialog):
     def __init__(self, parent=None):
         super(AddNewStudyForm, self).__init__(parent)
         self.setupUi(self)
+        qt_layout.fit_text_to_contents(self)
 
 
 class AddNewCovariateForm(QDialog, forms.ui_new_covariate.Ui_new_covariate_dialog):
@@ -54,6 +59,7 @@ class AddNewCovariateForm(QDialog, forms.ui_new_covariate.Ui_new_covariate_dialo
         super(AddNewCovariateForm, self).__init__(parent)
         self.setupUi(self)
         self._populate_combo_box()
+        qt_layout.fit_text_to_contents(self)
 
     def _populate_combo_box(self):
         for name, type_id in zip(["continuous", "factor"], range(2)):

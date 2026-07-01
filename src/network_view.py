@@ -3,6 +3,7 @@ from PyQt5.QtWidgets import QDialog, QGraphicsScene
 import forms.ui_network_view
 import edit_list_models
 import meta_py_r
+import qt_layout
 
 PageSize = (500, 300)
 
@@ -18,6 +19,7 @@ class ViewDialog(QDialog, forms.ui_network_view.Ui_network_view_dialog):
         self.cur_follow_up = model.get_current_follow_up_name()
 
         self.populate_cbo_boxes()
+        qt_layout.fit_text_to_contents(self)
         self.setup_signals()
 
         self.x_coord = 5

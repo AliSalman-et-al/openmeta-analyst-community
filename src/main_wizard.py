@@ -36,6 +36,7 @@ class WelcomePage(QWizardPage, forms.ui_welcome_page.Ui_WizardPage):
             QPixmap(":/wizard_images/wizard_images/forest.jpg"),
         )
         self._setup_connections()
+        qt_layout.fit_text_to_contents(self, adjust_root=False)
 
     def initializePage(self):
         # self.wizard().adjustSize()
@@ -151,6 +152,7 @@ class DataTypePage(QWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
             QWizard.BackgroundPixmap,
             QPixmap(":/wizard_images/wizard_images/laplace.jpg"),
         )
+        qt_layout.fit_text_to_contents(self, adjust_root=False)
 
     def initializePage(self):
         # self.wizard().adjustSize()
@@ -239,6 +241,7 @@ class ChooseMetricPage(QWizardPage, forms.ui_choose_metric_page.Ui_WizardPage):
         self.metric_cbo_box.currentIndexChanged[int].connect(
             self._metric_choice_changed
         )
+        qt_layout.fit_text_to_contents(self, adjust_root=False)
 
     def initializePage(self):
         data_type = self.wizard().get_dataset_info()["data_type"]
@@ -269,6 +272,7 @@ class ChooseMetricPage(QWizardPage, forms.ui_choose_metric_page.Ui_WizardPage):
             self.metric_cbo_box.setItemText(index_of_default, default_item_text)
             # Resize the dialog
             self.metric_cbo_box.blockSignals(False)
+            qt_layout.fit_text_to_contents(self, adjust_root=False)
 
         self.setPixmap(
             QWizard.BackgroundPixmap, QPixmap(":/wizard_images/wizard_images/airy.jpg")
@@ -588,6 +592,7 @@ class OutcomeNamePage(QWizardPage, forms.ui_outcome_name_page.Ui_WizardPage):
         )
 
         self.registerField("outcomeName*", self.outcome_name_LineEdit)
+        qt_layout.fit_text_to_contents(self, adjust_root=False)
 
     def initializePage(self):
         # self.wizard().adjustSize()
@@ -635,8 +640,11 @@ class MainWizard(QWizard):
 
         # make the displayed size of the pages reasonable
         self.currentIdChanged.connect(self._change_size)
+        qt_layout.fit_text_to_contents(self)
 
     def _change_size(self, pageid):
+        qt_layout.fit_text_to_contents(self.currentPage(), adjust_root=False)
+        qt_layout.fit_text_to_contents(self)
         self.adjustSize()
 
     def set_wizard_path(self, path):

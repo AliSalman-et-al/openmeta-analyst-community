@@ -36,6 +36,7 @@ import meta_globals
 from meta_globals import *
 import ma_dataset
 import legacy_pickle
+import qt_layout
 import qt_text
 from settings import *
 
@@ -133,6 +134,7 @@ class ImportProgress(QDialog, forms.ui_running.Ui_running):
 
         self.setWindowTitle("Importing from CSV...")
         self.progress_bar.setRange(min_, max_)
+        qt_layout.fit_text_to_contents(self)
 
     def setValue(self, value):
         if self.progress_bar.minimum() <= value <= self.progress_bar.maximum():
@@ -158,6 +160,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         # this approach throughout OpenMeta.
         super(MetaForm, self).__init__(parent)
         self.setupUi(self)
+        qt_layout.fit_text_to_contents(self)
         table_view = ma_data_table_view.MADataTable(self.nav_frame)
         self.verticalLayout.replaceWidget(self.tableView, table_view)
         self.tableView.deleteLater()
@@ -168,6 +171,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         )
         self.cl_label.setAlignment(Qt.AlignRight)
         self.statusbar.addWidget(self.cl_label, 1)
+        qt_layout.fit_text_to_contents(self)
 
         # TODO should also allow a (path to a) dataset
         # to be given on the console.
@@ -291,6 +295,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             self.dataset_file_lbl.setText(
                 "open file: <font color='red'>%s</font>" % self.out_path
             )
+        qt_layout.fit_text_to_contents(self)
 
     def toggle_menu_options_that_require_dataset(self, enable):
         self.action_go.setEnabled(enable)
@@ -470,6 +475,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def _change_conf_level_label(self):
         conf_level = self.model.get_global_conf_level()
         self.cl_label.setText(_format_confidence_level_status(conf_level))
+        qt_layout.fit_text_to_contents(self)
 
     def go(self):
         form = None
@@ -1062,6 +1068,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def update_dimension(self):
         self.cur_dimension = self.dimensions[self.cur_dimension_index]
         self.nav_lbl.setText(self.cur_dimension)
+        qt_layout.fit_text_to_contents(self)
 
     def display_groups(self, groups):
         print("displaying groups: %s" % groups)
@@ -1116,6 +1123,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.cur_time_lbl.setText(
             "<font color='Blue'>%s</font>" % self.model.get_current_follow_up_name()
         )
+        qt_layout.fit_text_to_contents(self)
         self.model.reset()
         self.tableView.resizeColumnsToContents()
 
@@ -1130,6 +1138,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.cur_time_lbl.setText(
             "<font color='Blue'>%s</font>" % self.model.get_current_follow_up_name()
         )
+        qt_layout.fit_text_to_contents(self)
 
     def open(self, file_path=None):
         """
@@ -1208,6 +1217,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         open_command = meta_globals.CommandGenericDo(redo_f, undo_f)
         self.tableView.undoStack.push(open_command)
         self.dataset_file_lbl.setText("open file: %s" % file_path)
+        qt_layout.fit_text_to_contents(self)
 
         # we just opened it, so it's 'saved'
         self.current_data_unsaved = False
@@ -1406,11 +1416,13 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.tableView.setModel(self.model)
         self.model_updated()
         self.dataset_file_lbl.setText("open file: %s" % self.out_path)
+        qt_layout.fit_text_to_contents(self)
 
     def update_outcome_lbl(self):
         self.cur_outcome_lbl.setText(
             "<font color='Blue'>%s</font>" % self.model.current_outcome
         )
+        qt_layout.fit_text_to_contents(self)
 
     def quit(self):
         if self.current_data_unsaved:
@@ -1485,6 +1497,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             add_file_to_recent_files(self.out_path)
 
             self.dataset_file_lbl.setText("open file: %s" % self.out_path)
+            qt_layout.fit_text_to_contents(self)
             self.current_data_unsaved = False
         except Exception as e:
             # @TODO handle this elegantly?
@@ -1690,6 +1703,7 @@ class Command_Change_Conf_Level(QUndoCommand):
     def _set_conf_level(self, conf_level):
         self.mainform.model.set_conf_level(conf_level)
         self.mainform.cl_label.setText(_format_confidence_level_status(conf_level))
+        qt_layout.fit_text_to_contents(self.mainform)
         self.mainform.model.reset()
         print(
             (
