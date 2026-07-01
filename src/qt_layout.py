@@ -1,10 +1,20 @@
-from PyQt5.QtWidgets import QCheckBox, QGroupBox, QRadioButton, QSizePolicy
+from PyQt5.QtCore import QSize
+from PyQt5.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QGroupBox,
+    QLabel,
+    QRadioButton,
+    QSizePolicy,
+)
 
 
 def fit_option_groups_to_contents(root, adjust_root=True):
-    """Prevent checkbox/radio groups from being compressed below their labels."""
+    """Prevent dialog contents from being compressed below visible text."""
     if root.layout() is not None:
         root.layout().activate()
+
+    _fit_text_widgets_to_contents(root)
 
     for group_box in _option_group_boxes(root):
         _raise_maximum_height(group_box, group_box.sizeHint().height())
@@ -21,10 +31,65 @@ def fit_option_groups_to_contents(root, adjust_root=True):
 
     if adjust_root:
         size_hint = root.sizeHint()
+        title_width = _window_title_width_hint(root)
         _raise_maximum_height(root, size_hint.height())
-        _raise_maximum_width(root, size_hint.width())
-        root.setMinimumSize(root.minimumSize().expandedTo(size_hint))
+        _raise_maximum_width(root, max(size_hint.width(), title_width))
+        root.setMinimumSize(
+            root.minimumSize().expandedTo(size_hint.expandedTo(QSize(title_width, 0)))
+        )
         root.adjustSize()
+
+
+def _fit_text_widgets_to_contents(root):
+    for label in root.findChildren(QLabel):
+        if _is_hidden_for_fit(label, root) or not str(label.text()).strip():
+            continue
+        _fit_widget_width_to_hint(label, label.sizeHint().width())
+
+    for combo_box in root.findChildren(QComboBox):
+        if _is_hidden_for_fit(combo_box, root):
+            continue
+        combo_box.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        _fit_widget_width_to_hint(
+            combo_box,
+            max(combo_box.sizeHint().width(), _combo_contents_width(combo_box)),
+        )
+        if combo_box.view() is not None:
+            combo_box.view().setMinimumWidth(combo_box.minimumWidth())
+
+
+def _is_hidden_for_fit(widget, root):
+    current = widget
+    while current is not None and current is not root:
+        if current.isHidden():
+            return True
+        current = current.parentWidget()
+    return False
+
+
+def _fit_widget_width_to_hint(widget, width):
+    _raise_maximum_width(widget, width)
+    widget.setMinimumWidth(max(widget.minimumWidth(), width))
+    if widget.sizePolicy().horizontalPolicy() == QSizePolicy.Fixed:
+        widget.setSizePolicy(QSizePolicy.Preferred, widget.sizePolicy().verticalPolicy())
+
+
+def _combo_contents_width(combo_box):
+    if combo_box.count() == 0:
+        return 0
+    metrics = combo_box.fontMetrics()
+    widest_item = max(
+        metrics.horizontalAdvance(str(combo_box.itemText(index)))
+        for index in range(combo_box.count())
+    )
+    return widest_item + 48
+
+
+def _window_title_width_hint(root):
+    title = str(root.windowTitle()).strip()
+    if not title:
+        return 0
+    return root.fontMetrics().horizontalAdvance(title) + 96
 
 
 def _option_group_boxes(root):

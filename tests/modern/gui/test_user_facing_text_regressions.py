@@ -90,6 +90,55 @@ def test_option_group_forms_fit_checkbox_and_radio_labels():
     app.processEvents()
 
 
+def test_dialog_width_fit_includes_labels_combos_and_window_title():
+    sys.path.insert(0, str(ROOT / "src"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    root = QtWidgets.QDialog()
+    root.setWindowTitle("select covariates")
+    layout = QtWidgets.QVBoxLayout(root)
+
+    group_box = QtWidgets.QGroupBox("binary.random")
+    group_layout = QtWidgets.QGridLayout(group_box)
+    description = QtWidgets.QLabel(
+        "Description: Performs random-effects meta-analysis."
+    )
+    parameter_label = QtWidgets.QLabel("Correction factor target")
+    combo = QtWidgets.QComboBox()
+    combo.addItems(
+        [
+            "DL: DerSimonian-Laird",
+            "Binary Fixed-Effect Mantel-Haenszel",
+            "Binary Fixed-Effect Inverse Variance",
+        ]
+    )
+    combo.setCurrentIndex(0)
+
+    group_layout.addWidget(description, 0, 0, 1, 2)
+    group_layout.addWidget(parameter_label, 1, 0)
+    group_layout.addWidget(combo, 1, 1)
+    layout.addWidget(group_box)
+
+    qt_layout.fit_option_groups_to_contents(root)
+    root.show()
+    app.processEvents()
+
+    try:
+        assert description.minimumWidth() >= description.sizeHint().width()
+        assert parameter_label.minimumWidth() >= parameter_label.sizeHint().width()
+        assert combo.sizeAdjustPolicy() == QtWidgets.QComboBox.AdjustToContents
+        assert combo.minimumWidth() >= combo.sizeHint().width()
+        assert root.minimumWidth() >= root.sizeHint().width()
+
+        title_width = root.fontMetrics().horizontalAdvance(root.windowTitle())
+        assert root.minimumWidth() >= title_width
+    finally:
+        root.close()
+        root.deleteLater()
+    app.processEvents()
+
+
 def test_issue_76_to_105_reported_bad_user_facing_strings_are_absent():
     text = _combined_text(
         [

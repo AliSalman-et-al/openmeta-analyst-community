@@ -750,7 +750,7 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
             },
         },
         "to": {
-            "pretty.name": "Cells to which correction factor should be added",
+            "pretty.name": "Correction factor target",
             "description": "Cells receiving the correction factor",
         },
     }
@@ -806,6 +806,20 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
             "DL: DerSimonian-Laird",
             "only0",
         ]
+        for combo in [specs[0].method_cbo_box] + enum_combos:
+            assert combo.sizeAdjustPolicy() == QtWidgets.QComboBox.AdjustToContents
+            assert combo.minimumWidth() >= combo.sizeHint().width()
+
+        parameter_labels = [
+            label
+            for label in specs[0].parameter_grp_box.findChildren(QtWidgets.QLabel)
+            if str(label.text())
+            in {"Random-Effects method", "Correction factor target"}
+        ]
+        assert len(parameter_labels) == 2
+        for label in parameter_labels:
+            assert label.minimumWidth() >= label.sizeHint().width()
+
         assert specs[0].current_param_vals["rm.method"] == "DL"
         assert specs[0].current_param_vals["to"] == "only0"
     finally:
