@@ -289,7 +289,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.action_cum_ma.setEnabled(enable)
         self.action_loo_ma.setEnabled(enable)
         self._enable_action_meta_regression(enable)
-        self._enable_action_subgroup_ma()
+        self._enable_action_subgroup_ma(enable)
 
     def _enable_action_meta_regression(self, dataset_analysis_enabled=None):
         ''' Enables action_meta_regression if analysis can run and covariates exist. '''
@@ -298,14 +298,19 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         has_covariates = bool(self.model and self.model.dataset.covariates)
         self.action_meta_regression.setEnabled(dataset_analysis_enabled and has_covariates)
         
-    def _enable_action_subgroup_ma(self):
+    def _enable_action_subgroup_ma(self, dataset_analysis_enabled=None):
         ''' Enables action_subgroup_ma if there are suitable covariate(s)
         i.e. of type Factor '''
-        
-        if any([cov.get_data_type() == meta_globals.FACTOR for cov in self.model.dataset.covariates]):
-            self.action_subgroup_ma.setEnabled(True)
-        else:
-            self.action_subgroup_ma.setEnabled(False)
+        if dataset_analysis_enabled is None:
+            dataset_analysis_enabled = self.action_go.isEnabled()
+        has_factor_covariates = bool(
+            self.model
+            and any(
+                cov.get_data_type() == meta_globals.FACTOR
+                for cov in self.model.dataset.covariates
+            )
+        )
+        self.action_subgroup_ma.setEnabled(dataset_analysis_enabled and has_factor_covariates)
         
     def disable_menu_options_that_require_dataset(self):
         self.toggle_menu_options_that_require_dataset(False)
@@ -805,13 +810,12 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.model.add_covariate(cov_name, cov_type)
         print("new covariate name: %s with type %s" % (cov_name, cov_type))
         self.tableView.resizeColumnsToContents()
-        self._enable_action_meta_regression()
+        self._refresh_advanced_analysis_actions()
         
     def _undo_add_new_covariate(self, cov_name):
         self.model.remove_covariate(cov_name)
         self.tableView.resizeColumnsToContents()
-        if len(self.model.covariates) == 0:
-            self._enable_action_meta_regression()
+        self._refresh_advanced_analysis_actions()
         
     def add_new(self, startup_outcome = None):
         redo_f, undo_f = None, None
@@ -1191,13 +1195,24 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
     def delete_covariate(self, covariate):
         cov_vals_d = self.model.dataset.get_values_for_cov(covariate.name)
-        undo_f = lambda : \
-                    self.model.add_covariate(covariate.name, \
-                                meta_globals.COV_INTS_TO_STRS[covariate.data_type], \
-                                cov_values=cov_vals_d)
-        redo_f = lambda : self.model.remove_covariate(covariate)
+        def undo_f():
+            self.model.add_covariate(
+                covariate.name,
+                meta_globals.COV_INTS_TO_STRS[covariate.data_type],
+                cov_values=cov_vals_d,
+            )
+            self._refresh_advanced_analysis_actions()
+
+        def redo_f():
+            self.model.remove_covariate(covariate)
+            self._refresh_advanced_analysis_actions()
+
         delete_command = meta_globals.CommandGenericDo(redo_f, undo_f)
         self.tableView.undoStack.push(delete_command)  
+
+    def _refresh_advanced_analysis_actions(self):
+        self._enable_action_meta_regression()
+        self._enable_action_subgroup_ma()
 
     def _add_study(self, study, study_index=None):
         print("adding study: %s" % study.name)

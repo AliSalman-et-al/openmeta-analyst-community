@@ -155,18 +155,19 @@ class Dataset:
 
     def remove_covariate(self, covariate):
         cov_index = None # keep record of the remvoed covariate's index.
+        covariate_name = covariate.name if isinstance(covariate, Covariate) else covariate
         # first remove the covariate from the list of 
         # covariate objects for this dataset
         for i,cov in enumerate(self.covariates):
-            if cov.name == covariate.name:
+            if cov.name == covariate_name:
                 self.covariates.remove(cov)
                 cov_index = i
                 break
         # now remove the covariate from all of the studies
         # in the dataset
         for study in self.studies:
-            if covariate.name in study.covariate_dict:
-                study.covariate_dict.pop(covariate.name)
+            if covariate_name in study.covariate_dict:
+                study.covariate_dict.pop(covariate_name)
         return cov_index
             
     def add_covariate(self, covariate, cov_values=None, cov_index=None):

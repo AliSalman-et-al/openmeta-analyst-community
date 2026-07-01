@@ -673,6 +673,96 @@ def test_meta_regression_dialog_disables_ok_and_does_not_run_without_covariates(
         os.chdir(REPO_ROOT)
 
 
+def test_advanced_analysis_actions_require_dataset_readiness_and_covariates():
+    import launch
+
+    app, window = launch.start_automation()
+
+    try:
+        window._add_new_covariate("region", "factor")
+
+        assert window.action_go.isEnabled() is False
+        assert window.action_meta_regression.isEnabled() is False
+        assert window.action_subgroup_ma.isEnabled() is False
+
+        window.enable_menu_options_that_require_dataset()
+
+        assert window.action_meta_regression.isEnabled()
+        assert window.action_subgroup_ma.isEnabled()
+    finally:
+        window.current_data_unsaved = False
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
+def test_deleting_last_covariate_refreshes_advanced_analysis_actions():
+    import launch
+
+    app, window = launch.start_automation()
+
+    try:
+        assert window.open(os.path.abspath(os.path.join("sample_data", "amino.oma"))) is True
+        window._add_new_covariate("region", "factor")
+
+        assert window.action_meta_regression.isEnabled()
+        assert window.action_subgroup_ma.isEnabled()
+
+        window.delete_covariate(window.model.dataset.covariates[0])
+
+        assert window.model.dataset.covariates == []
+        assert window.action_meta_regression.isEnabled() is False
+        assert window.action_subgroup_ma.isEnabled() is False
+
+        window.tableView.undoStack.undo()
+
+        assert [cov.name for cov in window.model.dataset.covariates] == ["region"]
+        assert window.action_meta_regression.isEnabled()
+        assert window.action_subgroup_ma.isEnabled()
+    finally:
+        window.current_data_unsaved = False
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
+def test_subgroup_dialog_disables_ok_and_does_not_run_without_factor_covariates(monkeypatch):
+    import launch
+    import meta_subgroup_form
+
+    app, window = launch.start_automation()
+    warnings = []
+    calls = []
+
+    monkeypatch.setattr(
+        meta_subgroup_form.QMessageBox,
+        "warning",
+        lambda *args: warnings.append(args),
+    )
+    monkeypatch.setattr(window, "meta_subgroup", lambda selected_cov: calls.append(selected_cov))
+
+    try:
+        window._add_new_covariate("dose", "continuous")
+        form = meta_subgroup_form.MetaSubgroupForm(window.model, parent=window)
+
+        assert form.cov_subgroup_cbo_box.count() == 0
+        assert form.buttonBox.button(QtWidgets.QDialogButtonBox.Ok).isEnabled() is False
+
+        form.get_selected_cov()
+
+        assert calls == []
+        assert warnings
+        assert warnings[0][1:3] == (
+            "No covariate selected",
+            "Select a factor covariate before running subgroup analysis.",
+        )
+    finally:
+        window.current_data_unsaved = False
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
 def test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe(monkeypatch):
     from PyQt5 import QtCore
     import launch

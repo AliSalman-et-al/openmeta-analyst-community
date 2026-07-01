@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QDialog
+from PyQt5.QtWidgets import QDialog, QMessageBox
 
 import forms.ui_diagnostic_metrics
 import ma_specs
@@ -21,6 +21,15 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
             self._metric_checkbox(metric).toggled.connect(self._refresh_ok_enabled)
 
     def ok(self):
+        selected_metrics = self.get_selected_metrics()
+        if not selected_metrics:
+            QMessageBox.warning(
+                self,
+                "No diagnostic metric selected",
+                "Select at least one available diagnostic metric before running analysis.",
+            )
+            return
+
         # Route the Method & Parameters dialog through the parent's
         # backend-error-handling builder (the same path the binary/continuous
         # case uses). This ensures a backend failure surfaces the "Analysis
@@ -30,13 +39,13 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
         if builder is not None:
             form = builder(meta_f_str=self.meta_f_str,
                            external_params=self.external_params,
-                           diag_metrics=self.get_selected_metrics(),
+                           diag_metrics=selected_metrics,
                            conf_level=self.model.get_global_conf_level())
         else:
             form = ma_specs.MA_Specs(self.model, parent=self.parent,
                                      meta_f_str=self.meta_f_str,
                                      external_params=self.external_params,
-                                     diag_metrics=self.get_selected_metrics(),
+                                     diag_metrics=selected_metrics,
                                      conf_level=self.model.get_global_conf_level())
         if form is None:
             return

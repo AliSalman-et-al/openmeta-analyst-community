@@ -351,6 +351,44 @@ def test_diagnostic_metric_dialog_defaults_to_supported_direct_effects(monkeypat
         _close_without_prompt(app, window)
 
 
+def test_diagnostic_metric_dialog_does_not_run_without_selected_metrics(monkeypatch):
+    import launch
+
+    app, window = launch.start_automation()
+    import diag_metrics
+
+    warnings = []
+    captured = []
+
+    try:
+        _create_diagnostic_dataset(window)
+
+        monkeypatch.setattr(window.model, "included_studies_have_raw_data", lambda: False)
+        monkeypatch.setattr(window.model, "included_studies_have_point_estimates", lambda effect=None: False)
+        monkeypatch.setattr(window, "_build_analysis_specs_dialog", lambda **kwargs: captured.append(kwargs))
+        monkeypatch.setattr(
+            diag_metrics.QMessageBox,
+            "warning",
+            lambda *args: warnings.append(args),
+        )
+
+        form = diag_metrics.Diag_Metrics(window.model, parent=window)
+
+        assert form.get_selected_metrics() == []
+        assert form.btn_ok.isEnabled() is False
+
+        form.ok()
+
+        assert captured == []
+        assert warnings
+        assert warnings[0][1:3] == (
+            "No diagnostic metric selected",
+            "Select at least one available diagnostic metric before running analysis.",
+        )
+    finally:
+        _close_without_prompt(app, window)
+
+
 def test_diagnostic_direct_effects_do_not_offer_count_based_methods(monkeypatch):
     import launch
 
