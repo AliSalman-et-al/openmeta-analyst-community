@@ -62,9 +62,125 @@ def require_success(result: subprocess.CompletedProcess[str], label: str) -> Non
         raise DefaultREvidenceError(f"{label} failed with exit code {result.returncode}: {output}")
 
 
-def resolve_rscript(name: str) -> Path | None:
-    resolved = shutil.which(name) if not Path(name).is_absolute() else name
-    return Path(resolved).resolve() if resolved else None
+def _candidate_rscript_names() -> list[str]:
+    return ["Rscript.exe", "Rscript"] if os.name == "nt" else ["Rscript"]
+
+
+def _rscript_paths_for_r_home(r_home: str | Path | None) -> list[Path]:
+    if not r_home:
+        return []
+    root = Path(r_home)
+    return [
+        root / "bin" / name
+        for name in _candidate_rscript_names()
+    ] + [
+        root / "bin" / "x64" / name
+        for name in _candidate_rscript_names()
+    ]
+
+
+def _r_home_from_r_command(env: dict[str, str]) -> Path | None:
+    r_command = shutil.which("R", path=env.get("PATH"))
+    if not r_command:
+        return None
+    result = subprocess.run(
+        [r_command, "RHOME"],
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    r_home = result.stdout.strip()
+    return Path(r_home) if result.returncode == 0 and r_home else None
+
+
+def _windows_registry_r_homes() -> list[Path]:
+    if os.name != "nt":
+        return []
+    try:
+        import winreg
+    except ImportError:
+        return []
+
+    homes: list[Path] = []
+    roots = (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE)
+    keys = (
+        r"Software\R-core\R",
+        r"Software\WOW6432Node\R-core\R",
+    )
+    for root in roots:
+        for key_name in keys:
+            try:
+                with winreg.OpenKey(root, key_name) as key:
+                    try:
+                        install_path, _ = winreg.QueryValueEx(key, "InstallPath")
+                    except OSError:
+                        install_path = None
+                    if install_path:
+                        homes.append(Path(install_path))
+                    try:
+                        current_version, _ = winreg.QueryValueEx(key, "Current Version")
+                    except OSError:
+                        current_version = None
+                    if current_version:
+                        try:
+                            with winreg.OpenKey(key, current_version) as version_key:
+                                version_install_path, _ = winreg.QueryValueEx(version_key, "InstallPath")
+                                if version_install_path:
+                                    homes.append(Path(version_install_path))
+                        except OSError:
+                            pass
+                    index = 0
+                    while True:
+                        try:
+                            version = winreg.EnumKey(key, index)
+                        except OSError:
+                            break
+                        index += 1
+                        try:
+                            with winreg.OpenKey(key, version) as version_key:
+                                version_install_path, _ = winreg.QueryValueEx(version_key, "InstallPath")
+                                if version_install_path:
+                                    homes.append(Path(version_install_path))
+                        except OSError:
+                            continue
+            except OSError:
+                continue
+    return homes
+
+
+def _common_rscript_candidates(env: dict[str, str] | None = None) -> list[Path]:
+    env = env or os.environ
+    candidates: list[Path] = []
+    if env.get("OMA_RSCRIPT"):
+        candidates.append(Path(env["OMA_RSCRIPT"]))
+    for variable in ("OMA_R_HOME", "R_HOME"):
+        candidates.extend(_rscript_paths_for_r_home(env.get(variable)))
+    r_home = _r_home_from_r_command(env)
+    candidates.extend(_rscript_paths_for_r_home(r_home))
+    for r_home in _windows_registry_r_homes():
+        candidates.extend(_rscript_paths_for_r_home(r_home))
+    return candidates
+
+
+def resolve_rscript(name: str, env: dict[str, str] | None = None) -> Path | None:
+    env = env or os.environ
+    explicit = name and name != "Rscript"
+    if explicit:
+        requested = Path(name)
+        if requested.exists():
+            return requested.resolve()
+        resolved = shutil.which(name, path=env.get("PATH"))
+        return Path(resolved).resolve() if resolved else None
+
+    for candidate in _common_rscript_candidates(env):
+        if candidate.exists():
+            return candidate.resolve()
+    resolved = shutil.which(name or "Rscript", path=env.get("PATH"))
+    if resolved:
+        return Path(resolved).resolve()
+    return None
 
 
 def installed_version_report(root: Path, python: str, rscript: Path, env: dict[str, str]) -> dict:

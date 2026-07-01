@@ -210,6 +210,59 @@ def test_default_r_dependency_install_uses_script_file_and_archive_triples(monke
     ]
 
 
+def test_default_r_verifier_resolves_rscript_from_r_home(tmp_path):
+    import importlib.util
+
+    verifier_path = REPO_ROOT / "scripts" / "verify_openmetar_r_default.py"
+    spec = importlib.util.spec_from_file_location("verify_openmetar_r_default", verifier_path)
+    verifier = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(verifier)
+
+    r_home = tmp_path / "R"
+    rscript = r_home / "bin" / verifier._candidate_rscript_names()[0]
+    rscript.parent.mkdir(parents=True)
+    rscript.write_text("", encoding="utf-8")
+
+    resolved = verifier.resolve_rscript("Rscript", env={"OMA_R_HOME": str(r_home), "PATH": ""})
+
+    assert resolved == rscript.resolve()
+
+
+def test_default_r_verifier_resolves_rscript_from_r_command(monkeypatch, tmp_path):
+    import importlib.util
+
+    verifier_path = REPO_ROOT / "scripts" / "verify_openmetar_r_default.py"
+    spec = importlib.util.spec_from_file_location("verify_openmetar_r_default", verifier_path)
+    verifier = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(verifier)
+
+    r_home = tmp_path / "R"
+    rscript = r_home / "bin" / verifier._candidate_rscript_names()[0]
+    rscript.parent.mkdir(parents=True)
+    rscript.write_text("", encoding="utf-8")
+    fake_r = tmp_path / "bin" / verifier._candidate_rscript_names()[0].replace("Rscript", "R")
+    fake_r.parent.mkdir(parents=True)
+    fake_r.write_text("", encoding="utf-8")
+
+    def fake_which(name, path=None):
+        if name == "R":
+            return str(fake_r)
+        return None
+
+    def fake_run(command, env, text, stdout, stderr, check):
+        assert command == [str(fake_r), "RHOME"]
+        return subprocess.CompletedProcess(command, 0, stdout=str(r_home), stderr="")
+
+    monkeypatch.setattr(verifier.shutil, "which", fake_which)
+    monkeypatch.setattr(verifier.subprocess, "run", fake_run)
+
+    resolved = verifier.resolve_rscript("Rscript", env={"PATH": ""})
+
+    assert resolved == rscript.resolve()
+
+
 def read_description_fields():
     fields = {}
     current_key = None

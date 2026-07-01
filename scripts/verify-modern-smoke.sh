@@ -4,6 +4,8 @@ set -euo pipefail
 recreate_venv=0
 sync=0
 require_r_evidence=0
+rscript=""
+r_runtime_root=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --sync)
@@ -18,6 +20,22 @@ while [ "$#" -gt 0 ]; do
     --require-r-evidence)
       require_r_evidence=1
       shift
+      ;;
+    --rscript)
+      if [ "$#" -lt 2 ]; then
+        echo "--rscript requires a path or command name" >&2
+        exit 2
+      fi
+      rscript="$2"
+      shift 2
+      ;;
+    --r-runtime-root)
+      if [ "$#" -lt 2 ]; then
+        echo "--r-runtime-root requires an R runtime root" >&2
+        exit 2
+      fi
+      r_runtime_root="$2"
+      shift 2
       ;;
     *)
       echo "Unknown argument: $1" >&2
@@ -62,6 +80,11 @@ uv run pytest \
 
 step "Checking Default R Evidence prerequisites"
 r_evidence_args=(scripts/verify_openmetar_r_default.py)
+if [ -n "$rscript" ]; then
+  r_evidence_args+=(--rscript "$rscript")
+elif [ -n "$r_runtime_root" ]; then
+  r_evidence_args+=(--rscript "$r_runtime_root/bin/Rscript")
+fi
 if [ "$require_r_evidence" -eq 1 ]; then
   r_evidence_args+=(--require-r --require-installed-packages --install-missing --r-library-cache-root "$r_default_package_cache_root")
 fi

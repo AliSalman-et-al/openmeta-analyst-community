@@ -213,10 +213,20 @@ def test_modern_package_workflow_builds_path_aware_artifacts():
 def test_lane_named_local_scripts_replace_old_workflow_wrappers():
     smoke = ps_contract("scripts", "verify-modern-smoke.ps1")
     fast = ps_contract("scripts", "verify-modern-fast.ps1")
+    smoke_sh = sh_contract("scripts", "verify-modern-smoke.sh")
+    fast_sh = sh_contract("scripts", "verify-modern-fast.sh")
     package = ps_contract("scripts", "package-modern-windows.ps1")
 
-    assert {"Sync", "RecreateVenv", "RequireREvidence"} <= smoke["params"]
-    assert {"Sync", "RecreateVenv", "RequireREvidence", "StrictTaxonomy", "FastWorkers"} <= fast["params"]
+    assert {"Sync", "RecreateVenv", "RequireREvidence", "RRuntimeRoot", "Rscript"} <= smoke["params"]
+    assert {"Sync", "RecreateVenv", "RequireREvidence", "StrictTaxonomy", "FastWorkers", "RRuntimeRoot", "Rscript"} <= fast["params"]
+    assert {"--rscript", "--r-runtime-root"} <= smoke_sh["case_options"]
+    assert {"--rscript", "--r-runtime-root"} <= fast_sh["case_options"]
+    assert "RHOME" in smoke["text"]
+    assert "RHOME" in fast["text"]
+    assert "Current Version" in smoke["text"]
+    assert "Current Version" in fast["text"]
+    assert "ProgramFiles" not in smoke["text"]
+    assert "ProgramFiles" not in fast["text"]
     assert {"RPackageCacheRoot", "RRuntimeRoot"} <= package["params"]
     assert {"Resolve-RRuntimeRoot", "Resolve-RscriptFromRuntime"} <= package["functions"]
     assert "--rscript" in package["text"]
