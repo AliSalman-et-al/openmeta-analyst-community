@@ -39,6 +39,7 @@ import legacy_pickle
 import app_error_handler
 import qt_layout
 import qt_text
+import tabular_data
 from settings import *
 
 # additional forms
@@ -1666,6 +1667,8 @@ class CommandImportCSV(QUndoCommand):
 
         # Set data in model:
         num_rows = len(self.imported_data)
+        if num_rows == 0:
+            return
         num_cols = len(self.imported_data[0])
 
         # Handle covariates
@@ -1703,10 +1706,7 @@ class CommandImportCSV(QUndoCommand):
 
 
 def _normalize_imported_csv_rows(rows):
-    if not rows:
-        return []
-    num_cols = max(len(row) for row in rows)
-    return [row + [""] * (num_cols - len(row)) for row in rows]
+    return tabular_data.normalize_rows(rows)
 
 
 ####################### END Undo Command for Import CSV #######################

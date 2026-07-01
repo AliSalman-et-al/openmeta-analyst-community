@@ -38,6 +38,7 @@ import ma_dataset
 from ma_dataset import *
 from meta_globals import *
 import qt_text
+import tabular_data
 
 # for issue #169 -- normalizing new lines, e.g., for pasting
 # use QRegExp to manipulate QStrings (rather than re)
@@ -502,6 +503,9 @@ class MADataTable(QtWidgets.QTableView):
         # to copied data -- we drop that here
         if self._is_blank_row(new_content[-1]):
             new_content = new_content[:-1]
+        new_content = self._normalize_matrix_rows(new_content)
+        if not new_content:
+            return
 
         lower_row = upper_left_index.row() + len(new_content)
         lower_col = upper_left_index.column() + len(new_content[0])
@@ -573,6 +577,9 @@ class MADataTable(QtWidgets.QTableView):
         cell. new rows will be added as needed; existing data will be overwritten
         """
         origin_row, origin_col = upper_left_index.row(), upper_left_index.column()
+        source_content = self._normalize_matrix_rows(source_content)
+        if not source_content:
+            return
 
         if (
             isinstance(source_content[-1], list)
@@ -582,6 +589,9 @@ class MADataTable(QtWidgets.QTableView):
             # of appending blank lines (\ns) to copied
             # text -- we get rid of it here
             source_content = source_content[:-1]
+            source_content = self._normalize_matrix_rows(source_content)
+            if not source_content:
+                return
 
         # temporarily disable sorting to prevent automatic sorting of pasted data.
         # (note: this is consistent with Excel's approach.)
@@ -699,6 +709,9 @@ class MADataTable(QtWidgets.QTableView):
             cur_row = row.split(col_delimiter)
             m.append(cur_row)
         return m
+
+    def _normalize_matrix_rows(self, matrix):
+        return tabular_data.normalize_rows(matrix)
 
     def _print_row(self, r):
         print("length of row: %s" % len(r))

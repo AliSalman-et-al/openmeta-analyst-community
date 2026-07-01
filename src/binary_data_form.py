@@ -25,6 +25,7 @@ from PyQt5.QtWidgets import (
 
 import meta_py_r
 import qt_layout
+import tabular_data
 from meta_globals import *
 import calculator_routines as calc_fncs
 
@@ -557,8 +558,11 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         # self.set_clear_btn_color()
 
     def restore_table(self, old_table):
-        nrows = len(old_table)
-        ncols = len(old_table[0])
+        old_table = tabular_data.normalize_rows(old_table)
+        if not old_table:
+            return
+        nrows = min(len(old_table), self.raw_data_table.rowCount())
+        ncols = min(len(old_table[0]), self.raw_data_table.columnCount())
 
         for row in range(nrows):
             for col in range(ncols):

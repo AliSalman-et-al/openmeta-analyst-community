@@ -32,6 +32,7 @@ import calculator_routines as calc_fncs
 import app_error_handler
 import meta_py_r
 import qt_layout
+import tabular_data
 from meta_globals import *
 import forms.ui_continuous_data_form
 import forms.ui_choose_back_calc_result_form
@@ -600,9 +601,12 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         """
 
         for i, old_table_data in enumerate(old_tables_data):
-            nrows = len(old_table_data)
-            ncols = len(old_table_data[0])
+            old_table_data = tabular_data.normalize_rows(old_table_data)
+            if not old_table_data:
+                continue
             table = self.tables[i]
+            nrows = min(len(old_table_data), table.rowCount())
+            ncols = min(len(old_table_data[0]), table.columnCount())
 
             for row in range(nrows):
                 for col in range(ncols):

@@ -28,6 +28,7 @@ from PyQt5.QtWidgets import (
 import meta_py_r
 import app_error_handler
 import qt_layout
+import tabular_data
 from meta_globals import *
 import calculator_routines as calc_fncs
 from forms.ui_diagnostic_data_form import Ui_DiagnosticDataForm
@@ -345,8 +346,11 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         self.enable_back_calculation_btn()
 
     def restore_table(self, old_table_data):
-        nrows = len(old_table_data)
-        ncols = len(old_table_data[0])
+        old_table_data = tabular_data.normalize_rows(old_table_data)
+        if not old_table_data:
+            return
+        nrows = min(len(old_table_data), self.two_by_two_table.rowCount())
+        ncols = min(len(old_table_data[0]), self.two_by_two_table.columnCount())
 
         for row in range(nrows):
             for col in range(ncols):

@@ -146,6 +146,57 @@ def test_copy_paste_undo_and_redo_work_through_real_table_path():
         _close_without_prompt(app, window)
 
 
+def test_paste_contents_pads_short_rows_and_clears_trailing_cells():
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        model = window.model
+        table = window.tableView
+
+        table.paste_contents(
+            model.index(1, model.NAME), [["Beta", "2021", "3", "11", "4", "99"]]
+        )
+
+        table.paste_contents(
+            model.index(0, model.NAME),
+            [
+                ["Alpha", "2020", "1", "10", "2", "12"],
+                ["Beta", "2021", "3", "11", "4"],
+            ],
+        )
+
+        assert _cell_text(model, 0, model.RAW_DATA[-1]) == "12.0"
+        assert _cell_text(model, 1, model.NAME) == "Beta"
+        assert _cell_text(model, 1, model.RAW_DATA[-1]) == ""
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_paste_contents_keeps_columns_from_rows_wider_than_the_first():
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        model = window.model
+        table = window.tableView
+
+        table.paste_contents(
+            model.index(0, model.NAME),
+            [
+                ["Alpha", "2020", "1", "10", "2"],
+                ["Beta", "2021", "3", "11", "4", "13"],
+            ],
+        )
+
+        assert _cell_text(model, 0, model.RAW_DATA[-1]) == ""
+        assert _cell_text(model, 1, model.RAW_DATA[-1]) == "13.0"
+    finally:
+        _close_without_prompt(app, window)
+
+
 def test_invalid_paste_reports_validation_error_when_model_signals_are_blocked(
     monkeypatch,
 ):

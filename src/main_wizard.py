@@ -21,6 +21,7 @@ import meta_globals
 import app_error_handler
 import qt_layout
 import qt_text
+import tabular_data
 from ma_data_table_model import DatasetModel
 from settings import get_default_open_directory
 
@@ -581,14 +582,13 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
         self.print_extracted_data()  # just for debugging
 
     def _normalize_imported_rows(self):
-        if not self.imported_data:
-            return
-
-        num_cols = max([len(row) for row in self.imported_data] + [len(self.headers)])
-        self.imported_data = [
-            row + [""] * (num_cols - len(row)) for row in self.imported_data
-        ]
+        self.imported_data = tabular_data.normalize_rows(
+            self.imported_data, minimum_width=len(self.headers)
+        )
         if self.headers:
+            num_cols = (
+                len(self.imported_data[0]) if self.imported_data else len(self.headers)
+            )
             self.headers = self.headers + [""] * (num_cols - len(self.headers))
 
     def print_extracted_data(self):
