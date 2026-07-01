@@ -409,6 +409,89 @@ create.regression.display <- function(res, params, display.data) {
   return(reg.disp)
 }
 
+adjusted_means_display <- function(res, params, display.data) {
+  display.scale <- function(x, metric) {
+    if (metric.is.log.scale(metric)) {
+      exp(x)
+    } else if (metric.is.logit.scale(metric)) {
+      invlogit(x)
+    } else if (metric.is.arcsine.scale(metric)) {
+      invarcsine.sqrt(x)
+    } else {
+      x
+    }
+  }
+
+  factor.n.levels <- display.data$factor.n.levels
+  if (length(factor.n.levels) != 1) {
+    stop("adjusted_means_display requires exactly one factor covariate")
+  }
+  if (!is.null(display.data$n.cont.covs) && display.data$n.cont.covs != 0) {
+    stop("adjusted_means_display does not support continuous covariates")
+  }
+
+  n.levels <- factor.n.levels[[1]]
+  if (n.levels < 2) {
+    stop("adjusted_means_display requires at least two factor levels")
+  }
+  levels.display.col <- display.data$levels.display.col
+  studies.display.col <- display.data$studies.display.col
+
+  coefficient.count <- length(as.vector(res$b))
+  if (coefficient.count < n.levels) {
+    stop("meta-regression result has fewer coefficients than factor levels")
+  }
+
+  alpha <- 1.0 - (params$conf.level / 100.0)
+  mult <- abs(qnorm(alpha / 2.0))
+  digits.str <- paste("%.", params$digits, "f", sep="")
+
+  design.matrix <- cbind(
+    Intercept=rep(1, n.levels),
+    rbind(rep(0, n.levels - 1), diag(n.levels - 1))
+  )
+  betas <- as.matrix(res$b[1:n.levels, , drop=FALSE])
+  covariance <- as.matrix(res$vb[1:n.levels, 1:n.levels, drop=FALSE])
+
+  estimates <- as.vector(design.matrix %*% betas)
+  variances <- diag(design.matrix %*% covariance %*% t(design.matrix))
+  se <- sqrt(variances)
+  ci.lb <- estimates - mult * se
+  ci.ub <- estimates + mult * se
+
+  estimates.disp <- display.scale(estimates, params$measure)
+  ci.lb.disp <- display.scale(ci.lb, params$measure)
+  ci.ub.disp <- display.scale(ci.ub, params$measure)
+
+  adj.array <- array(
+    dim=c(n.levels + 1, 6),
+    dimnames=list(NULL, c("Level", "Studies", "Estimate", "Lower bound", "Upper bound", "Std. error"))
+  )
+  adj.array[1,] <- c("Level", "Studies", "Estimate", "Lower bound", "Upper bound", "Std. error")
+  level.start <- display.data$n.cont.covs + 2
+  level.end <- level.start + n.levels - 1
+  if (length(levels.display.col) < level.end || length(studies.display.col) < level.end) {
+    stop("display data does not contain factor levels")
+  }
+  adj.array[2:(n.levels + 1), "Level"] <- levels.display.col[level.start:level.end]
+  adj.array[2:(n.levels + 1), "Studies"] <- studies.display.col[level.start:level.end]
+  adj.array[2:(n.levels + 1), "Estimate"] <- sprintf(digits.str, estimates.disp)
+  adj.array[2:(n.levels + 1), "Lower bound"] <- sprintf(digits.str, ci.lb.disp)
+  adj.array[2:(n.levels + 1), "Upper bound"] <- sprintf(digits.str, ci.ub.disp)
+  adj.array[2:(n.levels + 1), "Std. error"] <- sprintf(digits.str, se)
+
+  metric.name <- pretty.metric.name(as.character(params$measure))
+  model.title <- paste("Adjusted Means\n\nMetric: ", metric.name, sep="")
+  adj.disp <- list(
+    "model.title" = model.title,
+    "table.titles" = c("Adjusted Means"),
+    "arrays" = list(arr1=adj.array),
+    "MAResults" = list(b=estimates, se=se, ci.lb=ci.lb, ci.ub=ci.ub)
+  )
+  class(adj.disp) <- "summary.display"
+  adj.disp
+}
+
 create.overall.display <- function(res, study.names, params, model.title, data.type) {
   # create tables for diplaying summary of meta-methods (cumulative and leave-one-out) results.
   if (data.type == "continuous") {

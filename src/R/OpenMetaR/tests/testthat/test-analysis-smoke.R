@@ -121,6 +121,16 @@ test_that("representative diagnostic analysis paths execute", {
   expect_analysis_result(subgroup.ma.diagnostic("diagnostic.random", fixture$data, fixture$params, get.cov(fixture$data, "quality")))
 })
 
+test_that("single factor diagnostic meta-regression returns adjusted means", {
+  fixture <- diagnostic_fixture("DOR")
+  result <- meta.regression(fixture$data, fixture$params)
+
+  expect_named(result, c("Summary", "Adjusted Mean", "res", "res.info", "References"))
+  expect_match(result[["Adjusted Mean"]], "Adjusted Means")
+  expect_match(result[["Adjusted Mean"]], "A")
+  expect_match(result[["Adjusted Mean"]], "B")
+})
+
 test_that("HSROC feasibility requires count-based diagnostic data", {
   entered.effects <- new(
     "DiagnosticData",
