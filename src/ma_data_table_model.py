@@ -2292,13 +2292,9 @@ class DatasetModel(QAbstractTableModel):
     def set_conf_level(self, conf_lev):
         """sets multiplier as well (~1.96 for 95% conf level)"""
 
-        invalid_conf_lev_msg = "Confidence level needs to be a number between 0 and 100"
-        if conf_lev is None:
-            raise ValueError(invalid_conf_lev_msg)
-        elif not (0 < conf_lev < 100):
-            raise ValueError(invalid_conf_lev_msg)
+        conf_lev = validate_confidence_level(conf_lev)
 
-        self.conf_level = float(conf_lev)
+        self.conf_level = conf_lev
         print(("Set confidence level to: %f" % conf_lev))
 
         self.mult = meta_py_r.get_mult_from_r(conf_lev)

@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
 )
 
-from meta_globals import DEFAULT_CONF_LEVEL
+from meta_globals import DEFAULT_CONF_LEVEL, CONFIDENCE_LEVEL_DISPLAY_MAX
 import qt_layout
 
 
@@ -26,11 +26,11 @@ class ChangeConfLevelDlg(QDialog):
         cl_label = QLabel("Global Confidence Level:")
 
         self.conf_level_spinbox = QDoubleSpinBox()
-        self.conf_level_spinbox.setRange(50, 99.999)
+        self.conf_level_spinbox.setDecimals(1)
+        self.conf_level_spinbox.setRange(50, CONFIDENCE_LEVEL_DISPLAY_MAX)
         self.conf_level_spinbox.setSingleStep(0.1)
         self.conf_level_spinbox.setSuffix("%")
         self.conf_level_spinbox.setValue(previous_value)
-        self.conf_level_spinbox.setDecimals(1)
 
         buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
 

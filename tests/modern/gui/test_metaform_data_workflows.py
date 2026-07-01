@@ -1,5 +1,6 @@
 import os
 import sys
+import math
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, os.path.abspath("src"))
@@ -293,6 +294,54 @@ def test_metric_selection_and_confidence_level_are_preserved_in_model_state():
         assert window.model.get_global_conf_level() == 90.0
         assert window.cl_label.text() == "confidence level: 90.0%"
         assert _metric_action(window, "RR").isChecked()
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_confidence_level_dialog_rejects_represented_100_percent():
+    from PyQt5.QtWidgets import QApplication
+
+    import conf_level_dialog
+
+    app = QApplication.instance() or QApplication([])
+    dialog = conf_level_dialog.ChangeConfLevelDlg(95.0)
+    try:
+        spinbox = dialog.conf_level_spinbox
+
+        spinbox.lineEdit().setText("100")
+        spinbox.interpretText()
+
+        assert spinbox.maximum() == 99.9
+        assert spinbox.value() == 95.0
+        assert dialog.get_value() == 95.0
+    finally:
+        dialog.close()
+
+
+def test_dataset_model_rejects_invalid_confidence_levels_without_touching_r(monkeypatch):
+    import launch
+    import ma_data_table_model
+
+    app, window = launch.start_automation()
+    try:
+        calls = []
+
+        def fail_if_called(conf_level):
+            calls.append(conf_level)
+            raise AssertionError("invalid confidence level reached R multiplier")
+
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r, "get_mult_from_r", fail_if_called
+        )
+
+        for invalid_value in (0, 100, math.inf, math.nan, "not-a-number"):
+            with pytest.raises(
+                ValueError, match="greater than 0 and less than 100"
+            ):
+                window.model.set_conf_level(invalid_value)
+
+        assert calls == []
+        assert window.model.get_global_conf_level() == 95.0
     finally:
         _close_without_prompt(app, window)
 

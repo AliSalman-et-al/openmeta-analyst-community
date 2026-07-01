@@ -444,10 +444,14 @@ def impute_pre_post_cont_data(cont_data_dict, correlation, alpha):
 ##################### DEALING WITH CONFIDENCE LEVEL IN R #######################
 @RfunctionCaller
 def get_mult_from_r(confidence_level):
+    confidence_level = validate_confidence_level(confidence_level)
     alpha = 1 - float(confidence_level) / 100.0
     r_str = "abs(qnorm(%s/2))" % str(alpha)
     mult = execute_r_string(r_str)
-    return mult[0]
+    multiplier = float(mult[0])
+    if not math.isfinite(multiplier):
+        raise ValueError(INVALID_CONFIDENCE_LEVEL_MESSAGE)
+    return multiplier
 
 
 ################################################################################

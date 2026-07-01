@@ -1862,6 +1862,69 @@
     {
       "decision": "keep",
       "evidence": [
+        "analysis_behavior",
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_confidence_level_validation.py::test_validate_confidence_level_accepts_finite_exclusive_percentage",
+      "reason": "Guards the shared Confidence Level validator for valid finite exclusive percentages before model or R-backed recomputation paths use the value.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "analysis_behavior",
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_confidence_level_validation.py::test_validate_confidence_level_rejects_endpoints_and_non_finite_values",
+      "reason": "Guards the shared Confidence Level validator against endpoint and non-finite values that would create invalid interval multipliers.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_data_workflows.py::test_confidence_level_dialog_rejects_represented_100_percent",
+      "reason": "Guards the user-facing Confidence Level dialog against accepting a typed 100% value after one-decimal spinbox rounding.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "analysis_behavior",
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_data_workflows.py::test_dataset_model_rejects_invalid_confidence_levels_without_touching_r",
+      "reason": "Guards the model boundary so invalid Confidence Level values cannot reach the R multiplier computation.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
         "packaging_contract",
         "release_readiness"
       ],

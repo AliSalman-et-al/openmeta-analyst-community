@@ -2,6 +2,8 @@ import os
 import sys
 import types
 
+from meta_globals import validate_confidence_level
+
 
 def install_meta_py_r_backend():
     # The real backend is the in-process rpy2 module (meta_py_r). When R/rpy2
@@ -43,7 +45,11 @@ def install_stub_meta_py_r():
             "build, so meta-analyses cannot be run."
         )
 
-    meta_py_r.get_mult_from_r = lambda conf_level: 1.96
+    def _get_mult_from_r(conf_level):
+        validate_confidence_level(conf_level)
+        return 1.96
+
+    meta_py_r.get_mult_from_r = _get_mult_from_r
     meta_py_r.get_R_libpaths = lambda: []
     meta_py_r.reset_Rs_working_dir = lambda: None
     meta_py_r.execute_r_string = lambda expression: [95.0]

@@ -14,6 +14,7 @@
 
 import os
 import sys
+import math
 
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QUndoCommand
@@ -180,6 +181,26 @@ def equal_close_enough(x, y):
 
 ### CONFIDENCE LEVEL STUFF #####
 DEFAULT_CONF_LEVEL = 95.0  # (normal 95% CI)
+CONFIDENCE_LEVEL_MIN = 0.0
+CONFIDENCE_LEVEL_MAX = 100.0
+CONFIDENCE_LEVEL_DISPLAY_MAX = 99.9
+INVALID_CONFIDENCE_LEVEL_MESSAGE = (
+    "Confidence level must be greater than 0 and less than 100."
+)
+
+
+def validate_confidence_level(conf_level):
+    try:
+        value = float(conf_level)
+    except (TypeError, ValueError):
+        raise ValueError(INVALID_CONFIDENCE_LEVEL_MESSAGE)
+
+    if not math.isfinite(value) or not (
+        CONFIDENCE_LEVEL_MIN < value < CONFIDENCE_LEVEL_MAX
+    ):
+        raise ValueError(INVALID_CONFIDENCE_LEVEL_MESSAGE)
+
+    return value
 
 
 """
