@@ -900,6 +900,56 @@ hsroc.retry.out.dir <- function(chain.out.dir) {
     retry.out.dir
 }
 
+hsroc.required.chain.files <- function() {
+    c("theta.txt", "alpha.txt", "PI.txt", "Sens1.txt", "Spec1.txt",
+      "Sens1_new.txt", "Spec1_new.txt",
+      "sigma.theta.txt", "sigma.alpha.txt", "capital_THETA.txt",
+      "LAMBDA.txt", "beta.txt", "S_overall.txt", "C_overall.txt")
+}
+
+hsroc.read.chain.samples <- function(sample.path) {
+    sample.size <- file.info(sample.path)$size
+    if (!is.na(sample.size) && sample.size > 0 && sample.size %% 8 == 0) {
+        samples <- try(readBin(sample.path, what="numeric", n=sample.size / 8), silent=TRUE)
+        if (!inherits(samples, "try-error") && length(samples) > 0) {
+            return(samples)
+        }
+    }
+
+    samples <- try(as.matrix(read.table(sample.path)), silent=TRUE)
+    if (inherits(samples, "try-error") || length(samples) == 0) {
+        return(samples)
+    }
+    suppressWarnings(as.numeric(samples))
+}
+
+hsroc.chain.validation.error <- function(chain.out.dir) {
+    required.files <- file.path(chain.out.dir, hsroc.required.chain.files())
+    missing.files <- required.files[!file.exists(required.files)]
+    if (length(missing.files) > 0) {
+        return(paste("missing sampler output file(s):", paste(basename(missing.files), collapse=", ")))
+    }
+
+    for (sample.path in required.files) {
+        samples <- hsroc.read.chain.samples(sample.path)
+        if (inherits(samples, "try-error") || length(samples) == 0) {
+            return(paste("could not read sampler output file:", basename(sample.path)))
+        }
+        if (any(is.na(samples)) || any(!is.finite(samples))) {
+            return(paste("non-finite sampler draw(s) in:", basename(sample.path)))
+        }
+    }
+
+    NULL
+}
+
+hsroc.nonconverged.try.error <- function(reason) {
+    structure(
+        paste("HSROC sampling did not converge cleanly:", reason),
+        class="try-error"
+    )
+}
+
 run.hsroc.with.recovery <- function(diag.data.frame, params, chain.out.dir) {
     run.once <- function(path) {
         try(HSROC(data=diag.data.frame, iter.num=params$num.iters,
@@ -909,7 +959,11 @@ run.hsroc.with.recovery <- function(diag.data.frame, params, chain.out.dir) {
     }
 
     res <- run.once(chain.out.dir)
+    res.validation.error <- NULL
     if (!inherits(res, "try-error")) {
+        res.validation.error <- hsroc.chain.validation.error(chain.out.dir)
+    }
+    if (!inherits(res, "try-error") && is.null(res.validation.error)) {
         return(list("result"=res, "path"=chain.out.dir))
     }
 
@@ -919,6 +973,10 @@ run.hsroc.with.recovery <- function(diag.data.frame, params, chain.out.dir) {
 
     if (inherits(retry.res, "try-error")) {
         return(list("result"=retry.res, "path"=retry.out.dir))
+    }
+    retry.validation.error <- hsroc.chain.validation.error(retry.out.dir)
+    if (!is.null(retry.validation.error)) {
+        return(list("result"=hsroc.nonconverged.try.error(retry.validation.error), "path"=retry.out.dir))
     }
     list("result"=retry.res, "path"=retry.out.dir)
 }
@@ -1027,6 +1085,110 @@ hsroc.summary.path.argument <- function(out.dir) {
     list("path"=out.dir)
 }
 
+hsroc.retained.chain.samples <- function(chain.out.dirs, file.name, params) {
+    retained.samples <- numeric()
+    for (chain.out.dir in chain.out.dirs) {
+        samples <- hsroc.read.chain.samples(file.path(chain.out.dir, file.name))
+        if (inherits(samples, "try-error") || length(samples) == 0) {
+            stop(paste("Could not read HSROC sampler output file:", file.name))
+        }
+        if (params$burn.in >= length(samples)) {
+            stop("HSROC burn-in removed all retained sampler draws.")
+        }
+        samples <- samples[(params$burn.in + 1):length(samples)]
+        samples <- samples[seq(1, length(samples), by=params$thin)]
+        retained.samples <- c(retained.samples, samples)
+    }
+    retained.samples
+}
+
+hsroc.hpd.interval <- function(samples) {
+    if (requireNamespace("coda", quietly=TRUE)) {
+        return(as.numeric(coda::HPDinterval(coda::as.mcmc(samples))[1, ]))
+    }
+    as.numeric(stats::quantile(samples, probs=c(0.025, 0.975), names=FALSE))
+}
+
+hsroc.repair.summary <- function(hsroc.sum, chain.out.dirs, params) {
+    summary.name <- "Between-study parameters"
+    if (!summary.name %in% names(hsroc.sum)) {
+        return(hsroc.sum)
+    }
+
+    between.study <- hsroc.sum[[summary.name]]
+    if (is.null(dim(between.study)) || is.null(rownames(between.study))) {
+        return(hsroc.sum)
+    }
+
+    row.index <- which(rownames(between.study) %in% c("Specificity (new)", "C1_new"))
+    if (length(row.index) != 1) {
+        return(hsroc.sum)
+    }
+
+    column.names <- colnames(between.study)
+    estimate.column <- grep("estimate", column.names, ignore.case=TRUE)
+    lower.column <- grep("HPD[._ ]?(low|lower)", column.names, ignore.case=TRUE)
+    upper.column <- grep("HPD[._ ]?(high|upper)", column.names, ignore.case=TRUE)
+    if (length(estimate.column) != 1 || length(lower.column) != 1 || length(upper.column) != 1) {
+        return(hsroc.sum)
+    }
+
+    estimate <- as.numeric(between.study[row.index, estimate.column])
+    lower <- as.numeric(between.study[row.index, lower.column])
+    upper <- as.numeric(between.study[row.index, upper.column])
+    if (is.finite(estimate) && is.finite(lower) && is.finite(upper) &&
+        lower <= estimate && estimate <= upper) {
+        return(hsroc.sum)
+    }
+
+    c1.new.samples <- hsroc.retained.chain.samples(chain.out.dirs, "Spec1_new.txt", params)
+    if (any(is.na(c1.new.samples)) || any(!is.finite(c1.new.samples))) {
+        return(hsroc.sum)
+    }
+
+    hpd <- hsroc.hpd.interval(c1.new.samples)
+    between.study[row.index, estimate.column] <- stats::median(c1.new.samples)
+    between.study[row.index, lower.column] <- hpd[1]
+    between.study[row.index, upper.column] <- hpd[2]
+    hsroc.sum[[summary.name]] <- between.study
+    hsroc.sum
+}
+
+hsroc.validate.summary.intervals <- function(hsroc.sum) {
+    summary.names <- intersect(c("Between-study parameters", "Within-study parameters", "Reference standard"), names(hsroc.sum))
+    for (summary.name in summary.names) {
+        summary.section <- hsroc.sum[[summary.name]]
+        if (is.null(dim(summary.section)) || length(dim(summary.section)) != 2) {
+            next
+        }
+
+        column.names <- colnames(summary.section)
+        estimate.column <- grep("estimate", column.names, ignore.case=TRUE)
+        lower.column <- grep("HPD[._ ]?(low|lower)", column.names, ignore.case=TRUE)
+        upper.column <- grep("HPD[._ ]?(high|upper)", column.names, ignore.case=TRUE)
+        if (length(estimate.column) != 1 || length(lower.column) != 1 || length(upper.column) != 1) {
+            next
+        }
+
+        estimates <- as.numeric(summary.section[, estimate.column])
+        lower <- as.numeric(summary.section[, lower.column])
+        upper <- as.numeric(summary.section[, upper.column])
+        bad.interval <- is.finite(estimates) & is.finite(lower) & is.finite(upper) &
+            (upper < lower | estimates < lower | estimates > upper)
+        if (any(bad.interval)) {
+            bad.names <- rownames(summary.section)[bad.interval]
+            if (is.null(bad.names)) {
+                bad.names <- which(bad.interval)
+            }
+            stop(paste("HSROC summary returned inconsistent interval bounds for",
+                       summary.name, paste(bad.names, collapse=", "),
+                       "- sampling did not converge cleanly. Try more iterations, a longer burn-in, or wider priors."))
+        }
+    }
+
+    invisible(TRUE)
+}
+
 ##################################
 #       diagnostic hsroc         #
 ##################################
@@ -1063,15 +1225,28 @@ diagnostic.hsroc <- function(diagnostic.data, params){
 
         # Put in try block in case HSROC fails
         if (inherits(res, "try-error")) {
-            stop("Sorry -- HSROC failed during sampling. Perhaps try running it again?")
+            stop("Sorry -- HSROC sampling did not converge cleanly. Try more iterations, a longer burn-in, or wider priors.")
         }
         chain.out.dirs <- c(chain.out.dirs, chain.res$path)
+    }
+
+    chain.validation.errors <- vapply(chain.out.dirs, function(path) {
+        validation.error <- hsroc.chain.validation.error(path)
+        if (is.null(validation.error)) {
+            return(NA_character_)
+        }
+        validation.error
+    }, character(1))
+    if (any(!is.na(chain.validation.errors))) {
+        stop("Sorry -- HSROC sampling did not converge cleanly. Try more iterations, a longer burn-in, or wider priors.")
     }
 
     summary.args <- c(list(data=diag.data.frame, burn_in=params$burn.in, Thin=params$thin, print_plot=T,
                            chain=chain.out.dirs),
                       hsroc.summary.path.argument(out.dir))
     hsroc.sum <- do.call(HSROCSummary, summary.args)
+    hsroc.sum <- hsroc.repair.summary(hsroc.sum, chain.out.dirs, params)
+    hsroc.validate.summary.intervals(hsroc.sum)
 
     #### 
     # pull out the summary

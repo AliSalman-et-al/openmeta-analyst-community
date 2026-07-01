@@ -24,15 +24,28 @@ _HSROC_RETRY_DRIVER = textwrap.dedent(
     run.case <- function(mode) {
       calls <<- c()
       summary.chains <<- c()
+      current.mode <<- mode
+
+      write.valid.chain <- function(path) {
+        for (file.name in hsroc.required.chain.files()) {
+          write(c(0.1, 0.2, 0.3), file=file.path(path, file.name), ncolumns=1)
+        }
+      }
 
       fake.HSROC <- function(..., path) {
         calls <<- c(calls, path)
         if (mode == "fresh-init" && length(calls) == 1) {
           stop("simulated transient HSROC failure")
         }
+        if (mode == "non-finite-init" && length(calls) == 1) {
+          write.valid.chain(path)
+          write(c(0.1, NaN, 0.3), file=file.path(path, "theta.txt"), ncolumns=1)
+          return(invisible(NULL))
+        }
         if (mode == "fatal") {
           stop("simulated unrecoverable validation failure")
         }
+        write.valid.chain(path)
         invisible(NULL)
       }
       assign("HSROC", fake.HSROC, envir=.GlobalEnv)
@@ -55,8 +68,26 @@ _HSROC_RETRY_DRIVER = textwrap.dedent(
       file.create(file.path(summary.path, "Summary ROC curve.pdf"))
       file.create(file.path(summary.path, "Density plots for N = 9 .pdf"))
       file.create(file.path(summary.path, "Trace plots for N = 9 .pdf"))
+      between.study <- matrix(
+        c(0.8, 0.7,
+          0.5, 0.4,
+          0.9, 0.8),
+        nrow=2
+      )
+      rownames(between.study) <- c("Sensitivity (new)", "Specificity (new)")
+      colnames(between.study) <- c("median estimate", "HPD.low", "HPD.high")
+      if (identical(current.mode, "bad-summary")) {
+        between.study["Specificity (new)", "median estimate"] <- 0.8
+        between.study["Specificity (new)", "HPD.low"] <- 0.5
+        between.study["Specificity (new)", "HPD.high"] <- 0
+      }
+      if (identical(current.mode, "bad-other-summary")) {
+        between.study["Sensitivity (new)", "median estimate"] <- 0.8
+        between.study["Sensitivity (new)", "HPD.low"] <- 0.5
+        between.study["Sensitivity (new)", "HPD.high"] <- 0
+      }
       list(
-        `Between-study parameters` = matrix(1:4, nrow=2),
+        `Between-study parameters` = between.study,
         `Within-study parameters` = array(1:8, dim=c(2, 2, 2)),
         "See summary directory for complete results"
       )
@@ -109,6 +140,35 @@ _HSROC_RETRY_DRIVER = textwrap.dedent(
     }
     if (!all(c("Between-study parameters", "Within-study parameters") %in% names(result$Summary))) {
       stop("diagnostic.hsroc did not preserve the stock HSROC summary sections")
+    }
+
+    result <- run.case("non-finite-init")
+
+    if (!is.list(result) || !"Summary" %in% names(result)) {
+      stop("diagnostic.hsroc did not return a result list after non-finite retry")
+    }
+    if (length(calls) != 2) {
+      stop(paste("unexpected non-finite retry call count:", length(calls)))
+    }
+    if (!grepl("chain_1_retry_1$", calls[[2]])) {
+      stop(paste("non-finite retry did not use retry directory:", calls[[2]]))
+    }
+    if (!identical(summary.chains, calls[[2]])) {
+      stop("HSROCSummary did not use the clean retry after non-finite output")
+    }
+
+    result <- run.case("bad-summary")
+    specificity.new <- result$Summary$`Between-study parameters`["Specificity (new)", ]
+    if (specificity.new[["HPD.high"]] <= specificity.new[["median estimate"]]) {
+      stop("diagnostic.hsroc did not repair the known HSROC Specificity (new) HPD.high summary bug")
+    }
+
+    result <- try(run.case("bad-other-summary"), silent=TRUE)
+    if (!inherits(result, "try-error")) {
+      stop("HSROC summary with other impossible interval bounds unexpectedly succeeded")
+    }
+    if (!grepl("inconsistent interval bounds", as.character(result))) {
+      stop(paste("unexpected bad-other-summary error:", as.character(result)))
     }
 
     result <- try(run.case("fatal"), silent=TRUE)

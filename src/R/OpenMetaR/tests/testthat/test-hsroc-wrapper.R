@@ -26,11 +26,17 @@ test_that("diagnostic.hsroc retries a failed first chain in a clean directory", 
 
   calls <- character()
   summary.chains <- character()
+  write.valid.chain <- function(path) {
+    for (file.name in hsroc.required.chain.files()) {
+      write(c(0.1, 0.2, 0.3), file=file.path(path, file.name), ncolumns=1)
+    }
+  }
   fake.HSROC <- function(..., path) {
     calls <<- c(calls, path)
     if (length(calls) == 1) {
       stop("simulated transient HSROC failure")
     }
+    write.valid.chain(path)
     invisible(NULL)
   }
   fake.HSROCSummary <- function(..., chain) {
