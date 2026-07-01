@@ -30,6 +30,20 @@ def _diagnostic_model_with_empty_cells():
     return model
 
 
+def _binary_model_with_blank_study():
+    dataset = ma_dataset.Dataset()
+    blank_study = ma_dataset.Study(1, name="", year=None, include=False)
+    dataset.add_study(blank_study)
+    dataset.add_outcome(ma_dataset.Outcome("Mortality", meta_globals.BINARY))
+
+    model = ma_data_table_model.DatasetModel(dataset=dataset, add_blank_study=False)
+    model.current_outcome = "Mortality"
+    model.current_effect = "OR"
+    model.current_txs = meta_globals.DEFAULT_GROUP_NAMES
+    model.update_column_indices()
+    return model
+
+
 def test_empty_editable_cells_return_blank_edit_text():
     model = _diagnostic_model_with_empty_cells()
     ma_unit = model.get_current_ma_unit_for_study(0)
@@ -58,6 +72,56 @@ def test_raw_data_edit_on_placeholder_row_emits_study_name_error():
     assert model.setData(model.index(1, model.RAW_DATA[0]), "90") is False
 
     assert errors == ["Please enter a study name before entering study data."]
+
+
+def test_direct_effect_edit_on_unnamed_study_emits_study_name_error(monkeypatch):
+    model = _binary_model_with_blank_study()
+    errors = []
+    model.dataError.connect(errors.append)
+    monkeypatch.setattr(
+        ma_data_table_model.meta_py_r,
+        "binary_convert_scale",
+        lambda value, *args, **kwargs: value,
+    )
+
+    assert model.setData(model.index(0, model.OUTCOMES[0]), "1.5") is False
+
+    study = model.dataset.studies[0]
+    ma_unit = model.get_current_ma_unit_for_study(0)
+    assert errors == ["Please enter a study name before entering study data."]
+    assert study.include is False
+    assert ma_unit.get_entered_effect_and_ci("OR", model.get_cur_group_str()) == (
+        None,
+        None,
+        None,
+    )
+
+
+def test_unnamed_study_cannot_be_manually_included():
+    model = _binary_model_with_blank_study()
+    errors = []
+    model.dataError.connect(errors.append)
+
+    assert model.setData(model.index(0, model.INCLUDE_STUDY), True) is False
+
+    assert errors == ["Please enter a study name before entering study data."]
+    assert model.dataset.studies[0].include is False
+
+
+def test_named_direct_effect_entry_still_auto_includes_study(monkeypatch):
+    model = _binary_model_with_blank_study()
+    model.dataset.studies[0].name = "Alpha"
+    monkeypatch.setattr(
+        ma_data_table_model.meta_py_r,
+        "binary_convert_scale",
+        lambda value, *args, **kwargs: value,
+    )
+
+    assert model.setData(model.index(0, model.OUTCOMES[0]), "1.5") is True
+    assert model.setData(model.index(0, model.OUTCOMES[1]), "0.8") is True
+    assert model.setData(model.index(0, model.OUTCOMES[2]), "2.8") is True
+
+    assert model.dataset.studies[0].include is True
 
 
 def test_empty_existing_study_name_emits_study_name_error():

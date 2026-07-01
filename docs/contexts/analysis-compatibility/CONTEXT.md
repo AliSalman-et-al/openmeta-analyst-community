@@ -84,6 +84,10 @@ _Avoid_: Exact functionality, analysis functionality
 A diagnostic sensitivity, specificity, likelihood-ratio, or diagnostic-odds-ratio estimate entered directly with its confidence interval instead of being computed from TP/FN/FP/TN counts.
 _Avoid_: Pre-computed diagnostic data, manual diagnostic value
 
+**Direct Effect-Size Entry**:
+A study-level effect estimate entered directly with its confidence interval or standard error instead of being computed from raw study measurements.
+_Avoid_: Manual outcome, precomputed row
+
 **Count-Based Diagnostic Accuracy Method**:
 A diagnostic method that needs complete TP/FN/FP/TN counts for each included study because direct entered estimates do not carry the paired count information the model requires.
 _Avoid_: Direct-effect bivariate method, manual HSROC

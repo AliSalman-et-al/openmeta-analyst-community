@@ -181,6 +181,26 @@ class DatasetModel(QAbstractTableModel):
         self.dataError.emit(msg)
         return False
 
+    def _study_name_is_blank(self, study):
+        return _to_text_value(study.name).trimmed() == ""
+
+    def _edit_requires_named_study(self, column, value):
+        if column == self.NAME:
+            return False
+        if column == self.INCLUDE_STUDY:
+            return _to_bool(value)
+        if column == self.YEAR:
+            return False
+
+        value_is_blank = _to_text_value(value).trimmed() == ""
+        if self.current_outcome is not None and column in self.RAW_DATA:
+            return not value_is_blank
+        if column in self.OUTCOMES:
+            return not value_is_blank
+        if self.OUTCOMES and column > max(self.OUTCOMES):
+            return not value_is_blank
+        return False
+
     def set_current_metric(self, metric):
         self.current_effect = metric
         print("OK! metric updated.")
@@ -689,6 +709,12 @@ class DatasetModel(QAbstractTableModel):
                     self.dataset.add_study(Study(self.max_study_id() + 1))
 
             study = self.dataset.studies[index.row()]
+            if (
+                not allow_empty_names
+                and self._study_name_is_blank(study)
+                and self._edit_requires_named_study(column, value)
+            ):
+                return self._reject_edit(STUDY_NAME_REQUIRED_MESSAGE)
         else:
             return self._reject_edit("Cannot edit that cell.")
 
