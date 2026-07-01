@@ -164,6 +164,83 @@ def test_diagnostic_backend_failure_does_not_open_empty_results(monkeypatch):
         _close_without_prompt(app, window)
 
 
+def test_diagnostic_multi_metric_failure_keeps_independent_results(monkeypatch):
+    import launch
+
+    app, window = launch.start_automation()
+    import ma_specs
+
+    backend = ma_specs.meta_py_r
+    saved = {name: getattr(backend, name) for name in
+             ("get_available_methods", "get_params", "get_method_description",
+              "ma_dataset_to_simple_diagnostic_robj", "run_diagnostic_multi",
+              "reset_Rs_working_dir")}
+    shown = []
+    results = []
+    try:
+        _create_diagnostic_dataset(window)
+
+        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
+        backend.get_available_methods = lambda **kwargs: {
+            "HSROC": "diagnostic.hsroc",
+            "Diagnostic Random-Effects": "diagnostic.random",
+        }
+        backend.get_params = lambda method: ({}, {}, [], {})
+        backend.get_method_description = lambda method: "stub method"
+        backend.reset_Rs_working_dir = lambda: None
+
+        def run_metric(method_names, param_vals):
+            if len(param_vals) > 1:
+                raise RuntimeError("combined diagnostic failure")
+            metric = param_vals[0]["measure"]
+            if metric == "Sens":
+                raise RuntimeError("HSROC failed to converge")
+            return {
+                "texts": {
+                    "%s Summary" % metric: "%s ok" % metric,
+                },
+                "images": {
+                    "%s Forest plot" % metric: "%s.png" % metric.lower(),
+                },
+                "image_var_names": {},
+                "image_params_paths": {},
+                "image_order": ["%s Forest plot" % metric],
+            }
+
+        backend.run_diagnostic_multi = run_metric
+        monkeypatch.setattr(ma_specs.QMessageBox, "critical",
+                            lambda *args, **kwargs: shown.append(args))
+        monkeypatch.setattr(window, "analysis", lambda result: results.append(result))
+
+        form = window._build_analysis_specs_dialog(
+            diag_metrics=["sens", "lr", "dor"],
+            conf_level=window.model.get_global_conf_level(),
+        )
+        form.diag_metrics_to_analysis_details = {
+            "Sens": ("diagnostic.hsroc", {"conf.level": 95.0}),
+            "DOR": ("diagnostic.random", {"conf.level": 95.0}),
+            "PLR": ("diagnostic.random", {"conf.level": 95.0}),
+            "NLR": ("diagnostic.random", {"conf.level": 95.0}),
+        }
+        form.sens_spec = False
+        form.lr_dor = True
+
+        form.run_ma()
+
+        assert shown == []
+        assert len(results) == 1
+        assert results[0]["texts"]["Sens Error"] == "HSROC failed to converge"
+        assert results[0]["texts"]["DOR Summary"] == "DOR ok"
+        assert results[0]["texts"]["PLR Summary"] == "PLR ok"
+        assert results[0]["texts"]["NLR Summary"] == "NLR ok"
+        assert results[0]["image_order"] == [
+            "NLR Forest plot", "PLR Forest plot", "DOR Forest plot"]
+    finally:
+        for name, value in saved.items():
+            setattr(backend, name, value)
+        _close_without_prompt(app, window)
+
+
 def test_diagnostic_direct_effects_build_analysis_data_per_metric(monkeypatch):
     import launch
 

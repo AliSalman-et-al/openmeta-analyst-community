@@ -265,15 +265,8 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             if self.meta_f_str is None:
                 # regular meta-analysis
                 try:
-                    if _diagnostic_direct_effects_need_metric_specific_data(self.model, list_of_param_vals):
-                        result = _run_diagnostic_with_metric_specific_data(
-                            self.model, method_names, list_of_param_vals)
-                    else:
-                        # Count-based diagnostic data can use the existing R
-                        # wrapper, which computes each requested metric from the
-                        # same 2x2 tables and preserves side-by-side plots.
-                        meta_py_r.ma_dataset_to_simple_diagnostic_robj(self.model)
-                        result = meta_py_r.run_diagnostic_multi(method_names, list_of_param_vals)
+                    result = _run_diagnostic_analysis_isolating_metric_failures(
+                        self.model, method_names, list_of_param_vals)
                 except Exception as e:
                     error_message = \
                         "sorry, something has gone wrong with your analysis. here is a stack trace that probably won't be terribly useful.\n %s"  \
@@ -289,14 +282,21 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             else:
                 # in the case of diagnostic, we pass in lists
                 # of param values to the meta_method 
-                if _diagnostic_direct_effects_need_metric_specific_data(self.model, list_of_param_vals):
-                    result = _run_diagnostic_with_metric_specific_data(
+                try:
+                    result = _run_diagnostic_analysis_isolating_metric_failures(
                         self.model, method_names, list_of_param_vals,
                         meta_f_str=self.meta_f_str)
-                else:
-                    meta_py_r.ma_dataset_to_simple_diagnostic_robj(self.model)
-                    result = meta_py_r.run_meta_method_diag(
-                                    self.meta_f_str, method_names, list_of_param_vals)
+                except Exception as e:
+                    error_message = \
+                        "sorry, something has gone wrong with your analysis. here is a stack trace that probably won't be terribly useful.\n %s"  \
+                                            % e
+
+                    QMessageBox.critical(self, "analysis failed", error_message)
+                    bar.hide()
+                    # reset Rs working directory
+                    meta_py_r.reset_Rs_working_dir()
+                    self.accept()
+                    return
                 #_writeout_test_data(self.meta_f_str, method_names, list_of_param_vals, result, diag=True) # FOR MAKING TESTS
 
         bar.hide()
@@ -821,18 +821,66 @@ def _diagnostic_direct_effects_need_metric_specific_data(model, list_of_param_va
     return True
 
 
+def _run_diagnostic_analysis_isolating_metric_failures(
+        model, method_names, list_of_param_vals, meta_f_str=None):
+    if _diagnostic_direct_effects_need_metric_specific_data(model, list_of_param_vals):
+        return _run_diagnostic_with_metric_specific_data(
+            model, method_names, list_of_param_vals, meta_f_str=meta_f_str)
+
+    meta_py_r.ma_dataset_to_simple_diagnostic_robj(model)
+    try:
+        if meta_f_str is None:
+            return meta_py_r.run_diagnostic_multi(method_names, list_of_param_vals)
+        return meta_py_r.run_meta_method_diag(
+            meta_f_str, method_names, list_of_param_vals)
+    except Exception:
+        return _run_diagnostic_with_shared_data_per_metric(
+            method_names, list_of_param_vals, meta_f_str=meta_f_str)
+
+
+def _run_diagnostic_with_shared_data_per_metric(method_names, list_of_param_vals,
+                                               meta_f_str=None):
+    return _run_diagnostic_methods_per_metric(
+        method_names,
+        list_of_param_vals,
+        lambda method_name, param_vals: (
+            meta_py_r.run_diagnostic_multi([method_name], [param_vals])
+            if meta_f_str is None else
+            meta_py_r.run_meta_method_diag(meta_f_str, [method_name], [param_vals])
+        ),
+    )
+
+
 def _run_diagnostic_with_metric_specific_data(model, method_names, list_of_param_vals,
                                              meta_f_str=None):
-    merged_result = _empty_diagnostic_result()
-    for method_name, param_vals in zip(method_names, list_of_param_vals):
+    def run_metric(method_name, param_vals):
         metric = param_vals["measure"]
         meta_py_r.ma_dataset_to_simple_diagnostic_robj(model, metric=metric)
         if meta_f_str is None:
-            metric_result = meta_py_r.run_diagnostic_multi([method_name], [param_vals])
+            return meta_py_r.run_diagnostic_multi([method_name], [param_vals])
+        return meta_py_r.run_meta_method_diag(
+            meta_f_str, [method_name], [param_vals])
+
+    return _run_diagnostic_methods_per_metric(method_names, list_of_param_vals,
+                                             run_metric)
+
+
+def _run_diagnostic_methods_per_metric(method_names, list_of_param_vals, run_metric):
+    merged_result = _empty_diagnostic_result()
+    failures = []
+    for method_name, param_vals in zip(method_names, list_of_param_vals):
+        metric = param_vals["measure"]
+        try:
+            metric_result = run_metric(method_name, param_vals)
+        except Exception as e:
+            failures.append((metric, e))
+            merged_result["texts"]["%s Error" % metric] = str(e)
         else:
-            metric_result = meta_py_r.run_meta_method_diag(
-                meta_f_str, [method_name], [param_vals])
-        _merge_diagnostic_result(merged_result, metric_result)
+            _merge_diagnostic_result(merged_result, metric_result)
+
+    if failures and not _diagnostic_result_has_successes(merged_result):
+        raise RuntimeError(_format_diagnostic_failures(failures))
+
     if not merged_result["image_order"]:
         merged_result["image_order"] = None
     return merged_result
@@ -858,6 +906,20 @@ def _merge_diagnostic_result(merged_result, metric_result):
             merged_result["image_order"].extend(image_order)
         else:
             merged_result["image_order"].append(image_order)
+
+
+def _diagnostic_result_has_successes(result):
+    return bool(
+        result["images"] or
+        any(not key.endswith(" Error") for key in result["texts"])
+    )
+
+
+def _format_diagnostic_failures(failures):
+    return "\n".join(
+        "%s failed: %s" % (metric, error)
+        for metric, error in failures
+    )
 
 
 def _writeout_test_data(meta_f_str, method, params, results, diag=False):
