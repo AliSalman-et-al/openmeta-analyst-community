@@ -80,11 +80,17 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         # method
         self.meta_f_str = meta_f_str
 
-        self.buttonBox.accepted.connect(self.run_ma)
-        self.buttonBox.rejected.connect(self.cancel)
-        self.save_btn.pressed.connect(self.select_out_path)
+        self.buttonBox.accepted.connect(
+            app_error_handler.safe_slot(self.run_ma, parent=self)
+        )
+        self.buttonBox.rejected.connect(
+            app_error_handler.safe_slot(self.cancel, parent=self)
+        )
+        self.save_btn.pressed.connect(
+            app_error_handler.safe_slot(self.select_out_path, parent=self)
+        )
         self.method_cbo_box.currentIndexChanged[str].connect(
-            lambda _text: self.method_changed()
+            app_error_handler.safe_slot(lambda _text: self.method_changed(), parent=self)
         )
 
         self.data_type = self.model.get_current_outcome_type()
@@ -572,7 +578,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                 cbo_box.setCurrentIndex(default_index)
             self.current_param_vals[name] = self.current_defaults[name]
 
-        cbo_box.currentIndexChanged[int].connect(self.set_param_f_from_itemdata(name))
+        cbo_box.currentIndexChanged[int].connect(
+            app_error_handler.safe_slot(self.set_param_f_from_itemdata(name), parent=self)
+        )
 
         self.current_widgets.append(cbo_box)
         layout.addWidget(cbo_box, cur_grid_row, 1)
@@ -633,7 +641,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             self.current_param_vals[name] = self.current_defaults[name]
 
         finput.setMaximumWidth(50)
-        finput.textChanged.connect(self.set_param_f(name, to_type=float))
+        finput.textChanged.connect(
+            app_error_handler.safe_slot(self.set_param_f(name, to_type=float), parent=self)
+        )
         self.current_widgets.append(finput)
         layout.addWidget(finput, cur_grid_row, 1)
 
@@ -649,7 +659,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             conf_input.setValue(value)
             self.current_param_vals[name] = value
 
-        conf_input.valueChanged[float].connect(self.set_param_f(name, to_type=float))
+        conf_input.valueChanged[float].connect(
+            app_error_handler.safe_slot(self.set_param_f(name, to_type=float), parent=self)
+        )
         self.current_widgets.append(conf_input)
         layout.addWidget(conf_input, cur_grid_row, 1)
 
@@ -669,7 +681,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             self.current_param_vals[name] = self.current_defaults[name]
 
         iinput.setMaximumWidth(50)
-        iinput.textChanged.connect(self.set_param_f(name, to_type=int))
+        iinput.textChanged.connect(
+            app_error_handler.safe_slot(self.set_param_f(name, to_type=int), parent=self)
+        )
         self.current_widgets.append(iinput)
         layout.addWidget(iinput, cur_grid_row, 1)
 
@@ -689,7 +703,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             self.current_param_vals[name] = self.current_defaults[name]
 
         txt_input.setMaximumWidth(200)
-        txt_input.textChanged.connect(self.set_param_f(name, to_type=float))
+        txt_input.textChanged.connect(
+            app_error_handler.safe_slot(self.set_param_f(name, to_type=float), parent=self)
+        )
         self.current_widgets.append(txt_input)
         layout.addWidget(txt_input, cur_grid_row, 1)
 
@@ -819,7 +835,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                 self.buttonBox.accepted.disconnect(self.run_ma)
             except TypeError:
                 pass
-            self.buttonBox.accepted.connect(self.diag_next)
+            self.buttonBox.accepted.connect(
+                app_error_handler.safe_slot(self.diag_next, parent=self)
+            )
 
             # in the case that both 'families' of metrics are selected,
             # we prompt the user for two different methods (because different

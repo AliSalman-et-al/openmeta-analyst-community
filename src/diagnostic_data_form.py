@@ -26,6 +26,7 @@ from PyQt5.QtWidgets import (
 )
 
 import meta_py_r
+import app_error_handler
 import qt_layout
 from meta_globals import *
 import calculator_routines as calc_fncs
@@ -109,20 +110,34 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             txt_box.setText("")
 
     def setup_signals_and_slots(self):
-        self.two_by_two_table.cellChanged.connect(self.cell_changed)
-        self.effect_cbo_box.currentIndexChanged[str].connect(
-            lambda _text: self.effect_changed()
+        self.two_by_two_table.cellChanged.connect(
+            app_error_handler.safe_slot(self.cell_changed, parent=self)
         )
-        self.clear_Btn.clicked.connect(self.clear_form)
+        self.effect_cbo_box.currentIndexChanged[str].connect(
+            app_error_handler.safe_slot(lambda _text: self.effect_changed(), parent=self)
+        )
+        self.clear_Btn.clicked.connect(
+            app_error_handler.safe_slot(self.clear_form, parent=self)
+        )
         self.back_calc_Btn.clicked.connect(
-            lambda: self.enable_back_calculation_btn(engage=True)
+            app_error_handler.safe_slot(
+                lambda: self.enable_back_calculation_btn(engage=True), parent=self
+            )
         )
 
-        self.effect_txt_box.editingFinished.connect(lambda: self.val_changed("est"))
-        self.low_txt_box.editingFinished.connect(lambda: self.val_changed("lower"))
-        self.high_txt_box.editingFinished.connect(lambda: self.val_changed("upper"))
+        self.effect_txt_box.editingFinished.connect(
+            app_error_handler.safe_slot(lambda: self.val_changed("est"), parent=self)
+        )
+        self.low_txt_box.editingFinished.connect(
+            app_error_handler.safe_slot(lambda: self.val_changed("lower"), parent=self)
+        )
+        self.high_txt_box.editingFinished.connect(
+            app_error_handler.safe_slot(lambda: self.val_changed("upper"), parent=self)
+        )
         self.prevalence_txt_box.editingFinished.connect(
-            lambda: self.val_changed("prevalence")
+            app_error_handler.safe_slot(
+                lambda: self.val_changed("prevalence"), parent=self
+            )
         )
 
         # Add undo/redo actions
@@ -132,8 +147,12 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         redo.setShortcut(QKeySequence.Redo)
         self.addAction(undo)
         self.addAction(redo)
-        undo.triggered.connect(lambda _checked=False: self.undo())
-        redo.triggered.connect(lambda _checked=False: self.redo())
+        undo.triggered.connect(
+            app_error_handler.safe_slot(lambda _checked=False: self.undo(), parent=self)
+        )
+        redo.triggered.connect(
+            app_error_handler.safe_slot(lambda _checked=False: self.redo(), parent=self)
+        )
 
     def on_two_by_two_table_currentCellChanged(
         self, currentRow, currentColumn, previousRow, previousColumn

@@ -192,6 +192,73 @@ def test_global_exception_handler_logs_trace_and_shows_recoverable_dialog(
     app.processEvents()
 
 
+def test_main_window_action_exceptions_are_recoverable(monkeypatch, tmp_path):
+    from PyQt5.QtWidgets import QAction
+
+    import launch
+    import app_error_handler
+    import meta_form
+
+    app, window = launch.start_automation()
+    log_path = tmp_path / "openmeta-analyst-error.log"
+    shown = []
+    try:
+        monkeypatch.setattr(
+            app_error_handler, "exception_log_path", lambda: str(log_path)
+        )
+        monkeypatch.setattr(
+            app_error_handler.QMessageBox,
+            "critical",
+            lambda *args, **kwargs: shown.append(args),
+        )
+        action = QAction(window)
+        meta_form._connect_action(
+            action,
+            lambda: (_ for _ in ()).throw(RuntimeError("action exploded")),
+        )
+
+        action.trigger()
+        app.processEvents()
+
+        assert shown
+        assert shown[0][1] == app_error_handler.UNEXPECTED_ERROR_TITLE
+        assert "action exploded" in log_path.read_text(encoding="utf-8")
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_safe_application_notify_reports_event_handler_exceptions(
+    monkeypatch, tmp_path
+):
+    from PyQt5.QtCore import QEvent
+    from PyQt5.QtWidgets import QWidget
+
+    import app_error_handler
+
+    app = app_error_handler.get_or_create_application([])
+    log_path = tmp_path / "openmeta-analyst-error.log"
+    shown = []
+    monkeypatch.setattr(app_error_handler, "exception_log_path", lambda: str(log_path))
+    monkeypatch.setattr(
+        app_error_handler.QMessageBox,
+        "critical",
+        lambda *args, **kwargs: shown.append(args),
+    )
+
+    class RaisingWidget(QWidget):
+        def event(self, event):
+            raise RuntimeError("event exploded")
+
+    widget = RaisingWidget()
+    try:
+        assert app.notify(widget, QEvent(QEvent.User)) is False
+        assert shown
+        assert "event exploded" in log_path.read_text(encoding="utf-8")
+    finally:
+        widget.close()
+        app.processEvents()
+
+
 def _close_without_prompt(app, window):
     window.current_data_unsaved = False
     window.close()

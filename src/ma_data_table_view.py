@@ -27,6 +27,7 @@ print("In ma_data_table_view: importing forms")
 import binary_data_form
 import continuous_data_form
 import diagnostic_data_form
+import app_error_handler
 
 # it's a questionable practice to import the
 # underlying model into the view, but sometimes
@@ -44,7 +45,10 @@ _newlines_re = QRegExp("(\r\n|\r|\r)")
 
 
 def _connect_action(action, callback):
-    action.triggered.connect(lambda checked=False: callback())
+    parent = getattr(callback, "__self__", None)
+    action.triggered.connect(
+        app_error_handler.safe_slot(lambda checked=False: callback(), parent=parent)
+    )
 
 
 def _to_text(value):
@@ -79,11 +83,15 @@ class MADataTable(QtWidgets.QTableView):
         self.undoStack = QUndoStack(self)
 
         header = self.horizontalHeader()
-        header.sectionClicked.connect(self.header_clicked)
+        header.sectionClicked.connect(
+            app_error_handler.safe_slot(self.header_clicked, parent=self)
+        )
 
         self.vert_header = self.verticalHeader()
 
-        self.vert_header.sectionClicked.connect(self.row_header_clicked)
+        self.vert_header.sectionClicked.connect(
+            app_error_handler.safe_slot(self.row_header_clicked, parent=self)
+        )
 
         ## TODO need to add covariate indices here, as needed
         self.reverse_column_sorts = {0: False, 1: False}
@@ -95,7 +103,9 @@ class MADataTable(QtWidgets.QTableView):
         ### vertical (column) header
         headers = self.horizontalHeader()
         headers.setContextMenuPolicy(Qt.CustomContextMenu)
-        headers.customContextMenuRequested.connect(self.header_context_menu)
+        headers.customContextMenuRequested.connect(
+            app_error_handler.safe_slot(self.header_context_menu, parent=self)
+        )
 
     def _make_context_menu(self):
         def _context_menu(event):

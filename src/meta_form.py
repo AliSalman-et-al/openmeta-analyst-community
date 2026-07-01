@@ -112,7 +112,10 @@ def _qt_text(value):
 
 
 def _connect_action(action, callback):
-    action.triggered.connect(lambda checked=False: callback())
+    parent = getattr(callback, "__self__", None)
+    action.triggered.connect(
+        app_error_handler.safe_slot(lambda checked=False: callback(), parent=parent)
+    )
 
 
 def _format_confidence_level_status(conf_level):
@@ -125,7 +128,10 @@ def _disconnect_signal(signal, slot):
     try:
         signal.disconnect(slot)
     except (TypeError, RuntimeError):
-        pass
+        try:
+            signal.disconnect()
+        except (TypeError, RuntimeError):
+            pass
 
 
 class ImportProgress(QDialog, forms.ui_running.Ui_running):
@@ -415,9 +421,19 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def _setup_connections(self, menu_actions=True):
         """Signals & slots"""
         model = self.tableView.model()
-        model.pyCellContentChanged.connect(self.tableView.cell_content_changed)
-        model.outcomeChanged.connect(self.tableView.displayed_ma_changed)
-        model.followUpChanged.connect(self.tableView.displayed_ma_changed)
+        model.pyCellContentChanged.connect(
+            app_error_handler.safe_slot(self.tableView.cell_content_changed, parent=self)
+        )
+        model.outcomeChanged.connect(
+            app_error_handler.safe_slot(
+                self.tableView.displayed_ma_changed, parent=self
+            )
+        )
+        model.followUpChanged.connect(
+            app_error_handler.safe_slot(
+                self.tableView.displayed_ma_changed, parent=self
+            )
+        )
 
         ###
         # this is not ideal, but I couldn't get the rowsInserted methods working.
@@ -426,11 +442,15 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         # where it was before this reset() call (reset clears the current editor).
         # this index is the QModelIndex. this is used, e.g., when a new study is added.
         # this fixes bug #20.
-        model.editFocusRequested.connect(self.set_edit_focus)
+        model.editFocusRequested.connect(
+            app_error_handler.safe_slot(self.set_edit_focus, parent=self)
+        )
 
         # Do actions when the model is about to be reset (for now, just
         # recalculate display scale values)
-        model.modelAboutToBeReset.connect(self._model_about_to_be_reset)
+        model.modelAboutToBeReset.connect(
+            app_error_handler.safe_slot(self._model_about_to_be_reset, parent=self)
+        )
 
         ###
         # this listens to the model regarding errors in data entry --
@@ -438,15 +458,27 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         # and this hook allows the model to pass along error messages to the
         # user. the data checking happens in ma_dataset (specifically, in the
         # setData method)
-        model.dataError.connect(self.data_error)
+        model.dataError.connect(app_error_handler.safe_slot(self.data_error, parent=self))
 
-        self.tableView.dataDirtied.connect(self.data_dirtied)
+        self.tableView.dataDirtied.connect(
+            app_error_handler.safe_slot(self.data_dirtied, parent=self)
+        )
         if menu_actions:
-            self.nav_add_btn.pressed.connect(self.add_new)
-            self.nav_right_btn.pressed.connect(self.next)
-            self.nav_left_btn.pressed.connect(self.previous)
-            self.nav_up_btn.pressed.connect(self.next_dimension)
-            self.nav_down_btn.pressed.connect(self.previous_dimension)
+            self.nav_add_btn.pressed.connect(
+                app_error_handler.safe_slot(self.add_new, parent=self)
+            )
+            self.nav_right_btn.pressed.connect(
+                app_error_handler.safe_slot(self.next, parent=self)
+            )
+            self.nav_left_btn.pressed.connect(
+                app_error_handler.safe_slot(self.previous, parent=self)
+            )
+            self.nav_up_btn.pressed.connect(
+                app_error_handler.safe_slot(self.next_dimension, parent=self)
+            )
+            self.nav_down_btn.pressed.connect(
+                app_error_handler.safe_slot(self.previous_dimension, parent=self)
+            )
 
             _connect_action(self.action_save, self.save)
             _connect_action(self.action_save_as, self.save_as)
@@ -756,8 +788,11 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             print("Could not set metric name tooltip")
         metric_action.setCheckable(True)
         metric_action.toggled.connect(
-            lambda checked=False, metric=metric, menu=menu: self.metric_selected(
-                metric, menu
+            app_error_handler.safe_slot(
+                lambda checked=False, metric=metric, menu=menu: self.metric_selected(
+                    metric, menu
+                ),
+                parent=self,
             )
         )
         menu.addAction(metric_action)

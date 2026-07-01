@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import QDialog, QMessageBox
 
 import forms.ui_diagnostic_metrics
+import app_error_handler
 import ma_specs
 import qt_layout
 from meta_globals import DIAG_METRIC_NAMES_D
@@ -16,10 +17,12 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
         self.parent = parent
         self.external_params = external_params
         self.meta_f_str = meta_f_str
-        self.btn_ok.pressed.connect(self.ok)
+        self.btn_ok.pressed.connect(app_error_handler.safe_slot(self.ok, parent=self))
         self._configure_metric_checkboxes()
         for metric in self.SELECTABLE_METRICS:
-            self._metric_checkbox(metric).toggled.connect(self._refresh_ok_enabled)
+            self._metric_checkbox(metric).toggled.connect(
+                app_error_handler.safe_slot(self._refresh_ok_enabled, parent=self)
+            )
         qt_layout.fit_option_groups_to_contents(self)
 
     def ok(self):

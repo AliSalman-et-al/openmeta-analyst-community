@@ -29,6 +29,7 @@ from PyQt5.QtWidgets import QAction, QDialog, QMessageBox, QTableWidgetItem, QUn
 from functools import partial
 import calculator_routines as calc_fncs
 
+import app_error_handler
 import meta_py_r
 import qt_layout
 from meta_globals import *
@@ -144,31 +145,51 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                 txt_box.setText("0.0")
 
     def setup_signals_and_slots(self):
-        self.simple_table.cellChanged.connect(self._cell_changed)
+        self.simple_table.cellChanged.connect(
+            app_error_handler.safe_slot(self._cell_changed, parent=self)
+        )
         self.g1_pre_post_table.cellChanged.connect(
-            lambda row, col: self.impute_pre_post_data(
-                self.g1_pre_post_table, 0, row, col
+            app_error_handler.safe_slot(
+                lambda row, col: self.impute_pre_post_data(
+                    self.g1_pre_post_table, 0, row, col
+                ),
+                parent=self,
             )
         )
         self.g2_pre_post_table.cellChanged.connect(
-            lambda row, col: self.impute_pre_post_data(
-                self.g2_pre_post_table, 1, row, col
+            app_error_handler.safe_slot(
+                lambda row, col: self.impute_pre_post_data(
+                    self.g2_pre_post_table, 1, row, col
+                ),
+                parent=self,
             )
         )
 
         self.effect_cbo_box.currentIndexChanged[str].connect(
-            lambda _text: self.effect_changed()
+            app_error_handler.safe_slot(lambda _text: self.effect_changed(), parent=self)
         )
-        self.clear_Btn.clicked.connect(self.clear_form)
+        self.clear_Btn.clicked.connect(
+            app_error_handler.safe_slot(self.clear_form, parent=self)
+        )
         self.back_calc_btn.clicked.connect(
-            lambda: self.enable_back_calculation_btn(engage=True)
+            app_error_handler.safe_slot(
+                lambda: self.enable_back_calculation_btn(engage=True), parent=self
+            )
         )
 
-        self.effect_txt_box.editingFinished.connect(lambda: self.val_changed("est"))
-        self.low_txt_box.editingFinished.connect(lambda: self.val_changed("lower"))
-        self.high_txt_box.editingFinished.connect(lambda: self.val_changed("upper"))
+        self.effect_txt_box.editingFinished.connect(
+            app_error_handler.safe_slot(lambda: self.val_changed("est"), parent=self)
+        )
+        self.low_txt_box.editingFinished.connect(
+            app_error_handler.safe_slot(lambda: self.val_changed("lower"), parent=self)
+        )
+        self.high_txt_box.editingFinished.connect(
+            app_error_handler.safe_slot(lambda: self.val_changed("upper"), parent=self)
+        )
         self.correlation_pre_post.editingFinished.connect(
-            lambda: self.val_changed("correlation_pre_post")
+            app_error_handler.safe_slot(
+                lambda: self.val_changed("correlation_pre_post"), parent=self
+            )
         )
 
         # Add undo/redo actions
@@ -178,8 +199,12 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         redo.setShortcut(QKeySequence.Redo)
         self.addAction(undo)
         self.addAction(redo)
-        undo.triggered.connect(lambda _checked=False: self.undo())
-        redo.triggered.connect(lambda _checked=False: self.redo())
+        undo.triggered.connect(
+            app_error_handler.safe_slot(lambda _checked=False: self.undo(), parent=self)
+        )
+        redo.triggered.connect(
+            app_error_handler.safe_slot(lambda _checked=False: self.redo(), parent=self)
+        )
 
     def _set_col_widths(self, table):
         for column in range(table.columnCount()):

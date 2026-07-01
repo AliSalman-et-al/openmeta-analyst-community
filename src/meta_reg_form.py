@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (
 )
 
 import forms.ui_meta_reg
+import app_error_handler
 import meta_py_r
 import qt_layout
 
@@ -28,8 +29,12 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
 
         qt_layout.fit_option_groups_to_contents(self)
 
-        self.buttonBox.rejected.connect(self.cancel)
-        self.buttonBox.accepted.connect(self.run_meta_reg)
+        self.buttonBox.rejected.connect(
+            app_error_handler.safe_slot(self.cancel, parent=self)
+        )
+        self.buttonBox.accepted.connect(
+            app_error_handler.safe_slot(self.run_meta_reg, parent=self)
+        )
 
     def cancel(self):
         print("(cancel)")
@@ -165,7 +170,9 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
                 # check the first covariate by default
                 # (this is arbitrary)
                 chk_box.setChecked(True)
-            chk_box.toggled.connect(self._update_ok_button)
+            chk_box.toggled.connect(
+                app_error_handler.safe_slot(self._update_ok_button, parent=self)
+            )
             chk_box_layout.addWidget(chk_box)
             self.covs_and_check_boxes.append((cov, chk_box))
 

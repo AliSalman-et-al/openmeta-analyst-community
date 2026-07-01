@@ -23,6 +23,7 @@ from PyQt5.QtWidgets import QDialog, QMessageBox
 import forms.ui_edit_dialog
 import edit_list_models
 import add_new_dialogs
+import app_error_handler
 import meta_globals
 import ma_dataset
 import qt_layout
@@ -101,37 +102,67 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
             self.studies_model,
             self.covariates_model,
         ]:
-            model.dataError.connect(self.data_error)
+            model.dataError.connect(app_error_handler.safe_slot(self.data_error, self))
 
         ###
         # groups
-        self.add_group_btn.pressed.connect(self.add_group)
-        self.remove_group_btn.pressed.connect(self.remove_group)
-        self.group_list.clicked.connect(self.group_selected)
+        self.add_group_btn.pressed.connect(
+            app_error_handler.safe_slot(self.add_group, self)
+        )
+        self.remove_group_btn.pressed.connect(
+            app_error_handler.safe_slot(self.remove_group, self)
+        )
+        self.group_list.clicked.connect(
+            app_error_handler.safe_slot(self.group_selected, self)
+        )
 
         ###
         # outcomes
-        self.add_outcome_btn.pressed.connect(self.add_outcome)
-        self.remove_outcome_btn.pressed.connect(self.remove_outcome)
-        self.outcome_list.clicked.connect(self.outcome_selected)
+        self.add_outcome_btn.pressed.connect(
+            app_error_handler.safe_slot(self.add_outcome, self)
+        )
+        self.remove_outcome_btn.pressed.connect(
+            app_error_handler.safe_slot(self.remove_outcome, self)
+        )
+        self.outcome_list.clicked.connect(
+            app_error_handler.safe_slot(self.outcome_selected, self)
+        )
 
         ###
         # follow-ups
-        self.add_follow_up_btn.pressed.connect(self.add_follow_up)
-        self.remove_follow_up_btn.pressed.connect(self.remove_follow_up)
-        self.follow_up_list.clicked.connect(self.follow_up_selected)
+        self.add_follow_up_btn.pressed.connect(
+            app_error_handler.safe_slot(self.add_follow_up, self)
+        )
+        self.remove_follow_up_btn.pressed.connect(
+            app_error_handler.safe_slot(self.remove_follow_up, self)
+        )
+        self.follow_up_list.clicked.connect(
+            app_error_handler.safe_slot(self.follow_up_selected, self)
+        )
 
         ###
         # studies
-        self.add_study_btn.pressed.connect(self.add_study)
-        self.remove_study_btn.pressed.connect(self.remove_study)
-        self.study_list.clicked.connect(lambda _index: self.study_selected())
+        self.add_study_btn.pressed.connect(
+            app_error_handler.safe_slot(self.add_study, self)
+        )
+        self.remove_study_btn.pressed.connect(
+            app_error_handler.safe_slot(self.remove_study, self)
+        )
+        self.study_list.clicked.connect(
+            app_error_handler.safe_slot(lambda _index: self.study_selected(), self)
+        )
 
         ###
         # covariates
-        self.add_covariate_btn.pressed.connect(self.add_covariate)
-        self.remove_covariate_btn.pressed.connect(self.remove_covariate)
-        self.covariate_list.clicked.connect(lambda _index: self.covariate_selected())
+        self.add_covariate_btn.pressed.connect(
+            app_error_handler.safe_slot(self.add_covariate, self)
+        )
+        self.remove_covariate_btn.pressed.connect(
+            app_error_handler.safe_slot(self.remove_covariate, self)
+        )
+        self.covariate_list.clicked.connect(
+            app_error_handler.safe_slot(lambda _index: self.covariate_selected(), self)
+        )
 
     def data_error(self, msg):
         QMessageBox.warning(self, "Whoops", msg)

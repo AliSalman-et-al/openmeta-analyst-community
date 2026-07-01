@@ -131,7 +131,7 @@ def start():
 
     startup_project_path = _startup_project_path(startup_argv)
     meta_form = _import_meta_form()
-    app = QtWidgets.QApplication(list(sys.argv))
+    app = app_error_handler.get_or_create_application(list(sys.argv))
     app.setApplicationName(meta_globals.APPLICATION_NAME)
     app.setOrganizationName(meta_globals.ORGANIZATION_NAME)
     _set_application_icon(app)
@@ -177,7 +177,7 @@ def start():
 def start_automation():
     app_error_handler.install_global_exception_handler()
     meta_form = _import_meta_form()
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
+    app = app_error_handler.get_or_create_application(sys.argv)
     app.setApplicationName(meta_globals.APPLICATION_NAME)
     app.setOrganizationName(meta_globals.ORGANIZATION_NAME)
     _set_application_icon(app)

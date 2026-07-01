@@ -18,6 +18,7 @@ from PyQt5.QtWidgets import (
     QWizardPage,
 )
 import meta_globals
+import app_error_handler
 import qt_layout
 import qt_text
 from ma_data_table_model import DatasetModel
@@ -53,10 +54,22 @@ class WelcomePage(QWizardPage, forms.ui_welcome_page.Ui_WizardPage):
             return Page_DataType
 
     def _setup_connections(self):
-        self.create_new_btn.clicked.connect(lambda _checked=False: self.new_dataset())
-        self.open_btn.clicked.connect(lambda _checked=False: self.open_dataset())
+        self.create_new_btn.clicked.connect(
+            app_error_handler.safe_slot(
+                lambda _checked=False: self.new_dataset(), parent=self
+            )
+        )
+        self.open_btn.clicked.connect(
+            app_error_handler.safe_slot(
+                lambda _checked=False: self.open_dataset(), parent=self
+            )
+        )
         self._setup_open_recent_btn()
-        self.import_csv_btn.clicked.connect(lambda _checked=False: self.import_csv())
+        self.import_csv_btn.clicked.connect(
+            app_error_handler.safe_slot(
+                lambda _checked=False: self.import_csv(), parent=self
+            )
+        )
 
     def _setup_open_recent_btn(self):
         if len(self.recent_datasets) > 0:
@@ -75,8 +88,11 @@ class WelcomePage(QWizardPage, forms.ui_welcome_page.Ui_WizardPage):
                 # retrieve the action_item, i.e., dataset, selected (see
                 # the dataset_selected routine).
                 action_item.triggered.connect(
-                    lambda _checked=False, action_item=action_item: (
-                        self.dataset_selected(action_item)
+                    app_error_handler.safe_slot(
+                        lambda _checked=False, action_item=action_item: (
+                            self.dataset_selected(action_item)
+                        ),
+                        parent=self,
                     )
                 )
             self.open_recent_btn.setMenu(qm)
@@ -146,7 +162,9 @@ class DataTypePage(QWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
             name=None,
         )  # ProjectInfo()
 
-        self.buttonGroup.buttonClicked[QAbstractButton].connect(self._button_selected)
+        self.buttonGroup.buttonClicked[QAbstractButton].connect(
+            app_error_handler.safe_slot(self._button_selected, parent=self)
+        )
 
         self.setPixmap(
             QWizard.BackgroundPixmap,
@@ -239,7 +257,7 @@ class ChooseMetricPage(QWizardPage, forms.ui_choose_metric_page.Ui_WizardPage):
         self.setupUi(self)
 
         self.metric_cbo_box.currentIndexChanged[int].connect(
-            self._metric_choice_changed
+            app_error_handler.safe_slot(self._metric_choice_changed, parent=self)
         )
         qt_layout.fit_text_to_contents(self, adjust_root=False)
 
@@ -301,12 +319,16 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
         self.setupUi(self)
         qt_layout.fit_option_groups_to_contents(self, adjust_root=False)
 
-        self.select_file_btn.clicked.connect(lambda _checked=False: self._select_file())
+        self.select_file_btn.clicked.connect(
+            app_error_handler.safe_slot(
+                lambda _checked=False: self._select_file(), parent=self
+            )
+        )
         self.from_excel_chkbx.stateChanged.connect(
-            lambda _state: self._rebuild_display()
+            app_error_handler.safe_slot(lambda _state: self._rebuild_display(), parent=self)
         )
         self.has_headers_chkbx.stateChanged.connect(
-            lambda _state: self._rebuild_display()
+            app_error_handler.safe_slot(lambda _state: self._rebuild_display(), parent=self)
         )
 
         self.setPixmap(
@@ -639,7 +661,9 @@ class MainWizard(QWizard):
         #               QtGui.QPixmap(':/misc/meta.png'))
 
         # make the displayed size of the pages reasonable
-        self.currentIdChanged.connect(self._change_size)
+        self.currentIdChanged.connect(
+            app_error_handler.safe_slot(self._change_size, parent=self)
+        )
         qt_layout.fit_text_to_contents(self)
 
     def _change_size(self, pageid):

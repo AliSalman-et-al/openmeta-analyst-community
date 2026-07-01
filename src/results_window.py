@@ -29,6 +29,7 @@ import os
 import sys
 import ui_results_window
 import edit_forest_plot_form
+import app_error_handler
 import meta_py_r
 import qt_layout
 # import shutil
@@ -63,15 +64,23 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self.prev_point = QPoint()
         self.borders = []
 
-        self.nav_tree.itemClicked.connect(self.item_clicked)
+        self.nav_tree.itemClicked.connect(
+            app_error_handler.safe_slot(self.item_clicked, parent=self)
+        )
 
         self.psuedo_console.blockSignals(False)
         if hasattr(self.psuedo_console, "returnPressed"):
-            self.psuedo_console.returnPressed.connect(self.process_console_input)
+            self.psuedo_console.returnPressed.connect(
+                app_error_handler.safe_slot(self.process_console_input, parent=self)
+            )
         if hasattr(self.psuedo_console, "upArrowPressed"):
-            self.psuedo_console.upArrowPressed.connect(self.f)
+            self.psuedo_console.upArrowPressed.connect(
+                app_error_handler.safe_slot(self.f, parent=self)
+            )
         if hasattr(self.psuedo_console, "downArrowPressed"):
-            self.psuedo_console.downArrowPressed.connect(self.f)
+            self.psuedo_console.downArrowPressed.connect(
+                app_error_handler.safe_slot(self.f, parent=self)
+            )
 
         self.nav_tree.setHeaderLabels(["Results"])
         self.nav_tree.setItemsExpandable(True)
@@ -397,8 +406,11 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             def add_save_as_pdf_menu_action(menu):
                 action = QAction("save pdf image as", self)
                 action.triggered.connect(
-                    lambda _checked=False: self.save_image_as(
-                        params_path, title, plot_type=plot_type, format="pdf"
+                    app_error_handler.safe_slot(
+                        lambda _checked=False: self.save_image_as(
+                            params_path, title, plot_type=plot_type, format="pdf"
+                        ),
+                        parent=self,
                     )
                 )
                 menu.addAction(action)
@@ -406,12 +418,15 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             def add_save_as_png_menu_action(menu):
                 action = QAction("save png image as", self)
                 action.triggered.connect(
-                    lambda _checked=False: self.save_image_as(
-                        params_path,
-                        title,
-                        plot_type=plot_type,
-                        unscaled_image=plot_img,
-                        format="png",
+                    app_error_handler.safe_slot(
+                        lambda _checked=False: self.save_image_as(
+                            params_path,
+                            title,
+                            plot_type=plot_type,
+                            unscaled_image=plot_img,
+                            format="png",
+                        ),
+                        parent=self,
                     )
                 )
                 menu.addAction(action)
@@ -422,8 +437,11 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                 if plot_type == "forest" and not self._is_side_by_side_fp(title):
                     action = QAction("edit plot", self)
                     action.triggered.connect(
-                        lambda _checked=False: self.edit_image(
-                            params_path, title, png_path, qpixmap_item
+                        app_error_handler.safe_slot(
+                            lambda _checked=False: self.edit_image(
+                                params_path, title, png_path, qpixmap_item
+                            ),
+                            parent=self,
                         )
                     )
                     menu.addAction(action)

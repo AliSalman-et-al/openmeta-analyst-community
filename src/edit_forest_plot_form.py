@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import QDialog, QDialogButtonBox
 
 import forms.ui_edit_forest_plot
+import app_error_handler
 import ma_specs
 import meta_py_r
 import meta_globals
@@ -45,7 +46,9 @@ class EditPlotWindow(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
 
         # get the button object
         self.apply_button = self.buttonBox.button(QDialogButtonBox.Apply)
-        self.apply_button.clicked.connect(self.regenerate_graph)
+        self.apply_button.clicked.connect(
+            app_error_handler.safe_slot(self.regenerate_graph, parent=self)
+        )
         self.populate_params()
         qt_layout.fit_option_groups_to_contents(self)
 

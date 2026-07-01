@@ -7,6 +7,7 @@ from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
 from PyQt5.QtWidgets import QDialog, QMessageBox
 
 from meta_globals import *
+import app_error_handler
 import forms.ui_change_cov_type
 from forms.ui_change_cov_type import Ui_ChangeCovTypeForm
 from ma_dataset import Covariate
@@ -33,7 +34,9 @@ class ChangeCovTypeForm(QDialog, Ui_ChangeCovTypeForm):
         self.setupUi(self)
         self.dataset = dataset
         self.cov_model = CovModel(dataset, cov)
-        self.cov_model.dataError.connect(self.data_error)
+        self.cov_model.dataError.connect(
+            app_error_handler.safe_slot(self.data_error, parent=self)
+        )
         self.cov_prev_table.setModel(self.cov_model)
         self.cov_prev_table.resizeColumnsToContents()
         qt_layout.fit_text_to_contents(self)

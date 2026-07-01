@@ -30,6 +30,7 @@ import calculator_routines as calc_fncs
 
 import forms.ui_binary_data_form
 import forms.ui_choose_back_calc_result_form
+import app_error_handler
 
 # this is the maximum size of a residual that we're willing to accept
 # when computing 2x2 data
@@ -296,19 +297,31 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         print("Current Item Data:", self.current_item_data)
 
     def _setup_signals_and_slots(self):
-        self.raw_data_table.cellChanged.connect(self.cell_changed)
+        self.raw_data_table.cellChanged.connect(
+            app_error_handler.safe_slot(self.cell_changed, parent=self)
+        )
 
         self.effect_cbo_box.currentIndexChanged[str].connect(
-            lambda _text: self.effect_changed()
+            app_error_handler.safe_slot(lambda _text: self.effect_changed(), parent=self)
         )
-        self.clear_Btn.clicked.connect(self.clear_form)
+        self.clear_Btn.clicked.connect(
+            app_error_handler.safe_slot(self.clear_form, parent=self)
+        )
         self.back_calc_btn.clicked.connect(
-            lambda: self.enable_back_calculation_btn(engage=True)
+            app_error_handler.safe_slot(
+                lambda: self.enable_back_calculation_btn(engage=True), parent=self
+            )
         )
 
-        self.effect_txt_box.editingFinished.connect(lambda: self.val_changed("est"))
-        self.low_txt_box.editingFinished.connect(lambda: self.val_changed("lower"))
-        self.high_txt_box.editingFinished.connect(lambda: self.val_changed("upper"))
+        self.effect_txt_box.editingFinished.connect(
+            app_error_handler.safe_slot(lambda: self.val_changed("est"), parent=self)
+        )
+        self.low_txt_box.editingFinished.connect(
+            app_error_handler.safe_slot(lambda: self.val_changed("lower"), parent=self)
+        )
+        self.high_txt_box.editingFinished.connect(
+            app_error_handler.safe_slot(lambda: self.val_changed("upper"), parent=self)
+        )
 
         # Add undo/redo actions
         undo = QAction(self)
@@ -317,8 +330,12 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         redo.setShortcut(QKeySequence.Redo)
         self.addAction(undo)
         self.addAction(redo)
-        undo.triggered.connect(lambda _checked=False: self.undo())
-        redo.triggered.connect(lambda _checked=False: self.redo())
+        undo.triggered.connect(
+            app_error_handler.safe_slot(lambda _checked=False: self.undo(), parent=self)
+        )
+        redo.triggered.connect(
+            app_error_handler.safe_slot(lambda _checked=False: self.redo(), parent=self)
+        )
 
     def _populate_effect_data(self):
         q_effects = sorted(

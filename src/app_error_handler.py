@@ -75,3 +75,45 @@ def install_global_exception_handler():
         return
     _previous_excepthook = sys.excepthook
     sys.excepthook = handle_exception
+
+
+def safe_slot(callback, parent=None):
+    def _safe_slot(*args, **kwargs):
+        try:
+            return callback(*args, **kwargs)
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception as e:
+            handle_exception(type(e), e, e.__traceback__, parent=_resolve_parent(parent))
+            return None
+
+    return _safe_slot
+
+
+def connect_safely(signal, callback, parent=None):
+    signal.connect(safe_slot(callback, parent=parent))
+
+
+def _resolve_parent(parent):
+    if callable(parent):
+        try:
+            return parent()
+        except Exception:
+            return None
+    return parent
+
+
+class SafeApplication(QApplication):
+    def notify(self, receiver, event):
+        try:
+            return super(SafeApplication, self).notify(receiver, event)
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception as e:
+            handle_exception(type(e), e, e.__traceback__, parent=receiver)
+            return False
+
+
+def get_or_create_application(argv):
+    install_global_exception_handler()
+    return QApplication.instance() or SafeApplication(argv)
