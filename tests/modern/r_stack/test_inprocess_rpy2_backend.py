@@ -80,6 +80,16 @@ _DRIVER = textwrap.dedent(
     assert isinstance(defaults, dict)
     assert "conf.level" in defaults or "rm.method" in defaults
 
+    invalid_conf_level_checks = ro.r('''
+      c(
+        inherits(try(set.global.conf.level(100), silent=TRUE), "try-error"),
+        inherits(try(get.mult.from.conf.level(100), silent=TRUE), "try-error"),
+        inherits(try(get.mult.from.conf.level(0), silent=TRUE), "try-error"),
+        inherits(try(get.mult.from.conf.level(Inf), silent=TRUE), "try-error")
+      )
+    ''')
+    assert all(bool(value) for value in invalid_conf_level_checks)
+
     import golden_analysis
 
     subgroup_bundle = [

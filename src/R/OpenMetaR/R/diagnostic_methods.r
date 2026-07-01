@@ -167,8 +167,7 @@ get.res.for.one.diag.study <- function(diagnostic.data, params){
     se <- diagnostic.data@SE
 
     # note: conf.level is given as, e.g., 95, rather than .95.
-    alpha <- 1.0-(params$conf.level/100.0)
-    mult <- abs(qnorm(alpha/2.0))
+    mult <- get.mult.from.conf.level(params$conf.level)
     ub <- y + mult*se
     lb <- y - mult*se
     # we make lists to comply with the get.overall method
@@ -1325,8 +1324,7 @@ diagnostic.hsroc.ml.is.feasible <- diagnostic.hsroc.is.feasible
 #   diagnostic biviariate        #
 ##################################
 diagnostic.bivariate.ml <- function(diagnostic.data, params){
-	alpha <- 1.0-(params$conf.level/100.0)
-	mult <- abs(qnorm(alpha/2.0))
+	mult <- get.mult.from.conf.level(params$conf.level)
     adjusted.counts <- adjust.raw.data(diagnostic.data, params)
 
     biv.results <- bivariate.dx.test(adjusted.counts$TP, adjusted.counts$FP, adjusted.counts$FN, adjusted.counts$TN)
@@ -1434,8 +1432,7 @@ create.sroc.plot.data <- function(diagnostic.data, params){
     fitted.line <- list(intercept=res$coefficients[1], slope=res$coefficients[2])
     std.err <- summary(res)$sigma
     # residual standard error
-    alpha <- 1.0-(params$conf.level/100.0)
-    mult <- abs(qnorm(alpha/2.0))
+    mult <- get.mult.from.conf.level(params$conf.level)
     # multiplier for std.err to get conf. int. bounds
     plot.options <- list()
     plot.options$roc.xlabel <- params$roc_xlabel

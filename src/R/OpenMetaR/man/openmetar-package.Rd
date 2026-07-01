@@ -237,6 +237,7 @@
 \alias{subgroup.ma.continuous}
 \alias{subgroup.ma.diagnostic}
 \alias{two.forest.plots}
+\alias{validate.conf.level}
 \alias{update.changed.plot.params}
 \alias{update.plot.data.multiple}
 \alias{write.bin.study.data.to.file}

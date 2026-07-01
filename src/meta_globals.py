@@ -203,6 +203,13 @@ def validate_confidence_level(conf_level):
     return value
 
 
+def normalize_confidence_level_params(params):
+    normalized = dict(params)
+    if "conf.level" in normalized:
+        normalized["conf.level"] = validate_confidence_level(normalized["conf.level"])
+    return normalized
+
+
 """
 some useful static methods
 """

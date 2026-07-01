@@ -48,8 +48,7 @@ gimpute.bin.data <- function(bin.data) {
 	if (is.null(lower)) lower <- NA
 	if (is.null(upper)) upper <- NA
 	
-	alpha <- 1.0-(conf.level/100.0)
-	mult <- abs(qnorm(alpha/2.0))
+	mult <- get.mult.from.conf.level(conf.level)
 	n <- N_0 + N_1
 	
 	# Calculates the estimate, low, and high if one of the three is NA, assumes
@@ -436,8 +435,7 @@ gimpute.cont.data <- function(group1, group2, effect_data, conf.level=95.0) {
 	high <- effect.and.ci[["high"]]
 	
 	# Obtain standard error and variance from CI
-	alpha <- 1.0-(conf.level/100.0)
-	mult <- abs(qnorm(alpha/2.0))
+	mult <- get.mult.from.conf.level(conf.level)
 	se <- (high-low)/(2*mult)
 	var = se^2
 	
@@ -918,8 +916,7 @@ calc.est.var <- function(ci.data) {
   # calculate estimate and variance given any two of the following: estimate, ci lower bound, ci upper bound.
   #
   est.var <- list()
-  alpha <- 1.0-(ci.data$conf.level/100.0)
-  mult <- abs(qnorm(alpha/2.0))
+  mult <- get.mult.from.conf.level(ci.data$conf.level)
   if (isnt.null(ci.data$estimate)) {
     # if estimate is there, use it.
     if (isnt.null(ci.data$lb)) {
@@ -982,10 +979,8 @@ rescale.effect.and.ci.conf.level <- function(dataf.arg) {
 		high <- est + (est - low)	
 	}
 
-	old.alpha <- 1.0-(orig.conf.level/100.0)
-	new.alpha <- 1.0-(target.conf.level/100.0)
-	old.mult <- abs(qnorm(old.alpha/2.0))
-	new.mult <- abs(qnorm(new.alpha/2.0))
+	old.mult <- get.mult.from.conf.level(orig.conf.level)
+	new.mult <- get.mult.from.conf.level(target.conf.level)
 	
 	se <- (high-low)/(2*old.mult)
 	

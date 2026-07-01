@@ -26,6 +26,7 @@ from PyQt5.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QDoubleSpinBox,
 )
 
 import copy
@@ -72,7 +73,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         if conf_level is None:
             raise ValueError("CONFIDENCE LEVEL MUST BE SPECIFIED")
-        self.conf_level = conf_level
+        self.conf_level = validate_confidence_level(conf_level)
 
         # if not none, we assume we're running a meta
         # method
@@ -637,6 +638,10 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             self.param_d[name]["pretty.name"],
             tool_tip_text=self.param_d[name]["description"],
         )
+        if name == "conf.level":
+            self.add_confidence_level_box(layout, cur_grid_row, name)
+            return
+
         # now add the float input line edit
         finput = QLineEdit()
 
@@ -649,6 +654,22 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         finput.textChanged.connect(self.set_param_f(name, to_type=float))
         self.current_widgets.append(finput)
         layout.addWidget(finput, cur_grid_row, 1)
+
+    def add_confidence_level_box(self, layout, cur_grid_row, name):
+        conf_input = QDoubleSpinBox()
+        conf_input.setDecimals(1)
+        conf_input.setRange(50, CONFIDENCE_LEVEL_DISPLAY_MAX)
+        conf_input.setSingleStep(0.1)
+        conf_input.setSuffix("%")
+
+        if name in self.current_defaults:
+            value = validate_confidence_level(self.current_defaults[name])
+            conf_input.setValue(value)
+            self.current_param_vals[name] = value
+
+        conf_input.valueChanged[float].connect(self.set_param_f(name, to_type=float))
+        self.current_widgets.append(conf_input)
+        layout.addWidget(conf_input, cur_grid_row, 1)
 
     def add_int_box(self, layout, cur_grid_row, name):
         self.add_label(

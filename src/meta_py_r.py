@@ -195,6 +195,7 @@ def reset_Rs_working_dir():
 def impute_diag_data(diag_data_dict):
     print("computing 2x2 table via R...")
     print(diag_data_dict)
+    diag_data_dict = normalize_confidence_level_params(diag_data_dict)
 
     # rpy2 doesn't know how to handle None types.
     # we can just remove them from the dictionary.
@@ -224,6 +225,16 @@ def R_fn_with_dataframe_arg(data_dict, R_fn_name):
     parameters within. Returns a python dictionary. Assumes R function returns
     an R list"""
 
+    data_dict = normalize_confidence_level_params(data_dict)
+    if "orig.conf.level" in data_dict:
+        data_dict["orig.conf.level"] = validate_confidence_level(
+            data_dict["orig.conf.level"]
+        )
+    if "target.conf.level" in data_dict:
+        data_dict["target.conf.level"] = validate_confidence_level(
+            data_dict["target.conf.level"]
+        )
+
     for param, val in list(data_dict.items()):
         if val is None:
             data_dict.pop(param)
@@ -240,6 +251,7 @@ def R_fn_with_dataframe_arg(data_dict, R_fn_name):
 
 @RfunctionCaller
 def impute_bin_data(bin_data_dict):
+    bin_data_dict = normalize_confidence_level_params(bin_data_dict)
     remove_value(None, bin_data_dict)
 
     dataf = ro.r["data.frame"](**bin_data_dict)
@@ -252,6 +264,7 @@ def impute_bin_data(bin_data_dict):
 
 @RfunctionCaller
 def back_calc_cont_data(group1_data, group2_data, effect_data, conf_level):
+    conf_level = validate_confidence_level(conf_level)
     remove_value(None, group1_data)
     remove_value(None, group2_data)
     remove_value(None, effect_data)
@@ -1155,6 +1168,7 @@ def cov_to_str(cov, study_ids, dataset, named_list=True, return_cov_vals=False):
 def run_continuous_ma(
     function_name, params, res_name="result", cont_data_name="tmp_obj"
 ):
+    params = normalize_confidence_level_params(params)
     params_df = ro.r["data.frame"](**params)
     r_str = "%s<-%s(%s, %s)" % (
         res_name,
@@ -1170,6 +1184,7 @@ def run_continuous_ma(
 
 @RfunctionCaller
 def run_binary_ma(function_name, params, res_name="result", bin_data_name="tmp_obj"):
+    params = normalize_confidence_level_params(params)
     params_df = ro.r["data.frame"](**params)
     r_str = "%s<-%s(%s, %s)" % (
         res_name,
@@ -1214,6 +1229,7 @@ def _to_R_params(params):
 def run_diagnostic_multi(
     function_names, list_of_params, res_name="result", diag_data_name="tmp_obj"
 ):
+    list_of_params = [normalize_confidence_level_params(p) for p in list_of_params]
     r_params_str = "list(%s)" % ",".join([_to_R_params(p) for p in list_of_params])
 
     execute_r_string("list.of.params <- %s" % r_params_str)
@@ -1662,8 +1678,7 @@ def run_binary_fixed_meta_regression(
     selected_cov, bin_data_name="tmp_obj", res_name="result", conf_level=None
 ):
 
-    if conf_level is None:
-        raise ValueError("Confidence level must be specified")
+    conf_level = validate_confidence_level(conf_level)
 
     method_str = "FE"
     # equiavlent to params <- list(conf.level=95, digits=3)
@@ -1724,8 +1739,7 @@ def run_meta_regression(
     conf_level=None,
 ):
 
-    if conf_level is None:
-        raise ValueError("Confidence level must be specified")
+    conf_level = validate_confidence_level(conf_level)
 
     method_str = "FE" if fixed_effects else "DL"
 
@@ -1773,6 +1787,7 @@ def run_meta_method_diag(
     diag_data_name="tmp_obj",
 ):
     # list of parameter objects
+    list_of_params = [normalize_confidence_level_params(p) for p in list_of_params]
     r_params_str = "list(%s)" % ",".join([_to_R_params(p) for p in list_of_params])
     r_str = "list.of.params <- %s" % r_params_str
     print(r_str)
@@ -1809,6 +1824,7 @@ def run_meta_method(
     (on the R side). The meta-method called is specified by the meta_function_name
     argument.
     """
+    params = normalize_confidence_level_params(params)
     params_df = ro.r["data.frame"](**params)
     r_str = "%s<-%s('%s', %s, %s)" % (
         res_name,
@@ -1848,6 +1864,7 @@ def _get_col(m, i):
 def diagnostic_effects_for_study(
     tp, fn, fp, tn, metrics=["Spec", "Sens"], conf_level=95.0
 ):
+    conf_level = validate_confidence_level(conf_level)
     # first create a diagnostic data object
     r_str = (
         "diag.tmp <- new('DiagnosticData', TP=c(%s), FN=c(%s), TN=c(%s), FP=c(%s))"
@@ -1899,6 +1916,7 @@ def continuous_effect_for_study(
     two_arm=True,
     conf_level=95.0,
 ):
+    conf_level = validate_confidence_level(conf_level)
 
     point_est, se = None, None
     if two_arm:
@@ -1954,6 +1972,7 @@ def effect_for_study(
     n2 -- size of group 2
     --
     """
+    conf_level = validate_confidence_level(conf_level)
     print(metric)
     r_str = None
     if two_arm:

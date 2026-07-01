@@ -442,8 +442,7 @@ adjusted_means_display <- function(res, params, display.data) {
     stop("meta-regression result has fewer coefficients than factor levels")
   }
 
-  alpha <- 1.0 - (params$conf.level / 100.0)
-  mult <- abs(qnorm(alpha / 2.0))
+  mult <- get.mult.from.conf.level(params$conf.level)
   digits.str <- paste("%.", params$digits, "f", sep="")
 
   design.matrix <- cbind(
@@ -630,8 +629,7 @@ calc.ci.bounds <- function(om.data, params, ...) {
   #  Calulate confidence interval bounds using normal approximation.
   y <- om.data@y
   se <- om.data@SE
-  alpha <- 1.0-(params$conf.level/100.0)
-  mult <- abs(qnorm(alpha/2.0))
+  mult <- get.mult.from.conf.level(params$conf.level)
   lb <- y - mult*om.data@SE
   ub <- y + mult*om.data@SE
   extra.args <- list(...)

@@ -1894,6 +1894,38 @@
     {
       "decision": "keep",
       "evidence": [
+        "analysis_behavior",
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_confidence_level_validation.py::test_normalize_confidence_level_params_validates_analysis_dictionaries",
+      "reason": "Guards Python analysis parameter dictionaries so valid Confidence Level values are normalized before R-backed calculations.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "analysis_behavior",
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_confidence_level_validation.py::test_normalize_confidence_level_params_rejects_invalid_analysis_dictionaries",
+      "reason": "Guards Python analysis parameter dictionaries so invalid Confidence Level values cannot reach R-backed calculations.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
         "gui_compatibility",
         "release_readiness"
       ],

@@ -49,8 +49,7 @@ get.res.for.one.cont.study <- function(cont.data, params){
     se <- cont.data@SE[1]
   }
   # note: conf.level is given as, e.g., 95, rather than .95.
-  alpha <- 1.0-(params$conf.level/100.0)
-  mult <- abs(qnorm(alpha/2.0))
+  mult <- get.mult.from.conf.level(params$conf.level)
   ub <- y + mult*se
   lb <- y - mult*se
   # we make lists to comply with the get.overall method

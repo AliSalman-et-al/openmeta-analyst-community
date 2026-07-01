@@ -1253,8 +1253,7 @@ update.plot.data.multiple <- function(binary.data, params, results) {
                     data.type = data.type,
                     overall =FALSE,
                     options = plot.options)
-    alpha <- 1.0-(params$conf.level/100.0)
-    mult <- abs(qnorm(alpha/2.0))
+    mult <- get.mult.from.conf.level(params$conf.level)
     y.overall <- res$b[1]
     lb.overall <- res$ci.lb[1]
     ub.overall <- res$ci.ub[1]

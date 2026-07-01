@@ -401,8 +401,7 @@ create.subgroup.plot.data.generic <- function(subgroup.data, params, data.type, 
     ub <- NULL
     label.col <- NULL
     types <- NULL
-    alpha <- 1.0-(params$conf.level/100.0)
-    mult <- abs(qnorm(alpha/2.0))
+    mult <- get.mult.from.conf.level(params$conf.level)
     digits.str <- paste("%.", params$digits, "f", sep="")
     
     for (i in 1:length(subgroup.list)){
@@ -592,8 +591,7 @@ create.plot.data.reg <- function(reg.data, params, fitted.line, selected.cov=NUL
                       types = c(rep(0, length(reg.data@study.names))),
                       scale = scale.str,
                       covariate = list(varname = cov.name, values = cov.vals))
-     alpha <- 1.0-(params$conf.level/100.0)
-     mult <- abs(qnorm(alpha/2.0))
+     mult <- get.mult.from.conf.level(params$conf.level)
     
      
      y <- reg.data@y

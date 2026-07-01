@@ -517,8 +517,7 @@ g.create.plot.data.reg <- function(reg.data, cov.name, cov.vals, measure, level,
 			types = c(rep(0, length(reg.data$slab))),
 			scale = scale.str,
 			covariate = list(varname = cov.name, values = cov.vals))
-	alpha <- 1.0-(level/100.0)
-	mult <- abs(qnorm(alpha/2.0))
+	mult <- get.mult.from.conf.level(level)
 	
 	
 	y <- reg.data$yi
@@ -576,8 +575,7 @@ g.meta.regression.cond.means <- function(data, mods, method, level, digits, stra
 	new_betas <- A %*% res$b
 	new_cov   <- A %*% res$vb %*% t(A)
 	new_vars <- diag(new_cov)
-	alpha <- 1.0-(level/100.0)
-	mult <- abs(qnorm(alpha/2.0))
+	mult <- get.mult.from.conf.level(level)
 	new_lowers <- new_betas - mult*sqrt(new_vars)
 	new_uppers <- new_betas + mult*sqrt(new_vars)
 	new_se     <- sqrt(new_vars)
@@ -683,6 +681,7 @@ g.bootstrap.meta.regression <- function(data, mods, method, level, digits,
 	ci.lb <- c()
 	ci.ub <- c()
 	for (i in 1:length(res.boot$t0)) {
+		level <- validate.conf.level(level)
 		ci <- boot.ci(boot.out=res.boot, type="norm", index=i, conf=level/100)# conf. interval
 		ci.lb <- c(ci.lb, ci[["normal"]][2])
 		ci.ub <- c(ci.ub, ci[["normal"]][3])
@@ -799,6 +798,7 @@ g.bootstrap.meta.regression.cond.means <- function(
 	ci.lb <- c()
 	ci.ub <- c()
 	for (i in 1:length(res.boot$t0)) {
+		level <- validate.conf.level(level)
 		ci <- boot.ci(boot.out=res.boot, type="norm", index=i, conf=level/100)# conf. interval
 		ci.lb <- c(ci.lb, ci[["normal"]][2])
 		ci.ub <- c(ci.ub, ci[["normal"]][3])
