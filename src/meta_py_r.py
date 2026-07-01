@@ -16,6 +16,7 @@ print("Entering meta_py_r for import probably")
 import math
 import os
 import r_runtime
+from r_call_serialization import serialized_r_call
 from meta_globals import *
 
 r_runtime.configure_bundled_r_environment()
@@ -85,6 +86,7 @@ try:
 except Exception:
     pass
 
+@serialized_r_call
 def execute_r_string(r_str):
     
     try:
@@ -128,6 +130,7 @@ install this package and then re-start OpenMeta." % name)
 #################### END OF R Library Loader ####################
 
 def RfunctionCaller(function):
+    @serialized_r_call
     def _RfunctionCaller(*args, **kw):
         print(("Using rpy2 interface to R to call %s" % function.__name__))
         res = function(*args, **kw)
