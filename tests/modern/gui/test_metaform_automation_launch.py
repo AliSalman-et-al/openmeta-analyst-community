@@ -673,6 +673,40 @@ def test_meta_regression_dialog_disables_ok_and_does_not_run_without_covariates(
         os.chdir(REPO_ROOT)
 
 
+def test_diagnostic_meta_regression_dialog_fits_radio_group_labels():
+    import launch
+    import meta_reg_form
+
+    app, window = launch.start_automation()
+    form = None
+
+    try:
+        assert window.open(os.path.abspath(os.path.join("sample_data", "lymph.oma"))) is True
+        cov_values = {
+            study.name: index + 1
+            for index, study in enumerate(window.model.dataset.studies)
+        }
+        window.model.add_covariate("dose", "continuous", cov_values)
+
+        form = meta_reg_form.MetaRegForm(window.model, parent=window)
+        form.show()
+        app.processEvents()
+        form.layout().activate()
+
+        assert form.diagnostic_group_box.isVisible()
+        for group_box in (form.diagnostic_group_box, form.groupBox):
+            assert group_box.height() >= group_box.sizeHint().height()
+
+        assert form.height() >= form.sizeHint().height()
+    finally:
+        window.current_data_unsaved = False
+        if form is not None:
+            form.close()
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
 def test_advanced_analysis_actions_require_dataset_readiness_and_covariates():
     import launch
 

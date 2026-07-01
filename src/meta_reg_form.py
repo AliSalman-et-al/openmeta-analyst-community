@@ -1,4 +1,11 @@
-from PyQt5.QtWidgets import QCheckBox, QDialog, QDialogButtonBox, QGridLayout, QMessageBox
+from PyQt5.QtWidgets import (
+    QCheckBox,
+    QDialog,
+    QDialogButtonBox,
+    QGridLayout,
+    QMessageBox,
+    QSizePolicy,
+)
 
 import forms.ui_meta_reg
 import meta_py_r
@@ -18,6 +25,8 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
     
         if not self.is_diagnostic:
             self.diagnostic_group_box.hide()
+
+        self._fit_layout_to_radio_groups()
 
         self.buttonBox.rejected.connect(self.cancel)
         self.buttonBox.accepted.connect(self.run_meta_reg)
@@ -151,4 +160,17 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
             self.covs_and_check_boxes.append((cov, chk_box))
                 
             self.cov_grp_box.setLayout(chk_box_layout)
+
+    def _fit_layout_to_radio_groups(self):
+        radio_groups = [self.groupBox]
+        if self.is_diagnostic:
+            radio_groups.append(self.diagnostic_group_box)
+
+        for group_box in radio_groups:
+            group_box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+            group_box.setMinimumHeight(group_box.sizeHint().height())
+
+        self.layout().activate()
+        self.setMinimumSize(self.sizeHint())
+        self.adjustSize()
             
