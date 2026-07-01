@@ -223,9 +223,9 @@ def test_headless_analysis_dispatches_sequential_binary_and_continuous_workflows
         )
         monkeypatch.setattr(
             headless_analysis.meta_py_r,
-            "run_meta_method",
-            lambda meta, method, params: {
-                "texts": {"Summary": "%s:%s" % (meta, method)}
+            "run_workflow_analysis",
+            lambda workflow, method, params: {
+                "texts": {"Summary": "%s:%s" % (workflow, method)}
             },
             raising=False,
         )
@@ -249,11 +249,11 @@ def test_headless_analysis_dispatches_sequential_binary_and_continuous_workflows
 
         assert (
             headless_analysis.run_headless_analysis(binary)["texts"]["Summary"]
-            == "cum.ma.binary:binary.random"
+            == "cumulative:binary.random"
         )
         assert (
             headless_analysis.run_headless_analysis(continuous)["texts"]["Summary"]
-            == "loo.ma.continuous:continuous.random"
+            == "leave-one-out:continuous.random"
         )
 
 

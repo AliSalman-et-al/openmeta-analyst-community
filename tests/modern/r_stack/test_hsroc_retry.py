@@ -234,14 +234,19 @@ _HSROC_NAMESPACE_DRIVER = textwrap.dedent(
     )
     setwd(old)
 
-    result <- HSROC::HSROCSummary(
+    summary.args <- list(
       data=data,
       burn_in=1,
       Thin=1,
       print_plot=FALSE,
-      path=work,
       chain=c(chain)
     )
+    if ("path" %in% names(formals(HSROC::HSROCSummary))) {
+      summary.args$path <- work
+    } else {
+      summary.args$summary.path <- work
+    }
+    result <- do.call(HSROC::HSROCSummary, summary.args)
     if (!is.list(result) || !"Between-study parameters" %in% names(result)) {
       stop("HSROCSummary did not return the expected summary sections")
     }

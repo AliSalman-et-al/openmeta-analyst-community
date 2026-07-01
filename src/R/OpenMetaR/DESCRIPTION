@@ -7,6 +7,9 @@ Authors@R: c(
     person("Byron", "Wallace", email = "bwallace@tuftsmedicalcenter.org", role = "aut"),
     person("Paul", "Trow", email = "ptrow@tuftsmedicalcenter.org", role = "cre")
     )
+Author: Byron Wallace [aut],
+    Paul Trow [cre]
+Maintainer: Paul Trow <ptrow@tuftsmedicalcenter.org>
 Description: R component for Open Meta-Analyst, a graphical user interface
     for performing meta-analysis.
 License: GPL (>= 2)
@@ -25,9 +28,10 @@ Imports:
     stats,
     utils
 Suggests:
+    coda,
     roxygen2,
     testthat
 Encoding: UTF-8
-Roxygen: list(markdown = TRUE)
+Roxygen: list(markdown = TRUE, roclets = c("rd"))
 RoxygenNote: 8.0.0
 Config/testthat/edition: 3

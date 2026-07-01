@@ -82,10 +82,10 @@ _DRIVER = textwrap.dedent(
 
     invalid_conf_level_checks = ro.r('''
       c(
-        inherits(try(set.global.conf.level(100), silent=TRUE), "try-error"),
-        inherits(try(get.mult.from.conf.level(100), silent=TRUE), "try-error"),
-        inherits(try(get.mult.from.conf.level(0), silent=TRUE), "try-error"),
-        inherits(try(get.mult.from.conf.level(Inf), silent=TRUE), "try-error")
+        inherits(try(openmetar.set.global.conf.level(100), silent=TRUE), "try-error"),
+        inherits(try(openmetar.get.mult.from.conf.level(100), silent=TRUE), "try-error"),
+        inherits(try(openmetar.get.mult.from.conf.level(0), silent=TRUE), "try-error"),
+        inherits(try(openmetar.get.mult.from.conf.level(Inf), silent=TRUE), "try-error")
       )
     ''')
     assert all(bool(value) for value in invalid_conf_level_checks)
@@ -180,7 +180,7 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
               ),
               class = "summary.display"
             )
-            capture.output.and.collapse(summary)
+            paste(capture.output(print(summary)), collapse="\\n")
             '''
         )
         rendered = str(ro.r(summary_expr)[0])
@@ -334,7 +334,7 @@ _ADVANCED_OPENMETAR_DRIVER = textwrap.dedent(
             '''
             set.seed(113)
             dir.create("r_tmp", showWarnings=FALSE)
-            set.global.conf.level(95)
+            openmetar.set.global.conf.level(95)
             advanced_data <- new(
               "BinaryData",
               g1O1=c(6, 3, 19, 26, 8, 6),
@@ -361,14 +361,20 @@ _ADVANCED_OPENMETAR_DRIVER = textwrap.dedent(
               bootstrap.plot.path="./r_tmp/issue113_bootstrap.png",
               histogram.title="Bootstrap", histogram.xlab="Effect"
             )
-            boot.result <- bootstrap.binary("binary.random", advanced_data, params)
+            boot.result <- openmetar.run.analysis(
+              advanced_data,
+              list(method="binary.random", params=params, workflow="bootstrap")
+            )
             stopifnot("Summary" %in% names(boot.result))
             stopifnot("Histogram" %in% names(boot.result$images))
             stopifnot(file.exists(boot.result$images[["Histogram"]]))
 
             params$bootstrap.type <- "boot.meta.reg"
             params$bootstrap.plot.path <- "./r_tmp/issue113_bootstrap_meta_reg.png"
-            boot.reg.result <- bootstrap.binary("binary.random", advanced_data, params)
+            boot.reg.result <- openmetar.run.analysis(
+              advanced_data,
+              list(method="binary.random", params=params, workflow="bootstrap")
+            )
             stopifnot("Summary" %in% names(boot.reg.result))
             stopifnot("Histograms" %in% names(boot.reg.result$images))
             stopifnot(file.exists(boot.reg.result$images[["Histograms"]]))
@@ -379,11 +385,11 @@ _ADVANCED_OPENMETAR_DRIVER = textwrap.dedent(
               slab=advanced_data@study.names,
               year=advanced_data@covariates[[1]]@cov.vals
             )
-            perm.ma <- permuted.ma(perm.data, method="DL", iter=20, digits=3)
+            perm.ma <- openmetar.run.permutation(perm.data, method="DL", iter=20, digits=3)
             stopifnot("Summary" %in% names(perm.ma))
             stopifnot(nchar(perm.ma$Summary) > 0)
 
-            perm.reg <- permuted.meta.reg(
+            perm.reg <- openmetar.run.permutation(
               perm.data,
               method="DL",
               mods=list(numeric=c("year"), categorical=c(), interactions=list()),

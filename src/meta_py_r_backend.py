@@ -49,8 +49,15 @@ def install_stub_meta_py_r():
         validate_confidence_level(conf_level)
         return 1.96
 
+    def _set_global_conf_level(conf_level):
+        return float(validate_confidence_level(conf_level))
+
     meta_py_r.get_mult_from_r = _get_mult_from_r
+    meta_py_r.set_global_conf_level = _set_global_conf_level
     meta_py_r.get_R_libpaths = lambda: []
+    meta_py_r.get_r_version_string = lambda: None
+    meta_py_r.get_r_package_version = lambda package_name: None
+    meta_py_r.evaluate_r_console = lambda expression: [None]
     meta_py_r.reset_Rs_working_dir = lambda: None
     meta_py_r.execute_r_string = lambda expression: [95.0]
     meta_py_r.execute_r_function = lambda function_name, *args, **kwargs: [95.0]
@@ -79,8 +86,8 @@ def install_stub_meta_py_r():
     meta_py_r.run_binary_ma = _analysis_unavailable
     meta_py_r.run_continuous_ma = _analysis_unavailable
     meta_py_r.run_diagnostic_multi = _analysis_unavailable
-    meta_py_r.run_meta_method = _analysis_unavailable
-    meta_py_r.run_meta_method_diag = _analysis_unavailable
+    meta_py_r.run_workflow_analysis = _analysis_unavailable
+    meta_py_r.run_diagnostic_workflow = _analysis_unavailable
     meta_py_r.run_meta_regression = _analysis_unavailable
     meta_py_r.ro = type("RObjects", (), {"r": staticmethod(lambda expression: [95.0])})
     meta_py_r.RlibLoader = lambda: type(

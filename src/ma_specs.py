@@ -88,13 +88,6 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         self.data_type = self.model.get_current_outcome_type()
         print("data type: %s" % self.data_type)
-        if self.meta_f_str is not None:
-            # we pre-prend the data type to the meta-method function
-            # name. thus the caller (meta_form) needn't worry about
-            # the data type, only about the method name (e.g., cumulative)
-            if not self.meta_f_str.endswith(self.data_type):
-                self.meta_f_str = ".".join((self.meta_f_str, self.data_type))
-
         if self.data_type != "binary":
             self.disable_bin_only_fields()
             if self.data_type == "diagnostic":
@@ -232,7 +225,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                 )
                 # pass
             else:
-                result = meta_py_r.run_meta_method(
+                result = meta_py_r.run_workflow_analysis(
                     self.meta_f_str, self.current_method, self.current_param_vals
                 )
 
@@ -246,7 +239,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                 )
             else:
                 # get meta!
-                result = meta_py_r.run_meta_method(
+                result = meta_py_r.run_workflow_analysis(
                     self.meta_f_str, self.current_method, self.current_param_vals
                 )
 
@@ -937,7 +930,7 @@ def _run_diagnostic_analysis_isolating_metric_failures(
     try:
         if meta_f_str is None:
             return meta_py_r.run_diagnostic_multi(method_names, list_of_param_vals)
-        return meta_py_r.run_meta_method_diag(
+        return meta_py_r.run_diagnostic_workflow(
             meta_f_str, method_names, list_of_param_vals
         )
     except Exception:
@@ -955,7 +948,7 @@ def _run_diagnostic_with_shared_data_per_metric(
         lambda method_name, param_vals: (
             meta_py_r.run_diagnostic_multi([method_name], [param_vals])
             if meta_f_str is None
-            else meta_py_r.run_meta_method_diag(meta_f_str, [method_name], [param_vals])
+            else meta_py_r.run_diagnostic_workflow(meta_f_str, [method_name], [param_vals])
         ),
     )
 
@@ -968,7 +961,7 @@ def _run_diagnostic_with_metric_specific_data(
         meta_py_r.ma_dataset_to_simple_diagnostic_robj(model, metric=metric)
         if meta_f_str is None:
             return meta_py_r.run_diagnostic_multi([method_name], [param_vals])
-        return meta_py_r.run_meta_method_diag(meta_f_str, [method_name], [param_vals])
+        return meta_py_r.run_diagnostic_workflow(meta_f_str, [method_name], [param_vals])
 
     return _run_diagnostic_methods_per_metric(
         method_names, list_of_param_vals, run_metric
@@ -1043,15 +1036,6 @@ def _writeout_test_data(meta_f_str, method, params, results, diag=False):
         # Write the data to the disk for sure
         f.flush()
         os.fsync(f)
-
-
-#    method_and_params.append({'meta_f_str': u'loo.ma.binary',
-#                              'method'    : 'binary.random',
-#                              'parameters': {'conf.level': 95.0, 'digits': 3.0, 'fp_col2_str': u'[default]', 'fp_show_col4': True, 'to': 'only0', 'fp_col4_str': u'Ev/Ctrl', 'fp_xticks': '[default]', 'fp_col3_str': u'Ev/Trt', 'fp_show_col3': True, 'fp_show_col2': True, 'fp_show_col1': True, 'fp_plot_lb': '[default]', 'fp_outpath': u'./r_tmp/forest.png', 'rm.method': 'DL', 'adjust': 0.5, 'fp_plot_ub': '[default]', 'fp_col1_str': u'Studies', 'measure': 'OR', 'fp_xlabel': u'[default]', 'fp_show_summary_line': True},
-#                              'results'   : {'images': {'Leave-one-out Forest plot': './r_tmp/forest.png'}, 'texts': {'Leave-one-out Summary': 'Binary Random-Effects Model\n\nMetric: Odds Ratio\n\n Model Results\n\n Studies           Estimate   Lower bound   Upper bound   Std. error   p-Val  \n\n Overall             0.770       0.485         1.222         0.236     0.267  \n\n - Gonzalez          0.783       0.477         1.285         0.253     0.332  \n\n - Prins             0.796       0.489         1.296         0.249     0.359  \n\n - Giamarellou       0.811       0.513         1.281         0.233     0.369  \n\n - Maller            0.715       0.437         1.172         0.252     0.184  \n\n - Sturm             0.791       0.494         1.265         0.240     0.327  \n\n - Marik             0.864       0.543         1.375         0.237     0.538  \n\n - Muijsken          0.724       0.446         1.175         0.247     0.191  \n\n - Vigano            0.750       0.468         1.200         0.240     0.230  \n\n - Hansen            0.851       0.542         1.336         0.230     0.484  \n\n - De Vries          0.724       0.449         1.166         0.243     0.184  \n\n - Mauracher         0.813       0.515         1.283         0.233     0.375  \n\n - Nordstrom         0.772       0.474         1.257         0.249     0.298  \n\n - Rozdzinski        0.738       0.442         1.231         0.261     0.244  \n\n - Ter Braak         0.726       0.443         1.189         0.252     0.204  \n\n - Tulkens           0.764       0.476         1.227         0.242     0.266  \n\n - Van der Auwera    0.791       0.494         1.265         0.240     0.327  \n\n - Klastersky        0.696       0.458         1.059         0.214     0.091  \n\n - Vanhaeverbeek     0.764       0.476         1.226         0.242     0.265  \n\n - Hollender         0.780       0.486         1.253         0.241     0.304  \n\n\n'}, 'image_var_names': {'loo forest plot': 'loo_forest_plot'}, 'image_params_paths': {'Forest Plot': 'r_tmp/1371578321.65222'}, 'image_order': None},
-#                      })
-
-
 ####
 # simple progress bar
 import forms.ui_running

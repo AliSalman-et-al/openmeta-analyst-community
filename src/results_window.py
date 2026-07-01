@@ -319,7 +319,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         return (txt_item.boundingRect(), position)
 
     def process_console_input(self):
-        res = str(meta_py_r.execute_r_string(self.current_line()))
+        res = str(meta_py_r.evaluate_r_console(self.current_line()))
 
         # echo the result
         self.psuedo_console.append(res)

@@ -16,8 +16,8 @@
 ##################################################################
 
 cum_meta_analysis_ref = 'Cumulative Meta-Analysis: Lau, Joseph, et al. "Cumulative meta-analysis of therapeutic trials for myocardial infarction." New England Journal of Medicine 327.4 (1992): 248-254.'
-subgroup_ma_ref = "Subgroup Meta-Analysis: subgroup ma reference placeholder"
-loo_ma_ref = "Leave-one-out Meta-Analysis: LOO ma reference placeholder"
+subgroup_ma_ref = "Subgroup Meta-Analysis: estimates are recomputed within covariate-defined study groups using the selected base meta-analysis method."
+loo_ma_ref = "Leave-one-out Meta-Analysis: estimates are recomputed after omitting each study in turn to assess influence on the selected base meta-analysis method."
 
 ##################################
 #  binary cumulative MA          #
@@ -328,6 +328,7 @@ bootstrap <- function(fname, omdata, params, cond.means.data=FALSE) {
 	# For making textfile output of data
 	textfile.data <- construct.boot.res.and.value.info.for.results(results, boot.res, bootstrap.type)
 	results <- c(results, textfile.data) # res and res.info
+	results[["References"]] <- unique(c(results[["References"]], openmetar.method.references("bootstrap")))
 	
 	results
 	

@@ -450,7 +450,7 @@ diagnostic.fixed.inv.var <- function(diagnostic.data, params){
         } 
     }
 	
-	references <- "this is a placeholder for diagnostic fixed effect inv var reference"
+	references <- openmetar.method.references("rma.uni.fixed")
 	results[["References"]] <- references
 	
     results
@@ -580,7 +580,7 @@ diagnostic.fixed.mh <- function(diagnostic.data, params){
         }    
     }
 	
-	references <- "this is a placeholder for diagnostic fixed effect mh reference"
+	references <- openmetar.method.references("rma.mh")
 	results[["References"]] <- references
 	
     results
@@ -719,7 +719,7 @@ diagnostic.fixed.peto <- function(diagnostic.data, params){
     }
   }
   
-  references <- "this is a placeholder for diagnostic fixed peto reference"
+  references <- openmetar.method.references("rma.peto")
   results[["References"]] <- references
   
   results
@@ -839,7 +839,7 @@ diagnostic.random <- function(diagnostic.data, params){
         } 
     }
 	
-	references <- "this is a placeholder for diagnostic random reference"
+	references <- openmetar.method.references("rma.uni.random")
 	results[["References"]] <- references
 	
     results
@@ -1270,7 +1270,7 @@ diagnostic.hsroc <- function(diagnostic.data, params){
         image.order <- c(image.order, roc.plot.name)
     }
     image.order <- c(image.order, image.names[image.names!=roc.plot.name])
-	references <- "HSROC: C. M. Rutter and C. A. Gatsonis. A hierarchical regression approach to meta-analysis of diagnostic accuracy evaluations. Statistics in Medicine, 20(19):2865-2884, 2001."
+	references <- openmetar.method.references("hsroc")
     results <- list("images"=images,
 			        "image_order"=image.order,
 					"Summary"=summary,
@@ -1369,7 +1369,7 @@ diagnostic.bivariate.ml <- function(diagnostic.data, params){
 
     images <- c("ROC Plot"=paste(path.to.roc.plot.base, ".png", sep=""))
 
-	references <- "this is a placeholder for bivariate references"
+	references <- openmetar.method.references("diagnostic.bivariate")
     results <- list("images"=images,
 			        "Summary"=list("Bivariate Summary"=summary.text),
 					"References"=references)

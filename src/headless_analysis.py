@@ -78,10 +78,8 @@ def run_headless_analysis(case):
     if data_type == meta_globals.BINARY:
         meta_py_r.ma_dataset_to_simple_binary_robj(model, **covariate_kwargs)
         if case.analysis_type in ["cumulative", "leave-one-out"]:
-            return meta_py_r.run_meta_method(
-                {"cumulative": "cum.ma.binary", "leave-one-out": "loo.ma.binary"}[
-                    case.analysis_type
-                ],
+            return meta_py_r.run_workflow_analysis(
+                case.analysis_type,
                 case.method,
                 case.parameters,
             )
@@ -94,18 +92,13 @@ def run_headless_analysis(case):
                 conf_level=case.parameters.get("conf.level"),
             )
         if case.analysis_type == "subgroup":
-            return meta_py_r.run_meta_method(
-                "subgroup.ma.binary", case.method, case.parameters
-            )
+            return meta_py_r.run_workflow_analysis("subgroup", case.method, case.parameters)
         return meta_py_r.run_binary_ma(case.method, case.parameters)
     if data_type == meta_globals.CONTINUOUS:
         meta_py_r.ma_dataset_to_simple_continuous_robj(model, **covariate_kwargs)
         if case.analysis_type in ["cumulative", "leave-one-out"]:
-            return meta_py_r.run_meta_method(
-                {
-                    "cumulative": "cum.ma.continuous",
-                    "leave-one-out": "loo.ma.continuous",
-                }[case.analysis_type],
+            return meta_py_r.run_workflow_analysis(
+                case.analysis_type,
                 case.method,
                 case.parameters,
             )
@@ -118,9 +111,7 @@ def run_headless_analysis(case):
                 conf_level=case.parameters.get("conf.level"),
             )
         if case.analysis_type == "subgroup":
-            return meta_py_r.run_meta_method(
-                "subgroup.ma.continuous", case.method, case.parameters
-            )
+            return meta_py_r.run_workflow_analysis("subgroup", case.method, case.parameters)
         return meta_py_r.run_continuous_ma(case.method, case.parameters)
     if data_type == meta_globals.DIAGNOSTIC:
         meta_py_r.ma_dataset_to_simple_diagnostic_robj(model)

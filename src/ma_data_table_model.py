@@ -2301,8 +2301,7 @@ class DatasetModel(QAbstractTableModel):
         print(("mult is now: %s" % str(self.mult)))
 
         # set in R as well
-        r_str = "set.global.conf.level(" + str(float(conf_lev)) + ")"
-        new_cl_in_R = meta_py_r.execute_r_string(r_str)[0]
+        new_cl_in_R = meta_py_r.set_global_conf_level(conf_lev)
         print(("Set confidence level in R to: %f" % new_cl_in_R))
 
         self.confLevelChanged.emit()

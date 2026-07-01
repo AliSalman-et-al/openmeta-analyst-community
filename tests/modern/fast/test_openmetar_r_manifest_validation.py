@@ -16,6 +16,7 @@ OPENMETAR_PACKAGE = REPO_ROOT / "src" / "R" / "OpenMetaR"
 OPENMETAR_R_DIR = OPENMETAR_PACKAGE / "R"
 OPENMETAR_DESCRIPTION = OPENMETAR_PACKAGE / "DESCRIPTION"
 OPENMETAR_NAMESPACE = OPENMETAR_PACKAGE / "NAMESPACE"
+APP_SRC = REPO_ROOT / "src"
 
 LEGACY_EXPORT_PATTERN = re.compile(
     r"^([A-Za-z][A-Za-z0-9._]*)\s*<-\s*function\s*\(", re.MULTILINE
@@ -24,6 +25,38 @@ LEGACY_ALIAS_PATTERN = re.compile(
     r"^([A-Za-z][A-Za-z0-9._]*)\s*<-\s*([A-Za-z][A-Za-z0-9._]*)\s*$", re.MULTILINE
 )
 S4_CLASS_PATTERN = re.compile(r"setClass\(\s*[\"']([^\"']+)[\"']")
+OPENMETAR_PUBLIC_EXPORTS = {
+    "openmetar.analysis.methods",
+    "openmetar.available.methods",
+    "openmetar.back.calculate.continuous",
+    "openmetar.binary.study.effect",
+    "openmetar.continuous.study.effect",
+    "openmetar.convert.scale",
+    "openmetar.create.binary.data",
+    "openmetar.create.continuous.data",
+    "openmetar.create.covariate.values",
+    "openmetar.create.diagnostic.data",
+    "openmetar.diagnostic.study.effects",
+    "openmetar.draw.forest.plot",
+    "openmetar.draw.regression.plot",
+    "openmetar.get.mult.from.conf.level",
+    "openmetar.graphics.off",
+    "openmetar.impute.binary",
+    "openmetar.impute.continuous.prepost",
+    "openmetar.impute.continuous.study",
+    "openmetar.impute.diagnostic",
+    "openmetar.method.description",
+    "openmetar.method.parameters",
+    "openmetar.method.references",
+    "openmetar.prepare.analysis.data",
+    "openmetar.regenerate.plot.data",
+    "openmetar.run.analysis",
+    "openmetar.run.diagnostic.analyses",
+    "openmetar.run.permutation",
+    "openmetar.save.plot.data",
+    "openmetar.set.global.conf.level",
+    "openmetar.validate.analysis.request",
+}
 
 
 def copy_modernization_docs(tmp_path):
@@ -401,7 +434,7 @@ def test_openmetar_description_declares_only_direct_package_dependencies():
         "stats",
         "utils",
     }
-    assert parse_packages(fields["Suggests"]) == {"roxygen2", "testthat"}
+    assert parse_packages(fields["Suggests"]) == {"coda", "roxygen2", "testthat"}
     assert "igraph" not in fields["Imports"]
     assert "Hmisc" not in fields["Imports"]
     assert "exportPattern" not in OPENMETAR_NAMESPACE.read_text(encoding="utf-8")
@@ -418,17 +451,19 @@ def test_openmetar_source_uses_namespace_imports_instead_of_attach_calls():
     assert offenders == []
 
 
-def test_openmetar_namespace_preserves_legacy_export_surface_explicitly():
-    expected_functions = legacy_exported_functions_from_source()
+def test_openmetar_namespace_exports_only_core_interface():
     actual_exports = namespace_entries("export")
 
-    assert expected_functions
-    assert actual_exports == expected_functions
-    assert {
+    assert actual_exports == OPENMETAR_PUBLIC_EXPORTS
+    assert all(name.startswith("openmetar.") for name in actual_exports)
+    assert not {
+        "binary.random",
         "binary.random.parameters",
         "diagnostic.hsroc.pretty.names",
+        "forest.plot",
         "gimpute.cont.data",
-    } <= actual_exports
+        "set.global.conf.level",
+    } & actual_exports
 
 
 def test_openmetar_namespace_preserves_s4_classes_explicitly():
@@ -436,3 +471,28 @@ def test_openmetar_namespace_preserves_s4_classes_explicitly():
     actual_classes = namespace_entries("exportClasses")
 
     assert actual_classes == expected_classes
+
+
+def test_python_app_calls_r_through_meta_py_r_adapter():
+    offenders = []
+    for path in APP_SRC.glob("*.py"):
+        if path.name == "meta_py_r.py":
+            continue
+        text = path.read_text(encoding="utf-8")
+        if re.search(r"\b(?:execute_r_string|execute_r_function)\s*\(|\bro\.r\b", text):
+            offenders.append(path.relative_to(REPO_ROOT).as_posix())
+
+    assert offenders == []
+
+
+def test_meta_py_r_uses_core_constructors_instead_of_s4_slots():
+    text = (APP_SRC / "meta_py_r.py").read_text(encoding="utf-8")
+
+    assert "new('BinaryData'" not in text
+    assert "new('ContinuousData'" not in text
+    assert "new('DiagnosticData'" not in text
+    assert "new('CovariateValues'" not in text
+    assert "openmetar.create.binary.data" in text
+    assert "openmetar.create.continuous.data" in text
+    assert "openmetar.create.diagnostic.data" in text
+    assert "openmetar.create.covariate.values" in text

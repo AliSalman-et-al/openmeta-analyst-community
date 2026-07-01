@@ -708,7 +708,8 @@ g.bootstrap.meta.regression <- function(data, mods, method, level, digits,
 	# Output results
 	results<-list(
 		    "images"=images,
-			"Bootstrapped Meta Regression Summary"=summary.txt
+			"Bootstrapped Meta Regression Summary"=summary.txt,
+			"References"=openmetar.method.references("bootstrap")
 			#"res.boot"=res.boot
 	)
 }
@@ -835,7 +836,8 @@ g.bootstrap.meta.regression.cond.means <- function(
 	results<-list(
 			"images"=images,
 			"Bootstrapped Conditional Means Meta Regression Summary"=summary.txt,
-			"res"=boot.summary.df
+			"res"=boot.summary.df,
+			"References"=openmetar.method.references("bootstrap")
 	)
 }
 
@@ -931,7 +933,7 @@ meta.regression <- function(reg.data, params, cond.means.data=NULL, stop.at.rma=
 							"res.info"=rma.uni.value.info())
 		}
 	
-	references <- "Meta Regression: meta regression citation placeholder"
+	references <- openmetar.method.references("meta.regression")
 	results[["References"]] <- references
     results
 }

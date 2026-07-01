@@ -214,9 +214,7 @@ continuous.fixed <- function(cont.data, params){
           "Weights"=weights(res))
   }
 	
-  # removing 
-	#references <- "" #"Fixed Effects Inverse Variance: this is a placeholder for continuous fixed reference"
-	#results[["References"]] <- references
+  results[["References"]] <- openmetar.method.references("rma.uni.fixed")
 	
   results
 }
@@ -322,9 +320,7 @@ continuous.random <- function(cont.data, params) {
       "Weights"=weights(res))
   }
 	
-  # possible reference below; for now just removing the 'references' section. we may want to revisit this at some point.
-	#references <- "Random effects: DerSimonian and Laird. Meta-analysis in clinical trials. Controlled Clinical Trials. 7(3) (1986): 177-188."
-	#results[["References"]] <- references
+  results[["References"]] <- openmetar.method.references("rma.uni.random")
 	
   results
 }

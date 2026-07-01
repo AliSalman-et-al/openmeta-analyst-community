@@ -248,9 +248,7 @@ binary.fixed.inv.var <- function(binary.data, params){
                         "Weights"=weights(res))
     }
     
-    #references <- "this is a placeholder for binary fixed effect inv var reference"
-    #references <- ""
-    #results[["References"]] <- references
+    results[["References"]] <- openmetar.method.references("rma.uni.fixed")
     results
 }
 
@@ -355,7 +353,6 @@ binary.fixed.mh <- function(binary.data, params){
         # (mapping titles to pretty-printed text). In this case we have only one 
         # of each. 
         # 
-        #references <- "Mantel, N., & Haenszel, W. (1959). Statistical aspects of the analysis of data from retrospective studies of disease. Journal of the National Cancer Institute, 22, 719-748."
         plot.params.paths <- c("Forest Plot"=forest.plot.params.path)
         images <- c("Forest Plot"=forest.path)
         plot.names <- c("forest plot"="forest_plot")
@@ -373,8 +370,7 @@ binary.fixed.mh <- function(binary.data, params){
            
     }
     
-    references <- "Mantel, N., & Haenszel, W. (1959). Statistical aspects of the analysis of data from retrospective studies of disease. Journal of the National Cancer Institute, 22, 719-748."
-    results[["References"]] = references
+    results[["References"]] <- openmetar.method.references("rma.mh")
     
     results
 }
@@ -531,8 +527,7 @@ binary.fixed.peto <- function(binary.data, params) {
                         "Weights"=weights(res))
     }
     
-    references <- "Fixed Peto: Yusuf, S., Peto, R., Lewis, J., Collins, R., & Sleight, P. (1985). Beta blockade during and after myocardial infarction: An overview of the randomized trials. Progress in Cardiovascular Disease, 27, 335-371."
-    results[["References"]] <- references
+    results[["References"]] <- openmetar.method.references("rma.peto")
     results
 }
 
@@ -679,9 +674,7 @@ binary.random <- function(binary.data, params) {
                         "Weights"=weights(res))
     }
     
-    #references <- "this is a placeholder for binary random reference"
-    #references <- ""
-    #results[["References"]] <- references
+    results[["References"]] <- openmetar.method.references("rma.uni.random")
     results
 }
 

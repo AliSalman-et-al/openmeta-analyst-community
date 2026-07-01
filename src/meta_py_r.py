@@ -174,6 +174,23 @@ def get_R_libpaths():
 
 
 @RfunctionCaller
+def get_r_version_string():
+    return str(execute_r_string("R.version.string")[0])
+
+
+@RfunctionCaller
+def get_r_package_version(package_name):
+    return str(
+        execute_r_string("as.character(utils::packageVersion('%s'))" % package_name)[0]
+    )
+
+
+@RfunctionCaller
+def evaluate_r_console(expression):
+    return execute_r_string(expression)
+
+
+@RfunctionCaller
 def reset_Rs_working_dir():
     """resets R's working directory to the the application base_path, not to r_tmp!"""
     print("resetting R working dir")
@@ -204,49 +221,12 @@ def impute_diag_data(diag_data_dict):
             diag_data_dict.pop(param)
 
     dataf = ro.r["data.frame"](**diag_data_dict)
-    two_by_two = execute_r_string("gimpute.diagnostic.data(%s)" % (dataf.r_repr()))
+    two_by_two = execute_r_string("openmetar.impute.diagnostic(%s)" % (dataf.r_repr()))
 
     imputed_2x2 = R_parse_tools.rlist_to_pydict(two_by_two)
     print(("Imputed 2x2: %s" % str(imputed_2x2)))
 
     return imputed_2x2
-
-
-## Used anymore?
-# def rescale_effect_and_ci_conf_level(data_dict):
-#    print("Rescaling effect and CI confidence level")
-#
-#    return R_fn_with_dataframe_arg(data_dict, "rescale.effect.and.ci.conf.level")
-
-
-@RfunctionCaller
-def R_fn_with_dataframe_arg(data_dict, R_fn_name):
-    """Calls an R function which takes a dataframe as its only argument w/
-    parameters within. Returns a python dictionary. Assumes R function returns
-    an R list"""
-
-    data_dict = normalize_confidence_level_params(data_dict)
-    if "orig.conf.level" in data_dict:
-        data_dict["orig.conf.level"] = validate_confidence_level(
-            data_dict["orig.conf.level"]
-        )
-    if "target.conf.level" in data_dict:
-        data_dict["target.conf.level"] = validate_confidence_level(
-            data_dict["target.conf.level"]
-        )
-
-    for param, val in list(data_dict.items()):
-        if val is None:
-            data_dict.pop(param)
-
-    dataf = ro.r["data.frame"](**data_dict)
-    r_string = R_fn_name + "(" + str(dataf.r_repr()) + ")"
-
-    print(("executing (from R_fn_with_dataframe_arg: %s" % r_string))
-    R_result = execute_r_string(r_string)
-
-    res_as_dict = R_parse_tools.recursioner(R_result)
-    return res_as_dict
 
 
 @RfunctionCaller
@@ -255,7 +235,7 @@ def impute_bin_data(bin_data_dict):
     remove_value(None, bin_data_dict)
 
     dataf = ro.r["data.frame"](**bin_data_dict)
-    two_by_two = execute_r_string("gimpute.bin.data(%s)" % (dataf.r_repr()))
+    two_by_two = execute_r_string("openmetar.impute.binary(%s)" % (dataf.r_repr()))
 
     res_as_dict = R_parse_tools.recursioner(two_by_two)
 
@@ -274,7 +254,7 @@ def back_calc_cont_data(group1_data, group2_data, effect_data, conf_level):
     dataf_effect = ro.r["data.frame"](**effect_data)
 
     r_res = execute_r_string(
-        "gimpute.cont.data(%s,%s,%s,%s)"
+        "openmetar.back.calculate.continuous(%s,%s,%s,%s)"
         % (
             dataf_grp1.r_repr(),
             dataf_grp2.r_repr(),
@@ -419,15 +399,11 @@ def impute_cont_data(cont_data_dict, alpha):
     if len(list(cont_data_dict.items())) == 0:
         return {"succeeded": False}
 
-    r_str = ["fillin.cont.1spell("]
-    for param, val in list(cont_data_dict.items()):
-        r_str.append("%s=%s," % (param, val))
-
-    r_str = "".join(r_str)
-
-    # append alpha argument (for CI level); close function call (parens)
-    r_str += "alpha=%s)" % alpha
-
+    dataf = ro.r["data.frame"](**cont_data_dict)
+    r_str = "openmetar.impute.continuous.study(%s, alpha=%s)" % (
+        dataf.r_repr(),
+        alpha,
+    )
     print("attempting to execute: %s" % r_str)
     c_data = execute_r_string(r_str)
 
@@ -441,12 +417,12 @@ def impute_pre_post_cont_data(cont_data_dict, correlation, alpha):
     if len(list(cont_data_dict.items())) == 0:
         return {"succeeded": False}
 
-    r_str = ["fillin.cont.AminusB("]
-    for param, val in list(cont_data_dict.items()):
-        r_str.append("%s=%s," % (param, val))
-
-    r_str = "".join(r_str)
-    r_str += "correlation=%s, alpha=%s)" % (correlation, alpha)
+    dataf = ro.r["data.frame"](**cont_data_dict)
+    r_str = "openmetar.impute.continuous.prepost(%s, correlation=%s, alpha=%s)" % (
+        dataf.r_repr(),
+        correlation,
+        alpha,
+    )
     print("attempting to execute: %s" % r_str)
     c_data = execute_r_string(r_str)
     pythonized_data = R_parse_tools.recursioner(c_data)
@@ -459,12 +435,21 @@ def impute_pre_post_cont_data(cont_data_dict, correlation, alpha):
 def get_mult_from_r(confidence_level):
     confidence_level = validate_confidence_level(confidence_level)
     alpha = 1 - float(confidence_level) / 100.0
-    r_str = "abs(qnorm(%s/2))" % str(alpha)
+    r_str = "openmetar.get.mult.from.conf.level(%s)" % str(confidence_level)
     mult = execute_r_string(r_str)
     multiplier = float(mult[0])
     if not math.isfinite(multiplier):
         raise ValueError(INVALID_CONFIDENCE_LEVEL_MESSAGE)
     return multiplier
+
+
+@RfunctionCaller
+def set_global_conf_level(confidence_level):
+    confidence_level = validate_confidence_level(confidence_level)
+    new_level = execute_r_string(
+        "openmetar.set.global.conf.level(%s)" % str(float(confidence_level))
+    )
+    return float(new_level[0])
 
 
 ################################################################################
@@ -478,9 +463,7 @@ def none_to_null(x):
 
 
 def get_params(method_name):
-    param_list = execute_r_string("%s.parameters()" % method_name)
-    # note that we're assuming that the last entry of param_list, as provided
-    # by the corresponding R routine, is the order to display the variables
+    param_list = execute_r_string("openmetar.method.parameters('%s')" % method_name)
     param_d = {}
     for name, r_obj in zip(param_list.names, param_list):
         param_d[name] = r_obj
@@ -489,8 +472,8 @@ def get_params(method_name):
     if "var_order" in param_d:
         order_vars = list(param_d["var_order"])
 
-    pretty_names_and_descriptions = get_pretty_names_and_descriptions_for_params(
-        method_name, param_list
+    pretty_names_and_descriptions = R_parse_tools.recursioner(
+        param_d.get("pretty.names", ro.r["list"]())
     )
 
     return (
@@ -503,15 +486,9 @@ def get_params(method_name):
 
 @RfunctionCaller
 def get_pretty_names_and_descriptions_for_params(method_name, param_list):
-    method_list = execute_r_string("lsf.str('package:OpenMetaR')")
-    pretty_names_f = "%s.pretty.names" % method_name
-    params_d = {}
-    if pretty_names_f in method_list:
-        # try to match params to their pretty names and descriptions
-        pretty_names_and_descriptions = execute_r_string("%s()" % pretty_names_f)
-        # this dictionary is assumed to be as follows:
-        #      params_d[param] --> {"pretty.name":XX, "description":XX}
-        params_d = R_parse_tools.recursioner(pretty_names_and_descriptions)
+    params_d = R_parse_tools.recursioner(
+        execute_r_string("openmetar.method.parameters('%s')$pretty.names" % method_name)
+    )
 
     # fill in entries for parameters for which pretty names/descriptions were
     # not provided-- these are just place-holders to make processing this
@@ -529,83 +506,21 @@ def get_pretty_names_and_descriptions_for_params(method_name, param_list):
 def get_available_methods(for_data_type=None, data_obj_name=None, metric=None):
     """
     Returns a list of methods available in OpenMeta for the particular data_type
-    (if one is given). Excludes "*.parameters" methods
+    (if one is given).
     """
-    method_list = execute_r_string("lsf.str('package:OpenMetaR')")
-
-    # the following constitute 'special' or 'reserved' function
-    # names that are used by meta-analyst to parse out available
-    # methods and their parameters. we exclude these from the list
-    # of available meta-analytic routines.
-    #
-    # by convention, the methods available for a data type (e.g., binary)
-    # start with the name of the data type. furthermore, the parameters
-    # for those methods are returned by a method with a name
-    # ending in ".parameters"
-    special_endings = [
-        ".parameters",
-        ".is.feasible",
-        ".overall",
-        ".regression",
-        "transform.f",
-        ".pretty.names",
-        ".value.info",
-        "is.feasible.for.funnel",
-    ]
-    is_special = lambda f: any([f.endswith(ending) for ending in special_endings])
-    all_methods = [method for method in method_list if not is_special(method)]
-    if for_data_type is not None:
-        all_methods = [
-            method for method in all_methods if method.startswith(for_data_type)
-        ]
-
-    # now, if a data object handle was provided, check which methods are feasible
-    if data_obj_name is not None:
-        # we will return a dictionary mapping pretty
-        # names (optionally) to method names; if no pretty name exists,
-        # then we just map the method name to itself.
-        # note that if more than one method exists with the same pretty name
-        # it will be overwritten!
-        feasible_methods = {}
-        for method in all_methods:
-            is_feasible = True
-            # we check if the author of this method has provided an is.feasible
-            # routine; if so, we will call it. otherwise, we assume that we can
-            # invoke the corresponding routine (i.e., we assume it's feasible)
-            is_feas_f = "%s.is.feasible" % method
-            if is_feas_f in method_list:
-                # we need to pass along the metric along with the data
-                # object to assess if a given method is feasible (e.g,.
-                # PETO for binary data only makes sense for 'OR')
-                is_feasible = execute_r_string(
-                    "%s(%s, '%s')" % (is_feas_f, data_obj_name, metric)
-                )[0]
-
-            if is_feasible:
-                # do we have a pretty name?
-                pretty_names_f = "%s.pretty.names" % method
-                if pretty_names_f in method_list:
-                    pretty_name = execute_r_string("%s()$pretty.name" % pretty_names_f)[
-                        0
-                    ]
-                    feasible_methods[pretty_name] = method
-                else:
-                    # no? then just map to the function name
-                    feasible_methods[method] = method
-    return feasible_methods
+    data_type_arg = "NULL" if for_data_type is None else "'%s'" % for_data_type
+    data_arg = "NULL" if data_obj_name is None else data_obj_name
+    metric_arg = "NULL" if metric is None else "'%s'" % metric
+    methods = execute_r_string(
+        "openmetar.available.methods(data.type=%s, om.data=%s, metric=%s)"
+        % (data_type_arg, data_arg, metric_arg)
+    )
+    return R_parse_tools.recursioner(methods)
 
 
 @RfunctionCaller
 def get_method_description(method_name):
-    pretty_names_f = "%s.pretty.names" % method_name
-    method_list = execute_r_string("lsf.str('package:OpenMetaR')")
-    description = "None provided."
-    if pretty_names_f in method_list:
-        try:
-            description = execute_r_string("%s()$description" % pretty_names_f)[0]
-        except:
-            pass
-    return description
+    return execute_r_string("openmetar.method.description('%s')" % method_name)[0]
 
 
 # def ma_dataset_to_binary_robj(table_model, var_name):
@@ -691,7 +606,7 @@ def ma_dataset_to_simple_continuous_robj(
         SDs2_str = _get_str(raw_data, 5)
 
         r_str = (
-            "%s <- new('ContinuousData', \
+            "%s <- openmetar.create.continuous.data( \
                                      N1=c(%s), mean1=c(%s), sd1=c(%s), \
                                      N2=c(%s), mean2=c(%s), sd2=c(%s), \
                                      y=c(%s), SE=c(%s), study.names=c(%s),\
@@ -715,7 +630,7 @@ def ma_dataset_to_simple_continuous_robj(
     else:
         print("no raw data (or one-arm)... using effects")
         r_str = (
-            "%s <- new('ContinuousData', \
+            "%s <- openmetar.create.continuous.data( \
                             y=c(%s), SE=c(%s), study.names=c(%s),\
                             years=c(%s), covariates=%s)"
             % (var_name, ests_str, SEs_str, study_names, study_years, cov_str)
@@ -816,7 +731,7 @@ def ma_dataset_to_simple_binary_robj(
         # python side, but this would require more work and I'm not sure what the benefits
         # would be
         r_str = (
-            "%s <- new('BinaryData', g1O1=c(%s), g1O2=c(%s), g2O1=c(%s), g2O2=c(%s), \
+            "%s <- openmetar.create.binary.data(g1O1=c(%s), g1O2=c(%s), g2O1=c(%s), g2O2=c(%s), \
                             y=c(%s), SE=c(%s), study.names=c(%s), years=c(%s), covariates=%s)"
             % (
                 var_name,
@@ -836,7 +751,7 @@ def ma_dataset_to_simple_binary_robj(
         print("not sufficient raw data, but studies have point estimates...")
 
         r_str = (
-            "%s <- new('BinaryData', y=c(%s), SE=c(%s), study.names=c(%s), years=c(%s), covariates=%s)"
+            "%s <- openmetar.create.binary.data(y=c(%s), SE=c(%s), study.names=c(%s), years=c(%s), covariates=%s)"
             % (var_name, ests_str, SEs_str, study_names, study_years, cov_str)
         )
 
@@ -1087,7 +1002,7 @@ def ma_dataset_to_simple_diagnostic_robj(
         # python side, but this would require more work and I'm not sure what the benefits
         # would be
         r_str = (
-            "%s <- new('DiagnosticData', TP=c(%s), FN=c(%s), TN=c(%s), FP=c(%s), \
+            "%s <- openmetar.create.diagnostic.data(TP=c(%s), FN=c(%s), TN=c(%s), FP=c(%s), \
                             y=c(%s), SE=c(%s), study.names=c(%s), years=c(%s), covariates=%s)"
             % (
                 var_name,
@@ -1107,7 +1022,7 @@ def ma_dataset_to_simple_diagnostic_robj(
         print("not sufficient raw data, but studies have point estimates...")
 
         r_str = (
-            "%s <- new('DiagnosticData', y=c(%s), SE=c(%s), study.names=c(%s), \
+            "%s <- openmetar.create.diagnostic.data(y=c(%s), SE=c(%s), study.names=c(%s), \
                                     years=c(%s), covariates=%s)"
             % (var_name, y_ests_str, y_SEs_str, study_names, study_years, cov_str)
         )
@@ -1168,34 +1083,16 @@ def cov_to_str(cov, study_ids, dataset, named_list=True, return_cov_vals=False):
 def run_continuous_ma(
     function_name, params, res_name="result", cont_data_name="tmp_obj"
 ):
-    params = normalize_confidence_level_params(params)
-    params_df = ro.r["data.frame"](**params)
-    r_str = "%s<-%s(%s, %s)" % (
-        res_name,
-        function_name,
-        cont_data_name,
-        params_df.r_repr(),
+    return _run_openmetar_core_analysis(
+        cont_data_name, function_name, params, res_name=res_name
     )
-    print("\n\n(run_continuous_ma): executing:\n %s\n" % r_str)
-    execute_r_string(r_str)
-    result = execute_r_string("%s" % res_name)
-    return parse_out_results(result)
 
 
 @RfunctionCaller
 def run_binary_ma(function_name, params, res_name="result", bin_data_name="tmp_obj"):
-    params = normalize_confidence_level_params(params)
-    params_df = ro.r["data.frame"](**params)
-    r_str = "%s<-%s(%s, %s)" % (
-        res_name,
-        function_name,
-        bin_data_name,
-        params_df.r_repr(),
+    return _run_openmetar_core_analysis(
+        bin_data_name, function_name, params, res_name=res_name
     )
-    print("\n\n(run_binary_ma): executing:\n %s\n" % r_str)
-    execute_r_string(r_str)
-    result = execute_r_string("%s" % res_name)
-    return parse_out_results(result)
 
 
 def _to_R_param_str(param):
@@ -1212,6 +1109,19 @@ def _to_R_param_str(param):
     return param
 
 
+def _to_R_value(param):
+    """Encode a scalar Python value as an R expression."""
+    if param is None:
+        return "NULL"
+    if isinstance(param, bool):
+        return "TRUE" if param else "FALSE"
+    if isinstance(param, str):
+        return "'%s'" % param
+    if isinstance(param, float) and math.isnan(param):
+        return "NA"
+    return str(param)
+
+
 def _to_R_params(params):
     """
     Given a Python dictionary of method arguments, this returns a string
@@ -1223,6 +1133,49 @@ def _to_R_params(params):
 
     params_str = "list(" + ",".join(params_str) + ")"
     return params_str
+
+
+def _normalize_openmetar_workflow(workflow):
+    if workflow is None:
+        return "standard"
+    workflow = str(workflow)
+    known_workflows = {"standard", "cumulative", "leave-one-out", "subgroup", "bootstrap", "meta-regression"}
+    if workflow not in known_workflows:
+        raise ValueError("Unknown OpenMetaR workflow: %s" % workflow)
+    return workflow
+
+
+def _run_openmetar_core_analysis(
+    data_name,
+    method_name,
+    params,
+    workflow="standard",
+    res_name="result",
+    cond_means_data="NULL",
+    stop_at_rma=False,
+):
+    workflow = _normalize_openmetar_workflow(workflow)
+    params = normalize_confidence_level_params(params)
+    params_str = _to_R_params(params)
+    stop_at_rma_str = "TRUE" if stop_at_rma else "FALSE"
+    r_str = (
+        "%s <- openmetar.run.analysis(%s, "
+        "list(method='%s', params=%s, workflow='%s', "
+        "cond.means.data=%s, stop.at.rma=%s))"
+        % (
+            res_name,
+            data_name,
+            method_name,
+            params_str,
+            workflow,
+            cond_means_data,
+            stop_at_rma_str,
+        )
+    )
+    print("\n\n(_run_openmetar_core_analysis): executing:\n %s\n" % r_str)
+    execute_r_string(r_str)
+    result = execute_r_string("%s" % res_name)
+    return parse_out_results(result)
 
 
 @RfunctionCaller
@@ -1237,11 +1190,9 @@ def run_diagnostic_multi(
         "f.names <- c(%s)" % ",".join(["'%s'" % f_name for f_name in function_names])
     )
     result = execute_r_string(
-        "multiple.diagnostic(f.names, list.of.params, %s)" % diag_data_name
+        "openmetar.run.diagnostic.analyses(%s, f.names, list.of.params, workflow='standard')"
+        % diag_data_name
     )
-    # execute_r_string("list.of.params <- %s" % r_params_str)
-    # execute_r_string("f.names <- c(%s)" % ",".join(["'%s'" % f_name for f_name in function_names]))
-    # result = execute_r_string("multiple.diagnostic(f.names, list.of.params, %s)" % diag_data_name)
 
     print("Got here is run diagnostic multi w/o error")
     return parse_out_results(result)
@@ -1293,7 +1244,9 @@ def load_vars_for_plot(params_path, return_params_dict=False):
 
 @RfunctionCaller
 def write_out_plot_data(params_out_path, plot_data_name="plot.data"):
-    execute_r_string("save.plot.data(%s, '%s')" % (plot_data_name, params_out_path))
+    execute_r_string(
+        "openmetar.save.plot.data(%s, '%s')" % (plot_data_name, params_out_path)
+    )
 
 
 @RfunctionCaller
@@ -1328,44 +1281,31 @@ def regenerate_plot_data(
     plot_data_name="plot.data",
 ):
 
-    ####
-    # this is crude, but works for now, and easier than making
-    # the results_window keep track of why type of data it's
-    # displaying. may need to re-think this ain any case for the
-    # general case of plots (what 'type' is a mixed analysis, e.g.?)
-    ####
-    data_type = str(execute_r_string("class(%s)" % om_data_name))
-
-    if "BinaryData" in data_type:
-        execute_r_string(
-            "plot.data<-create.plot.data.binary(%s, %s, %s)"
-            % (om_data_name, plot_params_name, res_name)
-        )
-    elif "ContinuousData" in data_type:
-        execute_r_string(
-            "plot.data<-create.plot.data.continuous(%s, %s, %s)"
-            % (om_data_name, plot_params_name, res_name)
-        )
-    else:
-        execute_r_string(
-            "plot.data<-create.plot.data.diagnostic(%s, %s, %s)"
-            % (om_data_name, plot_params_name, res_name)
-        )
+    execute_r_string(
+        "plot.data<-openmetar.regenerate.plot.data(%s, %s, %s)"
+        % (om_data_name, res_name, plot_params_name)
+    )
 
 
 @RfunctionCaller
 def generate_reg_plot(file_path, params_name="plot.data"):
-    execute_r_string("meta.regression.plot(%s, '%s')" % (params_name, file_path))
+    execute_r_string("openmetar.draw.regression.plot(%s, '%s')" % (params_name, file_path))
 
 
 @RfunctionCaller
 def generate_forest_plot(file_path, side_by_side=False, params_name="plot.data"):
     if side_by_side:
         print("generating a side-by-side forest plot...")
-        execute_r_string("two.forest.plots(%s, '%s')" % (params_name, file_path))
+        execute_r_string(
+            "openmetar.draw.forest.plot(%s, '%s', side.by.side=TRUE)"
+            % (params_name, file_path)
+        )
     else:
         print("generating a forest plot....")
-        execute_r_string("forest.plot(%s, '%s')" % (params_name, file_path))
+        execute_r_string(
+            "openmetar.draw.forest.plot(%s, '%s', side.by.side=FALSE)"
+            % (params_name, file_path)
+        )
 
 
 def parse_out_results(result):
@@ -1456,7 +1396,8 @@ def _is_summary_display(r_object):
 
 
 def _capture_formatted_summary(r_object):
-    return execute_r_function("capture.output.and.collapse", r_object)[0]
+    capture_summary = ro.r("function(x) paste(capture.output(print(x)), collapse='\\n')")
+    return capture_summary(r_object)[0]
 
 
 def _format_table_summary(section_name, r_object, title=None):
@@ -1672,30 +1613,6 @@ def make_weights_str(results):
     return table
 
 
-# Is this function obsolete?
-@RfunctionCaller
-def run_binary_fixed_meta_regression(
-    selected_cov, bin_data_name="tmp_obj", res_name="result", conf_level=None
-):
-
-    conf_level = validate_confidence_level(conf_level)
-
-    method_str = "FE"
-    # equiavlent to params <- list(conf.level=95, digits=3)
-    params = {"conf.level": conf_level, "digits": 3, "method": method_str}
-    params_df = ro.r["data.frame"](**params)
-    r_str = "%s<-binary.fixed.meta.regression(%s, %s, %s)" % (
-        res_name,
-        bin_data_name,
-        params_df.r_repr(),
-        "'" + selected_cov + "'",
-    )
-    print("\n\n(run_binary_ma): executing:\n %s\n" % r_str)
-    execute_r_string(r_str)
-    result = execute_r_string("%s" % res_name)
-    return parse_out_results(result)
-
-
 def _gen_cov_vals_obj_str(cov, study_ids, dataset):
     values_str, cov_vals = cov_to_str(
         cov, study_ids, dataset, named_list=False, return_cov_vals=True
@@ -1706,7 +1623,7 @@ def _gen_cov_vals_obj_str(cov, study_ids, dataset):
     # for now -- this only matters for factors, obviously
 
     r_str = (
-        "new('CovariateValues', cov.name='%s', cov.vals=%s, \
+        "openmetar.create.covariate.values(cov.name='%s', cov.vals=%s, \
                     cov.type='%s', ref.var='%s')"
         % (cov.name, values_str, TYPE_TO_STR_DICT[cov.data_type], ref_var)
     )
@@ -1751,36 +1668,18 @@ def run_meta_regression(
         "rm.method": "ML",
         "measure": metric_name,
     }
-    params_df = ro.r["data.frame"](**params)
-
-    # create a lit of covariate objects on the R side
-    r_str = "%s<- meta.regression(%s, %s)" % (
-        results_name,
+    return _run_openmetar_core_analysis(
         data_name,
-        str(params_df.r_repr()),
+        "meta.regression",
+        params,
+        workflow="meta-regression",
+        res_name=results_name,
     )
-
-    print("\n\n(run_meta_regression): executing:\n %s\n" % r_str)
-
-    ### TODO -- this is hacky
-
-    execute_r_string(r_str)
-    result = execute_r_string("%s" % results_name)
-
-    if "try-error" in str(result):
-        # uh-oh, there was an error (but the weird
-        # RRunTimeError alluded to above; this is a
-        # legit error returned from an R routine)
-        return str([msg for msg in result][0])
-
-    parsed_results = parse_out_results(result)
-
-    return parsed_results
 
 
 @RfunctionCaller
-def run_meta_method_diag(
-    meta_function_name,
+def run_diagnostic_workflow(
+    workflow,
     function_names,
     list_of_params,
     res_name="result",
@@ -1799,50 +1698,32 @@ def run_meta_method_diag(
     print(r_str)
     execute_r_string(r_str)
 
-    multi_meta_function_name = {
-        "loo.ma.diagnostic": "multiple.loo.diagnostic",
-        "subgroup.ma.diagnostic": "multiple.subgroup.diagnostic",
-        "cum.ma.diagnostic": "multiple.cum.ma.diagnostic",
-    }[meta_function_name]
-
-    r_str = "%s(f.names, list.of.params, %s)" % (
-        multi_meta_function_name,
-        diag_data_name,
+    workflow = _normalize_openmetar_workflow(workflow)
+    r_str = (
+        "%s <- openmetar.run.diagnostic.analyses(%s, f.names, list.of.params, workflow='%s')"
+        % (res_name, diag_data_name, workflow)
     )
     print(r_str)
-    result = execute_r_string(r_str)
+    execute_r_string(r_str)
+    result = execute_r_string("%s" % res_name)
 
     return parse_out_results(result)
 
 
 @RfunctionCaller
-def run_meta_method(
-    meta_function_name, function_name, params, res_name="result", data_name="tmp_obj"
+def run_workflow_analysis(
+    workflow, function_name, params, res_name="result", data_name="tmp_obj"
 ):
     """
-    Runs a binary `meta` method over the data in the bin_data_name argument
-    (on the R side). The meta-method called is specified by the meta_function_name
-    argument.
+    Runs a non-standard OpenMetaR workflow through the core analysis facade.
     """
-    params = normalize_confidence_level_params(params)
-    params_df = ro.r["data.frame"](**params)
-    r_str = "%s<-%s('%s', %s, %s)" % (
-        res_name,
-        meta_function_name,
-        function_name,
+    return _run_openmetar_core_analysis(
         data_name,
-        params_df.r_repr(),
+        function_name,
+        params,
+        workflow=workflow,
+        res_name=res_name,
     )
-
-    print("\n\n(run_meta_method): executing:\n %s\n" % r_str)
-
-    execute_r_string(r_str)
-    result = execute_r_string("%s" % res_name)
-
-    # parse out text field(s). note that "plot names" is 'reserved', i.e., it's
-    # a special field which is assumed to contain the plot variable names
-    # in R (for graphics manipulation).
-    return parse_out_results(result)
 
 
 def _get_c_str_for_col(m, i):
@@ -1865,41 +1746,12 @@ def diagnostic_effects_for_study(
     tp, fn, fp, tn, metrics=["Spec", "Sens"], conf_level=95.0
 ):
     conf_level = validate_confidence_level(conf_level)
-    # first create a diagnostic data object
-    r_str = (
-        "diag.tmp <- new('DiagnosticData', TP=c(%s), FN=c(%s), TN=c(%s), FP=c(%s))"
-        % (tp, fn, tn, fp)
+    metrics_str = ", ".join("'%s'" % metric for metric in metrics)
+    r_res = execute_r_string(
+        "openmetar.diagnostic.study.effects(%s, %s, %s, %s, metrics=c(%s), conf.level=%s)"
+        % (tp, fn, fp, tn, metrics_str, conf_level)
     )
-
-    print("\n\n(diagnostic_effects_for_study): executing:\n %s\n" % r_str)
-    execute_r_string(r_str)
-
-    # this will map metrics to est., lower, upper
-    effects_dict = {}
-    for metric in metrics:
-        ###
-        # Curiously (annoyingly), updating the params dictionary, then recasting it using the
-        # ro.r['data.frame'](** params) call will not overwrite the existing
-        # structure on the R side -- i.e., you will keep getting the same metric
-        # here. Hence the somewhat ugly strategy of constructing the whole
-        # named list on the R side anew on each iteration
-        #####
-
-        r_res = execute_r_string(
-            "get.res.for.one.diag.study(diag.tmp, \
-                        list('to'='only0', 'measure'='{0}', 'conf.level'={1:.6f}, 'adjust'=.5))".format(
-                metric, conf_level
-            )
-        )
-        est, lower, upper = r_res[0][0], r_res[1][0], r_res[2][0]
-        calc_estimates = (est, lower, upper)
-        disp_estimates = [diagnostic_convert_scale(x, metric) for x in calc_estimates]
-        effects_dict[metric] = {
-            "calc_scale": calc_estimates,
-            "display_scale": disp_estimates,
-        }
-
-    return effects_dict
+    return R_parse_tools.recursioner(r_res)
 
 
 @RfunctionCaller
@@ -1917,41 +1769,23 @@ def continuous_effect_for_study(
     conf_level=95.0,
 ):
     conf_level = validate_confidence_level(conf_level)
-
-    point_est, se = None, None
-    if two_arm:
-        if not None in [se1, se2] and metric == "MD":
-            # in this case, we have means & standard errors (but no sample size/ sds)
-            # thus we compute the point estimate and se directly
-            point_est = m1 - m2
-            se = math.sqrt(sum([x**2 for x in [se1, se2]]))
-        else:
-            r_str = (
-                "escalc('%s', n1i=c(%s), n2i=c(%s), m1i=c(%s), m2i=c(%s), sd1i=c(%s), sd2i=c(%s))"
-                % (metric, n1, n2, m1, m2, sd1, sd2)
-            )
-
-            effect = execute_r_string(r_str)
-            # the first 0 indexes into the study; the second, into the point estimate
-            # (the escalc method is general and thus expects an array of studies)
-            point_est = effect[0][0]
-            se = math.sqrt(effect[1][0])
-    else:
-        # only one-arm
-        point_est = m1
-        # eesh; this was only over n until
-        # 3/28/13.
-        se = sd1 / math.sqrt(n1)
-
-    alpha = 1.0 - (conf_level / 100.0)
-    r_str = "abs(qnorm(%s))" % str(alpha / 2.0)
-    mult = execute_r_string(r_str)[0]
-    # print("Alpha:",alpha)
-    # print("mult:" ,mult)
-    lower, upper = (point_est - mult * se, point_est + mult * se)
-    est_and_ci = (point_est, lower, upper)
-    transformed_est_and_ci = continuous_convert_scale(est_and_ci, metric)
-    return {"calc_scale": est_and_ci, "display_scale": transformed_est_and_ci}
+    r_res = execute_r_string(
+        "openmetar.continuous.study.effect(n1=%s, m1=%s, sd1=%s, se1=%s, n2=%s, m2=%s, sd2=%s, se2=%s, metric='%s', two.arm=%s, conf.level=%s)"
+        % (
+            _to_R_value(n1),
+            _to_R_value(m1),
+            _to_R_value(sd1),
+            _to_R_value(se1),
+            _to_R_value(n2),
+            _to_R_value(m2),
+            _to_R_value(sd2),
+            _to_R_value(se2),
+            metric,
+            _to_R_value(two_arm),
+            conf_level,
+        )
+    )
+    return R_parse_tools.recursioner(r_res)
 
 
 @RfunctionCaller
@@ -1973,46 +1807,19 @@ def effect_for_study(
     --
     """
     conf_level = validate_confidence_level(conf_level)
-    print(metric)
-    r_str = None
-    if two_arm:
-        # notice that we're using WV's escalc routine here
-        r_str = "escalc(measure='%s', ai=c(%s), n1i=c(%s), ci=c(%s), n2i=c(%s))" % (
+    r_res = execute_r_string(
+        "openmetar.binary.study.effect(e1=%s, n1=%s, e2=%s, n2=%s, two.arm=%s, metric='%s', conf.level=%s)"
+        % (
+            _to_R_value(e1),
+            _to_R_value(n1),
+            _to_R_value(e2),
+            _to_R_value(n2),
+            _to_R_value(two_arm),
             metric,
-            e1,
-            n1,
-            e2,
-            n2,
+            conf_level,
         )
-    else:
-        r_str = "escalc(measure='%s', xi=c(%s), ni=c(%s))" % (metric, e1, n1)
-
-    # print "calling out to R: %s" % r_str
-    effect = execute_r_string(r_str)
-
-    # print "result: %s" % effect
-    point_est = effect[0][0]
-    se = math.sqrt(effect[1][0])
-
-    # print "point_est: ", point_est
-    # print "var:", effect[1][0]
-
-    # scalar for computing confidence interval
-    alpha = 1.0 - (conf_level / 100.0)
-    r_str = "abs(qnorm(%s))" % str(alpha / 2.0)
-    mult = execute_r_string(r_str)[0]
-
-    # note that the point estimate, lower & upper are all computed
-    # and returned on the calculation scale (e.g., log in the case of
-    # ratios)
-    lower, upper = (point_est - mult * se, point_est + mult * se)
-
-    print("%s, %s, %s" % (lower, point_est, upper))
-
-    # we return both the transformed and untransformed scales here
-    est_and_ci = (point_est, lower, upper)
-    transformed_est_and_ci = binary_convert_scale(est_and_ci, metric, n1=n1)
-    return {"calc_scale": est_and_ci, "display_scale": transformed_est_and_ci}
+    )
+    return R_parse_tools.recursioner(r_res)
 
 
 def binary_convert_scale(x, metric_name, convert_to="display.scale", n1=None):
@@ -2032,27 +1839,26 @@ def diagnostic_convert_scale(x, metric_name, convert_to="display.scale"):
 def generic_convert_scale(
     x, metric_name, data_type, convert_to="display.scale", n1=None
 ):
-    r_str = "trans.f <- %s.transform.f('%s')" % (data_type, metric_name)
-    execute_r_string(r_str)
-
     if x is None or x == "":
         return None
     islist = isinstance(x, list) or isinstance(
         x, tuple
     )  # being loose with what qualifies as a 'list' here.
     if islist:
-        execute_r_string("x <- c%s" % str(x))
-        if metric_name == "PFT":
-            execute_r_string("ni<-c%s" % str((n1,) * len(x)))
+        x_arg = "c(%s)" % ", ".join(str(x_i) for x_i in x)
+        n1_arg = (
+            "NULL"
+            if n1 is None
+            else "c(%s)" % ", ".join(str(n1) for _ in range(len(x)))
+        )
     else:
-        execute_r_string("x <- %s" % str(x))
-        if metric_name == "PFT":
-            execute_r_string("ni<-%s" % str(n1))
+        x_arg = str(x)
+        n1_arg = _to_R_value(n1)
 
-    if metric_name == "PFT":
-        transformed = execute_r_string("trans.f$%s(x=x, ni=ni)" % convert_to)
-    else:
-        transformed = execute_r_string("trans.f$%s(x)" % convert_to)
+    transformed = execute_r_string(
+        "openmetar.convert.scale(x=%s, metric='%s', data.type='%s', convert.to='%s', n1=%s)"
+        % (x_arg, metric_name, data_type, convert_to, n1_arg)
+    )
     transformed_ls = [x_i for x_i in transformed]
     if not islist:
         # scalar
@@ -2062,4 +1868,4 @@ def generic_convert_scale(
 
 @RfunctionCaller
 def turn_off_R_graphics():
-    execute_r_string("graphics.off()")
+    execute_r_string("openmetar.graphics.off()")

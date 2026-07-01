@@ -99,31 +99,109 @@ expect_analysis_result <- function(result) {
 
 test_that("representative binary analysis paths execute", {
   fixture <- binary_fixture()
-  expect_analysis_result(binary.random(fixture$data, fixture$params))
-  expect_analysis_result(cum.ma.binary("binary.random", fixture$data, fixture$params))
-  expect_analysis_result(loo.ma.binary("binary.random", fixture$data, fixture$params))
-  expect_analysis_result(subgroup.ma.binary("binary.random", fixture$data, fixture$params))
+  expect_analysis_result(openmetar.run.analysis(fixture$data, list(method = "binary.random", params = fixture$params)))
+  expect_analysis_result(openmetar.run.analysis(fixture$data, list(method = "binary.random", params = fixture$params, workflow = "cumulative")))
+  expect_analysis_result(openmetar.run.analysis(fixture$data, list(method = "binary.random", params = fixture$params, workflow = "leave-one-out")))
+  expect_analysis_result(openmetar.run.analysis(fixture$data, list(method = "binary.random", params = fixture$params, workflow = "subgroup")))
 })
 
 test_that("representative continuous analysis paths execute", {
   fixture <- continuous_fixture()
-  expect_analysis_result(continuous.random(fixture$data, fixture$params))
-  expect_analysis_result(cum.ma.continuous("continuous.random", fixture$data, fixture$params))
-  expect_analysis_result(loo.ma.continuous("continuous.random", fixture$data, fixture$params))
-  expect_analysis_result(subgroup.ma.continuous("continuous.random", fixture$data, fixture$params))
+  expect_analysis_result(openmetar.run.analysis(fixture$data, list(method = "continuous.random", params = fixture$params)))
+  expect_analysis_result(openmetar.run.analysis(fixture$data, list(method = "continuous.random", params = fixture$params, workflow = "cumulative")))
+  expect_analysis_result(openmetar.run.analysis(fixture$data, list(method = "continuous.random", params = fixture$params, workflow = "leave-one-out")))
+  expect_analysis_result(openmetar.run.analysis(fixture$data, list(method = "continuous.random", params = fixture$params, workflow = "subgroup")))
 })
 
 test_that("representative diagnostic analysis paths execute", {
   fixture <- diagnostic_fixture("Sens")
-  expect_analysis_result(diagnostic.random(fixture$data, fixture$params))
-  expect_analysis_result(cum.ma.diagnostic("diagnostic.random", fixture$data, fixture$params))
-  expect_analysis_result(loo.ma.diagnostic("diagnostic.random", fixture$data, fixture$params))
-  expect_analysis_result(subgroup.ma.diagnostic("diagnostic.random", fixture$data, fixture$params, get.cov(fixture$data, "quality")))
+  expect_analysis_result(openmetar.run.analysis(fixture$data, list(method = "diagnostic.random", params = fixture$params)))
+  expect_analysis_result(openmetar.run.analysis(fixture$data, list(method = "diagnostic.random", params = fixture$params, workflow = "cumulative")))
+  expect_analysis_result(openmetar.run.analysis(fixture$data, list(method = "diagnostic.random", params = fixture$params, workflow = "leave-one-out")))
+  expect_analysis_result(openmetar.run.analysis(fixture$data, list(method = "diagnostic.random", params = fixture$params, workflow = "subgroup")))
+})
+
+test_that("core analysis facade dispatches representative workflows", {
+  binary <- binary_fixture()
+  binary_result <- openmetar.run.analysis(
+    binary$data,
+    list(method = "binary.random", params = binary$params)
+  )
+  expect_analysis_result(binary_result)
+  expect_equal(attr(binary_result, "openmetar.request")$workflow, "standard")
+
+  continuous <- continuous_fixture()
+  continuous_result <- openmetar.run.analysis(
+    continuous$data,
+    list(method = "continuous.random", params = continuous$params, workflow = "leave-one-out")
+  )
+  expect_analysis_result(continuous_result)
+  expect_s3_class(continuous_result[["Leave-one-out Summary"]], "summary.display")
+
+  diagnostic <- diagnostic_fixture("Sens")
+  subgroup_result <- openmetar.run.analysis(
+    diagnostic$data,
+    list(method = "diagnostic.random", params = diagnostic$params, workflow = "subgroup")
+  )
+  expect_analysis_result(subgroup_result)
+  expect_equal(attr(subgroup_result, "openmetar.request")$workflow, "subgroup")
+})
+
+test_that("core diagnostic multi-analysis facade preserves multi-metric results", {
+  fixture <- diagnostic_fixture("Sens")
+  sens_params <- fixture$params
+  spec_params <- fixture$params
+  spec_params$measure <- "Spec"
+  spec_effects <- get.res.for.one.diag.study(fixture$data, spec_params)
+  spec_data <- fixture$data
+  spec_data@y <- spec_effects$b
+  spec_data@SE <- spec_effects$se
+
+  result <- openmetar.run.diagnostic.analyses(
+    spec_data,
+    c("diagnostic.random", "diagnostic.random"),
+    list(sens_params, spec_params)
+  )
+
+  expect_analysis_result(result)
+  expect_true(any(grepl("Sens|Spec", names(result))))
+  expect_equal(attr(result, "openmetar.request")$workflow, "standard")
+})
+
+test_that("core facade rejects incompatible methods before dispatch", {
+  fixture <- binary_fixture()
+  expect_error(
+    openmetar.run.analysis(
+      fixture$data,
+      list(method = "continuous.random", params = fixture$params)
+    ),
+    "not supported for binary data"
+  )
+})
+
+test_that("core method discovery and metadata avoid legacy export scanning", {
+  fixture <- binary_fixture()
+  methods <- openmetar.available.methods("binary", fixture$data, "OR")
+
+  expect_true("Binary Random-Effects" %in% names(methods))
+  expect_equal(methods[["Binary Random-Effects"]], "binary.random")
+  expect_false(any(grepl("parameters|pretty.names|overall", methods)))
+
+  params <- openmetar.method.parameters("binary.random")
+  expect_named(params, c("parameters", "defaults", "var_order", "pretty.names"), ignore.order = TRUE)
+  expect_true("conf.level" %in% names(params$parameters))
+
+  description <- openmetar.method.description("binary.random")
+  expect_type(description, "character")
+  expect_true(nzchar(description))
 })
 
 test_that("single factor diagnostic meta-regression returns adjusted means", {
   fixture <- diagnostic_fixture("DOR")
-  result <- meta.regression(fixture$data, fixture$params)
+  result <- openmetar.run.analysis(
+    fixture$data,
+    list(method = "meta.regression", params = fixture$params, workflow = "meta-regression")
+  )
 
   expect_named(result, c("Summary", "Adjusted Mean", "res", "res.info", "References"))
   expect_match(result[["Adjusted Mean"]], "Adjusted Means")

@@ -514,7 +514,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     # which operate over the output of meta-analytic methods. Note
     # that we don't care what sort of data we're operating over here;
     # ma_specs takes care of that. The convention is that each meta
-    # method, for example `cum.ma`, has .binary and .continuous
+    # Repeated-analysis actions pass workflow names to the OpenMetaR core facade.
     # implementation.
     ### TODO pull out meta methods auto-magically via introspection.
     def cum_ma(self):
@@ -527,7 +527,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         # module when specifications have been provided.
         if self.model.get_current_outcome_type() != "diagnostic":
             form = self._build_analysis_specs_dialog(
-                meta_f_str="cum.ma", conf_level=self.model.get_global_conf_level()
+                meta_f_str="cumulative", conf_level=self.model.get_global_conf_level()
             )
         else:
             # diagnostic data; we first have the user select metric(s),
@@ -538,7 +538,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             *never* be called with diagnostic data.
             """
             form = diag_metrics.Diag_Metrics(
-                self.model, meta_f_str="cum.ma", parent=self
+                self.model, meta_f_str="cumulative", parent=self
             )
 
         if form is None:
@@ -555,13 +555,13 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             # this allows the spec form to callback to this
             # module when specifications have been provided.
             form = self._build_analysis_specs_dialog(
-                meta_f_str="loo.ma", conf_level=self.model.get_global_conf_level()
+                meta_f_str="leave-one-out", conf_level=self.model.get_global_conf_level()
             )
         else:
             # diagnostic data; we first have the user select metric(s),
             # and only then the model, &etc.
             form = diag_metrics.Diag_Metrics(
-                self.model, meta_f_str="loo.ma", parent=self
+                self.model, meta_f_str="leave-one-out", parent=self
             )
 
         if form is None:
@@ -581,7 +581,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             # this allows the spec form to callback to this
             # module when specifications have been provided.
             form = self._build_analysis_specs_dialog(
-                meta_f_str="subgroup.ma",
+                meta_f_str="subgroup",
                 external_params={"cov_name": selected_cov},
                 conf_level=self.model.get_global_conf_level(),
             )
@@ -590,7 +590,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             # and only then the model, &etc.
             form = diag_metrics.Diag_Metrics(
                 self.model,
-                meta_f_str="subgroup.ma",
+                meta_f_str="subgroup",
                 parent=self,
                 external_params={"cov_name": selected_cov},
             )

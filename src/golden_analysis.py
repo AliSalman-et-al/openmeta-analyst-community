@@ -1027,7 +1027,7 @@ def _tool_versions():
         "platform": platform.platform(),
     }
     try:
-        versions["r"] = str(meta_py_r.execute_r_string("R.version.string")[0])
+        versions["r"] = meta_py_r.get_r_version_string()
     except Exception:
         versions["r"] = None
     try:
@@ -1062,11 +1062,7 @@ def _package_versions(tool_versions):
 
 def _r_package_version(package_name):
     try:
-        return str(
-            meta_py_r.execute_r_string(
-                "as.character(utils::packageVersion('%s'))" % package_name
-            )[0]
-        )
+        return meta_py_r.get_r_package_version(package_name)
     except Exception:
         return None
 

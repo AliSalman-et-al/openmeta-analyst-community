@@ -662,8 +662,8 @@ def test_sequential_analysis_actions_open_real_specs_dialog(monkeypatch):
         window.action_loo_ma.trigger()
 
         assert calls == [
-            ("cum.ma", window, window.model.get_global_conf_level(), "binary"),
-            ("loo.ma", window, window.model.get_global_conf_level(), "binary"),
+            ("cumulative", window, window.model.get_global_conf_level(), "binary"),
+            ("leave-one-out", window, window.model.get_global_conf_level(), "binary"),
         ]
     finally:
         window.close()
