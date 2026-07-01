@@ -1093,7 +1093,7 @@ random.meta.regression <- function(reg.data, params, cov.name){
 binary.random.meta.regression.parameters <- function(){
     # parameters
     rm_method_ls <- c("HE", "DL", "SJ", "ML", "REML", "EB")
-    params <- list("rm.method"=rm_method_ls, "conf.level"="float", "digits"="float")
+    params <- list("rm.method"=rm_method_ls, "conf.level"="float", "digits"="int")
     
     # default values
     defaults <- list("rm.method"="DL", "conf.level"=95, "digits"=3)

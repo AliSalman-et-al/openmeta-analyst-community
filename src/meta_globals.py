@@ -192,6 +192,23 @@ ANALYSIS_DIGITS_MAX = 15
 INVALID_ANALYSIS_DIGITS_MESSAGE = (
     "Number of digits must be a non-negative integer."
 )
+ANALYSIS_NUMERIC_MIN = -1000000000.0
+ANALYSIS_NUMERIC_MAX = 1000000000.0
+ANALYSIS_COUNT_MAX = 1000000000
+ANALYSIS_POSITIVE_INTEGER_PARAMS = set(["num.iters", "thin", "num.chains"])
+ANALYSIS_NON_NEGATIVE_INTEGER_PARAMS = set(["burn.in"])
+ANALYSIS_NON_NEGATIVE_FLOAT_PARAMS = set(["adjust"])
+ANALYSIS_FLOAT_PARAMS = set(
+    [
+        "theta.lower",
+        "theta.upper",
+        "lambda.lower",
+        "lambda.upper",
+    ]
+)
+INVALID_CORRECTION_FACTOR_MESSAGE = (
+    "Correction factor must be a finite non-negative number."
+)
 
 
 def validate_confidence_level(conf_level):
@@ -224,12 +241,65 @@ def validate_analysis_digits(digits):
     return int(value)
 
 
+def validate_correction_factor(adjust):
+    try:
+        value = float(adjust)
+    except (TypeError, ValueError):
+        raise ValueError(INVALID_CORRECTION_FACTOR_MESSAGE)
+
+    if not math.isfinite(value) or not (0 <= value <= ANALYSIS_NUMERIC_MAX):
+        raise ValueError(INVALID_CORRECTION_FACTOR_MESSAGE)
+    return value
+
+
+def validate_analysis_count(name, count):
+    try:
+        value = float(count)
+    except (TypeError, ValueError):
+        raise ValueError("%s must be an integer." % name)
+
+    minimum = 1 if name in ANALYSIS_POSITIVE_INTEGER_PARAMS else 0
+    if (
+        not math.isfinite(value)
+        or not value.is_integer()
+        or not (minimum <= value <= ANALYSIS_COUNT_MAX)
+    ):
+        raise ValueError(
+            "%s must be an integer greater than or equal to %d." % (name, minimum)
+        )
+
+    return int(value)
+
+
+def validate_analysis_float(name, value):
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        raise ValueError("%s must be a finite number." % name)
+
+    if (
+        not math.isfinite(value)
+        or not (ANALYSIS_NUMERIC_MIN <= value <= ANALYSIS_NUMERIC_MAX)
+    ):
+        raise ValueError("%s must be a finite number." % name)
+
+    return value
+
+
 def normalize_confidence_level_params(params):
     normalized = dict(params)
     if "conf.level" in normalized:
         normalized["conf.level"] = validate_confidence_level(normalized["conf.level"])
     if "digits" in normalized:
         normalized["digits"] = validate_analysis_digits(normalized["digits"])
+    if "adjust" in normalized:
+        normalized["adjust"] = validate_correction_factor(normalized["adjust"])
+    for name in ANALYSIS_POSITIVE_INTEGER_PARAMS | ANALYSIS_NON_NEGATIVE_INTEGER_PARAMS:
+        if name in normalized:
+            normalized[name] = validate_analysis_count(name, normalized[name])
+    for name in ANALYSIS_FLOAT_PARAMS:
+        if name in normalized:
+            normalized[name] = validate_analysis_float(name, normalized[name])
     return normalized
 
 

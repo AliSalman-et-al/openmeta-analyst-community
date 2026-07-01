@@ -765,13 +765,17 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         "rm.method": ["HE", "DL", "SJ", "ML", "REML", "EB"],
         "to": ["only0", "all"],
         "conf.level": "float",
-        "digits": "int",
+        "digits": "float",
+        "adjust": "float",
+        "theta.lower": "float",
     }
     defaults = {
         "rm.method": "DL",
         "to": "only0",
         "conf.level": 95.0,
         "digits": 3,
+        "adjust": 0.5,
+        "theta.lower": -2.0,
     }
     pretty_names = {
         "rm.method": {
@@ -798,6 +802,14 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
             "pretty.name": "Number of digits",
             "description": "Number of digits to display in results",
         },
+        "adjust": {
+            "pretty.name": "Correction factor",
+            "description": "Constant added to two-by-two table entries.",
+        },
+        "theta.lower": {
+            "pretty.name": "Prior lower bound",
+            "description": "Lower value in a uniform prior range.",
+        },
     }
 
     monkeypatch.setattr(
@@ -814,7 +826,7 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         lambda method: (
             dict(params),
             dict(defaults),
-            ["rm.method", "to", "conf.level", "digits"],
+            ["rm.method", "to", "conf.level", "digits", "adjust", "theta.lower"],
             pretty_names,
         ),
         raising=False,
@@ -858,12 +870,34 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         confidence_spinboxes = specs[0].parameter_grp_box.findChildren(
             QtWidgets.QDoubleSpinBox
         )
+        confidence_spinboxes = [
+            spinbox for spinbox in confidence_spinboxes if spinbox.suffix() == "%"
+        ]
         assert len(confidence_spinboxes) == 1
         confidence_spinbox = confidence_spinboxes[0]
         confidence_spinbox.lineEdit().setText("100")
         confidence_spinbox.interpretText()
         assert confidence_spinbox.maximum() == 99.9
         assert confidence_spinbox.value() == 95.0
+
+        double_spinboxes = specs[0].parameter_grp_box.findChildren(
+            QtWidgets.QDoubleSpinBox
+        )
+        non_conf_double_spinboxes = [
+            spinbox for spinbox in double_spinboxes if spinbox.suffix() != "%"
+        ]
+        assert len(non_conf_double_spinboxes) == 2
+        correction_spinbox = next(
+            spinbox for spinbox in non_conf_double_spinboxes if spinbox.minimum() == 0
+        )
+        signed_spinbox = next(
+            spinbox for spinbox in non_conf_double_spinboxes if spinbox.minimum() < 0
+        )
+        correction_spinbox.lineEdit().setText("-1")
+        correction_spinbox.interpretText()
+        assert correction_spinbox.value() == 0.5
+        signed_spinbox.setValue(-2.5)
+        assert signed_spinbox.value() == -2.5
 
         digit_spinboxes = specs[0].parameter_grp_box.findChildren(QtWidgets.QSpinBox)
         assert len(digit_spinboxes) == 1
@@ -882,9 +916,11 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
                 "Correction factor target",
                 "Confidence level",
                 "Number of digits",
+                "Correction factor",
+                "Prior lower bound",
             }
         ]
-        assert len(parameter_labels) == 4
+        assert len(parameter_labels) == 6
         for label in parameter_labels:
             assert label.minimumWidth() >= label.sizeHint().width()
 
@@ -892,6 +928,8 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         assert specs[0].current_param_vals["to"] == "only0"
         assert specs[0].current_param_vals["conf.level"] == 95.0
         assert specs[0].current_param_vals["digits"] == 3
+        assert specs[0].current_param_vals["adjust"] == 0.5
+        assert specs[0].current_param_vals["theta.lower"] == -2.5
     finally:
         window.close()
         app.processEvents()

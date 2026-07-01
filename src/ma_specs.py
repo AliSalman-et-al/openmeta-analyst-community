@@ -539,6 +539,8 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         if isinstance(value, list):
             # then it's an enumeration of values
             self.add_enum(layout, cur_grid_row, name, value)
+        elif _is_integer_analysis_param(name):
+            self.add_int_box(layout, cur_grid_row, name)
         elif value.lower() == "float":
             self.add_float_box(layout, cur_grid_row, name)
         elif value.lower() == "int":
@@ -633,16 +635,26 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             self.add_confidence_level_box(layout, cur_grid_row, name)
             return
 
-        # now add the float input line edit
-        finput = QLineEdit()
+        finput = QDoubleSpinBox()
+        finput.setDecimals(6)
+        if name in ANALYSIS_NON_NEGATIVE_FLOAT_PARAMS:
+            finput.setRange(0, ANALYSIS_NUMERIC_MAX)
+        else:
+            finput.setRange(ANALYSIS_NUMERIC_MIN, ANALYSIS_NUMERIC_MAX)
+        finput.setCorrectionMode(QtWidgets.QAbstractSpinBox.CorrectToPreviousValue)
 
         # if a default value has been specified, use it
         if name in self.current_defaults:
-            finput.setText(str(self.current_defaults[name]))
-            self.current_param_vals[name] = self.current_defaults[name]
+            value = (
+                validate_correction_factor(self.current_defaults[name])
+                if name in ANALYSIS_NON_NEGATIVE_FLOAT_PARAMS
+                else validate_analysis_float(name, self.current_defaults[name])
+            )
+            finput.setValue(value)
+            self.current_param_vals[name] = value
 
         finput.setMaximumWidth(50)
-        finput.textChanged.connect(
+        finput.valueChanged[float].connect(
             app_error_handler.safe_slot(self.set_param_f(name, to_type=float), parent=self)
         )
         self.current_widgets.append(finput)
@@ -676,6 +688,10 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         iinput = QSpinBox()
         if name == "digits":
             iinput.setRange(ANALYSIS_DIGITS_MIN, ANALYSIS_DIGITS_MAX)
+        elif name in ANALYSIS_POSITIVE_INTEGER_PARAMS:
+            iinput.setRange(1, ANALYSIS_COUNT_MAX)
+        elif name in ANALYSIS_NON_NEGATIVE_INTEGER_PARAMS:
+            iinput.setRange(0, ANALYSIS_COUNT_MAX)
         else:
             iinput.setRange(-2147483648, 2147483647)
         iinput.setCorrectionMode(QtWidgets.QAbstractSpinBox.CorrectToPreviousValue)
@@ -685,7 +701,11 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             value = (
                 validate_analysis_digits(self.current_defaults[name])
                 if name == "digits"
-                else int(self.current_defaults[name])
+                else (
+                    validate_analysis_count(name, self.current_defaults[name])
+                    if _is_count_analysis_param(name)
+                    else int(self.current_defaults[name])
+                )
             )
             iinput.setValue(value)
             self.current_param_vals[name] = value
@@ -714,7 +734,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         txt_input.setMaximumWidth(200)
         txt_input.textChanged.connect(
-            app_error_handler.safe_slot(self.set_param_f(name, to_type=float), parent=self)
+            app_error_handler.safe_slot(self.set_param_f(name, to_type=str), parent=self)
         )
         self.current_widgets.append(txt_input)
         layout.addWidget(txt_input, cur_grid_row, 1)
@@ -922,6 +942,16 @@ def _reset_r_working_dir_safely():
         meta_py_r.reset_Rs_working_dir()
     except Exception:
         pass
+
+
+def _is_count_analysis_param(name):
+    return name in (
+        ANALYSIS_POSITIVE_INTEGER_PARAMS | ANALYSIS_NON_NEGATIVE_INTEGER_PARAMS
+    )
+
+
+def _is_integer_analysis_param(name):
+    return name == "digits" or _is_count_analysis_param(name)
 
 
 def add_plot_params(specs_form):
