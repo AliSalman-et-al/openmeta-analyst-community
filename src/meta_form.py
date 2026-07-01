@@ -37,6 +37,7 @@ from meta_globals import *
 import ma_dataset
 import legacy_pickle
 import app_error_handler
+import meta_py_r_backend
 import qt_layout
 import qt_text
 import tabular_data
@@ -648,16 +649,30 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                 kwargs["diag_metrics"] = diag_metrics
             return ma_specs.MA_Specs(self.model, **kwargs)
         except Exception as e:
-            self._show_analysis_backend_error(e)
+            self._show_analysis_specs_error(e)
             return None
+
+    def _show_analysis_specs_error(self, exception):
+        if isinstance(exception, meta_py_r_backend.AnalysisBackendUnavailableError):
+            self._show_analysis_backend_error(exception)
+        else:
+            self._show_analysis_preparation_error(exception)
 
     def _show_analysis_backend_error(self, exception):
         message = (
-            "The analysis backend is not available in this modern build, so "
+            "The analysis backend could not be reached, so "
             "OpenMeta[Analyst] cannot build the Method & Parameters dialog.\n\n"
             "Details: %s: %s" % (exception.__class__.__name__, exception)
         )
         QMessageBox.critical(self, "Analysis backend unavailable", message)
+
+    def _show_analysis_preparation_error(self, exception):
+        message = (
+            "OpenMeta[Analyst] could not prepare the Method & Parameters dialog "
+            "for this analysis.\n\n"
+            "Details: %s: %s" % (exception.__class__.__name__, exception)
+        )
+        QMessageBox.critical(self, "Could not prepare analysis", message)
 
     def undo(self):
         self.tableView.undoStack.undo()

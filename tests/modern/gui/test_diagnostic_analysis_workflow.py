@@ -43,7 +43,7 @@ def _create_diagnostic_dataset(window):
     )
 
 
-def test_diagnostic_next_surfaces_backend_failure_instead_of_silent_dead_end():
+def test_diagnostic_next_surfaces_specs_failure_instead_of_silent_dead_end():
     import launch
 
     app, window = launch.start_automation()
@@ -57,10 +57,10 @@ def test_diagnostic_next_surfaces_backend_failure_instead_of_silent_dead_end():
     try:
         _create_diagnostic_dataset(window)
 
-        # Simulate the underlying backend failure (#51 analogue) raised while
-        # building the Method & Parameters dialog.
+        # Simulate a Method & Parameters construction failure raised after the
+        # diagnostic metrics dialog hands off to the shared builder.
         def _boom(*args, **kwargs):
-            raise ValueError("simulated backend failure")
+            raise ValueError("simulated preparation failure")
 
         ma_specs.MA_Specs = _boom
         # QMessageBox.critical (a modal exec) aborts under the offscreen
@@ -75,7 +75,9 @@ def test_diagnostic_next_surfaces_backend_failure_instead_of_silent_dead_end():
         form.ok()
 
         assert shown, "diagnostic next > swallowed the backend error silently"
-        assert shown[0][1] == "Analysis backend unavailable"
+        assert shown[0][1] == "Could not prepare analysis"
+        assert "simulated preparation failure" in shown[0][2]
+        assert "backend is not available" not in shown[0][2]
     finally:
         ma_specs.MA_Specs = original_specs
         meta_form.QMessageBox.critical = original_critical

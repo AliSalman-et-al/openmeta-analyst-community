@@ -35,11 +35,10 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
             )
             return
 
-        # Route the Method & Parameters dialog through the parent's
-        # backend-error-handling builder (the same path the binary/continuous
-        # case uses). This ensures a backend failure surfaces the "Analysis
-        # backend unavailable" dialog instead of propagating out of this Qt
-        # slot and being silently swallowed by the event loop. See issue #53.
+        # Route the Method & Parameters dialog through the parent's shared
+        # error-handling builder (the same path the binary/continuous case
+        # uses). This keeps construction failures from propagating out of this
+        # Qt slot and being silently swallowed by the event loop. See issue #53.
         builder = getattr(self.parent, "_build_analysis_specs_dialog", None)
         if builder is not None:
             form = builder(

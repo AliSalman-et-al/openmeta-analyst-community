@@ -149,6 +149,66 @@ def test_continuous_workflow_failure_shows_dialog_and_does_not_open_results(
         _close_without_prompt(app, window)
 
 
+def test_method_parameters_build_failure_reports_preparation_error(monkeypatch):
+    import launch
+    import ma_specs
+    import meta_form
+
+    app, window = launch.start_automation()
+    shown = []
+    try:
+        _create_binary_dataset(window)
+
+        def _boom(*args, **kwargs):
+            raise TypeError("study name is missing")
+
+        monkeypatch.setattr(ma_specs, "MA_Specs", _boom)
+        monkeypatch.setattr(
+            meta_form.QMessageBox,
+            "critical",
+            lambda *args, **kwargs: shown.append(args),
+        )
+
+        form = window._build_analysis_specs_dialog(
+            conf_level=window.model.get_global_conf_level()
+        )
+
+        assert form is None
+        assert shown
+        assert shown[0][1] == "Could not prepare analysis"
+        assert "study name is missing" in shown[0][2]
+        assert "backend is not available" not in shown[0][2]
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_method_parameters_backend_unavailable_keeps_backend_error(monkeypatch):
+    import launch
+    import meta_form
+
+    app, window = launch.start_automation()
+    shown = []
+    try:
+        _create_binary_dataset(window)
+        monkeypatch.setattr(
+            meta_form.QMessageBox,
+            "critical",
+            lambda *args, **kwargs: shown.append(args),
+        )
+
+        form = window._build_analysis_specs_dialog(
+            conf_level=window.model.get_global_conf_level()
+        )
+
+        assert form is None
+        assert shown
+        assert shown[0][1] == "Analysis backend unavailable"
+        assert "could not be reached" in shown[0][2]
+        assert "not available in this modern build" not in shown[0][2]
+    finally:
+        _close_without_prompt(app, window)
+
+
 def test_results_window_accepts_incomplete_result_payload():
     from PyQt5.QtWidgets import QApplication
 

@@ -5,6 +5,10 @@ import types
 from meta_globals import validate_confidence_level
 
 
+class AnalysisBackendUnavailableError(RuntimeError):
+    """Raised when the configured R analysis backend cannot service requests."""
+
+
 def install_meta_py_r_backend():
     # The real backend is the in-process rpy2 module (meta_py_r). When R/rpy2
     # is unavailable -- notably in CI and GUI-only tests -- fall back to a pure
@@ -38,9 +42,10 @@ def install_stub_meta_py_r():
 
     meta_py_r = types.ModuleType("meta_py_r")
     meta_py_r._oma_stub_backend = True
+    meta_py_r.AnalysisBackendUnavailableError = AnalysisBackendUnavailableError
 
     def _analysis_unavailable(*args, **kwargs):
-        raise RuntimeError(
+        raise AnalysisBackendUnavailableError(
             "The analysis backend (in-process rpy2/R) is not available in this "
             "build, so meta-analyses cannot be run."
         )
