@@ -17,6 +17,7 @@ from PyQt5.QtGui import QBrush, QColor, QKeySequence, QPalette
 from PyQt5.QtWidgets import QAction, QDialog, QDialogButtonBox, QMessageBox, QTableWidgetItem, QUndoStack
 
 import meta_py_r
+import qt_layout
 from meta_globals import *
 import calculator_routines as calc_fncs
 
@@ -32,6 +33,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
     def __init__(self, ma_unit, cur_txs, cur_group_str, cur_effect, conf_level=None, parent=None):
         super(BinaryDataForm2, self).__init__(parent)
         self.setupUi(self)
+        qt_layout.fit_option_groups_to_contents(self)
         
         if conf_level is None:
             raise ValueError("Confidence level must be specified")
@@ -742,7 +744,7 @@ class ChooseBackCalcResultForm(QDialog, forms.ui_choose_back_calc_result_form.Ui
                                 " choose one from below. These choices do not "
                                 "reflect possible corrections for zero counts.")
         
-        self.adjustSize()
+        qt_layout.fit_option_groups_to_contents(self)
 
     def getChoice(self):
         choices = ["op1", "op2"]

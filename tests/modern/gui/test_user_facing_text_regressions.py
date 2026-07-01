@@ -1,4 +1,5 @@
 from pathlib import Path
+import importlib
 import sys
 
 from PyQt5 import QtWidgets
@@ -33,6 +34,59 @@ def test_issue_94_current_outcome_and_follow_up_labels_can_expand():
         assert label.sizePolicy().horizontalPolicy() != QtWidgets.QSizePolicy.Fixed
 
     window.deleteLater()
+    app.processEvents()
+
+
+def test_option_group_forms_fit_checkbox_and_radio_labels():
+    sys.path.insert(0, str(ROOT / "src"))
+    sys.path.insert(0, str(ROOT / "src" / "forms"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    module_names = [
+        "forms.ui_binary_data_form",
+        "forms.ui_choose_back_calc_result_form",
+        "forms.ui_csv_import_page",
+        "forms.ui_diagnostic_data_form",
+        "forms.ui_diagnostic_metrics",
+        "forms.ui_diagnostic_explain_dlg",
+        "forms.ui_edit_forest_plot",
+        "forms.ui_ma_specs",
+        "forms.ui_meta_reg",
+    ]
+
+    for module_name in module_names:
+        module = importlib.import_module(module_name)
+        ui_class = next(
+            value for name, value in vars(module).items()
+            if name.startswith("Ui_")
+        )
+        root = (
+            QtWidgets.QWizardPage()
+            if "WizardPage" in ui_class.__name__
+            else QtWidgets.QDialog()
+        )
+        ui = ui_class()
+        ui.setupUi(root)
+        qt_layout.fit_option_groups_to_contents(root)
+
+        root.show()
+        app.processEvents()
+        if root.layout() is not None:
+            root.layout().activate()
+
+        for group_box in root.findChildren(QtWidgets.QGroupBox):
+            option_buttons = (
+                group_box.findChildren(QtWidgets.QCheckBox) +
+                group_box.findChildren(QtWidgets.QRadioButton)
+            )
+            if not any(button.isVisible() and str(button.text()).strip()
+                       for button in option_buttons):
+                continue
+            assert group_box.height() >= group_box.sizeHint().height(), module_name
+
+        root.close()
+        root.deleteLater()
     app.processEvents()
 
 

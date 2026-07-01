@@ -4,6 +4,7 @@ import forms.ui_edit_forest_plot
 import ma_specs
 import meta_py_r
 import meta_globals
+import qt_layout
 
 class EditPlotWindow(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg):
 
@@ -46,6 +47,7 @@ class EditPlotWindow(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
         self.apply_button = self.buttonBox.button(QDialogButtonBox.Apply)
         self.apply_button.clicked.connect(self.regenerate_graph)
         self.populate_params()
+        qt_layout.fit_option_groups_to_contents(self)
 
 
     def set_ui_values(self):

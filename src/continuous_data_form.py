@@ -30,6 +30,7 @@ from functools import partial
 import calculator_routines as calc_fncs
 
 import meta_py_r
+import qt_layout
 from meta_globals import *
 import forms.ui_continuous_data_form
 import forms.ui_choose_back_calc_result_form
@@ -51,6 +52,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
     def __init__(self, ma_unit, cur_txs, cur_group_str, cur_effect, conf_level=None, parent=None):
         super(ContinuousDataForm, self).__init__(parent)
         self.setupUi(self)
+        qt_layout.fit_option_groups_to_contents(self)
         self.setup_signals_and_slots()
         
         if conf_level is None:
@@ -1009,6 +1011,7 @@ class ChooseBackCalcResultForm(QDialog, forms.ui_choose_back_calc_result_form.Ui
         
         
         self.info_label.setText(info_text)
+        qt_layout.fit_option_groups_to_contents(self)
 
     def getChoice(self):
         # Choice data to be returned is index of data item

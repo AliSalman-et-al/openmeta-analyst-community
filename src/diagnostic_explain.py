@@ -1,6 +1,7 @@
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import QDialog
 import forms.ui_diagnostic_explain_dlg
+import qt_layout
 
 from settings import update_setting
 
@@ -9,6 +10,7 @@ class DiagnosticExplain(QDialog, forms.ui_diagnostic_explain_dlg.Ui_diag_explain
     def __init__(self, parent=None):
         super(DiagnosticExplain, self).__init__(parent)
         self.setupUi(self)
+        qt_layout.fit_option_groups_to_contents(self)
 
         self.dont_show_again_chk_box.stateChanged.connect(self.update_explain_diag_setting)
 

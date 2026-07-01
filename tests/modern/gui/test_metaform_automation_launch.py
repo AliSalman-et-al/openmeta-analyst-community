@@ -707,6 +707,31 @@ def test_diagnostic_meta_regression_dialog_fits_radio_group_labels():
         os.chdir(REPO_ROOT)
 
 
+def test_diagnostic_metric_dialog_fits_checkbox_group_labels():
+    import diag_metrics
+    import launch
+
+    app, window = launch.start_automation()
+    form = None
+
+    try:
+        assert window.open(os.path.abspath(os.path.join("sample_data", "lymph.oma"))) is True
+
+        form = diag_metrics.Diag_Metrics(window.model, parent=window)
+        form.show()
+        app.processEvents()
+        form.layout().activate()
+
+        assert form.metrics_grp_box.height() >= form.metrics_grp_box.sizeHint().height()
+        assert form.height() >= form.sizeHint().height()
+    finally:
+        if form is not None:
+            form.close()
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
 def test_advanced_analysis_actions_require_dataset_readiness_and_covariates():
     import launch
 

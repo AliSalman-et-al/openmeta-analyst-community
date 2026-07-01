@@ -19,6 +19,7 @@ from PyQt5.QtGui import QKeySequence, QPalette
 from PyQt5.QtWidgets import QAction, QDialog, QDialogButtonBox, QMessageBox, QTableWidgetItem, QUndoStack
 
 import meta_py_r
+import qt_layout
 from meta_globals import *
 import calculator_routines as calc_fncs
 from forms.ui_diagnostic_data_form import Ui_DiagnosticDataForm
@@ -29,6 +30,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
     def __init__(self, ma_unit, cur_txs, cur_group_str, conf_level=None, parent=None):
         super(DiagnosticDataForm, self).__init__(parent)
         self.setupUi(self)
+        qt_layout.fit_option_groups_to_contents(self)
         
         if conf_level is None:
             raise ValueError("Confidence level must be specified")
