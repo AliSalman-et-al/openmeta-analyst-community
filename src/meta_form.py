@@ -1632,7 +1632,7 @@ class CommandImportCSV(QUndoCommand):
         description="Import a CSV file",
     ):
         super(CommandImportCSV, self).__init__(description)
-        self.imported_data = imported_data
+        self.imported_data = _normalize_imported_csv_rows(imported_data or [])
         self.covariate_names = covariate_names
         self.covariate_types = covariate_types
         self.main_form = main_form
@@ -1700,6 +1700,13 @@ class CommandImportCSV(QUndoCommand):
                 )
 
         progress_bar.hide()  # we are done
+
+
+def _normalize_imported_csv_rows(rows):
+    if not rows:
+        return []
+    num_cols = max(len(row) for row in rows)
+    return [row + [""] * (num_cols - len(row)) for row in rows]
 
 
 ####################### END Undo Command for Import CSV #######################

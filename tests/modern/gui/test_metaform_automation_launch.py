@@ -76,6 +76,62 @@ def test_full_app_imports_representative_csv_into_dataset():
     assert str(window.model.dataset.studies[1].covariate_dict["Region"]) == "South"
 
 
+def test_full_app_import_pads_ragged_csv_rows_into_dataset():
+    import launch
+    from PyQt5 import QtWidgets
+
+    meta_form = launch._import_meta_form()
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    window = meta_form.MetaForm()
+    try:
+        window._handle_wizard_results(
+            {
+                "path": "csv_import",
+                "outcome_info": {
+                    "arms": "two",
+                    "data_type": "binary",
+                    "sub_type": "proportions",
+                    "effect": "OR",
+                    "metric_choices": [],
+                    "name": "Mortality",
+                },
+                "csv_data": {
+                    "headers": [
+                        "Study",
+                        "Year",
+                        "Tx A events",
+                        "Tx A total",
+                        "Tx B events",
+                        "Tx B total",
+                    ],
+                    "expected_headers": [
+                        "Study",
+                        "Year",
+                        "Tx A events",
+                        "Tx A total",
+                        "Tx B events",
+                        "Tx B total",
+                    ],
+                    "data": [
+                        ["Alpha", "2020", "1", "10", "2", "12"],
+                        ["Beta", "2021", "3", "11", "4"],
+                    ],
+                    "covariate_names": [],
+                    "covariate_types": [],
+                },
+                "selected_dataset": None,
+            }
+        )
+
+        assert _cell_text(window.model, 1, window.model.NAME) == "Beta"
+        assert _cell_text(window.model, 1, window.model.RAW_DATA[-1]) == ""
+    finally:
+        window.current_data_unsaved = False
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
 def test_automation_launch_creates_and_closes_real_metaform_shell():
     import launch
 
@@ -2064,6 +2120,50 @@ def test_csv_import_wizard_accepts_representative_csv(tmp_path, monkeypatch):
     assert page.isComplete()
     assert wizard.get_csv_data()["covariate_names"] == ["Dose", "Region"]
     assert wizard.get_csv_data()["covariate_types"] == ["continuous", "factor"]
+
+
+def test_csv_import_wizard_pads_ragged_rows_before_previewing(tmp_path, monkeypatch):
+    import launch
+    from PyQt5 import QtWidgets
+    import main_wizard
+
+    csv_path = tmp_path / "ragged-studies.csv"
+    csv_path.write_text(
+        "Study,Year,Tx A events,Tx A total,Tx B events,Tx B total\n"
+        "Alpha,2020,1,10,2,12\n"
+        "Beta,2021,3,11,4\n"
+    )
+    shown = []
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    wizard = main_wizard.MainWizard(path="csv_import")
+    wizard.set_dataset_info(
+        {
+            "arms": "two",
+            "data_type": "binary",
+            "sub_type": "proportions",
+            "effect": "OR",
+            "metric_choices": [],
+        }
+    )
+    page = wizard.page(main_wizard.Page_CsvImport)
+    page.initializePage()
+    monkeypatch.setattr(
+        main_wizard.QFileDialog,
+        "getOpenFileName",
+        lambda **kwargs: (str(csv_path), "csv files (*.csv)"),
+    )
+    monkeypatch.setattr(
+        main_wizard.QMessageBox,
+        "warning",
+        lambda *args, **kwargs: shown.append(args),
+    )
+
+    page._select_file()
+
+    assert shown == []
+    assert page.isComplete()
+    assert page.preview_table.item(1, 5).text() == ""
+    assert wizard.get_csv_data()["data"][-1] == ["Beta", "2021", "3", "11", "4", ""]
 
 
 def test_csv_import_file_selection_enables_finish_button(tmp_path, monkeypatch):

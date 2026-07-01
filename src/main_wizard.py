@@ -401,6 +401,42 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
         self._reset_data()
         try:
             self.extract_data()
+            if len(self.imported_data) == 0:
+                QMessageBox.warning(self, "Whoops", "No data in CSV. Try again.")
+                self.imported_data_ok = False
+                return False
+
+            num_rows = len(self.imported_data)
+            num_cols = len(self.imported_data[0])
+            self._handle_covariates_in_extracted_data(
+                num_rows,
+                num_cols,
+                headers=self.headers,
+                expected_headers=self.required_header_labels,
+            )
+
+            # set up table
+            self.preview_table.setRowCount(num_rows)
+            self.preview_table.setColumnCount(num_cols)
+            if self.headers != []:
+                self.preview_table.setHorizontalHeaderLabels(self.headers)
+            else:
+                preview_header_labels = self.required_header_labels[:]
+                preview_header_labels.extend(self.covariate_names)
+                self.preview_table.setHorizontalHeaderLabels(preview_header_labels)
+
+            # copy extracted data to table
+            for row in range(num_rows):
+                for col in range(num_cols):
+                    item = QTableWidgetItem(self.imported_data[row][col])
+                    item.setFlags(Qt.NoItemFlags)
+                    self.preview_table.setItem(row, col, item)
+            self.preview_table.resizeColumnsToContents()
+            self.preview_table.resizeRowsToContents()
+
+            # Validate table entries
+            self._validate_imported_data()
+            self.completeChanged.emit()
         except Exception as e:
             print(e)
             QMessageBox.warning(
@@ -410,43 +446,6 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
             )
             self.imported_data_ok = False
             return False
-
-        num_rows = len(self.imported_data)
-        num_cols = len(self.imported_data[0])
-        self._handle_covariates_in_extracted_data(
-            num_rows,
-            num_cols,
-            headers=self.headers,
-            expected_headers=self.required_header_labels,
-        )
-
-        if len(self.imported_data) == 0:
-            QMessageBox.warning(self, "Whoops", "No data in CSV. Try again.")
-            self.imported_data_ok = False
-            return False
-
-        # set up table
-        self.preview_table.setRowCount(num_rows)
-        self.preview_table.setColumnCount(num_cols)
-        if self.headers != []:
-            self.preview_table.setHorizontalHeaderLabels(self.headers)
-        else:
-            preview_header_labels = self.required_header_labels[:]
-            preview_header_labels.extend(self.covariate_names)
-            self.preview_table.setHorizontalHeaderLabels(preview_header_labels)
-
-        # copy extracted data to table
-        for row in range(num_rows):
-            for col in range(num_cols):
-                item = QTableWidgetItem(self.imported_data[row][col])
-                item.setFlags(Qt.NoItemFlags)
-                self.preview_table.setItem(row, col, item)
-        self.preview_table.resizeColumnsToContents()
-        self.preview_table.resizeRowsToContents()
-
-        # Validate table entries
-        self._validate_imported_data()
-        self.completeChanged.emit()
 
     def _validate_imported_data(self):
         # Make sure there are at least as many columns as required columns
@@ -578,7 +577,19 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
                 self.headers = next(reader)
             for row in reader:
                 self.imported_data.append(row)
+        self._normalize_imported_rows()
         self.print_extracted_data()  # just for debugging
+
+    def _normalize_imported_rows(self):
+        if not self.imported_data:
+            return
+
+        num_cols = max([len(row) for row in self.imported_data] + [len(self.headers)])
+        self.imported_data = [
+            row + [""] * (num_cols - len(row)) for row in self.imported_data
+        ]
+        if self.headers:
+            self.headers = self.headers + [""] * (num_cols - len(self.headers))
 
     def print_extracted_data(self):
         print("Data extracted from csv:")
