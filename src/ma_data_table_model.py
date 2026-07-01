@@ -28,6 +28,7 @@ import qt_text
 # number of (empty) rows in the spreadsheet to show
 # following the last study.
 DUMMY_ROWS = 20
+STUDY_NAME_REQUIRED_MESSAGE = "Please enter a study name before entering study data."
 
 def _item_data(value=None):
     if value is None:
@@ -607,11 +608,25 @@ class DatasetModel(QAbstractTableModel):
         '''
         group_str = self.get_cur_group_str()
         study_added_due_to_edit = None
-        if index.isValid() and 0 <= index.row() < len(self.dataset):
+        if index.isValid() and 0 <= index.row() < self.rowCount():
             current_data_type = self.dataset.get_outcome_type(self.current_outcome)
             outcome_subtype = self.dataset.get_outcome_subtype(self.current_outcome)
             column = index.column()
             old_val = self.data(index)
+
+            if index.row() >= len(self.dataset):
+                if column != self.NAME:
+                    self.dataError.emit(STUDY_NAME_REQUIRED_MESSAGE)
+                    return False
+
+                name = str(_to_text_value(value).toUtf8(), encoding="utf8")
+                if name == "" and not allow_empty_names:
+                    self.dataError.emit(STUDY_NAME_REQUIRED_MESSAGE)
+                    return False
+
+                while len(self.dataset) <= index.row():
+                    self.dataset.add_study(Study(self.max_study_id()+1))
+
             study = self.dataset.studies[index.row()]
         else:
             return False
@@ -621,7 +636,7 @@ class DatasetModel(QAbstractTableModel):
             name = str(_to_text_value(value).toUtf8(), encoding="utf8")
             
             if name == "" and not allow_empty_names:
-                # just ignore -- we don't allow empty study names
+                self.dataError.emit(STUDY_NAME_REQUIRED_MESSAGE)
                 return False
             # if we already have the name and the name is not just the current name
             if name in self.dataset.get_study_names() and name != study.name:
