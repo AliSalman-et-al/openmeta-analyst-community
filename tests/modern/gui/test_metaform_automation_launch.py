@@ -1814,6 +1814,32 @@ def test_wizard_size_refit_ignores_closed_wizard_without_current_page(monkeypatc
         app.processEvents()
 
 
+def test_modal_dialogs_center_over_parent_window():
+    import launch
+    from PyQt5 import QtWidgets
+    import main_wizard
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    parent = QtWidgets.QMainWindow()
+    parent.setGeometry(40, 80, 900, 620)
+    parent.show()
+    app.processEvents()
+
+    wizard = main_wizard.MainWizard(parent=parent)
+    try:
+        qt_layout.center_dialog_over_parent(wizard)
+
+        parent_center = parent.frameGeometry().center()
+        wizard_center = wizard.frameGeometry().center()
+        assert abs(wizard_center.x() - parent_center.x()) <= 1
+        assert abs(wizard_center.y() - parent_center.y()) <= 1
+    finally:
+        wizard.close()
+        parent.close()
+        app.processEvents()
+
+
 def test_startup_wizard_cancel_preserves_loaded_dataset(monkeypatch):
     import launch
     from PyQt5 import QtWidgets

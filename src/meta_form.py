@@ -248,7 +248,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             parent=self, recent_datasets=get_setting("recent_files")
         )
 
-        if start_up_wizard.exec():
+        if qt_layout.exec_centered(start_up_wizard):
             wizard_data = start_up_wizard.get_results()
             self._handle_wizard_results(wizard_data)
 
@@ -292,7 +292,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                 return
 
         wizard = main_wizard.MainWizard(parent=self, path="new_dataset")
-        if wizard.exec():
+        if qt_layout.exec_centered(wizard):
             wizard_data = wizard.get_results()
             self._handle_wizard_results(wizard_data)
 
@@ -423,7 +423,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         prev_conf_level = self.model.get_global_conf_level()
 
         dialog = conf_level_dialog.ChangeConfLevelDlg(prev_conf_level, self)
-        if dialog.exec():
+        if qt_layout.exec_centered(dialog):
             new_conf_level = dialog.get_value()
             change_cl_command = Command_Change_Conf_Level(
                 prev_conf_level, new_conf_level, mainform=self
@@ -433,7 +433,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def _import_csv(self):
         """Import data from csv file"""
         wizard = main_wizard.MainWizard(parent=self, path="csv_import")
-        if wizard.exec():
+        if qt_layout.exec_centered(wizard):
             wizard_data = wizard.get_results()
             self._handle_wizard_results(wizard_data)
 
@@ -565,11 +565,11 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             form = diag_metrics.Diag_Metrics(self.model, parent=self)
         if form is None:
             return
-        form.show()
+        qt_layout.show_centered(form)
 
     def meta_reg(self):
         form = meta_reg_form.MetaRegForm(self.model, parent=self)
-        form.show()
+        qt_layout.show_centered(form)
 
     def data_dirtied(self):
         self._notify_user_that_data_is_unsaved()
@@ -577,7 +577,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
     def meta_subgroup_get_cov(self):
         form = meta_subgroup_form.MetaSubgroupForm(self.model, parent=self)
-        form.show()
+        qt_layout.show_centered(form)
 
     ####
     # Here are the calls to ma_specs with so-called `meta-methods`
@@ -613,7 +613,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
         if form is None:
             return
-        form.show()
+        qt_layout.show_centered(form)
 
     def loo_ma(self):
         form = None
@@ -636,7 +636,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
         if form is None:
             return
-        form.show()
+        qt_layout.show_centered(form)
 
     def show_help(self):
         webbrowser.open(meta_globals.HELP_URL)
@@ -667,7 +667,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
         if form is None:
             return
-        form.show()
+        qt_layout.show_centered(form)
 
     def _build_analysis_specs_dialog(
         self, meta_f_str=None, external_params=None, diag_metrics=None, conf_level=None
@@ -719,7 +719,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         cur_dataset = copy.deepcopy(self.model.dataset)
         edit_window = edit_dialog.EditDialog(cur_dataset, parent=self)
 
-        if edit_window.exec():
+        if qt_layout.exec_centered(edit_window):
             # if we edited the current dataset when there was no
             # outcome yet, then we want to default to an outcome
             # that was added.
@@ -909,7 +909,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         edit_group_form = edit_group_name_form.EditGroupName(
             cur_group_name, parent=self
         )
-        if edit_group_form.exec():
+        if qt_layout.exec_centered(edit_group_form):
             try:
                 existing_groups = list(self.model.dataset.get_group_names())
                 if orig_group_name in existing_groups:
@@ -930,7 +930,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def add_covariate(self):
         form = add_new_dialogs.AddNewCovariateForm(self)
         form.covariate_name_le.setFocus()
-        if form.exec():
+        if qt_layout.exec_centered(form):
             # then the user clicked 'ok'.
             try:
                 new_covariate_name = ma_data_table_model.validate_new_covariate_name(
@@ -969,7 +969,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                 parent=self, is_diag=self.model.is_diag()
             )
             form.outcome_name_le.setFocus()
-            if form.exec():
+            if qt_layout.exec_centered(form):
                 # then the user clicked ok and has added a new outcome.
                 # here we want to add the outcome to the dataset, and then
                 # display it
@@ -1010,7 +1010,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         elif self.cur_dimension == "group":
             form = add_new_dialogs.AddNewGroupForm(self)
             form.group_name_le.setFocus()
-            if form.exec():
+            if qt_layout.exec_centered(form):
                 try:
                     new_group_name = ma_data_table_model.validate_new_group_name(
                         self.model.dataset, form.group_name_le.text()
@@ -1025,7 +1025,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             # then the dimension is follow-up
             form = add_new_dialogs.AddNewFollowUpForm(self)
             form.follow_up_name_le.setFocus()
-            if form.exec():
+            if qt_layout.exec_centered(form):
                 try:
                     follow_up_lbl = ma_data_table_model.validate_new_follow_up_name(
                         self.model.dataset,
@@ -1340,7 +1340,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             cur_dataset, covariate, parent=self
         )
 
-        if change_type_form.exec():
+        if qt_layout.exec_centered(change_type_form):
             modified_dataset = change_type_form.dataset
             # revert to original study ordering
             modified_dataset.studies.sort(
@@ -1369,7 +1369,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         edit_cov_form = edit_group_name_form.EditCovariateName(
             orig_cov_name, parent=self
         )
-        if edit_cov_form.exec():
+        if qt_layout.exec_centered(edit_cov_form):
             # the field names are also poorly named, in this case. here we mean the
             # **covariate name**, of course.
             try:

@@ -1,4 +1,5 @@
-from PyQt5.QtCore import QSize
+from PyQt5.QtCore import QPoint, QSize
+from PyQt5.QtGui import QGuiApplication
 from PyQt5.QtWidgets import (
     QAbstractButton,
     QCheckBox,
@@ -19,6 +20,48 @@ APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH = 360
 ANALYSIS_DIALOG_MINIMUM_WIDTH = 520
 ANALYSIS_DIALOG_MINIMUM_HEIGHT = 260
 ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH = APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH
+
+
+def exec_centered(dialog):
+    """Center a modal child dialog over its parent before executing it."""
+    center_dialog_over_parent(dialog)
+    return dialog.exec()
+
+
+def show_centered(dialog):
+    """Center a child dialog over its parent before showing it."""
+    center_dialog_over_parent(dialog)
+    return dialog.show()
+
+
+def center_dialog_over_parent(dialog):
+    """Center a top-level dialog over its parent window when a parent exists."""
+    if dialog is None:
+        return
+
+    parent_widget = getattr(dialog, "parentWidget", None)
+    if parent_widget is None:
+        return
+
+    parent = parent_widget()
+    if parent is None:
+        return
+
+    dialog.adjustSize()
+    dialog_geometry = dialog.frameGeometry()
+    parent_geometry = parent.frameGeometry()
+    if parent_geometry.isNull():
+        parent_geometry = parent.geometry()
+
+    dialog_geometry.moveCenter(parent_geometry.center())
+    dialog_geometry.moveTopLeft(
+        _clamp_top_left_to_available_screen(
+            dialog_geometry.topLeft(),
+            dialog_geometry.size(),
+            parent_geometry.center(),
+        )
+    )
+    dialog.move(dialog_geometry.topLeft())
 
 
 def fit_application_dialog_to_contents(root, adjust_root=True):
@@ -199,6 +242,27 @@ def _has_visible_option_button(group_box, root):
         not _is_hidden_for_fit(button, root) and str(button.text()).strip()
         for button in option_buttons
     )
+
+
+def _clamp_top_left_to_available_screen(top_left, size, screen_point):
+    screen = QGuiApplication.screenAt(screen_point) or QGuiApplication.primaryScreen()
+    if screen is None:
+        return top_left
+
+    available = screen.availableGeometry()
+    min_x = available.left()
+    min_y = available.top()
+    max_x = available.right() - size.width() + 1
+    max_y = available.bottom() - size.height() + 1
+
+    return QPoint(
+        _clamp(top_left.x(), min_x, max(min_x, max_x)),
+        _clamp(top_left.y(), min_y, max(min_y, max_y)),
+    )
+
+
+def _clamp(value, minimum, maximum):
+    return max(minimum, min(value, maximum))
 
 
 def _raise_maximum_height(widget, height):
