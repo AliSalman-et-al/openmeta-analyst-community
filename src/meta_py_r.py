@@ -16,6 +16,7 @@ print("Entering meta_py_r for import probably")
 import math
 import os
 import r_runtime
+from diagnostic_effect_shapes import effect_triplet, normalize_diagnostic_effects
 from r_call_serialization import serialized_r_call
 from meta_globals import *
 
@@ -1772,7 +1773,7 @@ def diagnostic_effects_for_study(
         metrics=_r_character_vector(metrics),
         **{"conf.level": conf_level},
     )
-    return R_parse_tools.recursioner(r_res)
+    return normalize_diagnostic_effects(R_parse_tools.recursioner(r_res))
 
 
 @RfunctionCaller

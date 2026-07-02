@@ -2,6 +2,7 @@ import os
 import sys
 import types
 
+from diagnostic_effect_shapes import effect_triplet, normalize_diagnostic_effects
 from meta_globals import validate_confidence_level
 
 
@@ -69,6 +70,8 @@ def install_stub_meta_py_r():
     meta_py_r.binary_convert_scale = lambda value, *args, **kwargs: value
     meta_py_r.continuous_convert_scale = lambda value, *args, **kwargs: value
     meta_py_r.diagnostic_convert_scale = lambda value, *args, **kwargs: value
+    meta_py_r.effect_triplet = effect_triplet
+    meta_py_r.normalize_diagnostic_effects = normalize_diagnostic_effects
     meta_py_r.effect_for_study = lambda *args, **kwargs: None
     meta_py_r.continuous_effect_for_study = lambda *args, **kwargs: None
     meta_py_r.diagnostic_effects_for_study = lambda *args, **kwargs: {}

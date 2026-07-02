@@ -12,6 +12,7 @@
 #########################################################################################
 
 # core libraries
+import copy
 from functools import cmp_to_key
 
 from PyQt5 import QtCore
@@ -788,11 +789,24 @@ class DatasetModel(QAbstractTableModel):
             adjusted_index = column - adjust_by
             double_value, converted_ok = _to_double(value)
             val = double_value if converted_ok else ""
+            old_ma_unit = copy.deepcopy(ma_unit)
+            old_include = study.include
+            old_manually_excluded = study.manually_excluded
             ma_unit.tx_groups[group_name].raw_data[adjusted_index] = val
 
             # If a raw data column value is being edited, attempt to
-            # update the corresponding outcome (if data permits)
-            self.update_outcome_if_possible(index.row())
+            # update the corresponding outcome (if data permits). Keep the row
+            # coherent if the effect calculation fails.
+            try:
+                self.update_outcome_if_possible(index.row())
+            except Exception as exc:
+                ma_unit.__dict__ = copy.deepcopy(old_ma_unit.__dict__)
+                study.include = old_include
+                study.manually_excluded = old_manually_excluded
+                return self._reject_edit(
+                    "Could not compute study effects from the edited raw data: %s"
+                    % exc
+                )
 
         elif column in self.OUTCOMES:
             print(("Value %s in outcomes" % str(_to_text_value(value))))
@@ -1954,7 +1968,11 @@ class DatasetModel(QAbstractTableModel):
                 # now we're going to set the effect estimate/CI on the MA object.
 
                 for metric in DIAGNOSTIC_METRICS:
-                    est, lower, upper = ests_and_cis[metric]["calc_scale"]
+                    est, lower, upper = meta_py_r.effect_triplet(
+                        ests_and_cis[metric],
+                        "calc_scale",
+                        metric=metric,
+                    )
                     ma_unit.set_effect_and_ci(
                         metric, group_str, est, lower, upper, mult=self.mult
                     )

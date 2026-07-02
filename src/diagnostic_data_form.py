@@ -438,7 +438,11 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             elif metric.lower() == "spec" and not can_calculate_spec:
                 continue
 
-            est, lower, upper = ests_and_cis[metric]["calc_scale"]
+            est, lower, upper = meta_py_r.effect_triplet(
+                ests_and_cis[metric],
+                "calc_scale",
+                metric=metric,
+            )
             self.ma_unit.set_effect_and_ci(
                 metric, self.group_str, est, lower, upper, mult=self.mult
             )

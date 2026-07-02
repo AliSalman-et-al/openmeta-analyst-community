@@ -160,3 +160,98 @@ def test_invalid_continuous_covariate_edit_emits_error_and_preserves_value():
 
     assert errors == ["Covariate values for continuous covariates need to be numeric."]
     assert model.dataset.studies[0].covariate_dict["Dose"] == 5.5
+
+
+def test_diagnostic_raw_count_edit_accepts_scalar_metric_effects(monkeypatch):
+    model = _diagnostic_model_with_empty_cells()
+    ma_unit = model.get_current_ma_unit_for_study(0)
+    group_str = model.get_cur_group_str()
+    ma_unit.tx_groups[group_str].raw_data = [19.0, 10.0, 1.0, 81.0]
+    errors = []
+    model.dataError.connect(errors.append)
+
+    monkeypatch.setattr(
+        ma_data_table_model.meta_py_r,
+        "diagnostic_convert_scale",
+        lambda value, *args, **kwargs: value,
+    )
+
+    def diagnostic_effects_for_study(*args, **kwargs):
+        return {
+            "Sens": {"calc_scale": 0.75},
+            "Spec": {"calc_scale": [0.95, 0.88, 0.99]},
+            "PLR": {"calc_scale": [15.0]},
+            "NLR": {"calc_scale": [0.25, 0.12, 0.50]},
+            "DOR": {"calc_scale": [60.0, 25.0, 120.0]},
+        }
+
+    monkeypatch.setattr(
+        ma_data_table_model.meta_py_r,
+        "diagnostic_effects_for_study",
+        diagnostic_effects_for_study,
+    )
+
+    assert model.setData(model.index(0, model.RAW_DATA[0]), "20") is True
+
+    assert errors == []
+    assert ma_unit.tx_groups[group_str].raw_data[0] == 20.0
+    assert ma_unit.get_effect_and_ci("Sens", group_str, model.get_mult()) == (
+        0.75,
+        None,
+        None,
+    )
+    assert ma_unit.get_entered_effect_and_ci("Spec", group_str) == (
+        0.95,
+        0.88,
+        0.99,
+    )
+
+
+def test_diagnostic_raw_count_edit_rolls_back_when_effect_calculation_fails(
+    monkeypatch,
+):
+    model = _diagnostic_model_with_empty_cells()
+    ma_unit = model.get_current_ma_unit_for_study(0)
+    group_str = model.get_cur_group_str()
+    ma_unit.tx_groups[group_str].raw_data = [19.0, 10.0, 1.0, 81.0]
+    ma_unit.set_effect_and_ci("Sens", group_str, 0.66, 0.50, 0.80, model.get_mult())
+    model.dataset.studies[0].include = True
+    errors = []
+    model.dataError.connect(errors.append)
+
+    def diagnostic_effects_for_study(*args, **kwargs):
+        raise RuntimeError("simulated diagnostic calculation failure")
+
+    monkeypatch.setattr(
+        ma_data_table_model.meta_py_r,
+        "diagnostic_effects_for_study",
+        diagnostic_effects_for_study,
+    )
+
+    assert model.setData(model.index(0, model.RAW_DATA[0]), "20") is False
+
+    assert ma_unit.tx_groups[group_str].raw_data == [19.0, 10.0, 1.0, 81.0]
+    assert ma_unit.get_entered_effect_and_ci("Sens", group_str) == (
+        0.66,
+        0.50,
+        0.80,
+    )
+    assert model.dataset.studies[0].include is True
+    assert errors == [
+        "Could not compute study effects from the edited raw data: "
+        "simulated diagnostic calculation failure"
+    ]
+
+
+def test_diagnostic_effect_normalizer_preserves_triplets_and_expands_scalars():
+    effects = ma_data_table_model.meta_py_r.normalize_diagnostic_effects(
+        {
+            "Sens": {"calc_scale": 0.75},
+            "Spec": {"calc_scale": [0.95, 0.88, 0.99]},
+            "PLR": {"calc_scale": [15.0]},
+        }
+    )
+
+    assert effects["Sens"]["calc_scale"] == (0.75, None, None)
+    assert effects["Spec"]["calc_scale"] == (0.95, 0.88, 0.99)
+    assert effects["PLR"]["calc_scale"] == (15.0, None, None)
