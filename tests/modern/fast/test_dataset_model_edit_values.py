@@ -9,6 +9,7 @@ import modern_compat
 modern_compat.install()
 
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QColor
 
 import ma_data_table_model
 import ma_dataset
@@ -75,6 +76,26 @@ def test_empty_editable_cells_return_blank_edit_text():
         value = model.data(model.index(0, column), Qt.EditRole)
 
         assert value == ""
+
+
+def test_normal_study_cells_do_not_override_view_alternating_row_background():
+    model = _continuous_model_with_named_study()
+
+    assert model.data(model.index(0, model.NAME), Qt.BackgroundColorRole) is None
+    assert model.data(model.index(0, model.RAW_DATA[0]), Qt.BackgroundColorRole) is None
+    assert model.data(model.index(0, model.OUTCOMES[0]), Qt.BackgroundColorRole) == QColor(
+        Qt.yellow
+    )
+
+
+def test_one_arm_inactive_raw_data_cells_keep_disabled_background():
+    model = _continuous_model_with_named_study()
+    model.current_effect = "TX Mean"
+
+    assert model.data(model.index(0, model.RAW_DATA[3]), Qt.BackgroundColorRole) == QColor(
+        Qt.gray
+    )
+    assert model.data(model.index(0, model.RAW_DATA[0]), Qt.BackgroundColorRole) is None
 
 
 def test_raw_data_edit_on_placeholder_row_emits_study_name_error():

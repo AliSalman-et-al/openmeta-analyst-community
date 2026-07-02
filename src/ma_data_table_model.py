@@ -508,8 +508,6 @@ class DatasetModel(QAbstractTableModel):
                 and self.current_effect in ONE_ARM_METRICS
             ):
                 return _item_data(QColor(Qt.gray))
-            else:
-                return _item_data(QColor(Qt.white))
 
         return _item_data()
 
