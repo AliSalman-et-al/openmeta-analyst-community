@@ -325,7 +325,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             )
         else:
             self.dataset_file_lbl.setText(
-                "open file: <font color='red'>%s</font>" % self.out_path
+                "Open File: <font color='red'>%s</font>" % self.out_path
             )
         qt_layout.fit_text_to_contents(self)
 
@@ -1313,7 +1313,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             self.set_model(data_model, state_dict, check_for_appropriate_metric=True)
             self.model.analysis_source_path = file_path
             self.tableView.undoStack.clear()
-            self.dataset_file_lbl.setText("open file: %s" % file_path)
+            self.dataset_file_lbl.setText("Open File: %s" % file_path)
             qt_layout.fit_text_to_contents(self)
         finally:
             self._restore_window_placement(placement)
@@ -1518,7 +1518,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self._disconnections()
         self.tableView.setModel(self.model)
         self.model_updated()
-        self.dataset_file_lbl.setText("open file: %s" % self.out_path)
+        self.dataset_file_lbl.setText("Open File: %s" % self.out_path)
         qt_layout.fit_text_to_contents(self)
 
     def update_outcome_lbl(self):
@@ -1599,7 +1599,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             # add dataset to recent files
             add_file_to_recent_files(self.out_path)
 
-            self.dataset_file_lbl.setText("open file: %s" % self.out_path)
+            self.dataset_file_lbl.setText("Open File: %s" % self.out_path)
             qt_layout.fit_text_to_contents(self)
             self.current_data_unsaved = False
             return True

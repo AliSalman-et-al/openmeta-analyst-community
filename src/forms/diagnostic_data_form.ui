@@ -69,32 +69,32 @@
      </property>
      <row>
       <property name="text">
-       <string>(test) +</string>
+       <string>(Test) +</string>
       </property>
      </row>
      <row>
       <property name="text">
-       <string>(test) -</string>
+       <string>(Test) -</string>
       </property>
      </row>
      <row>
       <property name="text">
-       <string>total</string>
+       <string>Total</string>
       </property>
      </row>
      <column>
       <property name="text">
-       <string>(disease) +</string>
+       <string>(Disease) +</string>
       </property>
      </column>
      <column>
       <property name="text">
-       <string>(disease) -</string>
+       <string>(Disease) -</string>
       </property>
      </column>
      <column>
       <property name="text">
-       <string>total</string>
+       <string>Total</string>
       </property>
      </column>
     </widget>

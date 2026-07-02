@@ -80,12 +80,12 @@
      </property>
      <row>
       <property name="text">
-       <string>group 1</string>
+       <string>Group 1</string>
       </property>
      </row>
      <row>
       <property name="text">
-       <string>group 2</string>
+       <string>Group 2</string>
       </property>
      </row>
      <column>
@@ -95,7 +95,7 @@
      </column>
      <column>
       <property name="text">
-       <string>mean</string>
+       <string>Mean</string>
       </property>
      </column>
      <column>
@@ -110,22 +110,22 @@
      </column>
      <column>
       <property name="text">
-       <string>var</string>
+       <string>Variance</string>
       </property>
      </column>
      <column>
       <property name="text">
-       <string>pval</string>
+       <string>p-Value</string>
       </property>
      </column>
      <column>
       <property name="text">
-       <string>low</string>
+       <string>Lower</string>
       </property>
      </column>
      <column>
       <property name="text">
-       <string>high</string>
+       <string>Upper</string>
       </property>
      </column>
     </widget>
@@ -139,7 +139,7 @@
       </sizepolicy>
      </property>
      <property name="title">
-      <string>pre / post</string>
+      <string>Pre / Post</string>
      </property>
      <layout class="QVBoxLayout" name="verticalLayout">
       <item>
@@ -190,12 +190,12 @@
         </property>
         <row>
          <property name="text">
-          <string>pre</string>
+          <string>Pre</string>
          </property>
         </row>
         <row>
          <property name="text">
-          <string>post</string>
+          <string>Post</string>
          </property>
         </row>
         <column>
@@ -205,7 +205,7 @@
         </column>
         <column>
          <property name="text">
-          <string>mean</string>
+          <string>Mean</string>
          </property>
         </column>
         <column>
@@ -220,17 +220,17 @@
         </column>
         <column>
          <property name="text">
-          <string>var</string>
+          <string>Variance</string>
          </property>
         </column>
         <column>
          <property name="text">
-          <string>low</string>
+          <string>Lower</string>
          </property>
         </column>
         <column>
          <property name="text">
-          <string>high</string>
+          <string>Upper</string>
          </property>
         </column>
        </widget>
@@ -253,7 +253,7 @@
 &lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
 p, li { white-space: pre-wrap; }
 &lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Verdana'; font-size:8pt; font-weight:600; font-style:italic;&quot;&gt;
-&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-size:7pt;&quot;&gt;group 1&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-size:7pt;&quot;&gt;Group 1&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
        </widget>
       </item>
@@ -297,12 +297,12 @@ p, li { white-space: pre-wrap; }
         </property>
         <row>
          <property name="text">
-          <string>pre</string>
+          <string>Pre</string>
          </property>
         </row>
         <row>
          <property name="text">
-          <string>post</string>
+          <string>Post</string>
          </property>
         </row>
         <column>
@@ -312,7 +312,7 @@ p, li { white-space: pre-wrap; }
         </column>
         <column>
          <property name="text">
-          <string>mean</string>
+          <string>Mean</string>
          </property>
         </column>
         <column>
@@ -327,17 +327,17 @@ p, li { white-space: pre-wrap; }
         </column>
         <column>
          <property name="text">
-          <string>var</string>
+          <string>Variance</string>
          </property>
         </column>
         <column>
          <property name="text">
-          <string>low</string>
+          <string>Lower</string>
          </property>
         </column>
         <column>
          <property name="text">
-          <string>high</string>
+          <string>Upper</string>
          </property>
         </column>
        </widget>
@@ -357,7 +357,7 @@ p, li { white-space: pre-wrap; }
 &lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
 p, li { white-space: pre-wrap; }
 &lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Verdana'; font-size:8pt; font-weight:600; font-style:italic;&quot;&gt;
-&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-size:7pt;&quot;&gt;group 2&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-size:7pt;&quot;&gt;Group 2&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
        </widget>
       </item>

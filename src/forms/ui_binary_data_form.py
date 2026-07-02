@@ -230,12 +230,12 @@ class Ui_BinaryDataForm(object):
     def retranslateUi(self, BinaryDataForm):
         _translate = QtCore.QCoreApplication.translate
         BinaryDataForm.setWindowTitle(_translate("BinaryDataForm", "Binary Data"))
-        self.event_lbl_3.setText(_translate("BinaryDataForm", "event"))
-        self.label_18.setText(_translate("BinaryDataForm", "no event"))
-        self.label_19.setText(_translate("BinaryDataForm", "total"))
-        self.label_20.setText(_translate("BinaryDataForm", "group 1"))
-        self.label_21.setText(_translate("BinaryDataForm", "group 2"))
-        self.label_22.setText(_translate("BinaryDataForm", "total"))
+        self.event_lbl_3.setText(_translate("BinaryDataForm", "Event"))
+        self.label_18.setText(_translate("BinaryDataForm", "No Event"))
+        self.label_19.setText(_translate("BinaryDataForm", "Total"))
+        self.label_20.setText(_translate("BinaryDataForm", "Group 1"))
+        self.label_21.setText(_translate("BinaryDataForm", "Group 2"))
+        self.label_22.setText(_translate("BinaryDataForm", "Total"))
         self.clear_Btn.setText(_translate("BinaryDataForm", "Clear Form"))
         self.back_calc_btn.setText(_translate("BinaryDataForm", "Back-Calculate Table"))
         self.label_17.setText(_translate("BinaryDataForm", "Effect"))

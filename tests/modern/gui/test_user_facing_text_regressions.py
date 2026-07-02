@@ -638,10 +638,6 @@ def test_issue_76_to_105_reported_bad_user_facing_strings_are_absent():
         "and and follow-up",
         "be default",
         "Please select a csv file to import:",
-        '"Undo"',
-        '"Redo"',
-        '"Copy"',
-        '"Paste"',
         '"p-Val"',
         '"z-Val"',
         '"Het. p-Val"',
@@ -786,7 +782,7 @@ def test_issue_76_to_105_corrected_user_facing_strings_are_present():
         "Diagnostic Data",
         "Regression\nCoefficient",
         "Follow-Ups",
-        "undo",
+        "Undo",
         "Ctrl+Z",
         "Correction factor target",
         "Number of digits",
@@ -795,7 +791,7 @@ def test_issue_76_to_105_corrected_user_facing_strings_are_present():
         "Negative Predictive Value",
         "Yule's Y",
         "OpenMetaAnalyst",
-        "rename covariate %s",
+        "Rename Covariate %s",
         "Expected a whole number",
         "prepended to study_data.csv",
         "Subgroup Meta-Analysis",
@@ -838,8 +834,8 @@ def test_issue_76_to_105_corrected_user_facing_strings_are_present():
         '_translate("edit_forest_plot_dlg", "Edit Forest Plot")',
         '_translate("running", "Running Analysis...")',
         '_translate("DataTypePage", "Proportion")',
-        'QAction("rename group %s"',
-        'QAction("rename covariate %s"',
+        'QAction("Rename Group %s"',
+        'QAction("Rename Covariate %s"',
         'QAction("save pdf image as"',
         'QAction("save png image as"',
         'QAction("edit plot"',
@@ -847,3 +843,86 @@ def test_issue_76_to_105_corrected_user_facing_strings_are_present():
 
     for expected_string in expected_strings:
         assert expected_string in text
+
+
+def test_issue_173_user_facing_commands_and_headers_use_desktop_casing():
+    text = _combined_text(
+        [
+            "src/meta.ui",
+            "src/ui_meta.py",
+            "src/forms/binary_data_form2.ui",
+            "src/forms/ui_binary_data_form.py",
+            "src/forms/continuous_data_form.ui",
+            "src/forms/ui_continuous_data_form.py",
+            "src/forms/diagnostic_data_form.ui",
+            "src/forms/ui_diagnostic_data_form.py",
+            "src/ma_data_table_view.py",
+            "src/meta_form.py",
+        ]
+    )
+
+    expected_strings = [
+        "Undo",
+        "Redo",
+        "Copy",
+        "Paste",
+        "Event",
+        "No Event",
+        "Total",
+        "Group 1",
+        "Group 2",
+        "Mean",
+        "Variance",
+        "p-Value",
+        "Lower",
+        "Upper",
+        "Pre / Post",
+        "Pre",
+        "Post",
+        "(Test) +",
+        "(Test) -",
+        "(Disease) +",
+        "(Disease) -",
+        "Delete Study %s",
+        "Include All",
+        "Exclude All",
+        "Sort Studies by %s",
+        "Rename Group %s",
+        "Rename Covariate %s",
+        "Delete Covariate %s",
+        "Create a %s Copy of %s",
+        "Open File: %s",
+    ]
+    forbidden_strings = [
+        '"undo"',
+        '"redo"',
+        '"copy"',
+        '"paste"',
+        ">event<",
+        ">no event<",
+        ">total<",
+        ">group 1<",
+        ">group 2<",
+        ">mean<",
+        ">var<",
+        ">pval<",
+        ">low<",
+        ">high<",
+        ">pre / post<",
+        ">pre<",
+        ">post<",
+        'QAction("delete study %s"',
+        'QAction("include all"',
+        'QAction("exclude all"',
+        'QAction("sort studies by %s"',
+        'QAction("rename group %s"',
+        'QAction("rename covariate %s"',
+        'QAction("delete covariate %s"',
+        '"create a %s copy of %s"',
+        '"open file: %s"',
+    ]
+
+    for expected_string in expected_strings:
+        assert expected_string in text
+    for forbidden_string in forbidden_strings:
+        assert forbidden_string not in text

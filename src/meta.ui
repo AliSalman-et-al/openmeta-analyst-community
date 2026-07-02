@@ -654,7 +654,7 @@
      <normaloff>:/toolbar-icons/toolbar-icons/back.png</normaloff>:/toolbar-icons/toolbar-icons/back.png</iconset>
    </property>
    <property name="text">
-    <string>undo</string>
+    <string>Undo</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+Z</string>
@@ -666,7 +666,7 @@
      <normaloff>:/toolbar-icons/toolbar-icons/forward.png</normaloff>:/toolbar-icons/toolbar-icons/forward.png</iconset>
    </property>
    <property name="text">
-    <string>redo</string>
+    <string>Redo</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+Y</string>
@@ -678,7 +678,7 @@
      <normaloff>:/misc/copy.png</normaloff>:/misc/copy.png</iconset>
    </property>
    <property name="text">
-    <string>copy</string>
+    <string>Copy</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+C</string>
@@ -690,7 +690,7 @@
      <normaloff>:/toolbar-icons/toolbar-icons/paste.png</normaloff>:/toolbar-icons/toolbar-icons/paste.png</iconset>
    </property>
    <property name="text">
-    <string>paste</string>
+    <string>Paste</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+V</string>

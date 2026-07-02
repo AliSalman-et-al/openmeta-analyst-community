@@ -36,7 +36,7 @@
           </font>
          </property>
          <property name="text">
-          <string>event</string>
+          <string>Event</string>
          </property>
          <property name="alignment">
           <set>Qt::AlignCenter</set>
@@ -51,7 +51,7 @@
           </font>
          </property>
          <property name="text">
-          <string>no event</string>
+          <string>No Event</string>
          </property>
          <property name="alignment">
           <set>Qt::AlignCenter</set>
@@ -68,7 +68,7 @@
           </font>
          </property>
          <property name="text">
-          <string>total</string>
+          <string>Total</string>
          </property>
          <property name="alignment">
           <set>Qt::AlignCenter</set>
@@ -83,7 +83,7 @@
           </font>
          </property>
          <property name="text">
-          <string>group 1</string>
+          <string>Group 1</string>
          </property>
          <property name="alignment">
           <set>Qt::AlignBottom|Qt::AlignRight|Qt::AlignTrailing</set>
@@ -170,7 +170,7 @@
           </font>
          </property>
          <property name="text">
-          <string>group 2</string>
+          <string>Group 2</string>
          </property>
          <property name="alignment">
           <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -187,7 +187,7 @@
           </font>
          </property>
          <property name="text">
-          <string>total</string>
+          <string>Total</string>
          </property>
          <property name="alignment">
           <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>

@@ -120,7 +120,7 @@ class MADataTable(QtWidgets.QTableView):
 
             ### delete study
             study = self.model().dataset.studies[study_index]
-            action = QAction("delete study %s" % study.name, self)
+            action = QAction("Delete Study %s" % study.name, self)
             _connect_action(
                 action,
                 lambda: self.main_gui.delete_study(study, study_index=study_index),
@@ -128,12 +128,12 @@ class MADataTable(QtWidgets.QTableView):
             context_menu.addAction(action)
 
             ### copy
-            action = QAction("copy", self)
+            action = QAction("Copy", self)
             _connect_action(action, self.copy)
             context_menu.addAction(action)
 
             ### paste
-            action = QAction("paste", self)
+            action = QAction("Paste", self)
             _connect_action(action, self.paste)
             context_menu.addAction(action)
 
@@ -163,13 +163,13 @@ class MADataTable(QtWidgets.QTableView):
         if column_clicked == 0:
             # option to (de-)select / include all studies
             # per Ethan (issue #100)
-            action = QAction("include all", self)
+            action = QAction("Include All", self)
             _connect_action(action, self.include_all_studies)
             if self.model().all_studies_are_included():
                 action.setEnabled(False)
             context_menu.addAction(action)
 
-            action = QAction("exclude all", self)
+            action = QAction("Exclude All", self)
             _connect_action(action, self.exclude_all_studies)
             if self.model().all_studies_are_excluded():
                 action.setEnabled(False)
@@ -177,8 +177,8 @@ class MADataTable(QtWidgets.QTableView):
 
             context_menu.popup(self.mapToGlobal(pos))
         elif column_clicked in (1, 2):
-            col_name = {1: "study name", 2: "year"}[column_clicked]
-            action_sort = QAction("sort studies by %s" % col_name, self)
+            col_name = {1: "Study Name", 2: "Year"}[column_clicked]
+            action_sort = QAction("Sort Studies by %s" % col_name, self)
 
             _connect_action(action_sort, lambda: self.sort_by_col(column_clicked))
             context_menu.addAction(action_sort)
@@ -193,7 +193,7 @@ class MADataTable(QtWidgets.QTableView):
                     corresponding_tx_group = self.model().current_txs[1]
 
             # renaming
-            action_rename = QAction("rename group %s" % corresponding_tx_group, self)
+            action_rename = QAction("Rename Group %s" % corresponding_tx_group, self)
             _connect_action(
                 action_rename,
                 lambda: self.main_gui.edit_group_name(corresponding_tx_group),
@@ -201,35 +201,35 @@ class MADataTable(QtWidgets.QTableView):
             context_menu.addAction(action_rename)
             # sorting
             col_name = _to_text(self.model().headerData(column_clicked, Qt.Horizontal))
-            action_sort = QAction("sort studies by %s" % col_name, self)
+            action_sort = QAction("Sort Studies by %s" % col_name, self)
             _connect_action(action_sort, lambda: self.sort_by_col(column_clicked))
             context_menu.addAction(action_sort)
         elif column_clicked in raw_data_columns and data_type == "diagnostic":
             # sorting
             col_name = _to_text(self.model().headerData(column_clicked, Qt.Horizontal))
-            action_sort = QAction("sort studies by %s" % col_name, self)
+            action_sort = QAction("Sort Studies by %s" % col_name, self)
             _connect_action(action_sort, lambda: self.sort_by_col(column_clicked))
             context_menu.addAction(action_sort)
         elif column_clicked in outcomes_columns:
             # sorting
             col_name = _to_text(self.model().headerData(column_clicked, Qt.Horizontal))
-            action_sort = QAction("sort studies by %s" % col_name, self)
+            action_sort = QAction("Sort Studies by %s" % col_name, self)
             _connect_action(action_sort, lambda: self.sort_by_col(column_clicked))
             context_menu.addAction(action_sort)
         elif column_clicked in covariate_columns:
             cov = self.model().get_cov(column_clicked)
 
             # and for sorting (issue #142)
-            action_sort = QAction("sort studies by %s" % cov.name, self)
+            action_sort = QAction("Sort Studies by %s" % cov.name, self)
             _connect_action(action_sort, lambda: self.sort_by_col(column_clicked))
             context_menu.addAction(action_sort)
 
-            action_ren = QAction("rename covariate %s" % cov.name, self)
+            action_ren = QAction("Rename Covariate %s" % cov.name, self)
             _connect_action(action_ren, lambda: self.main_gui.rename_covariate(cov))
             context_menu.addAction(action_ren)
 
             # allow deletion of covariate
-            action_del = QAction("delete covariate %s" % cov.name, self)
+            action_del = QAction("Delete Covariate %s" % cov.name, self)
             _connect_action(action_del, lambda: self.main_gui.delete_covariate(cov))
             context_menu.addAction(action_del)
 
@@ -238,7 +238,7 @@ class MADataTable(QtWidgets.QTableView):
                 convert_to_str = "*factor*"
 
             action_change = QAction(
-                "create a %s copy of %s" % (convert_to_str, cov.name), self
+                "Create a %s Copy of %s" % (convert_to_str, cov.name), self
             )
             _connect_action(action_change, lambda: self.main_gui.change_cov_type(cov))
             context_menu.addAction(action_change)
