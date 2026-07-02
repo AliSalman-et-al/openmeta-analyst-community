@@ -79,7 +79,7 @@ def test_option_group_forms_fit_checkbox_and_radio_labels():
                 QtWidgets.QCheckBox
             ) + group_box.findChildren(QtWidgets.QRadioButton)
             if not any(
-                button.isVisible() and str(button.text()).strip()
+                not _hidden_for_fit(button, root) and str(button.text()).strip()
                 for button in option_buttons
             ):
                 continue
@@ -185,9 +185,18 @@ def _visible_text(widget, root, text):
 def _hidden_for_fit(widget, root):
     current = widget
     while current is not None and current is not root:
-        if current.isHidden():
+        if current.isHidden() and not _hidden_page_for_fit(current):
             return True
         current = current.parentWidget()
+    return False
+
+
+def _hidden_page_for_fit(widget):
+    parent = widget.parentWidget()
+    if isinstance(parent, QtWidgets.QTabWidget) and parent.indexOf(widget) >= 0:
+        return True
+    if isinstance(parent, QtWidgets.QStackedWidget) and parent.indexOf(widget) >= 0:
+        return True
     return False
 
 
