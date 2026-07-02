@@ -295,6 +295,8 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
         assert 'attr(,"class")' not in rendered, rendered
         assert bool(ro.r('!is.null(getS3method("print", "summary.display", optional=TRUE))')[0])
         assert bool(ro.r('!is.null(getS3method("print", "summary.data", optional=TRUE))')[0])
+        assert str(ro.r('OpenMetaR:::forest.plot.p.value.label(0.0002, 3)')[0]) == "P< 0.001"
+        assert str(ro.r('OpenMetaR:::forest.plot.p.value.label(0.015, 3)')[0]) == "P=0.015"
 
         meta_regression_expr = textwrap.dedent(
             '''
@@ -357,6 +359,19 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
         assert "Gonzalez" in weights, weights
         assert "De Vries" in weights, weights
         assert "Study 1" not in weights, weights
+
+        named_weights_result = ro.r(
+            '''
+            list(
+              Weights = structure(c(12.345, 67.89), names = c("Alpha Study", "Beta Study")),
+              input_params = list(digits = 3)
+            )
+            '''
+        )
+        named_weights = meta_py_r.parse_out_results(named_weights_result)["texts"]["Weights"]
+        assert "Alpha Study" in named_weights, named_weights
+        assert "Beta Study" in named_weights, named_weights
+        assert "Study 1" not in named_weights, named_weights
 
         sys.stdout.write("OK\\n")
         sys.stdout.flush()

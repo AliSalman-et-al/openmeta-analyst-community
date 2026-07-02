@@ -17,6 +17,20 @@
 #   functions for creating plot data to pass to plot functions  #
 #################################################################
 
+forest.plot.p.value.label <- function(p.value, digits, missing.label="NA") {
+    if (is.null(p.value)) {
+        return(missing.label)
+    }
+    if (is.na(p.value)) {
+        return("P=NA")
+    }
+    formatted <- round.display(p.value, digits)
+    if (p.value < 10^(-digits)) {
+        return(paste("P", formatted, sep=""))
+    }
+    paste("P=", formatted, sep="")
+}
+
 create.plot.data.generic <- function(om.data, params, res, selected.cov=NULL){
     # Creates a data structure that can be passed to forest.plot
     # res is the output of a call to the Metafor function rma
@@ -64,19 +78,9 @@ create.plot.data.generic <- function(om.data, params, res, selected.cov=NULL){
     } else {
         I2 <- "NA"
     }
-    if (!is.null(res$QEp)) {
-      if (res$QEp < 10^(-params$digits)) {
-          PLabel <- "P"  
-      } else {
-          PLabel <- "P="
-      }
-      QEp <- round.display(res$QEp, params$digits)
-    } else {
-      PLabel <- ""
-      QEp <- "NA"
-    } 
+    QEp <- forest.plot.p.value.label(res$QEp, params$digits)
     
-    overall <- paste("Overall (I²=", I2, " , ", PLabel, QEp, ")", sep="")
+    overall <- paste("Overall (I²=", I2, " , ", QEp, ")", sep="")
     # append years to study names unless year equals 0 (0 is passed to R when year is empty).
     study.names <- om.data@study.names
     years <- om.data@years
@@ -430,13 +434,9 @@ create.subgroup.plot.data.generic <- function(subgroup.data, params, data.type, 
         } else {
             I2 <- "NA"
         }
-        if (!is.null(cur.res$QEp)) {
-            QEp <- sprintf(digits.str, cur.res$QEp)
-        } else {
-            QEp <- "NA"
-        } 
+        QEp <- forest.plot.p.value.label(cur.res$QEp, params$digits, missing.label="P=NA")
     
-        overall <- paste(" (I²=", I2, " , P=", QEp, ")", sep="")
+        overall <- paste(" (I²=", I2, " , ", QEp, ")", sep="")
         types <- c(types, rep(0, length(grouped.data[[i]]@study.names)), 1)
         label.col <-c(label.col, grouped.data[[i]]@study.names, paste("Subgroup ", subgroup.list[i], overall, sep=""))
     } 
@@ -460,12 +460,8 @@ create.subgroup.plot.data.generic <- function(subgroup.data, params, data.type, 
     } else {
         I2 <- "NA"
     }
-    if (!is.null(cur.res$QEp)) {
-        QEp <- sprintf(digits.str, cur.res$QEp)
-    } else {
-        QEp <- "NA"
-    } 
-    overall <- paste(" (I²=", I2, " , P=", QEp, ")", sep="")
+    QEp <- forest.plot.p.value.label(cur.res$QEp, params$digits, missing.label="P=NA")
+    overall <- paste(" (I²=", I2, " , ", QEp, ")", sep="")
     label.col <- c(as.character(params$fp_col1_str), label.col, paste("Overall", overall, sep=""))
     plot.options <- set.plot.options(params)
     if (params$fp_plot_lb == "[default]") {

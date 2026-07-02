@@ -1515,6 +1515,16 @@ def _r_dimnames(r_object):
     ]
 
 
+def _r_names_or_none(r_object):
+    names = getattr(r_object, "names", None)
+    if names is None or _r_is_null(names):
+        return None
+    names = [str(name) for name in list(names)]
+    if not names or any(name == "" for name in names):
+        return None
+    return names
+
+
 def _format_r_matrix(matrix):
     dims = _r_dims(matrix)
     dimnames = _r_dimnames(matrix)
@@ -1643,12 +1653,17 @@ def make_weights_str(results):
     if "input_params" in results:
         digits = results["input_params"].rx2("digits")[0]
     digits = validate_analysis_digits(digits)
-    weights = list(results["weights"])
+    weights_object = results["weights"]
+    weights = list(weights_object)
     weights = ["{0:.{digits}f}%".format(x, digits=digits) for x in weights]
     if "input_data" in results:
         study_names = list(results["input_data"].do_slot("study.names"))
     else:
-        study_names = ["Study %d" % (index + 1) for index in range(len(weights))]
+        weight_names = _r_names_or_none(weights_object)
+        if weight_names is not None and len(weight_names) == len(weights):
+            study_names = weight_names
+        else:
+            study_names = ["Study %d" % (index + 1) for index in range(len(weights))]
 
     table, widths = tabulate(
         [study_names, weights], sep=": ", return_col_widths=True, align=["L", "R"]

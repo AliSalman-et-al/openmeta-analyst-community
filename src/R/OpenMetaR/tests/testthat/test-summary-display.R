@@ -155,3 +155,22 @@ test_that("meta-regression omnibus p-value uses small-p display convention", {
   expect_match(rendered, "< 0.001", fixed = TRUE)
   expect_false(grepl("Omnibus p-Value\n\n 0.000", rendered, fixed = TRUE))
 })
+
+test_that("forest plot p-value labels use small-p display convention", {
+  expect_equal(
+    OpenMetaR:::forest.plot.p.value.label(0.0002, 3),
+    "P< 0.001"
+  )
+  expect_equal(
+    OpenMetaR:::forest.plot.p.value.label(0.015, 3),
+    "P=0.015"
+  )
+  expect_equal(
+    OpenMetaR:::forest.plot.p.value.label(NULL, 3),
+    "NA"
+  )
+  expect_equal(
+    OpenMetaR:::forest.plot.p.value.label(NULL, 3, missing.label = "P=NA"),
+    "P=NA"
+  )
+})
