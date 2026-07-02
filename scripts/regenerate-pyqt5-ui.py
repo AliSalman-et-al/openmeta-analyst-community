@@ -32,7 +32,6 @@ UI_MODULES = {
     "src/forms/new_study_dlg.ui": "src/forms/ui_new_study.py",
     "src/forms/outcome_name_page.ui": "src/forms/ui_outcome_name_page.py",
     "src/forms/running.ui": "src/forms/ui_running.py",
-    "src/forms/tom_form.ui": "src/forms/ui_tom_form.py",
     "src/forms/welcome_page.ui": "src/forms/ui_welcome_page.py",
     "src/meta.ui": "src/ui_meta.py",
     "src/results_window.ui": "src/ui_results_window.py",

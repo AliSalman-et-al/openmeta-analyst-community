@@ -630,31 +630,6 @@
     <string>leave-one-out meta-analysis</string>
    </property>
   </action>
-  <action name="actionOR">
-   <property name="text">
-    <string>OR</string>
-   </property>
-  </action>
-  <action name="actionRR">
-   <property name="text">
-    <string>RR</string>
-   </property>
-  </action>
-  <action name="actionTX_Mean_one_arm">
-   <property name="text">
-    <string>TX Mean (one-arm)</string>
-   </property>
-  </action>
-  <action name="actionYo">
-   <property name="text">
-    <string>yo</string>
-   </property>
-  </action>
-  <action name="actionNew_dataset">
-   <property name="text">
-    <string>new dataset</string>
-   </property>
-  </action>
   <action name="action_new_dataset">
    <property name="icon">
     <iconset resource="../images/icons.qrc">

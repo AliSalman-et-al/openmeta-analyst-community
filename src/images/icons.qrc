@@ -15,7 +15,6 @@
     <file alias="meta.png">OMA_community.png</file>
     <file>right_arrow.png</file>
     <file>up_arrow.png</file>
-    <file>tom.jpg</file>
   </qresource>
   <qresource prefix="wizard_images">
     <file>wizard_images/catfishtank.jpg</file>

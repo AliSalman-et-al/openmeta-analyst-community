@@ -1,8 +1,3 @@
-"""""" """""" """""" """""" """"""
-
-" admittedly, kind of silly. "
-"""""" """""" """""" """""" """"""
-
 from PyQt5.QtWidgets import QDialog
 
 # import pdb

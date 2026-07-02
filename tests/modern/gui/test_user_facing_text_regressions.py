@@ -144,7 +144,6 @@ def test_generated_ui_surfaces_do_not_cap_visible_text_widgets_below_contents():
         "forms.ui_new_study",
         "forms.ui_outcome_name_page",
         "forms.ui_running",
-        "forms.ui_tom_form",
         "forms.ui_welcome_page",
         "ui_meta",
         "ui_results_window",
@@ -194,7 +193,6 @@ def test_generated_qdialog_surfaces_use_application_dialog_floor_and_combo_cap()
         "forms.ui_new_outcome",
         "forms.ui_new_study",
         "forms.ui_running",
-        "forms.ui_tom_form",
     ]
 
     for module_name in module_names:

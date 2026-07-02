@@ -26,7 +26,6 @@ def test_full_app_import_path_has_no_python2_syntax():
         "change_cov_type_form.py",
         "network_view.py",
         "conf_level_dialog.py",
-        "easter_egg.py",
         "binary_data_form.py",
         "calculator_routines.py",
         "continuous_data_form.py",

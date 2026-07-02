@@ -15,7 +15,6 @@ import sys
 from functools import cmp_to_key
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QKeySequence
 from PyQt5.QtWidgets import (
     QAction,
     QApplication,
@@ -58,7 +57,6 @@ import change_cov_type_form
 import network_view
 import conf_level_dialog
 import main_wizard
-import easter_egg
 
 # for the help
 import webbrowser
@@ -238,12 +236,6 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
         load_settings()
         self.populate_open_recent_menu()
-
-        # The most important code of the entire application
-        show_tom = QAction(self)
-        show_tom.setShortcut(QKeySequence("T, Shift+O, M"))
-        self.addAction(show_tom)
-        _connect_action(show_tom, self._show_tom)
 
         if DISABLE_NETWORK_STUFF:
             self.action_view_network.setEnabled(False)
@@ -1617,10 +1609,6 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                 % (self.out_path, e.__class__.__name__, e),
             )
             return False
-
-    def _show_tom(self):
-        tom_dlg = easter_egg.TomDialog(parent=self)
-        tom_dlg.exec()
 
     def _make_new_dataset_and_setup_spreadsheet(self, dataset_info):
         is_diag = dataset_info["data_type"] == "diagnostic"
