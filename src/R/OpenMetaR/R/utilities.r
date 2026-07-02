@@ -225,7 +225,7 @@ create.summary.disp <- function(om.data, params, res, model.title) {
     het.col.vals <-  c(QE, QEp)
     het.array <- rbind(het.col.labels, het.col.vals)
   } else {  
-    het.col.labels <- c("τ²", QLabel, "Het. p-Value", "I²")
+    het.col.labels <- c("\u03c4\u00b2", QLabel, "Het. p-Value", "I\u00b2")
     het.col.vals <-  c(tau2, QE, QEp, I2)
     het.array <- rbind(het.col.labels, het.col.vals)
   }
@@ -608,7 +608,7 @@ create.subgroup.display <- function(res, study.names, params, model.title, data.
 
   subgroup.array[1,] <- c("Subgroups", "Studies", "Estimate", "Lower bound", "Upper bound", "Std. error", "p-Value", "z-Value")
   het.array[1,] <- c("Studies", "Q (df)",
-               "Het. p-Value", "I²")
+               "Het. p-Value", "I\u00b2")
   # unpack the data
   for (count in 1:length(study.names)) {
     num.studies <- res[[count]]$k
