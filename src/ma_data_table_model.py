@@ -25,15 +25,12 @@ from meta_globals import *
 import calculator_routines as calc_fncs
 import meta_py_r
 import qt_text
+import name_validation
 
 # number of (empty) rows in the spreadsheet to show
 # following the last study.
 DUMMY_ROWS = 20
 STUDY_NAME_REQUIRED_MESSAGE = "Please enter a study name before entering study data."
-OUTCOME_NAME_REQUIRED_MESSAGE = "Outcome names cannot be empty."
-OUTCOME_NAME_DUPLICATE_MESSAGE = (
-    "An outcome named %s already exists. Please pick another name."
-)
 
 
 def _item_data(value=None):
@@ -69,16 +66,39 @@ def _to_native_text(value):
 
 
 def normalize_outcome_name(value):
-    return _to_native_text(value).strip()
+    return name_validation.normalize_name(value)
 
 
 def validate_new_outcome_name(dataset, name):
-    outcome_name = normalize_outcome_name(name)
-    if outcome_name == "":
-        raise ValueError(OUTCOME_NAME_REQUIRED_MESSAGE)
-    if outcome_name in dataset.get_outcome_names():
-        raise ValueError(OUTCOME_NAME_DUPLICATE_MESSAGE % outcome_name)
-    return outcome_name
+    return name_validation.validate_unique_name(
+        "outcome", name, dataset.get_outcome_names()
+    )
+
+
+def validate_new_group_name(dataset, name):
+    return name_validation.validate_unique_name("group", name, dataset.get_group_names())
+
+
+def validate_new_follow_up_name(dataset, outcome_name, name):
+    return name_validation.validate_unique_name(
+        "follow-up", name, dataset.get_follow_up_names_for_outcome(outcome_name)
+    )
+
+
+def validate_new_global_follow_up_name(dataset, name):
+    return name_validation.validate_unique_name(
+        "follow-up", name, dataset.get_follow_up_names()
+    )
+
+
+def validate_new_covariate_name(dataset, name):
+    return name_validation.validate_unique_name(
+        "covariate", name, dataset.get_cov_names()
+    )
+
+
+def validate_new_study_name(name):
+    return name_validation.validate_required_name("study", name)
 
 
 def _to_int(value):
@@ -1404,6 +1424,7 @@ class DatasetModel(QAbstractTableModel):
         self.dataset.remove_outcome(outcome_name)
 
     def add_new_group(self, name):
+        name = validate_new_group_name(self.dataset, name)
         self.dataset.add_group(name, self.current_outcome)
 
     def remove_group(self, group_name):
@@ -1419,12 +1440,16 @@ class DatasetModel(QAbstractTableModel):
         self.reset()
 
     def add_follow_up_to_current_outcome(self, follow_up_name):
+        follow_up_name = validate_new_follow_up_name(
+            self.dataset, self.current_outcome, follow_up_name
+        )
         self.dataset.add_follow_up_to_outcome(self.current_outcome, follow_up_name)
 
     def remove_follow_up_from_outcome(self, follow_up_name, outcome_name):
         self.dataset.remove_follow_up_from_outcome(follow_up_name, outcome_name)
 
     def add_covariate(self, covariate_name, covariate_type, cov_values=None):
+        covariate_name = validate_new_covariate_name(self.dataset, covariate_name)
         self.dataset.add_covariate(
             Covariate(covariate_name, covariate_type), cov_values=cov_values
         )

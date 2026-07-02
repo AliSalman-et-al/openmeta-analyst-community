@@ -13,11 +13,14 @@
 # core libraries
 from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
 
-import qt_text
+import name_validation
 
 
-def _to_native_text(value):
-    return qt_text.to_native_text(value)
+def _without_current_name(names, current_name):
+    remaining = list(names)
+    if current_name in remaining:
+        remaining.remove(current_name)
+    return remaining
 
 
 class ResettableTableModel(QAbstractTableModel):
@@ -72,13 +75,14 @@ class TXGroupsModel(ResettableTableModel):
 
     def setData(self, index, value, role=Qt.EditRole):
         old_name = self.group_list[index.row()]
-        new_name = _to_native_text(value)
-
-        ###
-        # we don't allow empty strings for group names; just pass
-        # if this happens (typically this will be an accident on the user's part)
-        if new_name == "":
-            return self.reject_edit("Group names cannot be empty.")
+        try:
+            new_name = name_validation.validate_unique_name(
+                "group",
+                value,
+                _without_current_name(self.dataset.get_group_names(), old_name),
+            )
+        except ValueError as exc:
+            return self.reject_edit(str(exc))
 
         self.dataset.change_group_name(old_name, new_name)  # , \
         # outcome=self.current_outcome, follow_up=self.current_follow_up)
@@ -131,9 +135,14 @@ class OutcomesModel(ResettableTableModel):
 
     def setData(self, index, value, role=Qt.EditRole):
         old_outcome_name = self.outcome_list[index.row()]
-        new_outcome_name = _to_native_text(value)
-        if new_outcome_name == "":
-            return self.reject_edit("Outcome names cannot be empty.")
+        try:
+            new_outcome_name = name_validation.validate_unique_name(
+                "outcome",
+                value,
+                _without_current_name(self.dataset.get_outcome_names(), old_outcome_name),
+            )
+        except ValueError as exc:
+            return self.reject_edit(str(exc))
 
         self.dataset.change_outcome_name(old_outcome_name, new_outcome_name)
         # issue #130: if we change an outcome name, set the current outcome
@@ -191,9 +200,17 @@ class FollowUpsModel(ResettableTableModel):
 
     def setData(self, index, value, role=Qt.EditRole):
         old_follow_up_name = self.follow_up_list[index.row()]
-        new_follow_up_name = _to_native_text(value)
-        if new_follow_up_name == "":
-            return self.reject_edit("Follow-up names cannot be empty.")
+        try:
+            new_follow_up_name = name_validation.validate_unique_name(
+                "follow-up",
+                value,
+                _without_current_name(
+                    self.dataset.get_follow_up_names_for_outcome(self.current_outcome),
+                    old_follow_up_name,
+                ),
+            )
+        except ValueError as exc:
+            return self.reject_edit(str(exc))
         self.dataset.change_follow_up_name(
             self.current_outcome, old_follow_up_name, new_follow_up_name
         )
@@ -238,13 +255,10 @@ class StudiesModel(ResettableTableModel):
 
     def setData(self, index, value, role=Qt.EditRole):
         study_object = self.studies_list[index.row()]
-        new_name = _to_native_text(value)
-
-        ###
-        # we don't allow empty strings for group names; just pass
-        # if this happens (typically this will be an accident on the user's part)
-        if new_name == "":
-            return self.reject_edit("Study names cannot be empty.")
+        try:
+            new_name = name_validation.validate_required_name("study", value)
+        except ValueError as exc:
+            return self.reject_edit(str(exc))
 
         study_object.name = new_name
         self.update_study_list()
@@ -288,16 +302,14 @@ class CovariatesModel(ResettableTableModel):
 
     def setData(self, index, value, role=Qt.EditRole):
         cov_object = self.covariates_list[index.row()]
-        new_name = _to_native_text(value)
-
-        ###
-        # we don't allow empty strings for group names; just pass
-        # if this happens (typically this will be an accident on the user's part).
-        # nor do we allow covariates to have the same name.
-        if new_name == "":
-            return self.reject_edit("Covariate names cannot be empty.")
-        if new_name in self.dataset.get_cov_names():
-            return self.reject_edit("Duplicate covariate names not allowed.")
+        try:
+            new_name = name_validation.validate_unique_name(
+                "covariate",
+                value,
+                _without_current_name(self.dataset.get_cov_names(), cov_object.name),
+            )
+        except ValueError as exc:
+            return self.reject_edit(str(exc))
 
         self.dataset.change_covariate_name(cov_object, new_name)
         self.update_covariates_list()

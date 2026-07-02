@@ -82,6 +82,44 @@ def test_dataset_model_rejects_blank_and_duplicate_outcome_names():
         _close_without_prompt(app, window)
 
 
+def test_dataset_model_rejects_invalid_added_entity_names():
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+
+        for method, args, message in [
+            (window.model.add_new_group, ("   ",), "Group names cannot be empty"),
+            (
+                window.model.add_follow_up_to_current_outcome,
+                ("   ",),
+                "Follow-up names cannot be empty",
+            ),
+            (
+                window.model.add_covariate,
+                ("   ", "continuous"),
+                "Covariate names cannot be empty",
+            ),
+        ]:
+            with pytest.raises(ValueError, match=message):
+                method(*args)
+
+        with pytest.raises(ValueError, match="already exists"):
+            window.model.add_new_group(window.model.get_current_groups()[0])
+
+        with pytest.raises(ValueError, match="already exists"):
+            window.model.add_follow_up_to_current_outcome(
+                window.model.get_current_follow_up_name()
+            )
+
+        window.model.add_covariate("Dose", "continuous")
+        with pytest.raises(ValueError, match="already exists"):
+            window.model.add_covariate("Dose", "continuous")
+    finally:
+        _close_without_prompt(app, window)
+
+
 def test_data_table_editing_preserves_project_state_and_round_trips(
     tmp_path, monkeypatch
 ):
@@ -395,6 +433,162 @@ def test_edit_dialog_rejects_blank_outcome_name(monkeypatch):
     finally:
         if dialog is not None:
             dialog.close()
+        _close_without_prompt(app, window)
+
+
+def test_edit_dialog_rejects_blank_names_for_other_dataset_entities(monkeypatch):
+    import launch
+    import edit_dialog
+    from PyQt5 import QtWidgets
+
+    app, window = launch.start_automation()
+    dialog = None
+    try:
+        _create_binary_dataset(window)
+        warnings = []
+        monkeypatch.setattr(
+            edit_dialog.QMessageBox,
+            "warning",
+            lambda *args, **kwargs: warnings.append(args),
+        )
+
+        class BlankGroupDialog(object):
+            def __init__(self, *args, **kwargs):
+                self.group_name_le = QtWidgets.QLineEdit()
+                self.group_name_le.setText(" ")
+
+            def exec_(self):
+                return True
+
+        class BlankFollowUpDialog(object):
+            def __init__(self, *args, **kwargs):
+                self.follow_up_name_le = QtWidgets.QLineEdit()
+                self.follow_up_name_le.setText("   ")
+
+            def exec_(self):
+                return True
+
+        class BlankCovariateDialog(object):
+            def __init__(self, *args, **kwargs):
+                self.covariate_name_le = QtWidgets.QLineEdit()
+                self.covariate_name_le.setText("")
+                self.datatype_cbo_box = QtWidgets.QComboBox()
+                self.datatype_cbo_box.addItem("Continuous")
+
+            def exec_(self):
+                return True
+
+        class BlankStudyDialog(object):
+            def __init__(self, *args, **kwargs):
+                self.study_lbl = QtWidgets.QLineEdit()
+                self.study_lbl.setText(" ")
+
+            def exec_(self):
+                return True
+
+        monkeypatch.setattr(
+            edit_dialog.add_new_dialogs, "AddNewGroupForm", BlankGroupDialog
+        )
+        monkeypatch.setattr(
+            edit_dialog.add_new_dialogs, "AddNewFollowUpForm", BlankFollowUpDialog
+        )
+        monkeypatch.setattr(
+            edit_dialog.add_new_dialogs, "AddNewCovariateForm", BlankCovariateDialog
+        )
+        monkeypatch.setattr(
+            edit_dialog.add_new_dialogs, "AddNewStudyForm", BlankStudyDialog
+        )
+
+        dialog = edit_dialog.EditDialog(window.model.dataset, parent=window)
+
+        dialog.add_group()
+        assert warnings[-1][1:] == ("Whoops", "Group names cannot be empty.")
+
+        dialog.add_follow_up()
+        assert warnings[-1][1:] == ("Whoops", "Follow-up names cannot be empty.")
+
+        dialog.add_covariate()
+        assert warnings[-1][1:] == ("Whoops", "Covariate names cannot be empty.")
+
+        dialog.add_study()
+        assert warnings[-1][1:] == ("Whoops", "Study names cannot be empty.")
+
+        assert " " not in window.model.dataset.get_group_names()
+        assert "   " not in window.model.dataset.get_follow_up_names()
+        assert "" not in window.model.get_covariate_names()
+        assert " " not in window.model.dataset.get_study_names()
+    finally:
+        if dialog is not None:
+            dialog.close()
+        _close_without_prompt(app, window)
+
+
+def test_add_dialogs_reject_blank_names_for_other_dataset_entities(monkeypatch):
+    import launch
+    from PyQt5 import QtWidgets
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        meta_form = sys.modules["meta_form"]
+        warnings = []
+        monkeypatch.setattr(
+            meta_form.QMessageBox,
+            "warning",
+            lambda *args, **kwargs: warnings.append(args),
+        )
+
+        class BlankGroupDialog(object):
+            def __init__(self, *args, **kwargs):
+                self.group_name_le = QtWidgets.QLineEdit()
+                self.group_name_le.setText("   ")
+
+            def exec_(self):
+                return True
+
+        class BlankFollowUpDialog(object):
+            def __init__(self, *args, **kwargs):
+                self.follow_up_name_le = QtWidgets.QLineEdit()
+                self.follow_up_name_le.setText("")
+
+            def exec_(self):
+                return True
+
+        class BlankCovariateDialog(object):
+            def __init__(self, *args, **kwargs):
+                self.covariate_name_le = QtWidgets.QLineEdit()
+                self.covariate_name_le.setText(" ")
+                self.datatype_cbo_box = QtWidgets.QComboBox()
+                self.datatype_cbo_box.addItem("Continuous")
+
+            def exec_(self):
+                return True
+
+        monkeypatch.setattr(
+            meta_form.add_new_dialogs, "AddNewGroupForm", BlankGroupDialog
+        )
+        monkeypatch.setattr(
+            meta_form.add_new_dialogs, "AddNewFollowUpForm", BlankFollowUpDialog
+        )
+        monkeypatch.setattr(
+            meta_form.add_new_dialogs, "AddNewCovariateForm", BlankCovariateDialog
+        )
+
+        window.cur_dimension = "group"
+        window.add_new()
+        assert warnings[-1][1:] == ("Whoops", "Group names cannot be empty.")
+
+        window.cur_dimension = "follow-up"
+        window.add_new()
+        assert warnings[-1][1:] == ("Whoops", "Follow-up names cannot be empty.")
+
+        window.add_covariate()
+        assert warnings[-1][1:] == ("Whoops", "Covariate names cannot be empty.")
+
+        assert "   " not in window.model.dataset.get_group_names()
+        assert "" not in window.model.dataset.get_follow_up_names()
+        assert " " not in window.model.get_covariate_names()
+    finally:
         _close_without_prompt(app, window)
 
 

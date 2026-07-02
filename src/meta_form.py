@@ -41,6 +41,7 @@ import meta_py_r_backend
 import progress_bar as progress_dialog
 import qt_layout
 import qt_text
+import name_validation
 import tabular_data
 from settings import *
 
@@ -915,53 +916,46 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             cur_group_name, parent=self
         )
         if edit_group_form.exec_():
-            new_group_name = _qt_text(edit_group_form.group_name_le.text())
-
-            # make sure the group name doesn't already exist
-            if new_group_name in self.model.dataset.get_group_names():
-                QMessageBox.warning(
-                    self,
-                    "Whoops",
-                    "%s is already a group name -- pick something else, please"
-                    % new_group_name,
+            try:
+                existing_groups = list(self.model.dataset.get_group_names())
+                if orig_group_name in existing_groups:
+                    existing_groups.remove(orig_group_name)
+                new_group_name = name_validation.validate_unique_name(
+                    "group", edit_group_form.group_name_le.text(), existing_groups
                 )
+            except ValueError as exc:
+                QMessageBox.warning(self, "Whoops", str(exc))
+                return
 
-            else:
-                redo_f = lambda: self.model.rename_group(
-                    orig_group_name, new_group_name
-                )
-                undo_f = lambda: self.model.rename_group(
-                    new_group_name, orig_group_name
-                )
+            redo_f = lambda: self.model.rename_group(orig_group_name, new_group_name)
+            undo_f = lambda: self.model.rename_group(new_group_name, orig_group_name)
 
-                rename_group_command = meta_globals.CommandGenericDo(redo_f, undo_f)
-                self.tableView.undoStack.push(rename_group_command)
+            rename_group_command = meta_globals.CommandGenericDo(redo_f, undo_f)
+            self.tableView.undoStack.push(rename_group_command)
 
     def add_covariate(self):
         form = add_new_dialogs.AddNewCovariateForm(self)
         form.covariate_name_le.setFocus()
         if form.exec_():
             # then the user clicked 'ok'.
-            new_covariate_name = _qt_text(form.covariate_name_le.text())
+            try:
+                new_covariate_name = ma_data_table_model.validate_new_covariate_name(
+                    self.model.dataset, form.covariate_name_le.text()
+                )
+            except ValueError as exc:
+                QMessageBox.warning(self, "Whoops", str(exc))
+                return
 
             # fix for issue #59; do not allow the user to create two covariates with
             # the same name!
             new_covariate_type = str(form.datatype_cbo_box.currentText()).lower()
-            if new_covariate_name in self.model.get_covariate_names():
-                QMessageBox.warning(
-                    self,
-                    "Whoops",
-                    "you've already entered a covariate with the name %s; please pick another name."
-                    % new_covariate_name,
-                )
-            else:
-                redo_f = lambda: self._add_new_covariate(
-                    new_covariate_name, new_covariate_type
-                )
-                undo_f = lambda: self._undo_add_new_covariate(new_covariate_name)
+            redo_f = lambda: self._add_new_covariate(
+                new_covariate_name, new_covariate_type
+            )
+            undo_f = lambda: self._undo_add_new_covariate(new_covariate_name)
 
-                add_cov_command = meta_globals.CommandGenericDo(redo_f, undo_f)
-                self.tableView.undoStack.push(add_cov_command)
+            add_cov_command = meta_globals.CommandGenericDo(redo_f, undo_f)
+            self.tableView.undoStack.push(add_cov_command)
 
     def _add_new_covariate(self, cov_name, cov_type):
         self.model.add_covariate(cov_name, cov_type)
@@ -1027,7 +1021,13 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             form = add_new_dialogs.AddNewGroupForm(self)
             form.group_name_le.setFocus()
             if form.exec_():
-                new_group_name = _qt_text(form.group_name_le.text())
+                try:
+                    new_group_name = ma_data_table_model.validate_new_group_name(
+                        self.model.dataset, form.group_name_le.text()
+                    )
+                except ValueError as exc:
+                    QMessageBox.warning(self, "Whoops", str(exc))
+                    return
                 cur_groups = list(self.model.get_current_groups())
                 redo_f = lambda: self._add_new_group(new_group_name)
                 undo_f = lambda: self._undo_add_new_group(new_group_name, cur_groups)
@@ -1036,7 +1036,15 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             form = add_new_dialogs.AddNewFollowUpForm(self)
             form.follow_up_name_le.setFocus()
             if form.exec_():
-                follow_up_lbl = _qt_text(form.follow_up_name_le.text())
+                try:
+                    follow_up_lbl = ma_data_table_model.validate_new_follow_up_name(
+                        self.model.dataset,
+                        self.model.current_outcome,
+                        form.follow_up_name_le.text(),
+                    )
+                except ValueError as exc:
+                    QMessageBox.warning(self, "Whoops", str(exc))
+                    return
                 redo_f = lambda: self._add_new_follow_up_for_cur_outcome(follow_up_lbl)
                 previous_follow_up = self.model.get_current_follow_up_name()
                 undo_f = lambda: self._undo_add_follow_up_for_cur_outcome(
@@ -1374,25 +1382,26 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         if edit_cov_form.exec_():
             # the field names are also poorly named, in this case. here we mean the
             # **covariate name**, of course.
-            new_cov = _qt_text(edit_cov_form.group_name_le.text())
-
-            # make sure the group name doesn't already exist
-            if new_cov in self.model.dataset.get_cov_names():
-                QMessageBox.warning(
-                    self,
-                    "Whoops",
-                    "%s is already a covariate name -- pick something else, please"
-                    % new_cov,
+            try:
+                existing_covariates = list(self.model.dataset.get_cov_names())
+                if orig_cov_name in existing_covariates:
+                    existing_covariates.remove(orig_cov_name)
+                new_cov = name_validation.validate_unique_name(
+                    "covariate",
+                    edit_cov_form.group_name_le.text(),
+                    existing_covariates,
                 )
+            except ValueError as exc:
+                QMessageBox.warning(self, "Whoops", str(exc))
+                return
 
-            else:
-                ###
-                # TODO implement rename_covariate!
-                redo_f = lambda: self.model.rename_covariate(orig_cov_name, new_cov)
-                undo_f = lambda: self.model.rename_covariate(new_cov, orig_cov_name)
+            ###
+            # TODO implement rename_covariate!
+            redo_f = lambda: self.model.rename_covariate(orig_cov_name, new_cov)
+            undo_f = lambda: self.model.rename_covariate(new_cov, orig_cov_name)
 
-                rename_cov_command = meta_globals.CommandGenericDo(redo_f, undo_f)
-                self.tableView.undoStack.push(rename_cov_command)
+            rename_cov_command = meta_globals.CommandGenericDo(redo_f, undo_f)
+            self.tableView.undoStack.push(rename_cov_command)
 
     def delete_covariate(self, covariate):
         cov_vals_d = self.model.dataset.get_values_for_cov(covariate.name)

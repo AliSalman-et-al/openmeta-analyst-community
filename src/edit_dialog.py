@@ -172,7 +172,13 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         form = add_new_dialogs.AddNewGroupForm(self)
         form.group_name_le.setFocus()
         if form.exec_():
-            new_group_name = str(form.group_name_le.text())
+            try:
+                new_group_name = ma_data_table_model.validate_new_group_name(
+                    self.group_list.model().dataset, form.group_name_le.text()
+                )
+            except ValueError as exc:
+                QMessageBox.warning(self, "Whoops", str(exc))
+                return
             self.group_list.model().dataset.add_group(
                 new_group_name, self.selected_outcome
             )
@@ -270,7 +276,14 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         form = add_new_dialogs.AddNewFollowUpForm(self)
         form.follow_up_name_le.setFocus()
         if form.exec_():
-            follow_up_lbl = str(form.follow_up_name_le.text())
+            try:
+                follow_up_lbl = ma_data_table_model.validate_new_global_follow_up_name(
+                    self.follow_up_list.model().dataset,
+                    form.follow_up_name_le.text(),
+                )
+            except ValueError as exc:
+                QMessageBox.warning(self, "Whoops", str(exc))
+                return
             self.follow_up_list.model().dataset.add_follow_up(follow_up_lbl)
             self.follow_up_list.model().current_outcome = self.selected_outcome
             self.follow_up_list.model().refresh_follow_up_list()
@@ -298,7 +311,13 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         form = add_new_dialogs.AddNewCovariateForm(self)
         form.covariate_name_le.setFocus()
         if form.exec_():
-            new_covariate_name = str(form.covariate_name_le.text())
+            try:
+                new_covariate_name = ma_data_table_model.validate_new_covariate_name(
+                    self.covariate_list.model().dataset, form.covariate_name_le.text()
+                )
+            except ValueError as exc:
+                QMessageBox.warning(self, "Whoops", str(exc))
+                return
             new_covariate_type = str(form.datatype_cbo_box.currentText())
             cov_obj = ma_dataset.Covariate(new_covariate_name, new_covariate_type)
             self.covariate_list.model().dataset.add_covariate(cov_obj)
@@ -337,7 +356,13 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         form = add_new_dialogs.AddNewStudyForm(self)
         form.study_lbl.setFocus()
         if form.exec_():
-            study_name = str(form.study_lbl.text())
+            try:
+                study_name = ma_data_table_model.validate_new_study_name(
+                    form.study_lbl.text()
+                )
+            except ValueError as exc:
+                QMessageBox.warning(self, "Whoops", str(exc))
+                return
             study_id = self.study_list.model().dataset.max_study_id() + 1
             new_study = ma_dataset.Study(study_id, name=study_name)
             self.study_list.model().dataset.add_study(new_study)
