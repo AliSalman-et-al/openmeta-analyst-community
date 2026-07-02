@@ -1430,6 +1430,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def set_model(
         self, data_model, state_dict=None, check_for_appropriate_metric=False
     ):
+        placement = self._capture_window_placement() if self.isVisible() else None
 
         ##
         # we explicitly append a blank study to the
@@ -1472,6 +1473,8 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
         self.model_updated()
         self.data_dirtied()
+        if placement is not None:
+            self._restore_window_placement(placement)
         print("ok -- model set.")
 
     def model_updated(self):

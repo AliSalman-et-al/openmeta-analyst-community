@@ -103,6 +103,31 @@ def test_real_metaform_creates_binary_continuous_and_diagnostic_datasets():
             _close_without_prompt(app, window)
 
 
+@pytest.mark.parametrize(
+    ("show_method", "state_method"),
+    [
+        ("showMaximized", "isMaximized"),
+        ("showFullScreen", "isFullScreen"),
+    ],
+)
+def test_new_dataset_preserves_main_window_state(show_method, state_method):
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        getattr(window, show_method)()
+        app.processEvents()
+
+        _create_binary_dataset(window)
+        app.processEvents()
+
+        assert getattr(window, state_method)()
+        assert window.tableView.model() is window.model
+        assert window.model.current_outcome == "Mortality"
+    finally:
+        _close_without_prompt(app, window)
+
+
 def test_dataset_model_rejects_missing_or_unknown_outcome_data_type():
     import launch
 
