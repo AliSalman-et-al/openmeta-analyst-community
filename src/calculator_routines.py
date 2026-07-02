@@ -18,6 +18,20 @@ from meta_globals import *
 import meta_py_r
 
 
+def cell_text_is_blank(value):
+    """Return whether Qt item text is blank under both PyQt4 and PyQt5."""
+    if value is None:
+        return True
+    if hasattr(value, "trimmed"):
+        return value.trimmed() == ""
+    return str(value).strip() == ""
+
+
+def set_table_item_text_color(item, color):
+    if item is not None:
+        item.setForeground(color)
+
+
 def between_bounds(est=None, low=None, high=None):
     def my_lt(a, b):
         if is_a_float(a) and is_a_float(b):
@@ -216,7 +230,9 @@ class ConsistencyChecker:
                     if value < 0:
                         # Color item
                         self.table.blockSignals(True)
-                        self.table.item(row, col).setTextColor(ERROR_COLOR)
+                        set_table_item_text_color(
+                            self.table.item(row, col), ERROR_COLOR
+                        )
                         self.table.blockSignals(False)
                         # Set flag
                         self.inconsistent = True
@@ -230,21 +246,21 @@ class ConsistencyChecker:
                 # print "setting row: %s, col: %s" % (row, col)
                 item = self.table.item(row, col)
                 if item is not None:
-                    item.setTextColor(color)
+                    set_table_item_text_color(item, color)
         self.table.blockSignals(False)
 
     def _color_row(self, row):
         self.table.blockSignals(True)
         for col in range(3):
             print("setting row: %s, col: %s" % (row, col))
-            self.table.item(row, col).setTextColor(ERROR_COLOR)
+            set_table_item_text_color(self.table.item(row, col), ERROR_COLOR)
         self.table.blockSignals(False)
 
     def _color_col(self, col):
         self.table.blockSignals(True)
         for row in range(3):
             print("setting row: %s, col: %s" % (row, col))
-            self.table.item(row, col).setTextColor(ERROR_COLOR)
+            set_table_item_text_color(self.table.item(row, col), ERROR_COLOR)
         self.table.blockSignals(False)
 
     def _row_is_populated(self, row):

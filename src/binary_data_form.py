@@ -527,7 +527,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
 
     def _cell_data_not_valid(self, celldata_string):
         # ignore blank entries
-        if celldata_string.trimmed() == "" or celldata_string is None:
+        if calc_fncs.cell_text_is_blank(celldata_string):
             return None
 
         if not is_a_float(celldata_string):
