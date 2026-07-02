@@ -1,19 +1,12 @@
 import sys
 from pathlib import Path
 
-import pytest
-from PyQt5.QtWidgets import QApplication, QTableWidget, QTableWidgetItem
+from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem
 
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "src" / "forms"))
-
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance() or QApplication([])
-    return app
 
 
 def test_calculator_cell_validators_accept_pyqt5_table_item_text():

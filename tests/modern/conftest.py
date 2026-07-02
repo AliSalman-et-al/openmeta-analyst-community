@@ -2,9 +2,37 @@ import json
 import os
 from pathlib import Path
 
+import pytest
+
 
 # Modern tests run without a live R backend; use the pure-Python stub.
 os.environ.setdefault("OMA_STUB_BACKEND", "1")
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+_QAPPLICATION = None
+
+
+def _get_qapplication():
+    global _QAPPLICATION
+    from PyQt5 import QtWidgets
+
+    app = QtWidgets.QApplication.instance()
+    if app is None:
+        app = QtWidgets.QApplication([])
+    _QAPPLICATION = app
+    return app
+
+
+@pytest.fixture(scope="session")
+def qapp():
+    return _get_qapplication()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _qapplication_for_qt_test_selections(request):
+    if getattr(request.config, "_needs_qapplication", False):
+        return _get_qapplication()
+    return None
 
 
 def _taxonomy_entries():
@@ -23,10 +51,15 @@ def _taxonomy_entries():
 
 def pytest_collection_modifyitems(config, items):
     entries = _taxonomy_entries()
+    config._needs_qapplication = False
     for item in items:
         entry = entries.get(item.nodeid.replace("\\", "/"))
         if not entry:
             continue
+        has_qt_dependency = "qt" in entry.get("external_dependencies", [])
+        has_gui_evidence = "gui_compatibility" in entry.get("evidence", [])
+        if has_qt_dependency or has_gui_evidence:
+            config._needs_qapplication = True
         marker_names = {entry.get("size"), entry.get("lane")}
         marker_names.update(entry.get("evidence", []))
         if entry.get("runtime_class") == "minutes":

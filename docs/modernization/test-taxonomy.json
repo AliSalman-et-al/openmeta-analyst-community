@@ -166,22 +166,6 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/gui/test_diagnostic_analysis_workflow.py::test_diagnostic_next_surfaces_backend_failure_instead_of_silent_dead_end",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "minutes",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "analysis_behavior"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
       "nodeid": "tests/modern/gui/test_diagnostic_analysis_workflow.py::test_diagnostic_method_dialog_builds_with_working_backend",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
@@ -1638,21 +1622,6 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_openmetar_namespace_preserves_legacy_export_surface_explicitly",
-      "reason": "Validates R dependency and drift manifest contracts without installing broad R packages.",
-      "runtime_class": "seconds",
-      "size": "small"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "r_stack",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "filesystem"
-      ],
-      "lane": "fast",
       "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_openmetar_namespace_preserves_s4_classes_explicitly",
       "reason": "Validates R dependency and drift manifest contracts without installing broad R packages.",
       "runtime_class": "seconds",
@@ -2150,6 +2119,1787 @@
       "reason": "Exercises the visible Results window navigation and wrapping behavior reported in issue #166.",
       "runtime_class": "subsecond",
       "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_analysis_method_labels.py::test_known_analysis_method_keys_have_user_facing_labels",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_analysis_method_labels.py::test_available_method_labels_are_normalized_without_changing_method_keys",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_analysis_method_labels.py::test_parameter_value_labels_hide_internal_codes_without_changing_values",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_calculator_pyqt5_migration.py::test_calculator_cell_validators_accept_pyqt5_table_item_text",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_calculator_pyqt5_migration.py::test_consistency_checker_uses_pyqt5_foreground_api",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "analysis_behavior",
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_confidence_level_validation.py::test_validate_analysis_digits_accepts_non_negative_integer_precision",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "analysis_behavior",
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_confidence_level_validation.py::test_validate_analysis_digits_rejects_negative_and_non_integer_values",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "analysis_behavior",
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_confidence_level_validation.py::test_normalize_confidence_level_params_rejects_invalid_digits",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "analysis_behavior",
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_confidence_level_validation.py::test_validate_correction_factor_accepts_finite_non_negative_values",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "analysis_behavior",
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_confidence_level_validation.py::test_validate_correction_factor_rejects_negative_and_non_finite_values",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "analysis_behavior",
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_confidence_level_validation.py::test_validate_analysis_count_accepts_integer_counts",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "analysis_behavior",
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_confidence_level_validation.py::test_validate_analysis_count_rejects_invalid_counts",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "analysis_behavior",
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_confidence_level_validation.py::test_normalize_confidence_level_params_validates_numeric_analysis_params",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "analysis_behavior",
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_confidence_level_validation.py::test_normalize_confidence_level_params_rejects_bad_numeric_analysis_params",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_dataset_model_edit_values.py::test_normal_study_cells_do_not_override_view_alternating_row_background",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_dataset_model_edit_values.py::test_one_arm_inactive_raw_data_cells_keep_disabled_background",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_dataset_model_edit_values.py::test_empty_new_entry_row_does_not_render_populated_study_chrome",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_dataset_model_edit_values.py::test_named_new_entry_row_keeps_populated_study_chrome",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_dataset_model_edit_values.py::test_raw_data_edit_on_placeholder_row_emits_study_name_error",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_dataset_model_edit_values.py::test_direct_effect_edit_on_unnamed_study_emits_study_name_error",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_dataset_model_edit_values.py::test_unnamed_study_cannot_be_manually_included",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_dataset_model_edit_values.py::test_named_direct_effect_entry_still_auto_includes_study",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_dataset_model_edit_values.py::test_empty_existing_study_name_emits_study_name_error",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_dataset_model_edit_values.py::test_study_name_edit_on_placeholder_row_creates_study",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_dataset_model_edit_values.py::test_invalid_continuous_covariate_edit_emits_error_and_preserves_value",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_dataset_model_edit_values.py::test_diagnostic_raw_count_edit_accepts_scalar_metric_effects",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_dataset_model_edit_values.py::test_binary_raw_count_edit_accepts_scalar_metric_effect",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_dataset_model_edit_values.py::test_continuous_raw_count_edit_accepts_scalar_metric_effect",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_dataset_model_edit_values.py::test_diagnostic_raw_count_edit_rolls_back_when_effect_calculation_fails",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_dataset_model_edit_values.py::test_effect_normalizer_preserves_triplets_and_expands_scalars",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_default_r_verifier_resolves_rscript_from_r_home",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_default_r_verifier_resolves_rscript_from_r_command",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_default_r_openmetar_install_preserves_dependency_libraries",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_openmetar_namespace_exports_only_core_interface",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_python_app_calls_r_through_meta_py_r_adapter",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_meta_py_r_uses_core_constructors_instead_of_s4_slots",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_meta_py_r_does_not_interpolate_user_text_into_r_source",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_pyqt5_generated_ui_imports.py::test_qt_resource_manifest_references_existing_image_files",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_qt_text_boundaries.py::test_old_qt_string_and_item_color_apis_stay_inside_compat_boundaries",
+      "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_analysis_failure_safety.py::test_binary_analysis_failure_shows_dialog_and_does_not_open_results",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_analysis_failure_safety.py::test_continuous_workflow_failure_shows_dialog_and_does_not_open_results",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_analysis_failure_safety.py::test_diagnostic_progress_dialog_closes_when_run_setup_raises",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_analysis_failure_safety.py::test_method_parameters_build_failure_reports_preparation_error",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_analysis_failure_safety.py::test_method_parameters_backend_unavailable_keeps_backend_error",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_analysis_failure_safety.py::test_results_window_accepts_incomplete_result_payload",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_analysis_failure_safety.py::test_results_window_build_failure_reports_display_error",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_analysis_failure_safety.py::test_project_save_failure_reports_original_error",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_analysis_failure_safety.py::test_opening_pickled_non_dataset_reports_invalid_project",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_analysis_failure_safety.py::test_global_exception_handler_logs_trace_and_shows_recoverable_dialog",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_analysis_failure_safety.py::test_safe_signal_connection_replaces_and_disconnects_wrapped_slots",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_analysis_failure_safety.py::test_safe_slot_discards_surplus_signal_arguments",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_analysis_failure_safety.py::test_safe_slot_preserves_callback_type_errors",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_analysis_failure_safety.py::test_meta_reg_covariate_toggles_refresh_ok_button_without_unexpected_error",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_analysis_failure_safety.py::test_metaform_model_reconnect_preserves_external_signal_subscribers",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_analysis_failure_safety.py::test_main_window_action_exceptions_are_recoverable",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_analysis_failure_safety.py::test_safe_application_notify_reports_event_handler_exceptions",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_diagnostic_analysis_workflow.py::test_diagnostic_next_surfaces_specs_failure_instead_of_silent_dead_end",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_diagnostic_analysis_workflow.py::test_diagnostic_multi_metric_failure_keeps_independent_results",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_diagnostic_analysis_workflow.py::test_diagnostic_hsroc_next_does_not_run_before_lr_dor_screen",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_diagnostic_analysis_workflow.py::test_diagnostic_run_rejects_unconfigured_metric_slots",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_diagnostic_analysis_workflow.py::test_diagnostic_metric_dialog_does_not_run_without_selected_metrics",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_diagnostic_analysis_workflow.py::test_diagnostic_metric_toggles_refresh_ok_button_without_unexpected_error",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_full_app_import_pads_ragged_csv_rows_into_dataset",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_automation_launch_shows_main_window_maximized",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_open_project_preserves_main_window_state_without_duplicate_windows",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_openmeta_logo_resource_is_valid_and_used_consistently",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_undo_immediately_after_open_does_not_clear_loaded_project[amino.oma]",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_undo_immediately_after_open_does_not_clear_loaded_project[continuous.oma]",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_undo_immediately_after_open_does_not_clear_loaded_project[lymph.oma]",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_undo_immediately_after_open_does_not_clear_loaded_project[meantime.oma]",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_meantime_sample_project_loads_native_factor_covariate",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_automation_launch_opens_meantime_project_and_enables_subgroup_analysis",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_method_parameters_dialog_stays_stable_when_method_description_changes",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_meta_regression_action_stays_disabled_without_covariates_when_data_are_enabled",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_meta_regression_dialog_disables_ok_and_does_not_run_without_covariates",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_diagnostic_meta_regression_dialog_fits_radio_group_labels",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_diagnostic_metric_dialog_fits_checkbox_group_labels",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_advanced_analysis_actions_require_dataset_readiness_and_covariates",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_deleting_last_covariate_refreshes_advanced_analysis_actions",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_subgroup_dialog_disables_ok_and_does_not_run_without_factor_covariates",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_main_window_maximized_state_persists_through_pyqt5_settings",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_wizard_size_refit_ignores_closed_wizard_without_current_page",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_modal_dialogs_center_over_parent_window",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_startup_wizard_cancel_preserves_loaded_dataset",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_data_type_page_data_type_buttons_use_uniform_size",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_new_dataset_wizard_sizes_to_show_diagnostic_choice",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_analysis_dialog_family_uses_shared_base_size",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_csv_import_wizard_pads_ragged_rows_before_previewing",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_csv_import_wizard_reports_empty_file_as_no_data",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_csv_import_preview_failure_preserves_error_details",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_data_workflows.py::test_data_table_return_moves_vertically_from_selected_cells",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_data_workflows.py::test_data_table_return_commits_editor_and_moves_down_same_column",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_data_workflows.py::test_new_dataset_preserves_main_window_state[showMaximized-isMaximized]",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_data_workflows.py::test_new_dataset_preserves_main_window_state[showFullScreen-isFullScreen]",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_data_workflows.py::test_dataset_model_rejects_blank_and_duplicate_outcome_names",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_data_workflows.py::test_dataset_model_rejects_invalid_added_entity_names",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_data_workflows.py::test_csv_import_progress_dialog_closes_when_model_write_raises",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_data_workflows.py::test_paste_contents_pads_short_rows_and_clears_trailing_cells",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_data_workflows.py::test_paste_contents_keeps_columns_from_rows_wider_than_the_first",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_data_workflows.py::test_invalid_paste_reports_validation_error_when_model_signals_are_blocked",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_data_workflows.py::test_add_outcome_dialog_rejects_blank_and_duplicate_names",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_data_workflows.py::test_edit_dialog_rejects_blank_outcome_name",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_data_workflows.py::test_edit_dialog_rejects_blank_names_for_other_dataset_entities",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_data_workflows.py::test_add_dialogs_reject_blank_names_for_other_dataset_entities",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_option_group_forms_fit_checkbox_and_radio_labels",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_layout_fitters_ignore_missing_or_deleted_roots",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_generated_ui_surfaces_do_not_cap_visible_text_widgets_below_contents",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_generated_qdialog_surfaces_use_application_dialog_floor_and_combo_cap",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_dialog_width_fit_includes_labels_combos_and_window_title",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_dialog_width_fit_includes_hidden_tab_contents_and_late_content",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_analysis_dialog_combo_widths_are_content_aware_but_capped",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_application_dialog_refit_does_not_ratchet_root_width",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_analysis_dialog_refit_does_not_ratchet_after_hidden_content_changes",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_change_confidence_level_dialog_uses_analysis_dialog_width_floor",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_issue_173_user_facing_commands_and_headers_use_desktop_casing",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "r_stack",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "r",
+        "subprocess",
+        "filesystem"
+      ],
+      "lane": "r_stack",
+      "nodeid": "tests/modern/r_stack/test_hsroc_retry.py::test_hsroc_fallback_summary_uses_canonical_hpd_interval_headers",
+      "reason": "Exercises R-level behavior that belongs outside default fast verification.",
+      "runtime_class": "seconds",
+      "size": "large"
     }
   ]
 }
