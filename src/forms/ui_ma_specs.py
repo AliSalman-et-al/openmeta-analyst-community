@@ -174,9 +174,9 @@ class Ui_Dialog(object):
     def retranslateUi(self, Dialog):
         _translate = QtCore.QCoreApplication.translate
         Dialog.setWindowTitle(_translate("Dialog", "Method & Parameters"))
-        self.method_lbl.setText(_translate("Dialog", "analysis method:"))
-        self.specs_tab.setTabText(self.specs_tab.indexOf(self.methods_tab), _translate("Dialog", "method"))
-        self.groupBox.setTitle(_translate("Dialog", "column labels"))
+        self.method_lbl.setText(_translate("Dialog", "Analysis method:"))
+        self.specs_tab.setTabText(self.specs_tab.indexOf(self.methods_tab), _translate("Dialog", "Method"))
+        self.groupBox.setTitle(_translate("Dialog", "Column Labels"))
         self.label_2.setToolTip(_translate("Dialog", "Text for column title that appears on forest plot"))
         self.label_2.setText(_translate("Dialog", "col 1 label:"))
         self.col1_str_edit.setText(_translate("Dialog", "Studies"))
@@ -205,5 +205,5 @@ class Ui_Dialog(object):
         self.label_3.setText(_translate("Dialog", "save image to:"))
         self.image_path.setText(_translate("Dialog", "./r_tmp/forest.png"))
         self.save_btn.setText(_translate("Dialog", "..."))
-        self.specs_tab.setTabText(self.specs_tab.indexOf(self.plot_tab), _translate("Dialog", "forest plot"))
+        self.specs_tab.setTabText(self.specs_tab.indexOf(self.plot_tab), _translate("Dialog", "Forest Plot"))
 import icons_rc

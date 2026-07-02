@@ -8,6 +8,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from analysis_method_labels import (  # noqa: E402
     method_display_label,
     normalize_available_method_labels,
+    parameter_value_display_label,
 )
 
 
@@ -46,3 +47,14 @@ def test_available_method_labels_are_normalized_without_changing_method_keys():
         "Continuous Random-Effects": "continuous.random",
         "Bivariate (Maximum Likelihood)": "diagnostic.bivariate.ml",
     }
+
+
+def test_parameter_value_labels_hide_internal_codes_without_changing_values():
+    metadata = {"rm.method.names": {"DL": "DerSimonian-Laird"}}
+
+    assert parameter_value_display_label("rm.method", "DL", metadata) == (
+        "DerSimonian-Laird"
+    )
+    assert parameter_value_display_label("to", "only0") == "Only zero-event studies"
+    assert parameter_value_display_label("to", "all") == "All studies"
+    assert parameter_value_display_label("unknown", "raw-code") == "raw-code"

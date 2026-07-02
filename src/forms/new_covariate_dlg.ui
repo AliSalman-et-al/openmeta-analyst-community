@@ -31,7 +31,7 @@
    </font>
   </property>
   <property name="windowTitle">
-   <string>add new covariate</string>
+   <string>Add Covariate</string>
   </property>
   <property name="windowIcon">
    <iconset>

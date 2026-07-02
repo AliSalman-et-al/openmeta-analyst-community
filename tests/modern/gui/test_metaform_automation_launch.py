@@ -1016,8 +1016,8 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
             if combo is not specs[0].method_cbo_box
         ]
         assert [str(combo.currentText()) for combo in enum_combos] == [
-            "DL: DerSimonian-Laird",
-            "only0",
+            "DerSimonian-Laird",
+            "Only zero-event studies",
         ]
         for combo in [specs[0].method_cbo_box] + enum_combos:
             assert combo.sizeAdjustPolicy() == QtWidgets.QComboBox.AdjustToContents

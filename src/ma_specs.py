@@ -35,7 +35,10 @@ import copy
 import sys
 
 import forms.ui_ma_specs
-from analysis_method_labels import normalize_available_method_labels
+from analysis_method_labels import (
+    normalize_available_method_labels,
+    parameter_value_display_label,
+)
 import app_error_handler
 import meta_py_r
 import progress_bar as progress_dialog
@@ -550,7 +553,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         cbo_box = QComboBox()
         for index, value in enumerate(values):
             name_str = self._get_enum_item_pretty_name(name, value)
-            cbo_box.addItem(name_str)  # TODO: replace value with pretty values
+            cbo_box.addItem(name_str)
             cbo_box.setItemData(index, value)
 
         if name in self.current_defaults:
@@ -570,14 +573,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         layout.addWidget(cbo_box, cur_grid_row, 1)
 
     def _get_enum_item_pretty_name(self, enum_name, item_name):
-        if "rm.method.names" in self.param_d[enum_name]:
-            if item_name in self.param_d[enum_name]["rm.method.names"]:
-                return (
-                    item_name
-                    + ": "
-                    + str(self.param_d[enum_name]["rm.method.names"][item_name])
-                )
-        return item_name
+        return parameter_value_display_label(
+            enum_name, item_name, self.param_d.get(enum_name)
+        )
 
     def _find_enum_item_index(self, cbo_box, value):
         for index in range(cbo_box.count()):
@@ -885,10 +883,10 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         window_title, method_label = "", ""
         if self.sens_spec:
             window_title = "Method & Parameters for Sens./Spec."
-            method_label = "method for sens./spec."
+            method_label = "Method for Sens./Spec."
         else:
             window_title = "Method & Parameters for DOR/LR"
-            method_label = "method for DOR/LR"
+            method_label = "Method for DOR/LR"
 
         self.setWindowTitle(QtCore.QCoreApplication.translate("Dialog", window_title))
         self.method_lbl.setText(method_label)
