@@ -1246,7 +1246,10 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         This gets called when the user opts to open an existing dataset. Note that we make use
         of the pickled dataset itself (.oma) and we also look for a corresponding `state`
         dictionary, which contains things like which outcome was currently displayed, etc.
-        Also note that, as in Excel, the open operation is undoable.
+
+        Opening a project is a document boundary, not an undoable edit. The undo stack is
+        reset after a successful load so Ctrl+Z cannot step back into the previously open
+        dataset.
         """
 
         if self.current_data_unsaved:
@@ -1288,10 +1291,6 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             QMessageBox.critical(self, "Could not open project", msg)
             return None
 
-        ## cache current state for undo.
-        prev_out_path = copy.copy(self.out_path)
-        prev_state_dict = copy.copy(self.model.get_stateful_dict())
-
         self.out_path = file_path
 
         state_dict = None
@@ -1305,22 +1304,11 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             )
             print("made state dictionary: \n%s" % state_dict)
 
-        prev_dataset = self.model.dataset.copy()
-
-        undo_f = lambda: self.undo_set_model(
-            prev_out_path, prev_state_dict, prev_dataset
-        )
-
-        def redo_open():
-            self.set_model(data_model, state_dict, check_for_appropriate_metric=True)
-            self.model.analysis_source_path = file_path
-
-        redo_f = redo_open
-
         placement = self._capture_window_placement()
         try:
-            open_command = meta_globals.CommandGenericDo(redo_f, undo_f)
-            self.tableView.undoStack.push(open_command)
+            self.set_model(data_model, state_dict, check_for_appropriate_metric=True)
+            self.model.analysis_source_path = file_path
+            self.tableView.undoStack.clear()
             self.dataset_file_lbl.setText("open file: %s" % file_path)
             qt_layout.fit_text_to_contents(self)
         finally:

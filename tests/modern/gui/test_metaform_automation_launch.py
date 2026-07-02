@@ -269,6 +269,47 @@ def test_automation_launch_opens_sample_project_in_real_data_table():
         os.chdir(REPO_ROOT)
 
 
+@pytest.mark.parametrize(
+    "sample_project",
+    ["amino.oma", "continuous.oma", "lymph.oma"],
+)
+def test_undo_immediately_after_open_does_not_clear_loaded_project(sample_project):
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        assert window.open(os.path.abspath(os.path.join("sample_data", sample_project)))
+
+        loaded_model = window.model
+        loaded_row_count = loaded_model.rowCount()
+        loaded_summary = _dataset_summary(loaded_model.dataset)
+        loaded_outcome = window.cur_outcome_lbl.text()
+        loaded_follow_up = window.cur_time_lbl.text()
+        assert loaded_row_count > 0
+
+        window.undo()
+        app.processEvents()
+
+        assert window.model.rowCount() == loaded_row_count
+        assert _dataset_summary(window.model.dataset) == loaded_summary
+        assert window.cur_outcome_lbl.text() == loaded_outcome
+        assert window.cur_time_lbl.text() == loaded_follow_up
+        assert window.tableView.undoStack.canRedo() is False
+
+        model = window.model
+        original_name = _cell_text(model, 0, model.NAME)
+        window.tableView.set_data_in_model(model.index(0, model.NAME), "Edited Study")
+        assert _cell_text(model, 0, model.NAME) == "Edited Study"
+
+        window.undo()
+        assert _cell_text(window.model, 0, window.model.NAME) == original_name
+    finally:
+        window.current_data_unsaved = False
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
 def test_frozen_startup_argv_falls_back_to_native_windows_command_line():
     import launch
 
