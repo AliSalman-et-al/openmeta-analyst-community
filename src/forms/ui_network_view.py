@@ -50,5 +50,5 @@ class Ui_network_view_dialog(object):
     def retranslateUi(self, network_view_dialog):
         _translate = QtCore.QCoreApplication.translate
         network_view_dialog.setWindowTitle(_translate("network_view_dialog", "Network"))
-        self.label_3.setText(_translate("network_view_dialog", "outcome:"))
-        self.label_4.setText(_translate("network_view_dialog", "follow-up:"))
+        self.label_3.setText(_translate("network_view_dialog", "Outcome:"))
+        self.label_4.setText(_translate("network_view_dialog", "Follow-up:"))

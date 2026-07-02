@@ -68,10 +68,10 @@ class Ui_diag_metric(object):
     def retranslateUi(self, diag_metric):
         _translate = QtCore.QCoreApplication.translate
         diag_metric.setWindowTitle(_translate("diag_metric", "Diagnostic Metrics"))
-        self.metrics_grp_box.setTitle(_translate("diag_metric", "select metrics for analysis"))
-        self.chk_box_sens.setText(_translate("diag_metric", "sensitivity"))
-        self.chk_box_spec.setText(_translate("diag_metric", "specificity"))
-        self.chk_box_lr.setText(_translate("diag_metric", "likelihood ratio"))
-        self.chk_box_dor.setText(_translate("diag_metric", "diagnostic odds ratio"))
-        self.btn_ok.setText(_translate("diag_metric", "next >"))
+        self.metrics_grp_box.setTitle(_translate("diag_metric", "Select Metrics for Analysis"))
+        self.chk_box_sens.setText(_translate("diag_metric", "Sensitivity"))
+        self.chk_box_spec.setText(_translate("diag_metric", "Specificity"))
+        self.chk_box_lr.setText(_translate("diag_metric", "Likelihood Ratio"))
+        self.chk_box_dor.setText(_translate("diag_metric", "Diagnostic Odds Ratio"))
+        self.btn_ok.setText(_translate("diag_metric", "Next >"))
 import icons_rc

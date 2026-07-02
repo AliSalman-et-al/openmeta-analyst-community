@@ -55,7 +55,7 @@
        <item>
         <widget class="QPushButton" name="create_new_btn">
          <property name="text">
-          <string>Create a new dataset</string>
+          <string>Create a New Dataset</string>
          </property>
          <property name="icon">
           <iconset resource="../images/icons.qrc">
@@ -77,7 +77,7 @@
        <item>
         <widget class="QPushButton" name="open_recent_btn">
          <property name="text">
-          <string>Open recent...</string>
+          <string>Open Recent...</string>
          </property>
          <property name="icon">
           <iconset resource="../images/icons.qrc">

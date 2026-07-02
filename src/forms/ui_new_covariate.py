@@ -74,6 +74,6 @@ class Ui_new_covariate_dialog(object):
     def retranslateUi(self, new_covariate_dialog):
         _translate = QtCore.QCoreApplication.translate
         new_covariate_dialog.setWindowTitle(_translate("new_covariate_dialog", "Add Covariate"))
-        self.label_2.setText(_translate("new_covariate_dialog", "covariate name:"))
-        self.label.setText(_translate("new_covariate_dialog", "type of covariate:"))
+        self.label_2.setText(_translate("new_covariate_dialog", "Covariate name:"))
+        self.label.setText(_translate("new_covariate_dialog", "Type of covariate:"))
 import icons_rc

@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>edit dataset</string>
+   <string>Edit Dataset</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
@@ -26,13 +26,13 @@
      </property>
      <widget class="QWidget" name="tab">
       <attribute name="title">
-       <string>outcomes/follow-ups/groups</string>
+       <string>Outcomes / Follow-Ups / Groups</string>
       </attribute>
       <layout class="QGridLayout" name="gridLayout">
        <item row="0" column="0">
         <widget class="QGroupBox" name="groupBox_2">
          <property name="title">
-          <string>outcomes</string>
+          <string>Outcomes</string>
          </property>
          <widget class="QListView" name="outcome_list">
           <property name="geometry">
@@ -125,7 +125,7 @@
        <item row="0" column="1">
         <widget class="QGroupBox" name="grpbox_follow_ups">
          <property name="title">
-          <string>follow-ups</string>
+          <string>Follow-Ups</string>
          </property>
          <widget class="QListView" name="follow_up_list">
           <property name="geometry">
@@ -218,7 +218,7 @@
        <item row="0" column="2">
         <widget class="QGroupBox" name="groupBox">
          <property name="title">
-          <string>tx groups</string>
+          <string>Treatment Groups</string>
          </property>
          <property name="flat">
           <bool>false</bool>
@@ -315,7 +315,7 @@
      </widget>
      <widget class="QWidget" name="tab_2">
       <attribute name="title">
-       <string>studies</string>
+       <string>Studies</string>
       </attribute>
       <layout class="QVBoxLayout" name="verticalLayout_2">
        <item>
@@ -394,7 +394,7 @@
      </widget>
      <widget class="QWidget" name="tab_3">
       <attribute name="title">
-       <string>covariates</string>
+       <string>Covariates</string>
       </attribute>
       <layout class="QHBoxLayout" name="horizontalLayout">
        <item>

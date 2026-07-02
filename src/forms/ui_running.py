@@ -38,5 +38,5 @@ class Ui_running(object):
 
     def retranslateUi(self, running):
         _translate = QtCore.QCoreApplication.translate
-        running.setWindowTitle(_translate("running", "running analysis..."))
+        running.setWindowTitle(_translate("running", "Running Analysis..."))
 import icons_rc

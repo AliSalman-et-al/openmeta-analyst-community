@@ -31,7 +31,7 @@
    </font>
   </property>
   <property name="windowTitle">
-   <string>add new tx group (arm)</string>
+   <string>Add Treatment Group (Arm)</string>
   </property>
   <property name="windowIcon">
    <iconset>
@@ -77,7 +77,7 @@
        </font>
       </property>
       <property name="text">
-       <string>tx group name:</string>
+       <string>Treatment group name:</string>
       </property>
      </widget>
     </item>

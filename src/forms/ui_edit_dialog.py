@@ -177,11 +177,11 @@ class Ui_edit_dialog(object):
 
     def retranslateUi(self, edit_dialog):
         _translate = QtCore.QCoreApplication.translate
-        edit_dialog.setWindowTitle(_translate("edit_dialog", "edit dataset"))
-        self.groupBox_2.setTitle(_translate("edit_dialog", "outcomes"))
-        self.grpbox_follow_ups.setTitle(_translate("edit_dialog", "follow-ups"))
-        self.groupBox.setTitle(_translate("edit_dialog", "tx groups"))
-        self.edit_tab.setTabText(self.edit_tab.indexOf(self.tab), _translate("edit_dialog", "outcomes/follow-ups/groups"))
-        self.edit_tab.setTabText(self.edit_tab.indexOf(self.tab_2), _translate("edit_dialog", "studies"))
-        self.edit_tab.setTabText(self.edit_tab.indexOf(self.tab_3), _translate("edit_dialog", "covariates"))
+        edit_dialog.setWindowTitle(_translate("edit_dialog", "Edit Dataset"))
+        self.groupBox_2.setTitle(_translate("edit_dialog", "Outcomes"))
+        self.grpbox_follow_ups.setTitle(_translate("edit_dialog", "Follow-Ups"))
+        self.groupBox.setTitle(_translate("edit_dialog", "Treatment Groups"))
+        self.edit_tab.setTabText(self.edit_tab.indexOf(self.tab), _translate("edit_dialog", "Outcomes / Follow-Ups / Groups"))
+        self.edit_tab.setTabText(self.edit_tab.indexOf(self.tab_2), _translate("edit_dialog", "Studies"))
+        self.edit_tab.setTabText(self.edit_tab.indexOf(self.tab_3), _translate("edit_dialog", "Covariates"))
 import icons_rc

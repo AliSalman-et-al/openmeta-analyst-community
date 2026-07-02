@@ -16,7 +16,7 @@
    </font>
   </property>
   <property name="windowTitle">
-   <string>select covariates</string>
+   <string>Select Covariates</string>
   </property>
   <property name="windowIcon">
    <iconset>
@@ -26,7 +26,7 @@
    <item>
     <widget class="QLabel" name="label">
      <property name="text">
-      <string>select covariates for regression:</string>
+      <string>Select covariates for regression:</string>
      </property>
     </widget>
    </item>
@@ -49,7 +49,7 @@
    <item>
     <widget class="QGroupBox" name="cov_grp_box">
      <property name="title">
-      <string>available covariates</string>
+      <string>Available Covariates</string>
      </property>
     </widget>
    </item>
@@ -69,13 +69,13 @@
    <item>
     <widget class="QGroupBox" name="diagnostic_group_box">
      <property name="title">
-      <string>metric</string>
+      <string>Metric</string>
      </property>
      <layout class="QVBoxLayout" name="verticalLayout_3">
       <item>
        <widget class="QRadioButton" name="dor_radio">
         <property name="text">
-         <string>diagnostic odds ratio</string>
+         <string>Diagnostic Odds Ratio</string>
         </property>
         <property name="checked">
          <bool>true</bool>
@@ -85,7 +85,7 @@
       <item>
        <widget class="QRadioButton" name="sensitivity_radio">
         <property name="text">
-         <string>sensitivity</string>
+         <string>Sensitivity</string>
         </property>
         <property name="checked">
          <bool>false</bool>
@@ -95,7 +95,7 @@
       <item>
        <widget class="QRadioButton" name="fixed_radio">
         <property name="text">
-         <string>specificity</string>
+         <string>Specificity</string>
         </property>
        </widget>
       </item>
@@ -105,13 +105,13 @@
    <item>
     <widget class="QGroupBox" name="groupBox">
      <property name="title">
-      <string>model type</string>
+      <string>Model Type</string>
      </property>
      <layout class="QVBoxLayout" name="verticalLayout_2">
       <item>
        <widget class="QRadioButton" name="random_effects_radio">
         <property name="text">
-         <string>random effects</string>
+         <string>Random Effects</string>
         </property>
         <property name="checked">
          <bool>true</bool>
@@ -121,7 +121,7 @@
       <item>
        <widget class="QRadioButton" name="fixed_effects_radio">
         <property name="text">
-         <string>fixed effects</string>
+         <string>Fixed Effects</string>
         </property>
        </widget>
       </item>

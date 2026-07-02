@@ -59,6 +59,6 @@ class Ui_group_name_dialog(object):
 
     def retranslateUi(self, group_name_dialog):
         _translate = QtCore.QCoreApplication.translate
-        group_name_dialog.setWindowTitle(_translate("group_name_dialog", "edit group name"))
-        self.field_lbl.setText(_translate("group_name_dialog", "group name:"))
+        group_name_dialog.setWindowTitle(_translate("group_name_dialog", "Edit Group Name"))
+        self.field_lbl.setText(_translate("group_name_dialog", "Group name:"))
 import icons_rc

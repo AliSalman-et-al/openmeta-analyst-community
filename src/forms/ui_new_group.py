@@ -60,6 +60,6 @@ class Ui_new_group_dialog(object):
 
     def retranslateUi(self, new_group_dialog):
         _translate = QtCore.QCoreApplication.translate
-        new_group_dialog.setWindowTitle(_translate("new_group_dialog", "add new tx group (arm)"))
-        self.label_2.setText(_translate("new_group_dialog", "tx group name:"))
+        new_group_dialog.setWindowTitle(_translate("new_group_dialog", "Add Treatment Group (Arm)"))
+        self.label_2.setText(_translate("new_group_dialog", "Treatment group name:"))
 import icons_rc

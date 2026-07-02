@@ -379,7 +379,7 @@ p, li { white-space: pre-wrap; }
         <item>
          <widget class="QLabel" name="label">
           <property name="text">
-           <string>correlation:</string>
+           <string>Correlation:</string>
           </property>
          </widget>
         </item>
@@ -435,7 +435,7 @@ p, li { white-space: pre-wrap; }
         <bool>false</bool>
        </property>
        <property name="text">
-        <string>back-calculate table</string>
+        <string>Back-Calculate Table</string>
        </property>
       </widget>
      </item>
@@ -451,7 +451,7 @@ p, li { white-space: pre-wrap; }
         </font>
        </property>
        <property name="text">
-        <string>effect</string>
+        <string>Effect</string>
        </property>
        <property name="alignment">
         <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
@@ -546,7 +546,7 @@ p, li { white-space: pre-wrap; }
           </font>
          </property>
          <property name="text">
-          <string>est.</string>
+          <string>Est.</string>
          </property>
          <property name="alignment">
           <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>

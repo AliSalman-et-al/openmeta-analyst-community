@@ -41,7 +41,7 @@ p, li { white-space: pre-wrap; }
      <item>
       <widget class="QCheckBox" name="dont_show_again_chk_box">
        <property name="text">
-        <string>don't show this message next time</string>
+        <string>Don't show this message next time</string>
        </property>
       </widget>
      </item>

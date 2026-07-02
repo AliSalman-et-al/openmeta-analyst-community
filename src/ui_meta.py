@@ -369,8 +369,8 @@ class Ui_MainWindow(object):
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "OpenMetaAnalyst"))
-        self.label.setText(_translate("MainWindow", "outcome:"))
-        self.label_3.setText(_translate("MainWindow", "follow-up:"))
+        self.label.setText(_translate("MainWindow", "Outcome:"))
+        self.label_3.setText(_translate("MainWindow", "Follow-up:"))
         self.menu_file.setTitle(_translate("MainWindow", "File"))
         self.action_open_recent_2.setTitle(_translate("MainWindow", "Open Recent"))
         self.menuAnalysis.setTitle(_translate("MainWindow", "Analysis"))

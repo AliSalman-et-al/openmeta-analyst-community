@@ -60,6 +60,6 @@ class Ui_new_follow_up_dialog(object):
 
     def retranslateUi(self, new_follow_up_dialog):
         _translate = QtCore.QCoreApplication.translate
-        new_follow_up_dialog.setWindowTitle(_translate("new_follow_up_dialog", "add new follow-up"))
-        self.label_2.setText(_translate("new_follow_up_dialog", "follow-up label"))
+        new_follow_up_dialog.setWindowTitle(_translate("new_follow_up_dialog", "Add Follow-Up"))
+        self.label_2.setText(_translate("new_follow_up_dialog", "Follow-up label"))
 import icons_rc

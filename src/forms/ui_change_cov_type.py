@@ -48,5 +48,5 @@ class Ui_ChangeCovTypeForm(object):
     def retranslateUi(self, ChangeCovTypeForm):
         _translate = QtCore.QCoreApplication.translate
         ChangeCovTypeForm.setWindowTitle(_translate("ChangeCovTypeForm", "Change Covariate Type"))
-        self.grp_box_preview.setTitle(_translate("ChangeCovTypeForm", "values for new covariate"))
+        self.grp_box_preview.setTitle(_translate("ChangeCovTypeForm", "Values for New Covariate"))
 import icons_rc

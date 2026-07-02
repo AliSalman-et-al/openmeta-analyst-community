@@ -174,16 +174,16 @@ class Ui_DataTypePage(object):
         DataTypePage.setWindowTitle(_translate("DataTypePage", "WizardPage"))
         DataTypePage.setTitle(_translate("DataTypePage", "What type of data do you have?"))
         self.label_2.setText(_translate("DataTypePage", "One piece of data from each study or studies with one group"))
-        self.onearm_proportion_Button.setText(_translate("DataTypePage", "proportion"))
-        self.onearm_mean_Button.setText(_translate("DataTypePage", "mean"))
-        self.onearm_single_reg_coef_Button.setText(_translate("DataTypePage", "regression\n"
-"coefficient"))
-        self.onearm_generic_effect_size_Button.setText(_translate("DataTypePage", "generic\n"
-"effect size"))
+        self.onearm_proportion_Button.setText(_translate("DataTypePage", "Proportion"))
+        self.onearm_mean_Button.setText(_translate("DataTypePage", "Mean"))
+        self.onearm_single_reg_coef_Button.setText(_translate("DataTypePage", "Regression\n"
+"Coefficient"))
+        self.onearm_generic_effect_size_Button.setText(_translate("DataTypePage", "Generic\n"
+"Effect Size"))
         self.label_4.setText(_translate("DataTypePage", "Data on two or more groups per study"))
-        self.twoarm_proportions_Button.setText(_translate("DataTypePage", "proportions"))
-        self.twoarm_means_Button.setText(_translate("DataTypePage", "means"))
+        self.twoarm_proportions_Button.setText(_translate("DataTypePage", "Proportions"))
+        self.twoarm_means_Button.setText(_translate("DataTypePage", "Means"))
         self.twoarm_smds_Button.setText(_translate("DataTypePage", "SMD"))
         self.label_5.setText(_translate("DataTypePage", "Data on test performance"))
-        self.diagnostic_Button.setText(_translate("DataTypePage", "diagnostic"))
+        self.diagnostic_Button.setText(_translate("DataTypePage", "Diagnostic"))
 import icons_rc

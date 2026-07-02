@@ -31,7 +31,7 @@
    </font>
   </property>
   <property name="windowTitle">
-   <string>edit group name</string>
+   <string>Edit Group Name</string>
   </property>
   <property name="windowIcon">
    <iconset>
@@ -49,7 +49,7 @@
         </font>
        </property>
        <property name="text">
-        <string>group name:</string>
+        <string>Group name:</string>
        </property>
       </widget>
      </item>

@@ -52,7 +52,7 @@
         </size>
        </property>
        <property name="text">
-        <string>proportion</string>
+        <string>Proportion</string>
        </property>
        <property name="icon">
         <iconset resource="../images/icons.qrc">
@@ -96,7 +96,7 @@
         </size>
        </property>
        <property name="text">
-        <string>mean</string>
+        <string>Mean</string>
        </property>
        <property name="icon">
         <iconset resource="../images/icons.qrc">
@@ -140,8 +140,8 @@
         </size>
        </property>
        <property name="text">
-        <string>regression
-coefficient</string>
+        <string>Regression
+Coefficient</string>
        </property>
        <property name="icon">
         <iconset resource="../images/icons.qrc">
@@ -185,8 +185,8 @@ coefficient</string>
         </size>
        </property>
        <property name="text">
-        <string>generic
-effect size</string>
+        <string>Generic
+Effect Size</string>
        </property>
        <property name="icon">
         <iconset resource="../images/icons.qrc">
@@ -264,7 +264,7 @@ effect size</string>
         </size>
        </property>
        <property name="text">
-        <string>proportions</string>
+        <string>Proportions</string>
        </property>
        <property name="icon">
         <iconset resource="../images/icons.qrc">
@@ -308,7 +308,7 @@ effect size</string>
         </size>
        </property>
        <property name="text">
-        <string>means</string>
+        <string>Means</string>
        </property>
        <property name="icon">
         <iconset resource="../images/icons.qrc">
@@ -427,7 +427,7 @@ effect size</string>
         </size>
        </property>
        <property name="text">
-        <string>diagnostic</string>
+        <string>Diagnostic</string>
        </property>
        <property name="icon">
         <iconset resource="../images/icons.qrc">

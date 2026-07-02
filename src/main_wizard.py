@@ -653,7 +653,7 @@ class MainWizard(QWizard):
             self.setWindowTitle("Import a CSV")
         elif path == "new_dataset":
             self.setStartId(Page_DataType)
-            self.setWindowTitle("Create a new dataset")
+            self.setWindowTitle("Create a New Dataset")
 
         # self.setPixmap(QtWidgets.QWizard.BannerPixmap,
         #        QtGui.QPixmap(':/misc/meta.png'))

@@ -342,13 +342,13 @@ class Ui_ContinuousDataForm(object):
 "p, li { white-space: pre-wrap; }\n"
 "</style></head><body style=\" font-family:\'Verdana\'; font-size:8pt; font-weight:600; font-style:italic;\">\n"
 "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:7pt;\">group 2</span></p></body></html>"))
-        self.label.setText(_translate("ContinuousDataForm", "correlation:"))
+        self.label.setText(_translate("ContinuousDataForm", "Correlation:"))
         self.correlation_pre_post.setText(_translate("ContinuousDataForm", "0.0"))
         self.clear_Btn.setText(_translate("ContinuousDataForm", "Clear Form"))
-        self.back_calc_btn.setText(_translate("ContinuousDataForm", "back-calculate table"))
-        self.label_13.setText(_translate("ContinuousDataForm", "effect"))
+        self.back_calc_btn.setText(_translate("ContinuousDataForm", "Back-Calculate Table"))
+        self.label_13.setText(_translate("ContinuousDataForm", "Effect"))
         self.ci_label.setText(_translate("ContinuousDataForm", "(X% confidence interval)"))
-        self.label_14.setText(_translate("ContinuousDataForm", "est."))
+        self.label_14.setText(_translate("ContinuousDataForm", "Est."))
         self.label_15.setText(_translate("ContinuousDataForm", "["))
         self.label_2.setText(_translate("ContinuousDataForm", ","))
         self.label_16.setText(_translate("ContinuousDataForm", "]"))

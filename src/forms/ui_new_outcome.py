@@ -73,7 +73,7 @@ class Ui_Dialog(object):
 
     def retranslateUi(self, Dialog):
         _translate = QtCore.QCoreApplication.translate
-        Dialog.setWindowTitle(_translate("Dialog", "add new outcome"))
-        self.label_2.setText(_translate("Dialog", "outcome name:"))
-        self.label.setText(_translate("Dialog", "type of outcome:"))
+        Dialog.setWindowTitle(_translate("Dialog", "Add Outcome"))
+        self.label_2.setText(_translate("Dialog", "Outcome name:"))
+        self.label.setText(_translate("Dialog", "Type of outcome:"))
 import icons_rc

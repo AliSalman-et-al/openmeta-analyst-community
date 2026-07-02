@@ -19,7 +19,7 @@
    </font>
   </property>
   <property name="windowTitle">
-   <string>running analysis...</string>
+   <string>Running Analysis...</string>
   </property>
   <property name="windowIcon">
    <iconset>

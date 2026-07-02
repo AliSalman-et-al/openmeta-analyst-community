@@ -178,7 +178,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
     def make_indefinite_progress_bar(self):
         bar = QtWidgets.QProgressBar(parent=self)
-        bar.setWindowTitle("running analysis...")
+        bar.setWindowTitle("Running Analysis...")
         bar.setRange(0, 0)  # makes it indefinite
         # specs_form_pos = self.pos()
         # specs_form_width, specs_form_height = self.width(), self.height()

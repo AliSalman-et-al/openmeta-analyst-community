@@ -31,7 +31,7 @@
    </font>
   </property>
   <property name="windowTitle">
-   <string>add new outcome</string>
+   <string>Add Outcome</string>
   </property>
   <property name="windowIcon">
    <iconset>
@@ -77,7 +77,7 @@
        </font>
       </property>
       <property name="text">
-       <string>outcome name:</string>
+       <string>Outcome name:</string>
       </property>
      </widget>
     </item>
@@ -102,7 +102,7 @@
        </font>
       </property>
       <property name="text">
-       <string>type of outcome:</string>
+       <string>Type of outcome:</string>
       </property>
      </widget>
     </item>

@@ -41,7 +41,7 @@
    <item row="0" column="0">
     <widget class="QGroupBox" name="metrics_grp_box">
      <property name="title">
-      <string>select metrics for analysis</string>
+      <string>Select Metrics for Analysis</string>
      </property>
      <layout class="QVBoxLayout" name="verticalLayout">
       <item>
@@ -49,7 +49,7 @@
         <item row="0" column="0">
          <widget class="QCheckBox" name="chk_box_sens">
           <property name="text">
-           <string>sensitivity</string>
+           <string>Sensitivity</string>
           </property>
           <property name="checked">
            <bool>true</bool>
@@ -59,7 +59,7 @@
         <item row="0" column="1">
          <widget class="QCheckBox" name="chk_box_spec">
           <property name="text">
-           <string>specificity</string>
+           <string>Specificity</string>
           </property>
           <property name="checked">
            <bool>true</bool>
@@ -69,7 +69,7 @@
         <item row="2" column="0">
          <widget class="QCheckBox" name="chk_box_lr">
           <property name="text">
-           <string>likelihood ratio</string>
+           <string>Likelihood Ratio</string>
           </property>
           <property name="checked">
            <bool>true</bool>
@@ -79,7 +79,7 @@
         <item row="2" column="1">
          <widget class="QCheckBox" name="chk_box_dor">
           <property name="text">
-           <string>diagnostic odds ratio</string>
+           <string>Diagnostic Odds Ratio</string>
           </property>
           <property name="checked">
            <bool>true</bool>
@@ -128,7 +128,7 @@
         </size>
        </property>
        <property name="text">
-        <string>next &gt;</string>
+        <string>Next &gt;</string>
        </property>
       </widget>
      </item>

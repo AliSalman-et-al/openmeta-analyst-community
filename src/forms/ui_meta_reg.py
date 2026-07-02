@@ -75,14 +75,14 @@ class Ui_cov_reg_dialog(object):
 
     def retranslateUi(self, cov_reg_dialog):
         _translate = QtCore.QCoreApplication.translate
-        cov_reg_dialog.setWindowTitle(_translate("cov_reg_dialog", "select covariates"))
-        self.label.setText(_translate("cov_reg_dialog", "select covariates for regression:"))
-        self.cov_grp_box.setTitle(_translate("cov_reg_dialog", "available covariates"))
-        self.diagnostic_group_box.setTitle(_translate("cov_reg_dialog", "metric"))
-        self.dor_radio.setText(_translate("cov_reg_dialog", "diagnostic odds ratio"))
-        self.sensitivity_radio.setText(_translate("cov_reg_dialog", "sensitivity"))
-        self.fixed_radio.setText(_translate("cov_reg_dialog", "specificity"))
-        self.groupBox.setTitle(_translate("cov_reg_dialog", "model type"))
-        self.random_effects_radio.setText(_translate("cov_reg_dialog", "random effects"))
-        self.fixed_effects_radio.setText(_translate("cov_reg_dialog", "fixed effects"))
+        cov_reg_dialog.setWindowTitle(_translate("cov_reg_dialog", "Select Covariates"))
+        self.label.setText(_translate("cov_reg_dialog", "Select covariates for regression:"))
+        self.cov_grp_box.setTitle(_translate("cov_reg_dialog", "Available Covariates"))
+        self.diagnostic_group_box.setTitle(_translate("cov_reg_dialog", "Metric"))
+        self.dor_radio.setText(_translate("cov_reg_dialog", "Diagnostic Odds Ratio"))
+        self.sensitivity_radio.setText(_translate("cov_reg_dialog", "Sensitivity"))
+        self.fixed_radio.setText(_translate("cov_reg_dialog", "Specificity"))
+        self.groupBox.setTitle(_translate("cov_reg_dialog", "Model Type"))
+        self.random_effects_radio.setText(_translate("cov_reg_dialog", "Random Effects"))
+        self.fixed_effects_radio.setText(_translate("cov_reg_dialog", "Fixed Effects"))
 import icons_rc

@@ -48,7 +48,7 @@
        </size>
       </property>
       <property name="text" >
-       <string>outcome:</string>
+       <string>Outcome:</string>
       </property>
      </widget>
     </item>
@@ -64,7 +64,7 @@
        </size>
       </property>
       <property name="text" >
-       <string>follow-up:</string>
+       <string>Follow-up:</string>
       </property>
      </widget>
     </item>

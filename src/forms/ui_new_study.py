@@ -60,6 +60,6 @@ class Ui_new_study_dialog(object):
 
     def retranslateUi(self, new_study_dialog):
         _translate = QtCore.QCoreApplication.translate
-        new_study_dialog.setWindowTitle(_translate("new_study_dialog", "add new study"))
-        self.label_2.setText(_translate("new_study_dialog", "study "))
+        new_study_dialog.setWindowTitle(_translate("new_study_dialog", "Add Study"))
+        self.label_2.setText(_translate("new_study_dialog", "Study"))
 import icons_rc

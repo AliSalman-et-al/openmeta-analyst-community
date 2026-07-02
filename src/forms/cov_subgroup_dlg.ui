@@ -20,7 +20,7 @@
     <normaloff>:/misc/meta.ico</normaloff>:/misc/meta.ico</iconset>
   </property>
   <property name="windowTitle">
-   <string>select covariate</string>
+   <string>Select Covariate</string>
   </property>
   <widget class="QDialogButtonBox" name="buttonBox">
    <property name="geometry">

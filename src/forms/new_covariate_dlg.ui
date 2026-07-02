@@ -77,7 +77,7 @@
        </font>
       </property>
       <property name="text">
-       <string>covariate name:</string>
+       <string>Covariate name:</string>
       </property>
      </widget>
     </item>
@@ -102,7 +102,7 @@
        </font>
       </property>
       <property name="text">
-       <string>type of covariate:</string>
+       <string>Type of covariate:</string>
       </property>
      </widget>
     </item>

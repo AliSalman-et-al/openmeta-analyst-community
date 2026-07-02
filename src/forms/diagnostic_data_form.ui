@@ -140,7 +140,7 @@
         <bool>false</bool>
        </property>
        <property name="text">
-        <string>back-calculate table</string>
+        <string>Back-Calculate Table</string>
        </property>
       </widget>
      </item>
@@ -211,7 +211,7 @@
         </font>
        </property>
        <property name="text">
-        <string>metric</string>
+        <string>Metric</string>
        </property>
        <property name="alignment">
         <set>Qt::AlignBottom|Qt::AlignHCenter</set>
@@ -313,7 +313,7 @@
            </font>
           </property>
           <property name="text">
-           <string>est.</string>
+           <string>Est.</string>
           </property>
           <property name="alignment">
            <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>

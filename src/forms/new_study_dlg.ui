@@ -31,7 +31,7 @@
    </font>
   </property>
   <property name="windowTitle">
-   <string>add new study</string>
+   <string>Add Study</string>
   </property>
   <property name="windowIcon">
    <iconset>
@@ -77,7 +77,7 @@
        </font>
       </property>
       <property name="text">
-       <string>study </string>
+       <string>Study</string>
       </property>
      </widget>
     </item>
