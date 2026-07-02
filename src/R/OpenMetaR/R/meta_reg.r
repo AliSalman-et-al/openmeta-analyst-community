@@ -893,7 +893,9 @@ meta.regression <- function(reg.data, params, cond.means.data=NULL, stop.at.rma=
             reg.plot.params.path <- save.plot.data(plot.data)
             plot.params.paths <- c("Regression Plot"=plot.data.path)
 			pure.res$weights <- weights(res)
-            results <- list("images"=images,
+            results <- list("input_data"=reg.data,
+                            "input_params"=params,
+                            "images"=images,
 					        "Summary"=reg.disp,
 							"plot_names"=plot.names,
 							"plot_params_paths"=plot.params.paths,

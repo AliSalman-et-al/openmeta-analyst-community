@@ -130,3 +130,28 @@ test_that("subgroup heterogeneity display uses readable I-squared labels", {
   expect_false(grepl("I^2", text, fixed = TRUE))
   expect_match(text, "92.645%", fixed = TRUE)
 })
+
+test_that("meta-regression omnibus p-value uses small-p display convention", {
+  display <- OpenMetaR:::create.regression.display(
+    list(
+      b = c(0.1, 0.2),
+      ci.lb = c(0.0, 0.1),
+      ci.ub = c(0.2, 0.3),
+      se = c(0.01, 0.02),
+      pval = c(0.0002, 0.267),
+      QMp = 0.0002
+    ),
+    list(digits = 3, measure = "OR"),
+    list(
+      cov.display.col = c("intercept", "latitude"),
+      levels.display.col = character(0),
+      studies.display.col = character(0),
+      factor.n.levels = numeric(0),
+      n.cont.covs = 1
+    )
+  )
+  rendered <- paste(capture.output(print(display)), collapse = "\n")
+
+  expect_match(rendered, "< 0.001", fixed = TRUE)
+  expect_false(grepl("Omnibus p-Value\n\n 0.000", rendered, fixed = TRUE))
+})

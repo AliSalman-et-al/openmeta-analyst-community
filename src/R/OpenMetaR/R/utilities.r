@@ -438,7 +438,7 @@ create.regression.display <- function(res, params, display.data) {
     reg.array[2:n.rows, "p-Value"] <- pvals.tmp
     
     omnibus.pval.array <- array(dim=c(1,1))
-    omnibus.pval.array[1,1] <- sprintf(digits.str, res$QMp)
+    omnibus.pval.array[1,1] <- round.display(res$QMp, digits=params$digits)
     arrays <- list(arr1=reg.array, arr2=omnibus.pval.array)
   } else {
     arrays <- list(arr1=reg.array)

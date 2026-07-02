@@ -296,6 +296,68 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
         assert bool(ro.r('!is.null(getS3method("print", "summary.display", optional=TRUE))')[0])
         assert bool(ro.r('!is.null(getS3method("print", "summary.data", optional=TRUE))')[0])
 
+        meta_regression_expr = textwrap.dedent(
+            '''
+            dir.create("r_tmp", showWarnings=FALSE)
+            openmetar.set.global.conf.level(95)
+
+            regression_display <- OpenMetaR:::create.regression.display(
+              list(
+                b = c(0.1, 0.2),
+                ci.lb = c(0.0, 0.1),
+                ci.ub = c(0.2, 0.3),
+                se = c(0.01, 0.02),
+                pval = c(0.0002, 0.267),
+                QMp = 0.0002
+              ),
+              list(digits = 3, measure = "OR"),
+              list(
+                cov.display.col = c("intercept", "latitude"),
+                levels.display.col = character(0),
+                studies.display.col = character(0),
+                factor.n.levels = numeric(0),
+                n.cont.covs = 1
+              )
+            )
+            regression_text <- paste(capture.output(print(regression_display)), collapse="\\n")
+            stopifnot(grepl("< 0.001", regression_text, fixed=TRUE))
+            stopifnot(!grepl("Omnibus p-Value\\\\n\\\\n 0.000", regression_text))
+
+            advanced_data <- new(
+              "BinaryData",
+              g1O1=c(6, 3, 19, 26, 8, 6),
+              g1O2=c(21, 56, 145, 129, 24, 74),
+              g2O1=c(9, 7, 13, 49, 6, 3),
+              g2O2=c(18, 57, 139, 96, 29, 73),
+              y=c(-0.5596157879, -0.8295982833, 0.3372298124, -0.9291879730, 0.4769240721, 0.6795415285),
+              SE=c(0.6172133998, 0.7152562329, 0.3790058736, 0.2775577532, 0.6064784349, 0.7260937568),
+              study.names=c("Gonzalez", "Prins", "Maller", "Marik", "Muijsken", "De Vries"),
+              years=as.integer(c(1993, 1993, 1993, 1991, 1988, 1990)),
+              covariates=list(
+                new("CovariateValues", cov.name="year", cov.vals=c(1993, 1993, 1993, 1991, 1988, 1990), cov.type="continuous", ref.var="1993")
+              )
+            )
+            params <- data.frame(
+              conf.level=95, digits=3, measure="OR", rm.method="DL", to="only0", adjust=0.5,
+              fp_col1_str="Studies", fp_col2_str="[default]", fp_col3_str="Ev/Trt", fp_col4_str="Ev/Ctrl",
+              fp_xlabel="[default]", fp_outpath="./r_tmp/meta_regression_names_forest.png",
+              fp_plot_lb="[default]", fp_plot_ub="[default]", fp_show_col1=TRUE,
+              fp_show_col2=TRUE, fp_show_col3=TRUE, fp_show_col4=TRUE,
+              fp_show_summary_line=TRUE, fp_xticks="[default]"
+            )
+            openmetar.run.analysis(
+              advanced_data,
+              list(method="meta.regression", params=params, workflow="meta-regression")
+            )
+            '''
+        )
+        meta_reg_result = ro.r(meta_regression_expr)
+        parsed_meta_regression = meta_py_r.parse_out_results(meta_reg_result)
+        weights = parsed_meta_regression["texts"]["Weights"]
+        assert "Gonzalez" in weights, weights
+        assert "De Vries" in weights, weights
+        assert "Study 1" not in weights, weights
+
         sys.stdout.write("OK\\n")
         sys.stdout.flush()
         sys.stderr.flush()
