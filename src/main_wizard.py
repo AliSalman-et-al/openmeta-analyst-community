@@ -576,7 +576,7 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
             self.headers = []
             self.imported_data = []
             if self._hasHeaders():
-                self.headers = next(reader)
+                self.headers = next(reader, [])
             for row in reader:
                 self.imported_data.append(row)
         self._normalize_imported_rows()

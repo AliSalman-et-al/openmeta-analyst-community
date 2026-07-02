@@ -2296,6 +2296,46 @@ def test_csv_import_wizard_pads_ragged_rows_before_previewing(tmp_path, monkeypa
     assert wizard.get_csv_data()["data"][-1] == ["Beta", "2021", "3", "11", "4", ""]
 
 
+def test_csv_import_wizard_reports_empty_file_as_no_data(tmp_path, monkeypatch):
+    from PyQt5 import QtWidgets
+    import main_wizard
+
+    csv_path = tmp_path / "empty.csv"
+    csv_path.write_text("")
+    shown = []
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    wizard = main_wizard.MainWizard(path="csv_import")
+    wizard.set_dataset_info(
+        {
+            "arms": "two",
+            "data_type": "binary",
+            "sub_type": "proportions",
+            "effect": "OR",
+            "metric_choices": [],
+        }
+    )
+    page = wizard.page(main_wizard.Page_CsvImport)
+    page.initializePage()
+    monkeypatch.setattr(
+        main_wizard.QFileDialog,
+        "getOpenFileName",
+        lambda **kwargs: (str(csv_path), "csv files (*.csv)"),
+    )
+    monkeypatch.setattr(
+        main_wizard.QMessageBox,
+        "warning",
+        lambda *args, **kwargs: shown.append(args),
+    )
+
+    page._select_file()
+
+    assert shown
+    assert shown[0][1] == "Whoops"
+    assert shown[0][2] == "No data in CSV. Try again."
+    assert "StopIteration" not in shown[0][2]
+    assert not page.isComplete()
+
+
 def test_csv_import_preview_failure_preserves_error_details(tmp_path, monkeypatch):
     from PyQt5 import QtWidgets
     import main_wizard
