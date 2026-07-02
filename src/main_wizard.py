@@ -664,15 +664,14 @@ class MainWizard(QWizard):
         self.currentIdChanged.connect(
             app_error_handler.safe_slot(self._change_size, parent=self)
         )
-        qt_layout.fit_text_to_contents(self)
+        qt_layout.fit_application_dialog_to_contents(self)
 
     def _change_size(self, pageid):
         current_page = self.currentPage()
         if current_page is None:
             return
         qt_layout.fit_text_to_contents(current_page, adjust_root=False)
-        qt_layout.fit_text_to_contents(self)
-        self.adjustSize()
+        qt_layout.fit_application_dialog_to_contents(self)
 
     def set_wizard_path(self, path):
         self.info_d["path"] = path

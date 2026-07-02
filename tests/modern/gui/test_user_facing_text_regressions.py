@@ -409,6 +409,89 @@ def test_analysis_dialog_combo_widths_are_content_aware_but_capped():
     app.processEvents()
 
 
+def test_application_dialog_refit_does_not_ratchet_root_width():
+    sys.path.insert(0, str(ROOT / "src"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    root = QtWidgets.QDialog()
+    root.setWindowTitle("Dynamic dialog")
+    layout = QtWidgets.QVBoxLayout(root)
+    label = QtWidgets.QLabel("Short label")
+    combo = QtWidgets.QComboBox()
+    combo.addItems(["Short", "Medium"])
+    layout.addWidget(label)
+    layout.addWidget(combo)
+
+    qt_layout.fit_application_dialog_to_contents(root)
+    root.show()
+    app.processEvents()
+    stable_width = root.width()
+    stable_minimum = root.minimumSize()
+
+    try:
+        label.setText(
+            "A much longer dynamically generated label that should not cause "
+            "an already fitted application dialog to grow wider."
+        )
+        combo.addItem(
+            "A much longer dynamically generated choice that should stay within the combo cap"
+        )
+        qt_layout.fit_application_dialog_to_contents(root)
+        app.processEvents()
+
+        assert root.width() == stable_width
+        assert root.minimumSize() == stable_minimum
+        assert combo.maximumWidth() == qt_layout.APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH
+    finally:
+        root.close()
+        root.deleteLater()
+    app.processEvents()
+
+
+def test_analysis_dialog_refit_does_not_ratchet_after_hidden_content_changes():
+    sys.path.insert(0, str(ROOT / "src"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    root = QtWidgets.QDialog()
+    root.setWindowTitle("Analysis options")
+    layout = QtWidgets.QVBoxLayout(root)
+    details = QtWidgets.QGroupBox("Advanced")
+    details_layout = QtWidgets.QVBoxLayout(details)
+    details_layout.addWidget(QtWidgets.QLabel("Short advanced option"))
+    layout.addWidget(QtWidgets.QLabel("Analysis method"))
+    layout.addWidget(details)
+
+    qt_layout.fit_analysis_dialog_to_contents(root)
+    root.show()
+    app.processEvents()
+    stable_width = root.width()
+    stable_height = root.height()
+    stable_minimum = root.minimumSize()
+
+    try:
+        details.setVisible(False)
+        qt_layout.fit_analysis_dialog_to_contents(root)
+        details.setVisible(True)
+        details_layout.addWidget(
+            QtWidgets.QLabel(
+                "A long dynamically revealed advanced option should not ratchet "
+                "the fitted analysis dialog after the first stable size is recorded."
+            )
+        )
+        qt_layout.fit_analysis_dialog_to_contents(root)
+        app.processEvents()
+
+        assert root.width() == stable_width
+        assert root.height() == stable_height
+        assert root.minimumSize() == stable_minimum
+    finally:
+        root.close()
+        root.deleteLater()
+    app.processEvents()
+
+
 def test_change_confidence_level_dialog_uses_analysis_dialog_width_floor():
     sys.path.insert(0, str(ROOT / "src"))
     import conf_level_dialog

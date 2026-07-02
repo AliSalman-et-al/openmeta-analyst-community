@@ -120,7 +120,6 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         # Hide pre-post for SMD until it is implemented
         if self.cur_effect not in ["MD", "SMD"]:
             self.grp_box_pre_post.setVisible(False)
-            self.adjustSize()
 
         self.current_correlation = self._get_correlation_str()
         qt_layout.fit_analysis_dialog_to_contents(self)
@@ -225,10 +224,9 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         # hide pre-post for SMD
         if self.cur_effect not in ["MD", "SMD"]:
             self.grp_box_pre_post.setVisible(False)
-            self.adjustSize()
         else:
             self.grp_box_pre_post.setVisible(True)
-            self.adjustSize()
+        qt_layout.fit_analysis_dialog_to_contents(self)
 
         self.group_str = self.get_cur_group_str()
 

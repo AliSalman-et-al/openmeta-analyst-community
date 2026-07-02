@@ -74,6 +74,7 @@ def fit_application_dialog_to_contents(root, adjust_root=True):
         adjust_root=adjust_root,
         minimum_width=APPLICATION_DIALOG_MINIMUM_WIDTH,
         minimum_height=APPLICATION_DIALOG_MINIMUM_HEIGHT,
+        stable_root=True,
     )
 
 
@@ -86,11 +87,12 @@ def fit_analysis_dialog_to_contents(root, adjust_root=True):
         adjust_root=adjust_root,
         minimum_width=ANALYSIS_DIALOG_MINIMUM_WIDTH,
         minimum_height=ANALYSIS_DIALOG_MINIMUM_HEIGHT,
+        stable_root=True,
     )
 
 
 def fit_option_groups_to_contents(
-    root, adjust_root=True, minimum_width=0, minimum_height=0
+    root, adjust_root=True, minimum_width=0, minimum_height=0, stable_root=False
 ):
     """Prevent dialog contents from being compressed below visible text."""
     if not _fit_root_is_available(root):
@@ -100,10 +102,13 @@ def fit_option_groups_to_contents(
         adjust_root=adjust_root,
         minimum_width=minimum_width,
         minimum_height=minimum_height,
+        stable_root=stable_root,
     )
 
 
-def fit_text_to_contents(root, adjust_root=True, minimum_width=0, minimum_height=0):
+def fit_text_to_contents(
+    root, adjust_root=True, minimum_width=0, minimum_height=0, stable_root=False
+):
     """Prevent visible text-bearing widgets from being compressed below content."""
     if not _fit_root_is_available(root):
         return
@@ -132,11 +137,17 @@ def fit_text_to_contents(root, adjust_root=True, minimum_width=0, minimum_height
         title_width = _window_title_width_hint(root)
         target_width = max(size_hint.width(), title_width, minimum_width)
         target_height = max(size_hint.height(), minimum_height)
+        stable_size = _stable_root_size(root) if stable_root else None
+        if stable_size is not None:
+            root.setMinimumSize(stable_size)
+            return
+
+        target_size = QSize(target_width, target_height)
         _raise_maximum_height(root, target_height)
         _raise_maximum_width(root, target_width)
-        root.setMinimumSize(
-            root.minimumSize().expandedTo(QSize(target_width, target_height))
-        )
+        root.setMinimumSize(root.minimumSize().expandedTo(target_size))
+        if stable_root:
+            root.setProperty("oma_stable_fit_size", root.minimumSize())
         root.adjustSize()
 
 
@@ -148,6 +159,13 @@ def _fit_root_is_available(root):
     except RuntimeError:
         return False
     return True
+
+
+def _stable_root_size(root):
+    stable_size = root.property("oma_stable_fit_size")
+    if isinstance(stable_size, QSize) and stable_size.isValid():
+        return stable_size
+    return None
 
 
 def _fit_text_widgets_to_contents(root):
