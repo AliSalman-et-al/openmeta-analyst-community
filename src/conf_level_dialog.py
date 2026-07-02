@@ -41,12 +41,12 @@ class ChangeConfLevelDlg(QDialog):
         vlayout.addLayout(hlayout)
         vlayout.addWidget(buttonBox)
         self.setLayout(vlayout)
-        self.setMinimumWidth(260)
+        self.setMinimumWidth(qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH)
 
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
         self.setWindowTitle("Change Confidence Level")
-        qt_layout.fit_text_to_contents(self)
+        qt_layout.fit_analysis_dialog_to_contents(self)
 
     def get_value(self):
         return self.conf_level_spinbox.value()

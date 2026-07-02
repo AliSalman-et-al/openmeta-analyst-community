@@ -240,6 +240,72 @@ def test_dialog_width_fit_includes_labels_combos_and_window_title():
     app.processEvents()
 
 
+def test_dialog_width_fit_includes_hidden_tab_contents_and_late_content():
+    sys.path.insert(0, str(ROOT / "src"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    root = QtWidgets.QDialog()
+    root.setWindowTitle("Method & Parameters")
+    layout = QtWidgets.QVBoxLayout(root)
+    tabs = QtWidgets.QTabWidget(root)
+    narrow_tab = QtWidgets.QWidget()
+    wide_tab = QtWidgets.QWidget()
+    narrow_layout = QtWidgets.QVBoxLayout(narrow_tab)
+    wide_layout = QtWidgets.QGridLayout(wide_tab)
+    narrow_layout.addWidget(QtWidgets.QLabel("forest plot"))
+    tabs.addTab(narrow_tab, "forest plot")
+    tabs.addTab(wide_tab, "method")
+    tabs.setCurrentWidget(narrow_tab)
+    layout.addWidget(tabs)
+
+    description = QtWidgets.QLabel(
+        "Description: Performs random-effects meta-analysis with a long generated description."
+    )
+    parameter_label = QtWidgets.QLabel("Correction factor target")
+    combo = QtWidgets.QComboBox()
+    combo.addItems(["DL: DerSimonian-Laird", "SJ: Sidik-Jonkman"])
+    wide_layout.addWidget(description, 0, 0, 1, 2)
+    wide_layout.addWidget(parameter_label, 1, 0)
+    wide_layout.addWidget(combo, 1, 1)
+
+    qt_layout.fit_analysis_dialog_to_contents(root)
+    root.show()
+    app.processEvents()
+
+    try:
+        assert tabs.currentWidget() is narrow_tab
+        assert wide_tab.isHidden()
+        assert description.minimumWidth() >= description.sizeHint().width()
+        assert parameter_label.minimumWidth() >= parameter_label.sizeHint().width()
+        assert combo.minimumWidth() >= combo.sizeHint().width()
+        assert root.minimumWidth() >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
+        assert root.minimumWidth() >= root.sizeHint().width()
+    finally:
+        root.close()
+        root.deleteLater()
+    app.processEvents()
+
+
+def test_change_confidence_level_dialog_uses_analysis_dialog_width_floor():
+    sys.path.insert(0, str(ROOT / "src"))
+    import conf_level_dialog
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    dialog = conf_level_dialog.ChangeConfLevelDlg(95.0)
+    dialog.show()
+    app.processEvents()
+
+    try:
+        assert dialog.minimumWidth() >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
+        assert dialog.minimumWidth() >= dialog.sizeHint().width()
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+    app.processEvents()
+
+
 def test_issue_76_to_105_reported_bad_user_facing_strings_are_absent():
     text = _combined_text(
         [

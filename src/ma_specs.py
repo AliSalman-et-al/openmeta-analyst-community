@@ -144,7 +144,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             self.setup_diagnostic_ui()
 
         self.populate_cbo_box()
-        qt_layout.fit_option_groups_to_contents(self)
+        qt_layout.fit_analysis_dialog_to_contents(self)
 
     def cancel(self):
         print("(cancel)")
@@ -359,7 +359,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.setup_params()
         self.parameter_grp_box.setTitle(self.current_method)
         self.ui_for_params()
-        qt_layout.fit_option_groups_to_contents(self)
+        qt_layout.fit_analysis_dialog_to_contents(self)
 
     def populate_cbo_box(self, cbo_box=None, param_box=None):
         # if no combo box is passed in, use the default 'method_cbo_box'
@@ -532,7 +532,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             self.plot_tab.setEnabled(False)
         else:
             self.plot_tab.setEnabled(True)
-        qt_layout.fit_option_groups_to_contents(self)
+        qt_layout.fit_analysis_dialog_to_contents(self)
 
     def add_param(self, layout, cur_grid_row, name, value):
         print("adding param. name: %s, value: %s" % (name, value))

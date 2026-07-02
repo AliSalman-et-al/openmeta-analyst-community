@@ -8,15 +8,28 @@ from PyQt5.QtWidgets import (
     QToolButton,
     QRadioButton,
     QSizePolicy,
+    QStackedWidget,
+    QTabWidget,
 )
 
+ANALYSIS_DIALOG_MINIMUM_WIDTH = 520
 
-def fit_option_groups_to_contents(root, adjust_root=True):
+
+def fit_analysis_dialog_to_contents(root, adjust_root=True):
+    """Apply the shared width floor used by analysis parameter dialogs."""
+    fit_option_groups_to_contents(
+        root,
+        adjust_root=adjust_root,
+        minimum_width=ANALYSIS_DIALOG_MINIMUM_WIDTH,
+    )
+
+
+def fit_option_groups_to_contents(root, adjust_root=True, minimum_width=0):
     """Prevent dialog contents from being compressed below visible text."""
-    fit_text_to_contents(root, adjust_root=adjust_root)
+    fit_text_to_contents(root, adjust_root=adjust_root, minimum_width=minimum_width)
 
 
-def fit_text_to_contents(root, adjust_root=True):
+def fit_text_to_contents(root, adjust_root=True, minimum_width=0):
     """Prevent visible text-bearing widgets from being compressed below content."""
     if root.layout() is not None:
         root.layout().activate()
@@ -39,10 +52,11 @@ def fit_text_to_contents(root, adjust_root=True):
     if adjust_root:
         size_hint = root.sizeHint()
         title_width = _window_title_width_hint(root)
+        target_width = max(size_hint.width(), title_width, minimum_width)
         _raise_maximum_height(root, size_hint.height())
-        _raise_maximum_width(root, max(size_hint.width(), title_width))
+        _raise_maximum_width(root, target_width)
         root.setMinimumSize(
-            root.minimumSize().expandedTo(size_hint.expandedTo(QSize(title_width, 0)))
+            root.minimumSize().expandedTo(size_hint.expandedTo(QSize(target_width, 0)))
         )
         root.adjustSize()
 
@@ -75,9 +89,18 @@ def _fit_text_widgets_to_contents(root):
 def _is_hidden_for_fit(widget, root):
     current = widget
     while current is not None and current is not root:
-        if current.isHidden():
+        if current.isHidden() and not _is_hidden_page_for_fit(current):
             return True
         current = current.parentWidget()
+    return False
+
+
+def _is_hidden_page_for_fit(widget):
+    parent = widget.parentWidget()
+    if isinstance(parent, QTabWidget) and parent.indexOf(widget) >= 0:
+        return True
+    if isinstance(parent, QStackedWidget) and parent.indexOf(widget) >= 0:
+        return True
     return False
 
 
@@ -110,16 +133,17 @@ def _option_group_boxes(root):
     return [
         group_box
         for group_box in root.findChildren(QGroupBox)
-        if not group_box.isHidden() and _has_visible_option_button(group_box)
+        if not _is_hidden_for_fit(group_box, root)
+        and _has_visible_option_button(group_box, root)
     ]
 
 
-def _has_visible_option_button(group_box):
+def _has_visible_option_button(group_box, root):
     option_buttons = group_box.findChildren(QCheckBox) + group_box.findChildren(
         QRadioButton
     )
     return any(
-        not button.isHidden() and str(button.text()).strip()
+        not _is_hidden_for_fit(button, root) and str(button.text()).strip()
         for button in option_buttons
     )
 

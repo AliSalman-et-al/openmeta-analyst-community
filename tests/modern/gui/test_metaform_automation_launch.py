@@ -816,6 +816,7 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
     app, window = launch.start_automation()
     meta_form = sys.modules["meta_form"]
     meta_py_r = sys.modules["meta_py_r"]
+    qt_layout = sys.modules["qt_layout"]
 
     params = {
         "rm.method": ["HE", "DL", "SJ", "ML", "REML", "EB"],
@@ -909,6 +910,7 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         window.action_go.trigger()
         specs = window.findChildren(meta_form.ma_specs.MA_Specs)
         assert len(specs) == 1
+        assert specs[0].minimumWidth() >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
 
         enum_combos = [
             combo
