@@ -6,6 +6,7 @@ import ma_specs
 import meta_py_r
 import meta_globals
 import qt_layout
+import qt_text
 
 
 class EditPlotWindow(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg):
@@ -92,39 +93,39 @@ class EditPlotWindow(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
         fill in parameters will current values
         """
         self.current_param_vals["fp_show_col1"] = self.show_1.isChecked()
-        self.current_param_vals["fp_col1_str"] = str(
-            self.col1_str_edit.text().toUtf8(), "utf-8"
+        self.current_param_vals["fp_col1_str"] = qt_text.to_native_text(
+            self.col1_str_edit.text()
         )
         self.current_param_vals["fp_show_col2"] = self.show_2.isChecked()
-        self.current_param_vals["fp_col2_str"] = str(
-            self.col2_str_edit.text().toUtf8(), "utf-8"
+        self.current_param_vals["fp_col2_str"] = qt_text.to_native_text(
+            self.col2_str_edit.text()
         )
         self.current_param_vals["fp_show_col3"] = self.show_3.isChecked()
-        self.current_param_vals["fp_col3_str"] = str(
-            self.col3_str_edit.text().toUtf8(), "utf-8"
+        self.current_param_vals["fp_col3_str"] = qt_text.to_native_text(
+            self.col3_str_edit.text()
         )
         self.current_param_vals["fp_show_col4"] = self.show_4.isChecked()
-        self.current_param_vals["fp_col4_str"] = str(
-            self.col4_str_edit.text().toUtf8(), "utf-8"
+        self.current_param_vals["fp_col4_str"] = qt_text.to_native_text(
+            self.col4_str_edit.text()
         )
-        self.current_param_vals["fp_xlabel"] = str(
-            self.x_lbl_le.text().toUtf8(), "utf-8"
+        self.current_param_vals["fp_xlabel"] = qt_text.to_native_text(
+            self.x_lbl_le.text()
         )
-        self.current_param_vals["fp_outpath"] = str(
-            self.image_path.text().toUtf8(), "utf-8"
+        self.current_param_vals["fp_outpath"] = qt_text.to_native_text(
+            self.image_path.text()
         )
 
-        plot_lb = str(self.plot_lb_le.text().toUtf8(), "utf-8")
+        plot_lb = qt_text.to_native_text(self.plot_lb_le.text())
         self.current_param_vals["fp_plot_lb"] = "[default]"
         if plot_lb != "[default]" and meta_globals.check_plot_bound(plot_lb):
             self.current_param_vals["fp_plot_lb"] = plot_lb
 
-        plot_ub = str(self.plot_ub_le.text().toUtf8(), "utf-8")
+        plot_ub = qt_text.to_native_text(self.plot_ub_le.text())
         self.current_param_vals["fp_plot_ub"] = "[default]"
         if plot_ub != "[default]" and meta_globals.check_plot_bound(plot_ub):
             self.current_param_vals["fp_plot_ub"] = plot_ub
 
-        xticks = str(self.x_ticks_le.text().toUtf8(), "utf-8")
+        xticks = qt_text.to_native_text(self.x_ticks_le.text())
         self.current_param_vals["fp_xticks"] = "[default]"
         if xticks != "[default]" and meta_globals.seems_sane(xticks):
             self.current_param_vals["fp_xticks"] = xticks

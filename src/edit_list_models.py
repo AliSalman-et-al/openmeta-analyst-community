@@ -14,6 +14,11 @@
 from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
 
 import name_validation
+import qt_text
+
+
+def _to_native_text(value):
+    return qt_text.to_native_text(value)
 
 
 def _without_current_name(names, current_name):

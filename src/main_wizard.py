@@ -106,11 +106,7 @@ class WelcomePage(QWizardPage, forms.ui_welcome_page.Ui_WizardPage):
         # we use the sender method to see which menu item was
         # triggered
         dataset_path = (action_item or self.sender()).text()
-        dataset_path = (
-            str(dataset_path.toUtf8(), "utf8")
-            if hasattr(dataset_path, "toUtf8")
-            else str(dataset_path)
-        )
+        dataset_path = qt_text.to_native_text(dataset_path)
         self.selected_dataset = dataset_path
         self.wizard().set_selected_dataset(self.selected_dataset)
         self.wizard().accept()
@@ -126,11 +122,7 @@ class WelcomePage(QWizardPage, forms.ui_welcome_page.Ui_WizardPage):
         )
         if isinstance(self.selected_dataset, tuple):
             self.selected_dataset = self.selected_dataset[0]
-        self.selected_dataset = (
-            str(self.selected_dataset.toUtf8(), "utf8")
-            if hasattr(self.selected_dataset, "toUtf8")
-            else str(self.selected_dataset)
-        )
+        self.selected_dataset = qt_text.to_native_text(self.selected_dataset)
 
         if self.selected_dataset != "":
             self.wizard().set_selected_dataset(self.selected_dataset)
@@ -386,11 +378,7 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
         self.file_path = (
             self.file_path[0] if isinstance(self.file_path, tuple) else self.file_path
         )
-        self.file_path = (
-            str(self.file_path.toUtf8(), "utf8")
-            if hasattr(self.file_path, "toUtf8")
-            else str(self.file_path)
-        )
+        self.file_path = qt_text.to_native_text(self.file_path)
 
         if self.file_path:
             self.file_path_lbl.setText(self.file_path)

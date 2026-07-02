@@ -16,15 +16,12 @@ from PyQt5.QtWidgets import QMessageBox, QUndoCommand
 
 from meta_globals import *
 import meta_py_r
+import qt_text
 
 
 def cell_text_is_blank(value):
     """Return whether Qt item text is blank under both PyQt4 and PyQt5."""
-    if value is None:
-        return True
-    if hasattr(value, "trimmed"):
-        return value.trimmed() == ""
-    return str(value).strip() == ""
+    return qt_text.is_blank(value)
 
 
 def set_table_item_text_color(item, color):

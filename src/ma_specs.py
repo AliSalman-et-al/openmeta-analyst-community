@@ -1006,8 +1006,7 @@ def _diagnostic_analysis_requests(specs_form):
 
 
 def _text_value(widget):
-    text = widget.text()
-    return str(text.toUtf8(), "utf-8") if hasattr(text, "toUtf8") else str(text)
+    return qt_text.to_native_text(widget.text())
 
 
 def _diagnostic_direct_effects_need_metric_specific_data(model, list_of_param_vals):

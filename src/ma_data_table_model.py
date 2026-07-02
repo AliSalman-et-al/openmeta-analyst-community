@@ -45,20 +45,8 @@ def _editable_data(value=None):
     return value
 
 
-class _QtText(str):
-    def toUtf8(self):
-        return self.encode("utf8")
-
-    def trimmed(self):
-        return _QtText(self.strip())
-
-
 def _to_text_value(value):
-    if qt_text.is_invalid_qvariant(value):
-        return _QtText("")
-    if hasattr(value, "toString"):
-        return value.toString()
-    return _QtText("" if value is None else str(value))
+    return qt_text.to_native_text(value)
 
 
 def _to_native_text(value):
@@ -220,7 +208,7 @@ class DatasetModel(QAbstractTableModel):
         return False
 
     def _study_name_is_blank(self, study):
-        return _to_text_value(study.name).trimmed() == ""
+        return qt_text.is_blank(study.name)
 
     def _edit_requires_named_study(self, column, value):
         if column == self.NAME:
@@ -230,7 +218,7 @@ class DatasetModel(QAbstractTableModel):
         if column == self.YEAR:
             return False
 
-        value_is_blank = _to_text_value(value).trimmed() == ""
+        value_is_blank = qt_text.is_blank(value)
         if self.current_outcome is not None and column in self.RAW_DATA:
             return not value_is_blank
         if column in self.OUTCOMES:
@@ -544,7 +532,7 @@ class DatasetModel(QAbstractTableModel):
             return int(float(value))
 
         # ignore blank entries
-        if s.trimmed() == "" or s is None:
+        if qt_text.is_blank(s):
             return True, None
 
         if not is_a_float(s):
@@ -668,7 +656,7 @@ class DatasetModel(QAbstractTableModel):
                     """You have already entered raw data for this study. If you want to enter the outcome directly, delete the raw data first.""",
                 )
 
-        if s.trimmed() == "":
+        if qt_text.is_blank(s):
             # in this case, they've deleted a value
             # (i.e., left it blank) -- this is OK.
             return True, None
@@ -708,7 +696,7 @@ class DatasetModel(QAbstractTableModel):
         return True, None
 
     def _verify_year(self, s):
-        if s.trimmed() == "":
+        if qt_text.is_blank(s):
             return True, None
 
         if not is_an_int(s):
@@ -739,7 +727,7 @@ class DatasetModel(QAbstractTableModel):
                 if column != self.NAME:
                     return self._reject_edit(STUDY_NAME_REQUIRED_MESSAGE)
 
-                name = str(_to_text_value(value).toUtf8(), encoding="utf8")
+                name = _to_text_value(value)
                 if name == "" and not allow_empty_names:
                     return self._reject_edit(STUDY_NAME_REQUIRED_MESSAGE)
 
@@ -758,7 +746,7 @@ class DatasetModel(QAbstractTableModel):
 
         if column == self.NAME:
             # proposed study name
-            name = str(_to_text_value(value).toUtf8(), encoding="utf8")
+            name = _to_text_value(value)
 
             if name == "" and not allow_empty_names:
                 return self._reject_edit(STUDY_NAME_REQUIRED_MESSAGE)
@@ -790,7 +778,7 @@ class DatasetModel(QAbstractTableModel):
                 self.editFocusRequested.emit(new_index)
 
             # study name is good to go
-            study.name = str(_to_text_value(value).toUtf8(), encoding="utf8")
+            study.name = _to_text_value(value)
 
         elif column == self.YEAR:
             year_ok, msg = self._verify_year(_to_text_value(value))
@@ -850,7 +838,7 @@ class DatasetModel(QAbstractTableModel):
 
             row = index.row()
 
-            if _to_text_value(value).trimmed() == "":
+            if qt_text.is_blank(value):
                 delete_value = True
                 display_scale_val = None
                 calc_scale_val = None
@@ -1006,8 +994,7 @@ class DatasetModel(QAbstractTableModel):
                 new_value = _to_native_text(value)
             else:
                 # continuous
-                text_value = _to_text_value(value)
-                if text_value.trimmed() == "":
+                if qt_text.is_blank(value):
                     new_value = None
                 else:
                     new_value, converted_ok = _to_double(value)

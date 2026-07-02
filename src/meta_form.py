@@ -999,11 +999,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         elif (
             self.cur_dimension == "outcome" and startup_outcome
         ):  # For dealing with outcomes from the startup form
-            new_outcome_name = (
-                str(startup_outcome["name"].toUtf8(), "utf-8")
-                if hasattr(startup_outcome["name"], "toUtf8")
-                else str(startup_outcome["name"])
-            )
+            new_outcome_name = qt_text.to_native_text(startup_outcome["name"])
             new_outcome_type = str(startup_outcome["data_type"])
             try:
                 new_outcome_subtype = startup_outcome["sub_type"]
