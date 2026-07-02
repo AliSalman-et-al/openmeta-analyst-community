@@ -1188,6 +1188,209 @@ hsroc.validate.summary.intervals <- function(hsroc.sum) {
     invisible(TRUE)
 }
 
+hsroc.summary.columns <- function(summary.section) {
+    column.names <- colnames(summary.section)
+    list(
+        estimate=grep("estimate", column.names, ignore.case=TRUE),
+        lower=grep("HPD[._ ]?(low|lower)", column.names, ignore.case=TRUE),
+        upper=grep("HPD[._ ]?(high|upper)", column.names, ignore.case=TRUE)
+    )
+}
+
+hsroc.summary.row <- function(summary.section, candidates) {
+    row.names <- rownames(summary.section)
+    if (is.null(row.names)) {
+        return(NULL)
+    }
+    row.index <- which(row.names %in% candidates)
+    if (length(row.index) != 1) {
+        return(NULL)
+    }
+    row.index
+}
+
+hsroc.summary.values <- function(summary.section, candidates) {
+    columns <- hsroc.summary.columns(summary.section)
+    if (length(columns$estimate) != 1 || length(columns$lower) != 1 || length(columns$upper) != 1) {
+        return(NULL)
+    }
+    row.index <- hsroc.summary.row(summary.section, candidates)
+    if (is.null(row.index)) {
+        return(NULL)
+    }
+    stats::setNames(
+        as.numeric(c(
+            summary.section[row.index, columns$estimate],
+            summary.section[row.index, columns$lower],
+            summary.section[row.index, columns$upper]
+        )),
+        c("estimate", "lower", "upper")
+    )
+}
+
+hsroc.safe.ratio <- function(numerator, denominator) {
+    if (is.na(numerator) || is.na(denominator) || denominator == 0) {
+        return(NA_real_)
+    }
+    numerator / denominator
+}
+
+hsroc.diagnostic.odds.ratio <- function(sensitivity, specificity) {
+    hsroc.safe.ratio(sensitivity * specificity, (1 - sensitivity) * (1 - specificity))
+}
+
+hsroc.posterior.summary <- function(samples) {
+    samples <- samples[is.finite(samples)]
+    if (length(samples) == 0) {
+        return(NULL)
+    }
+    hpd <- hsroc.hpd.interval(samples)
+    stats::setNames(c(stats::median(samples), hpd[1], hpd[2]), c("estimate", "lower", "upper"))
+}
+
+hsroc.derived.accuracy.rows.from.samples <- function(chain.out.dirs, params) {
+    sensitivity.samples <- hsroc.retained.chain.samples(chain.out.dirs, "Sens1_new.txt", params)
+    specificity.samples <- hsroc.retained.chain.samples(chain.out.dirs, "Spec1_new.txt", params)
+    sample.count <- min(length(sensitivity.samples), length(specificity.samples))
+    if (sample.count == 0) {
+        return(NULL)
+    }
+    sensitivity.samples <- sensitivity.samples[seq_len(sample.count)]
+    specificity.samples <- specificity.samples[seq_len(sample.count)]
+
+    plr.samples <- sensitivity.samples / (1 - specificity.samples)
+    nlr.samples <- (1 - sensitivity.samples) / specificity.samples
+    dor.samples <- (sensitivity.samples * specificity.samples) /
+        ((1 - sensitivity.samples) * (1 - specificity.samples))
+    list(
+        plr=hsroc.posterior.summary(plr.samples),
+        nlr=hsroc.posterior.summary(nlr.samples),
+        dor=hsroc.posterior.summary(dor.samples)
+    )
+}
+
+hsroc.derived.accuracy.rows.from.intervals <- function(sensitivity, specificity) {
+    plr <- c(
+        estimate=hsroc.safe.ratio(sensitivity[["estimate"]], 1 - specificity[["estimate"]]),
+        lower=hsroc.safe.ratio(sensitivity[["lower"]], 1 - specificity[["lower"]]),
+        upper=hsroc.safe.ratio(sensitivity[["upper"]], 1 - specificity[["upper"]])
+    )
+    nlr <- c(
+        estimate=hsroc.safe.ratio(1 - sensitivity[["estimate"]], specificity[["estimate"]]),
+        lower=hsroc.safe.ratio(1 - sensitivity[["upper"]], specificity[["upper"]]),
+        upper=hsroc.safe.ratio(1 - sensitivity[["lower"]], specificity[["lower"]])
+    )
+    dor <- c(
+        estimate=hsroc.diagnostic.odds.ratio(sensitivity[["estimate"]], specificity[["estimate"]]),
+        lower=hsroc.diagnostic.odds.ratio(sensitivity[["lower"]], specificity[["lower"]]),
+        upper=hsroc.diagnostic.odds.ratio(sensitivity[["upper"]], specificity[["upper"]])
+    )
+    list(plr=plr, nlr=nlr, dor=dor)
+}
+
+hsroc.derived.accuracy.rows <- function(sensitivity, specificity, chain.out.dirs, params) {
+    sampled.rows <- try(hsroc.derived.accuracy.rows.from.samples(chain.out.dirs, params), silent=TRUE)
+    if (!inherits(sampled.rows, "try-error") && !is.null(sampled.rows) &&
+        !is.null(sampled.rows$plr) && !is.null(sampled.rows$nlr) && !is.null(sampled.rows$dor)) {
+        return(sampled.rows)
+    }
+    hsroc.derived.accuracy.rows.from.intervals(sensitivity, specificity)
+}
+
+hsroc.format.summary.number <- function(x, digits) {
+    if (is.na(x) || !is.finite(x)) {
+        return("NA")
+    }
+    sprintf(paste("%.", digits, "f", sep=""), x)
+}
+
+hsroc.summary.table.text <- function(rows, digits) {
+    formatted <- data.frame(
+        Metric=names(rows),
+        Estimate=vapply(rows, function(row) hsroc.format.summary.number(row[["estimate"]], digits), character(1)),
+        `Lower bound`=vapply(rows, function(row) hsroc.format.summary.number(row[["lower"]], digits), character(1)),
+        `Upper bound`=vapply(rows, function(row) hsroc.format.summary.number(row[["upper"]], digits), character(1)),
+        check.names=FALSE
+    )
+    paste(capture.output(print(formatted, row.names=FALSE, right=FALSE)), collapse="\n")
+}
+
+hsroc.model.parameter.summary <- function(between.study, clinical.rows, digits) {
+    if (is.null(dim(between.study)) || is.null(rownames(between.study))) {
+        return(NULL)
+    }
+    model.rows <- setdiff(seq_len(nrow(between.study)), clinical.rows)
+    if (length(model.rows) == 0) {
+        return(NULL)
+    }
+
+    model.parameters <- between.study[model.rows, , drop=FALSE]
+    columns <- hsroc.summary.columns(model.parameters)
+    if (length(columns$estimate) == 1 && length(columns$lower) == 1 && length(columns$upper) == 1) {
+        rows <- lapply(seq_len(nrow(model.parameters)), function(row.index) {
+            stats::setNames(
+                as.numeric(c(
+                    model.parameters[row.index, columns$estimate],
+                    model.parameters[row.index, columns$lower],
+                    model.parameters[row.index, columns$upper]
+                )),
+                c("estimate", "lower", "upper")
+            )
+        })
+        names(rows) <- rownames(model.parameters)
+        return(hsroc.summary.table.text(rows, digits))
+    }
+
+    paste(capture.output(print(model.parameters)), collapse="\n")
+}
+
+hsroc.display.summary <- function(hsroc.sum, params, chain.out.dirs) {
+    raw.summary.names <- intersect(c("Between-study parameters", "Within-study parameters", "Reference standard"), names(hsroc.sum))
+    fallback.summary <- hsroc.sum[raw.summary.names]
+    if (!"Between-study parameters" %in% names(hsroc.sum)) {
+        return(fallback.summary)
+    }
+
+    between.study <- hsroc.sum[["Between-study parameters"]]
+    if (is.null(dim(between.study)) || length(dim(between.study)) != 2) {
+        return(fallback.summary)
+    }
+
+    sensitivity.rows <- c("S Overall", "Sensitivity Overall", "Sensitivity (overall)", "Sensitivity (new)", "S1_new")
+    specificity.rows <- c("C Overall", "Specificity Overall", "Specificity (overall)", "Specificity (new)", "C1_new")
+    sensitivity <- hsroc.summary.values(between.study, sensitivity.rows)
+    specificity <- hsroc.summary.values(between.study, specificity.rows)
+    if (is.null(sensitivity) || is.null(specificity)) {
+        return(fallback.summary)
+    }
+
+    digits <- params$digits
+    if (is.null(digits) || is.na(digits)) {
+        digits <- 3
+    }
+    derived <- hsroc.derived.accuracy.rows(sensitivity, specificity, chain.out.dirs, params)
+    summary.rows <- list(
+        "Pooled Sensitivity"=sensitivity,
+        "Pooled Specificity"=specificity,
+        "Positive Likelihood Ratio"=derived$plr,
+        "Negative Likelihood Ratio"=derived$nlr,
+        "Diagnostic Odds Ratio"=derived$dor,
+        "Summary ROC point (Sensitivity)"=sensitivity,
+        "Summary ROC point (Specificity)"=specificity
+    )
+
+    summary <- list("Clinical Accuracy Summary"=hsroc.summary.table.text(summary.rows, digits))
+    clinical.row.indexes <- c(
+        hsroc.summary.row(between.study, sensitivity.rows),
+        hsroc.summary.row(between.study, specificity.rows)
+    )
+    model.summary <- hsroc.model.parameter.summary(between.study, clinical.row.indexes, digits)
+    if (!is.null(model.summary)) {
+        summary[["HSROC Model Parameters"]] <- model.summary
+    }
+    summary
+}
+
 ##################################
 #       diagnostic hsroc         #
 ##################################
@@ -1254,8 +1457,7 @@ diagnostic.hsroc <- function(diagnostic.data, params){
     if (length(missing.summary.names) > 0) {
         stop(paste("HSROC summary did not contain expected section(s):", paste(missing.summary.names, collapse=", ")))
     }
-    summary.names <- intersect(c(required.summary.names, "Reference standard"), names(hsroc.sum))
-    summary <- hsroc.sum[summary.names]
+    summary <- hsroc.display.summary(hsroc.sum, params, chain.out.dirs)
 
     ####
     # and the images

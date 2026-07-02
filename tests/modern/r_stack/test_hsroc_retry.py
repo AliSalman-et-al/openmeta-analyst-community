@@ -138,8 +138,24 @@ _HSROC_RETRY_DRIVER = textwrap.dedent(
     if (!all(file.exists(unlist(result$images)))) {
       stop(paste("diagnostic.hsroc exposed missing plot paths:", paste(unlist(result$images), collapse=", ")))
     }
-    if (!all(c("Between-study parameters", "Within-study parameters") %in% names(result$Summary))) {
-      stop("diagnostic.hsroc did not preserve the stock HSROC summary sections")
+    if (!"Clinical Accuracy Summary" %in% names(result$Summary)) {
+      stop("diagnostic.hsroc did not expose a clinically labelled HSROC summary")
+    }
+    clinical.summary <- result$Summary[["Clinical Accuracy Summary"]]
+    expected.labels <- c(
+      "Pooled Sensitivity",
+      "Pooled Specificity",
+      "Positive Likelihood Ratio",
+      "Negative Likelihood Ratio",
+      "Diagnostic Odds Ratio",
+      "Summary ROC point"
+    )
+    missing.labels <- expected.labels[!vapply(expected.labels, grepl, logical(1), clinical.summary, fixed=TRUE)]
+    if (length(missing.labels) > 0) {
+      stop(paste("diagnostic.hsroc clinical summary is missing:", paste(missing.labels, collapse=", ")))
+    }
+    if (grepl("Between-study parameters|Within-study parameters|THETA|LAMBDA|theta|alpha", clinical.summary)) {
+      stop(paste("diagnostic.hsroc clinical summary leaked raw sampler parameters:\n", clinical.summary))
     }
 
     result <- run.case("non-finite-init")
@@ -158,8 +174,9 @@ _HSROC_RETRY_DRIVER = textwrap.dedent(
     }
 
     result <- run.case("bad-summary")
-    specificity.new <- result$Summary$`Between-study parameters`["Specificity (new)", ]
-    if (specificity.new[["HPD.high"]] <= specificity.new[["median estimate"]]) {
+    clinical.summary <- result$Summary[["Clinical Accuracy Summary"]]
+    specificity.line <- grep("Pooled Specificity", strsplit(clinical.summary, "\n", fixed=TRUE)[[1]], value=TRUE)
+    if (length(specificity.line) != 1 || !grepl("0.200", specificity.line, fixed=TRUE)) {
       stop("diagnostic.hsroc did not repair the known HSROC Specificity (new) HPD.high summary bug")
     }
 
