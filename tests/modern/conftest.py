@@ -49,6 +49,28 @@ def _taxonomy_entries():
     }
 
 
+def _entry_requires_qt(entry):
+    return entry and (
+        "qt" in entry.get("external_dependencies", [])
+        or "gui_compatibility" in entry.get("evidence", [])
+    )
+
+
+@pytest.fixture(autouse=True)
+def _isolate_qsettings_for_qt_tests(request, tmp_path):
+    entries = _taxonomy_entries()
+    entry = entries.get(request.node.nodeid.replace("\\", "/"))
+    if not _entry_requires_qt(entry):
+        return
+
+    from PyQt5 import QtCore
+
+    QtCore.QSettings.setPath(
+        QtCore.QSettings.IniFormat, QtCore.QSettings.UserScope, str(tmp_path)
+    )
+    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.IniFormat)
+
+
 def pytest_collection_modifyitems(config, items):
     entries = _taxonomy_entries()
     config._needs_qapplication = False
@@ -56,9 +78,7 @@ def pytest_collection_modifyitems(config, items):
         entry = entries.get(item.nodeid.replace("\\", "/"))
         if not entry:
             continue
-        has_qt_dependency = "qt" in entry.get("external_dependencies", [])
-        has_gui_evidence = "gui_compatibility" in entry.get("evidence", [])
-        if has_qt_dependency or has_gui_evidence:
+        if _entry_requires_qt(entry):
             config._needs_qapplication = True
         marker_names = {entry.get("size"), entry.get("lane")}
         marker_names.update(entry.get("evidence", []))

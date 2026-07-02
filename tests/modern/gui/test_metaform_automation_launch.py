@@ -1665,7 +1665,7 @@ def test_subgroup_covariate_dialog_constructs_with_factor_covariate():
 
         form = meta_subgroup_form.MetaSubgroupForm(window.model, parent=window)
 
-        assert str(form.windowTitle()) == "select covariate"
+        assert str(form.windowTitle()) == "Select Covariate"
         assert [
             str(form.cov_subgroup_cbo_box.itemText(index))
             for index in range(form.cov_subgroup_cbo_box.count())
