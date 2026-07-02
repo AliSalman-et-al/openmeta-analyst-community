@@ -1021,7 +1021,17 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         ]
         for combo in [specs[0].method_cbo_box] + enum_combos:
             assert combo.sizeAdjustPolicy() == QtWidgets.QComboBox.AdjustToContents
-            assert combo.minimumWidth() >= combo.sizeHint().width()
+            assert combo.minimumWidth() <= qt_layout.ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH
+            assert (
+                combo.sizePolicy().horizontalPolicy()
+                != QtWidgets.QSizePolicy.Expanding
+            )
+
+        for combo in enum_combos:
+            assert (
+                combo.maximumWidth()
+                <= qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
+            )
 
         confidence_spinboxes = specs[0].parameter_grp_box.findChildren(
             QtWidgets.QDoubleSpinBox
@@ -1086,6 +1096,147 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         assert specs[0].current_param_vals["digits"] == 3
         assert specs[0].current_param_vals["adjust"] == 0.5
         assert specs[0].current_param_vals["theta.lower"] == -2.5
+    finally:
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
+def test_method_parameters_dialog_stays_stable_when_method_description_changes(
+    monkeypatch,
+):
+    import launch
+    from PyQt5 import QtWidgets
+
+    app, window = launch.start_automation()
+    meta_form = sys.modules["meta_form"]
+    meta_py_r = sys.modules["meta_py_r"]
+    qt_layout = sys.modules["qt_layout"]
+
+    method_map = {
+        "Binary Random-Effects": "binary.random",
+        "Binary Fixed-Effect Mantel Haenszel": "binary.fixed.mh",
+    }
+    descriptions = {
+        "binary.random": "Random-effects analysis",
+        "binary.fixed.mh": (
+            "Fixed-effect Mantel-Haenszel analysis with a long generated "
+            "description that should wrap inside the method panel instead of "
+            "widening the dialog while the user changes selections."
+        ),
+    }
+    params = {
+        "binary.random": (
+            {"rm.method": ["DL", "SJ"], "conf.level": "float", "digits": "float"},
+            {"rm.method": "DL", "conf.level": 95.0, "digits": 3},
+            ["rm.method", "conf.level", "digits"],
+        ),
+        "binary.fixed.mh": (
+            {"to": ["only0", "all"], "conf.level": "float", "digits": "float"},
+            {"to": "only0", "conf.level": 95.0, "digits": 3},
+            ["to", "conf.level", "digits"],
+        ),
+    }
+    pretty_names = {
+        "rm.method": {
+            "pretty.name": "Random-Effects method",
+            "description": "Method for estimating between-studies heterogeneity",
+        },
+        "to": {
+            "pretty.name": "Correction factor target",
+            "description": "Cells receiving the correction factor",
+        },
+        "conf.level": {
+            "pretty.name": "Confidence level",
+            "description": "Level at which to compute confidence intervals",
+        },
+        "digits": {
+            "pretty.name": "Number of digits",
+            "description": "Number of digits to display in results",
+        },
+    }
+
+    monkeypatch.setattr(
+        meta_py_r,
+        "get_available_methods",
+        lambda **kwargs: dict(method_map),
+        raising=False,
+    )
+
+    def get_params(method):
+        method_params, defaults, var_order = params[method]
+        return dict(method_params), dict(defaults), list(var_order), pretty_names
+
+    monkeypatch.setattr(meta_py_r, "get_params", get_params, raising=False)
+    monkeypatch.setattr(
+        meta_py_r,
+        "get_method_description",
+        lambda method: descriptions[method],
+        raising=False,
+    )
+    monkeypatch.setattr(
+        meta_py_r,
+        "ma_dataset_to_simple_binary_robj",
+        lambda model, **kwargs: None,
+        raising=False,
+    )
+
+    try:
+        assert (
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            is True
+        )
+
+        window.action_go.trigger()
+        specs = window.findChildren(meta_form.ma_specs.MA_Specs)
+        assert len(specs) == 1
+        specs = specs[0]
+        specs.show()
+        app.processEvents()
+
+        stable_width = specs.width()
+        stable_minimum_width = specs.minimumWidth()
+        assert stable_minimum_width >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
+
+        long_method_index = specs.method_cbo_box.findText(
+            "Binary Fixed-Effect Mantel Haenszel"
+        )
+        assert long_method_index >= 0
+        specs.method_cbo_box.setCurrentIndex(long_method_index)
+        app.processEvents()
+        short_method_index = specs.method_cbo_box.findText("Binary Random-Effects")
+        specs.method_cbo_box.setCurrentIndex(short_method_index)
+        app.processEvents()
+
+        assert specs.width() == stable_width
+        assert specs.minimumWidth() == stable_minimum_width
+
+        descriptions = [
+            label
+            for label in specs.parameter_grp_box.findChildren(QtWidgets.QLabel)
+            if str(label.text()).startswith("Description:")
+        ]
+        assert len(descriptions) == 1
+        assert descriptions[0].wordWrap() is True
+        assert descriptions[0].minimumWidth() == 0
+
+        value_controls = []
+        for control_type in (
+            QtWidgets.QComboBox,
+            QtWidgets.QSpinBox,
+            QtWidgets.QDoubleSpinBox,
+        ):
+            value_controls.extend(specs.parameter_grp_box.findChildren(control_type))
+
+        for value_control in value_controls:
+            assert (
+                value_control.maximumWidth()
+                <= qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
+            )
+            assert (
+                value_control.sizePolicy().horizontalPolicy()
+                != QtWidgets.QSizePolicy.Expanding
+            )
     finally:
         window.close()
         app.processEvents()

@@ -27,6 +27,7 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QDoubleSpinBox,
+    QSizePolicy,
     QSpinBox,
 )
 
@@ -326,8 +327,8 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         ]
         self.setup_params()
         self.parameter_grp_box.setTitle(self.current_method)
-        self.ui_for_params()
-        qt_layout.fit_analysis_dialog_to_contents(self)
+        self.ui_for_params(adjust_root=False)
+        qt_layout.fit_analysis_dialog_to_contents(self, adjust_root=False)
 
     def populate_cbo_box(self, cbo_box=None, param_box=None):
         # if no combo box is passed in, use the default 'method_cbo_box'
@@ -438,10 +439,13 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
     def clear_param_ui(self):
         for widget in self.current_widgets:
+            if self.parameter_grp_box.layout() is not None:
+                self.parameter_grp_box.layout().removeWidget(widget)
+            widget.setParent(None)
             widget.deleteLater()
             widget = None
 
-    def ui_for_params(self):
+    def ui_for_params(self, adjust_root=True):
         if self.parameter_grp_box.layout() is None:
             layout = QGridLayout()
             self.parameter_grp_box.setLayout(layout)
@@ -451,7 +455,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         # add the method description
         method_description = meta_py_r.get_method_description(self.current_method)
 
-        self.add_label(
+        self.add_method_description(
             self.parameter_grp_box.layout(),
             cur_grid_row,
             "Description: %s" % method_description,
@@ -500,7 +504,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             self.plot_tab.setEnabled(False)
         else:
             self.plot_tab.setEnabled(True)
-        qt_layout.fit_analysis_dialog_to_contents(self)
+        qt_layout.fit_analysis_dialog_to_contents(self, adjust_root=adjust_root)
 
     def add_param(self, layout, cur_grid_row, name, value):
         print("adding param. name: %s, value: %s" % (name, value))
@@ -553,6 +557,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             app_error_handler.safe_slot(self.set_param_f_from_itemdata(name), parent=self)
         )
 
+        self._cap_value_control_width(cbo_box)
         self.current_widgets.append(cbo_box)
         layout.addWidget(cbo_box, cur_grid_row, 1)
 
@@ -622,6 +627,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             self.current_param_vals[name] = value
 
         finput.setMaximumWidth(50)
+        self._cap_value_control_width(finput)
         finput.valueChanged[float].connect(
             app_error_handler.safe_slot(self.set_param_f(name, to_type=float), parent=self)
         )
@@ -643,6 +649,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         conf_input.valueChanged[float].connect(
             app_error_handler.safe_slot(self.set_param_f(name, to_type=float), parent=self)
         )
+        self._cap_value_control_width(conf_input)
         self.current_widgets.append(conf_input)
         layout.addWidget(conf_input, cur_grid_row, 1)
 
@@ -679,6 +686,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             self.current_param_vals[name] = value
 
         iinput.setMaximumWidth(50)
+        self._cap_value_control_width(iinput)
         iinput.valueChanged[int].connect(
             app_error_handler.safe_slot(self.set_param_f(name, to_type=int), parent=self)
         )
@@ -701,6 +709,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             self.current_param_vals[name] = self.current_defaults[name]
 
         txt_input.setMaximumWidth(200)
+        self._cap_value_control_width(txt_input)
         txt_input.textChanged.connect(
             app_error_handler.safe_slot(self.set_param_f(name, to_type=str), parent=self)
         )
@@ -725,6 +734,27 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             lbl.setToolTip(tool_tip_text)
         self.current_widgets.append(lbl)
         layout.addWidget(lbl, cur_grid_row, 0)
+
+    def add_method_description(self, layout, cur_grid_row, text):
+        lbl = QLabel(text, self.parameter_grp_box)
+        lbl.setWordWrap(True)
+        lbl.setMinimumWidth(0)
+        lbl.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.current_widgets.append(lbl)
+        layout.addWidget(lbl, cur_grid_row, 0, 1, 2)
+
+    def _cap_value_control_width(self, widget):
+        widget.setProperty(
+            "oma_maximum_value_control_width",
+            qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH,
+        )
+        widget.setMaximumWidth(
+            min(
+                widget.maximumWidth(),
+                qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH,
+            )
+        )
+        widget.setSizePolicy(QSizePolicy.Maximum, widget.sizePolicy().verticalPolicy())
 
     def setup_params(self):
         # parses out information about the parameters of the current method

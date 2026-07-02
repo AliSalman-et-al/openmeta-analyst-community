@@ -20,6 +20,7 @@ APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH = 360
 ANALYSIS_DIALOG_MINIMUM_WIDTH = 520
 ANALYSIS_DIALOG_MINIMUM_HEIGHT = 260
 ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH = APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH
+ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH = 220
 
 
 def exec_centered(dialog):
@@ -153,6 +154,9 @@ def _fit_text_widgets_to_contents(root):
     for label in root.findChildren(QLabel):
         if _is_hidden_for_fit(label, root) or not str(label.text()).strip():
             continue
+        if label.wordWrap():
+            label.setMinimumWidth(0)
+            continue
         _fit_widget_width_to_hint(label, label.sizeHint().width())
 
     for combo_box in root.findChildren(QComboBox):
@@ -198,9 +202,10 @@ def _fit_widget_width_to_hint(widget, width):
 
 def _fit_combo_width_to_contents(combo_box):
     width = max(combo_box.sizeHint().width(), _combo_contents_width(combo_box))
-    target_width = min(width, APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH)
+    target_maximum_width = _combo_maximum_width(combo_box)
+    target_width = min(width, target_maximum_width)
     combo_box.setMinimumWidth(target_width)
-    combo_box.setMaximumWidth(max(target_width, APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH))
+    combo_box.setMaximumWidth(max(target_width, target_maximum_width))
     if combo_box.sizePolicy().horizontalPolicy() == QSizePolicy.Fixed:
         combo_box.setSizePolicy(
             QSizePolicy.Preferred, combo_box.sizePolicy().verticalPolicy()
@@ -216,6 +221,13 @@ def _combo_contents_width(combo_box):
         for index in range(combo_box.count())
     )
     return widest_item + 48
+
+
+def _combo_maximum_width(combo_box):
+    explicit_cap = combo_box.property("oma_maximum_value_control_width")
+    if isinstance(explicit_cap, int) and explicit_cap > 0:
+        return min(explicit_cap, APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH)
+    return APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH
 
 
 def _window_title_width_hint(root):

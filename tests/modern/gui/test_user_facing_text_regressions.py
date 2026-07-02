@@ -237,6 +237,9 @@ def _assert_visible_text_widgets_fit(root, module_name):
     for label in root.findChildren(QtWidgets.QLabel):
         if not _visible_text(label, root, label.text()):
             continue
+        if label.wordWrap():
+            assert label.minimumWidth() == 0, module_name
+            continue
         assert label.minimumWidth() >= label.sizeHint().width(), module_name
         assert label.maximumWidth() >= label.sizeHint().width(), module_name
 
@@ -316,7 +319,8 @@ def test_dialog_width_fit_includes_labels_combos_and_window_title():
         assert description.minimumWidth() >= description.sizeHint().width()
         assert parameter_label.minimumWidth() >= parameter_label.sizeHint().width()
         assert combo.sizeAdjustPolicy() == QtWidgets.QComboBox.AdjustToContents
-        assert combo.minimumWidth() >= combo.sizeHint().width()
+        assert combo.minimumWidth() <= qt_layout.APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH
+        assert combo.maximumWidth() == qt_layout.APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH
         assert root.minimumWidth() >= root.sizeHint().width()
 
         title_width = root.fontMetrics().horizontalAdvance(root.windowTitle())
@@ -365,7 +369,8 @@ def test_dialog_width_fit_includes_hidden_tab_contents_and_late_content():
         assert wide_tab.isHidden()
         assert description.minimumWidth() >= description.sizeHint().width()
         assert parameter_label.minimumWidth() >= parameter_label.sizeHint().width()
-        assert combo.minimumWidth() >= combo.sizeHint().width()
+        assert combo.minimumWidth() <= qt_layout.ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH
+        assert combo.maximumWidth() == qt_layout.ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH
         assert root.minimumWidth() >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
         assert root.minimumWidth() >= root.sizeHint().width()
     finally:
