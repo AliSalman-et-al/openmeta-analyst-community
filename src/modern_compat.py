@@ -1,11 +1,6 @@
 import meta_py_r_backend
 
 
-def reset_model(model):
-    model.beginResetModel()
-    model.endResetModel()
-
-
 def install():
     return meta_py_r_backend.install_meta_py_r_backend()
 

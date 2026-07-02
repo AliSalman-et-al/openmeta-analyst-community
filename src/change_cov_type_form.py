@@ -74,7 +74,7 @@ class CovModel(QAbstractTableModel):
 
         self.STUDY_COL, self.ORIG_VAL, self.NEW_VAL = list(range(3))
 
-    def reset(self):
+    def reset_model(self):
         self.beginResetModel()
         self.endResetModel()
 
@@ -93,7 +93,7 @@ class CovModel(QAbstractTableModel):
         self.new_covariate = Covariate(new_name, COV_INTS_TO_STRS[self.new_data_type])
 
         self.dataset.add_covariate(self.new_covariate, cov_values=guessed_vals)
-        self.reset()
+        self.reset_model()
 
     def guess_at_values(self):
         cov_d = self.dataset.get_values_for_cov(self.covariate)  # original values
@@ -165,7 +165,7 @@ class CovModel(QAbstractTableModel):
                 self.new_cov_list.append(None)
         self.orig_cov_list.append("")
 
-        self.reset()
+        self.reset_model()
 
     def update_included_studies(self):
         study_list = []

@@ -88,7 +88,13 @@ def test_representative_projects_round_trip_without_byte_identical_expectations(
 ):
     import launch
 
-    for name in ["amino.oma", "continuous.oma", "lymph.oma", "BCG.oma"]:
+    for name in [
+        "amino.oma",
+        "continuous.oma",
+        "lymph.oma",
+        "BCG.oma",
+        "meantime.oma",
+    ]:
         app, window = launch.start_automation()
         saved_path = str(tmp_path / name)
         try:
@@ -104,7 +110,7 @@ def test_representative_projects_round_trip_without_byte_identical_expectations(
             )
 
             window.save_as()
-            reopened = meta_form._load_legacy_pickle(saved_path)
+            reopened = meta_form._load_project_pickle(saved_path)
 
             assert _dataset_summary(reopened) == expected
         finally:

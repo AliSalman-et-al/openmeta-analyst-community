@@ -955,7 +955,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                 option1_txt = "no"
                 dialog = ChooseBackCalcResultForm(info, option0_txt, option1_txt)
                 dialog.setWindowTitle("Population SD Assumptions")
-                if dialog.exec_():
+                if dialog.exec():
                     self.metric_parameter = True if dialog.getChoice() == 0 else False
             elif self.cur_effect == "SMD":
                 info = "In order to perform back-calculation most accurately, we need to know if the the bias in the SMD been corrected i.e. should we use Hedge's g or Cohen's d when performing the back calculation?"
@@ -963,7 +963,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                 option1_txt = "Cohen's d"
                 dialog = ChooseBackCalcResultForm(info, option0_txt, option1_txt)
                 dialog.setWindowTitle("SMD bias correction")
-                if dialog.exec_():
+                if dialog.exec():
                     self.metric_parameter = True if dialog.getChoice() == 0 else False
             print(("metric_parameter is now %s" % str(self.metric_parameter)))
 
@@ -1087,7 +1087,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                 print(("Options (0,1)", value[0], value[1]))
 
                 dialog = ChooseBackCalcResultForm(info, option0_txt, option1_txt)
-                if dialog.exec_():
+                if dialog.exec():
                     imputed[key] = value[0] if dialog.getChoice() == 0 else value[1]
                 else:  # pressed cancel
                     return None  # do nothing and leave

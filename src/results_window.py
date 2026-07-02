@@ -571,4 +571,4 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     resultswindow = ResultsWindow(test_results)
     resultswindow.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())

@@ -35,12 +35,12 @@ STUDY_NAME_REQUIRED_MESSAGE = "Please enter a study name before entering study d
 
 def _item_data(value=None):
     if value is None:
-        return QtCore.QVariant()
+        return None
     return value
 
 
 def _editable_data(value=None):
-    if value is None or qt_text.is_invalid_qvariant(value):
+    if value is None:
         return ""
     return value
 
@@ -198,7 +198,7 @@ class DatasetModel(QAbstractTableModel):
         self.NUM_DIGITS = 3
         self.dirty = False
 
-    def reset(self):
+    def reset_model(self):
         self.beginResetModel()
         self.endResetModel()
 
@@ -239,7 +239,7 @@ class DatasetModel(QAbstractTableModel):
         # when the user edits the currently displayed outcome,
         # the edited outcome is shown in its place
         self.current_outcome = outcome_names[0] if len(outcome_names) > 0 else None
-        self.reset()
+        self.reset_model()
 
     def update_current_time_points(self):
         if self.current_outcome is not None:
@@ -250,7 +250,7 @@ class DatasetModel(QAbstractTableModel):
             )[0]
         else:
             self.current_time_point = 0
-        self.reset()
+        self.reset_model()
 
     def update_current_group_names(self):
         """
@@ -281,7 +281,7 @@ class DatasetModel(QAbstractTableModel):
             else:
                 self.current_txs = ["test 1"]
         self.previous_txs = self.current_txs
-        self.reset()
+        self.reset_model()
 
     def update_column_indices(self):
         # Here we update variable column indices, contingent on
@@ -772,7 +772,7 @@ class DatasetModel(QAbstractTableModel):
                 self.dataset.add_study(new_study)
                 self.study_auto_added = int(new_study.id)
                 study_added_due_to_edit = int(new_study.id)
-                self.reset()
+                self.reset_model()
                 # new_index is where the user *should* be editing.
                 new_index = self.index(index.row(), index.column() + 1)
                 self.editFocusRequested.emit(new_index)
@@ -1370,7 +1370,7 @@ class DatasetModel(QAbstractTableModel):
     def rename_covariate(self, old_cov_name, new_cov_name):
         old_cov_obj = self.dataset.get_cov_obj_from_name(old_cov_name)
         self.dataset.change_covariate_name(old_cov_obj, new_cov_name)
-        self.reset()
+        self.reset_model()
 
     def _get_col_count(self):
         """
@@ -1424,7 +1424,7 @@ class DatasetModel(QAbstractTableModel):
             # now remove the old group from the list of current groups
             self.current_txs.pop(group_index)
             self.current_txs.insert(group_index, new_group_name)
-        self.reset()
+        self.reset_model()
 
     def add_follow_up_to_current_outcome(self, follow_up_name):
         follow_up_name = validate_new_follow_up_name(
@@ -1440,15 +1440,15 @@ class DatasetModel(QAbstractTableModel):
         self.dataset.add_covariate(
             Covariate(covariate_name, covariate_type), cov_values=cov_values
         )
-        self.reset()
+        self.reset_model()
 
     def remove_covariate(self, covariate_name):
         self.dataset.remove_covariate(covariate_name)
-        self.reset()
+        self.reset_model()
 
     def remove_study(self, an_id):
         self.dataset.studies.pop(an_id)
-        self.reset()
+        self.reset_model()
 
     def get_name(self):
         return self.dataset.title
@@ -1504,7 +1504,7 @@ class DatasetModel(QAbstractTableModel):
     def set_current_time_point(self, time_point):
         self.current_time_point = time_point
         self.followUpChanged.emit()
-        self.reset()
+        self.reset_model()
 
     def set_current_follow_up(self, follow_up_name):
         t_point = self.dataset.outcome_names_to_follow_ups[
@@ -1654,7 +1654,7 @@ class DatasetModel(QAbstractTableModel):
             cov = self.get_cov(col)
             self._sort_studies_with_cmp(cov.name, reverse)
 
-        self.reset()
+        self.reset_model()
 
     def order_studies(self, ids):
         """Shuffles studies vector to the order specified by ids"""
@@ -1665,14 +1665,14 @@ class DatasetModel(QAbstractTableModel):
                     ordered_studies.append(study)
                     break
         self.dataset.studies = ordered_studies
-        self.reset()
+        self.reset_model()
 
     def set_current_outcome(self, outcome_name):
         self.current_outcome = outcome_name
         self.update_column_indices()
         self.update_cur_tx_effect()
         self.outcomeChanged.emit()
-        self.reset()
+        self.reset_model()
 
     def update_cur_tx_effect(self):
         outcome_type = self.dataset.get_outcome_type(self.current_outcome)
@@ -1796,7 +1796,7 @@ class DatasetModel(QAbstractTableModel):
         if "conf_level" not in list(state_dict.keys()):
             self.set_conf_level(DEFAULT_CONF_LEVEL)
 
-        self.reset()
+        self.reset_model()
 
     def raw_data_is_complete_for_study(self, study_index, first_arm_only=False):
         raw_data = self._get_raw_data_according_to_arms(study_index, first_arm_only)

@@ -171,7 +171,7 @@ def start():
                 "Startup project smoke test did not receive a project path."
             )
         meta.start()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
 
 
 def start_automation():

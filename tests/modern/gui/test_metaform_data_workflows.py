@@ -200,7 +200,7 @@ def test_data_table_editing_preserves_project_state_and_round_trips(
             meta_form.QFileDialog, "getSaveFileName", lambda **kwargs: (saved_path, "")
         )
         window.save_as()
-        reopened = meta_form._load_legacy_pickle(saved_path)
+        reopened = meta_form._load_project_pickle(saved_path)
 
         assert [
             (str(study.name), str(study.year)) for study in reopened.studies[:1]
@@ -413,7 +413,7 @@ def test_add_outcome_dialog_rejects_blank_and_duplicate_names(monkeypatch):
                 self.datatype_cbo_box = QtWidgets.QComboBox()
                 self.datatype_cbo_box.addItem("Binary")
 
-            def exec_(self):
+            def exec(self):
                 return True
 
         monkeypatch.setattr(
@@ -469,7 +469,7 @@ def test_edit_dialog_rejects_blank_outcome_name(monkeypatch):
                 self.datatype_cbo_box = QtWidgets.QComboBox()
                 self.datatype_cbo_box.addItem("Continuous")
 
-            def exec_(self):
+            def exec(self):
                 return True
 
         monkeypatch.setattr(
@@ -508,7 +508,7 @@ def test_edit_dialog_rejects_blank_names_for_other_dataset_entities(monkeypatch)
                 self.group_name_le = QtWidgets.QLineEdit()
                 self.group_name_le.setText(" ")
 
-            def exec_(self):
+            def exec(self):
                 return True
 
         class BlankFollowUpDialog(object):
@@ -516,7 +516,7 @@ def test_edit_dialog_rejects_blank_names_for_other_dataset_entities(monkeypatch)
                 self.follow_up_name_le = QtWidgets.QLineEdit()
                 self.follow_up_name_le.setText("   ")
 
-            def exec_(self):
+            def exec(self):
                 return True
 
         class BlankCovariateDialog(object):
@@ -526,7 +526,7 @@ def test_edit_dialog_rejects_blank_names_for_other_dataset_entities(monkeypatch)
                 self.datatype_cbo_box = QtWidgets.QComboBox()
                 self.datatype_cbo_box.addItem("Continuous")
 
-            def exec_(self):
+            def exec(self):
                 return True
 
         class BlankStudyDialog(object):
@@ -534,7 +534,7 @@ def test_edit_dialog_rejects_blank_names_for_other_dataset_entities(monkeypatch)
                 self.study_lbl = QtWidgets.QLineEdit()
                 self.study_lbl.setText(" ")
 
-            def exec_(self):
+            def exec(self):
                 return True
 
         monkeypatch.setattr(
@@ -594,7 +594,7 @@ def test_add_dialogs_reject_blank_names_for_other_dataset_entities(monkeypatch):
                 self.group_name_le = QtWidgets.QLineEdit()
                 self.group_name_le.setText("   ")
 
-            def exec_(self):
+            def exec(self):
                 return True
 
         class BlankFollowUpDialog(object):
@@ -602,7 +602,7 @@ def test_add_dialogs_reject_blank_names_for_other_dataset_entities(monkeypatch):
                 self.follow_up_name_le = QtWidgets.QLineEdit()
                 self.follow_up_name_le.setText("")
 
-            def exec_(self):
+            def exec(self):
                 return True
 
         class BlankCovariateDialog(object):
@@ -612,7 +612,7 @@ def test_add_dialogs_reject_blank_names_for_other_dataset_entities(monkeypatch):
                 self.datatype_cbo_box = QtWidgets.QComboBox()
                 self.datatype_cbo_box.addItem("Continuous")
 
-            def exec_(self):
+            def exec(self):
                 return True
 
         monkeypatch.setattr(
@@ -657,7 +657,7 @@ def test_metaform_dialog_text_slots_accept_pyqt5_line_edit_strings(monkeypatch):
                 self.group_name_le = QtWidgets.QLineEdit()
                 self.group_name_le.setText("Renamed group")
 
-            def exec_(self):
+            def exec(self):
                 return True
 
         class CovariateNameDialog(object):
@@ -665,7 +665,7 @@ def test_metaform_dialog_text_slots_accept_pyqt5_line_edit_strings(monkeypatch):
                 self.group_name_le = QtWidgets.QLineEdit()
                 self.group_name_le.setText("Renamed dose")
 
-            def exec_(self):
+            def exec(self):
                 return True
 
         class NewCovariateDialog(object):
@@ -675,7 +675,7 @@ def test_metaform_dialog_text_slots_accept_pyqt5_line_edit_strings(monkeypatch):
                 self.datatype_cbo_box = QtWidgets.QComboBox()
                 self.datatype_cbo_box.addItem("Continuous")
 
-            def exec_(self):
+            def exec(self):
                 return True
 
         class NewOutcomeDialog(object):
@@ -685,7 +685,7 @@ def test_metaform_dialog_text_slots_accept_pyqt5_line_edit_strings(monkeypatch):
                 self.datatype_cbo_box = QtWidgets.QComboBox()
                 self.datatype_cbo_box.addItem("Continuous")
 
-            def exec_(self):
+            def exec(self):
                 return True
 
         class NewGroupDialog(object):
@@ -693,7 +693,7 @@ def test_metaform_dialog_text_slots_accept_pyqt5_line_edit_strings(monkeypatch):
                 self.group_name_le = QtWidgets.QLineEdit()
                 self.group_name_le.setText("Added group")
 
-            def exec_(self):
+            def exec(self):
                 return True
 
         class NewFollowUpDialog(object):
@@ -701,7 +701,7 @@ def test_metaform_dialog_text_slots_accept_pyqt5_line_edit_strings(monkeypatch):
                 self.follow_up_name_le = QtWidgets.QLineEdit()
                 self.follow_up_name_le.setText("week 4")
 
-            def exec_(self):
+            def exec(self):
                 return True
 
         monkeypatch.setattr(
@@ -836,17 +836,15 @@ def _create_binary_dataset(window):
 
 
 def _metric_action(window, metric):
+    import qt_text
+
     for menu_action in window.menuMetric.actions():
         menu = menu_action.menu()
         if menu is None:
             continue
         for action in menu.actions():
             action_data = action.data()
-            action_metric = (
-                str(action_data.toString())
-                if hasattr(action_data, "toString")
-                else str(action_data)
-            )
+            action_metric = qt_text.to_native_text(action_data)
             if action_metric == metric:
                 return action
     raise AssertionError("Metric action not found: %s" % metric)

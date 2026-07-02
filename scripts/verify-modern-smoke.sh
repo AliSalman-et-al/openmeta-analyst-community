@@ -76,7 +76,8 @@ uv run python scripts/validate_golden_baseline_manifests.py
 step "Running smoke pytest nodes"
 uv run pytest \
   tests/modern/golden/test_modern_golden_compare.py::test_golden_summary_parser_reads_current_openmetar_summary_display \
-  tests/modern/fast/test_project_pickle_loader.py::test_loader_opens_representative_qt4_project_without_pyqt4_module
+  tests/modern/fast/test_project_pickle_migration.py::test_project_loader_migrates_old_qt_text_values_without_importing_old_qt \
+  tests/modern/fast/test_qt_text_boundaries.py::test_old_qt_string_and_item_color_apis_stay_inside_compat_boundaries
 
 step "Checking Default R Evidence prerequisites"
 r_evidence_args=(scripts/verify_openmetar_r_default.py)

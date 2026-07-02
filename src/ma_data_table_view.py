@@ -41,7 +41,7 @@ import qt_text
 import tabular_data
 
 # for issue #169 -- normalizing new lines, e.g., for pasting
-# use QRegExp to manipulate QStrings (rather than re)
+# use QRegExp for Qt regular-expression matching
 _newlines_re = QRegExp("(\r\n|\r|\r)")
 
 
@@ -247,11 +247,11 @@ class MADataTable(QtWidgets.QTableView):
 
     def include_all_studies(self):
         self.model().include_all_studies()
-        self.model().reset()
+        self.model().reset_model()
 
     def exclude_all_studies(self):
         self.model().exclude_all_studies()
-        self.model().reset()
+        self.model().reset_model()
 
     def keyPressEvent(self, event):
         if event.modifiers() & QtCore.Qt.ControlModifier:
@@ -365,7 +365,7 @@ class MADataTable(QtWidgets.QTableView):
                 conf_level=self.model().get_global_conf_level(),
                 parent=self,
             )
-            if form.exec_():
+            if form.exec():
                 # push the edit even
                 ma_edit = CommandEditMAUnit(self, study_index, ma_unit, old_ma_unit)
                 self.undoStack.push(ma_edit)
@@ -385,7 +385,7 @@ class MADataTable(QtWidgets.QTableView):
                 conf_level=self.model().get_global_conf_level(),
                 parent=self,
             )
-            if form.exec_():
+            if form.exec():
                 # update the model; push this event onto the stack
                 ma_edit = CommandEditMAUnit(self, study_index, ma_unit, old_ma_unit)
                 self.undoStack.push(ma_edit)
@@ -402,7 +402,7 @@ class MADataTable(QtWidgets.QTableView):
                 conf_level=self.model().get_global_conf_level(),
                 parent=self,
             )
-            if form.exec_():
+            if form.exec():
                 ma_edit = CommandEditMAUnit(self, study_index, ma_unit, old_ma_unit)
                 self.undoStack.push(ma_edit)
         self.vert_header.blockSignals(False)
@@ -432,7 +432,7 @@ class MADataTable(QtWidgets.QTableView):
         self._enable_analysis_menus_if_appropriate()
 
     def _new_eq_old(self, old, new):
-        """None and "" are the same. Assume old and new are QVariants"""
+        """None and "" are the same for table-edit comparisons."""
 
         blank_vals = meta_globals.EMPTY_VALS
 
@@ -642,14 +642,14 @@ class MADataTable(QtWidgets.QTableView):
                     print("whoops, exception while pasting: %s" % e)
 
         self.model().blockSignals(False)
-        self.model().reset()
+        self.model().reset_model()
         if failed_messages:
             self._report_model_data_error(failed_messages[0])
 
     def set_data_in_model(self, index, val):
         if not self.model().setData(index, val):
             self._report_model_data_error(self._model_data_error_message())
-        self.model().reset()
+        self.model().reset_model()
 
     def _model_data_error_message(self):
         return (
@@ -813,7 +813,7 @@ class MADataTable(QtWidgets.QTableView):
             self.model().dataset.add_study(new_study)
             self.model().dataset.study_auto_added = int(new_study.id)
 
-        self.model().reset()
+        self.model().reset_model()
 
 
 class CommandCellEdit(QUndoCommand):
@@ -894,7 +894,7 @@ class CommandCellEdit(QUndoCommand):
                     self.ma_data_table_view._model_data_error_message()
                 )
             # make the view reflect the update
-            self.ma_data_table_view.model().reset()
+            self.ma_data_table_view.model().reset_model()
 
         self.ma_data_table_view._enable_analysis_menus_if_appropriate()
         self.ma_data_table_view.resizeColumnsToContents()
@@ -923,7 +923,7 @@ class CommandCellEdit(QUndoCommand):
             self.ma_data_table_view._report_model_data_error(
                 self.ma_data_table_view._model_data_error_message()
             )
-        self.ma_data_table_view.model().reset()
+        self.ma_data_table_view.model().reset_model()
 
         # here is where we check if there are enough studies to actually
         # perform an analysis.
@@ -997,7 +997,7 @@ class CommandPaste(QUndoCommand):
             if self.metric_changed:
                 self.ma_data_table_view.set_metric_in_ui(self.new_metric)
 
-        self.ma_data_table_view.model().reset()
+        self.ma_data_table_view.model().reset_model()
         self.ma_data_table_view._enable_analysis_menus_if_appropriate()
         self.ma_data_table_view.dataDirtied.emit()
         self.ma_data_table_view.resizeColumnsToContents()
@@ -1016,7 +1016,7 @@ class CommandPaste(QUndoCommand):
         if self.metric_changed:
             self.ma_data_table_view.set_metric_in_ui(self.old_metric)
 
-        self.ma_data_table_view.model().reset()
+        self.ma_data_table_view.model().reset_model()
         self.ma_data_table_view._enable_analysis_menus_if_appropriate()
         self.ma_data_table_view.dataDirtied.emit()
 
@@ -1044,17 +1044,17 @@ class CommandEditMAUnit(QUndoCommand):
     @DebugHelper
     def undo(self):
         self.model.set_current_ma_unit_for_study(self.study_index, self.old_ma_unit)
-        self.model.reset()
+        self.model.reset_model()
         self.table_view.resizeColumnsToContents()
         self.ma_data_table_view.dataDirtied.emit()
 
     @DebugHelper
     def redo(self):
         self.model.set_current_ma_unit_for_study(self.study_index, self.new_ma_unit)
-        self.model.reset()
+        self.model.reset_model()
         self.model.try_to_update_outcomes()
 
-        # self.table_view.model().reset()
+        # self.table_view.model().reset_model()
         self.table_view.resizeColumnsToContents()
         self.ma_data_table_view.dataDirtied.emit()
 
@@ -1071,7 +1071,7 @@ class CommandEditRawData(QUndoCommand):
     ):
         super(CommandEditRawData, self).__init__(description)
         self.ma_unit = ma_unit
-        # we take the model in as a parameter so we can call reset(), in turn
+        # we take the model in as a parameter so we can refresh it, in turn
         # notifying the view to refresh. otherwise, the old data is displayed
         # until the user interacts with it in some way
         self.model = model
@@ -1086,7 +1086,7 @@ class CommandEditRawData(QUndoCommand):
         for group_name in self.group_names:
             raw_data = self.old_raw_data_dict[group_name]
             self.ma_unit.set_raw_data_for_group(group_name, raw_data)
-        self.model.reset()
+        self.model.reset_model()
         self.ma_data_table_view.dataDirtied.emit()
 
     @DebugHelper
@@ -1094,7 +1094,7 @@ class CommandEditRawData(QUndoCommand):
         for group_name in self.group_names:
             raw_data = self.new_raw_data_dict[group_name]
             self.ma_unit.set_raw_data_for_group(group_name, raw_data)
-        self.model.reset()
+        self.model.reset_model()
         self.ma_data_table_view.dataDirtied.emit()
 
 
@@ -1111,11 +1111,11 @@ class CommandSort(QUndoCommand):
     def redo(self):
         self.previous_order = self.model.get_ordered_study_ids()
         self.model.sort_studies(self.col, self.reverse)
-        self.model.reset()
+        self.model.reset_model()
 
     def undo(self):
         self.model.order_studies(self.previous_order)
-        self.model.reset()
+        self.model.reset_model()
 
 
 class StudyDelegate(QItemDelegate):

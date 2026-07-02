@@ -8,7 +8,7 @@ import modern_compat
 
 modern_compat.install()
 
-from PyQt5 import QtCore
+from PyQt5.QtCore import Qt
 
 import ma_data_table_model
 import ma_dataset
@@ -72,10 +72,9 @@ def test_empty_editable_cells_return_blank_edit_text():
     ]
 
     for column in editable_columns:
-        value = model.data(model.index(0, column), QtCore.Qt.EditRole)
+        value = model.data(model.index(0, column), Qt.EditRole)
 
         assert value == ""
-        assert not isinstance(value, QtCore.QVariant)
 
 
 def test_raw_data_edit_on_placeholder_row_emits_study_name_error():

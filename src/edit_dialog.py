@@ -171,7 +171,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
     def add_group(self):
         form = add_new_dialogs.AddNewGroupForm(self)
         form.group_name_le.setFocus()
-        if form.exec_():
+        if form.exec():
             try:
                 new_group_name = ma_data_table_model.validate_new_group_name(
                     self.group_list.model().dataset, form.group_name_le.text()
@@ -193,7 +193,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         self.group_list.model().refresh_group_list(
             self.selected_outcome, self.selected_follow_up
         )
-        self.group_list.model().reset()
+        self.group_list.model().reset_model()
 
     def group_selected(self, index):
         self.disable_remove_buttons()
@@ -202,7 +202,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
     def add_outcome(self):
         form = add_new_dialogs.AddNewOutcomeForm(self, is_diag=self.dataset.is_diag)
         form.outcome_name_le.setFocus()
-        if form.exec_():
+        if form.exec():
             # then the user clicked ok and has added a new outcome.
             # here we want to add the outcome to the dataset, and then
             # display it
@@ -240,7 +240,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         self.selected_outcome = self.get_selected_outcome()
         self.outcome_list.model().dataset.remove_outcome(self.selected_outcome)
         self.outcome_list.model().refresh_outcome_list()
-        self.outcome_list.model().reset()
+        self.outcome_list.model().reset_model()
         # now update the selected outcome
         self.selected_outcome = self.get_selected_outcome()
         # update the follow-ups list as appropriate
@@ -257,9 +257,9 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
             ## the assumption in this case is that all outcomes have been deleted
             # so we clear the follow up and group lists.
             self.follow_up_list.model().follow_up_list = []
-            self.follow_up_list.model().reset()
+            self.follow_up_list.model().reset_model()
             self.group_list.model().group_list = []
-            self.group_list.model().reset()
+            self.group_list.model().reset_model()
 
     def outcome_selected(self, index):
         self.selected_outcome = self.get_selected_outcome()
@@ -275,7 +275,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
     def add_follow_up(self):
         form = add_new_dialogs.AddNewFollowUpForm(self)
         form.follow_up_name_le.setFocus()
-        if form.exec_():
+        if form.exec():
             try:
                 follow_up_lbl = ma_data_table_model.validate_new_global_follow_up_name(
                     self.follow_up_list.model().dataset,
@@ -310,7 +310,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
     def add_covariate(self):
         form = add_new_dialogs.AddNewCovariateForm(self)
         form.covariate_name_le.setFocus()
-        if form.exec_():
+        if form.exec():
             try:
                 new_covariate_name = ma_data_table_model.validate_new_covariate_name(
                     self.covariate_list.model().dataset, form.covariate_name_le.text()
@@ -355,7 +355,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
     def add_study(self):
         form = add_new_dialogs.AddNewStudyForm(self)
         form.study_lbl.setFocus()
-        if form.exec_():
+        if form.exec():
             try:
                 study_name = ma_data_table_model.validate_new_study_name(
                     form.study_lbl.text()

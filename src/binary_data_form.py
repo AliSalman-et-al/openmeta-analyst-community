@@ -239,7 +239,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
 
         if len(list(imputed.keys())) > 1:
             dialog = ChooseBackCalcResultForm(imputed, parent=self)
-            if dialog.exec_():
+            if dialog.exec():
                 choice = dialog.getChoice()
             else:  # don't do anything if cancelled
                 return None

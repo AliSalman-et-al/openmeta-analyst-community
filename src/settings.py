@@ -32,8 +32,7 @@ DEFAULT_SETTINGS = {
 
 
 def update_setting(field, value):
-    """updates the setting with key field to value (gets converted to a
-    QVariant internally, need to reconvert to desired type in get_setting()"""
+    """Updates the setting with key field to value."""
 
     settings = QSettings()
 

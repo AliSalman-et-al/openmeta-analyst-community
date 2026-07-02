@@ -35,13 +35,13 @@ import ma_data_table_model
 import meta_globals
 from meta_globals import *
 import ma_dataset
-import legacy_pickle
 import app_error_handler
 import meta_py_r_backend
 import progress_bar as progress_dialog
 import qt_layout
 import qt_text
 import name_validation
+import project_pickle
 import tabular_data
 from settings import *
 
@@ -102,8 +102,8 @@ def _resolve_open_file_path(file_path):
     return file_path
 
 
-def _load_legacy_pickle(file_path):
-    return legacy_pickle.load_legacy_pickle(file_path)
+def _load_project_pickle(file_path):
+    return project_pickle.load_project_pickle(file_path)
 
 
 class InvalidProjectFileError(ValueError):
@@ -119,7 +119,9 @@ def _validate_open_project_dataset(dataset):
 
 
 def _format_open_project_error(file_path, exception):
-    if isinstance(exception, InvalidProjectFileError):
+    if isinstance(
+        exception, (InvalidProjectFileError, project_pickle.ProjectFileFormatError)
+    ):
         return "Could not open %s.\n\n%s" % (file_path, exception)
     return "Could not open %s.\n\nDetails: %s: %s" % (
         file_path,
@@ -220,7 +222,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self._model_signal_connections = []
         self._setup_connections()
         self.tableView.setSelectionMode(QTableView.ContiguousSelection)
-        self.model.reset()
+        self.model.reset_model()
         ##
         # we hand off a reference of the main gui to the table view
         # so that it can do things like pass suitable events 'up'
@@ -254,7 +256,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             parent=self, recent_datasets=get_setting("recent_files")
         )
 
-        if start_up_wizard.exec_():
+        if start_up_wizard.exec():
             wizard_data = start_up_wizard.get_results()
             self._handle_wizard_results(wizard_data)
 
@@ -298,7 +300,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                 return
 
         wizard = main_wizard.MainWizard(parent=self, path="new_dataset")
-        if wizard.exec_():
+        if wizard.exec():
             wizard_data = wizard.get_results()
             self._handle_wizard_results(wizard_data)
 
@@ -429,7 +431,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         prev_conf_level = self.model.get_global_conf_level()
 
         dialog = conf_level_dialog.ChangeConfLevelDlg(prev_conf_level, self)
-        if dialog.exec_():
+        if dialog.exec():
             new_conf_level = dialog.get_value()
             change_cl_command = Command_Change_Conf_Level(
                 prev_conf_level, new_conf_level, mainform=self
@@ -439,7 +441,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def _import_csv(self):
         """Import data from csv file"""
         wizard = main_wizard.MainWizard(parent=self, path="csv_import")
-        if wizard.exec_():
+        if wizard.exec():
             wizard_data = wizard.get_results()
             self._handle_wizard_results(wizard_data)
 
@@ -471,8 +473,8 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         ###
         # this is not ideal, but I couldn't get the rowsInserted methods working.
         # basically, the modelReset (which is custom to this app; not a QT thing, per se)
-        # is emitted when a model reset was called but the edit focus should be set back to
-        # where it was before this reset() call (reset clears the current editor).
+        # is emitted when a model refresh was called but the edit focus should be set back to
+        # where it was before this refresh (refresh clears the current editor).
         # this index is the QModelIndex. this is used, e.g., when a new study is added.
         # this fixes bug #20.
         self._model_signal_connections.append(
@@ -725,7 +727,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         cur_dataset = copy.deepcopy(self.model.dataset)
         edit_window = edit_dialog.EditDialog(cur_dataset, parent=self)
 
-        if edit_window.exec_():
+        if edit_window.exec():
             # if we edited the current dataset when there was no
             # outcome yet, then we want to default to an outcome
             # that was added.
@@ -887,7 +889,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
         self.tableView.model().set_current_metric(metric_name)
         self.model.try_to_update_outcomes()
-        self.model.reset()
+        self.model.reset_model()
         self.tableView.resizeColumnsToContents()
 
     def view_network(self):
@@ -915,7 +917,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         edit_group_form = edit_group_name_form.EditGroupName(
             cur_group_name, parent=self
         )
-        if edit_group_form.exec_():
+        if edit_group_form.exec():
             try:
                 existing_groups = list(self.model.dataset.get_group_names())
                 if orig_group_name in existing_groups:
@@ -936,7 +938,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def add_covariate(self):
         form = add_new_dialogs.AddNewCovariateForm(self)
         form.covariate_name_le.setFocus()
-        if form.exec_():
+        if form.exec():
             # then the user clicked 'ok'.
             try:
                 new_covariate_name = ma_data_table_model.validate_new_covariate_name(
@@ -975,7 +977,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                 parent=self, is_diag=self.model.is_diag()
             )
             form.outcome_name_le.setFocus()
-            if form.exec_():
+            if form.exec():
                 # then the user clicked ok and has added a new outcome.
                 # here we want to add the outcome to the dataset, and then
                 # display it
@@ -1016,7 +1018,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         elif self.cur_dimension == "group":
             form = add_new_dialogs.AddNewGroupForm(self)
             form.group_name_le.setFocus()
-            if form.exec_():
+            if form.exec():
                 try:
                     new_group_name = ma_data_table_model.validate_new_group_name(
                         self.model.dataset, form.group_name_le.text()
@@ -1031,7 +1033,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             # then the dimension is follow-up
             form = add_new_dialogs.AddNewFollowUpForm(self)
             form.follow_up_name_le.setFocus()
-            if form.exec_():
+            if form.exec():
                 try:
                     follow_up_lbl = ma_data_table_model.validate_new_follow_up_name(
                         self.model.dataset,
@@ -1185,7 +1187,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         print("displaying groups: %s" % groups)
         self.model.set_current_groups(groups)
         self.model.try_to_update_outcomes()
-        self.model.reset()
+        self.model.reset_model()
         self.tableView.resizeColumnsToContents()
 
     def display_outcome(self, outcome_name, group_names=None, follow_up_name=None):
@@ -1235,14 +1237,14 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             "<font color='Blue'>%s</font>" % self.model.get_current_follow_up_name()
         )
         qt_layout.fit_text_to_contents(self)
-        self.model.reset()
+        self.model.reset_model()
         self.tableView.resizeColumnsToContents()
 
     def display_follow_up(self, time_point):
         print("follow up")
         self.model.current_time_point = time_point
         self.update_follow_up_label()
-        self.model.reset()
+        self.model.reset_model()
         self.tableView.resizeColumnsToContents()
 
     def update_follow_up_label(self):
@@ -1292,7 +1294,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         data_model = None
         print("loading %s..." % file_path)
         try:
-            data_model = _load_legacy_pickle(file_path)
+            data_model = _load_project_pickle(file_path)
             data_model = _validate_open_project_dataset(data_model)
             print("successfully loaded data")
         except Exception as e:
@@ -1305,7 +1307,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
         state_dict = None
         try:
-            state_dict = _load_legacy_pickle(file_path + ".state")
+            state_dict = _load_project_pickle(file_path + ".state")
             print("found state dictionary: \n%s" % state_dict)
         except:
             print("no state dictionary found -- using 'reasonable' defaults")
@@ -1346,7 +1348,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             cur_dataset, covariate, parent=self
         )
 
-        if change_type_form.exec_():
+        if change_type_form.exec():
             modified_dataset = change_type_form.dataset
             # revert to original study ordering
             modified_dataset.studies.sort(
@@ -1375,7 +1377,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         edit_cov_form = edit_group_name_form.EditCovariateName(
             orig_cov_name, parent=self
         )
-        if edit_cov_form.exec_():
+        if edit_cov_form.exec():
             # the field names are also poorly named, in this case. here we mean the
             # **covariate name**, of course.
             try:
@@ -1424,13 +1426,13 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def _add_study(self, study, study_index=None):
         print("adding study: %s" % study.name)
         self.model.dataset.add_study(study, study_index=study_index)
-        self.model.reset()
+        self.model.reset_model()
         self.data_dirtied()
 
     def _remove_study(self, study):
         print("deleting study: %s" % study.name)
         self.model.dataset.studies.remove(study)
-        self.model.reset()
+        self.model.reset_model()
         self.data_dirtied()
 
     def set_model(
@@ -1511,7 +1513,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                 metric_to_check=self.tableView.model().current_effect
             )
 
-        self.model.reset()
+        self.model.reset_model()
         self._change_conf_level_label()
 
     def undo_set_model(self, out_path, state_dict, dataset):
@@ -1618,7 +1620,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
     def _show_tom(self):
         tom_dlg = easter_egg.TomDialog(parent=self)
-        tom_dlg.exec_()
+        tom_dlg.exec()
 
     def _make_new_dataset_and_setup_spreadsheet(self, dataset_info):
         is_diag = dataset_info["data_type"] == "diagnostic"
@@ -1633,7 +1635,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             self.model.current_effect = dataset_info["effect"]  # set current effect
             self.populate_metrics_menu(metric_to_check=self.model.current_effect)
             self.model.try_to_update_outcomes()
-            self.model.reset()
+            self.model.reset_model()
 
     def _handle_wizard_results(self, wizard_data):
         path = wizard_data["path"]  # route through wizard
@@ -1726,7 +1728,7 @@ class CommandImportCSV(QUndoCommand):
 
     def undo(self):
         self.main_form.set_model(self.original_dataset, self.old_state_dict)
-        self.main_form.model.reset()
+        self.main_form.model.reset_model()
         QApplication.processEvents()
 
     def _import_data_into_new_dataset(self):
@@ -1824,7 +1826,7 @@ class Command_Change_Conf_Level(QUndoCommand):
         self.mainform.model.set_conf_level(conf_level)
         self.mainform.cl_label.setText(_format_confidence_level_status(conf_level))
         qt_layout.fit_text_to_contents(self.mainform)
-        self.mainform.model.reset()
+        self.mainform.model.reset_model()
         print(
             (
                 "Global Confidence level is now: %f"

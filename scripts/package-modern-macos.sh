@@ -111,7 +111,7 @@ uv sync --locked
 
 if [ "$skip_tests" -eq 0 ]; then
   step "Running focused macOS packaging tests"
-  uv run pytest tests/modern/fast/test_pyqt5_ci_path.py tests/modern/fast/test_pyqt5_generated_ui_imports.py tests/modern/fast/test_project_pickle_loader.py
+  uv run pytest tests/modern/fast/test_pyqt5_ci_path.py tests/modern/fast/test_pyqt5_generated_ui_imports.py tests/modern/fast/test_project_pickle_migration.py tests/modern/fast/test_qt_text_boundaries.py
 fi
 
 build_args=(

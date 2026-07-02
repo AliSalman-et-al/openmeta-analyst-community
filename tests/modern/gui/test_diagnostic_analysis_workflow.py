@@ -8,10 +8,9 @@ showed no error. Two distinct defects caused this:
    handling that the binary/continuous path uses. A backend failure raised out
    of the Qt slot and was swallowed by the event loop (no feedback at all).
 
-2. ``MA_Specs.setup_diagnostic_ui`` called ``QApplication.translate`` with the
-   old PyQt4 four-argument signature (``..., None, UnicodeUTF8``). PyQt5 rejects
-   ``None`` for the 4th argument, so even with a working backend the dialog
-   construction raised before it could be shown.
+2. ``MA_Specs.setup_diagnostic_ui`` called ``QApplication.translate`` with a
+   removed four-argument signature. PyQt5 rejects that call shape, so even with
+   a working backend the dialog construction raised before it could be shown.
 """
 
 import os

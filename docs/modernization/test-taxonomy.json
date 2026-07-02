@@ -60,7 +60,7 @@
       ],
       "lane": "fast",
       "nodeid": "tests/modern/fast/test_dataset_model_edit_values.py::test_empty_editable_cells_return_blank_edit_text",
-      "reason": "Guards Qt model edit text normalization so empty cells do not surface invalid QVariant object representations.",
+      "reason": "Guards Qt model edit text normalization so empty cells surface native blank edit text.",
       "runtime_class": "subsecond",
       "size": "small"
     },
@@ -74,8 +74,84 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/modern/fast/test_qt_text_boundaries.py::test_invalid_qvariant_is_blank_at_text_boundaries",
-      "reason": "Guards shared Qt text-boundary conversion against invalid QVariant object representations across GUI helpers.",
+      "nodeid": "tests/modern/fast/test_qt_text_boundaries.py::test_none_is_blank_at_text_boundaries",
+      "reason": "Guards shared Qt text-boundary conversion for native blank values across GUI helpers.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_project_pickle_migration.py::test_project_loader_migrates_old_qt_text_values_without_importing_old_qt",
+      "reason": "Guards project-file migration for old serialized Qt text values without requiring old Qt modules.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_project_pickle_migration.py::test_project_loader_migrates_direct_old_qt_text_constructor",
+      "reason": "Guards direct constructor project-file migration for old serialized Qt text records.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_project_pickle_migration.py::test_project_loader_maps_old_qt_byte_array_to_current_qt_value",
+      "reason": "Guards migration of old serialized Qt byte-array values to the current Qt value class.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_project_pickle_migration.py::test_project_loader_reports_unsupported_old_qt_values_as_project_format_errors",
+      "reason": "Guards user-facing project-format failures for old serialized Qt values that cannot be migrated.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_project_pickle_migration.py::test_representative_sample_projects_load_with_current_project_loader",
+      "reason": "Guards all bundled sample projects through the current project loader.",
       "runtime_class": "subsecond",
       "size": "small"
     },
@@ -538,37 +614,6 @@
       ],
       "lane": "gui",
       "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_startup_smoke_opens_positional_project_without_wizard",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "minutes",
-      "size": "large"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_meantime_sample_project_loads_legacy_qstring_factor_covariate",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "minutes",
-      "size": "large"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "analysis_behavior"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_automation_launch_opens_meantime_project_and_enables_subgroup_analysis",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -1611,90 +1656,6 @@
       "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_openmetar_namespace_preserves_s4_classes_explicitly",
       "reason": "Validates R dependency and drift manifest contracts without installing broad R packages.",
       "runtime_class": "seconds",
-      "size": "small"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "filesystem"
-      ],
-      "lane": "fast",
-      "nodeid": "tests/modern/fast/test_project_pickle_loader.py::test_loader_converts_sip_qt4_qstring_to_python3_str",
-      "reason": "Fast modernization guard suitable for default feedback.",
-      "runtime_class": "subsecond",
-      "size": "small"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "filesystem"
-      ],
-      "lane": "fast",
-      "nodeid": "tests/modern/fast/test_project_pickle_loader.py::test_loader_converts_direct_qt4_qstring_constructor_to_python3_str",
-      "reason": "Fast modernization guard suitable for default feedback.",
-      "runtime_class": "subsecond",
-      "size": "small"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "filesystem"
-      ],
-      "lane": "fast",
-      "nodeid": "tests/modern/fast/test_project_pickle_loader.py::test_loader_converts_qt4_qstring_list_and_qvariant_to_native_values",
-      "reason": "Fast modernization guard suitable for default feedback.",
-      "runtime_class": "subsecond",
-      "size": "small"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "filesystem"
-      ],
-      "lane": "fast",
-      "nodeid": "tests/modern/fast/test_project_pickle_loader.py::test_loader_maps_qt4_qbytearray_to_pyqt5_qbytearray",
-      "reason": "Fast modernization guard suitable for default feedback.",
-      "runtime_class": "subsecond",
-      "size": "small"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "filesystem"
-      ],
-      "lane": "fast",
-      "nodeid": "tests/modern/fast/test_project_pickle_loader.py::test_loader_maps_other_qt4_qtcore_types_to_pyqt5_classes",
-      "reason": "Fast modernization guard suitable for default feedback.",
-      "runtime_class": "subsecond",
-      "size": "small"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "filesystem"
-      ],
-      "lane": "fast",
-      "nodeid": "tests/modern/fast/test_project_pickle_loader.py::test_loader_opens_representative_qt4_project_without_pyqt4_module",
-      "reason": "Fast modernization guard suitable for default feedback.",
-      "runtime_class": "subsecond",
       "size": "small"
     },
     {

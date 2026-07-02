@@ -20,7 +20,7 @@ import qt_text
 
 
 def cell_text_is_blank(value):
-    """Return whether Qt item text is blank under both PyQt4 and PyQt5."""
+    """Return whether Qt item text is blank."""
     return qt_text.is_blank(value)
 
 

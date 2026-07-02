@@ -271,7 +271,7 @@ def test_automation_launch_opens_sample_project_in_real_data_table():
 
 @pytest.mark.parametrize(
     "sample_project",
-    ["amino.oma", "continuous.oma", "lymph.oma"],
+    ["amino.oma", "continuous.oma", "lymph.oma", "meantime.oma"],
 )
 def test_undo_immediately_after_open_does_not_clear_loaded_project(sample_project):
     import launch
@@ -405,7 +405,7 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch):
     os.chdir(REPO_ROOT)
 
 
-def test_meantime_sample_project_loads_legacy_qstring_factor_covariate():
+def test_meantime_sample_project_loads_native_factor_covariate():
     import modern_compat
 
     modern_compat.install()
@@ -1464,8 +1464,7 @@ def test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe(monke
             QtCore.Qt.SizeHintRole,
         ):
             value = window.model.data(factor_index, role)
-            assert isinstance(value, QtCore.QVariant)
-            assert not value.isValid()
+            assert value is None
     finally:
         window.current_data_unsaved = False
         if form is not None:
@@ -1683,7 +1682,7 @@ def test_real_metaform_save_as_round_trips_representative_projects(
             assert os.path.exists(saved_path)
             assert window.current_data_unsaved is False
             meta_form = sys.modules["meta_form"]
-            reopened = meta_form._load_legacy_pickle(saved_path)
+            reopened = meta_form._load_project_pickle(saved_path)
             assert _dataset_summary(reopened) == expected
             if name == "meantime.oma":
                 values = [
@@ -1817,7 +1816,7 @@ def test_startup_wizard_cancel_preserves_loaded_dataset(monkeypatch):
         def __init__(self, *args, **kwargs):
             pass
 
-        def exec_(self):
+        def exec(self):
             return 0
 
     quit_calls = []
@@ -2203,7 +2202,7 @@ def test_data_entry_dialogs_construct_with_stub_backend(monkeypatch):
     import diagnostic_data_form
 
     monkeypatch.setattr(
-        continuous_data_form.ChooseBackCalcResultForm, "exec_", lambda self: False
+        continuous_data_form.ChooseBackCalcResultForm, "exec", lambda self: False
     )
 
     try:

@@ -386,7 +386,7 @@ def test_local_modern_macos_package_script_uses_shared_build_script():
     assert relative_order(
         script["text"],
         "uv sync --locked",
-        "uv run pytest tests/modern/fast/test_pyqt5_ci_path.py tests/modern/fast/test_pyqt5_generated_ui_imports.py tests/modern/fast/test_project_pickle_loader.py",
+        "uv run pytest tests/modern/fast/test_pyqt5_ci_path.py tests/modern/fast/test_pyqt5_generated_ui_imports.py tests/modern/fast/test_project_pickle_migration.py tests/modern/fast/test_qt_text_boundaries.py",
         '--r-runtime-root "$r_runtime_root"',
         'bash "$repo_root/scripts/build-modern-macos-binary.sh"',
     )

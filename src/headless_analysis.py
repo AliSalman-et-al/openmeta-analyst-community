@@ -1,10 +1,10 @@
 import os
 
-import legacy_pickle
 import ma_data_table_model
 import ma_dataset
 import meta_globals
 import meta_py_r
+import project_pickle
 
 
 class HeadlessAnalysisCase:
@@ -28,10 +28,7 @@ class HeadlessAnalysisCase:
 
 
 def _load_pickle(path):
-    # Datasets are legacy Python-2 pickles; read them through the shared
-    # project-file compatibility loader so Qt4 text values normalize at the
-    # same boundary as the GUI open path.
-    return legacy_pickle.load_legacy_pickle(path)
+    return project_pickle.load_project_pickle(path)
 
 
 def load_dataset_model(dataset_path):

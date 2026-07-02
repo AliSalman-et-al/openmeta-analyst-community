@@ -31,7 +31,7 @@ def _without_current_name(names, current_name):
 class ResettableTableModel(QAbstractTableModel):
     dataError = pyqtSignal(str)
 
-    def reset(self):
+    def reset_model(self):
         self.beginResetModel()
         self.endResetModel()
 
@@ -60,7 +60,7 @@ class TXGroupsModel(ResettableTableModel):
             outcome, follow_up
         )
         print("\ngroup names are: %s" % self.group_list)
-        self.reset()
+        self.reset_model()
 
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid() or not (0 <= index.row() < len(self.group_list)):
@@ -115,7 +115,7 @@ class OutcomesModel(ResettableTableModel):
 
     def refresh_outcome_list(self):
         self.outcome_list = self.dataset.get_outcome_names()
-        self.reset()
+        self.reset_model()
 
     def data(self, index, role=Qt.DisplayRole):
         self.outcome_list = self.dataset.get_outcome_names()
@@ -180,7 +180,7 @@ class FollowUpsModel(ResettableTableModel):
         self.follow_up_list = self.dataset.get_follow_up_names_for_outcome(
             self.current_outcome
         )
-        self.reset()
+        self.reset_model()
 
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid() or not (0 <= index.row()):
@@ -240,7 +240,7 @@ class StudiesModel(ResettableTableModel):
 
     def update_study_list(self):
         self.studies_list = self.dataset.studies
-        self.reset()
+        self.reset_model()
 
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid() or not (0 <= index.row() < len(self.studies_list)):
@@ -287,7 +287,7 @@ class CovariatesModel(ResettableTableModel):
 
     def update_covariates_list(self):
         self.covariates_list = self.dataset.covariates
-        self.reset()
+        self.reset_model()
 
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid() or not (0 <= index.row() < len(self.covariates_list)):
