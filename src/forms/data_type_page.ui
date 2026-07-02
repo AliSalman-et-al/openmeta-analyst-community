@@ -39,18 +39,6 @@
     <layout class="QHBoxLayout" name="horizontalLayout_3">
      <item>
       <widget class="QToolButton" name="onearm_proportion_Button">
-       <property name="minimumSize">
-        <size>
-         <width>90</width>
-         <height>65</height>
-        </size>
-       </property>
-       <property name="maximumSize">
-        <size>
-         <width>90</width>
-         <height>65</height>
-        </size>
-       </property>
        <property name="text">
         <string>Proportion</string>
        </property>
@@ -77,18 +65,6 @@
      </item>
      <item>
       <widget class="QToolButton" name="onearm_mean_Button">
-       <property name="minimumSize">
-        <size>
-         <width>90</width>
-         <height>65</height>
-        </size>
-       </property>
-       <property name="maximumSize">
-        <size>
-         <width>90</width>
-         <height>65</height>
-        </size>
-       </property>
        <property name="baseSize">
         <size>
          <width>10</width>
@@ -121,18 +97,6 @@
      </item>
      <item>
       <widget class="QToolButton" name="onearm_single_reg_coef_Button">
-       <property name="minimumSize">
-        <size>
-         <width>120</width>
-         <height>88</height>
-        </size>
-       </property>
-       <property name="maximumSize">
-        <size>
-         <width>120</width>
-         <height>88</height>
-        </size>
-       </property>
        <property name="baseSize">
         <size>
          <width>10</width>
@@ -166,18 +130,6 @@ Coefficient</string>
      </item>
      <item>
       <widget class="QToolButton" name="onearm_generic_effect_size_Button">
-       <property name="minimumSize">
-        <size>
-         <width>90</width>
-         <height>88</height>
-        </size>
-       </property>
-       <property name="maximumSize">
-        <size>
-         <width>90</width>
-         <height>88</height>
-        </size>
-       </property>
        <property name="baseSize">
         <size>
          <width>10</width>
@@ -245,18 +197,6 @@ Effect Size</string>
     <layout class="QHBoxLayout" name="horizontalLayout_2">
      <item>
       <widget class="QToolButton" name="twoarm_proportions_Button">
-       <property name="minimumSize">
-        <size>
-         <width>90</width>
-         <height>65</height>
-        </size>
-       </property>
-       <property name="maximumSize">
-        <size>
-         <width>90</width>
-         <height>65</height>
-        </size>
-       </property>
        <property name="baseSize">
         <size>
          <width>10</width>
@@ -289,18 +229,6 @@ Effect Size</string>
      </item>
      <item>
       <widget class="QToolButton" name="twoarm_means_Button">
-       <property name="minimumSize">
-        <size>
-         <width>90</width>
-         <height>65</height>
-        </size>
-       </property>
-       <property name="maximumSize">
-        <size>
-         <width>90</width>
-         <height>65</height>
-        </size>
-       </property>
        <property name="baseSize">
         <size>
          <width>10</width>
@@ -333,18 +261,6 @@ Effect Size</string>
      </item>
      <item>
       <widget class="QToolButton" name="twoarm_smds_Button">
-       <property name="minimumSize">
-        <size>
-         <width>90</width>
-         <height>65</height>
-        </size>
-       </property>
-       <property name="maximumSize">
-        <size>
-         <width>90</width>
-         <height>65</height>
-        </size>
-       </property>
        <property name="baseSize">
         <size>
          <width>10</width>
@@ -408,18 +324,6 @@ Effect Size</string>
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
       <widget class="QToolButton" name="diagnostic_Button">
-       <property name="minimumSize">
-        <size>
-         <width>90</width>
-         <height>65</height>
-        </size>
-       </property>
-       <property name="maximumSize">
-        <size>
-         <width>90</width>
-         <height>65</height>
-        </size>
-       </property>
        <property name="baseSize">
         <size>
          <width>10</width>

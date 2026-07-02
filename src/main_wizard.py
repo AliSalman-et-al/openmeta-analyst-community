@@ -4,7 +4,7 @@ import forms.ui_data_type_page
 import forms.ui_outcome_name_page
 import forms.ui_welcome_page
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QSize, Qt
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import (
     QAction,
@@ -13,6 +13,8 @@ from PyQt5.QtWidgets import (
     QAbstractButton,
     QMenu,
     QMessageBox,
+    QWIDGETSIZE_MAX,
+    QSizePolicy,
     QTableWidgetItem,
     QWizard,
     QWizardPage,
@@ -163,11 +165,38 @@ class DataTypePage(QWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
             QWizard.BackgroundPixmap,
             QPixmap(":/wizard_images/wizard_images/laplace.jpg"),
         )
+        self._normalize_data_type_button_sizes()
         qt_layout.fit_text_to_contents(self, adjust_root=False)
 
     def initializePage(self):
         # self.wizard().adjustSize()
         self.setFocus()
+
+    def _data_type_buttons(self):
+        return [
+            self.onearm_proportion_Button,
+            self.onearm_mean_Button,
+            self.onearm_single_reg_coef_Button,
+            self.onearm_generic_effect_size_Button,
+            self.twoarm_proportions_Button,
+            self.twoarm_means_Button,
+            self.twoarm_smds_Button,
+            self.diagnostic_Button,
+        ]
+
+    def _normalize_data_type_button_sizes(self):
+        buttons = self._data_type_buttons()
+        for button in buttons:
+            button.setMinimumSize(QSize(0, 0))
+            button.setMaximumSize(QSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX))
+
+        common_size = QSize(
+            max(button.sizeHint().width() for button in buttons),
+            max(button.sizeHint().height() for button in buttons),
+        )
+        for button in buttons:
+            button.setFixedSize(common_size)
+            button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
     def _button_selected(self, button):
         # print("button clicked %s" % str(button))

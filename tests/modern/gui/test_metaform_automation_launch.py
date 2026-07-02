@@ -2114,6 +2114,39 @@ def test_data_type_page_multiline_buttons_fit_icon_and_caption():
         app.processEvents()
 
 
+def test_data_type_page_data_type_buttons_use_uniform_size():
+    import launch
+    from PyQt5 import QtWidgets
+    import main_wizard
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    wizard = main_wizard.MainWizard(path="new_dataset")
+    try:
+        wizard.restart()
+        app.processEvents()
+
+        data_type_page = wizard.page(main_wizard.Page_DataType)
+        data_type_buttons = [
+            data_type_page.onearm_proportion_Button,
+            data_type_page.onearm_mean_Button,
+            data_type_page.onearm_single_reg_coef_Button,
+            data_type_page.onearm_generic_effect_size_Button,
+            data_type_page.twoarm_proportions_Button,
+            data_type_page.twoarm_means_Button,
+            data_type_page.twoarm_smds_Button,
+            data_type_page.diagnostic_Button,
+        ]
+
+        button_sizes = {
+            button.objectName(): (button.size().width(), button.size().height())
+            for button in data_type_buttons
+        }
+        assert len(set(button_sizes.values())) == 1, button_sizes
+    finally:
+        wizard.close()
+        app.processEvents()
+
+
 def test_new_dataset_wizard_sizes_to_show_diagnostic_choice():
     import launch
     from PyQt5 import QtWidgets
