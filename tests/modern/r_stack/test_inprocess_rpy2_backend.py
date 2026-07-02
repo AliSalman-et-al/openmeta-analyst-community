@@ -80,6 +80,109 @@ _DRIVER = textwrap.dedent(
     assert isinstance(defaults, dict)
     assert "conf.level" in defaults or "rm.method" in defaults
 
+    class FakeCovariate:
+        def __init__(self, name, data_type):
+            self.name = name
+            self.data_type = data_type
+
+    class FakeStudy:
+        def __init__(self, study_id, name, year):
+            self.id = study_id
+            self.name = name
+            self.year = year
+            self.include = True
+
+    class FakeDataset:
+        def __init__(self, covariates, values):
+            self.covariates = covariates
+            self._values = values
+
+        def get_values_for_cov(self, covariate, ids_for_keys=False):
+            assert ids_for_keys is True
+            return self._values[covariate]
+
+    class FakeModel:
+        def __init__(self, data_type, raw_data, effect="OR"):
+            self.current_effect = effect
+            self._raw_data = raw_data
+            self._data_type = data_type
+            self._studies = [
+                FakeStudy(1, 'O\\'Brien "quote" \\\\back café', 1993),
+                FakeStudy(2, "Plain study", None),
+            ]
+            covariates = [
+                FakeCovariate('Group "label" \\\\ café', meta_py_r.FACTOR),
+                FakeCovariate("Dose", meta_py_r.CONTINUOUS),
+            ]
+            self.dataset = FakeDataset(
+                covariates,
+                {
+                    covariates[0].name: {
+                        1: 'alpha "quoted" \\\\ café',
+                        2: "beta",
+                    },
+                    covariates[1].name: {
+                        1: 1.5,
+                        2: 2.5,
+                    },
+                },
+            )
+
+        def get_studies(self, only_if_included=True):
+            return self._studies
+
+        def get_cur_ests_and_SEs(self, **kwargs):
+            return [-0.5596157879, -0.8295982833], [0.6172133998, 0.7152562329]
+
+        def included_studies_have_raw_data(self):
+            return True
+
+        def get_cur_raw_data(self, **kwargs):
+            return self._raw_data
+
+        def included_studies_have_point_estimates(self, effect=None):
+            return True
+
+    def assert_text_survived(var_name):
+        assert list(ro.r("%s@study.names" % var_name)) == [
+            'O\\'Brien "quote" \\\\back café',
+            "Plain study",
+        ]
+        assert list(ro.r("%s@years" % var_name))[0] == 1993
+        assert bool(ro.r("is.na(%s@years[2])" % var_name)[0]) is True
+        assert list(ro.r("%s@covariates[[1]]@cov.name" % var_name)) == [
+            'Group "label" \\\\ café'
+        ]
+        assert list(ro.r("%s@covariates[[1]]@cov.vals" % var_name)) == [
+            'alpha "quoted" \\\\ café',
+            "beta",
+        ]
+        assert list(ro.r("%s@covariates[[1]]@ref.var" % var_name)) == [
+            'alpha "quoted" \\\\ café'
+        ]
+
+    binary_model = FakeModel("binary", [[6, 27, 9, 27], [3, 59, 7, 64]])
+    meta_py_r.ma_dataset_to_simple_binary_robj(binary_model, var_name="issue146_binary")
+    assert_text_survived("issue146_binary")
+
+    continuous_model = FakeModel(
+        "continuous",
+        [[27, 5.1, 1.2, 27, 6.2, 1.5], [59, 3.4, 0.9, 64, 4.1, 1.1]],
+        effect="MD",
+    )
+    meta_py_r.ma_dataset_to_simple_continuous_robj(
+        continuous_model,
+        var_name="issue146_continuous",
+    )
+    assert_text_survived("issue146_continuous")
+
+    diagnostic_model = FakeModel("diagnostic", [[6, 21, 9, 18], [3, 56, 7, 57]])
+    meta_py_r.ma_dataset_to_simple_diagnostic_robj(
+        diagnostic_model,
+        var_name="issue146_diagnostic",
+    )
+    assert_text_survived("issue146_diagnostic")
+
     invalid_conf_level_checks = ro.r('''
       c(
         inherits(try(openmetar.set.global.conf.level(100), silent=TRUE), "try-error"),

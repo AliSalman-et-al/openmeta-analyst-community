@@ -564,30 +564,22 @@ def draw_network(edge_list, unconnected_vertices, network_path='"./r_tmp/network
 def ma_dataset_to_simple_continuous_robj(
     table_model, var_name="tmp_obj", covs_to_include=None, studies=None
 ):
-    r_str = None
-
     if studies is None:
         # grab all studies. note: the list is pulled out in reverse order from the
         # model, so we, er, reverse it.
         studies = table_model.get_studies()
     # the study_ids preserve the ordering
     study_ids = [study.id for study in studies]
-    study_names = ", ".join(['"' + study.name + '"' for study in studies])
-
-    # issue #139 -- also grab the years
-    none_to_str = lambda n: str(n) if n is not None else ""  # this will produce NA ints
-    study_years = ", ".join(
-        ["as.integer(%s)" % none_to_str(study.year) for study in studies]
-    )
 
     ests, SEs = table_model.get_cur_ests_and_SEs(only_these_studies=study_ids)
-    ests_str = ", ".join(_to_strs(ests))
-    SEs_str = ", ".join(_to_strs(SEs))
 
-    cov_str = list_of_cov_value_objects_str(
-        table_model.dataset,
+    data_kwargs = _analysis_data_kwargs(
+        studies,
         study_ids,
-        cov_list=covs_to_include,
+        table_model.dataset,
+        covs_to_include,
+        y=ests,
+        SE=SEs,
     )
 
     # first try and construct an object with raw data -- note that if
@@ -598,50 +590,24 @@ def ma_dataset_to_simple_continuous_robj(
         print("we have raw data... parsing, parsing, parsing")
 
         raw_data = table_model.get_cur_raw_data(only_these_studies=study_ids)
-        Ns1_str = _get_str(raw_data, 0)
-        means1_str = _get_str(raw_data, 1)
-        SDs1_str = _get_str(raw_data, 2)
-        Ns2_str = _get_str(raw_data, 3)
-        means2_str = _get_str(raw_data, 4)
-        SDs2_str = _get_str(raw_data, 5)
-
-        r_str = (
-            "%s <- openmetar.create.continuous.data( \
-                                     N1=c(%s), mean1=c(%s), sd1=c(%s), \
-                                     N2=c(%s), mean2=c(%s), sd2=c(%s), \
-                                     y=c(%s), SE=c(%s), study.names=c(%s),\
-                                    years=c(%s), covariates=%s)"
-            % (
-                var_name,
-                Ns1_str,
-                means1_str,
-                SDs1_str,
-                Ns2_str,
-                means2_str,
-                SDs2_str,
-                ests_str,
-                SEs_str,
-                study_names,
-                study_years,
-                cov_str,
-            )
+        data_kwargs.update(
+            {
+                "N1": _r_numeric_vector(_get_col(raw_data, 0)),
+                "mean1": _r_numeric_vector(_get_col(raw_data, 1)),
+                "sd1": _r_numeric_vector(_get_col(raw_data, 2)),
+                "N2": _r_numeric_vector(_get_col(raw_data, 3)),
+                "mean2": _r_numeric_vector(_get_col(raw_data, 4)),
+                "sd2": _r_numeric_vector(_get_col(raw_data, 5)),
+            }
         )
 
     else:
         print("no raw data (or one-arm)... using effects")
-        r_str = (
-            "%s <- openmetar.create.continuous.data( \
-                            y=c(%s), SE=c(%s), study.names=c(%s),\
-                            years=c(%s), covariates=%s)"
-            % (var_name, ests_str, SEs_str, study_names, study_years, cov_str)
-        )
 
-    # character encodings for R
-    r_str = _sanitize_for_R(r_str)
-    print("executing: %s" % r_str)
-    execute_r_string(r_str)
+    r_obj = execute_r_function("openmetar.create.continuous.data", **data_kwargs)
+    ro.globalenv[var_name] = r_obj
     print("ok.")
-    return r_str
+    return r_obj
 
 
 def _get_str(M, col_index, reverse=True):
@@ -671,8 +637,6 @@ def ma_dataset_to_simple_binary_robj(
         - implement methods for more advanced conversions, i.e., for multiple outcome
             datasets (althought this will be implemented in some other method)
     """
-    r_str = None
-
     if studies is None:
         # grab the study names. note: the list is pulled out in reverse order from the
         # model, so we, er, reverse it.
@@ -680,22 +644,17 @@ def ma_dataset_to_simple_binary_robj(
 
     study_ids = [study.id for study in studies]
 
-    # issue #139 -- also grab the years
-    none_to_str = lambda n: str(n) if n is not None else ""  # this will produce NA ints
-    study_years = ", ".join(
-        ["as.integer(%s)" % none_to_str(study.year) for study in studies]
-    )
-    study_names = ", ".join(['"' + study.name + '"' for study in studies])
-
     ests, SEs = table_model.get_cur_ests_and_SEs(
         only_if_included=True, only_these_studies=study_ids
     )
-    ests_str = ", ".join(_to_strs(ests))
-    SEs_str = ", ".join(_to_strs(SEs))
 
-    # generate the covariate string
-    cov_str = list_of_cov_value_objects_str(
-        table_model.dataset, study_ids, cov_list=covs_to_include
+    data_kwargs = _analysis_data_kwargs(
+        studies,
+        study_ids,
+        table_model.dataset,
+        covs_to_include,
+        y=ests,
+        SE=SEs,
     )
 
     # first try and construct an object with raw data
@@ -707,53 +666,33 @@ def ma_dataset_to_simple_binary_robj(
 
         g1_events = _get_col(raw_data, 0)
 
-        g1O1_str = ", ".join(_to_strs(g1_events))
         g1_totals = _get_col(raw_data, 1)
 
         g1O2 = [(total_i - event_i) for total_i, event_i in zip(g1_totals, g1_events)]
-        g1O2_str = ", ".join(_to_strs(g1O2))
 
         # now, for group 2; we only set up the string
         # for group two if we have a two-arm metric
-        g2O1_str, g2O2_str = "0", "0"  # the 0s are just to satisfy R; not used
+        g2O1, g2O2 = [0], [0]  # the 0s are just to satisfy R; not used
         if table_model.current_effect in TWO_ARM_METRICS:
             g2_events = _get_col(raw_data, 2)
-            g2O1_str = ", ".join(_to_strs(g2_events))
 
             g2_totals = _get_col(raw_data, 3)
             g2O2 = [
                 (total_i - event_i) for total_i, event_i in zip(g2_totals, g2_events)
             ]
-            g2O2_str = ", ".join(_to_strs(g2O2))
+            g2O1 = g2_events
 
-        # actually creating a new object on the R side seems the path of least resistance here.
-        # the alternative would be to try and create a representation of the R object on the
-        # python side, but this would require more work and I'm not sure what the benefits
-        # would be
-        r_str = (
-            "%s <- openmetar.create.binary.data(g1O1=c(%s), g1O2=c(%s), g2O1=c(%s), g2O2=c(%s), \
-                            y=c(%s), SE=c(%s), study.names=c(%s), years=c(%s), covariates=%s)"
-            % (
-                var_name,
-                g1O1_str,
-                g1O2_str,
-                g2O1_str,
-                g2O2_str,
-                ests_str,
-                SEs_str,
-                study_names,
-                study_years,
-                cov_str,
-            )
+        data_kwargs.update(
+            {
+                "g1O1": _r_numeric_vector(g1_events),
+                "g1O2": _r_numeric_vector(g1O2),
+                "g2O1": _r_numeric_vector(g2O1),
+                "g2O2": _r_numeric_vector(g2O2),
+            }
         )
 
     elif table_model.included_studies_have_point_estimates():
         print("not sufficient raw data, but studies have point estimates...")
-
-        r_str = (
-            "%s <- openmetar.create.binary.data(y=c(%s), SE=c(%s), study.names=c(%s), years=c(%s), covariates=%s)"
-            % (var_name, ests_str, SEs_str, study_names, study_years, cov_str)
-        )
 
     else:
         print(
@@ -761,17 +700,10 @@ def ma_dataset_to_simple_binary_robj(
         )
         # @TODO complain to the user here
 
-    ### Relevant for Issue #73
-    # ok, it seems R uses latin-1 for its unicode encodings,
-    # whereas QT uses UTF8. this can cause situations where
-    # rpy2 throws up on this call due to it not being able
-    # to parse a character; so we sanitize. This isn't great,
-    # because sometimes characters get garbled...
-    r_str = _sanitize_for_R(r_str)
-    print("executing: %s" % r_str)
-    execute_r_string(r_str)
+    r_obj = execute_r_function("openmetar.create.binary.data", **data_kwargs)
+    ro.globalenv[var_name] = r_obj
     print("ok.")
-    return r_str
+    return r_obj
 
 
 def ma_dataset_to_simple_network(
@@ -956,31 +888,23 @@ def ma_dataset_to_simple_diagnostic_robj(
 
 
     """
-    r_str = None
-
     # grab the study names. note: the list is pulled out in reverse order from the
     # model, so we, er, reverse it.
     if studies is None:
         studies = table_model.get_studies(only_if_included=True)
     study_ids = [study.id for study in studies]
 
-    study_names = ", ".join(['"' + study.name + '"' for study in studies])
-    # issue #139 -- also grab the years
-    none_to_str = lambda n: str(n) if n is not None else ""
-    study_years = ", ".join(
-        ["as.integer(%s)" % none_to_str(study.year) for study in studies]
-    )
-
     y_ests, y_SEs = table_model.get_cur_ests_and_SEs(
         only_if_included=True, effect=metric
     )
 
-    y_ests_str = ", ".join(_to_strs(y_ests))
-    y_SEs_str = ", ".join(_to_strs(y_SEs))
-
-    # generate the covariate string
-    cov_str = list_of_cov_value_objects_str(
-        table_model.dataset, study_ids, cov_list=covs_to_include
+    data_kwargs = _analysis_data_kwargs(
+        studies,
+        study_ids,
+        table_model.dataset,
+        covs_to_include,
+        y=y_ests,
+        SE=y_SEs,
     )
 
     # first try and construct an object with raw data
@@ -992,40 +916,17 @@ def ma_dataset_to_simple_diagnostic_robj(
         raw_data = table_model.get_cur_raw_data(only_these_studies=study_ids)
 
         ### assembling TP, FP, TN and FN strings ...
-        tps_str = ", ".join(_to_strs(_get_col(raw_data, 0)))
-        fns_str = ", ".join(_to_strs(_get_col(raw_data, 1)))
-        fps_str = ", ".join(_to_strs(_get_col(raw_data, 2)))
-        tns_str = ", ".join(_to_strs(_get_col(raw_data, 3)))
-
-        # actually creating a new object on the R side seems the path of least resistance here.
-        # the alternative would be to try and create a representation of the R object on the
-        # python side, but this would require more work and I'm not sure what the benefits
-        # would be
-        r_str = (
-            "%s <- openmetar.create.diagnostic.data(TP=c(%s), FN=c(%s), TN=c(%s), FP=c(%s), \
-                            y=c(%s), SE=c(%s), study.names=c(%s), years=c(%s), covariates=%s)"
-            % (
-                var_name,
-                tps_str,
-                fns_str,
-                tns_str,
-                fps_str,
-                y_ests_str,
-                y_SEs_str,
-                study_names,
-                study_years,
-                cov_str,
-            )
+        data_kwargs.update(
+            {
+                "TP": _r_numeric_vector(_get_col(raw_data, 0)),
+                "FN": _r_numeric_vector(_get_col(raw_data, 1)),
+                "FP": _r_numeric_vector(_get_col(raw_data, 2)),
+                "TN": _r_numeric_vector(_get_col(raw_data, 3)),
+            }
         )
 
     elif table_model.included_studies_have_point_estimates(effect=metric):
         print("not sufficient raw data, but studies have point estimates...")
-
-        r_str = (
-            "%s <- openmetar.create.diagnostic.data(y=c(%s), SE=c(%s), study.names=c(%s), \
-                                    years=c(%s), covariates=%s)"
-            % (var_name, y_ests_str, y_SEs_str, study_names, study_years, cov_str)
-        )
 
     else:
         raise ValueError(
@@ -1034,11 +935,81 @@ def ma_dataset_to_simple_diagnostic_robj(
             "for %s." % metric
         )
 
-    # character (unicode) encodings for R
-    r_str = _sanitize_for_R(r_str)
-    execute_r_string(r_str)
+    r_obj = execute_r_function("openmetar.create.diagnostic.data", **data_kwargs)
+    ro.globalenv[var_name] = r_obj
     print("ok.")
-    return r_str
+    return r_obj
+
+
+def _analysis_data_kwargs(studies, study_ids, dataset, covs_to_include, y, SE):
+    return {
+        "y": _r_numeric_vector(y),
+        "SE": _r_numeric_vector(SE),
+        "study.names": _r_character_vector([study.name for study in studies]),
+        "years": _r_year_vector([study.year for study in studies]),
+        "covariates": _r_covariate_list(dataset, study_ids, covs_to_include),
+    }
+
+
+def _r_character_vector(values):
+    converted = [
+        ro.NA_Character if _data_blank_or_none(value) else str(value)
+        for value in values
+    ]
+    return ro.StrVector(converted)
+
+
+def _r_year_vector(values):
+    converted = [
+        ro.NA_Integer if _data_blank_or_none(value) else int(value)
+        for value in values
+    ]
+    return ro.IntVector(converted)
+
+
+def _r_numeric_vector(values):
+    converted = [
+        ro.NA_Real if _data_blank_or_none(value) else float(value)
+        for value in values
+    ]
+    return ro.FloatVector(converted)
+
+
+def _r_covariate_list(dataset, study_ids, cov_list=None):
+    if cov_list is None:
+        cov_list = dataset.covariates
+    covariates = [_r_covariate_values(cov, study_ids, dataset) for cov in cov_list]
+    return execute_r_function("list", *covariates)
+
+
+def _r_covariate_values(cov, study_ids, dataset):
+    values = _cov_values_for_studies(cov, study_ids, dataset)
+    cov_type = TYPE_TO_STR_DICT[cov.data_type]
+    if cov.data_type == CONTINUOUS:
+        cov_vals = _r_numeric_vector(values)
+    else:
+        cov_vals = _r_character_vector(values)
+    return execute_r_function(
+        "openmetar.create.covariate.values",
+        **{
+            "cov.name": str(cov.name),
+            "cov.vals": cov_vals,
+            "cov.type": cov_type,
+            "ref.var": _cov_ref_value(values),
+        }
+    )
+
+
+def _cov_values_for_studies(cov, study_ids, dataset):
+    cov_value_d = dataset.get_values_for_cov(cov.name, ids_for_keys=True)
+    return [cov_value_d.get(study_id) for study_id in study_ids]
+
+
+def _cov_ref_value(values):
+    for value in values:
+        if not _data_blank_or_none(value):
+            return str(value)
+    return ""
 
 
 def cov_to_str(cov, study_ids, dataset, named_list=True, return_cov_vals=False):
