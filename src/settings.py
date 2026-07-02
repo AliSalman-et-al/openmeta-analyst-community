@@ -21,6 +21,7 @@ QSettings = QtCore.QSettings
 ##################### HANDLE SETTINGS #####################
 
 MAX_RECENT_FILES = 10
+MAIN_WINDOW_GROUP = "main_window"
 DEFAULT_SETTINGS = {
     "splash": True,
     "digits": 3,
@@ -131,6 +132,36 @@ def save_settings():
     print("saved settings")
     settings = QSettings()
     settings.sync()  # writes to permanent storage
+
+
+def save_main_window_placement(window):
+    settings = QSettings()
+    settings.beginGroup(MAIN_WINDOW_GROUP)
+    settings.setValue("geometry", window.saveGeometry())
+    settings.setValue("maximized", window.isMaximized())
+    settings.setValue("full_screen", window.isFullScreen())
+    settings.endGroup()
+    settings.sync()
+
+
+def restore_main_window_placement(window, default_maximized=True):
+    settings = QSettings()
+    settings.beginGroup(MAIN_WINDOW_GROUP)
+    has_geometry = settings.contains("geometry")
+    geometry = settings.value("geometry") if has_geometry else None
+    maximized = settings.value("maximized", default_maximized, type=bool)
+    full_screen = settings.value("full_screen", False, type=bool)
+    settings.endGroup()
+
+    if has_geometry and geometry is not None:
+        window.restoreGeometry(geometry)
+
+    if full_screen:
+        window.showFullScreen()
+    elif maximized or (default_maximized and not has_geometry):
+        window.showMaximized()
+    else:
+        window.show()
 
 
 def load_settings():

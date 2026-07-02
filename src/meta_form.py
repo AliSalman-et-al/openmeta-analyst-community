@@ -248,6 +248,21 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def closeEvent(self, event):
         self.quit()
 
+    def _capture_window_placement(self):
+        return {
+            "geometry": self.saveGeometry(),
+            "maximized": self.isMaximized(),
+            "full_screen": self.isFullScreen(),
+        }
+
+    def _restore_window_placement(self, placement):
+        if placement["full_screen"]:
+            self.showFullScreen()
+        elif placement["maximized"]:
+            self.showMaximized()
+        else:
+            self.restoreGeometry(placement["geometry"])
+
     def _model_about_to_be_reset(self):
         """Call all the functions here that should be called when the model is
         about to be reset"""
@@ -1281,10 +1296,14 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
         redo_f = redo_open
 
-        open_command = meta_globals.CommandGenericDo(redo_f, undo_f)
-        self.tableView.undoStack.push(open_command)
-        self.dataset_file_lbl.setText("open file: %s" % file_path)
-        qt_layout.fit_text_to_contents(self)
+        placement = self._capture_window_placement()
+        try:
+            open_command = meta_globals.CommandGenericDo(redo_f, undo_f)
+            self.tableView.undoStack.push(open_command)
+            self.dataset_file_lbl.setText("open file: %s" % file_path)
+            qt_layout.fit_text_to_contents(self)
+        finally:
+            self._restore_window_placement(placement)
 
         # we just opened it, so it's 'saved'
         self.current_data_unsaved = False
@@ -1502,6 +1521,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             else:  # Cancel
                 return
 
+        save_main_window_placement(self)
         save_settings()
         QApplication.quit()
 

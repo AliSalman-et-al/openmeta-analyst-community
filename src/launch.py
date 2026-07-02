@@ -158,7 +158,7 @@ def start():
 
     meta = meta_form.MetaForm()
     splash.finish(meta)
-    meta.show()
+    _show_main_window(meta)
     if startup_project_path:
         opened = meta.open(startup_project_path)
         if os.environ.get("OMA_STARTUP_PROJECT_SMOKE") == "1":
@@ -185,8 +185,19 @@ def start_automation():
     if os.environ.get("OMA_REQUIRE_IN_PROCESS_RPY2") == "1":
         load_R_libraries(app, None)
     meta = meta_form.MetaForm()
-    meta.show()
+    _show_main_window(meta)
     return app, meta
+
+
+def _show_main_window(window):
+    if hasattr(settings, "restore_main_window_placement") and hasattr(
+        window, "restoreGeometry"
+    ):
+        settings.restore_main_window_placement(window)
+    elif hasattr(window, "showMaximized"):
+        window.showMaximized()
+    else:
+        window.show()
 
 
 def _set_application_icon(app):

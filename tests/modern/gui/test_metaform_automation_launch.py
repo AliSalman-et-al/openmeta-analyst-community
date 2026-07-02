@@ -148,6 +148,52 @@ def test_automation_launch_creates_and_closes_real_metaform_shell():
     os.chdir(REPO_ROOT)
 
 
+def test_automation_launch_shows_main_window_maximized():
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        assert window.isVisible()
+        assert window.isMaximized()
+    finally:
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
+def test_open_project_preserves_main_window_state_without_duplicate_windows():
+    import launch
+
+    app, window = launch.start_automation()
+    meta_form = sys.modules["meta_form"]
+
+    try:
+        window.showMaximized()
+        app.processEvents()
+        visible_metaforms_before = [
+            widget
+            for widget in app.topLevelWidgets()
+            if isinstance(widget, meta_form.MetaForm) and widget.isVisible()
+        ]
+
+        assert window.open(os.path.abspath("sample_data/amino.oma")) is True
+        app.processEvents()
+
+        visible_metaforms_after = [
+            widget
+            for widget in app.topLevelWidgets()
+            if isinstance(widget, meta_form.MetaForm) and widget.isVisible()
+        ]
+        assert visible_metaforms_after == visible_metaforms_before
+        assert window.isMaximized()
+        assert window.tableView.model() is window.model
+        assert window.model.rowCount() >= 20
+    finally:
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
 def test_openmeta_logo_resource_is_valid_and_used_consistently():
     import icons_rc  # noqa: F401
     from PyQt5 import QtGui
@@ -1626,6 +1672,35 @@ def test_recent_files_persist_through_pyqt5_settings(tmp_path):
     settings.load_settings()
 
     assert settings.get_setting("recent_files") == ["first.oma", "second.oma"]
+
+
+def test_main_window_maximized_state_persists_through_pyqt5_settings(tmp_path):
+    from PyQt5 import QtCore, QtWidgets
+    import settings
+
+    QtCore.QSettings.setPath(
+        QtCore.QSettings.IniFormat, QtCore.QSettings.UserScope, str(tmp_path)
+    )
+    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.IniFormat)
+    settings.reset_settings()
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    saved = QtWidgets.QMainWindow()
+    restored = QtWidgets.QMainWindow()
+    try:
+        saved.showMaximized()
+        app.processEvents()
+
+        settings.save_main_window_placement(saved)
+        settings.restore_main_window_placement(restored)
+        app.processEvents()
+
+        assert restored.isVisible()
+        assert restored.isMaximized()
+    finally:
+        saved.close()
+        restored.close()
+        app.processEvents()
 
 
 def test_welcome_wizard_recent_action_selects_project():
