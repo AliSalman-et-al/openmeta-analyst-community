@@ -16,6 +16,7 @@ print("Entering meta_py_r for import probably")
 import math
 import os
 import r_runtime
+from analysis_method_labels import normalize_available_method_labels
 from study_effect_shapes import (
     effect_triplet,
     normalize_diagnostic_effects,
@@ -519,7 +520,7 @@ def get_available_methods(for_data_type=None, data_obj_name=None, metric=None):
             "metric": _r_null_if_none(None if metric is None else str(metric)),
         }
     )
-    return R_parse_tools.recursioner(methods)
+    return normalize_available_method_labels(R_parse_tools.recursioner(methods))
 
 
 @RfunctionCaller

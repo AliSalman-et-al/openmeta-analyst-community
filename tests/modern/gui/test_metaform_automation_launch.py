@@ -1106,7 +1106,7 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
     monkeypatch,
 ):
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt5 import QtCore, QtWidgets
 
     app, window = launch.start_automation()
     meta_form = sys.modules["meta_form"]
@@ -1114,8 +1114,8 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
     qt_layout = sys.modules["qt_layout"]
 
     method_map = {
-        "Binary Random-Effects": "binary.random",
-        "Binary Fixed-Effect Mantel Haenszel": "binary.fixed.mh",
+        "binary.random": "binary.random",
+        "binary.fixed.mh": "binary.fixed.mh",
     }
     descriptions = {
         "binary.random": "Random-effects analysis",
@@ -1204,12 +1204,23 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
         assert long_method_index >= 0
         specs.method_cbo_box.setCurrentIndex(long_method_index)
         app.processEvents()
+        assert (
+            specs.parameter_grp_box.title()
+            == "Binary Fixed-Effect Mantel Haenszel"
+        )
+        assert specs.parameter_grp_box.title() != "binary.fixed.mh"
         short_method_index = specs.method_cbo_box.findText("Binary Random-Effects")
         specs.method_cbo_box.setCurrentIndex(short_method_index)
         app.processEvents()
+        assert specs.parameter_grp_box.title() == "Binary Random-Effects"
+        assert specs.parameter_grp_box.title() != "binary.random"
 
         assert specs.width() == stable_width
         assert specs.minimumWidth() == stable_minimum_width
+        assert (
+            specs.parameter_grp_box.layout().alignment()
+            & QtCore.Qt.AlignTop
+        ) == QtCore.Qt.AlignTop
 
         descriptions = [
             label

@@ -35,6 +35,7 @@ import copy
 import sys
 
 import forms.ui_ma_specs
+from analysis_method_labels import normalize_available_method_labels
 import app_error_handler
 import meta_py_r
 import progress_bar as progress_dialog
@@ -326,9 +327,12 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             str(self.method_cbo_box.currentText())
         ]
         self.setup_params()
-        self.parameter_grp_box.setTitle(self.current_method)
+        self._set_parameter_box_title(self.method_cbo_box, self.parameter_grp_box)
         self.ui_for_params(adjust_root=False)
         qt_layout.fit_analysis_dialog_to_contents(self, adjust_root=False)
+
+    def _set_parameter_box_title(self, cbo_box, param_box):
+        param_box.setTitle(str(cbo_box.currentText()))
 
     def populate_cbo_box(self, cbo_box=None, param_box=None):
         # if no combo box is passed in, use the default 'method_cbo_box'
@@ -374,6 +378,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         self.available_method_d = meta_py_r.get_available_methods(
             for_data_type=self.data_type, data_obj_name=tmp_obj_name, metric=metric
+        )
+        self.available_method_d = normalize_available_method_labels(
+            self.available_method_d
         )
 
         print(
@@ -433,7 +440,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             cbo_box.blockSignals(signals_were_blocked)
         self.current_method = self.available_method_d[str(cbo_box.currentText())]
         self.setup_params()
-        param_box.setTitle(self.current_method)
+        self._set_parameter_box_title(cbo_box, param_box)
         if cbo_box is self.method_cbo_box:
             self.ui_for_params()
 
@@ -448,6 +455,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
     def ui_for_params(self, adjust_root=True):
         if self.parameter_grp_box.layout() is None:
             layout = QGridLayout()
+            layout.setAlignment(Qt.AlignTop)
             self.parameter_grp_box.setLayout(layout)
 
         cur_grid_row = 0
