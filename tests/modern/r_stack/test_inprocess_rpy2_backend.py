@@ -379,14 +379,38 @@ _HSROC_SUMMARY_DRIVER = textwrap.dedent(
     direct_summary = ro.r(
         '''
         list(
-          Summary = list(`Bivariate Summary` = "Bivariate Summary\\nEstimate")
+          Summary = list(
+            `Bivariate Summary` = paste(
+              "Bivariate Summary",
+              "Estimate HPD.low HPD.high",
+              "Fallback ci.lb ci.ub lower.bound upper.bound Lower Bound Upper Bound",
+              sep="\\n"
+            ),
+            `Other Summary` = "HPD lower HPD upper"
+          ),
+          `Raw Text Summary` = "ci.lb ci.ub"
         )
         '''
     )
     parsed_direct = meta_py_r.parse_out_results(direct_summary)
-    assert parsed_direct["texts"] == {
-        "Bivariate Summary": "Bivariate Summary\\nEstimate"
-    }, parsed_direct
+    direct_text = "\\n".join(parsed_direct["texts"].values())
+    for raw_header in (
+        "HPD.low",
+        "HPD.high",
+        "HPD lower",
+        "HPD upper",
+        "ci.lb",
+        "ci.ub",
+        "lower.bound",
+        "upper.bound",
+        "Lower Bound",
+        "Upper Bound",
+    ):
+        assert raw_header not in direct_text, parsed_direct
+    assert "Estimate Lower bound Upper bound" in direct_text, parsed_direct
+    assert "Fallback Lower bound Upper bound Lower bound Upper bound Lower bound Upper bound" in direct_text, parsed_direct
+    assert parsed_direct["texts"]["Other Summary"] == "Lower bound Upper bound", parsed_direct
+    assert parsed_direct["texts"]["Raw Text Summary"] == "Lower bound Upper bound", parsed_direct
 
     sys.stdout.write("OK\\n")
     sys.stdout.flush()

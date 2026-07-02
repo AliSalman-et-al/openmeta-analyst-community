@@ -15,6 +15,7 @@
 print("Entering meta_py_r for import probably")
 import math
 import os
+import re
 import r_runtime
 from analysis_method_labels import normalize_available_method_labels
 import result_sections
@@ -1368,9 +1369,9 @@ def parse_out_results(result):
             pass
         else:
             if type(text) == rpy2.robjects.vectors.StrVector:
-                text_d[text_n] = text[0]
+                text_d[text_n] = _format_result_text(text[0])
             elif _is_summary_display(text):
-                text_d[text_n] = _capture_formatted_summary(text)
+                text_d[text_n] = _format_result_text(_capture_formatted_summary(text))
             elif _is_table_summary(text):
                 text_d.update(_format_table_summary(text_n, text))
             elif _is_named_table_summary(text):
@@ -1378,7 +1379,7 @@ def parse_out_results(result):
             elif _is_named_text_summary(text):
                 text_d.update(_format_named_text_summary(text_n, text))
             else:
-                text_d[text_n] = str(text)
+                text_d[text_n] = _format_result_text(str(text))
 
     to_return = {
         "images": image_path_d,
@@ -1457,10 +1458,10 @@ def _format_named_text_summary(parent_name, r_object):
     for name, item in zip(list(r_object.names), list(r_object)):
         if name == "" or not _is_r_string_vector(item):
             continue
-        sections[_summary_section_name(parent_name, name)] = item[0]
+        sections[_summary_section_name(parent_name, name)] = _format_result_text(item[0])
 
     if not sections:
-        sections[parent_name] = str(r_object)
+        sections[parent_name] = _format_result_text(str(r_object))
     return sections
 
 
@@ -1480,10 +1481,10 @@ def _format_named_table_summary(parent_name, r_object):
         elif len(dims) == 3:
             sections.update(_format_r_array_sections(parent_name, name, item))
         elif _is_r_string_vector(item):
-            sections[_summary_section_name(parent_name, name)] = item[0]
+            sections[_summary_section_name(parent_name, name)] = _format_result_text(item[0])
 
     if not sections:
-        sections[parent_name] = str(r_object)
+        sections[parent_name] = _format_result_text(str(r_object))
     return sections
 
 
@@ -1600,15 +1601,33 @@ def _format_text_table(headers, rows):
 
 def _format_r_table_header(value):
     normalized = str(value).strip()
-    compact = normalized.lower().replace(".", " ")
+    compact = normalized.lower().replace(".", " ").replace("_", " ")
     compact = " ".join(compact.split())
-    if compact in ("hpd low", "hpd lower"):
+    if compact in ("hpd low", "hpd lower", "ci lb", "lower bound"):
         return "Lower bound"
-    if compact in ("hpd high", "hpd upper"):
+    if compact in ("hpd high", "hpd upper", "ci ub", "upper bound"):
         return "Upper bound"
     if compact == "median estimate":
         return "Median estimate"
     return normalized
+
+
+def _format_result_text(text):
+    if not isinstance(text, str):
+        text = str(text)
+    insensitive_replacements = (
+        (r"\bHPD[._\s]+(?:low|lower)\b", "Lower bound"),
+        (r"\bHPD[._\s]+(?:high|upper)\b", "Upper bound"),
+        (r"\bci[._\s]*lb\b", "Lower bound"),
+        (r"\bci[._\s]*ub\b", "Upper bound"),
+        (r"\blower[._]+bound\b", "Lower bound"),
+        (r"\bupper[._]+bound\b", "Upper bound"),
+    )
+    for pattern, replacement in insensitive_replacements:
+        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+    text = re.sub(r"\bLower Bound\b", "Lower bound", text)
+    text = re.sub(r"\bUpper Bound\b", "Upper bound", text)
+    return text
 
 
 def make_weights_str(results):
