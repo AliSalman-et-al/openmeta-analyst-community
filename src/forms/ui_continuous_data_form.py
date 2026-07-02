@@ -25,7 +25,7 @@ class Ui_ContinuousDataForm(object):
         font.setFamily("Verdana")
         ContinuousDataForm.setFont(font)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(QtGui.QPixmap(":/misc/meta.ico"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         ContinuousDataForm.setWindowIcon(icon)
         self.verticalLayout_2 = QtWidgets.QVBoxLayout(ContinuousDataForm)
         self.verticalLayout_2.setObjectName("verticalLayout_2")

@@ -19,7 +19,7 @@ class Ui_cov_subgroup_dialog(object):
         font.setFamily("Verdana")
         cov_subgroup_dialog.setFont(font)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(QtGui.QPixmap(":/misc/meta.ico"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         cov_subgroup_dialog.setWindowIcon(icon)
         self.buttonBox = QtWidgets.QDialogButtonBox(cov_subgroup_dialog)
         self.buttonBox.setGeometry(QtCore.QRect(10, 100, 281, 32))

@@ -16,7 +16,7 @@ class Ui_DiagnosticDataForm(object):
         DiagnosticDataForm.setObjectName("DiagnosticDataForm")
         DiagnosticDataForm.resize(380, 412)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(QtGui.QPixmap(":/misc/meta.ico"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         DiagnosticDataForm.setWindowIcon(icon)
         self.verticalLayout = QtWidgets.QVBoxLayout(DiagnosticDataForm)
         self.verticalLayout.setObjectName("verticalLayout")

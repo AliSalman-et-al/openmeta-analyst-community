@@ -16,7 +16,7 @@ class Ui_edit_forest_plot_dlg(object):
         edit_forest_plot_dlg.setObjectName("edit_forest_plot_dlg")
         edit_forest_plot_dlg.resize(506, 434)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(QtGui.QPixmap(":/misc/meta.ico"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         edit_forest_plot_dlg.setWindowIcon(icon)
         self.verticalLayout = QtWidgets.QVBoxLayout(edit_forest_plot_dlg)
         self.verticalLayout.setObjectName("verticalLayout")

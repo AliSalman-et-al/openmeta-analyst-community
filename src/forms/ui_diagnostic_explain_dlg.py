@@ -16,7 +16,7 @@ class Ui_diag_explain_window(object):
         diag_explain_window.setObjectName("diag_explain_window")
         diag_explain_window.resize(510, 239)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(QtGui.QPixmap(":/misc/meta.ico"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         diag_explain_window.setWindowIcon(icon)
         diag_explain_window.setModal(True)
         self.verticalLayout_2 = QtWidgets.QVBoxLayout(diag_explain_window)

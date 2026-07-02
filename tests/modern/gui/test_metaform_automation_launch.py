@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import sys
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -204,23 +205,33 @@ def test_openmeta_logo_resource_is_valid_and_used_consistently():
 
     assert app_icon.isNull() is False
     assert logo_pixmap.isNull() is False
+    assert logo_pixmap.width() != logo_pixmap.height()
 
     checked_paths = [
-        os.path.join("src", "meta.ui"),
-        os.path.join("src", "results_window.ui"),
+        Path("src", "meta.ui"),
+        Path("src", "results_window.ui"),
     ]
     checked_paths.extend(
-        os.path.join("src", "forms", file_name)
+        Path("src", "forms", file_name)
         for file_name in os.listdir(os.path.join(REPO_ROOT, "src", "forms"))
         if file_name.endswith((".ui", ".py"))
     )
-    broken_logo_path = ":/images/" + "meta.png"
 
-    broken_logo_refs = [
-        path
+    checked_window_icon_refs = [
+        (path, line)
         for path in checked_paths
-        if os.path.exists(path)
-        and broken_logo_path in open(path, encoding="utf-8").read()
+        if path.exists()
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if "setWindowIcon" in line
+        or "<property name=\"windowIcon\">" in line
+        or "<normaloff>:/misc/meta." in line
+        or "\":/misc/meta." in line
+        or "':/misc/meta." in line
+    ]
+    broken_logo_refs = [
+        f"{path}:{line.strip()}"
+        for path, line in checked_window_icon_refs
+        if ":/misc/meta.png" in line
     ]
 
     assert broken_logo_refs == []

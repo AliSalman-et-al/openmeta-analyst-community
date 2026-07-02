@@ -19,7 +19,7 @@ class Ui_cov_reg_dialog(object):
         font.setFamily("Verdana")
         cov_reg_dialog.setFont(font)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(QtGui.QPixmap(":/misc/meta.ico"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         cov_reg_dialog.setWindowIcon(icon)
         self.verticalLayout = QtWidgets.QVBoxLayout(cov_reg_dialog)
         self.verticalLayout.setObjectName("verticalLayout")
