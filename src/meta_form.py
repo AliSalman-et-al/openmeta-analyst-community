@@ -207,7 +207,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
         self.tableView.setModel(self.model)
         # attach a delegate for editing
-        self.tableView.setItemDelegate(ma_data_table_view.StudyDelegate(self))
+        self.tableView.setItemDelegate(ma_data_table_view.StudyDelegate(self.tableView))
 
         # the nav_lbl text corresponds to the currently selected
         # 'dimension', e.g., outcome or treatment. New points

@@ -12,6 +12,57 @@ import pytest
 REPO_ROOT = os.getcwd()
 
 
+def test_data_table_return_moves_vertically_from_selected_cells():
+    from PyQt5 import QtCore, QtTest
+
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        table = window.tableView
+        model = window.model
+
+        table.setCurrentIndex(model.index(0, model.NAME))
+        QtTest.QTest.keyClick(table, QtCore.Qt.Key_Return)
+        assert table.currentIndex() == model.index(1, model.NAME)
+
+        QtTest.QTest.keyClick(table, QtCore.Qt.Key_Enter)
+        assert table.currentIndex() == model.index(2, model.NAME)
+
+        QtTest.QTest.keyClick(table, QtCore.Qt.Key_Return, QtCore.Qt.ShiftModifier)
+        assert table.currentIndex() == model.index(1, model.NAME)
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_data_table_return_commits_editor_and_moves_down_same_column():
+    from PyQt5 import QtCore, QtTest, QtWidgets
+
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        table = window.tableView
+        model = window.model
+
+        table.setCurrentIndex(model.index(0, model.NAME))
+        table.edit(model.index(0, model.NAME))
+        app.processEvents()
+        editor = table.findChild(QtWidgets.QLineEdit)
+        assert editor is not None
+
+        editor.setText("Alpha")
+        QtTest.QTest.keyClick(editor, QtCore.Qt.Key_Return)
+        app.processEvents()
+
+        assert _cell_text(model, 0, model.NAME) == "Alpha"
+        assert table.currentIndex() == model.index(1, model.NAME)
+    finally:
+        _close_without_prompt(app, window)
+
+
 def test_real_metaform_creates_binary_continuous_and_diagnostic_datasets():
     import launch
 

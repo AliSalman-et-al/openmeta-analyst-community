@@ -273,6 +273,11 @@ class MADataTable(QtWidgets.QTableView):
                 # if the command hasn't anything to do with the table view
                 # in particular, we pass the event up to the main UI
                 self.main_gui.keyPressEvent(event)
+        elif self._is_return_key(event):
+            self._move_current_index_vertically(
+                -1 if event.modifiers() & QtCore.Qt.ShiftModifier else 1
+            )
+            event.accept()
         else:
             # fix for issue #180
             # if event.key() == QtCore.Qt.Key_Tab:
@@ -288,6 +293,23 @@ class MADataTable(QtWidgets.QTableView):
             # as bugs. See issues: #21, #19
             #
             QTableView.keyPressEvent(self, event)
+
+    def _is_return_key(self, event):
+        return event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter)
+
+    def _move_current_index_vertically(self, row_delta):
+        self._move_index_vertically_from(self.currentIndex(), row_delta)
+
+    def _move_index_vertically_from(self, index, row_delta):
+        model = self.model()
+        if index is None or not index.isValid() or model is None:
+            return
+
+        target_row = min(max(index.row() + row_delta, 0), model.rowCount() - 1)
+        target = model.index(target_row, index.column())
+        if target.isValid():
+            self.setCurrentIndex(target)
+            self.scrollTo(target)
 
     def copy(self):
         # copy/paste: these only happen if at least one cell is selected
@@ -1100,9 +1122,43 @@ class StudyDelegate(QItemDelegate):
     def __init__(self, parent=None):
         super(StudyDelegate, self).__init__(parent)
 
+    def eventFilter(self, editor, event):
+        if (
+            event.type() == QtCore.QEvent.KeyPress
+            and event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter)
+            and not event.modifiers() & QtCore.Qt.ControlModifier
+        ):
+            direction = -1 if event.modifiers() & QtCore.Qt.ShiftModifier else 1
+            table = self._table_for_editor(editor)
+            edited_index = table.currentIndex() if table is not None else None
+            self.commitData.emit(editor)
+            self.closeEditor.emit(editor, QtWidgets.QAbstractItemDelegate.NoHint)
+            if table is not None:
+                QtCore.QTimer.singleShot(
+                    0,
+                    lambda: table._move_index_vertically_from(
+                        edited_index, direction
+                    ),
+                )
+            event.accept()
+            return True
+        return super(StudyDelegate, self).eventFilter(editor, event)
+
     def createEditor(self, parent, *args):
         le = QLineEdit(parent)
         return le
+
+    def _table_for_editor(self, editor):
+        delegate_parent = self.parent()
+        if hasattr(delegate_parent, "_move_current_index_vertically"):
+            return delegate_parent
+
+        parent = editor.parent()
+        while parent is not None:
+            if hasattr(parent, "_move_current_index_vertically"):
+                return parent
+            parent = parent.parent()
+        return None
 
     def setEditorData(self, editor, index):
         # used to be Qt.DisplayRole
