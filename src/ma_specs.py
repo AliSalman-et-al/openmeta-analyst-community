@@ -81,9 +81,8 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         # method
         self.meta_f_str = meta_f_str
 
-        self.buttonBox.accepted.connect(
-            app_error_handler.safe_slot(self.run_ma, parent=self)
-        )
+        self._accepted_slot = None
+        self._set_accepted_handler(self.run_ma)
         self.buttonBox.rejected.connect(
             app_error_handler.safe_slot(self.cancel, parent=self)
         )
@@ -149,6 +148,15 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
     def cancel(self):
         print("(cancel)")
         self.reject()
+
+    def _set_accepted_handler(self, handler):
+        if self._accepted_slot is not None:
+            try:
+                self.buttonBox.accepted.disconnect(self._accepted_slot)
+            except TypeError:
+                pass
+        self._accepted_slot = app_error_handler.safe_slot(handler, parent=self)
+        self.buttonBox.accepted.connect(self._accepted_slot)
 
     def select_out_path(self):
         out_f = "."
@@ -239,86 +247,41 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
             # _writeout_test_data(self.meta_f_str, self.current_method, self.current_param_vals, result) # FOR MAKING TESTS
         elif self.data_type == "diagnostic":
-            # add the current metrics (e.g., PLR, etc.) to the method/params
-            # dictionary
-            self.add_cur_analysis_details()
-
-            method_names, list_of_param_vals = [], []
-
-            if len(self.diag_metrics_to_analysis_details) == 0:
+            try:
+                # add the current metrics (e.g., PLR, etc.) to the method/params
+                # dictionary
                 self.add_cur_analysis_details()
+                if len(self.diag_metrics_to_analysis_details) == 0:
+                    self.add_cur_analysis_details()
 
-            ordered_metrics = ["Sens", "Spec", "NLR", "PLR", "DOR"]
-            for diag_metric in [
-                metric
-                for metric in ordered_metrics
-                if metric in self.diag_metrics_to_analysis_details
-            ]:
-                # pull out the method and parameters object specified for this
-                # metric.
-                method, param_vals = self.diag_metrics_to_analysis_details[diag_metric]
-                param_vals = copy.deepcopy(param_vals)
+                method_names, list_of_param_vals = _diagnostic_analysis_requests(self)
 
-                # update the forest plot path
-                split_fp_path = self.current_param_vals["fp_outpath"].split(".")
-                new_str = (
-                    split_fp_path[0]
-                    if len(split_fp_path) == 1
-                    else ".".join(split_fp_path[:-1])
-                )
-                new_str = new_str + "_%s" % diag_metric.lower() + ".png"
-                param_vals["fp_outpath"] = new_str
-
-                # update the metric
-                param_vals["measure"] = diag_metric
-
-                method_names.append(method)
-                list_of_param_vals.append(param_vals)
-
-            if self.meta_f_str is None:
-                # regular meta-analysis
-                try:
+                if self.meta_f_str is None:
+                    # regular meta-analysis
                     result = _run_diagnostic_analysis_isolating_metric_failures(
                         self.model, method_names, list_of_param_vals
                     )
-                except Exception as e:
-                    app_error_handler.log_exception(type(e), e, e.__traceback__)
-                    error_message = (
-                        "Sorry, this analysis could not be completed:\n\n%s"
-                        % e
-                    )
-
-                    QMessageBox.critical(self, "analysis failed", error_message)
-                    bar.hide()
-                    # reset Rs working directory
-                    _reset_r_working_dir_safely()
-                    self.accept()
-                    return
-                # _writeout_test_data(self.meta_f_str, method_names, list_of_param_vals, result, diag=True) # FOR MAKING TESTS
-            else:
-                # in the case of diagnostic, we pass in lists
-                # of param values to the meta_method
-                try:
+                    # _writeout_test_data(self.meta_f_str, method_names, list_of_param_vals, result, diag=True) # FOR MAKING TESTS
+                else:
+                    # in the case of diagnostic, we pass in lists
+                    # of param values to the meta_method
                     result = _run_diagnostic_analysis_isolating_metric_failures(
                         self.model,
                         method_names,
                         list_of_param_vals,
                         meta_f_str=self.meta_f_str,
                     )
-                except Exception as e:
-                    app_error_handler.log_exception(type(e), e, e.__traceback__)
-                    error_message = (
-                        "Sorry, this analysis could not be completed:\n\n%s"
-                        % e
-                    )
+                    # _writeout_test_data(self.meta_f_str, method_names, list_of_param_vals, result, diag=True) # FOR MAKING TESTS
+            except Exception as e:
+                app_error_handler.log_exception(type(e), e, e.__traceback__)
+                error_message = "Sorry, this analysis could not be completed:\n\n%s" % e
 
-                    QMessageBox.critical(self, "analysis failed", error_message)
-                    bar.hide()
-                    # reset Rs working directory
-                    _reset_r_working_dir_safely()
-                    self.accept()
-                    return
-                # _writeout_test_data(self.meta_f_str, method_names, list_of_param_vals, result, diag=True) # FOR MAKING TESTS
+                QMessageBox.critical(self, "analysis failed", error_message)
+                bar.hide()
+                # reset Rs working directory
+                _reset_r_working_dir_safely()
+                self.accept()
+                return
 
         bar.hide()
 
@@ -861,13 +824,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
             # if both sets of metrics are selected, we need to next prompt the
             # user for parameters regarding the second
-            try:
-                self.buttonBox.accepted.disconnect(self.run_ma)
-            except TypeError:
-                pass
-            self.buttonBox.accepted.connect(
-                app_error_handler.safe_slot(self.diag_next, parent=self)
-            )
+            self._set_accepted_handler(self.diag_next)
 
             # in the case that both 'families' of metrics are selected,
             # we prompt the user for two different methods (because different
@@ -984,6 +941,63 @@ def add_plot_params(specs_form):
     specs_form.current_param_vals["fp_show_summary_line"] = (
         specs_form.show_summary_line.isChecked()
     )
+
+
+def _diagnostic_analysis_requests(specs_form):
+    method_names, list_of_param_vals = [], []
+    missing_metrics = []
+
+    ordered_metrics = ["Sens", "Spec", "NLR", "PLR", "DOR"]
+    for diag_metric in [
+        metric
+        for metric in ordered_metrics
+        if metric in specs_form.diag_metrics_to_analysis_details
+    ]:
+        details = specs_form.diag_metrics_to_analysis_details[diag_metric]
+        if details is None:
+            missing_metrics.append(diag_metric)
+            continue
+
+        try:
+            method, param_vals = details
+        except (TypeError, ValueError):
+            raise ValueError(
+                "Invalid method and parameter selection for: %s." % diag_metric
+            )
+
+        if method is None or param_vals is None:
+            missing_metrics.append(diag_metric)
+            continue
+
+        param_vals = copy.deepcopy(param_vals)
+
+        # update the forest plot path
+        split_fp_path = specs_form.current_param_vals["fp_outpath"].split(".")
+        new_str = (
+            split_fp_path[0]
+            if len(split_fp_path) == 1
+            else ".".join(split_fp_path[:-1])
+        )
+        new_str = new_str + "_%s" % diag_metric.lower() + ".png"
+        param_vals["fp_outpath"] = new_str
+
+        # update the metric
+        param_vals["measure"] = diag_metric
+
+        method_names.append(method)
+        list_of_param_vals.append(param_vals)
+
+    if missing_metrics:
+        raise ValueError(
+            "No method and parameters were selected for: %s. "
+            "Complete all diagnostic method screens before running analysis."
+            % ", ".join(missing_metrics)
+        )
+
+    if not method_names:
+        raise ValueError("No diagnostic metrics were configured for analysis.")
+
+    return method_names, list_of_param_vals
 
 
 def _text_value(widget):

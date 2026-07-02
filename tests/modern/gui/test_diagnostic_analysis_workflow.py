@@ -272,6 +272,126 @@ def test_diagnostic_multi_metric_failure_keeps_independent_results(monkeypatch):
         _close_without_prompt(app, window)
 
 
+def test_diagnostic_hsroc_next_does_not_run_before_lr_dor_screen(monkeypatch):
+    import launch
+
+    app, window = launch.start_automation()
+    import ma_specs
+    import app_error_handler
+
+    backend = ma_specs.meta_py_r
+    saved = {
+        name: getattr(backend, name)
+        for name in (
+            "get_available_methods",
+            "get_params",
+            "get_method_description",
+            "ma_dataset_to_simple_diagnostic_robj",
+            "run_diagnostic_multi",
+            "reset_Rs_working_dir",
+        )
+    }
+    unexpected_errors = []
+    analysis_results = []
+    run_calls = []
+    try:
+        _create_diagnostic_dataset(window)
+
+        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
+        backend.get_available_methods = lambda **kwargs: {
+            "Bivariate (Maximum Likelihood)": "diagnostic.bivariate.ml",
+            "HSROC": "diagnostic.hsroc",
+            "Diagnostic Random-Effects": "diagnostic.random",
+        }
+        backend.get_params = lambda method: ({}, {}, [], {})
+        backend.get_method_description = lambda method: "stub method"
+        backend.run_diagnostic_multi = lambda *args, **kwargs: run_calls.append(args)
+        backend.reset_Rs_working_dir = lambda: None
+        monkeypatch.setattr(
+            app_error_handler,
+            "handle_exception",
+            lambda *args, **kwargs: unexpected_errors.append(args),
+        )
+        monkeypatch.setattr(
+            window, "analysis", lambda result: analysis_results.append(result)
+        )
+
+        form = window._build_analysis_specs_dialog(
+            diag_metrics=["sens", "spec", "lr", "dor"],
+            conf_level=window.model.get_global_conf_level(),
+        )
+        form.method_cbo_box.setCurrentText("HSROC")
+
+        form.buttonBox.accepted.emit()
+        app.processEvents()
+
+        assert unexpected_errors == []
+        assert analysis_results == []
+        assert run_calls == []
+        assert form.diag_metrics_to_analysis_details["Sens"][0] == "diagnostic.hsroc"
+        assert form.diag_metrics_to_analysis_details["Spec"][0] == "diagnostic.hsroc"
+    finally:
+        for name, value in saved.items():
+            setattr(backend, name, value)
+        _close_without_prompt(app, window)
+
+
+def test_diagnostic_run_rejects_unconfigured_metric_slots(monkeypatch):
+    import launch
+
+    app, window = launch.start_automation()
+    import ma_specs
+
+    backend = ma_specs.meta_py_r
+    saved = {
+        name: getattr(backend, name)
+        for name in (
+            "get_available_methods",
+            "get_params",
+            "get_method_description",
+            "ma_dataset_to_simple_diagnostic_robj",
+            "run_diagnostic_multi",
+            "reset_Rs_working_dir",
+        )
+    }
+    shown = []
+    results = []
+    try:
+        _create_diagnostic_dataset(window)
+
+        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
+        backend.get_available_methods = lambda **kwargs: {
+            "HSROC": "diagnostic.hsroc",
+            "Diagnostic Random-Effects": "diagnostic.random",
+        }
+        backend.get_params = lambda method: ({}, {}, [], {})
+        backend.get_method_description = lambda method: "stub method"
+        backend.run_diagnostic_multi = lambda *args, **kwargs: results.append(args)
+        backend.reset_Rs_working_dir = lambda: None
+        monkeypatch.setattr(
+            ma_specs.QMessageBox, "critical", lambda *args, **kwargs: shown.append(args)
+        )
+        monkeypatch.setattr(window, "analysis", lambda result: results.append(result))
+
+        form = window._build_analysis_specs_dialog(
+            diag_metrics=["sens", "spec", "lr", "dor"],
+            conf_level=window.model.get_global_conf_level(),
+        )
+        form.diag_metrics_to_analysis_details["NLR"] = None
+
+        form.run_ma()
+
+        assert shown
+        assert shown[0][1] == "analysis failed"
+        assert "No method and parameters were selected for: NLR" in shown[0][2]
+        assert "cannot unpack non-iterable NoneType object" not in shown[0][2]
+        assert results == []
+    finally:
+        for name, value in saved.items():
+            setattr(backend, name, value)
+        _close_without_prompt(app, window)
+
+
 def test_diagnostic_direct_effects_build_analysis_data_per_metric(monkeypatch):
     import launch
 
