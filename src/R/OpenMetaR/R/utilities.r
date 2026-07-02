@@ -33,6 +33,12 @@ print.summary.display <- function(x, ...) {
     }
     count = count + 1
    }
+  if (!is.null(summary.disp$notes)) {
+    for (note in summary.disp$notes) {
+      cat(note)
+      cat("\n\n")
+    }
+  }
 }
 
 print.summary.data <- function(x, ...) {
@@ -40,49 +46,23 @@ print.summary.data <- function(x, ...) {
   # Prints an array table.data.
   num.rows <- length(table.data[,1])
   num.cols <- length(table.data[1,])
-  # Compute column widths
-  extra.col.spaces <- 2
-  #table.line <- " "
-  # This was for the old table lines.
-  col.widths <- NULL
+  col.spacing <- "  "
+  col.widths <- c()
   for (col.index in 1:num.cols) {
-    width <- max(nchar(table.data[,col.index])) + extra.col.spaces
-    col.widths <- c(col.widths, max(nchar(table.data[,col.index])) + extra.col.spaces)
-    #spaces <- rep(" ", width)
-    #dash.line <- create.repeat.string("-", width)
-    #table.line <- paste(table.line, spaces, " ", sep="")
+    col.widths <- c(col.widths, max(nchar(table.data[, col.index], type="width")))
   }
-  table.width <- sum(col.widths) + num.cols + 1
-  # Build table
-  #cat(table.line)
   cat("\n")
-  
+
   for (row.index in 1:num.rows) {
-    study.name <- table.data[row.index, 1]
-    # Study names are aligned left
-    end.num <- col.widths[1] - nchar(study.name) -1
-    table.row <- pad.with.spaces(study.name, 1, end.num)
-    if (num.cols > 1) {
-      for (col.index in 2:num.cols) {
-        # Data is aligned right
-        col.width <- col.widths[col.index]
-        entry <- table.data[row.index,col.index]
-        # pad entries with spaces to align columns.
-        end.num <- ceiling((col.width - nchar(entry))/2)
-        pos.num.check <- ((row.index>1) & (regexpr("-", entry)!=1) & (regexpr("<", entry)!=1))
-        if (!(is.na(pos.num.check)) && pos.num.check) {
-          # entry is a positive number so add extra space to align decimal sign.
-          entry <- paste(" ", entry, sep="")
-        } 
-        begin.num <- floor((col.width - nchar(entry))/2)
-        end.num <- col.width - begin.num - nchar(entry)
-        padded.entry <- pad.with.spaces(entry, begin.num, end.num)
-        table.row <- paste(table.row, padded.entry, " ", sep="")
-      }
+    cells <- c()
+    for (col.index in 1:num.cols) {
+      entry <- as.character(table.data[row.index, col.index])
+      justify <- if (row.index == 1 || col.index == 1) "left" else "right"
+      cells <- c(cells, format(entry, width=col.widths[col.index], justify=justify))
     }
+    table.row <- paste(" ", paste(cells, collapse=col.spacing), sep="")
     cat(table.row)
     cat("\n")
-    #cat(table.line)
     cat("\n")
   }
 }
@@ -205,7 +185,7 @@ create.summary.disp <- function(om.data, params, res, model.title) {
   tau2 <- sprintf(digits.str, res$tau2)
   degf <- res$k - 1
   if (!is.null(res$I2)) {
-    I2 <- round(res$I2, digits=params$digits)
+    I2 <- paste(sprintf(digits.str, res$I2), "%", sep="")
   }
   QLabel =  paste("Q(df=", degf, ")", sep="")
   # Set n, the vector of numbers of studies, for PFT metric.
@@ -245,7 +225,7 @@ create.summary.disp <- function(om.data, params, res, model.title) {
     het.col.vals <-  c(QE, QEp)
     het.array <- rbind(het.col.labels, het.col.vals)
   } else {  
-    het.col.labels <- c("tau^2", QLabel, "Het. p-Value", "I^2")
+    het.col.labels <- c("τ²", QLabel, "Het. p-Value", "I²")
     het.col.vals <-  c(tau2, QE, QEp, I2)
     het.array <- rbind(het.col.labels, het.col.vals)
   }
@@ -260,12 +240,15 @@ create.summary.disp <- function(om.data, params, res, model.title) {
     estCalc <- sprintf(digits.str, res$b)
     lbCalc <- sprintf(digits.str, res$ci.lb)
     ubCalc <- sprintf(digits.str, res$ci.ub)
-    alt.col.labels <- c("Estimate", "Lower bound", "Upper bound", "Std. error")
-    alt.col.vals <- c(estCalc, lbCalc, ubCalc, se)
-    alt.array <- rbind(alt.col.labels, alt.col.vals)
-    alt.title <- paste(" Results (", scale.str, " scale)", sep="")
-    arrays <- list(arr1=res.array, arr2=het.array, arr3=alt.array)
-    table.titles <- c(res.title, het.title, alt.title)
+    calc.note <- paste("Calculation scale: ", scale.str,
+                       "; estimate: ", estCalc,
+                       "; lower bound: ", lbCalc,
+                       "; upper bound: ", ubCalc,
+                       "; Std. error: ", se,
+                       sep="")
+    arrays <- list(arr1=res.array, arr2=het.array)
+    table.titles <- c(res.title, het.title)
+    notes <- c(calc.note)
   } else {
     # display and calculation scales are the same - create one table for results
     col.labels <- c("Estimate", "Lower bound", "Upper bound", "Std. error", "p-Value")
@@ -273,6 +256,7 @@ create.summary.disp <- function(om.data, params, res, model.title) {
     res.array <- rbind(col.labels, col.vals)
     arrays = list(arr1=res.array, arr2=het.array)
     table.titles <- c(res.title, het.title)
+    notes <- NULL
   }
   
   #if (transform.name == "binary.transform.f") {
@@ -293,6 +277,7 @@ create.summary.disp <- function(om.data, params, res, model.title) {
     "model.title" = model.title,
     "table.titles" = table.titles,
     "arrays" = arrays,
+    "notes" = notes,
     "MAResults" = res)
   class(summary.disp) <- "summary.display"
   summary.disp
@@ -623,7 +608,7 @@ create.subgroup.display <- function(res, study.names, params, model.title, data.
 
   subgroup.array[1,] <- c("Subgroups", "Studies", "Estimate", "Lower bound", "Upper bound", "Std. error", "p-Value", "z-Value")
   het.array[1,] <- c("Studies", "Q (df)",
-               "Het. p-Value", "I^2")
+               "Het. p-Value", "I²")
   # unpack the data
   for (count in 1:length(study.names)) {
     num.studies <- res[[count]]$k
@@ -644,7 +629,7 @@ create.subgroup.display <- function(res, study.names, params, model.title, data.
       QE <- "NA"
     }
     if (!is.null(res[[count]]$I2)) {
-        I2 <- paste(round(res[[count]]$I2, digits = 2), "%")
+        I2 <- paste(sprintf(digits.str, res[[count]]$I2), "%", sep="")
     } else {
         I2 <- "NA"
     }

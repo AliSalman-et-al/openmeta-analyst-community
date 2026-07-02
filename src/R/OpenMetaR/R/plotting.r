@@ -76,7 +76,7 @@ create.plot.data.generic <- function(om.data, params, res, selected.cov=NULL){
       QEp <- "NA"
     } 
     
-    overall <- paste("Overall (I^2=", I2, " , ", PLabel, QEp, ")", sep="")
+    overall <- paste("Overall (I²=", I2, " , ", PLabel, QEp, ")", sep="")
     # append years to study names unless year equals 0 (0 is passed to R when year is empty).
     study.names <- om.data@study.names
     years <- om.data@years
@@ -436,7 +436,7 @@ create.subgroup.plot.data.generic <- function(subgroup.data, params, data.type, 
             QEp <- "NA"
         } 
     
-        overall <- paste(" (I^2=", I2, " , P=", QEp, ")", sep="")
+        overall <- paste(" (I²=", I2, " , P=", QEp, ")", sep="")
         types <- c(types, rep(0, length(grouped.data[[i]]@study.names)), 1)
         label.col <-c(label.col, grouped.data[[i]]@study.names, paste("Subgroup ", subgroup.list[i], overall, sep=""))
     } 
@@ -465,7 +465,7 @@ create.subgroup.plot.data.generic <- function(subgroup.data, params, data.type, 
     } else {
         QEp <- "NA"
     } 
-    overall <- paste(" (I^2=", I2, " , P=", QEp, ")", sep="")
+    overall <- paste(" (I²=", I2, " , P=", QEp, ")", sep="")
     label.col <- c(as.character(params$fp_col1_str), label.col, paste("Overall", overall, sep=""))
     plot.options <- set.plot.options(params)
     if (params$fp_plot_lb == "[default]") {

@@ -527,7 +527,7 @@ if __name__ == "__main__":
     test_results["images"] = {"Forest Plot": "./r_tmp/forest.png"}
     test_results["texts"] = {
         "Weights": "studies             weights\nGonzalez       1993  7.3%\nPrins          1993  6.2%\nGiamarellou    1991  2.1%\nMaller         1993 10.7%\nSturm          1989  2.0%\nMarik          1991 12.2%\nMuijsken       1988  7.5%\nVigano         1992  1.8%\nHansen         1988  5.3%\nDe Vries       1990  6.1%\nMauracher      1989  2.2%\nNordstrom      1990  5.3%\nRozdzinski     1993 10.3%\nTer Braak      1990  8.7%\nTulkens        1988  1.2%\nVan der Auwera 1991  2.0%\nKlastersky     1977  6.0%\nVanhaeverbeek  1993  1.2%\nHollender      1989  1.8%\n",
-        "Summary": "Binary Random-Effects Model\n\nMetric: Odds Ratio\n\n Model Results\n\n Estimate  Lower bound   Upper bound   p-Value  \n\n 0.770        0.485         1.222       0.267   \n\n\n Heterogeneity\n\n tau^2  Q(df=18)   Het. p-Value   I^2  \n\n 0.378   33.360        0.015      46%  \n\n\n Results (log scale)\n\n Estimate  Lower bound   Upper bound   Std. error  \n\n -0.262      -0.724         0.200         0.236    \n\n\n",
+        "Summary": "Binary Random-Effects Model\n\nMetric: Odds Ratio\n\n Model Results\n\n Estimate  Lower bound  Upper bound  p-Value\n\n 0.770           0.485        1.222    0.267\n\n\n Heterogeneity\n\n τ²     Q(df=18)  Het. p-Value  I²\n\n 0.378    33.360         0.015  46.000%\n\n\nCalculation scale: log; estimate: -0.262; lower bound: -0.724; upper bound: 0.200; Std. error: 0.236\n\n",
     }
     test_results["image_var_names"] = {"forest plot": "forest_plot"}
     test_results["image_params_paths"] = {

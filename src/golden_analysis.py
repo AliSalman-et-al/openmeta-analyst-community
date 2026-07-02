@@ -1147,7 +1147,7 @@ def _parse_summary(text):
         re.S,
     )
     heterogeneity = re.search(
-        r"Heterogeneity.*?\n\s*(?:tau\^2|Q).*?\n\s*((?:%s\s+){3}%s%%?)"
+        r"Heterogeneity.*?\n\s*(?:tau\^2|τ²|Q).*?\n\s*((?:%s%%?\s+){3}%s%%?)"
         % (number, number),
         text,
         re.S,
@@ -1218,17 +1218,17 @@ def _extract_model_values(row):
 def _extract_heterogeneity_values(row):
     extracted = {}
     for label, value in row.items():
-        if label == "tau^2":
+        if label in {"tau^2", "τ²"}:
             extracted["tau_squared"] = _to_float(value)
         elif label.startswith("Q("):
             extracted["q"] = _to_float(value)
-        elif label == "I^2":
+        elif label in {"I^2", "I²"}:
             extracted["i_squared"] = _to_float(value)
     return extracted
 
 
 def _to_float(value):
-    return float(str(value).replace("<", "").strip())
+    return float(str(value).replace("<", "").replace("%", "").strip())
 
 
 if __name__ == "__main__":

@@ -635,6 +635,9 @@ def test_issue_76_to_105_reported_bad_user_facing_strings_are_absent():
         'QAction("save pdf image as..."',
         'QAction("save png image as..."',
         'QAction("edit plot..."',
+        "tau^2",
+        "I^2",
+        "Results (log scale)",
     ]
 
     for bad_string in bad_strings:
