@@ -1,4 +1,5 @@
 import os
+import pickle
 import sys
 
 
@@ -275,6 +276,34 @@ def test_project_save_failure_reports_original_error(monkeypatch, tmp_path):
         assert shown[0][1] == "Could not save project"
         assert "disk is full" in shown[0][2]
         assert "whoops" not in shown[0][2].lower()
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_opening_pickled_non_dataset_reports_invalid_project(monkeypatch, tmp_path):
+    import launch
+    import meta_form
+
+    invalid_project = tmp_path / "not-a-dataset.oma"
+    invalid_project.write_bytes(pickle.dumps({"not": "a dataset"}, protocol=2))
+
+    app, window = launch.start_automation()
+    shown = []
+    try:
+        window.current_data_unsaved = False
+        monkeypatch.setattr(
+            meta_form.QMessageBox,
+            "critical",
+            lambda *args, **kwargs: shown.append(args),
+        )
+
+        assert window.open(str(invalid_project)) is None
+
+        assert shown
+        assert shown[0][1] == "Could not open project"
+        assert "is not a valid OpenMeta[Analyst] project file" in shown[0][2]
+        assert "get_outcome_names" not in shown[0][2]
+        assert window.out_path is None
     finally:
         _close_without_prompt(app, window)
 

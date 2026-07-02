@@ -104,6 +104,28 @@ def _load_legacy_pickle(file_path):
     return legacy_pickle.load_legacy_pickle(file_path)
 
 
+class InvalidProjectFileError(ValueError):
+    pass
+
+
+def _validate_open_project_dataset(dataset):
+    if isinstance(dataset, ma_dataset.Dataset):
+        return dataset
+    raise InvalidProjectFileError(
+        "This file is not a valid OpenMeta[Analyst] project file."
+    )
+
+
+def _format_open_project_error(file_path, exception):
+    if isinstance(exception, InvalidProjectFileError):
+        return "Could not open %s.\n\n%s" % (file_path, exception)
+    return "Could not open %s.\n\nDetails: %s: %s" % (
+        file_path,
+        exception.__class__.__name__,
+        exception,
+    )
+
+
 def _qt_dialog_path(value):
     value = value[0] if isinstance(value, tuple) else value
     return qt_text.to_native_text(value)
@@ -1254,13 +1276,10 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         print("loading %s..." % file_path)
         try:
             data_model = _load_legacy_pickle(file_path)
+            data_model = _validate_open_project_dataset(data_model)
             print("successfully loaded data")
         except Exception as e:
-            msg = "Could not open %s.\n\nDetails: %s: %s" % (
-                file_path,
-                e.__class__.__name__,
-                e,
-            )
+            msg = _format_open_project_error(file_path, e)
             print(msg)
             QMessageBox.critical(self, "Could not open project", msg)
             return None
