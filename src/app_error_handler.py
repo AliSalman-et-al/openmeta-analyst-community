@@ -1,4 +1,5 @@
 import os
+import inspect
 import sys
 import traceback
 from datetime import datetime
@@ -77,10 +78,55 @@ def install_global_exception_handler():
     sys.excepthook = handle_exception
 
 
+def _call_with_compatible_signal_args(callback, args, kwargs):
+    try:
+        signature = inspect.signature(callback)
+    except (TypeError, ValueError):
+        return callback(*args, **kwargs)
+
+    parameters = list(signature.parameters.values())
+    accepts_varargs = any(
+        parameter.kind == inspect.Parameter.VAR_POSITIONAL
+        for parameter in parameters
+    )
+    accepts_varkwargs = any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in parameters
+    )
+
+    if not accepts_varargs:
+        positional_parameters = [
+            parameter
+            for parameter in parameters
+            if parameter.kind
+            in (
+                inspect.Parameter.POSITIONAL_ONLY,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            )
+        ]
+        args = args[: len(positional_parameters)]
+
+    if not accepts_varkwargs:
+        keyword_names = {
+            parameter.name
+            for parameter in parameters
+            if parameter.kind
+            in (
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                inspect.Parameter.KEYWORD_ONLY,
+            )
+        }
+        kwargs = {
+            name: value for name, value in kwargs.items() if name in keyword_names
+        }
+
+    return callback(*args, **kwargs)
+
+
 def safe_slot(callback, parent=None):
     def _safe_slot(*args, **kwargs):
         try:
-            return callback(*args, **kwargs)
+            return _call_with_compatible_signal_args(callback, args, kwargs)
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception as e:

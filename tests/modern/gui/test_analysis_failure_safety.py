@@ -438,6 +438,104 @@ def test_safe_signal_connection_replaces_and_disconnects_wrapped_slots():
     assert calls == ["first", "second"]
 
 
+def test_safe_slot_discards_surplus_signal_arguments(monkeypatch):
+    import app_error_handler
+
+    unexpected_errors = []
+    calls = []
+    monkeypatch.setattr(
+        app_error_handler,
+        "handle_exception",
+        lambda *args, **kwargs: unexpected_errors.append(args),
+    )
+
+    app_error_handler.safe_slot(lambda: calls.append("no-args"))(True)
+    app_error_handler.safe_slot(lambda checked: calls.append(checked))(True, "extra")
+
+    assert calls == ["no-args", True]
+    assert unexpected_errors == []
+
+
+def test_safe_slot_preserves_callback_type_errors(monkeypatch):
+    import app_error_handler
+
+    unexpected_errors = []
+    monkeypatch.setattr(
+        app_error_handler,
+        "handle_exception",
+        lambda *args, **kwargs: unexpected_errors.append(args),
+    )
+
+    def callback(_checked):
+        raise TypeError("internal type problem")
+
+    app_error_handler.safe_slot(callback)(True, "extra")
+
+    assert unexpected_errors
+    assert unexpected_errors[0][0] is TypeError
+    assert str(unexpected_errors[0][1]) == "internal type problem"
+
+
+def test_meta_reg_covariate_toggles_refresh_ok_button_without_unexpected_error(
+    monkeypatch,
+):
+    from PyQt5.QtWidgets import QApplication, QDialogButtonBox
+
+    import app_error_handler
+    import meta_globals
+    import meta_reg_form
+
+    class Covariate(object):
+        def __init__(self, name):
+            self.name = name
+            self.data_type = meta_globals.CONTINUOUS
+
+    class Study(object):
+        def __init__(self):
+            self.covariate_dict = {"Dose": 1.0, "Age": 2.0}
+
+    class Dataset(object):
+        covariates = [Covariate("Dose"), Covariate("Age")]
+
+    class Model(object):
+        dataset = Dataset()
+
+        def get_studies(self, only_if_included=True):
+            return [Study()]
+
+        def get_current_outcome_type(self):
+            return "binary"
+
+    app = QApplication.instance() or QApplication([])
+    unexpected_errors = []
+    monkeypatch.setattr(
+        app_error_handler,
+        "handle_exception",
+        lambda *args, **kwargs: unexpected_errors.append(args),
+    )
+
+    form = meta_reg_form.MetaRegForm(Model())
+    try:
+        ok_button = form.buttonBox.button(QDialogButtonBox.Ok)
+        assert ok_button.isEnabled() is True
+
+        for _covariate, checkbox in form.covs_and_check_boxes:
+            checkbox.setChecked(False)
+            app.processEvents()
+            assert unexpected_errors == []
+
+        assert ok_button.isEnabled() is False
+
+        form.covs_and_check_boxes[0][1].setChecked(True)
+        app.processEvents()
+
+        assert unexpected_errors == []
+        assert ok_button.isEnabled() is True
+    finally:
+        form.close()
+        app.processEvents()
+
+
 def test_metaform_model_reconnect_preserves_external_signal_subscribers():
     import launch
 

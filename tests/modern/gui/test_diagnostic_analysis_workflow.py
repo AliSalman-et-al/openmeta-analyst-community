@@ -568,6 +568,46 @@ def test_diagnostic_metric_dialog_does_not_run_without_selected_metrics(monkeypa
         _close_without_prompt(app, window)
 
 
+def test_diagnostic_metric_toggles_refresh_ok_button_without_unexpected_error(
+    monkeypatch,
+):
+    import launch
+
+    app, window = launch.start_automation()
+    import app_error_handler
+    import diag_metrics
+
+    unexpected_errors = []
+    try:
+        _create_diagnostic_dataset(window)
+        monkeypatch.setattr(
+            window.model, "included_studies_have_raw_data", lambda: True
+        )
+        monkeypatch.setattr(
+            app_error_handler,
+            "handle_exception",
+            lambda *args, **kwargs: unexpected_errors.append(args),
+        )
+
+        form = diag_metrics.Diag_Metrics(window.model, parent=window)
+
+        assert form.btn_ok.isEnabled() is True
+        for metric in form.SELECTABLE_METRICS:
+            form._metric_checkbox(metric).setChecked(False)
+            app.processEvents()
+            assert unexpected_errors == []
+
+        assert form.btn_ok.isEnabled() is False
+
+        form.chk_box_sens.setChecked(True)
+        app.processEvents()
+
+        assert unexpected_errors == []
+        assert form.btn_ok.isEnabled() is True
+    finally:
+        _close_without_prompt(app, window)
+
+
 def test_diagnostic_direct_effects_do_not_offer_count_based_methods(monkeypatch):
     import launch
 
