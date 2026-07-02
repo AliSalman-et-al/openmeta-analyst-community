@@ -17,6 +17,8 @@ ANALYSIS_DIALOG_MINIMUM_WIDTH = 520
 
 def fit_analysis_dialog_to_contents(root, adjust_root=True):
     """Apply the shared width floor used by analysis parameter dialogs."""
+    if root is None:
+        return
     fit_option_groups_to_contents(
         root,
         adjust_root=adjust_root,
@@ -26,11 +28,15 @@ def fit_analysis_dialog_to_contents(root, adjust_root=True):
 
 def fit_option_groups_to_contents(root, adjust_root=True, minimum_width=0):
     """Prevent dialog contents from being compressed below visible text."""
+    if root is None:
+        return
     fit_text_to_contents(root, adjust_root=adjust_root, minimum_width=minimum_width)
 
 
 def fit_text_to_contents(root, adjust_root=True, minimum_width=0):
     """Prevent visible text-bearing widgets from being compressed below content."""
+    if root is None:
+        return
     if root.layout() is not None:
         root.layout().activate()
 

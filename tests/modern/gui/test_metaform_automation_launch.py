@@ -1747,6 +1747,59 @@ def test_welcome_wizard_open_existing_selects_project(monkeypatch):
         app.processEvents()
 
 
+def test_wizard_size_refit_ignores_closed_wizard_without_current_page(monkeypatch):
+    import launch
+    from PyQt5 import QtWidgets
+    import main_wizard
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    wizard = main_wizard.MainWizard(path="csv_import")
+    try:
+        monkeypatch.setattr(wizard, "currentPage", lambda: None)
+
+        wizard._change_size(-1)
+    finally:
+        wizard.close()
+        app.processEvents()
+
+
+def test_startup_wizard_cancel_preserves_loaded_dataset(monkeypatch):
+    import launch
+    from PyQt5 import QtWidgets
+
+    meta_form = launch._import_meta_form()
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    window = meta_form.MetaForm()
+    sample_project = os.path.abspath(os.path.join("sample_data", "amino.oma"))
+
+    class RejectedWizard:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def exec_(self):
+            return 0
+
+    quit_calls = []
+    monkeypatch.setattr(meta_form.main_wizard, "MainWizard", RejectedWizard)
+    monkeypatch.setattr(meta_form.QApplication, "quit", lambda: quit_calls.append(True))
+
+    try:
+        assert window.open(sample_project) is True
+        loaded_dataset = window.model.dataset
+        loaded_title = loaded_dataset.title
+        loaded_studies = [study.name for study in loaded_dataset.studies]
+
+        window.start()
+
+        assert quit_calls == []
+        assert window.model.dataset is loaded_dataset
+        assert window.model.dataset.title == loaded_title
+        assert [study.name for study in window.model.dataset.studies] == loaded_studies
+    finally:
+        window.close()
+        app.processEvents()
+
+
 def test_data_type_page_multiline_buttons_fit_icon_and_caption():
     import launch
     from PyQt5 import QtWidgets

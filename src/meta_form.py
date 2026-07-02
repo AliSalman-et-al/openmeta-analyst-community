@@ -242,8 +242,6 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         if start_up_wizard.exec_():
             wizard_data = start_up_wizard.get_results()
             self._handle_wizard_results(wizard_data)
-        else:
-            QApplication.quit()
 
     def closeEvent(self, event):
         self.quit()
