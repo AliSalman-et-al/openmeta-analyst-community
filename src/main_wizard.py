@@ -679,7 +679,10 @@ class MainWizard(QWizard):
         qt_layout.fit_text_to_contents(self)
 
     def _change_size(self, pageid):
-        qt_layout.fit_text_to_contents(self.currentPage(), adjust_root=False)
+        current_page = self.currentPage()
+        if current_page is None:
+            return
+        qt_layout.fit_text_to_contents(current_page, adjust_root=False)
         qt_layout.fit_text_to_contents(self)
         self.adjustSize()
 

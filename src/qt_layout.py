@@ -17,7 +17,7 @@ ANALYSIS_DIALOG_MINIMUM_WIDTH = 520
 
 def fit_analysis_dialog_to_contents(root, adjust_root=True):
     """Apply the shared width floor used by analysis parameter dialogs."""
-    if root is None:
+    if not _fit_root_is_available(root):
         return
     fit_option_groups_to_contents(
         root,
@@ -28,17 +28,18 @@ def fit_analysis_dialog_to_contents(root, adjust_root=True):
 
 def fit_option_groups_to_contents(root, adjust_root=True, minimum_width=0):
     """Prevent dialog contents from being compressed below visible text."""
-    if root is None:
+    if not _fit_root_is_available(root):
         return
     fit_text_to_contents(root, adjust_root=adjust_root, minimum_width=minimum_width)
 
 
 def fit_text_to_contents(root, adjust_root=True, minimum_width=0):
     """Prevent visible text-bearing widgets from being compressed below content."""
-    if root is None:
+    if not _fit_root_is_available(root):
         return
-    if root.layout() is not None:
-        root.layout().activate()
+    root_layout = root.layout()
+    if root_layout is not None:
+        root_layout.activate()
 
     _fit_text_widgets_to_contents(root)
 
@@ -52,8 +53,9 @@ def fit_text_to_contents(root, adjust_root=True, minimum_width=0):
             max(group_box.minimumHeight(), group_box.sizeHint().height())
         )
 
-    if root.layout() is not None:
-        root.layout().activate()
+    root_layout = root.layout()
+    if root_layout is not None:
+        root_layout.activate()
 
     if adjust_root:
         size_hint = root.sizeHint()
@@ -65,6 +67,16 @@ def fit_text_to_contents(root, adjust_root=True, minimum_width=0):
             root.minimumSize().expandedTo(size_hint.expandedTo(QSize(target_width, 0)))
         )
         root.adjustSize()
+
+
+def _fit_root_is_available(root):
+    if root is None:
+        return False
+    try:
+        root.layout()
+    except RuntimeError:
+        return False
+    return True
 
 
 def _fit_text_widgets_to_contents(root):

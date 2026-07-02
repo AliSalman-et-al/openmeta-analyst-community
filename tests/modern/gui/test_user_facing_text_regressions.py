@@ -90,6 +90,30 @@ def test_option_group_forms_fit_checkbox_and_radio_labels():
     app.processEvents()
 
 
+def test_layout_fitters_ignore_missing_or_deleted_roots():
+    sys.path.insert(0, str(ROOT / "src"))
+    import qt_layout
+    from PyQt5 import sip
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    fitters = [
+        qt_layout.fit_text_to_contents,
+        qt_layout.fit_option_groups_to_contents,
+        qt_layout.fit_analysis_dialog_to_contents,
+    ]
+
+    for fitter in fitters:
+        fitter(None)
+
+    deleted_root = QtWidgets.QDialog()
+    sip.delete(deleted_root)
+
+    for fitter in fitters:
+        fitter(deleted_root)
+
+    app.processEvents()
+
+
 def test_generated_ui_surfaces_do_not_cap_visible_text_widgets_below_contents():
     sys.path.insert(0, str(ROOT / "src"))
     sys.path.insert(0, str(ROOT / "src" / "forms"))
