@@ -2065,6 +2065,29 @@ def test_data_type_page_multiline_buttons_fit_icon_and_caption():
         app.processEvents()
 
 
+def test_new_dataset_wizard_sizes_to_show_diagnostic_choice():
+    import launch
+    from PyQt5 import QtWidgets
+    import main_wizard
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    wizard = main_wizard.MainWizard(path="new_dataset")
+    try:
+        wizard.restart()
+        app.processEvents()
+
+        data_type_page = wizard.page(main_wizard.Page_DataType)
+        data_type_page.layout().activate()
+        app.processEvents()
+
+        diagnostic_button = data_type_page.diagnostic_Button
+        assert data_type_page.rect().contains(diagnostic_button.geometry())
+        assert wizard.minimumHeight() >= wizard.sizeHint().height()
+    finally:
+        wizard.close()
+        app.processEvents()
+
+
 @pytest.mark.parametrize(
     ("button_name", "expected"),
     [

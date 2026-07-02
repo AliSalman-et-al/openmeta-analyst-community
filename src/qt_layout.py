@@ -91,6 +91,13 @@ def fit_analysis_dialog_to_contents(root, adjust_root=True):
     )
 
 
+def reset_stable_fit_size(root):
+    """Allow a stable fitted root to recalculate its size for new content."""
+    if not _fit_root_is_available(root):
+        return
+    root.setProperty("oma_stable_fit_size", None)
+
+
 def fit_option_groups_to_contents(
     root, adjust_root=True, minimum_width=0, minimum_height=0, stable_root=False
 ):

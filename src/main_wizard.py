@@ -671,6 +671,7 @@ class MainWizard(QWizard):
         if current_page is None:
             return
         qt_layout.fit_text_to_contents(current_page, adjust_root=False)
+        qt_layout.reset_stable_fit_size(self)
         qt_layout.fit_application_dialog_to_contents(self)
 
     def set_wizard_path(self, path):
