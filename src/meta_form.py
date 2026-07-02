@@ -148,16 +148,6 @@ def _format_confidence_level_status(conf_level):
     return "confidence level: {:.1%}".format(float(conf_level) / 100.0)
 
 
-def _disconnect_signal(signal, slot):
-    try:
-        signal.disconnect(slot)
-    except (TypeError, RuntimeError):
-        try:
-            signal.disconnect()
-        except (TypeError, RuntimeError):
-            pass
-
-
 class ImportProgress(QDialog, forms.ui_running.Ui_running):
     def __init__(self, parent=None, min_=0, max_=10):
         super(ImportProgress, self).__init__(parent)
@@ -225,6 +215,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.dimensions = ["outcome", "follow-up", "group"]
         self.cur_dimension_index = 0
         self.update_dimension()
+        self._model_signal_connections = []
         self._setup_connections()
         self.tableView.setSelectionMode(QTableView.ContiguousSelection)
         self.model.reset()
@@ -399,15 +390,9 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         _setup_connections (with menu_actiosn set to False) should subsequently be invoked.
         """
 
-        model = self.tableView.model()
-        _disconnect_signal(
-            model.pyCellContentChanged, self.tableView.cell_content_changed
-        )
-        _disconnect_signal(model.outcomeChanged, self.tableView.displayed_ma_changed)
-        _disconnect_signal(model.followUpChanged, self.tableView.displayed_ma_changed)
-        _disconnect_signal(self.tableView.dataDirtied, self.data_dirtied)
-        _disconnect_signal(model.modelAboutToBeReset, self._model_about_to_be_reset)
-        _disconnect_signal(model.editFocusRequested, self.set_edit_focus)
+        for connection in self._model_signal_connections:
+            connection.disconnect()
+        self._model_signal_connections = []
 
     def data_error(self, msg):
         QMessageBox.warning(self.parent(), "Whoops", msg)
@@ -459,17 +444,25 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def _setup_connections(self, menu_actions=True):
         """Signals & slots"""
         model = self.tableView.model()
-        model.pyCellContentChanged.connect(
-            app_error_handler.safe_slot(self.tableView.cell_content_changed, parent=self)
-        )
-        model.outcomeChanged.connect(
-            app_error_handler.safe_slot(
-                self.tableView.displayed_ma_changed, parent=self
+        self._model_signal_connections.append(
+            app_error_handler.connect_safely(
+                model.pyCellContentChanged,
+                self.tableView.cell_content_changed,
+                parent=self,
             )
         )
-        model.followUpChanged.connect(
-            app_error_handler.safe_slot(
-                self.tableView.displayed_ma_changed, parent=self
+        self._model_signal_connections.append(
+            app_error_handler.connect_safely(
+                model.outcomeChanged,
+                self.tableView.displayed_ma_changed,
+                parent=self,
+            )
+        )
+        self._model_signal_connections.append(
+            app_error_handler.connect_safely(
+                model.followUpChanged,
+                self.tableView.displayed_ma_changed,
+                parent=self,
             )
         )
 
@@ -480,14 +473,18 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         # where it was before this reset() call (reset clears the current editor).
         # this index is the QModelIndex. this is used, e.g., when a new study is added.
         # this fixes bug #20.
-        model.editFocusRequested.connect(
-            app_error_handler.safe_slot(self.set_edit_focus, parent=self)
+        self._model_signal_connections.append(
+            app_error_handler.connect_safely(
+                model.editFocusRequested, self.set_edit_focus, parent=self
+            )
         )
 
         # Do actions when the model is about to be reset (for now, just
         # recalculate display scale values)
-        model.modelAboutToBeReset.connect(
-            app_error_handler.safe_slot(self._model_about_to_be_reset, parent=self)
+        self._model_signal_connections.append(
+            app_error_handler.connect_safely(
+                model.modelAboutToBeReset, self._model_about_to_be_reset, parent=self
+            )
         )
 
         ###
@@ -496,10 +493,16 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         # and this hook allows the model to pass along error messages to the
         # user. the data checking happens in ma_dataset (specifically, in the
         # setData method)
-        model.dataError.connect(app_error_handler.safe_slot(self.data_error, parent=self))
+        self._model_signal_connections.append(
+            app_error_handler.connect_safely(
+                model.dataError, self.data_error, parent=self
+            )
+        )
 
-        self.tableView.dataDirtied.connect(
-            app_error_handler.safe_slot(self.data_dirtied, parent=self)
+        self._model_signal_connections.append(
+            app_error_handler.connect_safely(
+                self.tableView.dataDirtied, self.data_dirtied, parent=self
+            )
         )
         if menu_actions:
             self.nav_add_btn.pressed.connect(

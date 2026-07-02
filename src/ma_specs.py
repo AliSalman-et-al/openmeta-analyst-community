@@ -81,7 +81,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         # method
         self.meta_f_str = meta_f_str
 
-        self._accepted_slot = None
+        self._accepted_connection = None
         self._set_accepted_handler(self.run_ma)
         self.buttonBox.rejected.connect(
             app_error_handler.safe_slot(self.cancel, parent=self)
@@ -150,13 +150,12 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.reject()
 
     def _set_accepted_handler(self, handler):
-        if self._accepted_slot is not None:
-            try:
-                self.buttonBox.accepted.disconnect(self._accepted_slot)
-            except TypeError:
-                pass
-        self._accepted_slot = app_error_handler.safe_slot(handler, parent=self)
-        self.buttonBox.accepted.connect(self._accepted_slot)
+        if self._accepted_connection is None:
+            self._accepted_connection = app_error_handler.connect_safely(
+                self.buttonBox.accepted, handler, parent=self
+            )
+        else:
+            self._accepted_connection.replace(handler, parent=self)
 
     def select_out_path(self):
         out_f = "."

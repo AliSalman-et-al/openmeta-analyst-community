@@ -336,6 +336,47 @@ def test_global_exception_handler_logs_trace_and_shows_recoverable_dialog(
     app.processEvents()
 
 
+def test_safe_signal_connection_replaces_and_disconnects_wrapped_slots():
+    from PyQt5.QtCore import QObject, pyqtSignal
+
+    import app_error_handler
+
+    class Emitter(QObject):
+        fired = pyqtSignal()
+
+    emitter = Emitter()
+    calls = []
+
+    connection = app_error_handler.connect_safely(
+        emitter.fired, lambda: calls.append("first")
+    )
+    emitter.fired.emit()
+
+    connection.replace(lambda: calls.append("second"))
+    emitter.fired.emit()
+
+    connection.disconnect()
+    emitter.fired.emit()
+
+    assert calls == ["first", "second"]
+
+
+def test_metaform_model_reconnect_preserves_external_signal_subscribers():
+    import launch
+
+    app, window = launch.start_automation()
+    calls = []
+    try:
+        window.tableView.dataDirtied.connect(lambda: calls.append("external"))
+
+        _create_binary_dataset(window)
+        window.tableView.dataDirtied.emit()
+
+        assert calls == ["external"]
+    finally:
+        _close_without_prompt(app, window)
+
+
 def test_main_window_action_exceptions_are_recoverable(monkeypatch, tmp_path):
     from PyQt5.QtWidgets import QAction
 

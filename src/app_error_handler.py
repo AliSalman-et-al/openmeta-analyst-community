@@ -90,8 +90,38 @@ def safe_slot(callback, parent=None):
     return _safe_slot
 
 
+class SafeSignalConnection(object):
+    def __init__(self, signal, callback, parent=None):
+        self.signal = signal
+        self.parent = parent
+        self.slot = None
+        self.replace(callback, parent=parent)
+
+    def disconnect(self):
+        if self.slot is None:
+            return
+        try:
+            self.signal.disconnect(self.slot)
+        except (TypeError, RuntimeError):
+            pass
+        self.slot = None
+
+    def replace(self, callback, parent=None):
+        self.disconnect()
+        if parent is not None:
+            self.parent = parent
+        self.slot = safe_slot(callback, parent=self.parent)
+        self.signal.connect(self.slot)
+        return self
+
+
 def connect_safely(signal, callback, parent=None):
-    signal.connect(safe_slot(callback, parent=parent))
+    return SafeSignalConnection(signal, callback, parent=parent)
+
+
+def disconnect_safely(connection):
+    if connection is not None:
+        connection.disconnect()
 
 
 def _resolve_parent(parent):
