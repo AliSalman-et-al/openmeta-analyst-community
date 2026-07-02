@@ -496,3 +496,25 @@ def test_meta_py_r_uses_core_constructors_instead_of_s4_slots():
     assert "openmetar.create.continuous.data" in text
     assert "openmetar.create.diagnostic.data" in text
     assert "openmetar.create.covariate.values" in text
+
+
+def test_meta_py_r_does_not_interpolate_user_text_into_r_source():
+    text = (APP_SRC / "meta_py_r.py").read_text(encoding="utf-8")
+    risky_patterns = [
+        r"execute_r_string\([^\n]*(?:%|\.format|\+)",
+        r"ro\.r\([^\n]*(?:%|\.format|\+)",
+        r"textConnection",
+        r"read\.table",
+        r"load\('%s",
+        r"save\(.*'%s",
+        r"png\('%s",
+        r"method\.parameters\('%s",
+        r"method\.description\('%s",
+        r"available\.methods\(.*%s",
+    ]
+
+    offenders = [
+        pattern for pattern in risky_patterns if re.search(pattern, text)
+    ]
+
+    assert offenders == []
