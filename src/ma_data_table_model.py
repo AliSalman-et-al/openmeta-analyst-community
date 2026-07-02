@@ -210,6 +210,40 @@ class DatasetModel(QAbstractTableModel):
     def _study_name_is_blank(self, study):
         return qt_text.is_blank(study.name)
 
+    def _value_is_empty(self, value):
+        return value in EMPTY_VALS
+
+    def _ma_unit_has_entered_data(self, ma_unit):
+        for group in ma_unit.tx_groups.values():
+            if any(not self._value_is_empty(value) for value in group.raw_data):
+                return True
+
+        for effect_groups in ma_unit.effects_dict.values():
+            for effect_data in effect_groups.values():
+                if any(not self._value_is_empty(value) for value in effect_data.values()):
+                    return True
+
+        return False
+
+    def _study_has_entered_data(self, row):
+        if row < 0 or row >= len(self.dataset):
+            return False
+
+        study = self.dataset.studies[row]
+        if not self._study_name_is_blank(study):
+            return True
+        if not self._value_is_empty(study.year) and study.year != 0:
+            return True
+        if any(not self._value_is_empty(value) for value in study.covariate_dict.values()):
+            return True
+
+        for follow_ups in study.outcomes_to_follow_ups.values():
+            for ma_unit in follow_ups.values():
+                if self._ma_unit_has_entered_data(ma_unit):
+                    return True
+
+        return False
+
     def _edit_requires_named_study(self, column, value):
         if column == self.NAME:
             return False
@@ -495,16 +529,18 @@ class DatasetModel(QAbstractTableModel):
             return _item_data(int(Qt.AlignLeft | Qt.AlignVCenter))
         elif role == Qt.CheckStateRole:
             # this is where we deal with the inclusion/exclusion of studies
-            if column == self.INCLUDE_STUDY:
+            if column == self.INCLUDE_STUDY and self._study_has_entered_data(index.row()):
                 checked_state = Qt.Unchecked
                 if index.row() < self.rowCount() - 1 and study.include:
                     checked_state = Qt.Checked
                 return _item_data(checked_state)
         elif role == Qt.BackgroundColorRole:
-            if column in self.OUTCOMES:
+            row_has_entered_data = self._study_has_entered_data(index.row())
+            if row_has_entered_data and column in self.OUTCOMES:
                 return _item_data(QColor(Qt.yellow))
             elif (
-                column in self.RAW_DATA[len(self.RAW_DATA) // 2 :]
+                row_has_entered_data
+                and column in self.RAW_DATA[len(self.RAW_DATA) // 2 :]
                 and self.current_effect in ONE_ARM_METRICS
             ):
                 return _item_data(QColor(Qt.gray))
@@ -1268,13 +1304,13 @@ class DatasetModel(QAbstractTableModel):
                                 return DIAGNOSTIC_METRIC_NAMES["Spec"]
 
             else:  # vertical
-                if sectionOK:
+                if sectionOK and self._study_has_entered_data(section):
                     return "Use calculator to fill-in missing information"
 
         # For cool calculator icon
         if role == Qt.DecorationRole:
             if orientation == Qt.Vertical:
-                if sectionOK:
+                if sectionOK and self._study_has_entered_data(section):
                     return QIcon(":/misc/calculator-34.png")
                 else:
                     # print "\n\n----\n\n"
@@ -1332,6 +1368,8 @@ class DatasetModel(QAbstractTableModel):
         if not index.isValid():
             return Qt.ItemIsEnabled
         elif index.column() == self.INCLUDE_STUDY:
+            if not self._study_has_entered_data(index.row()):
+                return Qt.ItemFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
             return Qt.ItemFlags(
                 Qt.ItemIsUserCheckable
                 | Qt.ItemIsEnabled

@@ -45,6 +45,25 @@ def _binary_model_with_blank_study():
     return model
 
 
+def _model_with_real_study_and_empty_new_entry_row(data_type):
+    dataset = ma_dataset.Dataset(is_diag=data_type == meta_globals.DIAGNOSTIC)
+    study = ma_dataset.Study(1, name="Alpha", year=2020)
+    outcome = ma_dataset.Outcome("Outcome", data_type)
+    dataset.add_study(study)
+    dataset.add_outcome(outcome)
+
+    model = ma_data_table_model.DatasetModel(dataset=dataset, add_blank_study=True)
+    model.current_outcome = "Outcome"
+    model.current_effect = "OR" if data_type == meta_globals.BINARY else "MD"
+    model.current_txs = (
+        ["test 1"]
+        if data_type == meta_globals.DIAGNOSTIC
+        else meta_globals.DEFAULT_GROUP_NAMES
+    )
+    model.update_column_indices()
+    return model
+
+
 def _continuous_model_with_named_study():
     dataset = ma_dataset.Dataset()
     study = ma_dataset.Study(1, name="Alpha", year=None)
@@ -96,6 +115,43 @@ def test_one_arm_inactive_raw_data_cells_keep_disabled_background():
         Qt.gray
     )
     assert model.data(model.index(0, model.RAW_DATA[0]), Qt.BackgroundColorRole) is None
+
+
+def test_empty_new_entry_row_does_not_render_populated_study_chrome():
+    for data_type in (
+        meta_globals.BINARY,
+        meta_globals.CONTINUOUS,
+        meta_globals.DIAGNOSTIC,
+    ):
+        model = _model_with_real_study_and_empty_new_entry_row(data_type)
+        blank_row = 1
+
+        assert model.headerData(blank_row, Qt.Vertical, Qt.DecorationRole) is None
+        assert (
+            model.data(model.index(blank_row, model.INCLUDE_STUDY), Qt.CheckStateRole)
+            is None
+        )
+
+        for column in model.OUTCOMES:
+            assert (
+                model.data(model.index(blank_row, column), Qt.BackgroundColorRole)
+                is None
+            )
+
+
+def test_named_new_entry_row_keeps_populated_study_chrome():
+    model = _model_with_real_study_and_empty_new_entry_row(meta_globals.BINARY)
+    model.dataset.studies[1].name = "Beta"
+    model.dataset.studies[1].include = True
+
+    assert model.headerData(1, Qt.Vertical, Qt.DecorationRole).isNull() is False
+    assert (
+        model.data(model.index(1, model.INCLUDE_STUDY), Qt.CheckStateRole)
+        == Qt.Checked
+    )
+    assert model.data(model.index(1, model.OUTCOMES[0]), Qt.BackgroundColorRole) == QColor(
+        Qt.yellow
+    )
 
 
 def test_raw_data_edit_on_placeholder_row_emits_study_name_error():
