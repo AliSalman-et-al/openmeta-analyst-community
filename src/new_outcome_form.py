@@ -8,7 +8,7 @@ class AddNewOutcomeForm(QDialog, forms.ui_new_outcome.Ui_Dialog):
         super(AddNewOutcomeForm, self).__init__(parent)
         self.setupUi(self)
         self._populate_combo_box()
-        qt_layout.fit_text_to_contents(self)
+        qt_layout.fit_application_dialog_to_contents(self)
 
     def _populate_combo_box(self):
         for name, item_id in zip(

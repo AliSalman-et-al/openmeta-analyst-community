@@ -170,6 +170,62 @@ def test_generated_ui_surfaces_do_not_cap_visible_text_widgets_below_contents():
     app.processEvents()
 
 
+def test_generated_qdialog_surfaces_use_application_dialog_floor_and_combo_cap():
+    sys.path.insert(0, str(ROOT / "src"))
+    sys.path.insert(0, str(ROOT / "src" / "forms"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    module_names = [
+        "forms.ui_change_cov_type",
+        "forms.ui_cov_subgroup_dlg",
+        "forms.ui_diagnostic_data_form",
+        "forms.ui_diagnostic_explain_dlg",
+        "forms.ui_diagnostic_metrics",
+        "forms.ui_edit_dialog",
+        "forms.ui_edit_forest_plot",
+        "forms.ui_edit_group_name",
+        "forms.ui_ma_specs",
+        "forms.ui_meta_reg",
+        "forms.ui_network_view",
+        "forms.ui_new_covariate",
+        "forms.ui_new_follow_up",
+        "forms.ui_new_group",
+        "forms.ui_new_outcome",
+        "forms.ui_new_study",
+        "forms.ui_running",
+        "forms.ui_tom_form",
+    ]
+
+    for module_name in module_names:
+        module = importlib.import_module(module_name)
+        ui_class = next(
+            value for name, value in vars(module).items() if name.startswith("Ui_")
+        )
+        root = QtWidgets.QDialog()
+        ui = ui_class()
+        ui.setupUi(root)
+        qt_layout.fit_application_dialog_to_contents(root)
+        root.show()
+        app.processEvents()
+
+        try:
+            assert root.minimumWidth() >= qt_layout.APPLICATION_DIALOG_MINIMUM_WIDTH
+            assert root.minimumHeight() >= qt_layout.APPLICATION_DIALOG_MINIMUM_HEIGHT
+            _assert_visible_text_widgets_fit(root, module_name)
+            for combo_box in root.findChildren(QtWidgets.QComboBox):
+                if _hidden_for_fit(combo_box, root):
+                    continue
+                assert (
+                    combo_box.maximumWidth()
+                    == qt_layout.APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH
+                )
+        finally:
+            root.close()
+            root.deleteLater()
+    app.processEvents()
+
+
 def _root_for_ui_class(ui_class):
     class_name = ui_class.__name__
     if class_name in {"Ui_MainWindow", "Ui_ResultsWindow"}:

@@ -8,7 +8,7 @@ class EditGroupName(QDialog, forms.ui_edit_group_name.Ui_group_name_dialog):
         super(EditGroupName, self).__init__(parent)
         self.setupUi(self)
         self.group_name_le.setText(cur_group_name)
-        qt_layout.fit_text_to_contents(self)
+        qt_layout.fit_application_dialog_to_contents(self)
 
 
 class EditCovariateName(QDialog, forms.ui_edit_group_name.Ui_group_name_dialog):
@@ -18,4 +18,4 @@ class EditCovariateName(QDialog, forms.ui_edit_group_name.Ui_group_name_dialog):
         self.group_name_le.setText(cur_cov_name)
         self.field_lbl.setText("covariate name:")
         self.setWindowTitle("edit covariate name")
-        qt_layout.fit_text_to_contents(self)
+        qt_layout.fit_application_dialog_to_contents(self)

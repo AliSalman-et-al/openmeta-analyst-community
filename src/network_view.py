@@ -20,7 +20,7 @@ class ViewDialog(QDialog, forms.ui_network_view.Ui_network_view_dialog):
         self.cur_follow_up = model.get_current_follow_up_name()
 
         self.populate_cbo_boxes()
-        qt_layout.fit_text_to_contents(self)
+        qt_layout.fit_application_dialog_to_contents(self)
         self.setup_signals()
 
         self.x_coord = 5

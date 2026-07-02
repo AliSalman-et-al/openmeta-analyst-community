@@ -13,7 +13,7 @@ class DiagnosticExplain(
     def __init__(self, parent=None):
         super(DiagnosticExplain, self).__init__(parent)
         self.setupUi(self)
-        qt_layout.fit_option_groups_to_contents(self)
+        qt_layout.fit_application_dialog_to_contents(self)
 
         self.dont_show_again_chk_box.stateChanged.connect(
             app_error_handler.safe_slot(

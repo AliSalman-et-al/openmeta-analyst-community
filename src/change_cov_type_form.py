@@ -39,7 +39,7 @@ class ChangeCovTypeForm(QDialog, Ui_ChangeCovTypeForm):
         )
         self.cov_prev_table.setModel(self.cov_model)
         self.cov_prev_table.resizeColumnsToContents()
-        qt_layout.fit_text_to_contents(self)
+        qt_layout.fit_application_dialog_to_contents(self)
 
     def data_error(self, msg):
         QMessageBox.warning(self, "Whoops", msg)

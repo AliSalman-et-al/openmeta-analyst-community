@@ -51,7 +51,7 @@ class EditPlotWindow(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
             app_error_handler.safe_slot(self.regenerate_graph, parent=self)
         )
         self.populate_params()
-        qt_layout.fit_option_groups_to_contents(self)
+        qt_layout.fit_application_dialog_to_contents(self)
 
     def set_ui_values(self):
         _to_bool = lambda x: True if x == "TRUE" else False

@@ -159,7 +159,7 @@ class ImportProgress(QDialog, forms.ui_running.Ui_running):
 
         self.setWindowTitle("Importing from CSV...")
         self.progress_bar.setRange(min_, max_)
-        qt_layout.fit_text_to_contents(self)
+        qt_layout.fit_application_dialog_to_contents(self)
 
     def setValue(self, value):
         if self.progress_bar.minimum() <= value <= self.progress_bar.maximum():

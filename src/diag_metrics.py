@@ -23,7 +23,7 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
             self._metric_checkbox(metric).toggled.connect(
                 app_error_handler.safe_slot(self._refresh_ok_enabled, parent=self)
             )
-        qt_layout.fit_option_groups_to_contents(self)
+        qt_layout.fit_analysis_dialog_to_contents(self)
 
     def ok(self):
         selected_metrics = self.get_selected_metrics()

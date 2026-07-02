@@ -12,9 +12,25 @@ from PyQt5.QtWidgets import (
     QTabWidget,
 )
 
+APPLICATION_DIALOG_MINIMUM_WIDTH = 420
+APPLICATION_DIALOG_MINIMUM_HEIGHT = 180
+APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH = 360
+
 ANALYSIS_DIALOG_MINIMUM_WIDTH = 520
 ANALYSIS_DIALOG_MINIMUM_HEIGHT = 260
-ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH = 360
+ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH = APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH
+
+
+def fit_application_dialog_to_contents(root, adjust_root=True):
+    """Apply the shared base sizing used by application dialogs."""
+    if not _fit_root_is_available(root):
+        return
+    fit_option_groups_to_contents(
+        root,
+        adjust_root=adjust_root,
+        minimum_width=APPLICATION_DIALOG_MINIMUM_WIDTH,
+        minimum_height=APPLICATION_DIALOG_MINIMUM_HEIGHT,
+    )
 
 
 def fit_analysis_dialog_to_contents(root, adjust_root=True):
@@ -139,9 +155,9 @@ def _fit_widget_width_to_hint(widget, width):
 
 def _fit_combo_width_to_contents(combo_box):
     width = max(combo_box.sizeHint().width(), _combo_contents_width(combo_box))
-    target_width = min(width, ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH)
+    target_width = min(width, APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH)
     combo_box.setMinimumWidth(target_width)
-    combo_box.setMaximumWidth(max(target_width, ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH))
+    combo_box.setMaximumWidth(max(target_width, APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH))
     if combo_box.sizePolicy().horizontalPolicy() == QSizePolicy.Fixed:
         combo_box.setSizePolicy(
             QSizePolicy.Preferred, combo_box.sizePolicy().verticalPolicy()

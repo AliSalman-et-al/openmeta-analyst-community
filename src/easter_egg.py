@@ -7,7 +7,7 @@ class TomDialog(QDialog, forms.ui_tom_form.Ui_Dialog):
     def __init__(self, parent=None):
         super(TomDialog, self).__init__(parent)
         self.setupUi(self)
-        qt_layout.fit_text_to_contents(self)
+        qt_layout.fit_application_dialog_to_contents(self)
 
 
 # class PersonDialog(QDialog, forms.ui_tom_form.Ui_Dialog):
