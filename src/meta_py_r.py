@@ -1421,11 +1421,9 @@ def _capture_formatted_summary(r_object):
 
 
 def _format_table_summary(section_name, r_object, title=None):
-    if title is None:
-        title = section_name
     dims = _r_dims(r_object)
     if len(dims) == 2:
-        return {section_name: "%s\n%s" % (title, _format_r_matrix(r_object))}
+        return {section_name: _format_r_matrix(r_object)}
     if len(dims) == 3:
         return _format_r_array_sections("Summary", section_name, r_object)
     return {section_name: str(r_object)}
@@ -1543,18 +1541,15 @@ def _format_r_array_sections(parent_name, array_name, r_array):
         start = slice_index * slice_size
         end = start + slice_size
         title = "%s - %s" % (array_name, slice_name)
-        sections[_summary_section_name(parent_name, title)] = "%s\n%s" % (
-            title,
-            _format_matrix_values(
-                values[start:end], dims[0], dims[1], row_names, col_names
-            ),
+        sections[_summary_section_name(parent_name, title)] = _format_matrix_values(
+            values[start:end], dims[0], dims[1], row_names, col_names
         )
     return sections
 
 
 def _format_matrix_values(values, nrow, ncol, row_names, col_names):
     headers = (
-        list(col_names)
+        [_format_r_table_header(name) for name in list(col_names)]
         if col_names is not None
         else ["V%s" % (index + 1) for index in range(ncol)]
     )
@@ -1601,6 +1596,19 @@ def _format_text_table(headers, rows):
         if row_index == 0:
             rendered_rows.append("  ".join("-" * width for width in widths).rstrip())
     return "\n".join(rendered_rows)
+
+
+def _format_r_table_header(value):
+    normalized = str(value).strip()
+    compact = normalized.lower().replace(".", " ")
+    compact = " ".join(compact.split())
+    if compact in ("hpd low", "hpd lower"):
+        return "Lower bound"
+    if compact in ("hpd high", "hpd upper"):
+        return "Upper bound"
+    if compact == "median estimate":
+        return "Median estimate"
+    return normalized
 
 
 def make_weights_str(results):

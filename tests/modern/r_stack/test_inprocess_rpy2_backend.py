@@ -362,6 +362,16 @@ _HSROC_SUMMARY_DRIVER = textwrap.dedent(
     assert ", , theta" not in combined, combined
     assert ", , alpha" not in combined, combined
     assert ", , pi" not in combined, combined
+    assert not texts["Between-study parameters"].startswith(
+        "Between-study parameters\\n"
+    ), texts
+    assert not texts["Within-study parameters - theta"].startswith(
+        "Within-study parameters - theta\\n"
+    ), texts
+    assert "Lower bound" in texts["Between-study parameters"], texts
+    assert "Upper bound" in texts["Between-study parameters"], texts
+    assert "HPD.low" not in texts["Between-study parameters"], texts
+    assert "HPD lower" not in texts["Within-study parameters - theta"], texts
     assert "THETA" in texts["Between-study parameters"], texts
     assert "Median estimate" in texts["Within-study parameters - theta"], texts
     assert "3" in texts["Within-study parameters - alpha"], texts
