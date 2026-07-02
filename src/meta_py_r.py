@@ -16,7 +16,11 @@ print("Entering meta_py_r for import probably")
 import math
 import os
 import r_runtime
-from diagnostic_effect_shapes import effect_triplet, normalize_diagnostic_effects
+from study_effect_shapes import (
+    effect_triplet,
+    normalize_diagnostic_effects,
+    normalize_effect_result,
+)
 from r_call_serialization import serialized_r_call
 from meta_globals import *
 
@@ -1804,7 +1808,10 @@ def continuous_effect_for_study(
         metric=str(metric),
         **{"two.arm": bool(two_arm), "conf.level": conf_level},
     )
-    return R_parse_tools.recursioner(r_res)
+    return normalize_effect_result(
+        R_parse_tools.recursioner(r_res),
+        metric=metric,
+    )
 
 
 @RfunctionCaller
@@ -1834,7 +1841,10 @@ def effect_for_study(
         n2=_r_null_if_none(n2),
         **{"two.arm": bool(two_arm), "metric": str(metric), "conf.level": conf_level},
     )
-    return R_parse_tools.recursioner(r_res)
+    return normalize_effect_result(
+        R_parse_tools.recursioner(r_res),
+        metric=metric,
+    )
 
 
 def binary_convert_scale(x, metric_name, convert_to="display.scale", n1=None):

@@ -44,6 +44,20 @@ def _binary_model_with_blank_study():
     return model
 
 
+def _continuous_model_with_named_study():
+    dataset = ma_dataset.Dataset()
+    study = ma_dataset.Study(1, name="Alpha", year=None)
+    dataset.add_study(study)
+    dataset.add_outcome(ma_dataset.Outcome("Score", meta_globals.CONTINUOUS))
+
+    model = ma_data_table_model.DatasetModel(dataset=dataset, add_blank_study=False)
+    model.current_outcome = "Score"
+    model.current_effect = "MD"
+    model.current_txs = meta_globals.DEFAULT_GROUP_NAMES
+    model.update_column_indices()
+    return model
+
+
 def test_empty_editable_cells_return_blank_edit_text():
     model = _diagnostic_model_with_empty_cells()
     ma_unit = model.get_current_ma_unit_for_study(0)
@@ -207,6 +221,69 @@ def test_diagnostic_raw_count_edit_accepts_scalar_metric_effects(monkeypatch):
     )
 
 
+def test_binary_raw_count_edit_accepts_scalar_metric_effect(monkeypatch):
+    model = _binary_model_with_blank_study()
+    model.dataset.studies[0].name = "Alpha"
+    ma_unit = model.get_current_ma_unit_for_study(0)
+    group_str = model.get_cur_group_str()
+    ma_unit.tx_groups[model.current_txs[0]].raw_data = [3.0, 10.0]
+    ma_unit.tx_groups[model.current_txs[1]].raw_data = [2.0, 10.0]
+    errors = []
+    model.dataError.connect(errors.append)
+
+    monkeypatch.setattr(
+        ma_data_table_model.meta_py_r,
+        "binary_convert_scale",
+        lambda value, *args, **kwargs: value,
+    )
+    monkeypatch.setattr(
+        ma_data_table_model.meta_py_r,
+        "effect_for_study",
+        lambda *args, **kwargs: {"calc_scale": 0.5},
+    )
+
+    assert model.setData(model.index(0, model.RAW_DATA[0]), "4") is True
+
+    assert errors == []
+    assert ma_unit.tx_groups[model.current_txs[0]].raw_data[0] == 4.0
+    assert ma_unit.get_effect_and_ci("OR", group_str, model.get_mult()) == (
+        0.5,
+        None,
+        None,
+    )
+
+
+def test_continuous_raw_count_edit_accepts_scalar_metric_effect(monkeypatch):
+    model = _continuous_model_with_named_study()
+    ma_unit = model.get_current_ma_unit_for_study(0)
+    group_str = model.get_cur_group_str()
+    ma_unit.tx_groups[model.current_txs[0]].raw_data = [10.0, 5.0, 1.0]
+    ma_unit.tx_groups[model.current_txs[1]].raw_data = [12.0, 4.0, 1.5]
+    errors = []
+    model.dataError.connect(errors.append)
+
+    monkeypatch.setattr(
+        ma_data_table_model.meta_py_r,
+        "continuous_convert_scale",
+        lambda value, *args, **kwargs: value,
+    )
+    monkeypatch.setattr(
+        ma_data_table_model.meta_py_r,
+        "continuous_effect_for_study",
+        lambda *args, **kwargs: {"calc_scale": 1.25},
+    )
+
+    assert model.setData(model.index(0, model.RAW_DATA[1]), "5.5") is True
+
+    assert errors == []
+    assert ma_unit.tx_groups[model.current_txs[0]].raw_data[1] == 5.5
+    assert ma_unit.get_effect_and_ci("MD", group_str, model.get_mult()) == (
+        1.25,
+        None,
+        None,
+    )
+
+
 def test_diagnostic_raw_count_edit_rolls_back_when_effect_calculation_fails(
     monkeypatch,
 ):
@@ -243,7 +320,10 @@ def test_diagnostic_raw_count_edit_rolls_back_when_effect_calculation_fails(
     ]
 
 
-def test_diagnostic_effect_normalizer_preserves_triplets_and_expands_scalars():
+def test_effect_normalizer_preserves_triplets_and_expands_scalars():
+    effect = ma_data_table_model.meta_py_r.normalize_effect_result(
+        {"calc_scale": 1.25, "display_scale": [1.25, 1.0, 1.5]},
+    )
     effects = ma_data_table_model.meta_py_r.normalize_diagnostic_effects(
         {
             "Sens": {"calc_scale": 0.75},
@@ -252,6 +332,8 @@ def test_diagnostic_effect_normalizer_preserves_triplets_and_expands_scalars():
         }
     )
 
+    assert effect["calc_scale"] == (1.25, None, None)
+    assert effect["display_scale"] == (1.25, 1.0, 1.5)
     assert effects["Sens"]["calc_scale"] == (0.75, None, None)
     assert effects["Spec"]["calc_scale"] == (0.95, 0.88, 0.99)
     assert effects["PLR"]["calc_scale"] == (15.0, None, None)

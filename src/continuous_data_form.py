@@ -482,8 +482,16 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             )
             return
 
-        self._copy_raw_data_from_table_to_ma_unit()  # table --> ma_unit
-        self.try_to_update_cur_outcome()
+        try:
+            self._copy_raw_data_from_table_to_ma_unit()  # table --> ma_unit
+            self.try_to_update_cur_outcome()
+        except Exception as e:
+            msg = "Could not compute study effects from the edited raw data: %s" % e
+            QMessageBox.warning(self.parent(), "Whoops", msg)
+            self.restore_ma_unit_and_tables(
+                old_ma_unit, old_tables_data, old_correlation
+            )
+            return
 
         new_ma_unit, new_tables_data = self._save_ma_unit_and_table_states(
             tables=self.tables,
@@ -759,7 +767,17 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                     computed_vals[var_name]
                 )  #
 
-        self.try_to_update_cur_outcome()
+        try:
+            self.try_to_update_cur_outcome()
+        except Exception as e:
+            if not (row, col) == (None, None):
+                msg = "Could not compute study effects from the edited raw data: %s" % e
+                QMessageBox.warning(self.parent(), "Whoops", msg)
+                self.restore_ma_unit_and_tables(
+                    old_ma_unit, old_tables_data, old_correlation
+                )
+                return
+            raise
 
         ###
         # also update the pre/post tables
@@ -898,7 +916,11 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                     conf_level=self.conf_level,
                 )
 
-            est, low, high = est_and_ci_d["calc_scale"]  # calculation (e.g., log) scale
+            est, low, high = meta_py_r.effect_triplet(
+                est_and_ci_d,
+                "calc_scale",
+                metric=self.cur_effect,
+            )
             self.ma_unit.set_effect_and_ci(
                 self.cur_effect, self.group_str, est, low, high, mult=self.mult
             )

@@ -1996,7 +1996,11 @@ class DatasetModel(QAbstractTableModel):
             if data_type != DIAGNOSTIC:
                 est, lower, upper = None, None, None
                 if est_and_ci_d is not None:
-                    est, lower, upper = est_and_ci_d["calc_scale"]  # calculation scale
+                    est, lower, upper = meta_py_r.effect_triplet(
+                        est_and_ci_d,
+                        "calc_scale",
+                        metric=self.current_effect,
+                    )
                 # now set the effect size & CIs
                 # note that we keep two versions around; a version on the 'calculation' scale
                 # (e.g., log) and a version on the continuous/display scale to present to the

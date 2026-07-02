@@ -620,8 +620,14 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             )  # brings things back to the way they were
             return  # and leave
 
-        self._update_ma_unit()  # table widget --> ma_unit
-        self.try_to_update_cur_outcome()  # update metric in ma_unit and in table
+        try:
+            self._update_ma_unit()  # table widget --> ma_unit
+            self.try_to_update_cur_outcome()  # update metric in ma_unit and in table
+        except Exception as e:
+            msg = "Could not compute study effects from the edited raw data: %s" % e
+            QMessageBox.warning(self.parent(), "Whoops", msg)
+            self.restore_ma_unit_and_table(old_ma_unit, old_table)
+            return
 
         new_ma_unit, new_table = self._save_ma_unit_and_table_state(
             table=self.raw_data_table,
@@ -779,7 +785,11 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
                     conf_level=self.global_conf_level,
                 )
 
-            est, low, high = est_and_ci_d["calc_scale"]  # calculation (e.g., log) scale
+            est, low, high = meta_py_r.effect_triplet(
+                est_and_ci_d,
+                "calc_scale",
+                metric=self.cur_effect,
+            )
             self.ma_unit.set_effect_and_ci(
                 self.cur_effect, self.group_str, est, low, high, mult=self.mult
             )

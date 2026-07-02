@@ -306,9 +306,15 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             return  # and leave
 
         # if we got here, everything seems ok
-        self._update_ma_unit()  # 2x2 table --> ma_unit
-        self.impute_effects_in_ma_unit()  # effects   --> ma_unit
-        self.set_current_effect()  # ma_unit   --> effects
+        try:
+            self._update_ma_unit()  # 2x2 table --> ma_unit
+            self.impute_effects_in_ma_unit()  # effects   --> ma_unit
+            self.set_current_effect()  # ma_unit   --> effects
+        except Exception as e:
+            msg = "Could not compute study effects from the edited raw data: %s" % e
+            QMessageBox.warning(self.parent(), "Whoops", msg)
+            self.restore_ma_unit_and_table(old_ma_unit, old_table, old_prevalence)
+            return
 
         new_ma_unit, new_table = self._save_ma_unit_and_table_state(
             table=self.two_by_two_table,
