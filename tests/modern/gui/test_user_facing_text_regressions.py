@@ -320,6 +320,36 @@ def test_dialog_width_fit_includes_hidden_tab_contents_and_late_content():
     app.processEvents()
 
 
+def test_analysis_dialog_combo_widths_are_content_aware_but_capped():
+    sys.path.insert(0, str(ROOT / "src"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    root = QtWidgets.QDialog()
+    root.setWindowTitle("Method & Parameters")
+    layout = QtWidgets.QVBoxLayout(root)
+    combo = QtWidgets.QComboBox()
+    combo.addItems(
+        [
+            "DL: DerSimonian-Laird",
+            "A very long estimator name that should not make the dialog sprawl horizontally across the screen",
+        ]
+    )
+    layout.addWidget(combo)
+
+    qt_layout.fit_analysis_dialog_to_contents(root)
+    root.show()
+    app.processEvents()
+
+    try:
+        assert combo.minimumWidth() <= qt_layout.ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH
+        assert combo.maximumWidth() == qt_layout.ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH
+    finally:
+        root.close()
+        root.deleteLater()
+    app.processEvents()
+
+
 def test_change_confidence_level_dialog_uses_analysis_dialog_width_floor():
     sys.path.insert(0, str(ROOT / "src"))
     import conf_level_dialog
@@ -332,6 +362,7 @@ def test_change_confidence_level_dialog_uses_analysis_dialog_width_floor():
 
     try:
         assert dialog.minimumWidth() >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
+        assert dialog.minimumHeight() >= qt_layout.ANALYSIS_DIALOG_MINIMUM_HEIGHT
         assert dialog.minimumWidth() >= dialog.sizeHint().width()
     finally:
         dialog.close()

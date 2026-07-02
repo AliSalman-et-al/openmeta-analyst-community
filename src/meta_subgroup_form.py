@@ -13,7 +13,7 @@ class MetaSubgroupForm(QDialog, forms.ui_cov_subgroup_dlg.Ui_cov_subgroup_dialog
         self.setupUi(self)
         self._populate_combo_box()
         self._update_ok_button()
-        qt_layout.fit_text_to_contents(self)
+        qt_layout.fit_analysis_dialog_to_contents(self)
         self.buttonBox.rejected.connect(
             app_error_handler.safe_slot(self.cancel, parent=self)
         )

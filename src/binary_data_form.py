@@ -44,7 +44,6 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
     ):
         super(BinaryDataForm2, self).__init__(parent)
         self.setupUi(self)
-        qt_layout.fit_option_groups_to_contents(self)
 
         if conf_level is None:
             raise ValueError("Confidence level must be specified")
@@ -79,6 +78,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         self.set_current_effect()  # fill in current effect data in line edits
         self._update_data_table()  # fill in 2x2
         self.enable_back_calculation_btn()
+        qt_layout.fit_analysis_dialog_to_contents(self)
 
     def initialize_form(self):
         """Initialize all cells to empty items"""
@@ -907,7 +907,7 @@ class ChooseBackCalcResultForm(
             "reflect possible corrections for zero counts."
         )
 
-        qt_layout.fit_option_groups_to_contents(self)
+        qt_layout.fit_analysis_dialog_to_contents(self)
 
     def getChoice(self):
         choices = ["op1", "op2"]

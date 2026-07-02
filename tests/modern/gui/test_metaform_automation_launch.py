@@ -2266,6 +2266,94 @@ def test_data_entry_dialogs_construct_with_stub_backend(monkeypatch):
         os.chdir(REPO_ROOT)
 
 
+def test_analysis_dialog_family_uses_shared_base_size(monkeypatch):
+    import copy
+    import launch
+    import add_new_dialogs
+    import binary_data_form
+    import continuous_data_form
+    import diagnostic_data_form
+    import meta_reg_form
+    import meta_subgroup_form
+    import qt_layout
+
+    app, window = launch.start_automation()
+    dialogs = []
+    monkeypatch.setattr(
+        continuous_data_form.ChooseBackCalcResultForm, "exec", lambda self: False
+    )
+
+    try:
+        assert (
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            is True
+        )
+        model = window.model
+        cov_values = {
+            study.name: "north" if index % 2 else "south"
+            for index, study in enumerate(model.dataset.studies)
+        }
+        model.add_covariate("region", "factor", cov_values)
+        dialogs.extend(
+            [
+                meta_reg_form.MetaRegForm(model, parent=window),
+                meta_subgroup_form.MetaSubgroupForm(model, parent=window),
+                add_new_dialogs.AddNewCovariateForm(parent=window),
+                binary_data_form.BinaryDataForm2(
+                    copy.deepcopy(model.get_current_ma_unit_for_study(0)),
+                    model.current_txs,
+                    model.get_cur_group_str(),
+                    model.current_effect,
+                    conf_level=model.get_global_conf_level(),
+                    parent=window.tableView,
+                ),
+            ]
+        )
+
+        assert (
+            window.open(os.path.abspath(os.path.join("sample_data", "continuous.oma")))
+            is True
+        )
+        model = window.model
+        dialogs.append(
+            continuous_data_form.ContinuousDataForm(
+                copy.deepcopy(model.get_current_ma_unit_for_study(0)),
+                model.current_txs,
+                model.get_cur_group_str(),
+                model.current_effect,
+                conf_level=model.get_global_conf_level(),
+                parent=window.tableView,
+            )
+        )
+
+        assert (
+            window.open(os.path.abspath(os.path.join("sample_data", "lymph.oma")))
+            is True
+        )
+        model = window.model
+        dialogs.append(
+            diagnostic_data_form.DiagnosticDataForm(
+                copy.deepcopy(model.get_current_ma_unit_for_study(0)),
+                model.current_txs,
+                model.get_cur_group_str(),
+                conf_level=model.get_global_conf_level(),
+                parent=window.tableView,
+            )
+        )
+
+        for dialog in dialogs:
+            dialog.show()
+            app.processEvents()
+            assert dialog.minimumWidth() >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
+            assert dialog.minimumHeight() >= qt_layout.ANALYSIS_DIALOG_MINIMUM_HEIGHT
+    finally:
+        for dialog in dialogs:
+            dialog.close()
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
 def test_csv_import_wizard_accepts_representative_csv(tmp_path, monkeypatch):
     import launch
     from PyQt5 import QtWidgets

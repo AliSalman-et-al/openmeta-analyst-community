@@ -13,6 +13,8 @@ from PyQt5.QtWidgets import (
 )
 
 ANALYSIS_DIALOG_MINIMUM_WIDTH = 520
+ANALYSIS_DIALOG_MINIMUM_HEIGHT = 260
+ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH = 360
 
 
 def fit_analysis_dialog_to_contents(root, adjust_root=True):
@@ -23,17 +25,25 @@ def fit_analysis_dialog_to_contents(root, adjust_root=True):
         root,
         adjust_root=adjust_root,
         minimum_width=ANALYSIS_DIALOG_MINIMUM_WIDTH,
+        minimum_height=ANALYSIS_DIALOG_MINIMUM_HEIGHT,
     )
 
 
-def fit_option_groups_to_contents(root, adjust_root=True, minimum_width=0):
+def fit_option_groups_to_contents(
+    root, adjust_root=True, minimum_width=0, minimum_height=0
+):
     """Prevent dialog contents from being compressed below visible text."""
     if not _fit_root_is_available(root):
         return
-    fit_text_to_contents(root, adjust_root=adjust_root, minimum_width=minimum_width)
+    fit_text_to_contents(
+        root,
+        adjust_root=adjust_root,
+        minimum_width=minimum_width,
+        minimum_height=minimum_height,
+    )
 
 
-def fit_text_to_contents(root, adjust_root=True, minimum_width=0):
+def fit_text_to_contents(root, adjust_root=True, minimum_width=0, minimum_height=0):
     """Prevent visible text-bearing widgets from being compressed below content."""
     if not _fit_root_is_available(root):
         return
@@ -61,10 +71,11 @@ def fit_text_to_contents(root, adjust_root=True, minimum_width=0):
         size_hint = root.sizeHint()
         title_width = _window_title_width_hint(root)
         target_width = max(size_hint.width(), title_width, minimum_width)
-        _raise_maximum_height(root, size_hint.height())
+        target_height = max(size_hint.height(), minimum_height)
+        _raise_maximum_height(root, target_height)
         _raise_maximum_width(root, target_width)
         root.setMinimumSize(
-            root.minimumSize().expandedTo(size_hint.expandedTo(QSize(target_width, 0)))
+            root.minimumSize().expandedTo(QSize(target_width, target_height))
         )
         root.adjustSize()
 
@@ -89,10 +100,7 @@ def _fit_text_widgets_to_contents(root):
         if _is_hidden_for_fit(combo_box, root):
             continue
         combo_box.setSizeAdjustPolicy(QComboBox.AdjustToContents)
-        _fit_widget_width_to_hint(
-            combo_box,
-            max(combo_box.sizeHint().width(), _combo_contents_width(combo_box)),
-        )
+        _fit_combo_width_to_contents(combo_box)
         if combo_box.view() is not None:
             combo_box.view().setMinimumWidth(combo_box.minimumWidth())
 
@@ -127,6 +135,17 @@ def _fit_widget_width_to_hint(widget, width):
     widget.setMinimumWidth(max(widget.minimumWidth(), width))
     if widget.sizePolicy().horizontalPolicy() == QSizePolicy.Fixed:
         widget.setSizePolicy(QSizePolicy.Preferred, widget.sizePolicy().verticalPolicy())
+
+
+def _fit_combo_width_to_contents(combo_box):
+    width = max(combo_box.sizeHint().width(), _combo_contents_width(combo_box))
+    target_width = min(width, ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH)
+    combo_box.setMinimumWidth(target_width)
+    combo_box.setMaximumWidth(max(target_width, ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH))
+    if combo_box.sizePolicy().horizontalPolicy() == QSizePolicy.Fixed:
+        combo_box.setSizePolicy(
+            QSizePolicy.Preferred, combo_box.sizePolicy().verticalPolicy()
+        )
 
 
 def _combo_contents_width(combo_box):

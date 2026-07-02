@@ -40,7 +40,6 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
     def __init__(self, ma_unit, cur_txs, cur_group_str, conf_level=None, parent=None):
         super(DiagnosticDataForm, self).__init__(parent)
         self.setupUi(self)
-        qt_layout.fit_option_groups_to_contents(self)
 
         if conf_level is None:
             raise ValueError("Confidence level must be specified")
@@ -83,6 +82,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         self.enable_back_calculation_btn()
 
         self.current_prevalence = self._get_prevalence_str()
+        qt_layout.fit_analysis_dialog_to_contents(self)
 
     #        # Color for clear_button_pallette
     #        self.orig_palette = self.clear_Btn.palette()

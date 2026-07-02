@@ -27,7 +27,7 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
         if not self.is_diagnostic:
             self.diagnostic_group_box.hide()
 
-        qt_layout.fit_option_groups_to_contents(self)
+        qt_layout.fit_analysis_dialog_to_contents(self)
 
         self.buttonBox.rejected.connect(
             app_error_handler.safe_slot(self.cancel, parent=self)

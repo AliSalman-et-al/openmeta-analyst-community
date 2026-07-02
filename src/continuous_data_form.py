@@ -58,7 +58,6 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
     ):
         super(ContinuousDataForm, self).__init__(parent)
         self.setupUi(self)
-        qt_layout.fit_option_groups_to_contents(self)
         self.setup_signals_and_slots()
 
         if conf_level is None:
@@ -124,6 +123,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             self.adjustSize()
 
         self.current_correlation = self._get_correlation_str()
+        qt_layout.fit_analysis_dialog_to_contents(self)
 
     def initialize_form(self, table=None):
         """Initialize all cells to empty items
@@ -1239,7 +1239,7 @@ class ChooseBackCalcResultForm(
         self.choice2_btn.setText(op2_txt)
 
         self.info_label.setText(info_text)
-        qt_layout.fit_option_groups_to_contents(self)
+        qt_layout.fit_analysis_dialog_to_contents(self)
 
     def getChoice(self):
         # Choice data to be returned is index of data item
