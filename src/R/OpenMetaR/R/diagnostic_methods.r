@@ -1197,6 +1197,41 @@ hsroc.summary.columns <- function(summary.section) {
     )
 }
 
+hsroc.canonical.summary.column.name <- function(column.name) {
+    compact <- tolower(gsub("[._]+", " ", trimws(as.character(column.name))))
+    compact <- gsub("[[:space:]]+", " ", compact)
+    if (compact %in% c("hpd low", "hpd lower")) {
+        return("Lower bound")
+    }
+    if (compact %in% c("hpd high", "hpd upper")) {
+        return("Upper bound")
+    }
+    if (compact == "median estimate") {
+        return("Median estimate")
+    }
+    as.character(column.name)
+}
+
+hsroc.normalize.summary.headers <- function(summary.section) {
+    if (is.list(summary.section) && is.null(dim(summary.section))) {
+        return(lapply(summary.section, hsroc.normalize.summary.headers))
+    }
+
+    if (!is.null(dim(summary.section)) && length(dim(summary.section)) >= 2) {
+        column.names <- colnames(summary.section)
+        if (!is.null(column.names)) {
+            colnames(summary.section) <- vapply(
+                column.names,
+                hsroc.canonical.summary.column.name,
+                character(1),
+                USE.NAMES=FALSE
+            )
+        }
+    }
+
+    summary.section
+}
+
 hsroc.summary.row <- function(summary.section, candidates) {
     row.names <- rownames(summary.section)
     if (is.null(row.names)) {
@@ -1346,7 +1381,7 @@ hsroc.model.parameter.summary <- function(between.study, clinical.rows, digits) 
 
 hsroc.display.summary <- function(hsroc.sum, params, chain.out.dirs) {
     raw.summary.names <- intersect(c("Between-study parameters", "Within-study parameters", "Reference standard"), names(hsroc.sum))
-    fallback.summary <- hsroc.sum[raw.summary.names]
+    fallback.summary <- hsroc.normalize.summary.headers(hsroc.sum[raw.summary.names])
     if (!"Between-study parameters" %in% names(hsroc.sum)) {
         return(fallback.summary)
     }

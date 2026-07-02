@@ -273,6 +273,61 @@ _HSROC_NAMESPACE_DRIVER = textwrap.dedent(
 ).replace("__REPO_ROOT__", repr(REPO_ROOT).replace("\\", "/"))
 
 
+_HSROC_HEADER_DRIVER = textwrap.dedent(
+    r"""
+    repo <- normalizePath(__REPO_ROOT__, winslash = "/")
+    suppressPackageStartupMessages(source(file.path(repo, "src/R/OpenMetaR/R/classes.r")))
+    suppressPackageStartupMessages(source(file.path(repo, "src/R/OpenMetaR/R/utilities.r")))
+    suppressPackageStartupMessages(source(file.path(repo, "src/R/OpenMetaR/R/diagnostic_methods.r")))
+
+    between.study <- matrix(
+      c(0.624, 1.110, 0.817, 1.907, 1.493, 1.356),
+      nrow=2
+    )
+    rownames(between.study) <- c("THETA", "LAMBDA")
+    colnames(between.study) <- c("Median estimate", "HPD.low", "HPD.high")
+
+    within.study <- array(
+      1:27,
+      dim=c(3, 3, 3),
+      dimnames=list(
+        c("1", "2", "3"),
+        c("Median estimate", "HPD lower", "HPD upper"),
+        c("theta", "alpha", "pi")
+      )
+    )
+
+    summary <- hsroc.display.summary(
+      list(
+        `Between-study parameters`=between.study,
+        `Within-study parameters`=within.study
+      ),
+      list(digits=3),
+      character()
+    )
+
+    if (!identical(colnames(summary[["Between-study parameters"]]), c("Median estimate", "Lower bound", "Upper bound"))) {
+      stop(paste("between-study HPD headers were not normalized:", paste(colnames(summary[["Between-study parameters"]]), collapse=", ")))
+    }
+
+    within.headers <- dimnames(summary[["Within-study parameters"]])[[2]]
+    if (!identical(within.headers, c("Median estimate", "Lower bound", "Upper bound"))) {
+      stop(paste("within-study HPD headers were not normalized:", paste(within.headers, collapse=", ")))
+    }
+
+    combined.headers <- paste(
+      c(colnames(summary[["Between-study parameters"]]), within.headers),
+      collapse=" "
+    )
+    if (grepl("HPD[.]low|HPD[.]high|HPD lower|HPD upper", combined.headers)) {
+      stop(paste("raw HSROC HPD headers leaked:", combined.headers))
+    }
+
+    cat("OK\n")
+    """
+).replace("__REPO_ROOT__", repr(REPO_ROOT).replace("\\", "/"))
+
+
 def test_hsroc_retries_failed_chain_once_in_clean_directory():
     rscript = shutil.which("Rscript")
     if not rscript:
@@ -314,6 +369,28 @@ def test_hsroc_summary_namespace_imports_as_mcmc():
 
     if result.returncode == 42:
         pytest.skip(result.stdout.strip())
+
+    assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
+        result.returncode,
+        result.stdout[-2000:],
+        result.stderr[-2000:],
+    )
+    assert "OK" in result.stdout
+
+
+def test_hsroc_fallback_summary_uses_canonical_hpd_interval_headers():
+    rscript = shutil.which("Rscript")
+    if not rscript:
+        pytest.skip("Rscript executable not found")
+
+    result = subprocess.run(
+        [rscript, "-"],
+        cwd=REPO_ROOT,
+        input=_HSROC_HEADER_DRIVER,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
+    )
 
     assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
         result.returncode,
