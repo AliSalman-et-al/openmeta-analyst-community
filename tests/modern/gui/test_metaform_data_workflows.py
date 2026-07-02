@@ -66,6 +66,22 @@ def test_dataset_model_rejects_missing_or_unknown_outcome_data_type():
         _close_without_prompt(app, window)
 
 
+def test_dataset_model_rejects_blank_and_duplicate_outcome_names():
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+
+        with pytest.raises(ValueError, match="Outcome names cannot be empty"):
+            window.model.add_new_outcome("   ", "binary")
+
+        with pytest.raises(ValueError, match="already exists"):
+            window.model.add_new_outcome("Mortality", "binary")
+    finally:
+        _close_without_prompt(app, window)
+
+
 def test_data_table_editing_preserves_project_state_and_round_trips(
     tmp_path, monkeypatch
 ):
@@ -283,6 +299,102 @@ def test_invalid_paste_reports_validation_error_when_model_signals_are_blocked(
         assert shown[-1][1:] == ("Whoops", "Raw data needs to be numeric.")
         assert _cell_text(model, 0, model.RAW_DATA[0]) == ""
     finally:
+        _close_without_prompt(app, window)
+
+
+def test_add_outcome_dialog_rejects_blank_and_duplicate_names(monkeypatch):
+    import launch
+    from PyQt5 import QtWidgets
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        meta_form = sys.modules["meta_form"]
+        warnings = []
+        monkeypatch.setattr(
+            meta_form.QMessageBox,
+            "warning",
+            lambda *args, **kwargs: warnings.append(args),
+        )
+
+        class BlankOutcomeDialog(object):
+            def __init__(self, *args, **kwargs):
+                self.outcome_name_le = QtWidgets.QLineEdit()
+                self.outcome_name_le.setText("   ")
+                self.datatype_cbo_box = QtWidgets.QComboBox()
+                self.datatype_cbo_box.addItem("Binary")
+
+            def exec_(self):
+                return True
+
+        monkeypatch.setattr(
+            meta_form.add_new_dialogs, "AddNewOutcomeForm", BlankOutcomeDialog
+        )
+
+        window.cur_dimension = "outcome"
+        window.add_new()
+
+        assert warnings[-1][1:] == ("Whoops", "Outcome names cannot be empty.")
+        assert window.model.dataset.get_outcome_names() == ["Mortality"]
+
+        class DuplicateOutcomeDialog(BlankOutcomeDialog):
+            def __init__(self, *args, **kwargs):
+                super(DuplicateOutcomeDialog, self).__init__(*args, **kwargs)
+                self.outcome_name_le.setText("Mortality")
+
+        monkeypatch.setattr(
+            meta_form.add_new_dialogs, "AddNewOutcomeForm", DuplicateOutcomeDialog
+        )
+
+        window.add_new()
+
+        assert warnings[-1][1:] == (
+            "Whoops",
+            "An outcome named Mortality already exists. Please pick another name.",
+        )
+        assert window.model.dataset.get_outcome_names() == ["Mortality"]
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_edit_dialog_rejects_blank_outcome_name(monkeypatch):
+    import launch
+    import edit_dialog
+    from PyQt5 import QtWidgets
+
+    app, window = launch.start_automation()
+    dialog = None
+    try:
+        _create_binary_dataset(window)
+        warnings = []
+        monkeypatch.setattr(
+            edit_dialog.QMessageBox,
+            "warning",
+            lambda *args, **kwargs: warnings.append(args),
+        )
+
+        class BlankOutcomeDialog(object):
+            def __init__(self, *args, **kwargs):
+                self.outcome_name_le = QtWidgets.QLineEdit()
+                self.outcome_name_le.setText("")
+                self.datatype_cbo_box = QtWidgets.QComboBox()
+                self.datatype_cbo_box.addItem("Continuous")
+
+            def exec_(self):
+                return True
+
+        monkeypatch.setattr(
+            edit_dialog.add_new_dialogs, "AddNewOutcomeForm", BlankOutcomeDialog
+        )
+
+        dialog = edit_dialog.EditDialog(window.model.dataset, parent=window)
+        dialog.add_outcome()
+
+        assert warnings[-1][1:] == ("Whoops", "Outcome names cannot be empty.")
+        assert window.model.dataset.get_outcome_names() == ["Mortality"]
+    finally:
+        if dialog is not None:
+            dialog.close()
         _close_without_prompt(app, window)
 
 

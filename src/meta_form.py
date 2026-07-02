@@ -985,7 +985,13 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                 # then the user clicked ok and has added a new outcome.
                 # here we want to add the outcome to the dataset, and then
                 # display it
-                new_outcome_name = _qt_text(form.outcome_name_le.text())
+                try:
+                    new_outcome_name = ma_data_table_model.validate_new_outcome_name(
+                        self.model.dataset, form.outcome_name_le.text()
+                    )
+                except ValueError as exc:
+                    QMessageBox.warning(self, "Whoops", str(exc))
+                    return
                 # the outcome type is one of the enumerated types; we don't worry about
                 # unicode encoding
                 new_outcome_type = str(form.datatype_cbo_box.currentText())

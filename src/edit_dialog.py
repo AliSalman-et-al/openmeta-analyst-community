@@ -26,6 +26,7 @@ import add_new_dialogs
 import app_error_handler
 import meta_globals
 import ma_dataset
+import ma_data_table_model
 import qt_layout
 
 
@@ -199,7 +200,13 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
             # then the user clicked ok and has added a new outcome.
             # here we want to add the outcome to the dataset, and then
             # display it
-            new_outcome_name = str(form.outcome_name_le.text())
+            try:
+                new_outcome_name = ma_data_table_model.validate_new_outcome_name(
+                    self.outcome_list.model().dataset, form.outcome_name_le.text()
+                )
+            except ValueError as exc:
+                QMessageBox.warning(self, "Whoops", str(exc))
+                return
             # the outcome type is one of the enumerated types; we don't worry about
             # unicode encoding
             data_type = str(form.datatype_cbo_box.currentText())

@@ -30,6 +30,10 @@ import qt_text
 # following the last study.
 DUMMY_ROWS = 20
 STUDY_NAME_REQUIRED_MESSAGE = "Please enter a study name before entering study data."
+OUTCOME_NAME_REQUIRED_MESSAGE = "Outcome names cannot be empty."
+OUTCOME_NAME_DUPLICATE_MESSAGE = (
+    "An outcome named %s already exists. Please pick another name."
+)
 
 
 def _item_data(value=None):
@@ -62,6 +66,19 @@ def _to_text_value(value):
 
 def _to_native_text(value):
     return qt_text.to_native_text(value)
+
+
+def normalize_outcome_name(value):
+    return _to_native_text(value).strip()
+
+
+def validate_new_outcome_name(dataset, name):
+    outcome_name = normalize_outcome_name(name)
+    if outcome_name == "":
+        raise ValueError(OUTCOME_NAME_REQUIRED_MESSAGE)
+    if outcome_name in dataset.get_outcome_names():
+        raise ValueError(OUTCOME_NAME_DUPLICATE_MESSAGE % outcome_name)
+    return outcome_name
 
 
 def _to_int(value):
@@ -1374,6 +1391,7 @@ class DatasetModel(QAbstractTableModel):
         return [study.id for study in self.dataset.studies]
 
     def add_new_outcome(self, name, data_type, sub_type=None):
+        name = validate_new_outcome_name(self.dataset, name)
         if data_type is None:
             raise ValueError("Cannot add an outcome without a data type")
         data_type_key = str(data_type).lower()
