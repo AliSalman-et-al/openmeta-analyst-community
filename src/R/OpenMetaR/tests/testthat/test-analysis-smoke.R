@@ -196,6 +196,12 @@ test_that("core method discovery and metadata avoid legacy export scanning", {
   expect_true(nzchar(description))
 })
 
+test_that("reference normalization preserves declared order while removing repeats", {
+  refs <- OpenMetaR:::openmetar.unique.references(c("method A", "method B", "method A", "method C"))
+
+  expect_identical(refs, c("method A", "method B", "method C"))
+})
+
 test_that("single factor diagnostic meta-regression returns adjusted means", {
   fixture <- diagnostic_fixture("DOR")
   result <- openmetar.run.analysis(

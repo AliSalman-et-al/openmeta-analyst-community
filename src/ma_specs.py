@@ -415,7 +415,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                 if biv_method in method_names and should_remove_bivariate_method:
                     method_names.remove(biv_method)
             # Fix for issue # 175
-            if set(["lr", "dor"]) <= set(self.diag_metrics):
+            if all(metric in self.diag_metrics for metric in ("lr", "dor")):
                 try:
                     method_names.remove("Diagnostic Fixed-Effect Peto")
                     # QMessageBox.warning(self.parent(), "whoops", "removed peto")
@@ -805,7 +805,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         form = MA_Specs(
             self.model,
             parent=self.parent(),
-            diag_metrics=list(set(["lr", "dor"]) & set(self.diag_metrics)),
+            diag_metrics=[
+                metric for metric in ("lr", "dor") if metric in self.diag_metrics
+            ],
             meta_f_str=self.meta_f_str,
             diag_metrics_to_analysis_details_d=self.diag_metrics_to_analysis_details,
             conf_level=self.model.get_global_conf_level(),

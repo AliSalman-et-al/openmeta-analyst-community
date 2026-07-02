@@ -293,6 +293,15 @@ def test_diagnostic_hsroc_next_does_not_run_before_lr_dor_screen(monkeypatch):
     unexpected_errors = []
     analysis_results = []
     run_calls = []
+    followup_metric_orders = []
+
+    class CapturingSpecs(object):
+        def __init__(self, *args, **kwargs):
+            followup_metric_orders.append(list(kwargs.get("diag_metrics") or []))
+
+        def show(self):
+            pass
+
     try:
         _create_diagnostic_dataset(window)
 
@@ -319,6 +328,7 @@ def test_diagnostic_hsroc_next_does_not_run_before_lr_dor_screen(monkeypatch):
             diag_metrics=["sens", "spec", "lr", "dor"],
             conf_level=window.model.get_global_conf_level(),
         )
+        monkeypatch.setattr(ma_specs, "MA_Specs", CapturingSpecs)
         form.method_cbo_box.setCurrentText("HSROC")
 
         form.buttonBox.accepted.emit()
@@ -327,6 +337,7 @@ def test_diagnostic_hsroc_next_does_not_run_before_lr_dor_screen(monkeypatch):
         assert unexpected_errors == []
         assert analysis_results == []
         assert run_calls == []
+        assert followup_metric_orders == [["lr", "dor"]]
         assert form.diag_metrics_to_analysis_details["Sens"][0] == "diagnostic.hsroc"
         assert form.diag_metrics_to_analysis_details["Spec"][0] == "diagnostic.hsroc"
     finally:

@@ -422,7 +422,7 @@ class Dataset:
                     ):
                         adjacency_list.append((g1, g2))
 
-        return (list(set(node_list)), adjacency_list)
+        return (_unique_in_first_seen_order(node_list), adjacency_list)
 
     def ma_unit_has_edge_between_groups(self, ma_unit, groups):
         # first check the effects. if *any* effect contains data

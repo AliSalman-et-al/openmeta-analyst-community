@@ -17,6 +17,7 @@ import math
 import os
 import r_runtime
 from analysis_method_labels import normalize_available_method_labels
+import result_sections
 from study_effect_shapes import (
     effect_triplet,
     normalize_diagnostic_effects,
@@ -1356,20 +1357,7 @@ def parse_out_results(result):
             else:
                 image_params_paths_d = R_parse_tools.recursioner(text)
         elif text_n == "References":
-            references_list = list(text)
-            references_list.append(
-                'metafor: Viechtbauer, Wolfgang. "Conducting meta-analyses in R with the metafor package." Journal of 36 (2010).'
-            )
-            references_list.append(
-                'OpenMetaAnalyst: Wallace, Byron C., Issa J. Dahabreh, Thomas A. Trikalinos, Joseph Lau, Paul Trow, and Christopher H. Schmid. "Closing the Gap between Methodologists and End-Users: R as a Computational Back-End." Journal of Statistical Software 49 (2012): 5."'
-            )
-            ref_set = set(references_list)  # removes duplicates
-
-            references_str = ""
-            for i, ref in enumerate(ref_set):
-                references_str += str(i + 1) + ". " + ref + "\n"
-
-            text_d[text_n] = references_str
+            text_d[text_n] = result_sections.format_references(text)
         elif text_n in ("weights", "Weights"):
             text_d["Weights"] = make_weights_str(result)
         elif (

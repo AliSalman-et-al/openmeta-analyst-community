@@ -32,6 +32,7 @@ import edit_forest_plot_form
 import app_error_handler
 import meta_py_r
 import qt_layout
+import result_sections
 # import shutil
 
 PageSize = (612, 792)
@@ -110,8 +111,11 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self.set_psuedo_console_text()
         self.items_to_coords = {}
         self.texts = results["texts"]
+        self.texts, self.references_text = result_sections.pop_references_section(
+            self.texts
+        )
 
-        # first add the text to self.scene
+        # Render ordinary text, plots, then References as the final section.
         self.add_text()
 
         self.y_coord += ROW_HEIGHT / 2.0
@@ -122,8 +126,8 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         if sys.platform.startswith("win"):
             self.y_coord += 2 * ROW_HEIGHT
 
-        # and now the images
         self.add_images()
+        self.add_references()
 
         # reset the scene
         self.graphics_view.setScene(self.scene)
@@ -144,24 +148,9 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self.psuedo_console.append(">> ")
 
     def add_images(self):
-        # temporary fix!
-        image_order = list(self.images.keys())
-
-        if self.image_order is not None:
-            image_order = self.image_order
-
-        ungrouped_images = [
-            (title, self.images[title]) for title in image_order if title in self.images
-        ]
-        ordered_images = ungrouped_images
-
-        if self.image_order is None:
-            # add to the arguments to make more groups, also make sure to add them
-            # in add_text
-            grouped_images = self._group_items(
-                ungrouped_images, ["Likelihood", "nlr", "plr"], ["sens", "spec"]
-            )
-            ordered_images = grouped_images
+        ordered_images = result_sections.order_image_sections(
+            list(self.images.items()), explicit_order=self.image_order
+        )
 
         for title, image in ordered_images:
             print("title: %s; image: %s" % (title, image))
@@ -213,14 +202,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         return pixmap
 
     def add_text(self):
-
-        # add to the arguments to make more groups, also make sure to add them
-        # in add_images
-        grouped_items = self._group_items(
-            list(self.texts.items()), ["Likelihood", "nlr", "plr"], ["sens", "spec"]
-        )
-
-        for title, text in grouped_items:
+        for title, text in result_sections.order_text_sections(list(self.texts.items())):
             try:
                 print("title: %s; text: %s" % (title, text))
                 cur_y = max(0, self.y_coord)
@@ -234,38 +216,15 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             except:
                 pass
 
-    def _group_items(self, items, *groups):
-        """Groups items together if their title contains an element in a group list.
-        items is a tuple of key,value pairs i.e. (title,text)
-        Each group is a list of strings to which item titles should be matched
-        i.e: _group_items(items, ['NLR','PLR'], ['sens','spec'])"""
+    def add_references(self):
+        if self.references_text is None:
+            return
 
-        def _get_group_id(key):
-            for group_id, group in enumerate(groups):
-                for grp_member in group:
-                    if key.lower().find(grp_member.lower()) != -1:
-                        return group_id
-            return None
-
-        # initialization
-        grouped_items = []
-        for i in range(len(groups) + 1):
-            grouped_items.append([])
-        no_grp_index = len(groups)
-
-        # main loop
-        for key, value in items:
-            group_id = _get_group_id(key)
-            if group_id is None:
-                grouped_items[no_grp_index].append((key, value))
-            else:
-                grouped_items[group_id].append((key, value))
-
-        # return result
-        result = []
-        for x in grouped_items:
-            result.extend(x)
-        return result
+        qt_item = self.add_title(result_sections.REFERENCE_SECTION_TITLE)
+        text_item_rect, pos = self.create_text_item(
+            str(self.references_text), self.position(), wrap=True
+        )
+        self.items_to_coords[id(qt_item)] = pos
 
     def add_title(self, title):
         print("Adding title")
@@ -306,9 +265,11 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         print(self.items_to_coords[id(item)])
         self.graphics_view.centerOn(self.items_to_coords[id(item)])
 
-    def create_text_item(self, text, position):
+    def create_text_item(self, text, position, wrap=False):
         txt_item = QGraphicsTextItem(text)
         txt_item.setFont(QFont("courier", 12))
+        if wrap:
+            txt_item.setTextWidth(self._text_wrap_width())
         txt_item.setToolTip(
             "To copy the text:\n"
             "1) Right click on the text and choose select all.\n"
@@ -333,6 +294,12 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         txt_item.setPos(position)
 
         return (txt_item.boundingRect(), position)
+
+    def _text_wrap_width(self):
+        viewport_width = self.graphics_view.viewport().width()
+        if viewport_width <= 0:
+            viewport_width = self.results_nav_splitter.width()
+        return max(300, viewport_width - horizontal_padding)
 
     def process_console_input(self):
         res = str(meta_py_r.evaluate_r_console(self.current_line()))

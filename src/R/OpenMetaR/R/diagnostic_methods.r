@@ -232,7 +232,7 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
             images <- c(images, biv.results$images)
             image.order <- append.image.order(image.order, biv.results)
             remove.indices <- c(sens.index, spec.index)
-			references <- c(references, biv.results$Reference)
+			references <- c(references, biv.results$References)
         } else {
             ###
             # we're not running bivariate; proceed as usual
@@ -371,7 +371,7 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
 					           "image_order"=image.order,
 							   "plot_names"=plot.names, 
                                "plot_params_paths"=plot.params.paths,
-							   "References"=references))
+							   "References"=openmetar.unique.references(references)))
     results
 }
 
@@ -1274,7 +1274,7 @@ diagnostic.hsroc <- function(diagnostic.data, params){
     results <- list("images"=images,
 			        "image_order"=image.order,
 					"Summary"=summary,
-					"References"=references)
+					"References"=openmetar.unique.references(references))
 
 }
 
@@ -1372,7 +1372,7 @@ diagnostic.bivariate.ml <- function(diagnostic.data, params){
 	references <- openmetar.method.references("diagnostic.bivariate")
     results <- list("images"=images,
 			        "Summary"=list("Bivariate Summary"=summary.text),
-					"References"=references)
+					"References"=openmetar.unique.references(references))
 }
 
 

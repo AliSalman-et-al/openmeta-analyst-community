@@ -110,7 +110,7 @@ class CovModel(QAbstractTableModel):
         return studies_to_guessed_vals
 
     def vals_to_new_vals(self, cov_d):
-        unique_values = list(set(cov_d.values()))
+        unique_values = list(dict.fromkeys(cov_d.values()))
         # fix for issue #155
         unique_values.sort()
         mapping = {}

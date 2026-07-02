@@ -132,6 +132,10 @@ openmetar.method.references <- function(method) {
   refs[[method]]
 }
 
+openmetar.unique.references <- function(references) {
+  unique(as.character(references))
+}
+
 if (!exists("validate.conf.level", mode="function")) {
   validate.conf.level <- function(conf.level) {
     if (length(conf.level) != 1 || is.na(conf.level) || !is.finite(conf.level) ||

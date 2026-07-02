@@ -2109,6 +2109,47 @@
       "reason": "Structured packaging contract coverage is lane-owned under tests/modern/packaging_contract.",
       "runtime_class": "subsecond",
       "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "analysis_behavior",
+        "release_readiness"
+      ],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_result_sections.py::test_format_references_preserves_method_order_and_dedupes_exact_matches",
+      "reason": "Guards shared result-section reference formatting against unordered and duplicate display regressions.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "analysis_behavior",
+        "gui_compatibility"
+      ],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_result_sections.py::test_order_text_sections_puts_primary_diagnostic_accuracy_before_likelihoods",
+      "reason": "Guards shared Results window section ordering for multi-metric diagnostic summaries.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_results_window_places_references_after_images_and_wraps_them",
+      "reason": "Exercises the visible Results window navigation and wrapping behavior reported in issue #166.",
+      "runtime_class": "subsecond",
+      "size": "small"
     }
   ]
 }

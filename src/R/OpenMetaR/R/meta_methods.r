@@ -119,7 +119,7 @@ cum.ma.binary <- function(fname, binary.data, params){
 			        "Cumulative Summary"=cum.disp, 
                     "plot_names"=plot.names, 
                     "plot_params_paths"=plot.params.paths, 
-					"References"=references,
+					"References"=openmetar.unique.references(references),
 					"res"=construct.sequential.res.output(cum.results, value.info, replacements=list(estimate='b')),
 					"res.info"=list(summary.table=list(type="data.frame", description=""))
                    )
@@ -328,7 +328,7 @@ bootstrap <- function(fname, omdata, params, cond.means.data=FALSE) {
 	# For making textfile output of data
 	textfile.data <- construct.boot.res.and.value.info.for.results(results, boot.res, bootstrap.type)
 	results <- c(results, textfile.data) # res and res.info
-	results[["References"]] <- unique(c(results[["References"]], openmetar.method.references("bootstrap")))
+	results[["References"]] <- openmetar.unique.references(c(results[["References"]], openmetar.method.references("bootstrap")))
 	
 	results
 	
@@ -602,7 +602,7 @@ loo.ma.binary <- function(fname, binary.data, params){
 			        "Leave-one-out Summary"=loo.disp, 
                     "plot_names"=plot.names, 
                     "plot_params_paths"=plot.params.paths,
-					"References"=references,
+					"References"=openmetar.unique.references(references),
 					"res"=construct.sequential.res.output(loo.results,
 						                                  value.info,
 														  replacements=list(estimate='b',
@@ -722,7 +722,7 @@ cum.ma.continuous <- function(fname, cont.data, params){
 			        "Cumulative Summary"=cum.disp, 
                     "plot_names"=plot.names, 
                     "plot_params_paths"=plot.params.paths,
-					"References"=references,
+					"References"=openmetar.unique.references(references),
 					"res"=construct.sequential.res.output(cum.results, value.info, replacements=list(estimate='b')),
 					"res.info"=list(summary.table=list(type="data.frame", description=""))
 			)
@@ -831,7 +831,7 @@ cum.ma.diagnostic <- function(fname, diagnostic.data, params){
 			        "Cumulative Summary"=cum.disp,
 			        "plot_names"=plot.names, 
 					"plot_params_paths"=plot.params.paths,
-					"References"=references)
+					"References"=openmetar.unique.references(references))
 	results
 }
 
@@ -880,7 +880,7 @@ multiple.cum.ma.diagnostic <- function(fnames, params.list, diagnostic.data) {
 	
 	results <- c(results, list("images"=images,
 					           "plot_names"=plot.names,
-							   "References"=references))
+							   "References"=openmetar.unique.references(references)))
 	results
 	
 
@@ -988,7 +988,7 @@ loo.ma.continuous <- function(fname, cont.data, params){
 			        "Leave-one-out Summary"=loo.disp, 
                     "plot_names"=plot.names, 
                     "plot_params_paths"=plot.params.paths,
-					"References"=references,
+					"References"=openmetar.unique.references(references),
 					"res"=construct.sequential.res.output(loo.results,
 							value.info,
 							replacements=list(estimate='b',
@@ -1080,7 +1080,7 @@ subgroup.ma.binary <- function(fname, binary.data, params){
 			        "Subgroup Summary"=subgroup.disp, 
                     "plot_names"=plot.names, 
                     "plot_params_paths"=plot.params.paths,
-					"References"=references,
+					"References"=openmetar.unique.references(references),
 					"res"      = construct.subgroup.res.output(subgroup.results),
 					"res.info" = construct.subgroup.value.info(value.info, subgroup.list))
     results
@@ -1181,7 +1181,7 @@ subgroup.ma.continuous <- function(fname, cont.data, params){
 			        "Subgroup Summary"=subgroup.disp, 
                     "plot_names"=plot.names, 
                     "plot_params_paths"=plot.params.paths,
-					"References"=references,
+					"References"=openmetar.unique.references(references),
 					"res"      = construct.subgroup.res.output(subgroup.results),
 					"res.info" = construct.subgroup.value.info(value.info, subgroup.list))
     results
@@ -1375,7 +1375,7 @@ multiple.loo.diagnostic <- function(fnames, params.list, diagnostic.data) {
         names(summary.spec) <- paste(eval(parse(text=paste("pretty.names$measure$", params.spec$measure,sep=""))), " Summary", sep="")
         results <- c(results, summary.sens, summary.spec)
 		
-		references <- c(references, results.sens$Reference) # spec reference will be the same
+		references <- c(references, results.sens$References) # spec reference will be the same
         
         res.sens.spec <- list("left"=results.sens$res, "right"=results.spec$res)
         plot.data <- create.loo.side.by.side.plot.data(diagnostic.data.sens.spec, params.tmp, res=res.sens.spec)
@@ -1472,7 +1472,7 @@ multiple.loo.diagnostic <- function(fnames, params.list, diagnostic.data) {
     results <- c(results, list("images"=images,
 					           "plot_names"=plot.names, 
                                "plot_params_paths"=plot.params.paths,
-							   "References"=references))
+							   "References"=openmetar.unique.references(references)))
     #results$images <- images
     #results$plot.names <- plot.names
     #results$plot.params.paths <- plot.params.paths
@@ -1563,7 +1563,7 @@ loo.ma.diagnostic <- function(fname, diagnostic.data, params){
     } 
 	
 	references <- c(res$References, loo_ma_ref)
-	results[["References"]] <- references
+	results[["References"]] <- openmetar.unique.references(references)
     results
 }
 
@@ -1659,7 +1659,7 @@ multiple.subgroup.diagnostic <- function(fnames, params.list, diagnostic.data) {
         subgroup.data.spec <- results.spec$subgroup.data
         subgroup.data.all <- list("left"=subgroup.data.sens, "right"=subgroup.data.spec)
 		
-		references <- c(references, results.sens$Reference) # spec reference will be the same
+		references <- c(references, results.sens$References) # spec reference will be the same
       
         summary.sens <- list("Summary"=results.sens$Summary)
         names(summary.sens) <- paste(eval(parse(text=paste("pretty.names$measure$", params.sens$measure,sep=""))), " Summary", sep="")
@@ -1776,7 +1776,7 @@ multiple.subgroup.diagnostic <- function(fnames, params.list, diagnostic.data) {
     results <- c(results, list("images"=images,
 					           "plot_names"=plot.names, 
                                "plot_params_paths"=plot.params.paths,
-							   "References"=references))
+							   "References"=openmetar.unique.references(references)))
     results
 }
 
@@ -1855,7 +1855,7 @@ subgroup.ma.diagnostic <- function(fname, diagnostic.data, params, selected.cov)
     }
 	
 	references <- c(res$References, subgroup_ma_ref)
-	results[["References"]] <- references
+	results[["References"]] <- openmetar.unique.references(references)
 	
     results
 }

@@ -1754,6 +1754,55 @@ def test_results_window_renders_summary_text_and_plot_navigation(tmp_path):
         app.processEvents()
 
 
+def test_results_window_places_references_after_images_and_wraps_them(tmp_path):
+    import launch
+    import modern_compat
+
+    modern_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    plot_path = tmp_path / "forest.png"
+    image = results_window.QImage(80, 40, results_window.QImage.Format_RGB32)
+    image.fill(results_window.Qt.white)
+    assert image.save(str(plot_path), "PNG")
+
+    long_reference = (
+        "1. Random-effects meta-analysis: DerSimonian, R., & Laird, N. (1986). "
+        "Meta-analysis in clinical trials. Controlled Clinical Trials, 7(3), "
+        "177-188. doi:10.1016/0197-2456(86)90046-2."
+    )
+    window = results_window.ResultsWindow(
+        {
+            "texts": {
+                "Summary": "Binary Random-Effects Model",
+                "References": long_reference,
+            },
+            "images": {"Forest Plot": str(plot_path)},
+            "image_var_names": {"Forest Plot": "forest_plot"},
+            "image_params_paths": {"Forest Plot": str(tmp_path / "forest_params")},
+            "image_order": ["Forest Plot"],
+        }
+    )
+
+    try:
+        nav_titles = [
+            window.nav_tree.topLevelItem(index).text(0)
+            for index in range(window.nav_tree.topLevelItemCount())
+        ]
+        assert nav_titles == ["Summary", "Forest Plot", "References"]
+
+        sections = {
+            item.toPlainText(): item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsTextItem)
+        }
+        assert sections[long_reference].textWidth() > 0
+    finally:
+        window.close()
+        app.processEvents()
+
+
 def test_results_window_separates_tall_text_sections():
     import launch
     import modern_compat
