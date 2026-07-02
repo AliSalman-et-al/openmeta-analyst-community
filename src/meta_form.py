@@ -38,6 +38,7 @@ import ma_dataset
 import legacy_pickle
 import app_error_handler
 import meta_py_r_backend
+import progress_bar as progress_dialog
 import qt_layout
 import qt_text
 import tabular_data
@@ -1748,28 +1749,30 @@ class CommandImportCSV(QUndoCommand):
 
         progress_bar.setValue(0)
         progress_bar.show()
-        for row in range(num_rows):
-            for col in range(num_cols):
-                progress_bar.setValue(row * num_cols + col)
-                QApplication.processEvents()
-                print(
-                    (
-                        "bar_ value: %s"
-                        % str(
-                            [
-                                progress_bar.value(),
-                                progress_bar.minimum(),
-                                progress_bar.maximum(),
-                            ]
+        try:
+            for row in range(num_rows):
+                for col in range(num_cols):
+                    progress_bar.setValue(row * num_cols + col)
+                    QApplication.processEvents()
+                    print(
+                        (
+                            "bar_ value: %s"
+                            % str(
+                                [
+                                    progress_bar.value(),
+                                    progress_bar.minimum(),
+                                    progress_bar.maximum(),
+                                ]
+                            )
                         )
                     )
-                )
-                value = str(self.imported_data[row][col])
-                self.main_form.model.setData(
-                    self.main_form.model.index(row, col + 1), value, import_csv=True
-                )
+                    value = str(self.imported_data[row][col])
+                    self.main_form.model.setData(
+                        self.main_form.model.index(row, col + 1), value, import_csv=True
+                    )
 
-        progress_bar.hide()  # we are done
+        finally:
+            progress_dialog.hide_once(progress_bar)
 
 
 def _normalize_imported_csv_rows(rows):

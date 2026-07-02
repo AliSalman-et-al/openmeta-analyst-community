@@ -36,6 +36,7 @@ import sys
 import forms.ui_ma_specs
 import app_error_handler
 import meta_py_r
+import progress_bar as progress_dialog
 import qt_layout
 import qt_text
 from meta_globals import *
@@ -195,22 +196,25 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         bar.show()
         result = None
 
-        if self.data_type == "binary":
-            data_type = BINARY
+        try:
+            if self.data_type == "binary":
+                data_type = BINARY
 
-        if self.data_type not in ["binary", "continuous"]:
-            raise ValueError(
-                "Network Analysis can currently only be done with binary or continuous data"
+            if self.data_type not in ["binary", "continuous"]:
+                raise ValueError(
+                    "Network Analysis can currently only be done with binary or continuous data"
+                )
+
+            meta_py_r.ma_dataset_to_simple_network(
+                table_model=self.model,
+                var_name="tmp_obj",
+                data_type=None,
+                outcome=None,
+                follow_up=None,
+                network_path="./r_tmp/network.png",
             )
-
-        meta_py_r.ma_dataset_to_simple_network(
-            table_model=self.model,
-            var_name="tmp_obj",
-            data_type=None,
-            outcome=None,
-            follow_up=None,
-            network_path="./r_tmp/network.png",
-        )
+        finally:
+            progress_dialog.hide_once(bar)
 
     def run_ma(self):
         ###
@@ -284,7 +288,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                     self.accept()
                     return
         finally:
-            _hide_progress_bar(bar)
+            progress_dialog.hide_once(bar)
 
         self.parent().analysis(result)
         self.accept()
@@ -889,17 +893,10 @@ def _run_guarded_analysis(specs_form, progress_bar, run_analysis):
             "analysis failed",
             "Sorry, this analysis could not be completed:\n\n%s" % e,
         )
-        _hide_progress_bar(progress_bar)
+        progress_dialog.hide_once(progress_bar)
         _reset_r_working_dir_safely()
         specs_form.accept()
         return None
-
-
-def _hide_progress_bar(progress_bar):
-    if getattr(progress_bar, "_oma_hidden", False):
-        return
-    progress_bar.hide()
-    progress_bar._oma_hidden = True
 
 
 def _reset_r_working_dir_safely():

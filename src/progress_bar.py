@@ -15,3 +15,10 @@ class MetaProgress(QDialog, forms.ui_running.Ui_running):
         super(MetaProgress, self).__init__(parent)
         self.setupUi(self)
         qt_layout.fit_text_to_contents(self)
+
+
+def hide_once(progress_dialog):
+    if getattr(progress_dialog, "_oma_hidden", False):
+        return
+    progress_dialog.hide()
+    progress_dialog._oma_hidden = True

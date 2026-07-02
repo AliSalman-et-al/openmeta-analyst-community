@@ -1,6 +1,7 @@
 import os
 import sys
 import math
+import copy
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, os.path.abspath("src"))
@@ -142,6 +143,68 @@ def test_copy_paste_undo_and_redo_work_through_real_table_path():
         window.redo()
         assert _cell_text(window.model, 1, window.model.NAME) == "Beta"
         assert _cell_text(window.model, 1, window.model.RAW_DATA[-1]) == "12.0"
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_csv_import_progress_dialog_closes_when_model_write_raises(monkeypatch):
+    import launch
+    import ma_data_table_model
+    import meta_form
+
+    app, window = launch.start_automation()
+    progress_events = []
+
+    class ProgressSpy(object):
+        def __init__(self, parent=None, min_=0, max_=10):
+            self.parent = parent
+            self.min_ = min_
+            self.max_ = max_
+            self.current = min_
+
+        def setValue(self, value):
+            self.current = value
+
+        def show(self):
+            progress_events.append("show")
+
+        def hide(self):
+            progress_events.append("hide")
+
+        def minimum(self):
+            return self.min_
+
+        def maximum(self):
+            return self.max_
+
+        def value(self):
+            return self.current
+
+    def raise_on_set_data(self, *args, **kwargs):
+        raise RuntimeError("simulated CSV model write failure")
+
+    try:
+        _create_binary_dataset(window)
+        state = window.tableView.model().get_stateful_dict()
+        command = meta_form.CommandImportCSV(
+            original_dataset=copy.deepcopy(window.model.dataset),
+            old_state_dict=state,
+            new_dataset=copy.deepcopy(window.model.dataset),
+            new_state_dict=state,
+            imported_data=[["Alpha", "2020", "1", "10", "2", "12"]],
+            main_form=window,
+            covariate_names=[],
+            covariate_types=[],
+        )
+        monkeypatch.setattr(meta_form, "ImportProgress", ProgressSpy)
+        monkeypatch.setattr(
+            ma_data_table_model.DatasetModel, "setData", raise_on_set_data
+        )
+
+        with pytest.raises(RuntimeError, match="simulated CSV model write failure"):
+            command._import_data_into_new_dataset()
+
+        assert progress_events == ["show", "hide"]
     finally:
         _close_without_prompt(app, window)
 
