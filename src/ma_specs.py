@@ -219,70 +219,72 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         bar.show()
         result = None
 
-        # this method is defined statically, below
-        add_plot_params(self)
+        try:
+            # this method is defined statically, below
+            add_plot_params(self)
 
-        # also add the metric to the parameters
-        # -- this is for scaling
+            # also add the metric to the parameters
+            # -- this is for scaling
 
-        if not self.data_type == "diagnostic":
-            self.current_param_vals["measure"] = self.model.current_effect
+            if not self.data_type == "diagnostic":
+                self.current_param_vals["measure"] = self.model.current_effect
 
-        # dispatch on type; build an R object, then run the analysis
-        if self.data_type == "binary":
-            result = _run_guarded_analysis(
-                self, bar, lambda: _run_binary_analysis(self)
-            )
-            if result is None:
-                return
+            # dispatch on type; build an R object, then run the analysis
+            if self.data_type == "binary":
+                result = _run_guarded_analysis(
+                    self, bar, lambda: _run_binary_analysis(self)
+                )
+                if result is None:
+                    return
 
-            # _writeout_test_data(self.meta_f_str, self.current_method, self.current_param_vals, result) # FOR MAKING TESTS
-        elif self.data_type == "continuous":
-            result = _run_guarded_analysis(
-                self, bar, lambda: _run_continuous_analysis(self)
-            )
-            if result is None:
-                return
+                # _writeout_test_data(self.meta_f_str, self.current_method, self.current_param_vals, result) # FOR MAKING TESTS
+            elif self.data_type == "continuous":
+                result = _run_guarded_analysis(
+                    self, bar, lambda: _run_continuous_analysis(self)
+                )
+                if result is None:
+                    return
 
-            # _writeout_test_data(self.meta_f_str, self.current_method, self.current_param_vals, result) # FOR MAKING TESTS
-        elif self.data_type == "diagnostic":
-            try:
-                # add the current metrics (e.g., PLR, etc.) to the method/params
-                # dictionary
-                self.add_cur_analysis_details()
-                if len(self.diag_metrics_to_analysis_details) == 0:
+                # _writeout_test_data(self.meta_f_str, self.current_method, self.current_param_vals, result) # FOR MAKING TESTS
+            elif self.data_type == "diagnostic":
+                try:
+                    # add the current metrics (e.g., PLR, etc.) to the method/params
+                    # dictionary
                     self.add_cur_analysis_details()
+                    if len(self.diag_metrics_to_analysis_details) == 0:
+                        self.add_cur_analysis_details()
 
-                method_names, list_of_param_vals = _diagnostic_analysis_requests(self)
+                    method_names, list_of_param_vals = _diagnostic_analysis_requests(self)
 
-                if self.meta_f_str is None:
-                    # regular meta-analysis
-                    result = _run_diagnostic_analysis_isolating_metric_failures(
-                        self.model, method_names, list_of_param_vals
+                    if self.meta_f_str is None:
+                        # regular meta-analysis
+                        result = _run_diagnostic_analysis_isolating_metric_failures(
+                            self.model, method_names, list_of_param_vals
+                        )
+                        # _writeout_test_data(self.meta_f_str, method_names, list_of_param_vals, result, diag=True) # FOR MAKING TESTS
+                    else:
+                        # in the case of diagnostic, we pass in lists
+                        # of param values to the meta_method
+                        result = _run_diagnostic_analysis_isolating_metric_failures(
+                            self.model,
+                            method_names,
+                            list_of_param_vals,
+                            meta_f_str=self.meta_f_str,
+                        )
+                        # _writeout_test_data(self.meta_f_str, method_names, list_of_param_vals, result, diag=True) # FOR MAKING TESTS
+                except Exception as e:
+                    app_error_handler.log_exception(type(e), e, e.__traceback__)
+                    error_message = (
+                        "Sorry, this analysis could not be completed:\n\n%s" % e
                     )
-                    # _writeout_test_data(self.meta_f_str, method_names, list_of_param_vals, result, diag=True) # FOR MAKING TESTS
-                else:
-                    # in the case of diagnostic, we pass in lists
-                    # of param values to the meta_method
-                    result = _run_diagnostic_analysis_isolating_metric_failures(
-                        self.model,
-                        method_names,
-                        list_of_param_vals,
-                        meta_f_str=self.meta_f_str,
-                    )
-                    # _writeout_test_data(self.meta_f_str, method_names, list_of_param_vals, result, diag=True) # FOR MAKING TESTS
-            except Exception as e:
-                app_error_handler.log_exception(type(e), e, e.__traceback__)
-                error_message = "Sorry, this analysis could not be completed:\n\n%s" % e
 
-                QMessageBox.critical(self, "analysis failed", error_message)
-                bar.hide()
-                # reset Rs working directory
-                _reset_r_working_dir_safely()
-                self.accept()
-                return
-
-        bar.hide()
+                    QMessageBox.critical(self, "analysis failed", error_message)
+                    # reset Rs working directory
+                    _reset_r_working_dir_safely()
+                    self.accept()
+                    return
+        finally:
+            _hide_progress_bar(bar)
 
         self.parent().analysis(result)
         self.accept()
@@ -887,10 +889,17 @@ def _run_guarded_analysis(specs_form, progress_bar, run_analysis):
             "analysis failed",
             "Sorry, this analysis could not be completed:\n\n%s" % e,
         )
-        progress_bar.hide()
+        _hide_progress_bar(progress_bar)
         _reset_r_working_dir_safely()
         specs_form.accept()
         return None
+
+
+def _hide_progress_bar(progress_bar):
+    if getattr(progress_bar, "_oma_hidden", False):
+        return
+    progress_bar.hide()
+    progress_bar._oma_hidden = True
 
 
 def _reset_r_working_dir_safely():

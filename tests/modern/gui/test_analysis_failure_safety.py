@@ -2,6 +2,8 @@ import os
 import pickle
 import sys
 
+import pytest
+
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("OMA_STUB_BACKEND", "1")
@@ -144,6 +146,81 @@ def test_continuous_workflow_failure_shows_dialog_and_does_not_open_results(
         assert shown
         assert "simulated recompute failure" in shown[0][2]
         assert results == []
+    finally:
+        for name, value in saved.items():
+            setattr(backend, name, value)
+        _close_without_prompt(app, window)
+
+
+def test_diagnostic_progress_dialog_closes_when_run_setup_raises(monkeypatch):
+    import launch
+    import ma_specs
+
+    app, window = launch.start_automation()
+    backend = ma_specs.meta_py_r
+    saved = {
+        name: getattr(backend, name)
+        for name in (
+            "get_available_methods",
+            "get_params",
+            "get_method_description",
+            "ma_dataset_to_simple_diagnostic_robj",
+        )
+    }
+    progress_events = []
+
+    class ProgressSpy(object):
+        def __init__(self, parent=None):
+            self.parent = parent
+
+        def show(self):
+            progress_events.append("show")
+
+        def hide(self):
+            progress_events.append("hide")
+
+    try:
+        window._handle_wizard_results(
+            {
+                "path": "new_dataset",
+                "outcome_info": {
+                    "arms": "two",
+                    "data_type": "diagnostic",
+                    "sub_type": None,
+                    "effect": "Sens",
+                    "metric_choices": [],
+                    "name": "Accuracy",
+                },
+                "csv_data": None,
+                "selected_dataset": None,
+            }
+        )
+
+        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
+        backend.get_available_methods = lambda **kwargs: {
+            "HSROC": "diagnostic.hsroc",
+            "Diagnostic Random-Effects": "diagnostic.random",
+        }
+        backend.get_params = lambda method: ({}, {}, [], {})
+        backend.get_method_description = lambda method: "stub method"
+        monkeypatch.setattr(ma_specs, "MetaProgress", ProgressSpy)
+        monkeypatch.setattr(
+            ma_specs,
+            "add_plot_params",
+            lambda specs_form: (_ for _ in ()).throw(
+                RuntimeError("simulated setup failure")
+            ),
+        )
+
+        form = window._build_analysis_specs_dialog(
+            diag_metrics=["sens", "spec"],
+            conf_level=window.model.get_global_conf_level(),
+        )
+
+        with pytest.raises(RuntimeError, match="simulated setup failure"):
+            form.run_ma()
+
+        assert progress_events == ["show", "hide"]
     finally:
         for name, value in saved.items():
             setattr(backend, name, value)
