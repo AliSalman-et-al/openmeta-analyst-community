@@ -1,4 +1,4 @@
-from PyQt5.QtCore import QPoint, QSize
+from PyQt5.QtCore import QPoint, QSize, Qt
 from PyQt5.QtGui import QGuiApplication
 from PyQt5.QtWidgets import (
     QAbstractButton,
@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import (
     QSizePolicy,
     QStackedWidget,
     QTabWidget,
+    QWidget,
     QWizard,
     QWizardPage,
 )
@@ -125,6 +126,7 @@ def fit_text_to_contents(
 
     root_layout = root.layout()
     if root_layout is not None:
+        _compact_expanding_vertical_spacers(root_layout)
         root_layout.activate()
 
     combo_content_expanded = _fit_text_widgets_to_contents(root)
@@ -161,7 +163,10 @@ def fit_text_to_contents(
         root.setMinimumSize(target_size)
         if stable_root:
             root.setProperty("oma_stable_fit_size", target_size)
-        root.adjustSize()
+        if size_hint.isValid():
+            root.adjustSize()
+        else:
+            root.resize(target_size)
 
 
 def _fit_root_is_available(root):
@@ -203,6 +208,8 @@ def _fit_wizard_page_height_to_contents(root):
 
 def _root_size_hint_for_current_contents(root):
     size_hint = root.sizeHint()
+    if not size_hint.isValid():
+        return _direct_child_contents_size_hint(root)
     if not isinstance(root, QWizard):
         return size_hint
 
@@ -225,6 +232,61 @@ def _root_size_hint_for_current_contents(root):
 
     chrome_height = max(0, size_hint.height() - max(page_heights))
     return QSize(size_hint.width(), current_hint.height() + chrome_height)
+
+
+def _direct_child_contents_size_hint(root):
+    contents_rect = None
+    for child in root.findChildren(QWidget, options=Qt.FindDirectChildrenOnly):
+        if child.isHidden():
+            continue
+        child_rect = child.geometry()
+        if child_rect.isNull():
+            continue
+        contents_rect = (
+            child_rect if contents_rect is None else contents_rect.united(child_rect)
+        )
+
+    if contents_rect is None:
+        return QSize(-1, -1)
+
+    right_margin = max(0, contents_rect.left())
+    bottom_margin = max(0, contents_rect.top())
+    return QSize(
+        contents_rect.right() + 1 + right_margin,
+        contents_rect.bottom() + 1 + bottom_margin,
+    )
+
+
+def _compact_expanding_vertical_spacers(layout):
+    for index in range(layout.count()):
+        item = layout.itemAt(index)
+        if item is None:
+            continue
+
+        child_layout = item.layout()
+        if child_layout is not None:
+            _compact_expanding_vertical_spacers(child_layout)
+            continue
+
+        widget = item.widget()
+        if widget is not None and widget.layout() is not None:
+            _compact_expanding_vertical_spacers(widget.layout())
+            continue
+
+        spacer = item.spacerItem()
+        if spacer is None:
+            continue
+        if not spacer.expandingDirections() & Qt.Vertical:
+            continue
+
+        hint = spacer.sizeHint()
+        horizontal_policy = spacer.sizePolicy().horizontalPolicy()
+        spacer.changeSize(
+            hint.width(),
+            0,
+            horizontal_policy,
+            QSizePolicy.Minimum,
+        )
 
 
 def _fit_text_widgets_to_contents(root):

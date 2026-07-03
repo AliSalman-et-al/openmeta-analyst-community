@@ -2,7 +2,7 @@ from pathlib import Path
 import importlib
 import sys
 
-from PyQt5 import QtWidgets
+from PyQt5 import QtCore, QtWidgets
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -276,7 +276,7 @@ def test_generated_qdialog_surfaces_use_application_dialog_width_floor_and_fit_c
         try:
             assert root.minimumWidth() >= qt_layout.APPLICATION_DIALOG_MINIMUM_WIDTH
             assert root.minimumHeight() <= max(
-                root.sizeHint().height(),
+                _root_content_height(root),
                 qt_layout.APPLICATION_DIALOG_MINIMUM_HEIGHT,
             )
             _assert_visible_text_widgets_fit(root, module_name)
@@ -338,6 +338,23 @@ def _combo_contents_width(combo_box):
         for index in range(combo_box.count())
     )
     return max(combo_box.sizeHint().width(), widest_item + 48)
+
+
+def _root_content_height(root):
+    size_hint = root.sizeHint()
+    if size_hint.isValid():
+        return size_hint.height()
+
+    content_bottom = 0
+    top_margin = 0
+    for child in root.findChildren(
+        QtWidgets.QWidget, options=QtCore.Qt.FindDirectChildrenOnly
+    ):
+        if child.isHidden():
+            continue
+        top_margin = max(top_margin, child.geometry().top())
+        content_bottom = max(content_bottom, child.geometry().bottom() + 1)
+    return content_bottom + top_margin
 
 
 def _hidden_for_fit(widget, root):
@@ -557,6 +574,36 @@ def test_application_dialog_refit_shrinks_to_current_contents():
             root.sizeHint().height(),
             qt_layout.APPLICATION_DIALOG_MINIMUM_HEIGHT,
         )
+    finally:
+        root.close()
+        root.deleteLater()
+    app.processEvents()
+
+
+def test_application_dialog_fit_collapses_expanding_vertical_spacers():
+    sys.path.insert(0, str(ROOT / "src"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    root = QtWidgets.QDialog()
+    layout = QtWidgets.QVBoxLayout(root)
+    layout.addWidget(QtWidgets.QLabel("One visible control"))
+    layout.addSpacerItem(
+        QtWidgets.QSpacerItem(
+            20,
+            80,
+            QtWidgets.QSizePolicy.Minimum,
+            QtWidgets.QSizePolicy.Expanding,
+        )
+    )
+    layout.addWidget(QtWidgets.QPushButton("OK"))
+
+    try:
+        inflated_height = root.sizeHint().height()
+        qt_layout.fit_application_dialog_to_contents(root)
+
+        assert root.sizeHint().height() < inflated_height
+        assert root.minimumHeight() == qt_layout.APPLICATION_DIALOG_MINIMUM_HEIGHT
     finally:
         root.close()
         root.deleteLater()
