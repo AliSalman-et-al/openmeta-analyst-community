@@ -17,7 +17,7 @@ import math
 import os
 import re
 import r_runtime
-from analysis_method_labels import normalize_available_method_labels
+from analysis_method_labels import method_display_label, normalize_available_method_labels
 import result_sections
 from study_effect_shapes import (
     effect_triplet,
@@ -1336,8 +1336,10 @@ def parse_out_results(result):
 
     # Turn result into a nice dictionary
     result = dict(list(zip(list(result.names), list(result))))
+    study_names = _study_names_from_result(result)
 
     for text_n, text in list(result.items()):
+        display_text_n = _display_section_name(text_n)
         # some special cases, notably the plot names and the path for a forest
         # plot. TODO in the case of diagnostic data, we're probably going to
         # need to parse out multiple forest plot param objects...
@@ -1358,7 +1360,7 @@ def parse_out_results(result):
             else:
                 image_params_paths_d = R_parse_tools.recursioner(text)
         elif text_n == "References":
-            text_d[text_n] = result_sections.format_references(text)
+            text_d[display_text_n] = result_sections.format_references(text)
         elif text_n in ("weights", "Weights"):
             text_d["Weights"] = make_weights_str(result)
         elif (
@@ -1369,17 +1371,17 @@ def parse_out_results(result):
             pass
         else:
             if type(text) == rpy2.robjects.vectors.StrVector:
-                text_d[text_n] = _format_result_text(text[0])
+                text_d[display_text_n] = _format_result_text(text[0])
             elif _is_summary_display(text):
-                text_d[text_n] = _format_result_text(_capture_formatted_summary(text))
+                text_d[display_text_n] = _format_result_text(_capture_formatted_summary(text))
             elif _is_table_summary(text):
-                text_d.update(_format_table_summary(text_n, text))
+                text_d.update(_format_table_summary(display_text_n, text, study_names=study_names))
             elif _is_named_table_summary(text):
-                text_d.update(_format_named_table_summary(text_n, text))
+                text_d.update(_format_named_table_summary(display_text_n, text, study_names=study_names))
             elif _is_named_text_summary(text):
-                text_d.update(_format_named_text_summary(text_n, text))
+                text_d.update(_format_named_text_summary(display_text_n, text))
             else:
-                text_d[text_n] = _format_result_text(str(text))
+                text_d[display_text_n] = _format_result_text(str(text))
 
     to_return = {
         "images": image_path_d,
@@ -1390,6 +1392,19 @@ def parse_out_results(result):
     }
 
     return to_return
+
+
+def _study_names_from_result(result):
+    input_data = result.get("input_data")
+    if input_data is None:
+        return None
+    try:
+        study_names = [str(name) for name in list(input_data.do_slot("study.names"))]
+    except Exception:
+        return None
+    if not study_names or any(name == "" for name in study_names):
+        return None
+    return study_names
 
 
 def _r_inherits(r_object, class_name):
@@ -1421,12 +1436,12 @@ def _capture_formatted_summary(r_object):
     return capture_summary(r_object)[0]
 
 
-def _format_table_summary(section_name, r_object, title=None):
+def _format_table_summary(section_name, r_object, title=None, study_names=None):
     dims = _r_dims(r_object)
     if len(dims) == 2:
-        return {section_name: _format_r_matrix(r_object)}
+        return {section_name: _format_r_matrix(r_object, study_names=study_names)}
     if len(dims) == 3:
-        return _format_r_array_sections("Summary", section_name, r_object)
+        return _format_r_array_sections("Summary", section_name, r_object, study_names=study_names)
     return {section_name: str(r_object)}
 
 
@@ -1458,30 +1473,34 @@ def _format_named_text_summary(parent_name, r_object):
     for name, item in zip(list(r_object.names), list(r_object)):
         if name == "" or not _is_r_string_vector(item):
             continue
-        sections[_summary_section_name(parent_name, name)] = _format_result_text(item[0])
+        sections[_summary_section_name(parent_name, _display_section_name(name))] = _format_result_text(item[0])
 
     if not sections:
         sections[parent_name] = _format_result_text(str(r_object))
     return sections
 
 
-def _format_named_table_summary(parent_name, r_object):
+def _format_named_table_summary(parent_name, r_object, study_names=None):
     sections = {}
     for name, item in zip(list(r_object.names), list(r_object)):
         if name == "":
             continue
 
+        display_name = _display_section_name(name)
         dims = _r_dims(item)
         if len(dims) == 2:
             sections.update(
                 _format_table_summary(
-                    _summary_section_name(parent_name, name), item, name
+                    _summary_section_name(parent_name, display_name),
+                    item,
+                    display_name,
+                    study_names=study_names,
                 )
             )
         elif len(dims) == 3:
-            sections.update(_format_r_array_sections(parent_name, name, item))
+            sections.update(_format_r_array_sections(parent_name, display_name, item, study_names=study_names))
         elif _is_r_string_vector(item):
-            sections[_summary_section_name(parent_name, name)] = _format_result_text(item[0])
+            sections[_summary_section_name(parent_name, display_name)] = _format_result_text(item[0])
 
     if not sections:
         sections[parent_name] = _format_result_text(str(r_object))
@@ -1492,6 +1511,10 @@ def _summary_section_name(parent_name, child_name):
     if parent_name == "Summary":
         return child_name
     return "%s: %s" % (parent_name, child_name)
+
+
+def _display_section_name(name):
+    return method_display_label(str(name))
 
 
 def _is_r_string_vector(r_object):
@@ -1525,16 +1548,16 @@ def _r_names_or_none(r_object):
     return names
 
 
-def _format_r_matrix(matrix):
+def _format_r_matrix(matrix, study_names=None):
     dims = _r_dims(matrix)
     dimnames = _r_dimnames(matrix)
     row_names = dimnames[0] if len(dimnames) > 0 and dimnames[0] is not None else None
     col_names = dimnames[1] if len(dimnames) > 1 and dimnames[1] is not None else None
     values = list(matrix)
-    return _format_matrix_values(values, dims[0], dims[1], row_names, col_names)
+    return _format_matrix_values(values, dims[0], dims[1], row_names, col_names, study_names=study_names)
 
 
-def _format_r_array_sections(parent_name, array_name, r_array):
+def _format_r_array_sections(parent_name, array_name, r_array, study_names=None):
     dims = _r_dims(r_array)
     dimnames = _r_dimnames(r_array)
     row_names = dimnames[0] if len(dimnames) > 0 and dimnames[0] is not None else None
@@ -1553,18 +1576,19 @@ def _format_r_array_sections(parent_name, array_name, r_array):
         end = start + slice_size
         title = "%s - %s" % (array_name, slice_name)
         sections[_summary_section_name(parent_name, title)] = _format_matrix_values(
-            values[start:end], dims[0], dims[1], row_names, col_names
+            values[start:end], dims[0], dims[1], row_names, col_names, study_names=study_names
         )
     return sections
 
 
-def _format_matrix_values(values, nrow, ncol, row_names, col_names):
+def _format_matrix_values(values, nrow, ncol, row_names, col_names, study_names=None):
     headers = (
         [_format_r_table_header(name) for name in list(col_names)]
         if col_names is not None
         else ["V%s" % (index + 1) for index in range(ncol)]
     )
     rows = []
+    row_names = _display_row_names(row_names, study_names)
     include_row_names = row_names is not None
     if include_row_names:
         headers = [""] + headers
@@ -1578,6 +1602,22 @@ def _format_matrix_values(values, nrow, ncol, row_names, col_names):
         rows.append(row)
 
     return _format_text_table(headers, rows)
+
+
+def _display_row_names(row_names, study_names):
+    if row_names is None:
+        return None
+    if _row_names_are_generic_study_ids(row_names, study_names):
+        return list(study_names)
+    return row_names
+
+
+def _row_names_are_generic_study_ids(row_names, study_names):
+    if study_names is None or len(row_names) != len(study_names):
+        return False
+    expected_numbers = [str(index + 1) for index in range(len(row_names))]
+    expected_studies = ["Study %s" % (index + 1) for index in range(len(row_names))]
+    return list(row_names) in (expected_numbers, expected_studies)
 
 
 def _format_r_table_cell(value):

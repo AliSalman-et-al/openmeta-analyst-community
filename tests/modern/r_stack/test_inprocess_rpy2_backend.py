@@ -489,6 +489,42 @@ _HSROC_SUMMARY_DRIVER = textwrap.dedent(
     assert parsed_direct["texts"]["Other Summary"] == "Lower bound Upper bound", parsed_direct
     assert parsed_direct["texts"]["Raw Text Summary"] == "Lower bound Upper bound", parsed_direct
 
+    classes_path = os.path.join(repo_root, "src", "R", "OpenMetaR", "R", "classes.r")
+    ro.r("source(%r)" % classes_path.replace(os.sep, "/"))
+    context_summary = ro.r(
+        '''
+        list(
+          input_data = new(
+            "DiagnosticData",
+            TP=c(19, 8),
+            FN=c(10, 2),
+            TN=c(81, 13),
+            FP=c(1, 9),
+            study.names=c("Lecart Lenfant", "Piver Barlow")
+          ),
+          Summary = list(
+            `diagnostic.random` = structure(
+              c(0.11, 0.22, 0.01, 0.02, 0.21, 0.32),
+              dim = c(2, 3),
+              dimnames = list(
+                c("Study 1", "Study 2"),
+                c("median estimate", "ci.lb", "ci.ub")
+              )
+            )
+          )
+        )
+        '''
+    )
+    parsed_context = meta_py_r.parse_out_results(context_summary)
+    assert "Diagnostic Random-Effects" in parsed_context["texts"], parsed_context
+    context_text = parsed_context["texts"]["Diagnostic Random-Effects"]
+    assert "Lecart Lenfant" in context_text, parsed_context
+    assert "Piver Barlow" in context_text, parsed_context
+    assert "Study 1" not in context_text, parsed_context
+    assert "diagnostic.random" not in parsed_context["texts"], parsed_context
+    assert "Lower bound" in context_text, parsed_context
+    assert "ci.lb" not in context_text, parsed_context
+
     sys.stdout.write("OK\\n")
     sys.stdout.flush()
     sys.stderr.flush()
