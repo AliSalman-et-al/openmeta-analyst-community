@@ -132,13 +132,13 @@ test_that("diagnostic.hsroc presents clinically labelled summary results", {
 
   expect_named(
     result$Summary,
-    c("Clinical Accuracy Summary", "HSROC Model Parameters"),
+    c("Clinical Accuracy Summary", "HSROC Model Parameters", "Within-study parameters"),
     ignore.order = FALSE
   )
 
   clinical.summary <- result$Summary[["Clinical Accuracy Summary"]]
-  expect_match(clinical.summary, "Pooled Sensitivity")
-  expect_match(clinical.summary, "Pooled Specificity")
+  expect_match(clinical.summary, "Summary Sensitivity")
+  expect_match(clinical.summary, "Summary Specificity")
   expect_match(clinical.summary, "Positive Likelihood Ratio")
   expect_match(clinical.summary, "Negative Likelihood Ratio")
   expect_match(clinical.summary, "Diagnostic Odds Ratio")
@@ -148,7 +148,9 @@ test_that("diagnostic.hsroc presents clinically labelled summary results", {
   expect_false(grepl("THETA|LAMBDA|theta|alpha|Within-study parameters", clinical.summary))
 
   model.parameters <- result$Summary[["HSROC Model Parameters"]]
-  expect_match(model.parameters, "THETA")
-  expect_match(model.parameters, "LAMBDA")
+  expect_match(model.parameters, "Accuracy parameter")
+  expect_match(model.parameters, "Threshold parameter")
+  expect_match(model.parameters, "Higher values increase diagnostic accuracy")
+  expect_match(model.parameters, "Higher values reflect a stricter positivity threshold")
   expect_false(grepl("Within-study parameters", model.parameters))
 })
