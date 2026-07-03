@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
     QComboBox,
     QGroupBox,
     QLabel,
+    QMainWindow,
     QToolButton,
     QRadioButton,
     QSizePolicy,
@@ -119,6 +120,9 @@ def fit_text_to_contents(
     """Prevent visible text-bearing widgets from being compressed below content."""
     if not _fit_root_is_available(root):
         return
+    if _window_state_blocks_content_fit(root):
+        return
+
     root_layout = root.layout()
     if root_layout is not None:
         root_layout.activate()
@@ -139,6 +143,7 @@ def fit_text_to_contents(
     if root_layout is not None:
         root_layout.activate()
 
+    adjust_root = adjust_root and _root_allows_content_resize(root)
     if adjust_root:
         size_hint = root.sizeHint()
         title_width = _window_title_width_hint(root)
@@ -166,6 +171,18 @@ def _fit_root_is_available(root):
     except RuntimeError:
         return False
     return True
+
+
+def _window_state_blocks_content_fit(root):
+    is_maximized = getattr(root, "isMaximized", None)
+    is_full_screen = getattr(root, "isFullScreen", None)
+    return (callable(is_maximized) and is_maximized()) or (
+        callable(is_full_screen) and is_full_screen()
+    )
+
+
+def _root_allows_content_resize(root):
+    return not isinstance(root, QMainWindow)
 
 
 def _stable_root_size(root):
