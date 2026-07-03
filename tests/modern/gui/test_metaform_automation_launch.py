@@ -1042,16 +1042,15 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
 
         for combo in enum_combos:
             assert combo.sizeAdjustPolicy() == QtWidgets.QComboBox.AdjustToContents
-            assert combo.minimumWidth() <= qt_layout.ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH
+            widest_enum_label = max(
+                combo.fontMetrics().horizontalAdvance(str(combo.itemText(index)))
+                for index in range(combo.count())
+            ) + 48
+            assert combo.minimumWidth() >= widest_enum_label
+            assert combo.maximumWidth() >= widest_enum_label
             assert (
                 combo.sizePolicy().horizontalPolicy()
                 != QtWidgets.QSizePolicy.Expanding
-            )
-
-        for combo in enum_combos:
-            assert (
-                combo.maximumWidth()
-                <= qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
             )
 
         confidence_spinboxes = specs[0].parameter_grp_box.findChildren(

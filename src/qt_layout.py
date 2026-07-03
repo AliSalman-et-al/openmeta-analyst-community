@@ -126,7 +126,7 @@ def fit_text_to_contents(
     if root_layout is not None:
         root_layout.activate()
 
-    _fit_text_widgets_to_contents(root)
+    combo_content_expanded = _fit_text_widgets_to_contents(root)
 
     for group_box in _option_group_boxes(root):
         _raise_maximum_height(group_box, group_box.sizeHint().height())
@@ -151,7 +151,7 @@ def fit_text_to_contents(
         target_width = max(size_hint.width(), title_width, minimum_width)
         target_height = max(size_hint.height(), minimum_height)
         stable_size = _stable_root_size(root) if stable_root else None
-        if stable_size is not None:
+        if stable_size is not None and not combo_content_expanded:
             root.setMinimumSize(stable_size)
             return
 
@@ -202,6 +202,7 @@ def _fit_wizard_page_height_to_contents(root):
 
 
 def _fit_text_widgets_to_contents(root):
+    combo_content_expanded = False
     for label in root.findChildren(QLabel):
         if _is_hidden_for_fit(label, root) or not str(label.text()).strip():
             continue
@@ -213,8 +214,13 @@ def _fit_text_widgets_to_contents(root):
     for combo_box in root.findChildren(QComboBox):
         if _is_hidden_for_fit(combo_box, root):
             continue
+        previous_minimum_width = combo_box.minimumWidth()
         combo_box.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         _fit_combo_width_to_contents(combo_box)
+        combo_content_expanded = (
+            combo_content_expanded
+            or combo_box.minimumWidth() > previous_minimum_width
+        )
         if combo_box.view() is not None:
             combo_box.view().setMinimumWidth(combo_box.minimumWidth())
 
@@ -224,6 +230,7 @@ def _fit_text_widgets_to_contents(root):
         if _is_hidden_for_fit(button, root) or not str(button.text()).strip():
             continue
         _fit_widget_width_to_hint(button, button.sizeHint().width())
+    return combo_content_expanded
 
 
 def _is_hidden_for_fit(widget, root):
@@ -253,18 +260,8 @@ def _fit_widget_width_to_hint(widget, width):
 
 def _fit_combo_width_to_contents(combo_box):
     width = max(combo_box.sizeHint().width(), _combo_contents_width(combo_box))
-    if combo_box.property("oma_fit_contents_without_width_cap") is True:
-        target_width = width
-        combo_box.setMinimumWidth(target_width)
-        combo_box.setMaximumWidth(max(target_width, combo_box.maximumWidth()))
-        if combo_box.sizePolicy().horizontalPolicy() == QSizePolicy.Fixed:
-            combo_box.setSizePolicy(
-                QSizePolicy.Preferred, combo_box.sizePolicy().verticalPolicy()
-            )
-        return
-
     target_maximum_width = _combo_maximum_width(combo_box)
-    target_width = min(width, target_maximum_width)
+    target_width = width
     combo_box.setMinimumWidth(target_width)
     combo_box.setMaximumWidth(max(target_width, target_maximum_width))
     if combo_box.sizePolicy().horizontalPolicy() == QSizePolicy.Fixed:

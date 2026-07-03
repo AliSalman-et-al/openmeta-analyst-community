@@ -235,7 +235,7 @@ def test_generated_ui_surfaces_do_not_cap_visible_text_widgets_below_contents():
     app.processEvents()
 
 
-def test_generated_qdialog_surfaces_use_application_dialog_floor_and_combo_cap():
+def test_generated_qdialog_surfaces_use_application_dialog_floor_and_fit_combos():
     sys.path.insert(0, str(ROOT / "src"))
     sys.path.insert(0, str(ROOT / "src" / "forms"))
     import qt_layout
@@ -280,10 +280,7 @@ def test_generated_qdialog_surfaces_use_application_dialog_floor_and_combo_cap()
             for combo_box in root.findChildren(QtWidgets.QComboBox):
                 if _hidden_for_fit(combo_box, root):
                     continue
-                assert (
-                    combo_box.maximumWidth()
-                    == qt_layout.APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH
-                )
+                assert combo_box.maximumWidth() >= combo_box.minimumWidth()
         finally:
             root.close()
             root.deleteLater()
@@ -321,12 +318,23 @@ def _assert_visible_text_widgets_fit(root, module_name):
         if _hidden_for_fit(combo_box, root):
             continue
         assert combo_box.sizeAdjustPolicy() == QtWidgets.QComboBox.AdjustToContents
-        assert combo_box.minimumWidth() >= combo_box.sizeHint().width(), module_name
-        assert combo_box.maximumWidth() >= combo_box.sizeHint().width(), module_name
+        assert combo_box.minimumWidth() >= _combo_contents_width(combo_box), module_name
+        assert combo_box.maximumWidth() >= combo_box.minimumWidth(), module_name
 
 
 def _visible_text(widget, root, text):
     return not _hidden_for_fit(widget, root) and str(text).strip()
+
+
+def _combo_contents_width(combo_box):
+    if combo_box.count() == 0:
+        return combo_box.sizeHint().width()
+    metrics = combo_box.fontMetrics()
+    widest_item = max(
+        metrics.horizontalAdvance(str(combo_box.itemText(index)))
+        for index in range(combo_box.count())
+    )
+    return max(combo_box.sizeHint().width(), widest_item + 48)
 
 
 def _hidden_for_fit(widget, root):
@@ -385,8 +393,8 @@ def test_dialog_width_fit_includes_labels_combos_and_window_title():
         assert description.minimumWidth() >= description.sizeHint().width()
         assert parameter_label.minimumWidth() >= parameter_label.sizeHint().width()
         assert combo.sizeAdjustPolicy() == QtWidgets.QComboBox.AdjustToContents
-        assert combo.minimumWidth() <= qt_layout.APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH
-        assert combo.maximumWidth() == qt_layout.APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH
+        assert combo.minimumWidth() >= _combo_contents_width(combo)
+        assert combo.maximumWidth() >= combo.minimumWidth()
         assert root.minimumWidth() >= root.sizeHint().width()
 
         title_width = root.fontMetrics().horizontalAdvance(root.windowTitle())
@@ -435,8 +443,8 @@ def test_dialog_width_fit_includes_hidden_tab_contents_and_late_content():
         assert wide_tab.isHidden()
         assert description.minimumWidth() >= description.sizeHint().width()
         assert parameter_label.minimumWidth() >= parameter_label.sizeHint().width()
-        assert combo.minimumWidth() <= qt_layout.ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH
-        assert combo.maximumWidth() == qt_layout.ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH
+        assert combo.minimumWidth() >= _combo_contents_width(combo)
+        assert combo.maximumWidth() >= combo.minimumWidth()
         assert root.minimumWidth() >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
         assert root.minimumWidth() >= root.sizeHint().width()
     finally:
@@ -445,7 +453,7 @@ def test_dialog_width_fit_includes_hidden_tab_contents_and_late_content():
     app.processEvents()
 
 
-def test_analysis_dialog_combo_widths_are_content_aware_but_capped():
+def test_analysis_dialog_combo_widths_fit_long_selectable_items():
     sys.path.insert(0, str(ROOT / "src"))
     import qt_layout
 
@@ -467,15 +475,15 @@ def test_analysis_dialog_combo_widths_are_content_aware_but_capped():
     app.processEvents()
 
     try:
-        assert combo.minimumWidth() <= qt_layout.ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH
-        assert combo.maximumWidth() == qt_layout.ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH
+        assert combo.minimumWidth() >= _combo_contents_width(combo)
+        assert combo.maximumWidth() >= combo.minimumWidth()
     finally:
         root.close()
         root.deleteLater()
     app.processEvents()
 
 
-def test_application_dialog_refit_does_not_ratchet_root_width():
+def test_application_dialog_refit_expands_for_new_combo_choices():
     sys.path.insert(0, str(ROOT / "src"))
     import qt_layout
 
@@ -501,14 +509,15 @@ def test_application_dialog_refit_does_not_ratchet_root_width():
             "an already fitted application dialog to grow wider."
         )
         combo.addItem(
-            "A much longer dynamically generated choice that should stay within the combo cap"
+            "A much longer dynamically generated choice that should fit when refit"
         )
         qt_layout.fit_application_dialog_to_contents(root)
         app.processEvents()
 
-        assert root.width() == stable_width
-        assert root.minimumSize() == stable_minimum
-        assert combo.maximumWidth() == qt_layout.APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH
+        assert combo.minimumWidth() >= _combo_contents_width(combo)
+        assert combo.maximumWidth() >= combo.minimumWidth()
+        assert root.width() > stable_width
+        assert root.minimumSize().width() > stable_minimum.width()
     finally:
         root.close()
         root.deleteLater()

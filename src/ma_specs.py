@@ -73,7 +73,6 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         super(MA_Specs, self).__init__(parent)
         self.setupUi(self)
-        self.method_cbo_box.setProperty("oma_fit_contents_without_width_cap", True)
         global meta_py_r
         meta_py_r = sys.modules.get("meta_py_r", meta_py_r)
 
