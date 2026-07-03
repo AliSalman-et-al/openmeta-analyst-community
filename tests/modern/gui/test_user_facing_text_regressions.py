@@ -114,6 +114,70 @@ def test_layout_fitters_ignore_missing_or_deleted_roots():
     app.processEvents()
 
 
+def test_content_fit_resizes_dialog_roots_only(monkeypatch):
+    sys.path.insert(0, str(ROOT / "src"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+
+    dialog = QtWidgets.QDialog()
+    dialog_layout = QtWidgets.QVBoxLayout(dialog)
+    dialog_layout.addWidget(QtWidgets.QLabel("Dialog text that needs fitting"))
+    dialog_adjust_calls = []
+    monkeypatch.setattr(
+        dialog, "adjustSize", lambda: dialog_adjust_calls.append(True)
+    )
+
+    main_window = QtWidgets.QMainWindow()
+    central = QtWidgets.QWidget(main_window)
+    main_layout = QtWidgets.QVBoxLayout(central)
+    main_label = QtWidgets.QLabel("Main window text that needs fitting")
+    main_layout.addWidget(main_label)
+    main_window.setCentralWidget(central)
+    main_adjust_calls = []
+    monkeypatch.setattr(
+        main_window, "adjustSize", lambda: main_adjust_calls.append(True)
+    )
+
+    try:
+        qt_layout.fit_text_to_contents(dialog)
+        qt_layout.fit_text_to_contents(main_window)
+
+        assert dialog_adjust_calls == [True]
+        assert main_adjust_calls == []
+        assert main_label.minimumWidth() >= main_label.sizeHint().width()
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+        main_window.close()
+        main_window.deleteLater()
+    app.processEvents()
+
+
+def test_maximized_roots_fit_child_text_without_resizing_root(monkeypatch):
+    sys.path.insert(0, str(ROOT / "src"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    dialog = QtWidgets.QDialog()
+    layout = QtWidgets.QVBoxLayout(dialog)
+    label = QtWidgets.QLabel("Maximized dialog text that still needs fitting")
+    layout.addWidget(label)
+    adjust_calls = []
+    monkeypatch.setattr(dialog, "isMaximized", lambda: True)
+    monkeypatch.setattr(dialog, "adjustSize", lambda: adjust_calls.append(True))
+
+    try:
+        qt_layout.fit_text_to_contents(dialog)
+
+        assert adjust_calls == []
+        assert label.minimumWidth() >= label.sizeHint().width()
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+    app.processEvents()
+
+
 def test_generated_ui_surfaces_do_not_cap_visible_text_widgets_below_contents():
     sys.path.insert(0, str(ROOT / "src"))
     sys.path.insert(0, str(ROOT / "src" / "forms"))

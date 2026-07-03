@@ -4,9 +4,9 @@ from PyQt5.QtWidgets import (
     QAbstractButton,
     QCheckBox,
     QComboBox,
+    QDialog,
     QGroupBox,
     QLabel,
-    QMainWindow,
     QToolButton,
     QRadioButton,
     QSizePolicy,
@@ -120,8 +120,6 @@ def fit_text_to_contents(
     """Prevent visible text-bearing widgets from being compressed below content."""
     if not _fit_root_is_available(root):
         return
-    if _window_state_blocks_content_fit(root):
-        return
 
     root_layout = root.layout()
     if root_layout is not None:
@@ -182,7 +180,7 @@ def _window_state_blocks_content_fit(root):
 
 
 def _root_allows_content_resize(root):
-    return not isinstance(root, QMainWindow)
+    return isinstance(root, QDialog) and not _window_state_blocks_content_fit(root)
 
 
 def _stable_root_size(root):
