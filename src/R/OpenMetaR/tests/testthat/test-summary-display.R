@@ -1,4 +1,4 @@
-summary_display_fixture <- function() {
+summary_display_fixture <- function(res.overrides = list()) {
   params <- list(
     conf.level = 95,
     digits = 3,
@@ -31,11 +31,14 @@ summary_display_fixture <- function() {
     QEp = 0.015,
     method = "DL"
   )
+  for (name in names(res.overrides)) {
+    res[[name]] <- res.overrides[[name]]
+  }
 
   OpenMetaR:::create.summary.disp(data, params, res, "Binary Random-Effects Model\n\nMetric: Odds Ratio")
 }
 
-subgroup_display_fixture <- function() {
+subgroup_display_fixture <- function(with.missing.values = FALSE) {
   params <- list(
     conf.level = 95,
     digits = 3,
@@ -67,8 +70,47 @@ subgroup_display_fixture <- function() {
       I2 = 41.2
     )
   )
+  if (with.missing.values) {
+    res[[2]]$QE <- NULL
+    res[[2]]$QEp <- NA_real_
+    res[[2]]$I2 <- NULL
+    res[[2]]$pval <- NA_real_
+    res[[2]]$zval <- NULL
+  }
 
   OpenMetaR:::create.subgroup.display(res, c("Early", "Late"), params, "Subgroup Analysis", "binary")
+}
+
+overall_display_fixture <- function() {
+  params <- list(
+    conf.level = 95,
+    digits = 3,
+    measure = "OR"
+  )
+  res <- list(
+    list(
+      b = -0.262,
+      ci.lb = -0.724,
+      ci.ub = 0.200,
+      se = 0.236,
+      pval = NULL
+    ),
+    list(
+      b = 0.125,
+      ci.lb = -0.100,
+      ci.ub = 0.350,
+      se = 0.115,
+      pval = 0.277
+    )
+  )
+
+  OpenMetaR:::create.overall.display(
+    res,
+    c("First study", "Second study"),
+    params,
+    "Cumulative Summary",
+    "binary"
+  )
 }
 
 first_line_after <- function(lines, label) {
@@ -108,8 +150,14 @@ test_that("summary display uses readable labels and aligned columns", {
   expect_false(grepl("I^2", text, fixed = TRUE))
   expect_match(text, "92.645%", fixed = TRUE)
   expect_false(grepl(" Results (log scale)", text, fixed = TRUE))
-  expect_match(text, "Calculation scale: log", fixed = TRUE)
-  expect_match(text, "Std. error: 0.236", fixed = TRUE)
+  expect_match(
+    text,
+    "Calculation scale: log - estimate: -0.262, lower: -0.724, upper: 0.200, std. error: 0.236",
+    fixed = TRUE
+  )
+  expect_false(grepl("Calculation scale: log; estimate", text, fixed = TRUE))
+  expect_false(grepl("; lower bound:", text, fixed = TRUE))
+  expect_false(grepl("Std. error: 0.236", text, fixed = TRUE))
 
   model.header <- first_line_after(rendered, " Model Results")
   model.values <- next_non_empty_line(rendered, model.header)
@@ -122,6 +170,23 @@ test_that("summary display uses readable labels and aligned columns", {
   expect_values_inside_header_columns(heterogeneity.header, heterogeneity.values, heterogeneity.labels)
 })
 
+test_that("summary display leaves unavailable statistics blank", {
+  display <- summary_display_fixture(list(
+    QE = NULL,
+    QEp = NA_real_,
+    I2 = NULL,
+    pval = NA_real_
+  ))
+
+  model <- display$arrays$arr1
+  heterogeneity <- display$arrays$arr2
+
+  expect_equal(unname(model[2, 4]), "")
+  expect_equal(unname(heterogeneity[2, 2]), "")
+  expect_equal(unname(heterogeneity[2, 3]), "")
+  expect_equal(unname(heterogeneity[2, 4]), "")
+})
+
 test_that("subgroup heterogeneity display uses readable I-squared labels", {
   rendered <- capture.output(print(subgroup_display_fixture()))
   text <- paste(rendered, collapse = "\n")
@@ -129,6 +194,26 @@ test_that("subgroup heterogeneity display uses readable I-squared labels", {
   expect_match(text, "I\u00b2", fixed = TRUE)
   expect_false(grepl("I^2", text, fixed = TRUE))
   expect_match(text, "92.645%", fixed = TRUE)
+})
+
+test_that("subgroup display leaves unavailable statistics blank", {
+  display <- subgroup_display_fixture(with.missing.values = TRUE)
+  model <- display$arrays$arr1
+  heterogeneity <- display$arrays$arr2
+
+  expect_equal(unname(model[3, 7]), "")
+  expect_equal(unname(model[3, 8]), "")
+  expect_equal(unname(heterogeneity[3, 2]), "")
+  expect_equal(unname(heterogeneity[3, 3]), "")
+  expect_equal(unname(heterogeneity[3, 4]), "")
+})
+
+test_that("overall display leaves unavailable p-values blank", {
+  display <- overall_display_fixture()
+  overall <- display$arrays$arr1
+
+  expect_equal(overall[2, 6], "")
+  expect_equal(overall[3, 6], "0.277")
 })
 
 test_that("meta-regression omnibus p-value uses small-p display convention", {
@@ -167,10 +252,26 @@ test_that("forest plot p-value labels use small-p display convention", {
   )
   expect_equal(
     OpenMetaR:::forest.plot.p.value.label(NULL, 3),
-    "NA"
+    ""
   )
   expect_equal(
-    OpenMetaR:::forest.plot.p.value.label(NULL, 3, missing.label = "P=NA"),
-    "P=NA"
+    OpenMetaR:::forest.plot.p.value.label(NA_real_, 3),
+    ""
+  )
+  expect_equal(
+    OpenMetaR:::forest.plot.heterogeneity.suffix("92.65%", "P=0.015"),
+    " (I\u00b2=92.65%, P=0.015)"
+  )
+  expect_equal(
+    OpenMetaR:::forest.plot.heterogeneity.suffix("92.65%", ""),
+    " (I\u00b2=92.65%)"
+  )
+  expect_equal(
+    OpenMetaR:::forest.plot.heterogeneity.suffix("", "P=0.015"),
+    " (P=0.015)"
+  )
+  expect_equal(
+    OpenMetaR:::forest.plot.heterogeneity.suffix("", ""),
+    ""
   )
 })

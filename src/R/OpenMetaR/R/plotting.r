@@ -17,18 +17,29 @@
 #   functions for creating plot data to pass to plot functions  #
 #################################################################
 
-forest.plot.p.value.label <- function(p.value, digits, missing.label="NA") {
-    if (is.null(p.value)) {
+forest.plot.p.value.label <- function(p.value, digits, missing.label="") {
+    if (display.value.is.missing(p.value)) {
         return(missing.label)
-    }
-    if (is.na(p.value)) {
-        return("P=NA")
     }
     formatted <- round.display(p.value, digits)
     if (p.value < 10^(-digits)) {
         return(paste("P", formatted, sep=""))
     }
     paste("P=", formatted, sep="")
+}
+
+forest.plot.heterogeneity.suffix <- function(I2, QEp) {
+    parts <- c()
+    if (!display.value.is.missing(I2) && nzchar(I2)) {
+        parts <- c(parts, paste("I\u00b2=", I2, sep=""))
+    }
+    if (!display.value.is.missing(QEp) && nzchar(QEp)) {
+        parts <- c(parts, QEp)
+    }
+    if (length(parts) == 0) {
+        return("")
+    }
+    paste(" (", paste(parts, collapse=", "), ")", sep="")
 }
 
 create.plot.data.generic <- function(om.data, params, res, selected.cov=NULL){
@@ -73,14 +84,14 @@ create.plot.data.generic <- function(om.data, params, res, selected.cov=NULL){
     } else {
       QE <- "NA"
     }
-    if (!is.null(res$I2)) {
-        I2 <- paste(round(res$I2, digits = 2), "%")
+    if (!display.value.is.missing(res$I2)) {
+        I2 <- paste(round(res$I2, digits = 2), "%", sep="")
     } else {
-        I2 <- "NA"
+        I2 <- ""
     }
     QEp <- forest.plot.p.value.label(res$QEp, params$digits)
     
-    overall <- paste("Overall (I\u00b2=", I2, " , ", QEp, ")", sep="")
+    overall <- paste("Overall", forest.plot.heterogeneity.suffix(I2, QEp), sep="")
     # append years to study names unless year equals 0 (0 is passed to R when year is empty).
     study.names <- om.data@study.names
     years <- om.data@years
@@ -429,14 +440,14 @@ create.subgroup.plot.data.generic <- function(subgroup.data, params, data.type, 
         } else {
             QE <- "NA"
         }
-        if (!is.null(cur.res$I2)) {
-            I2 <- paste(round(cur.res$I2, digits = 2), "%")
+        if (!display.value.is.missing(cur.res$I2)) {
+            I2 <- paste(round(cur.res$I2, digits = 2), "%", sep="")
         } else {
-            I2 <- "NA"
+            I2 <- ""
         }
-        QEp <- forest.plot.p.value.label(cur.res$QEp, params$digits, missing.label="P=NA")
+        QEp <- forest.plot.p.value.label(cur.res$QEp, params$digits)
     
-        overall <- paste(" (I\u00b2=", I2, " , ", QEp, ")", sep="")
+        overall <- forest.plot.heterogeneity.suffix(I2, QEp)
         types <- c(types, rep(0, length(grouped.data[[i]]@study.names)), 1)
         label.col <-c(label.col, grouped.data[[i]]@study.names, paste("Subgroup ", subgroup.list[i], overall, sep=""))
     } 
@@ -455,13 +466,13 @@ create.subgroup.plot.data.generic <- function(subgroup.data, params, data.type, 
     } else {
         QE <- "NA"
     }
-    if (!is.null(cur.res$I2)) {
-        I2 <- paste(round(cur.res$I2, digits = 2), "%")
+    if (!display.value.is.missing(cur.res$I2)) {
+        I2 <- paste(round(cur.res$I2, digits = 2), "%", sep="")
     } else {
-        I2 <- "NA"
+        I2 <- ""
     }
-    QEp <- forest.plot.p.value.label(cur.res$QEp, params$digits, missing.label="P=NA")
-    overall <- paste(" (I\u00b2=", I2, " , ", QEp, ")", sep="")
+    QEp <- forest.plot.p.value.label(cur.res$QEp, params$digits)
+    overall <- forest.plot.heterogeneity.suffix(I2, QEp)
     label.col <- c(as.character(params$fp_col1_str), label.col, paste("Overall", overall, sep=""))
     plot.options <- set.plot.options(params)
     if (params$fp_plot_lb == "[default]") {

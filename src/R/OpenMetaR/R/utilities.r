@@ -163,8 +163,36 @@ round.display <- function(x, digits) {
   x.disp
 }
 
+display.value.is.missing <- function(value) {
+  is.null(value) || length(value) == 0 || all(is.na(value))
+}
+
+format.numeric.display <- function(value, digits.str) {
+  if (display.value.is.missing(value)) {
+    return("")
+  }
+  sprintf(digits.str, value)
+}
+
+format.percent.display <- function(value, digits.str) {
+  if (display.value.is.missing(value)) {
+    return("")
+  }
+  paste(sprintf(digits.str, value), "%", sep="")
+}
+
+format.p.value.display <- function(value, digits) {
+  if (display.value.is.missing(value)) {
+    return("")
+  }
+  round.display(value, digits)
+}
+
 g.round.display.zval <- function(x, digits) {
   # just for use in # create.subgroup.display for rounding the (single) zvals
+  if (display.value.is.missing(x)) {
+    return("")
+  }
   digits.str <- paste("%.", digits, "f", sep="")
   x.disp <- c()
   
@@ -182,11 +210,9 @@ create.summary.disp <- function(om.data, params, res, model.title) {
   digits.str <- paste("%.", params$digits, "f", sep="")
   transform.name <- get.transform.name(om.data)
   scale.str <- get.scale(params)
-  tau2 <- sprintf(digits.str, res$tau2)
+  tau2 <- format.numeric.display(res$tau2, digits.str)
   degf <- res$k - 1
-  if (!is.null(res$I2)) {
-    I2 <- paste(sprintf(digits.str, res$I2), "%", sep="")
-  }
+  I2 <- format.percent.display(res$I2, digits.str)
   QLabel =  paste("Q(df=", degf, ")", sep="")
   # Set n, the vector of numbers of studies, for PFT metric.
   if (params$measure=="PFT" && length(om.data@g1O1) > 0 && length(om.data@g1O2) > 0) {
@@ -195,21 +221,9 @@ create.summary.disp <- function(om.data, params, res, model.title) {
   else {
     n <- NULL # don't need n except for PFT (freeman-tukey)
   }
-  if (!is.null(res$QE)) {
-    QE <- sprintf(digits.str, res$QE)
-  } else {
-    QE <- "NA"
-  }
-  if (!is.null(res$QEp)) {
-    QEp <- round.display(x=res$QEp, digits=params$digits)
-  } else {
-    QEp <- "NA"
-  }
-  if (!is.null(res$pval)) {
-    pVal <- round.display(res$pval, digits=params$digits)
-  } else {
-    pVal <- "NA"
-  }
+  QE <- format.numeric.display(res$QE, digits.str)
+  QEp <- format.p.value.display(res$QEp, params$digits)
+  pVal <- format.p.value.display(res$pval, params$digits)
 
   res.title <- " Model Results"
   #y.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(res$b, list(ni=n)))
@@ -240,12 +254,14 @@ create.summary.disp <- function(om.data, params, res, model.title) {
     estCalc <- sprintf(digits.str, res$b)
     lbCalc <- sprintf(digits.str, res$ci.lb)
     ubCalc <- sprintf(digits.str, res$ci.ub)
-    calc.note <- paste("Calculation scale: ", scale.str,
-                       "; estimate: ", estCalc,
-                       "; lower bound: ", lbCalc,
-                       "; upper bound: ", ubCalc,
-                       "; Std. error: ", se,
-                       sep="")
+    calc.note <- paste(
+      "Calculation scale: ", scale.str,
+      " - estimate: ", estCalc,
+      ", lower: ", lbCalc,
+      ", upper: ", ubCalc,
+      ", std. error: ", se,
+      sep=""
+    )
     arrays <- list(arr1=res.array, arr2=het.array)
     table.titles <- c(res.title, het.title)
     notes <- c(calc.note)
@@ -568,11 +584,7 @@ create.overall.display <- function(res, study.names, params, model.title, data.t
     ub.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(ub, n=NULL))
     se.disp <- sprintf(digits.str, se)
     
-    if (!is.null(res[[count]]$pval)) {
-      pVal <- round.display(res[[count]]$pval, digits=params$digits)
-    } else {
-      pVal <- "NA"
-    }
+    pVal <- format.p.value.display(res[[count]]$pval, params$digits)
     overall.array[count+1,] <- c(study.names[count], y.disp, lb.disp, ub.disp, se.disp, pVal)
   }
 
@@ -621,33 +633,17 @@ create.subgroup.display <- function(res, study.names, params, model.title, data.
     lb.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(lb, n))
     ub.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(ub, n))
     se.disp <- sprintf(digits.str, se)
-    if (!is.null(res[[count]]$QE)) {
+    if (!display.value.is.missing(res[[count]]$QE)) {
       degf <- res[[count]]$k - 1
       QE <- sprintf(digits.str, res[[count]]$QE)
       QE <- paste(QE, " (", degf,")", sep="")
     } else {
-      QE <- "NA"
+      QE <- ""
     }
-    if (!is.null(res[[count]]$I2)) {
-        I2 <- paste(sprintf(digits.str, res[[count]]$I2), "%", sep="")
-    } else {
-        I2 <- "NA"
-    }
-    if (!is.null(res[[count]]$QEp)) {
-      QEp <- round.display(x=res[[count]]$QEp, digits=params$digits)
-    } else {
-      QEp <- "NA"
-    }
-    if (!is.null(res[[count]]$pval)) {
-      pVal <- round.display(res[[count]]$pval, digits=params$digits)
-    } else {
-      pVal <- "NA"
-    }
-    if (!is.null(res[[count]]$zval)) {
-      zVal <- g.round.display.zval(res[[count]]$zval, digits=params$digits)
-    } else {
-      zVal <- "NA"
-    }
+    I2 <- format.percent.display(res[[count]]$I2, digits.str)
+    QEp <- format.p.value.display(res[[count]]$QEp, params$digits)
+    pVal <- format.p.value.display(res[[count]]$pval, params$digits)
+    zVal <- g.round.display.zval(res[[count]]$zval, digits=params$digits)
 
     # very hacky fix to issue where the function would die below. For some
     # reason when there is only a single study, the num.studies is NULL instead
