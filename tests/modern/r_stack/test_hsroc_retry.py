@@ -143,8 +143,8 @@ _HSROC_RETRY_DRIVER = textwrap.dedent(
     }
     clinical.summary <- result$Summary[["Clinical Accuracy Summary"]]
     expected.labels <- c(
-      "Pooled Sensitivity",
-      "Pooled Specificity",
+      "Predicted Sensitivity (new study)",
+      "Predicted Specificity (new study)",
       "Positive Likelihood Ratio",
       "Negative Likelihood Ratio",
       "Diagnostic Odds Ratio",
@@ -175,7 +175,7 @@ _HSROC_RETRY_DRIVER = textwrap.dedent(
 
     result <- run.case("bad-summary")
     clinical.summary <- result$Summary[["Clinical Accuracy Summary"]]
-    specificity.line <- grep("Pooled Specificity", strsplit(clinical.summary, "\n", fixed=TRUE)[[1]], value=TRUE)
+    specificity.line <- grep("Predicted Specificity (new study)", strsplit(clinical.summary, "\n", fixed=TRUE)[[1]], value=TRUE, fixed=TRUE)
     if (length(specificity.line) != 1 || !grepl("0.200", specificity.line, fixed=TRUE)) {
       stop("diagnostic.hsroc did not repair the known HSROC Specificity (new) HPD.high summary bug")
     }
@@ -338,6 +338,107 @@ _HSROC_HEADER_DRIVER = textwrap.dedent(
 ).replace("__REPO_ROOT__", repr(REPO_ROOT).replace("\\", "/"))
 
 
+_HSROC_CLINICAL_SUMMARY_DRIVER = textwrap.dedent(
+    r"""
+    repo <- normalizePath(__REPO_ROOT__, winslash = "/")
+    suppressPackageStartupMessages(source(file.path(repo, "src/R/OpenMetaR/R/classes.r")))
+    suppressPackageStartupMessages(source(file.path(repo, "src/R/OpenMetaR/R/utilities.r")))
+    suppressPackageStartupMessages(source(file.path(repo, "src/R/OpenMetaR/R/diagnostic_methods.r")))
+
+    between.study <- matrix(
+      c(
+        0.148, 1.368, 0.293, 0.650, 0.287, 0.677, 0.830, 0.698, 0.793,
+       -0.086, 0.964, -0.177, 0.354, 0.126, 0.584, 0.755, 0.378, 0.522,
+        0.388, 1.763, 0.746, 1.060, 0.486, 0.767, 0.898, 1.000, 1.000
+      ),
+      nrow=9
+    )
+    rownames(between.study) <- c(
+      "THETA", "LAMBDA", "beta", "sigma.alpha", "sigma.theta",
+      "S Overall", "C Overall", "S1_new", "C1_new"
+    )
+    colnames(between.study) <- c("Median estimate", "HPD.low", "HPD.high")
+
+    within.study <- array(
+      1:18,
+      dim=c(2, 3, 3),
+      dimnames=list(
+        c("Study 1", "Study 2"),
+        c("Median estimate", "HPD lower", "HPD upper"),
+        c("theta", "alpha", "pi")
+      )
+    )
+
+    diagnostic.data <- new(
+      "DiagnosticData",
+      TP=c(19, 8),
+      FN=c(10, 2),
+      TN=c(81, 13),
+      FP=c(1, 9),
+      study.names=c("Lecart Lenfant", "Piver Barlow")
+    )
+
+    summary <- hsroc.display.summary(
+      list(
+        `Between-study parameters`=between.study,
+        `Within-study parameters`=within.study
+      ),
+      list(digits=3),
+      character(),
+      diagnostic.data
+    )
+
+    if (!"Clinical Accuracy Summary" %in% names(summary)) {
+      stop("clinical accuracy summary is missing")
+    }
+    clinical.summary <- summary[["Clinical Accuracy Summary"]]
+    expected.labels <- c(
+      "Summary Sensitivity",
+      "Summary Specificity",
+      "Predicted Sensitivity (new study)",
+      "Predicted Specificity (new study)",
+      "Positive Likelihood Ratio",
+      "Negative Likelihood Ratio",
+      "Diagnostic Odds Ratio"
+    )
+    missing.labels <- expected.labels[!vapply(expected.labels, grepl, logical(1), clinical.summary, fixed=TRUE)]
+    if (length(missing.labels) > 0) {
+      stop(paste("clinical summary is missing:", paste(missing.labels, collapse=", ")))
+    }
+    leaked.labels <- c("S Overall", "C Overall", "S1_new", "C1_new")
+    leaked <- leaked.labels[vapply(leaked.labels, grepl, logical(1), clinical.summary, fixed=TRUE)]
+    if (length(leaked) > 0) {
+      stop(paste("clinical summary leaked raw row labels:", paste(leaked, collapse=", ")))
+    }
+
+    if (!"HSROC Model Parameters" %in% names(summary)) {
+      stop("model parameter summary is missing")
+    }
+    model.summary <- summary[["HSROC Model Parameters"]]
+    expected.model.labels <- c(
+      "Accuracy parameter",
+      "Threshold parameter",
+      "Shape parameter",
+      "Between-study accuracy SD",
+      "Between-study threshold SD",
+      "Higher values increase diagnostic accuracy",
+      "Higher values reflect a stricter positivity threshold"
+    )
+    missing.model.labels <- expected.model.labels[!vapply(expected.model.labels, grepl, logical(1), model.summary, fixed=TRUE)]
+    if (length(missing.model.labels) > 0) {
+      stop(paste("model summary is missing:", paste(missing.model.labels, collapse=", ")))
+    }
+
+    within.names <- dimnames(summary[["Within-study parameters"]])[[1]]
+    if (!identical(within.names, c("Lecart Lenfant", "Piver Barlow"))) {
+      stop(paste("within-study row names were not replaced:", paste(within.names, collapse=", ")))
+    }
+
+    cat("OK\n")
+    """
+).replace("__REPO_ROOT__", repr(REPO_ROOT).replace("\\", "/"))
+
+
 def test_hsroc_retries_failed_chain_once_in_clean_directory():
     rscript = shutil.which("Rscript")
     if not rscript:
@@ -397,6 +498,28 @@ def test_hsroc_fallback_summary_uses_canonical_hpd_interval_headers():
         [rscript, "-"],
         cwd=REPO_ROOT,
         input=_HSROC_HEADER_DRIVER,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
+    )
+
+    assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
+        result.returncode,
+        result.stdout[-2000:],
+        result.stderr[-2000:],
+    )
+    assert "OK" in result.stdout
+
+
+def test_hsroc_summary_uses_clinical_labels_and_study_names():
+    rscript = shutil.which("Rscript")
+    if not rscript:
+        pytest.skip("Rscript executable not found")
+
+    result = subprocess.run(
+        [rscript, "-"],
+        cwd=REPO_ROOT,
+        input=_HSROC_CLINICAL_SUMMARY_DRIVER,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         universal_newlines=True,

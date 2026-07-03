@@ -1350,6 +1350,32 @@ hsroc.summary.table.text <- function(rows, digits) {
     paste(capture.output(print(formatted, row.names=FALSE, right=FALSE)), collapse="\n")
 }
 
+hsroc.model.parameter.label <- function(parameter.name) {
+    labels <- list(
+        "THETA"=c("Accuracy parameter", "Higher values increase diagnostic accuracy."),
+        "LAMBDA"=c("Threshold parameter", "Higher values reflect a stricter positivity threshold."),
+        "beta"=c("Shape parameter", "Controls HSROC curve asymmetry or covariate effects."),
+        "sigma.alpha"=c("Between-study accuracy SD", "Between-study variation in diagnostic accuracy."),
+        "sigma.theta"=c("Between-study threshold SD", "Between-study variation in positivity threshold.")
+    )
+    if (parameter.name %in% names(labels)) {
+        return(labels[[parameter.name]])
+    }
+    c(as.character(parameter.name), "HSROC model parameter.")
+}
+
+hsroc.model.parameter.table.text <- function(rows, descriptions, digits) {
+    formatted <- data.frame(
+        Parameter=names(rows),
+        Description=descriptions,
+        Estimate=vapply(rows, function(row) hsroc.format.summary.number(row[["estimate"]], digits), character(1)),
+        `Lower bound`=vapply(rows, function(row) hsroc.format.summary.number(row[["lower"]], digits), character(1)),
+        `Upper bound`=vapply(rows, function(row) hsroc.format.summary.number(row[["upper"]], digits), character(1)),
+        check.names=FALSE
+    )
+    paste(capture.output(print(formatted, row.names=FALSE, right=FALSE)), collapse="\n")
+}
+
 hsroc.model.parameter.summary <- function(between.study, clinical.rows, digits) {
     if (is.null(dim(between.study)) || is.null(rownames(between.study))) {
         return(NULL)
@@ -1372,14 +1398,42 @@ hsroc.model.parameter.summary <- function(between.study, clinical.rows, digits) 
                 c("estimate", "lower", "upper")
             )
         })
-        names(rows) <- rownames(model.parameters)
-        return(hsroc.summary.table.text(rows, digits))
+        parameter.labels <- lapply(rownames(model.parameters), hsroc.model.parameter.label)
+        names(rows) <- vapply(parameter.labels, function(label) label[[1]], character(1))
+        descriptions <- vapply(parameter.labels, function(label) label[[2]], character(1))
+        return(hsroc.model.parameter.table.text(rows, descriptions, digits))
     }
 
     paste(capture.output(print(model.parameters)), collapse="\n")
 }
 
-hsroc.display.summary <- function(hsroc.sum, params, chain.out.dirs) {
+hsroc.add.study.names.to.within.study.summary <- function(hsroc.sum, diagnostic.data=NULL) {
+    if (is.null(diagnostic.data) || !"Within-study parameters" %in% names(hsroc.sum)) {
+        return(hsroc.sum)
+    }
+    study.names <- diagnostic.data@study.names
+    if (length(study.names) == 0) {
+        return(hsroc.sum)
+    }
+
+    within.study <- hsroc.sum[["Within-study parameters"]]
+    dimensions <- dim(within.study)
+    if (is.null(dimensions) || length(dimensions) < 1 || dimensions[[1]] != length(study.names)) {
+        return(hsroc.sum)
+    }
+
+    within.dimnames <- dimnames(within.study)
+    if (is.null(within.dimnames)) {
+        within.dimnames <- vector("list", length(dimensions))
+    }
+    within.dimnames[[1]] <- study.names
+    dimnames(within.study) <- within.dimnames
+    hsroc.sum[["Within-study parameters"]] <- within.study
+    hsroc.sum
+}
+
+hsroc.display.summary <- function(hsroc.sum, params, chain.out.dirs, diagnostic.data=NULL) {
+    hsroc.sum <- hsroc.add.study.names.to.within.study.summary(hsroc.sum, diagnostic.data)
     raw.summary.names <- intersect(c("Between-study parameters", "Within-study parameters", "Reference standard"), names(hsroc.sum))
     fallback.summary <- hsroc.normalize.summary.headers(hsroc.sum[raw.summary.names])
     if (!"Between-study parameters" %in% names(hsroc.sum)) {
@@ -1391,37 +1445,57 @@ hsroc.display.summary <- function(hsroc.sum, params, chain.out.dirs) {
         return(fallback.summary)
     }
 
-    sensitivity.rows <- c("S Overall", "Sensitivity Overall", "Sensitivity (overall)", "Sensitivity (new)", "S1_new")
-    specificity.rows <- c("C Overall", "Specificity Overall", "Specificity (overall)", "Specificity (new)", "C1_new")
-    sensitivity <- hsroc.summary.values(between.study, sensitivity.rows)
-    specificity <- hsroc.summary.values(between.study, specificity.rows)
-    if (is.null(sensitivity) || is.null(specificity)) {
-        return(fallback.summary)
-    }
-
     digits <- params$digits
     if (is.null(digits) || is.na(digits)) {
         digits <- 3
     }
-    derived <- hsroc.derived.accuracy.rows(sensitivity, specificity, chain.out.dirs, params)
+
+    summary.sensitivity.rows <- c("S Overall", "Sensitivity Overall", "Sensitivity (overall)")
+    summary.specificity.rows <- c("C Overall", "Specificity Overall", "Specificity (overall)")
+    predicted.sensitivity.rows <- c("S1_new", "Sensitivity (new)")
+    predicted.specificity.rows <- c("C1_new", "Specificity (new)")
+    summary.sensitivity <- hsroc.summary.values(between.study, summary.sensitivity.rows)
+    summary.specificity <- hsroc.summary.values(between.study, summary.specificity.rows)
+    predicted.sensitivity <- hsroc.summary.values(between.study, predicted.sensitivity.rows)
+    predicted.specificity <- hsroc.summary.values(between.study, predicted.specificity.rows)
+
+    accuracy.sensitivity <- summary.sensitivity
+    accuracy.specificity <- summary.specificity
+    if (is.null(accuracy.sensitivity) || is.null(accuracy.specificity)) {
+        accuracy.sensitivity <- predicted.sensitivity
+        accuracy.specificity <- predicted.specificity
+    }
+    if (is.null(accuracy.sensitivity) || is.null(accuracy.specificity)) {
+        return(fallback.summary)
+    }
+
+    derived <- hsroc.derived.accuracy.rows(accuracy.sensitivity, accuracy.specificity, chain.out.dirs, params)
     summary.rows <- list(
-        "Pooled Sensitivity"=sensitivity,
-        "Pooled Specificity"=specificity,
+        "Summary Sensitivity"=summary.sensitivity,
+        "Summary Specificity"=summary.specificity,
+        "Predicted Sensitivity (new study)"=predicted.sensitivity,
+        "Predicted Specificity (new study)"=predicted.specificity,
         "Positive Likelihood Ratio"=derived$plr,
         "Negative Likelihood Ratio"=derived$nlr,
         "Diagnostic Odds Ratio"=derived$dor,
-        "Summary ROC point (Sensitivity)"=sensitivity,
-        "Summary ROC point (Specificity)"=specificity
+        "Summary ROC point (Sensitivity)"=accuracy.sensitivity,
+        "Summary ROC point (Specificity)"=accuracy.specificity
     )
+    summary.rows <- summary.rows[!vapply(summary.rows, is.null, logical(1))]
 
     summary <- list("Clinical Accuracy Summary"=hsroc.summary.table.text(summary.rows, digits))
     clinical.row.indexes <- c(
-        hsroc.summary.row(between.study, sensitivity.rows),
-        hsroc.summary.row(between.study, specificity.rows)
+        hsroc.summary.row(between.study, summary.sensitivity.rows),
+        hsroc.summary.row(between.study, summary.specificity.rows),
+        hsroc.summary.row(between.study, predicted.sensitivity.rows),
+        hsroc.summary.row(between.study, predicted.specificity.rows)
     )
     model.summary <- hsroc.model.parameter.summary(between.study, clinical.row.indexes, digits)
     if (!is.null(model.summary)) {
         summary[["HSROC Model Parameters"]] <- model.summary
+    }
+    for (summary.name in setdiff(names(fallback.summary), "Between-study parameters")) {
+        summary[[summary.name]] <- fallback.summary[[summary.name]]
     }
     summary
 }
@@ -1492,7 +1566,7 @@ diagnostic.hsroc <- function(diagnostic.data, params){
     if (length(missing.summary.names) > 0) {
         stop(paste("HSROC summary did not contain expected section(s):", paste(missing.summary.names, collapse=", ")))
     }
-    summary <- hsroc.display.summary(hsroc.sum, params, chain.out.dirs)
+    summary <- hsroc.display.summary(hsroc.sum, params, chain.out.dirs, diagnostic.data)
 
     ####
     # and the images
