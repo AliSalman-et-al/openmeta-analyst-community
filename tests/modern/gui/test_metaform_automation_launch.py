@@ -1758,7 +1758,7 @@ def test_results_window_renders_summary_text_and_plot_navigation(tmp_path):
             for index in range(window.nav_tree.topLevelItemCount())
         ]
 
-        assert nav_titles == ["Summary", "Forest Plot"]
+        assert nav_titles == ["Meta-Analysis Summary", "Forest Plot"]
         assert "forest_plot" in window.psuedo_console.toPlainText()
         assert any(
             isinstance(item, results_window.QGraphicsTextItem)
@@ -1813,7 +1813,7 @@ def test_results_window_places_references_after_images_and_wraps_them(tmp_path):
             window.nav_tree.topLevelItem(index).text(0)
             for index in range(window.nav_tree.topLevelItemCount())
         ]
-        assert nav_titles == ["Summary", "Forest Plot", "References"]
+        assert nav_titles == ["Meta-Analysis Summary", "Forest Plot", "References"]
 
         sections = {
             item.toPlainText(): item
@@ -1899,13 +1899,85 @@ def test_results_window_ignores_missing_image_order_entries():
             for index in range(window.nav_tree.topLevelItemCount())
         ]
 
-        assert nav_titles == ["Summary"]
+        assert nav_titles == ["Meta-Analysis Summary"]
         assert not any(
             isinstance(item, results_window.QGraphicsPixmapItem)
             for item in window.scene.items()
         )
     finally:
         window.close()
+        app.processEvents()
+
+
+def test_results_window_uses_reader_oriented_section_names_and_order(tmp_path):
+    import launch
+    import modern_compat
+
+    modern_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    plot_paths = {}
+    for name in ["forest", "roc", "density", "trace"]:
+        plot_path = tmp_path / ("%s.png" % name)
+        image = results_window.QImage(80, 40, results_window.QImage.Format_RGB32)
+        image.fill(results_window.Qt.white)
+        assert image.save(str(plot_path), "PNG")
+        plot_paths[name] = str(plot_path)
+
+    standard_window = results_window.ResultsWindow(
+        {
+            "texts": {
+                "Weights": "Study weights",
+                "Summary": "Binary Random-Effects Model",
+            },
+            "images": {"Forest Plot": plot_paths["forest"]},
+            "image_order": ["Forest Plot"],
+        }
+    )
+    try:
+        nav_titles = [
+            standard_window.nav_tree.topLevelItem(index).text(0)
+            for index in range(standard_window.nav_tree.topLevelItemCount())
+        ]
+
+        assert nav_titles == ["Meta-Analysis Summary", "Forest Plot", "Weights"]
+        assert standard_window.nav_tree.minimumWidth() >= 250
+    finally:
+        standard_window.close()
+        app.processEvents()
+
+    hsroc_window = results_window.ResultsWindow(
+        {
+            "texts": {
+                "Within-study parameters - theta": "theta",
+                "Between-study parameters": "between",
+                "Clinical Accuracy Summary": "clinical",
+            },
+            "images": {
+                "Density plots": plot_paths["density"],
+                "Trace plots": plot_paths["trace"],
+                "Summary ROC": plot_paths["roc"],
+            },
+            "image_order": ["Summary ROC", "Density plots", "Trace plots"],
+        }
+    )
+    try:
+        nav_titles = [
+            hsroc_window.nav_tree.topLevelItem(index).text(0)
+            for index in range(hsroc_window.nav_tree.topLevelItemCount())
+        ]
+
+        assert nav_titles == [
+            "Clinical Accuracy Summary",
+            "Summary ROC",
+            "HSROC Model Parameters",
+            "Study-Level Threshold Parameters",
+            "Density Plots",
+            "Trace Plots",
+        ]
+    finally:
+        hsroc_window.close()
         app.processEvents()
 
 

@@ -353,7 +353,7 @@ try {
         "--noconfirm",
         "--windowed",
         "--name", "OpenMetaAnalyst",
-        "--icon", "images\OMA_community.ico",
+        "--icon", "images\openmeta-app-icon.ico",
         "--distpath", $distRoot,
         "--workpath", $workRoot,
         "--paths", "forms",

@@ -10,9 +10,9 @@ from PyQt5 import QtCore, QtGui
 
 ROOT = Path(__file__).resolve().parents[1]
 IMAGE_DIR = ROOT / "src" / "images"
-SOURCE_IMAGE = IMAGE_DIR / "OMA_community_transparent.png"
-PNG_TARGET = IMAGE_DIR / "OMA_community.png"
-ICO_TARGET = IMAGE_DIR / "OMA_community.ico"
+SOURCE_IMAGE = IMAGE_DIR / "openmeta-app-icon-source-whitefill.png"
+PNG_TARGET = IMAGE_DIR / "openmeta-app-icon.png"
+ICO_TARGET = IMAGE_DIR / "openmeta-app-icon.ico"
 MASTER_SIZE = 1024
 MASTER_MARGIN = 32
 ICO_SIZES = (16, 24, 32, 48, 64, 128, 256)
