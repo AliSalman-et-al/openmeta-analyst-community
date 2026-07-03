@@ -3,13 +3,13 @@ import re
 
 _KNOWN_METHOD_LABELS = {
     "binary.fixed.inv.var": "Binary Fixed-Effect Inverse Variance",
-    "binary.fixed.mh": "Binary Fixed-Effect Mantel Haenszel",
+    "binary.fixed.mh": "Binary Fixed-Effect Mantel-Haenszel",
     "binary.fixed.peto": "Binary Fixed-Effect Peto",
     "binary.random": "Binary Random-Effects",
     "continuous.fixed": "Continuous Fixed-Effect Inverse Variance",
     "continuous.random": "Continuous Random-Effects",
     "diagnostic.fixed.inv.var": "Diagnostic Fixed-Effect Inverse Variance",
-    "diagnostic.fixed.mh": "Diagnostic Fixed-Effect Mantel Haenszel",
+    "diagnostic.fixed.mh": "Diagnostic Fixed-Effect Mantel-Haenszel",
     "diagnostic.fixed.peto": "Diagnostic Fixed-Effect Peto",
     "diagnostic.random": "Diagnostic Random-Effects",
     "diagnostic.hsroc": "HSROC",
@@ -26,7 +26,7 @@ _TOKEN_LABELS = {
     "random": "Random-Effects",
     "inv": "Inverse",
     "var": "Variance",
-    "mh": "Mantel Haenszel",
+    "mh": "Mantel-Haenszel",
     "peto": "Peto",
     "hsroc": "HSROC",
     "bivariate": "Bivariate",
@@ -34,6 +34,10 @@ _TOKEN_LABELS = {
     "meta": "Meta",
     "regression": "Regression",
 }
+
+_CANONICAL_LABEL_REPLACEMENTS = (
+    ("Mantel Haenszel", "Mantel-Haenszel"),
+)
 
 _KNOWN_PARAMETER_VALUE_LABELS = {
     ("rm.method", "HE"): "Hedges",
@@ -54,8 +58,17 @@ def method_display_label(method_key_or_label):
     if text in _KNOWN_METHOD_LABELS:
         return _KNOWN_METHOD_LABELS[text]
     if not _RAW_METHOD_KEY_RE.match(text):
-        return text
-    return " ".join(_TOKEN_LABELS.get(token, token.title()) for token in text.split("."))
+        return _canonicalize_label(text)
+    return _canonicalize_label(
+        " ".join(_TOKEN_LABELS.get(token, token.title()) for token in text.split("."))
+    )
+
+
+def _canonicalize_label(label):
+    text = str(label)
+    for old, new in _CANONICAL_LABEL_REPLACEMENTS:
+        text = text.replace(old, new)
+    return text
 
 
 def normalize_available_method_labels(methods_by_label):

@@ -35,17 +35,31 @@ def test_known_analysis_method_keys_have_user_facing_labels():
         assert "." not in label
 
 
+def test_method_labels_use_canonical_statistical_names():
+    assert method_display_label("binary.fixed.mh") == (
+        "Binary Fixed-Effect Mantel-Haenszel"
+    )
+    assert method_display_label("diagnostic.fixed.mh") == (
+        "Diagnostic Fixed-Effect Mantel-Haenszel"
+    )
+    assert method_display_label("Binary Fixed-Effect Mantel Haenszel") == (
+        "Binary Fixed-Effect Mantel-Haenszel"
+    )
+
+
 def test_available_method_labels_are_normalized_without_changing_method_keys():
     methods = {
         "binary.random": "binary.random",
         "Continuous Random-Effects": "continuous.random",
         "diagnostic.bivariate.ml": "diagnostic.bivariate.ml",
+        "Binary Fixed-Effect Mantel Haenszel": "binary.fixed.mh",
     }
 
     assert normalize_available_method_labels(methods) == {
         "Binary Random-Effects": "binary.random",
         "Continuous Random-Effects": "continuous.random",
         "Bivariate (Maximum Likelihood)": "diagnostic.bivariate.ml",
+        "Binary Fixed-Effect Mantel-Haenszel": "binary.fixed.mh",
     }
 
 

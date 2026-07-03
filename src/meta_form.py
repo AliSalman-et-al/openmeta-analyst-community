@@ -1546,7 +1546,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         choice = QMessageBox.warning(
             self,
             "Warning",
-            "you've made unsaved changes to your data. Do you want to save your changes?",
+            "You've made unsaved changes to your data. Do you want to save your changes?",
             QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
         )
         return choice

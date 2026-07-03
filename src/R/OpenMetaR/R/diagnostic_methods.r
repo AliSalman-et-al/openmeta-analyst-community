@@ -535,7 +535,7 @@ diagnostic.fixed.mh <- function(diagnostic.data, params){
         #                        
         # Create list to display summary of results
         #
-        model.title <- "Diagnostic Fixed-Effect Model - Mantel Haenszel"
+        model.title <- "Diagnostic Fixed-Effect Model - Mantel-Haenszel"
         summary.disp <- create.summary.disp(diagnostic.data, params, res, model.title)
         pretty.names <- diagnostic.fixed.mh.pretty.names()
         pretty.metric <- eval(parse(text=paste("pretty.names$measure$", params$measure,sep="")))
@@ -603,8 +603,8 @@ diagnostic.fixed.mh.parameters <- function(){
 }
 
 diagnostic.fixed.mh.pretty.names <- function() {
-    pretty.names <- list("pretty.name"="Diagnostic Fixed-Effect Mantel Haenszel", 
-                         "description" = "Performs fixed-effect meta-analysis using the Mantel Haenszel method.",
+    pretty.names <- list("pretty.name"="Diagnostic Fixed-Effect Mantel-Haenszel", 
+                         "description" = "Performs fixed-effect meta-analysis using the Mantel-Haenszel method.",
                          "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"), 
                          "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
                          "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),

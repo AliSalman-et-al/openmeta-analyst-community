@@ -326,7 +326,7 @@ binary.fixed.mh <- function(binary.data, params){
         }
         # Create forest plot and list to display summary of results
         metric.name <- pretty.metric.name(as.character(params$measure))
-        model.title <- paste("Binary Fixed-Effect Model - Mantel Haenszel\n\nMetric: ", metric.name, sep="")
+        model.title <- paste("Binary Fixed-Effect Model - Mantel-Haenszel\n\nMetric: ", metric.name, sep="")
         # Create results display tables
         summary.disp <- create.summary.disp(binary.data, params, res, model.title)
         forest.path <- paste(params$fp_outpath, sep="")
@@ -417,8 +417,8 @@ binary.fixed.mh.parameters <- function(){
 }
 
 binary.fixed.mh.pretty.names <- function() {
-    pretty.names <- list("pretty.name"="Binary Fixed-Effect Mantel Haenszel", 
-                         "description" = "Performs fixed-effect meta-analysis using the Mantel Haenszel method.",
+    pretty.names <- list("pretty.name"="Binary Fixed-Effect Mantel-Haenszel", 
+                         "description" = "Performs fixed-effect meta-analysis using the Mantel-Haenszel method.",
                          "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"), 
                          "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
                          "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),

@@ -1219,14 +1219,14 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
         assert stable_minimum_width >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
 
         long_method_index = specs.method_cbo_box.findText(
-            "Binary Fixed-Effect Mantel Haenszel"
+            "Binary Fixed-Effect Mantel-Haenszel"
         )
         assert long_method_index >= 0
         specs.method_cbo_box.setCurrentIndex(long_method_index)
         app.processEvents()
         assert (
             specs.parameter_grp_box.title()
-            == "Binary Fixed-Effect Mantel Haenszel"
+            == "Binary Fixed-Effect Mantel-Haenszel"
         )
         assert specs.parameter_grp_box.title() != "binary.fixed.mh"
         short_method_index = specs.method_cbo_box.findText("Binary Random-Effects")

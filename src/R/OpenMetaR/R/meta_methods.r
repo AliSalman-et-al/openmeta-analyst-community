@@ -76,7 +76,7 @@ cum.ma.binary <- function(fname, binary.data, params){
     metric.name <- pretty.metric.name(as.character(params.tmp$measure))
 	model.title <- switch(fname,
                           binary.fixed.inv.var=paste("Binary Fixed-Effect Model - Inverse Variance\n\nMetric: ", metric.name, sep=""),
-                          binary.fixed.mh=paste("Binary Fixed-Effect Model - Mantel Haenszel\n\nMetric: ", metric.name, sep=""),
+                          binary.fixed.mh=paste("Binary Fixed-Effect Model - Mantel-Haenszel\n\nMetric: ", metric.name, sep=""),
                           binary.fixed.peto=paste("Binary Fixed-Effect Model - Peto\n\nMetric: ", metric.name, sep=""),
                           binary.random=paste("Binary Random-Effects Model\n\nMetric: ", metric.name, sep=""))
 	value.info <- switch(fname,
@@ -567,7 +567,7 @@ loo.ma.binary <- function(fname, binary.data, params){
     metric.name <- pretty.metric.name(as.character(params$measure))
 	model.title <- switch(fname,
 			binary.fixed.inv.var = paste("Binary Fixed-Effect Model - Inverse Variance\n\nMetric: ", metric.name, sep=""),
-			binary.fixed.mh = paste("Binary Fixed-Effect Model - Mantel Haenszel\n\nMetric: ", metric.name, sep=""),
+			binary.fixed.mh = paste("Binary Fixed-Effect Model - Mantel-Haenszel\n\nMetric: ", metric.name, sep=""),
 			binary.fixed.peto = paste("Binary Fixed-Effect Model - Peto\n\nMetric: ", metric.name, sep=""),
 			binary.random = paste("Binary Random-Effects Model\n\nMetric: ", metric.name, sep=""))
 	value.info <- switch(fname,
@@ -792,7 +792,7 @@ cum.ma.diagnostic <- function(fname, diagnostic.data, params){
 	model.title <- switch(fname,
                           diagnostic.bivariate.ml  = paste("Diagnostic Bivariate - Maximum Likelihood\n\nMetric: ", metric.name, sep=""),
                           diagnostic.fixed.inv.var = paste("Diagnostic Fixed-Effect Inverse Variance\n\nMetric: ", metric.name, sep=""),
-                          diagnostic.fixed.mh      = paste("Diagnostic Fixed-Effect Mantel Haenszel\n\nMetric: ", metric.name, sep=""),
+                          diagnostic.fixed.mh      = paste("Diagnostic Fixed-Effect Mantel-Haenszel\n\nMetric: ", metric.name, sep=""),
                           diagnostic.fixed.peto    = paste("Diagnostic Fixed-Effect Peto\n\nMetric: ", metric.name, sep=""),
                           diagnostic.hsroc         = paste("Diagnostic HSROC\n\nMetric: ", metric.name, sep=""),
                           diagnostic.random        = paste("Diagnostic Random-Effects\n\nMetric: ", metric.name, sep=""))
@@ -1043,7 +1043,7 @@ subgroup.ma.binary <- function(fname, binary.data, params){
     metric.name <- pretty.metric.name(as.character(params$measure))
 	model.title <- switch(fname,
 		binary.fixed.inv.var = paste("Binary Fixed-Effect Model - Inverse Variance\n\nMetric: ", metric.name, sep=""),
-		binary.fixed.mh = paste("Binary Fixed-Effect Model - Mantel Haenszel\n\nMetric: ", metric.name, sep=""),
+		binary.fixed.mh = paste("Binary Fixed-Effect Model - Mantel-Haenszel\n\nMetric: ", metric.name, sep=""),
 		binary.fixed.peto = paste("Binary Fixed-Effect Model - Peto\n\nMetric: ", metric.name, sep=""),
 		binary.random = paste("Binary Random-Effects Model\n\nMetric: ", metric.name, sep=""))
 	value.info <- switch(fname,
