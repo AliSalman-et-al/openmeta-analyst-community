@@ -202,10 +202,15 @@ def test_openmeta_logo_resource_is_valid_and_used_consistently():
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     app_icon = QtGui.QIcon(":/misc/meta.ico")
     logo_pixmap = QtGui.QPixmap(":/misc/meta.png")
+    expected_icon_sizes = [16, 24, 32, 48, 64, 128, 256]
 
     assert app_icon.isNull() is False
     assert logo_pixmap.isNull() is False
-    assert logo_pixmap.width() != logo_pixmap.height()
+    assert logo_pixmap.width() == logo_pixmap.height()
+    assert logo_pixmap.width() >= max(expected_icon_sizes)
+    assert sorted((size.width(), size.height()) for size in app_icon.availableSizes()) == [
+        (size, size) for size in expected_icon_sizes
+    ]
 
     checked_paths = [
         Path("src", "meta.ui"),
