@@ -9,6 +9,48 @@
 ####################################
 
 
+openmetar.summary.label <- function(value) {
+  normalized <- trimws(as.character(value))
+  compact <- tolower(gsub("[._-]+", " ", normalized))
+  compact <- gsub("\\s+", " ", compact)
+  compact <- trimws(compact)
+
+  if (compact == "p value") {
+    return("p-value")
+  }
+  if (compact == "het p value") {
+    return("Het. p-value")
+  }
+  if (compact == "omnibus p value") {
+    return("Omnibus p-value")
+  }
+  if (compact == "z value") {
+    return("z-value")
+  }
+  normalized
+}
+
+openmetar.summary.cell.is.numeric <- function(value) {
+  normalized <- trimws(as.character(value))
+  if (normalized == "") {
+    return(TRUE)
+  }
+  normalized <- gsub("%$", "", normalized)
+  normalized <- trimws(gsub("^[<>]\\s*", "", normalized))
+  grepl("^-?\\d+(\\.\\d+)?$", normalized)
+}
+
+openmetar.summary.column.justification <- function(table.data, col.index) {
+  if (col.index == 1) {
+    return("left")
+  }
+  values <- as.character(table.data[-1, col.index])
+  if (length(values) > 0 && all(vapply(values, openmetar.summary.cell.is.numeric, logical(1)))) {
+    return("right")
+  }
+  "left"
+}
+
 print.summary.display <- function(x, ...) {
   summary.disp <- x
   #
@@ -21,24 +63,35 @@ print.summary.display <- function(x, ...) {
   #   which are pretty-printed by print.summary.data 
   #
   cat(summary.disp$model.title)
-  cat("\n\n")
   arrays <- summary.disp$arrays
   count = 1
+  printed.block <- FALSE
   for (name in arrays) {
     if (!is.na(summary.disp$table.titles[count])) {
-      cat(summary.disp$table.titles[count])
+      if (printed.block) {
+        cat("\n")
+      } else {
+        cat("\n\n")
+      }
+      cat(openmetar.summary.label(summary.disp$table.titles[count]))
       cat("\n")
       print.summary.data(name)
-      cat("\n")
+      printed.block <- TRUE
     }
     count = count + 1
    }
   if (!is.null(summary.disp$notes)) {
     for (note in summary.disp$notes) {
+      if (printed.block) {
+        cat("\n")
+      } else {
+        cat("\n\n")
+      }
       cat(note)
-      cat("\n\n")
+      printed.block <- TRUE
     }
   }
+  cat("\n")
 }
 
 print.summary.data <- function(x, ...) {
@@ -48,21 +101,20 @@ print.summary.data <- function(x, ...) {
   num.cols <- length(table.data[1,])
   col.spacing <- "  "
   col.widths <- c()
+  table.data[1,] <- vapply(table.data[1,], openmetar.summary.label, character(1))
   for (col.index in 1:num.cols) {
-    col.widths <- c(col.widths, max(nchar(table.data[, col.index], type="width")))
+    col.widths <- c(col.widths, max(nchar(as.character(table.data[, col.index]), type="width")))
   }
-  cat("\n")
 
   for (row.index in 1:num.rows) {
     cells <- c()
     for (col.index in 1:num.cols) {
       entry <- as.character(table.data[row.index, col.index])
-      justify <- if (row.index == 1 || col.index == 1) "left" else "right"
+      justify <- openmetar.summary.column.justification(table.data, col.index)
       cells <- c(cells, format(entry, width=col.widths[col.index], justify=justify))
     }
     table.row <- paste(" ", paste(cells, collapse=col.spacing), sep="")
     cat(table.row)
-    cat("\n")
     cat("\n")
   }
 }

@@ -288,7 +288,11 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
         )
         rendered = str(ro.r(summary_expr)[0])
         assert "Binary Random-Effects Model" in rendered, rendered
-        assert " Model Results" in rendered, rendered
+        assert "Model Results" in rendered, rendered
+        assert " Model Results" not in rendered, rendered
+        assert "p-value" in rendered, rendered
+        assert "p-Value" not in rendered, rendered
+        assert "\\n\\n\\n" not in rendered, rendered
         assert "Estimate" in rendered and "0.770" in rendered, rendered
         assert "$model.title" not in rendered, rendered
         assert "$arrays" not in rendered, rendered
@@ -323,7 +327,7 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
             )
             regression_text <- paste(capture.output(print(regression_display)), collapse="\\n")
             stopifnot(grepl("< 0.001", regression_text, fixed=TRUE))
-            stopifnot(!grepl("Omnibus p-Value\\\\n\\\\n 0.000", regression_text))
+            stopifnot(!grepl("Omnibus p-value\\\\n 0.000", regression_text))
 
             advanced_data <- new(
               "BinaryData",
@@ -356,6 +360,8 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
         meta_reg_result = ro.r(meta_regression_expr)
         parsed_meta_regression = meta_py_r.parse_out_results(meta_reg_result)
         weights = parsed_meta_regression["texts"]["Weights"]
+        assert weights.splitlines()[0].strip() == "Study names  Weights", weights
+        assert "study names" not in weights, weights
         assert "Gonzalez" in weights, weights
         assert "De Vries" in weights, weights
         assert "Study 1" not in weights, weights
@@ -369,6 +375,7 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
             '''
         )
         named_weights = meta_py_r.parse_out_results(named_weights_result)["texts"]["Weights"]
+        assert named_weights.splitlines()[0].strip() == "Study names  Weights", named_weights
         assert "Alpha Study" in named_weights, named_weights
         assert "Beta Study" in named_weights, named_weights
         assert "Study 1" not in named_weights, named_weights

@@ -1651,8 +1651,16 @@ def _format_text_table(headers, rows):
 
 def _format_r_table_header(value):
     normalized = str(value).strip()
-    compact = normalized.lower().replace(".", " ").replace("_", " ")
+    compact = normalized.lower().replace(".", " ").replace("_", " ").replace("-", " ")
     compact = " ".join(compact.split())
+    if compact == "p value":
+        return "p-value"
+    if compact == "het p value":
+        return "Het. p-value"
+    if compact == "omnibus p value":
+        return "Omnibus p-value"
+    if compact == "z value":
+        return "z-value"
     if compact in ("hpd low", "hpd lower", "ci lb", "lower bound"):
         return "Lower bound"
     if compact in ("hpd high", "hpd upper", "ci ub", "upper bound"):
@@ -1672,6 +1680,9 @@ def _format_result_text(text):
         (r"\bci[._\s]*ub\b", "Upper bound"),
         (r"\blower[._]+bound\b", "Lower bound"),
         (r"\bupper[._]+bound\b", "Upper bound"),
+        (r"\bhet[._\s]+p[._\s-]*value\b", "Het. p-value"),
+        (r"\bp[._\s-]*value\b", "p-value"),
+        (r"\bz[._\s-]*value\b", "z-value"),
     )
     for pattern, replacement in insensitive_replacements:
         text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
@@ -1709,7 +1720,7 @@ def make_weights_str(results):
         [study_names, weights], sep=": ", return_col_widths=True, align=["L", "R"]
     )
     header = "{0:<{widths[0]}}  {1:<{widths[1]}}".format(
-        "study names", "weights", widths=widths
+        "Study names", "Weights", widths=widths
     )
     table = "\n".join([header, table]) + "\n"
     return table

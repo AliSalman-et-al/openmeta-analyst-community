@@ -130,12 +130,13 @@ expect_values_inside_header_columns <- function(header, values, labels) {
 
   expect_equal(length(value.matches), length(labels))
   for (index in seq_along(labels)) {
+    column.start <- if (index == 1) 1 else starts[index - 1] + nchar(labels[index - 1])
     column.end <- if (index == length(labels)) {
       nchar(values)
     } else {
       starts[index + 1] - 1
     }
-    expect_gte(value.matches[index], starts[index])
+    expect_gte(value.matches[index], column.start)
     expect_lte(value.matches[index] + value.lengths[index] - 1, column.end)
   }
 }
@@ -159,13 +160,21 @@ test_that("summary display uses readable labels and aligned columns", {
   expect_false(grepl("; lower bound:", text, fixed = TRUE))
   expect_false(grepl("Std. error: 0.236", text, fixed = TRUE))
 
-  model.header <- first_line_after(rendered, " Model Results")
+  expect_match(text, "\nModel Results\n", fixed = TRUE)
+  expect_match(text, "\nHeterogeneity\n", fixed = TRUE)
+  expect_false(grepl("\n Model Results\n", text, fixed = TRUE))
+  expect_false(grepl("\n Heterogeneity\n", text, fixed = TRUE))
+  expect_false(grepl("p-Value", text, fixed = TRUE))
+  expect_false(grepl("Het. p-Value", text, fixed = TRUE))
+  expect_false(grepl("\n\n\n", text, fixed = TRUE))
+
+  model.header <- first_line_after(rendered, "Model Results")
   model.values <- next_non_empty_line(rendered, model.header)
-  heterogeneity.header <- first_line_after(rendered, " Heterogeneity")
+  heterogeneity.header <- first_line_after(rendered, "Heterogeneity")
   heterogeneity.values <- next_non_empty_line(rendered, heterogeneity.header)
 
-  model.labels <- c("Estimate", "Lower bound", "Upper bound", "p-Value")
-  heterogeneity.labels <- c("\u03c4\u00b2", "Q(df=12)", "Het. p-Value", "I\u00b2")
+  model.labels <- c("Estimate", "Lower bound", "Upper bound", "p-value")
+  heterogeneity.labels <- c("\u03c4\u00b2", "Q(df=12)", "Het. p-value", "I\u00b2")
   expect_values_inside_header_columns(model.header, model.values, model.labels)
   expect_values_inside_header_columns(heterogeneity.header, heterogeneity.values, heterogeneity.labels)
 })
@@ -238,7 +247,7 @@ test_that("meta-regression omnibus p-value uses small-p display convention", {
   rendered <- paste(capture.output(print(display)), collapse = "\n")
 
   expect_match(rendered, "< 0.001", fixed = TRUE)
-  expect_false(grepl("Omnibus p-Value\n\n 0.000", rendered, fixed = TRUE))
+  expect_false(grepl("Omnibus p-value\n 0.000", rendered, fixed = TRUE))
 })
 
 test_that("forest plot p-value labels use small-p display convention", {

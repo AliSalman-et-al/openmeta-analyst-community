@@ -286,11 +286,11 @@ def _assert_standard_binary_summary_is_formatted(meta):
     required = [
         "Binary Random-Effects Model",
         "Metric: Odds Ratio",
-        " Model Results",
+        "Model Results",
         "Estimate",
         "Lower bound",
         "Upper bound",
-        "p-Value",
+        "p-value",
         "Heterogeneity",
     ]
     missing = [text for text in required if text not in summary]
