@@ -235,7 +235,7 @@ def test_generated_ui_surfaces_do_not_cap_visible_text_widgets_below_contents():
     app.processEvents()
 
 
-def test_generated_qdialog_surfaces_use_application_dialog_floor_and_fit_combos():
+def test_generated_qdialog_surfaces_use_application_dialog_width_floor_and_fit_combos():
     sys.path.insert(0, str(ROOT / "src"))
     sys.path.insert(0, str(ROOT / "src" / "forms"))
     import qt_layout
@@ -275,7 +275,10 @@ def test_generated_qdialog_surfaces_use_application_dialog_floor_and_fit_combos(
 
         try:
             assert root.minimumWidth() >= qt_layout.APPLICATION_DIALOG_MINIMUM_WIDTH
-            assert root.minimumHeight() >= qt_layout.APPLICATION_DIALOG_MINIMUM_HEIGHT
+            assert root.minimumHeight() <= max(
+                root.sizeHint().height(),
+                qt_layout.APPLICATION_DIALOG_MINIMUM_HEIGHT,
+            )
             _assert_visible_text_widgets_fit(root, module_name)
             for combo_box in root.findChildren(QtWidgets.QComboBox):
                 if _hidden_for_fit(combo_box, root):
@@ -521,6 +524,76 @@ def test_application_dialog_refit_expands_for_new_combo_choices():
     finally:
         root.close()
         root.deleteLater()
+    app.processEvents()
+
+
+def test_application_dialog_refit_shrinks_to_current_contents():
+    sys.path.insert(0, str(ROOT / "src"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    root = QtWidgets.QDialog()
+    root.setWindowTitle("Dynamic dialog")
+    layout = QtWidgets.QVBoxLayout(root)
+    label = QtWidgets.QLabel("Visible field")
+    extra = QtWidgets.QGroupBox("Advanced")
+    extra_layout = QtWidgets.QVBoxLayout(extra)
+    extra_layout.addWidget(QtWidgets.QLabel("Additional option"))
+    layout.addWidget(label)
+    layout.addWidget(extra)
+
+    qt_layout.fit_application_dialog_to_contents(root)
+    root.show()
+    app.processEvents()
+    expanded_height = root.height()
+
+    try:
+        extra.setVisible(False)
+        qt_layout.fit_application_dialog_to_contents(root)
+        app.processEvents()
+
+        assert root.height() < expanded_height
+        assert root.minimumHeight() <= max(
+            root.sizeHint().height(),
+            qt_layout.APPLICATION_DIALOG_MINIMUM_HEIGHT,
+        )
+    finally:
+        root.close()
+        root.deleteLater()
+    app.processEvents()
+
+
+def test_wizard_refit_shrinks_to_current_page_contents():
+    sys.path.insert(0, str(ROOT / "src"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    wizard = QtWidgets.QWizard()
+    tall_page = QtWidgets.QWizardPage()
+    tall_layout = QtWidgets.QVBoxLayout(tall_page)
+    tall_layout.addWidget(QtWidgets.QLabel("Detailed setup"))
+    tall_layout.addSpacing(220)
+    compact_page = QtWidgets.QWizardPage()
+    compact_layout = QtWidgets.QVBoxLayout(compact_page)
+    compact_layout.addWidget(QtWidgets.QLabel("Name:"))
+    compact_layout.addWidget(QtWidgets.QLineEdit())
+    wizard.addPage(tall_page)
+    wizard.addPage(compact_page)
+    wizard.restart()
+    app.processEvents()
+
+    qt_layout.fit_application_dialog_to_contents(wizard)
+    tall_height = wizard.minimumHeight()
+
+    try:
+        wizard.next()
+        qt_layout.fit_application_dialog_to_contents(wizard)
+
+        assert wizard.minimumHeight() < tall_height
+        assert wizard.minimumHeight() >= qt_layout.APPLICATION_DIALOG_MINIMUM_HEIGHT
+    finally:
+        wizard.close()
+        wizard.deleteLater()
     app.processEvents()
 
 

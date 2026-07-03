@@ -12,15 +12,16 @@ from PyQt5.QtWidgets import (
     QSizePolicy,
     QStackedWidget,
     QTabWidget,
+    QWizard,
     QWizardPage,
 )
 
 APPLICATION_DIALOG_MINIMUM_WIDTH = 420
-APPLICATION_DIALOG_MINIMUM_HEIGHT = 180
+APPLICATION_DIALOG_MINIMUM_HEIGHT = 96
 APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH = 360
 
 ANALYSIS_DIALOG_MINIMUM_WIDTH = 520
-ANALYSIS_DIALOG_MINIMUM_HEIGHT = 260
+ANALYSIS_DIALOG_MINIMUM_HEIGHT = 160
 ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH = APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH
 ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH = 220
 
@@ -146,21 +147,20 @@ def fit_text_to_contents(
 
     adjust_root = adjust_root and _root_allows_content_resize(root)
     if adjust_root:
-        size_hint = root.sizeHint()
+        size_hint = _root_size_hint_for_current_contents(root)
         title_width = _window_title_width_hint(root)
         target_width = max(size_hint.width(), title_width, minimum_width)
         target_height = max(size_hint.height(), minimum_height)
         stable_size = _stable_root_size(root) if stable_root else None
         if stable_size is not None and not combo_content_expanded:
-            root.setMinimumSize(stable_size)
-            return
+            target_width = max(target_width, stable_size.width())
 
         target_size = QSize(target_width, target_height)
         _raise_maximum_height(root, target_height)
         _raise_maximum_width(root, target_width)
-        root.setMinimumSize(root.minimumSize().expandedTo(target_size))
+        root.setMinimumSize(target_size)
         if stable_root:
-            root.setProperty("oma_stable_fit_size", root.minimumSize())
+            root.setProperty("oma_stable_fit_size", target_size)
         root.adjustSize()
 
 
@@ -199,6 +199,32 @@ def _fit_wizard_page_height_to_contents(root):
     target_height = root.sizeHint().height()
     _raise_maximum_height(root, target_height)
     root.setMinimumHeight(max(root.minimumHeight(), target_height))
+
+
+def _root_size_hint_for_current_contents(root):
+    size_hint = root.sizeHint()
+    if not isinstance(root, QWizard):
+        return size_hint
+
+    current_page = root.currentPage()
+    if current_page is None:
+        return size_hint
+
+    current_hint = current_page.sizeHint()
+    if not current_hint.isValid():
+        return size_hint
+
+    page_heights = [
+        page.sizeHint().height()
+        for page_id in root.pageIds()
+        for page in [root.page(page_id)]
+        if page is not None and page.sizeHint().isValid()
+    ]
+    if not page_heights:
+        return size_hint
+
+    chrome_height = max(0, size_hint.height() - max(page_heights))
+    return QSize(size_hint.width(), current_hint.height() + chrome_height)
 
 
 def _fit_text_widgets_to_contents(root):
