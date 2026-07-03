@@ -227,6 +227,8 @@ def test_generated_ui_surfaces_do_not_cap_visible_text_widgets_below_contents():
 
         try:
             _assert_visible_text_widgets_fit(root, module_name)
+            if isinstance(root, QtWidgets.QWizardPage):
+                assert root.minimumHeight() >= root.sizeHint().height(), module_name
         finally:
             root.close()
             root.deleteLater()

@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import (
     QSizePolicy,
     QStackedWidget,
     QTabWidget,
+    QWizardPage,
 )
 
 APPLICATION_DIALOG_MINIMUM_WIDTH = 420
@@ -141,6 +142,8 @@ def fit_text_to_contents(
     if root_layout is not None:
         root_layout.activate()
 
+    _fit_wizard_page_height_to_contents(root)
+
     adjust_root = adjust_root and _root_allows_content_resize(root)
     if adjust_root:
         size_hint = root.sizeHint()
@@ -188,6 +191,14 @@ def _stable_root_size(root):
     if isinstance(stable_size, QSize) and stable_size.isValid():
         return stable_size
     return None
+
+
+def _fit_wizard_page_height_to_contents(root):
+    if not isinstance(root, QWizardPage):
+        return
+    target_height = root.sizeHint().height()
+    _raise_maximum_height(root, target_height)
+    root.setMinimumHeight(max(root.minimumHeight(), target_height))
 
 
 def _fit_text_widgets_to_contents(root):
