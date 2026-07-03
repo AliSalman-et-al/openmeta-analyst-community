@@ -90,12 +90,13 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
         self.nav_tree.setHeaderLabels(["Results"])
         self.nav_tree.setItemsExpandable(True)
+        self.nav_tree.setMinimumWidth(250)
         self.x_coord = 5
         self.y_coord = 5
 
         # set (default) splitter sizes
         self.splitter.setSizes([400, 100])
-        self.results_nav_splitter.setSizes([200, 500])
+        self.results_nav_splitter.setSizes([260, 440])
 
         self.scene = QGraphicsScene(self)
 
@@ -121,18 +122,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             self.texts
         )
 
-        # Render ordinary text, plots, then References as the final section.
-        self.add_text()
-
-        self.y_coord += ROW_HEIGHT / 2.0
-
-        # additional padding for Windows..
-        # again, heuristic. I don't know
-        # why windows requires so much padding.
-        if sys.platform.startswith("win"):
-            self.y_coord += 2 * ROW_HEIGHT
-
-        self.add_images()
+        self.add_result_sections()
         self.add_references()
 
         # reset the scene
@@ -153,35 +143,71 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self.psuedo_console.setPlainText("\n".join(text))
         self.psuedo_console.append(">> ")
 
+    def add_result_sections(self):
+        ordered_sections = result_sections.order_display_sections(
+            texts=list(self.texts.items()),
+            images=list(self.images.items()),
+            explicit_image_order=self.image_order,
+        )
+
+        for section in ordered_sections:
+            if section.kind == "text":
+                self.add_text_section(section.key, section.display_title, section.value)
+            elif section.kind == "image":
+                self.add_image_section(
+                    section.key, section.display_title, section.value
+                )
+
+    def add_image_section(self, title, display_title, image):
+        print("title: %s; image: %s" % (title, image))
+        cur_y = max(0, self.y_coord)
+        print("cur_y: %s" % cur_y)
+        pixmap = self.generate_pixmap(image)
+        if pixmap.isNull():
+            print("Skipping image that Qt could not load: %s" % image)
+            return
+        # first add the title
+        qt_item = self.add_title(display_title)
+
+        # if there is a parameters object associated with this object
+        # (i.e., it is a forest plot of some variety), we pass it along
+        # to the create_pixmap_item method to for the context_menu
+        # construction
+        params_path = None
+        if self.params_paths is not None and title in self.params_paths:
+            params_path = self.params_paths[title]
+
+        img_shape, pos, pixmap_item = self.create_pixmap_item(
+            pixmap, self.position(), title, image, params_path=params_path
+        )
+
+        self.items_to_coords[id(qt_item)] = pos
+
     def add_images(self):
         ordered_images = result_sections.order_image_sections(
             list(self.images.items()), explicit_order=self.image_order
         )
 
         for title, image in ordered_images:
-            print("title: %s; image: %s" % (title, image))
-            cur_y = max(0, self.y_coord)
-            print("cur_y: %s" % cur_y)
-            pixmap = self.generate_pixmap(image)
-            if pixmap.isNull():
-                print("Skipping image that Qt could not load: %s" % image)
-                continue
-            # first add the title
-            qt_item = self.add_title(title)
-
-            # if there is a parameters object associated with this object
-            # (i.e., it is a forest plot of some variety), we pass it along
-            # to the create_pixmap_item method to for the context_menu
-            # construction
-            params_path = None
-            if self.params_paths is not None and title in self.params_paths:
-                params_path = self.params_paths[title]
-
-            img_shape, pos, pixmap_item = self.create_pixmap_item(
-                pixmap, self.position(), title, image, params_path=params_path
+            self.add_image_section(
+                title,
+                result_sections.section_display_title(title),
+                image,
             )
 
+    def add_text_section(self, title, display_title, text):
+        try:
+            print("title: %s; text: %s" % (title, text))
+            cur_y = max(0, self.y_coord)
+            print("cur_y: %s" % cur_y)
+            # first add the title
+            qt_item = self.add_title(display_title)
+
+            # now the text
+            text_item_rect, pos = self.create_text_item(str(text), self.position())
             self.items_to_coords[id(qt_item)] = pos
+        except:
+            pass
 
     def generate_pixmap(self, image):
         # now the image
@@ -209,18 +235,11 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
     def add_text(self):
         for title, text in result_sections.order_text_sections(list(self.texts.items())):
-            try:
-                print("title: %s; text: %s" % (title, text))
-                cur_y = max(0, self.y_coord)
-                print("cur_y: %s" % cur_y)
-                # first add the title
-                qt_item = self.add_title(title)
-
-                # now the text
-                text_item_rect, pos = self.create_text_item(str(text), self.position())
-                self.items_to_coords[id(qt_item)] = pos
-            except:
-                pass
+            self.add_text_section(
+                title,
+                result_sections.section_display_title(title),
+                text,
+            )
 
     def add_references(self):
         if self.references_text is None:

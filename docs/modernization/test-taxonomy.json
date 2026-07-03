@@ -2111,12 +2111,67 @@
         "gui_compatibility",
         "release_readiness"
       ],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_result_sections.py::test_display_titles_normalize_result_navigation_labels",
+      "reason": "Guards shared Results window display labels against cryptic or inconsistent navigation text.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_result_sections.py::test_standard_meta_analysis_sections_keep_headline_result_with_plot",
+      "reason": "Guards reader-oriented Results window ordering for standard meta-analysis outputs.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_result_sections.py::test_hsroc_sections_lead_with_clinical_result_before_model_details",
+      "reason": "Guards reader-oriented HSROC Results window ordering and display labels.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
       "external_dependencies": [
         "filesystem"
       ],
       "lane": "gui",
       "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_results_window_places_references_after_images_and_wraps_them",
       "reason": "Exercises the visible Results window navigation and wrapping behavior reported in issue #166.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_results_window_uses_reader_oriented_section_names_and_order",
+      "reason": "Exercises the visible Results window navigation labels, reader-oriented ordering, and wider navigation pane from issue #184.",
       "runtime_class": "subsecond",
       "size": "small"
     },
