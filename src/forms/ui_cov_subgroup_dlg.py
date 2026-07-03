@@ -49,5 +49,5 @@ class Ui_cov_subgroup_dialog(object):
     def retranslateUi(self, cov_subgroup_dialog):
         _translate = QtCore.QCoreApplication.translate
         cov_subgroup_dialog.setWindowTitle(_translate("cov_subgroup_dialog", "Select Covariate"))
-        self.label.setText(_translate("cov_subgroup_dialog", "covariate for \n"
+        self.label.setText(_translate("cov_subgroup_dialog", "Covariate for \n"
 "subgroups:"))

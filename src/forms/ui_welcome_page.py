@@ -106,7 +106,7 @@ class Ui_WizardPage(object):
         self.create_new_btn.setText(_translate("WizardPage", "Create a New Dataset"))
         self.import_csv_btn.setText(_translate("WizardPage", "Import CSV"))
         self.open_recent_btn.setText(_translate("WizardPage", "Open Recent..."))
-        self.open_btn.setText(_translate("WizardPage", "Open an existing dataset"))
+        self.open_btn.setText(_translate("WizardPage", "Open Existing Dataset"))
         self.oma_onlineLabel.setText(_translate("WizardPage", "<html><head/><body><p><a href=\"http://www.cebm.brown.edu/open_meta\"><span style=\" text-decoration: underline; color:#0000ff;\">OpenMeta Website</span></a></p></body></html>"))
         self.how_to_citeLabel.setText(_translate("WizardPage", "<a href=\"https://www.jstatsoft.org/article/view/v049i05\">How to cite</a>"))
         self.helpLabel.setText(_translate("WizardPage", "<a href=\"http://tuftscaes.org/open_meta/help/openMA_help.html\">Help</a>"))

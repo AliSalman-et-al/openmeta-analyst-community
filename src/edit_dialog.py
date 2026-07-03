@@ -166,7 +166,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         )
 
     def data_error(self, msg):
-        QMessageBox.warning(self, "Whoops", msg)
+        QMessageBox.warning(self, "Warning", msg)
 
     def add_group(self):
         form = add_new_dialogs.AddNewGroupForm(self)
@@ -177,7 +177,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
                     self.group_list.model().dataset, form.group_name_le.text()
                 )
             except ValueError as exc:
-                QMessageBox.warning(self, "Whoops", str(exc))
+                QMessageBox.warning(self, "Warning", str(exc))
                 return
             self.group_list.model().dataset.add_group(
                 new_group_name, self.selected_outcome
@@ -211,7 +211,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
                     self.outcome_list.model().dataset, form.outcome_name_le.text()
                 )
             except ValueError as exc:
-                QMessageBox.warning(self, "Whoops", str(exc))
+                QMessageBox.warning(self, "Warning", str(exc))
                 return
             # the outcome type is one of the enumerated types; we don't worry about
             # unicode encoding
@@ -282,7 +282,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
                     form.follow_up_name_le.text(),
                 )
             except ValueError as exc:
-                QMessageBox.warning(self, "Whoops", str(exc))
+                QMessageBox.warning(self, "Warning", str(exc))
                 return
             self.follow_up_list.model().dataset.add_follow_up(follow_up_lbl)
             self.follow_up_list.model().current_outcome = self.selected_outcome
@@ -316,7 +316,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
                     self.covariate_list.model().dataset, form.covariate_name_le.text()
                 )
             except ValueError as exc:
-                QMessageBox.warning(self, "Whoops", str(exc))
+                QMessageBox.warning(self, "Warning", str(exc))
                 return
             new_covariate_type = str(form.datatype_cbo_box.currentText())
             cov_obj = ma_dataset.Covariate(new_covariate_name, new_covariate_type)
@@ -361,7 +361,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
                     form.study_lbl.text()
                 )
             except ValueError as exc:
-                QMessageBox.warning(self, "Whoops", str(exc))
+                QMessageBox.warning(self, "Warning", str(exc))
                 return
             study_id = self.study_list.model().dataset.max_study_id() + 1
             new_study = ma_dataset.Study(study_id, name=study_name)

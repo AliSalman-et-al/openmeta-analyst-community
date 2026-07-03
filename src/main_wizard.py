@@ -427,7 +427,7 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
         try:
             self.extract_data()
             if len(self.imported_data) == 0:
-                QMessageBox.warning(self, "Whoops", "No data in CSV. Try again.")
+                QMessageBox.warning(self, "Warning", "No data in CSV. Try again.")
                 self.imported_data_ok = False
                 return False
 
@@ -477,7 +477,7 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
         # Make sure there are at least as many columns as required columns
         # (additional columns are covariates hopefully)
         #        if self.preview_table.columnCount() < self.required_fmt_table.columnCount():
-        #            QMessageBox.warning(self, "Whoops", "There are two few columns in the imported csv, try again with a properly formatted CSV.")
+        #            QMessageBox.warning(self, "Warning", "There are two few columns in the imported csv, try again with a properly formatted CSV.")
         #            self._reset_data
         #            return False
 
@@ -489,7 +489,7 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
             except ValueError:
                 QMessageBox.warning(
                     self,
-                    "Whoops",
+                    "Warning",
                     "The year at row " + str(row + 1) + " is not an integer number.",
                 )
                 self.imported_data_ok = False

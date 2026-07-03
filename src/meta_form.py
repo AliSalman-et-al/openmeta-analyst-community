@@ -391,7 +391,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self._model_signal_connections = []
 
     def data_error(self, msg):
-        QMessageBox.warning(self.parent(), "Whoops", msg)
+        QMessageBox.warning(self.parent(), "Warning", msg)
 
     def set_edit_focus(self, index):
         """sets edit focus to the row,col specified by index."""
@@ -699,7 +699,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             "OpenMeta[Analyst] cannot build the Method & Parameters dialog.\n\n"
             "Details: %s: %s" % (exception.__class__.__name__, exception)
         )
-        QMessageBox.critical(self, "Analysis backend unavailable", message)
+        QMessageBox.critical(self, "Analysis Backend Unavailable", message)
 
     def _show_analysis_preparation_error(self, exception):
         message = (
@@ -707,7 +707,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             "for this analysis.\n\n"
             "Details: %s: %s" % (exception.__class__.__name__, exception)
         )
-        QMessageBox.critical(self, "Could not prepare analysis", message)
+        QMessageBox.critical(self, "Could Not Prepare Analysis", message)
 
     def undo(self):
         self.tableView.undoStack.undo()
@@ -890,14 +890,14 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
     def analysis(self, results):
         if results is None:
-            return  # analysis failed
+            return  # Analysis failed
         try:
             form = results_window.ResultsWindow(results, parent=self)
         except Exception as e:
             app_error_handler.log_exception(type(e), e, e.__traceback__)
             QMessageBox.critical(
                 self,
-                "Could not display analysis results",
+                "Could Not Display Analysis Results",
                 "The analysis completed, but OpenMeta[Analyst] could not display "
                 "the results.\n\nDetails: %s: %s" % (e.__class__.__name__, e),
             )
@@ -918,7 +918,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                     "group", edit_group_form.group_name_le.text(), existing_groups
                 )
             except ValueError as exc:
-                QMessageBox.warning(self, "Whoops", str(exc))
+                QMessageBox.warning(self, "Warning", str(exc))
                 return
 
             redo_f = lambda: self.model.rename_group(orig_group_name, new_group_name)
@@ -937,7 +937,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                     self.model.dataset, form.covariate_name_le.text()
                 )
             except ValueError as exc:
-                QMessageBox.warning(self, "Whoops", str(exc))
+                QMessageBox.warning(self, "Warning", str(exc))
                 return
 
             # fix for issue #59; do not allow the user to create two covariates with
@@ -953,7 +953,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
     def _add_new_covariate(self, cov_name, cov_type):
         self.model.add_covariate(cov_name, cov_type)
-        print("new covariate name: %s with type %s" % (cov_name, cov_type))
+        print("New Covariate Name: %s with type %s" % (cov_name, cov_type))
         self.tableView.resizeColumnsToContents()
         self._refresh_advanced_analysis_actions()
 
@@ -978,7 +978,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                         self.model.dataset, form.outcome_name_le.text()
                     )
                 except ValueError as exc:
-                    QMessageBox.warning(self, "Whoops", str(exc))
+                    QMessageBox.warning(self, "Warning", str(exc))
                     return
                 # the outcome type is one of the enumerated types; we don't worry about
                 # unicode encoding
@@ -1016,7 +1016,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                         self.model.dataset, form.group_name_le.text()
                     )
                 except ValueError as exc:
-                    QMessageBox.warning(self, "Whoops", str(exc))
+                    QMessageBox.warning(self, "Warning", str(exc))
                     return
                 cur_groups = list(self.model.get_current_groups())
                 redo_f = lambda: self._add_new_group(new_group_name)
@@ -1033,7 +1033,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                         form.follow_up_name_le.text(),
                     )
                 except ValueError as exc:
-                    QMessageBox.warning(self, "Whoops", str(exc))
+                    QMessageBox.warning(self, "Warning", str(exc))
                     return
                 redo_f = lambda: self._add_new_follow_up_for_cur_outcome(follow_up_lbl)
                 previous_follow_up = self.model.get_current_follow_up_name()
@@ -1292,7 +1292,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         except Exception as e:
             msg = _format_open_project_error(file_path, e)
             print(msg)
-            QMessageBox.critical(self, "Could not open project", msg)
+            QMessageBox.critical(self, "Could Not Open Project", msg)
             return None
 
         self.out_path = file_path
@@ -1382,7 +1382,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                     existing_covariates,
                 )
             except ValueError as exc:
-                QMessageBox.warning(self, "Whoops", str(exc))
+                QMessageBox.warning(self, "Warning", str(exc))
                 return
 
             ###
@@ -1607,7 +1607,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             app_error_handler.log_exception(type(e), e, e.__traceback__)
             QMessageBox.critical(
                 self,
-                "Could not save project",
+                "Could Not Save Project",
                 "OpenMeta[Analyst] could not save %s.\n\nDetails: %s: %s"
                 % (self.out_path, e.__class__.__name__, e),
             )

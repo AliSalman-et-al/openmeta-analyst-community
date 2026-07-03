@@ -451,7 +451,7 @@ def test_invalid_paste_reports_validation_error_when_model_signals_are_blocked(
         table.paste_contents(model.index(0, model.RAW_DATA[0]), [["not numeric"]])
 
         assert shown
-        assert shown[-1][1:] == ("Whoops", "Raw data needs to be numeric.")
+        assert shown[-1][1:] == ("Warning", "Raw data needs to be numeric.")
         assert _cell_text(model, 0, model.RAW_DATA[0]) == ""
     finally:
         _close_without_prompt(app, window)
@@ -489,7 +489,7 @@ def test_add_outcome_dialog_rejects_blank_and_duplicate_names(monkeypatch):
         window.cur_dimension = "outcome"
         window.add_new()
 
-        assert warnings[-1][1:] == ("Whoops", "Outcome names cannot be empty.")
+        assert warnings[-1][1:] == ("Warning", "Outcome names cannot be empty.")
         assert window.model.dataset.get_outcome_names() == ["Mortality"]
 
         class DuplicateOutcomeDialog(BlankOutcomeDialog):
@@ -504,7 +504,7 @@ def test_add_outcome_dialog_rejects_blank_and_duplicate_names(monkeypatch):
         window.add_new()
 
         assert warnings[-1][1:] == (
-            "Whoops",
+            "Warning",
             "An outcome named Mortality already exists. Please pick another name.",
         )
         assert window.model.dataset.get_outcome_names() == ["Mortality"]
@@ -545,7 +545,7 @@ def test_edit_dialog_rejects_blank_outcome_name(monkeypatch):
         dialog = edit_dialog.EditDialog(window.model.dataset, parent=window)
         dialog.add_outcome()
 
-        assert warnings[-1][1:] == ("Whoops", "Outcome names cannot be empty.")
+        assert warnings[-1][1:] == ("Warning", "Outcome names cannot be empty.")
         assert window.model.dataset.get_outcome_names() == ["Mortality"]
     finally:
         if dialog is not None:
@@ -619,16 +619,16 @@ def test_edit_dialog_rejects_blank_names_for_other_dataset_entities(monkeypatch)
         dialog = edit_dialog.EditDialog(window.model.dataset, parent=window)
 
         dialog.add_group()
-        assert warnings[-1][1:] == ("Whoops", "Group names cannot be empty.")
+        assert warnings[-1][1:] == ("Warning", "Group names cannot be empty.")
 
         dialog.add_follow_up()
-        assert warnings[-1][1:] == ("Whoops", "Follow-up names cannot be empty.")
+        assert warnings[-1][1:] == ("Warning", "Follow-up names cannot be empty.")
 
         dialog.add_covariate()
-        assert warnings[-1][1:] == ("Whoops", "Covariate names cannot be empty.")
+        assert warnings[-1][1:] == ("Warning", "Covariate names cannot be empty.")
 
         dialog.add_study()
-        assert warnings[-1][1:] == ("Whoops", "Study names cannot be empty.")
+        assert warnings[-1][1:] == ("Warning", "Study names cannot be empty.")
 
         assert " " not in window.model.dataset.get_group_names()
         assert "   " not in window.model.dataset.get_follow_up_names()
@@ -693,14 +693,14 @@ def test_add_dialogs_reject_blank_names_for_other_dataset_entities(monkeypatch):
 
         window.cur_dimension = "group"
         window.add_new()
-        assert warnings[-1][1:] == ("Whoops", "Group names cannot be empty.")
+        assert warnings[-1][1:] == ("Warning", "Group names cannot be empty.")
 
         window.cur_dimension = "follow-up"
         window.add_new()
-        assert warnings[-1][1:] == ("Whoops", "Follow-up names cannot be empty.")
+        assert warnings[-1][1:] == ("Warning", "Follow-up names cannot be empty.")
 
         window.add_covariate()
-        assert warnings[-1][1:] == ("Whoops", "Covariate names cannot be empty.")
+        assert warnings[-1][1:] == ("Warning", "Covariate names cannot be empty.")
 
         assert "   " not in window.model.dataset.get_group_names()
         assert "" not in window.model.dataset.get_follow_up_names()

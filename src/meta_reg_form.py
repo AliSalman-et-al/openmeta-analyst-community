@@ -47,7 +47,7 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
         if not selected_covariates:
             QMessageBox.warning(
                 self,
-                "No covariates selected",
+                "No Covariates Selected",
                 "Select at least one covariate before running meta-regression.",
             )
             return
@@ -111,7 +111,7 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
             # error
             run_with_missing = QMessageBox.warning(
                 self,
-                "Missing covariate value(s)",
+                "Missing Covariate Values",
                 "Some studies do not have values for the covariate(s) you have selected. Do you want me to run the regression without them (i.e., drop studies with missing values)?",
                 QMessageBox.Yes | QMessageBox.No,
             )
@@ -132,7 +132,7 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
             # then there was an error!
             QMessageBox.critical(
                 self,
-                "Whoops",
+                "Analysis Failed",
                 "Sorry, there was an error performing the regression.\n%s" % result,
             )
         else:

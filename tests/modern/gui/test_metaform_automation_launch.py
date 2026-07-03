@@ -1550,7 +1550,7 @@ def test_subgroup_dialog_disables_ok_and_does_not_run_without_factor_covariates(
         assert calls == []
         assert warnings
         assert warnings[0][1:3] == (
-            "No covariate selected",
+            "No Covariate Selected",
             "Select a factor covariate before running subgroup analysis.",
         )
     finally:
@@ -2811,7 +2811,7 @@ def test_csv_import_wizard_reports_empty_file_as_no_data(tmp_path, monkeypatch):
     page._select_file()
 
     assert shown
-    assert shown[0][1] == "Whoops"
+    assert shown[0][1] == "Warning"
     assert shown[0][2] == "No data in CSV. Try again."
     assert "StopIteration" not in shown[0][2]
     assert not page.isComplete()

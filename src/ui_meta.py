@@ -378,7 +378,7 @@ class Ui_MainWindow(object):
         self.menuDataset.setTitle(_translate("MainWindow", "Dataset"))
         self.menuEdit.setTitle(_translate("MainWindow", "Edit"))
         self.menuHelp.setTitle(_translate("MainWindow", "Help"))
-        self.toolBar.setWindowTitle(_translate("MainWindow", "toolBar"))
+        self.toolBar.setWindowTitle(_translate("MainWindow", "Tool Bar"))
         self.action_save.setText(_translate("MainWindow", "Save"))
         self.action_open.setText(_translate("MainWindow", "Open"))
         self.action_quit.setText(_translate("MainWindow", "Quit"))

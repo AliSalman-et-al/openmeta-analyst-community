@@ -405,7 +405,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
         def _graphics_item_context_menu(event):
             def add_save_as_pdf_menu_action(menu):
-                action = QAction("save pdf image as", self)
+                action = QAction("Save PDF Image As", self)
                 action.triggered.connect(
                     app_error_handler.safe_slot(
                         lambda _checked=False: self.save_image_as(
@@ -417,7 +417,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                 menu.addAction(action)
 
             def add_save_as_png_menu_action(menu):
-                action = QAction("save png image as", self)
+                action = QAction("Save PNG Image As", self)
                 action.triggered.connect(
                     app_error_handler.safe_slot(
                         lambda _checked=False: self.save_image_as(
@@ -436,7 +436,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                 # only know how to edit *simple* (i.e., _not_ side-by-side, as
                 # in sens and spec plotted on the same canvass) forest plots for now
                 if plot_type == "forest" and not self._is_side_by_side_fp(title):
-                    action = QAction("edit plot", self)
+                    action = QAction("Edit Plot", self)
                     action.triggered.connect(
                         app_error_handler.safe_slot(
                             lambda _checked=False: self.edit_image(

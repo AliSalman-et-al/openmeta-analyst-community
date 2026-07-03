@@ -614,7 +614,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
                 raise Exception("Table no longer consistent.")
         except Exception as e:
             msg = e.args[0]
-            QMessageBox.warning(self.parent(), "Whoops", msg)  # popup warning
+            QMessageBox.warning(self.parent(), "Warning", msg)  # popup warning
             self.restore_ma_unit_and_table(
                 old_ma_unit, old_table
             )  # brings things back to the way they were
@@ -625,7 +625,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             self.try_to_update_cur_outcome()  # update metric in ma_unit and in table
         except Exception as e:
             msg = "Could not compute study effects from the edited raw data: %s" % e
-            QMessageBox.warning(self.parent(), "Whoops", msg)
+            QMessageBox.warning(self.parent(), "Warning", msg)
             self.restore_ma_unit_and_table(old_ma_unit, old_table)
             return
 

@@ -30,7 +30,7 @@ class MetaSubgroupForm(QDialog, forms.ui_cov_subgroup_dlg.Ui_cov_subgroup_dialog
         if not selected_cov:
             QMessageBox.warning(
                 self,
-                "No covariate selected",
+                "No Covariate Selected",
                 "Select a factor covariate before running subgroup analysis.",
             )
             return

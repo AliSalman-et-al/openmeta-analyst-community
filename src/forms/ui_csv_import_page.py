@@ -138,7 +138,7 @@ class Ui_WizardPage(object):
     def retranslateUi(self, WizardPage):
         _translate = QtCore.QCoreApplication.translate
         WizardPage.setWindowTitle(_translate("WizardPage", "WizardPage"))
-        WizardPage.setTitle(_translate("WizardPage", "Choose CSV file"))
+        WizardPage.setTitle(_translate("WizardPage", "Choose CSV File"))
         self.instructions.setText(_translate("WizardPage", "Please select a CSV file to import:\n"
 "The CSV should match the format of the spreadsheet currently displayed under \"required CSV format\". Don\'t worry if the column titles are not the same, these can be changed later.\n"
 "\n"

@@ -62,7 +62,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
 
         if conf_level is None:
             QMessageBox.critical(
-                self, "insufficient arguments", "Confidence interval must be specified"
+                self, "Insufficient Arguments", "Confidence interval must be specified"
             )
             raise ValueError("Confidence interval must be specified")
         self.conf_level = conf_level
@@ -474,7 +474,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             self.impute_data()
         except Exception as e:
             msg = e.args[0]
-            QMessageBox.warning(self.parent(), "Whoops", msg)
+            QMessageBox.warning(self.parent(), "Warning", msg)
             self.restore_ma_unit_and_tables(
                 old_ma_unit, old_tables_data, old_correlation
             )
@@ -485,7 +485,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             self.try_to_update_cur_outcome()
         except Exception as e:
             msg = "Could not compute study effects from the edited raw data: %s" % e
-            QMessageBox.warning(self.parent(), "Whoops", msg)
+            QMessageBox.warning(self.parent(), "Warning", msg)
             self.restore_ma_unit_and_tables(
                 old_ma_unit, old_tables_data, old_correlation
             )
@@ -770,7 +770,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         except Exception as e:
             if not (row, col) == (None, None):
                 msg = "Could not compute study effects from the edited raw data: %s" % e
-                QMessageBox.warning(self.parent(), "Whoops", msg)
+                QMessageBox.warning(self.parent(), "Warning", msg)
                 self.restore_ma_unit_and_tables(
                     old_ma_unit, old_tables_data, old_correlation
                 )
@@ -960,7 +960,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                 option0_txt = "Hedges' g (default)"
                 option1_txt = "Cohen's d"
                 dialog = ChooseBackCalcResultForm(info, option0_txt, option1_txt)
-                dialog.setWindowTitle("SMD bias correction")
+                dialog.setWindowTitle("SMD Bias Correction")
                 if dialog.exec():
                     self.metric_parameter = True if dialog.getChoice() == 0 else False
             print(("metric_parameter is now %s" % str(self.metric_parameter)))

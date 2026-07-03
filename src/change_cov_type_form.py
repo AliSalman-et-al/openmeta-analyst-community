@@ -42,7 +42,7 @@ class ChangeCovTypeForm(QDialog, Ui_ChangeCovTypeForm):
         qt_layout.fit_application_dialog_to_contents(self)
 
     def data_error(self, msg):
-        QMessageBox.warning(self, "Whoops", msg)
+        QMessageBox.warning(self, "Warning", msg)
 
 
 class CovModel(QAbstractTableModel):

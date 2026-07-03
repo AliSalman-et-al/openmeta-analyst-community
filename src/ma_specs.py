@@ -287,7 +287,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                         "Sorry, this analysis could not be completed:\n\n%s" % e
                     )
 
-                    QMessageBox.critical(self, "analysis failed", error_message)
+                    QMessageBox.critical(self, "Analysis Failed", error_message)
                     # reset Rs working directory
                     _reset_r_working_dir_safely()
                     self.accept()
@@ -421,7 +421,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             if all(metric in self.diag_metrics for metric in ("lr", "dor")):
                 try:
                     method_names.remove("Diagnostic Fixed-Effect Peto")
-                    # QMessageBox.warning(self.parent(), "whoops", "removed peto")
+                    # QMessageBox.warning(self.parent(), "Warning", "Removed Peto")
                 except:
                     print(
                         "Couldn't remove 'Diagnostic Fixed-Effect Peto' for some reason... don't know why"
@@ -928,7 +928,7 @@ def _run_guarded_analysis(specs_form, progress_bar, run_analysis):
         app_error_handler.log_exception(type(e), e, e.__traceback__)
         QMessageBox.critical(
             specs_form,
-            "analysis failed",
+            "Analysis Failed",
             "Sorry, this analysis could not be completed:\n\n%s" % e,
         )
         progress_dialog.hide_once(progress_bar)

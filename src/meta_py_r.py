@@ -1232,7 +1232,7 @@ def load_vars_for_plot(params_path, return_params_dict=False):
             load_in_R(cur_path)
             print("loaded %s" % cur_path)
         else:
-            print("whoops -- couldn't load %s" % cur_path)
+            print("Could not load %s" % cur_path)
             return False
 
     if return_params_dict:

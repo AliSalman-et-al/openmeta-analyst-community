@@ -196,7 +196,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         except:
             # Should never appear....
             msg = "Could not convert %s to integer" % self.two_by_two_table.item(i, j)
-            QMessageBox.warning(self.parent(), "Whoops", msg)
+            QMessageBox.warning(self.parent(), "Warning", msg)
             raise Exception(
                 "Could not convert %s to int" % self.two_by_two_table.item(i, j)
             )
@@ -299,7 +299,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
                 raise Exception("Table no longer consistent.")
         except Exception as e:
             msg = e.args[0]
-            QMessageBox.warning(self.parent(), "Whoops", msg)  # popup warning
+            QMessageBox.warning(self.parent(), "Warning", msg)  # popup warning
             self.restore_ma_unit_and_table(
                 old_ma_unit, old_table, old_prevalence
             )  # brings things back to the way they were
@@ -312,7 +312,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             self.set_current_effect()  # ma_unit   --> effects
         except Exception as e:
             msg = "Could not compute study effects from the edited raw data: %s" % e
-            QMessageBox.warning(self.parent(), "Whoops", msg)
+            QMessageBox.warning(self.parent(), "Warning", msg)
             self.restore_ma_unit_and_table(old_ma_unit, old_table, old_prevalence)
             return
 

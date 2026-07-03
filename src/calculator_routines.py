@@ -485,17 +485,17 @@ def evaluate(
     ###### ERROR CHECKING CODE#####
     # Make sure entered value is numeric and between the appropriate bounds
     if not is_a_float(new_text):
-        QMessageBox.warning(parent, "Whoops", "Must be numeric!")
+        QMessageBox.warning(parent, "Warning", "Must be numeric!")
         raise Exception("error")
     if not opt_cmp_fn:  # est, lower, upper
         (good_result, msg) = is_between_bounds(**{ci_param: new_text})
         if not good_result:
-            QMessageBox.warning(parent, "Whoops", msg)
+            QMessageBox.warning(parent, "Warning", msg)
             raise Exception("error")
     else:  # something other than est, lower, upper (like correlation or prevalence)
         print(("Result of correlation evaluation is: %s" % str(opt_cmp_fn(new_text))))
         if not opt_cmp_fn(new_text):
-            QMessageBox.warning(parent, "Whoops", opt_cmp_msg)
+            QMessageBox.warning(parent, "Warning", opt_cmp_msg)
             print("raising exception")
             raise Exception("error")
     return float(new_text)  # display_scale_val

@@ -30,7 +30,7 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
         if not selected_metrics:
             QMessageBox.warning(
                 self,
-                "No diagnostic metric selected",
+                "No Diagnostic Metric Selected",
                 "Select at least one available diagnostic metric before running analysis.",
             )
             return

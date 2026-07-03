@@ -74,7 +74,7 @@ def test_diagnostic_next_surfaces_specs_failure_instead_of_silent_dead_end():
         form.ok()
 
         assert shown, "diagnostic next > swallowed the backend error silently"
-        assert shown[0][1] == "Could not prepare analysis"
+        assert shown[0][1] == "Could Not Prepare Analysis"
         assert "simulated preparation failure" in shown[0][2]
         assert "backend is not available" not in shown[0][2]
     finally:
@@ -392,7 +392,7 @@ def test_diagnostic_run_rejects_unconfigured_metric_slots(monkeypatch):
         form.run_ma()
 
         assert shown
-        assert shown[0][1] == "analysis failed"
+        assert shown[0][1] == "Analysis Failed"
         assert "No method and parameters were selected for: NLR" in shown[0][2]
         assert "cannot unpack non-iterable NoneType object" not in shown[0][2]
         assert results == []
@@ -571,7 +571,7 @@ def test_diagnostic_metric_dialog_does_not_run_without_selected_metrics(monkeypa
         assert captured == []
         assert warnings
         assert warnings[0][1:3] == (
-            "No diagnostic metric selected",
+            "No Diagnostic Metric Selected",
             "Select at least one available diagnostic metric before running analysis.",
         )
     finally:

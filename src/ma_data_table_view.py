@@ -639,7 +639,7 @@ class MADataTable(QtWidgets.QTableView):
                     ):
                         failed_messages.append(self._model_data_error_message())
                 except Exception as e:
-                    print("whoops, exception while pasting: %s" % e)
+                    print("Exception while pasting: %s" % e)
 
         self.model().blockSignals(False)
         self.model().reset_model()
@@ -661,7 +661,7 @@ class MADataTable(QtWidgets.QTableView):
         if self.main_gui is not None and hasattr(self.main_gui, "data_error"):
             self.main_gui.data_error(msg)
         else:
-            QMessageBox.warning(self, "Whoops", msg)
+            QMessageBox.warning(self, "Warning", msg)
 
     def column_widths(self):
         """returns the current column widths"""

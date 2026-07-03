@@ -74,7 +74,7 @@ def test_binary_analysis_failure_shows_dialog_and_does_not_open_results(monkeypa
         form.run_ma()
 
         assert shown
-        assert shown[0][1] == "analysis failed"
+        assert shown[0][1] == "Analysis Failed"
         assert "simulated R failure" in shown[0][2]
         assert results == []
     finally:
@@ -253,7 +253,7 @@ def test_method_parameters_build_failure_reports_preparation_error(monkeypatch):
 
         assert form is None
         assert shown
-        assert shown[0][1] == "Could not prepare analysis"
+        assert shown[0][1] == "Could Not Prepare Analysis"
         assert "study name is missing" in shown[0][2]
         assert "backend is not available" not in shown[0][2]
     finally:
@@ -280,7 +280,7 @@ def test_method_parameters_backend_unavailable_keeps_backend_error(monkeypatch):
 
         assert form is None
         assert shown
-        assert shown[0][1] == "Analysis backend unavailable"
+        assert shown[0][1] == "Analysis Backend Unavailable"
         assert "could not be reached" in shown[0][2]
         assert "not available in this modern build" not in shown[0][2]
     finally:
@@ -322,7 +322,7 @@ def test_results_window_build_failure_reports_display_error(monkeypatch):
         window.analysis({"texts": {"Summary": "ok"}, "images": {}})
 
         assert shown
-        assert shown[0][1] == "Could not display analysis results"
+        assert shown[0][1] == "Could Not Display Analysis Results"
         assert "plot image could not be loaded" in shown[0][2]
         assert "analysis could not be completed" not in shown[0][2]
     finally:
@@ -350,7 +350,7 @@ def test_project_save_failure_reports_original_error(monkeypatch, tmp_path):
 
         assert window.save() is False
         assert shown
-        assert shown[0][1] == "Could not save project"
+        assert shown[0][1] == "Could Not Save Project"
         assert "disk is full" in shown[0][2]
         assert "whoops" not in shown[0][2].lower()
     finally:
@@ -377,7 +377,7 @@ def test_opening_pickled_non_dataset_reports_invalid_project(monkeypatch, tmp_pa
         assert window.open(str(invalid_project)) is None
 
         assert shown
-        assert shown[0][1] == "Could not open project"
+        assert shown[0][1] == "Could Not Open Project"
         assert "is not a valid OpenMeta[Analyst] project file" in shown[0][2]
         assert "get_outcome_names" not in shown[0][2]
         assert window.out_path is None

@@ -16,6 +16,6 @@ class EditCovariateName(QDialog, forms.ui_edit_group_name.Ui_group_name_dialog):
         super(EditCovariateName, self).__init__(parent)
         self.setupUi(self)
         self.group_name_le.setText(cur_cov_name)
-        self.field_lbl.setText("covariate name:")
-        self.setWindowTitle("edit covariate name")
+        self.field_lbl.setText("Covariate name:")
+        self.setWindowTitle("Edit Covariate Name")
         qt_layout.fit_application_dialog_to_contents(self)
