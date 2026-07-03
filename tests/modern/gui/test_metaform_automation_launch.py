@@ -1792,6 +1792,9 @@ def test_results_window_places_references_after_images_and_wraps_them(tmp_path):
     )
 
     try:
+        window.show()
+        app.processEvents()
+
         nav_titles = [
             window.nav_tree.topLevelItem(index).text(0)
             for index in range(window.nav_tree.topLevelItemCount())
@@ -1803,7 +1806,14 @@ def test_results_window_places_references_after_images_and_wraps_them(tmp_path):
             for item in window.scene.items()
             if isinstance(item, results_window.QGraphicsTextItem)
         }
-        assert sections[long_reference].textWidth() > 0
+        reference_item = sections[long_reference]
+        assert reference_item.textWidth() >= (
+            window.graphics_view.viewport().width() - results_window.padding - 5
+        )
+        assert (
+            reference_item.document().defaultTextOption().wrapMode()
+            == results_window.QTextOption.WordWrap
+        )
     finally:
         window.close()
         app.processEvents()

@@ -12,7 +12,7 @@
 
 import random
 from PyQt5.QtCore import QByteArray, QPoint, QRectF, Qt
-from PyQt5.QtGui import QFont, QFontMetricsF, QImage, QPixmap, QTransform
+from PyQt5.QtGui import QFont, QFontMetricsF, QImage, QPixmap, QTextOption, QTransform
 from PyQt5.QtWidgets import (
     QAction,
     QApplication,
@@ -68,6 +68,11 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self.nav_tree.itemClicked.connect(
             app_error_handler.safe_slot(self.item_clicked, parent=self)
         )
+        self.results_nav_splitter.splitterMoved.connect(
+            app_error_handler.safe_slot(
+                lambda _pos, _index: self._update_wrapped_text_widths(), parent=self
+            )
+        )
 
         self.psuedo_console.blockSignals(False)
         if hasattr(self.psuedo_console, "returnPressed"):
@@ -110,6 +115,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self.image_var_names = results["image_var_names"]
         self.set_psuedo_console_text()
         self.items_to_coords = {}
+        self._wrapped_text_items = []
         self.texts = results["texts"]
         self.texts, self.references_text = result_sections.pop_references_section(
             self.texts
@@ -269,7 +275,11 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         txt_item = QGraphicsTextItem(text)
         txt_item.setFont(QFont("courier", 12))
         if wrap:
+            text_option = txt_item.document().defaultTextOption()
+            text_option.setWrapMode(QTextOption.WordWrap)
+            txt_item.document().setDefaultTextOption(text_option)
             txt_item.setTextWidth(self._text_wrap_width())
+            self._wrapped_text_items.append(txt_item)
         txt_item.setToolTip(
             "To copy the text:\n"
             "1) Right click on the text and choose select all.\n"
@@ -297,9 +307,31 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
     def _text_wrap_width(self):
         viewport_width = self.graphics_view.viewport().width()
-        if viewport_width <= 0:
-            viewport_width = self.results_nav_splitter.width()
-        return max(300, viewport_width - horizontal_padding)
+        if viewport_width <= horizontal_padding:
+            viewport_width = max(self.results_nav_splitter.width(), self.width())
+        return max(300, viewport_width - self.x_coord - padding)
+
+    def _update_wrapped_text_widths(self):
+        if not self._wrapped_text_items:
+            return
+
+        wrap_width = self._text_wrap_width()
+        scene_width = self.scene.width()
+        scene_height = self.scene.height()
+        for txt_item in self._wrapped_text_items:
+            txt_item.setTextWidth(wrap_width)
+            scene_rect = txt_item.sceneBoundingRect()
+            scene_width = max(scene_width, scene_rect.right() + padding)
+            scene_height = max(scene_height, scene_rect.bottom() + padding)
+        self.scene.setSceneRect(0, 0, scene_width, scene_height)
+
+    def showEvent(self, event):
+        super(ResultsWindow, self).showEvent(event)
+        self._update_wrapped_text_widths()
+
+    def resizeEvent(self, event):
+        super(ResultsWindow, self).resizeEvent(event)
+        self._update_wrapped_text_widths()
 
     def process_console_input(self):
         res = str(meta_py_r.evaluate_r_console(self.current_line()))
