@@ -678,6 +678,52 @@ def test_diagnostic_direct_effects_do_not_offer_count_based_methods(monkeypatch)
         _close_without_prompt(app, window)
 
 
+def test_diagnostic_method_selector_fits_longest_available_label(monkeypatch):
+    import launch
+
+    app, window = launch.start_automation()
+    import ma_specs
+
+    backend = ma_specs.meta_py_r
+    saved = {
+        name: getattr(backend, name)
+        for name in (
+            "get_available_methods",
+            "get_params",
+            "get_method_description",
+            "ma_dataset_to_simple_diagnostic_robj",
+        )
+    }
+    try:
+        _create_diagnostic_dataset(window)
+
+        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
+        backend.get_available_methods = lambda **kwargs: {
+            "Diagnostic Random-Effects": "diagnostic.random",
+            "Diagnostic Fixed-Effect Inverse Variance": "diagnostic.fixed.inv.var",
+        }
+        backend.get_params = lambda method: ({}, {}, [], {})
+        backend.get_method_description = lambda method: "stub method"
+
+        form = window._build_analysis_specs_dialog(
+            diag_metrics=["sens", "spec"],
+            conf_level=window.model.get_global_conf_level(),
+        )
+        form.show()
+        app.processEvents()
+
+        label = "Diagnostic Fixed-Effect Inverse Variance"
+        label_width = form.method_cbo_box.fontMetrics().horizontalAdvance(label) + 48
+
+        assert form.method_cbo_box.findText(label) >= 0
+        assert form.method_cbo_box.minimumWidth() >= label_width
+        assert form.method_cbo_box.maximumWidth() >= label_width
+    finally:
+        for name, value in saved.items():
+            setattr(backend, name, value)
+        _close_without_prompt(app, window)
+
+
 def _close_without_prompt(app, window):
     window.current_data_unsaved = False
     window.close()

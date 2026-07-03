@@ -1025,7 +1025,22 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
             "DerSimonian-Laird",
             "Only zero-event studies",
         ]
-        for combo in [specs[0].method_cbo_box] + enum_combos:
+        method_combo = specs[0].method_cbo_box
+        assert method_combo.sizeAdjustPolicy() == QtWidgets.QComboBox.AdjustToContents
+        widest_method_label = max(
+            method_combo.fontMetrics().horizontalAdvance(
+                str(method_combo.itemText(index))
+            )
+            for index in range(method_combo.count())
+        ) + 48
+        assert method_combo.minimumWidth() >= widest_method_label
+        assert method_combo.maximumWidth() >= widest_method_label
+        assert (
+            method_combo.sizePolicy().horizontalPolicy()
+            != QtWidgets.QSizePolicy.Expanding
+        )
+
+        for combo in enum_combos:
             assert combo.sizeAdjustPolicy() == QtWidgets.QComboBox.AdjustToContents
             assert combo.minimumWidth() <= qt_layout.ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH
             assert (

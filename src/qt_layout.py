@@ -253,6 +253,16 @@ def _fit_widget_width_to_hint(widget, width):
 
 def _fit_combo_width_to_contents(combo_box):
     width = max(combo_box.sizeHint().width(), _combo_contents_width(combo_box))
+    if combo_box.property("oma_fit_contents_without_width_cap") is True:
+        target_width = width
+        combo_box.setMinimumWidth(target_width)
+        combo_box.setMaximumWidth(max(target_width, combo_box.maximumWidth()))
+        if combo_box.sizePolicy().horizontalPolicy() == QSizePolicy.Fixed:
+            combo_box.setSizePolicy(
+                QSizePolicy.Preferred, combo_box.sizePolicy().verticalPolicy()
+            )
+        return
+
     target_maximum_width = _combo_maximum_width(combo_box)
     target_width = min(width, target_maximum_width)
     combo_box.setMinimumWidth(target_width)
