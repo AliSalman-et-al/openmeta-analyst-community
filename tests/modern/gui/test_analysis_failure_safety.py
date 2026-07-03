@@ -619,6 +619,115 @@ def test_safe_application_notify_reports_event_handler_exceptions(
         app.processEvents()
 
 
+def test_context_menu_popup_helper_ignores_reentrant_popups(monkeypatch):
+    from PyQt5.QtCore import QPoint
+
+    import app_error_handler
+
+    popups = []
+
+    class FakeSignal(object):
+        def __init__(self):
+            self._callbacks = []
+
+        def connect(self, callback):
+            self._callbacks.append(callback)
+
+        def emit(self):
+            for callback in self._callbacks:
+                callback()
+
+    class FakeEvent(object):
+        def __init__(self):
+            self.accepted = False
+
+        def accept(self):
+            self.accepted = True
+
+    class FakeMenu(object):
+        def __init__(self, name):
+            self.name = name
+            self.aboutToHide = FakeSignal()
+
+        def popup(self, pos):
+            popups.append((self.name, pos))
+
+    monkeypatch.setattr(app_error_handler, "_active_context_menu", None)
+    first_menu = FakeMenu("first")
+    second_menu = FakeMenu("second")
+    first_event = FakeEvent()
+    second_event = FakeEvent()
+
+    assert (
+        app_error_handler.popup_context_menu(
+            first_menu, QPoint(1, 2), event=first_event
+        )
+        is True
+    )
+    assert (
+        app_error_handler.popup_context_menu(
+            second_menu, QPoint(3, 4), event=second_event
+        )
+        is False
+    )
+
+    assert first_event.accepted is True
+    assert second_event.accepted is True
+    assert popups == [("first", QPoint(1, 2))]
+
+    first_menu.aboutToHide.emit()
+    assert (
+        app_error_handler.popup_context_menu(second_menu, QPoint(3, 4)) is True
+    )
+    assert popups == [("first", QPoint(1, 2)), ("second", QPoint(3, 4))]
+
+
+def test_context_menu_events_are_suppressed_while_menu_is_active(monkeypatch):
+    from PyQt5.QtCore import QEvent
+
+    import app_error_handler
+
+    class FakeEvent(object):
+        def type(self):
+            return QEvent.ContextMenu
+
+    monkeypatch.setattr(app_error_handler, "is_context_menu_active", lambda: True)
+
+    assert app_error_handler.should_suppress_context_menu_event(FakeEvent()) is True
+
+
+def test_context_menu_popup_failure_clears_active_guard(monkeypatch):
+    from PyQt5.QtCore import QPoint
+
+    import app_error_handler
+
+    handled = []
+
+    class FakeSignal(object):
+        def connect(self, callback):
+            pass
+
+    class RaisingMenu(object):
+        aboutToHide = FakeSignal()
+
+        def popup(self, pos):
+            raise RuntimeError("popup exploded")
+
+    monkeypatch.setattr(app_error_handler, "_active_context_menu", None)
+    monkeypatch.setattr(
+        app_error_handler,
+        "handle_exception",
+        lambda *args, **kwargs: handled.append(args),
+    )
+
+    assert (
+        app_error_handler.popup_context_menu(RaisingMenu(), QPoint(1, 2)) is False
+    )
+
+    assert handled
+    assert app_error_handler._active_context_menu is None
+
+
 def _close_without_prompt(app, window):
     window.current_data_unsaved = False
     window.close()

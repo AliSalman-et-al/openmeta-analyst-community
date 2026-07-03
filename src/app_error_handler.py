@@ -4,7 +4,8 @@ import sys
 import traceback
 from datetime import datetime
 
-from PyQt5.QtWidgets import QApplication, QMessageBox
+from PyQt5.QtCore import QEvent
+from PyQt5.QtWidgets import QApplication, QMenu, QMessageBox
 
 import settings
 
@@ -17,6 +18,7 @@ UNEXPECTED_ERROR_MESSAGE = (
 
 _previous_excepthook = None
 _handling_exception = False
+_active_context_menu = None
 
 
 def exception_log_path():
@@ -170,6 +172,50 @@ def disconnect_safely(connection):
         connection.disconnect()
 
 
+def _clear_active_context_menu(menu):
+    global _active_context_menu
+    if _active_context_menu is menu:
+        _active_context_menu = None
+
+
+def is_context_menu_active():
+    popup = QApplication.activePopupWidget()
+    if isinstance(popup, QMenu):
+        return True
+    return _active_context_menu is not None
+
+
+def popup_context_menu(menu, pos, parent=None, event=None):
+    global _active_context_menu
+
+    if is_context_menu_active():
+        if event is not None:
+            event.accept()
+        return False
+
+    _active_context_menu = menu
+    try:
+        menu.aboutToHide.connect(lambda: _clear_active_context_menu(menu))
+        if hasattr(menu, "destroyed"):
+            menu.destroyed.connect(lambda *_args: _clear_active_context_menu(menu))
+        menu.popup(pos)
+        if event is not None:
+            event.accept()
+        return True
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except Exception as e:
+        _clear_active_context_menu(menu)
+        handle_exception(type(e), e, e.__traceback__, parent=_resolve_parent(parent))
+        if event is not None:
+            event.accept()
+        return False
+
+
+def should_suppress_context_menu_event(event):
+    return event.type() == QEvent.ContextMenu and is_context_menu_active()
+
+
 def _resolve_parent(parent):
     if callable(parent):
         try:
@@ -182,6 +228,9 @@ def _resolve_parent(parent):
 class SafeApplication(QApplication):
     def notify(self, receiver, event):
         try:
+            if should_suppress_context_menu_event(event):
+                event.accept()
+                return True
             return super(SafeApplication, self).notify(receiver, event)
         except (KeyboardInterrupt, SystemExit):
             raise

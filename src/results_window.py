@@ -368,9 +368,13 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         )
         context_menu.addAction(copy_action)
 
-        context_menu.aboutToHide.connect(self._clear_text_context_menu)
-        context_menu.popup(event.screenPos())
-        event.accept()
+        shown = app_error_handler.popup_context_menu(
+            context_menu, event.screenPos(), parent=self, event=event
+        )
+        if shown:
+            context_menu.aboutToHide.connect(self._clear_text_context_menu)
+        else:
+            self._clear_text_context_menu()
 
     def _clear_text_context_menu(self):
         self._active_text_context_menu = None
@@ -535,9 +539,9 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             else:  # no params path given, just give them the png
                 add_save_as_png_menu_action(context_menu)
 
-            pos = event.screenPos()
-            context_menu.popup(pos)
-            event.accept()
+            app_error_handler.popup_context_menu(
+                context_menu, event.screenPos(), parent=self, event=event
+            )
 
         return _graphics_item_context_menu
 

@@ -2846,6 +2846,51 @@
       "decision": "keep",
       "evidence": [
         "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_analysis_failure_safety.py::test_context_menu_popup_helper_ignores_reentrant_popups",
+      "reason": "Guards the shared context-menu popup helper against duplicate right-click menu creation while a menu is active.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_analysis_failure_safety.py::test_context_menu_events_are_suppressed_while_menu_is_active",
+      "reason": "Guards SafeApplication against dispatching native context-menu events re-entrantly while a popup menu is active.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_analysis_failure_safety.py::test_context_menu_popup_failure_clears_active_guard",
+      "reason": "Guards the shared context-menu popup helper against leaving the application in a permanently active menu state after popup failures.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
         "analysis_behavior"
       ],
       "external_dependencies": [

@@ -137,9 +137,9 @@ class MADataTable(QtWidgets.QTableView):
             _connect_action(action, self.paste)
             context_menu.addAction(action)
 
-            pos = event.globalPos()
-            context_menu.popup(pos)
-            event.accept()
+            app_error_handler.popup_context_menu(
+                context_menu, event.globalPos(), parent=self, event=event
+            )
 
         return _context_menu
 
@@ -175,7 +175,9 @@ class MADataTable(QtWidgets.QTableView):
                 action.setEnabled(False)
             context_menu.addAction(action)
 
-            context_menu.popup(self.mapToGlobal(pos))
+            app_error_handler.popup_context_menu(
+                context_menu, self.mapToGlobal(pos), parent=self
+            )
         elif column_clicked in (1, 2):
             col_name = {1: "Study Name", 2: "Year"}[column_clicked]
             action_sort = QAction("Sort Studies by %s" % col_name, self)
@@ -243,7 +245,9 @@ class MADataTable(QtWidgets.QTableView):
             _connect_action(action_change, lambda: self.main_gui.change_cov_type(cov))
             context_menu.addAction(action_change)
 
-        context_menu.popup(self.mapToGlobal(pos))
+        app_error_handler.popup_context_menu(
+            context_menu, self.mapToGlobal(pos), parent=self
+        )
 
     def include_all_studies(self):
         self.model().include_all_studies()
