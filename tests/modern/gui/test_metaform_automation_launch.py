@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import sys
+import xml.etree.ElementTree as ET
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("OMA_STUB_BACKEND", "1")
@@ -2172,6 +2173,24 @@ def test_new_dataset_wizard_sizes_to_show_diagnostic_choice():
         assert wizard.minimumHeight() >= wizard.sizeHint().height()
     finally:
         wizard.close()
+        app.processEvents()
+
+
+def test_data_type_page_canonical_geometry_covers_normalized_content():
+    import launch
+    from PyQt5 import QtWidgets
+    import main_wizard
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    data_type_page = main_wizard.DataTypePage()
+    try:
+        data_type_page.layout().activate()
+        ui_tree = ET.parse(Path("src", "forms", "data_type_page.ui"))
+        ui_height = int(ui_tree.findtext(".//height"))
+
+        assert ui_height >= data_type_page.minimumHeight()
+    finally:
+        data_type_page.close()
         app.processEvents()
 
 

@@ -167,6 +167,7 @@ class DataTypePage(QWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
         )
         self._normalize_data_type_button_sizes()
         qt_layout.fit_text_to_contents(self, adjust_root=False)
+        self._fit_page_to_data_type_contents()
 
     def initializePage(self):
         # self.wizard().adjustSize()
@@ -197,6 +198,12 @@ class DataTypePage(QWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
         for button in buttons:
             button.setFixedSize(common_size)
             button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+
+    def _fit_page_to_data_type_contents(self):
+        layout = self.layout()
+        if layout is not None:
+            layout.activate()
+        self.setMinimumSize(self.minimumSize().expandedTo(self.sizeHint()))
 
     def _button_selected(self, button):
         # print("button clicked %s" % str(button))
