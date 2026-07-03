@@ -686,7 +686,7 @@ g.bootstrap.meta.regression <- function(data, mods, method, level, digits,
 		ci.lb <- c(ci.lb, ci[["normal"]][2])
 		ci.ub <- c(ci.ub, ci[["normal"]][3])
 	}
-	boot.summary.df <- data.frame(estimate=b, "Lower Bound"=ci.lb, "Upper Bound"=ci.ub)
+	boot.summary.df <- data.frame(estimate=b, "Lower bound"=ci.lb, "Upper bound"=ci.ub, check.names=FALSE)
 	rownames(boot.summary.df) <- coeff.names
 	# summary text
     boot.summary.df.rounded <- round(boot.summary.df, digits=digits)
@@ -700,8 +700,8 @@ g.bootstrap.meta.regression <- function(data, mods, method, level, digits,
 	plot.custom.boot(res.boot,
 			title=as.character(histogram.title),
 			xlabs=xlabels,
-			ci.lb=boot.summary.df[["Lower Bound"]],
-			ci.ub=boot.summary.df[["Upper Bound"]])
+			ci.lb=boot.summary.df[["Lower bound"]],
+			ci.ub=boot.summary.df[["Upper bound"]])
 	graphics.off()
 	images <- c("Histograms"=bootstrap.plot.path)
 
@@ -804,7 +804,7 @@ g.bootstrap.meta.regression.cond.means <- function(
 		ci.lb <- c(ci.lb, ci[["normal"]][2])
 		ci.ub <- c(ci.ub, ci[["normal"]][3])
 	}
-	boot.summary.df <- data.frame(cond.mean=b, "Lower Bound"=ci.lb, "Upper Bound"=ci.ub)
+	boot.summary.df <- data.frame(cond.mean=b, "Lower bound"=ci.lb, "Upper bound"=ci.ub, check.names=FALSE)
 	rownames(boot.summary.df) <- coeff.names
 	
 	### Summary text
@@ -827,8 +827,8 @@ g.bootstrap.meta.regression.cond.means <- function(
 	plot.custom.boot(res.boot,
 			title=as.character(histogram.title),
 			xlabs=xlabels,
-			ci.lb=boot.summary.df[["Lower Bound"]],
-			ci.ub=boot.summary.df[["Upper Bound"]])
+			ci.lb=boot.summary.df[["Lower bound"]],
+			ci.ub=boot.summary.df[["Upper bound"]])
 	graphics.off()
 	images <- c("Histograms"=bootstrap.plot.path)
 	

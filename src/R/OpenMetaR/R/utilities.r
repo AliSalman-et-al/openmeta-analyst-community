@@ -277,7 +277,7 @@ create.summary.disp <- function(om.data, params, res, model.title) {
   QEp <- format.p.value.display(res$QEp, params$digits)
   pVal <- format.p.value.display(res$pval, params$digits)
 
-  res.title <- " Model Results"
+  res.title <- "Model Results"
   #y.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(res$b, list(ni=n)))
   #lb.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(res$ci.lb, list(ni=n)))
   #ub.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(res$ci.ub, list(ni=n)))
@@ -287,20 +287,20 @@ create.summary.disp <- function(om.data, params, res, model.title) {
   se <- sprintf(digits.str, res$se)
 
   if (res$method=="FE") {
-    het.col.labels <- c(QLabel, "Het. p-Value")
+    het.col.labels <- c(QLabel, "Het. p-value")
     het.col.vals <-  c(QE, QEp)
     het.array <- rbind(het.col.labels, het.col.vals)
   } else {  
-    het.col.labels <- c("\u03c4\u00b2", QLabel, "Het. p-Value", "I\u00b2")
+    het.col.labels <- c("\u03c4\u00b2", QLabel, "Het. p-value", "I\u00b2")
     het.col.vals <-  c(tau2, QE, QEp, I2)
     het.array <- rbind(het.col.labels, het.col.vals)
   }
   class(het.array) <- "summary.data"
-  het.title <- " Heterogeneity"
+  het.title <- "Heterogeneity"
    
   if (scale.str == "log" || scale.str == "logit" || scale.str == "arcsine") {
     # display and calculation scales are different - create two tables for results
-    res.col.labels <- c("Estimate", "Lower bound", "Upper bound","p-Value")
+    res.col.labels <- c("Estimate", "Lower bound", "Upper bound","p-value")
     res.col.vals <- c(y.disp, lb.disp, ub.disp, pVal)
     res.array <- rbind(res.col.labels, res.col.vals)
     estCalc <- sprintf(digits.str, res$b)
@@ -319,7 +319,7 @@ create.summary.disp <- function(om.data, params, res, model.title) {
     notes <- c(calc.note)
   } else {
     # display and calculation scales are the same - create one table for results
-    col.labels <- c("Estimate", "Lower bound", "Upper bound", "Std. error", "p-Value")
+    col.labels <- c("Estimate", "Lower bound", "Upper bound", "Std. error", "p-value")
     col.vals <- c(y.disp, lb.disp, ub.disp, se, pVal)
     res.array <- rbind(col.labels, col.vals)
     arrays = list(arr1=res.array, arr2=het.array)
@@ -445,13 +445,13 @@ create.regression.display <- function(res, params, display.data) {
   if (n.factor.covs==0) {
     col.labels <- switch(bootstrap.type,
                boot.meta.reg=c("Covariate", "Coefficients", "Lower bound", "Upper bound"),
-               c("Covariate", "Coefficients", "Lower bound", "Upper bound", "Std. error", "p-Value"))
-    #col.labels <- c("Covariate", "Coefficients", "Lower bound", "Upper bound", "Std. error", "p-Value")
+               c("Covariate", "Coefficients", "Lower bound", "Upper bound", "Std. error", "p-value"))
+    #col.labels <- c("Covariate", "Coefficients", "Lower bound", "Upper bound", "Std. error", "p-value")
   } else {
     col.labels <- switch(bootstrap.type,
         boot.meta.reg=col.labels <- c("Covariate", "Level", "Studies", "Coefficients", "Lower bound", "Upper bound"),
-        col.labels <- c("Covariate", "Level", "Studies", "Coefficients", "Lower bound", "Upper bound", "Std. error", "p-Value"))
-    #col.labels <- c("Covariate", "Level", "Studies", "Coefficients", "Lower bound", "Upper bound", "Std. error", "p-Value")
+        col.labels <- c("Covariate", "Level", "Studies", "Coefficients", "Lower bound", "Upper bound", "Std. error", "p-value"))
+    #col.labels <- c("Covariate", "Level", "Studies", "Coefficients", "Lower bound", "Upper bound", "Std. error", "p-value")
   }
     
   reg.array <- array(dim=c(length(cov.display.col)+1, length(col.labels)), dimnames=list(NULL, col.labels))
@@ -503,7 +503,7 @@ create.regression.display <- function(res, params, display.data) {
   reg.array[2:n.rows, "Upper bound"] <- ubs.tmp
   if (bootstrap.type!="boot.meta.reg") {
     reg.array[2:n.rows,"Std. error"] <- se.tmp
-    reg.array[2:n.rows, "p-Value"] <- pvals.tmp
+    reg.array[2:n.rows, "p-value"] <- pvals.tmp
     
     omnibus.pval.array <- array(dim=c(1,1))
     omnibus.pval.array[1,1] <- round.display(res$QMp, digits=params$digits)
@@ -516,7 +516,7 @@ create.regression.display <- function(res, params, display.data) {
   
   if (bootstrap.type!="boot.meta.reg") {
     model.title <- paste("Meta-Regression\n\nMetric: ", metric.name, sep="")
-    reg.disp <- list("model.title" = model.title, "table.titles" = c("Model Results", "Omnibus p-Value"), "arrays" = arrays, "MAResults" = res)
+    reg.disp <- list("model.title" = model.title, "table.titles" = c("Model Results", "Omnibus p-value"), "arrays" = arrays, "MAResults" = res)
   } else {
     model.title <- paste("Bootstrapped Meta-Regression based on ", params$num.bootstrap.replicates, " replicates.\n\n", params$extra.attempts, " resampling attempts failed.\n\nMetric: ", metric.name, sep="")
     reg.disp <- list("model.title" = model.title, "table.titles" = c("Model Results"), "arrays" = arrays, "MAResults" = res)
@@ -622,7 +622,7 @@ create.overall.display <- function(res, study.names, params, model.title, data.t
   overall.array <- array(dim=c(length(study.names) + 1, 6))
     #QLabel =  paste("Q(df = ", degf, ")", sep="")
   
-  overall.array[1,] <- c("Studies", "Estimate", "Lower bound", "Upper bound", "Std. error", "p-Value")
+  overall.array[1,] <- c("Studies", "Estimate", "Lower bound", "Upper bound", "Std. error", "p-value")
   
   # unpack the data
   for (count in 1:length(res)) {
@@ -640,7 +640,7 @@ create.overall.display <- function(res, study.names, params, model.title, data.t
     overall.array[count+1,] <- c(study.names[count], y.disp, lb.disp, ub.disp, se.disp, pVal)
   }
 
-  table.titles <- c(" Model Results")
+  table.titles <- c("Model Results")
   arrays <- list(arr1=overall.array)
   overall.disp <- list("model.title" = model.title, "table.titles" = table.titles, "arrays" = arrays,
              "MAResults" = res )
@@ -670,9 +670,9 @@ create.subgroup.display <- function(res, study.names, params, model.title, data.
   # hmm....
   n <- length(study.names)
 
-  subgroup.array[1,] <- c("Subgroups", "Studies", "Estimate", "Lower bound", "Upper bound", "Std. error", "p-Value", "z-Value")
+  subgroup.array[1,] <- c("Subgroups", "Studies", "Estimate", "Lower bound", "Upper bound", "Std. error", "p-value", "z-value")
   het.array[1,] <- c("Studies", "Q (df)",
-               "Het. p-Value", "I\u00b2")
+               "Het. p-value", "I\u00b2")
   # unpack the data
   for (count in 1:length(study.names)) {
     num.studies <- res[[count]]$k
@@ -708,7 +708,7 @@ create.subgroup.display <- function(res, study.names, params, model.title, data.
     het.array[count+1,] <- c(study.names[count], QE, QEp, I2)
   }
 
-  table.titles <- c(" Model Results", " Heterogeneity")
+  table.titles <- c("Model Results", "Heterogeneity")
   arrays <- list(arr1=subgroup.array, arr2=het.array)
   #}
   subgroup.disp <- list("model.title" = model.title, "table.titles" = table.titles, "arrays" = arrays,
@@ -761,7 +761,7 @@ write.results.to.file <- function(om.data, params, res, outpath) {
   results.df <- data.frame("Summary.estimate" = eval(call(transform.name, params$measure))$display.scale(res$b, n),
                "Lower.bound" = eval(call(transform.name, params$measure))$display.scale(res$ci.lb, n),
                "Upper.bound" = eval(call(transform.name, params$measure))$display.scale(res$ci.ub, n),
-               "p-Value" = res$pval)
+               "p-value" = res$pval)
   write.csv(results.df, file=outpath, row.names=FALSE)
 }
 

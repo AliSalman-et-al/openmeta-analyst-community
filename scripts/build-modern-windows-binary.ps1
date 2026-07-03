@@ -209,11 +209,11 @@ if (is.null(getS3method('print', 'summary.data', optional=TRUE))) {
 summary <- structure(
   list(
     model.title = 'Binary Random-Effects Model\n\nMetric: Odds Ratio',
-    table.titles = c(' Model Results'),
+    table.titles = c('Model Results'),
     arrays = list(
       arr1 = structure(
         rbind(
-          c('Estimate', 'Lower bound', 'Upper bound', 'p-Value'),
+          c('Estimate', 'Lower bound', 'Upper bound', 'p-value'),
           c('0.770', '0.485', '1.222', '0.267')
         ),
         class = 'summary.data'
@@ -223,7 +223,7 @@ summary <- structure(
   class = 'summary.display'
 )
 rendered <- paste(capture.output(print(summary)), collapse='\n')
-required <- c('Binary Random-Effects Model', ' Model Results', 'Estimate', '0.770')
+required <- c('Binary Random-Effects Model', 'Model Results', 'Estimate', '0.770')
 if (!all(vapply(required, function(value) grepl(value, rendered, fixed=TRUE), logical(1)))) {
   stop(sprintf('summary.display formatted output missing expected text:\n%s', rendered))
 }

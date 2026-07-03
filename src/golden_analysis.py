@@ -1207,6 +1207,7 @@ def _extract_model_values(row):
         "Lower bound": "lower_bound",
         "Upper bound": "upper_bound",
         "p-Value": "p_value",
+        "p-value": "p_value",
         "p-Val": "p_value",
     }
     for label, key in mapping.items():

@@ -290,7 +290,7 @@ class Ui_ContinuousDataForm(object):
         item = self.simple_table.horizontalHeaderItem(4)
         item.setText(_translate("ContinuousDataForm", "Variance"))
         item = self.simple_table.horizontalHeaderItem(5)
-        item.setText(_translate("ContinuousDataForm", "p-Value"))
+        item.setText(_translate("ContinuousDataForm", "p-value"))
         item = self.simple_table.horizontalHeaderItem(6)
         item.setText(_translate("ContinuousDataForm", "Lower"))
         item = self.simple_table.horizontalHeaderItem(7)

@@ -115,7 +115,7 @@
      </column>
      <column>
       <property name="text">
-       <string>p-Value</string>
+       <string>p-value</string>
       </property>
      </column>
      <column>
