@@ -1953,6 +1953,94 @@ def test_results_window_separates_tall_text_sections():
         app.processEvents()
 
 
+def test_results_window_text_context_menu_is_reentrant_safe(monkeypatch):
+    import launch
+    import modern_compat
+
+    modern_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    popups = []
+
+    class FakeEvent(object):
+        def __init__(self):
+            self.accepted = False
+
+        def screenPos(self):
+            return results_window.QPoint(10, 20)
+
+        def accept(self):
+            self.accepted = True
+
+    class FakeSignal(object):
+        def __init__(self):
+            self._callbacks = []
+
+        def connect(self, callback):
+            self._callbacks.append(callback)
+
+        def emit(self):
+            for callback in self._callbacks:
+                callback()
+
+    class FakeMenu(object):
+        current = None
+
+        def __init__(self, parent=None):
+            self.parent = parent
+            self.actions = []
+            self.aboutToHide = FakeSignal()
+            FakeMenu.current = self
+
+        def addAction(self, action):
+            self.actions.append(action)
+
+        def popup(self, pos):
+            popups.append((pos, [action.text() for action in self.actions]))
+
+    monkeypatch.setattr(results_window, "QMenu", FakeMenu)
+    window = results_window.ResultsWindow(
+        {
+            "texts": {"Summary": "Model Results\nEstimate  Lower bound"},
+            "images": {},
+            "image_var_names": {},
+            "image_params_paths": {},
+            "image_order": [],
+        }
+    )
+
+    try:
+        text_items = [
+            item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsTextItem)
+            and item.toPlainText().startswith("Model Results")
+        ]
+        assert len(text_items) == 1
+
+        first_event = FakeEvent()
+        second_event = FakeEvent()
+        text_items[0].contextMenuEvent(first_event)
+        text_items[0].contextMenuEvent(second_event)
+
+        assert first_event.accepted is True
+        assert second_event.accepted is True
+        assert popups == [
+            (
+                results_window.QPoint(10, 20),
+                ["Select All", "Copy"],
+            )
+        ]
+
+        FakeMenu.current.aboutToHide.emit()
+        text_items[0].contextMenuEvent(FakeEvent())
+        assert len(popups) == 2
+    finally:
+        window.close()
+        app.processEvents()
+
+
 def test_results_window_ignores_missing_image_order_entries():
     import launch
     import modern_compat

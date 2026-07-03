@@ -13,6 +13,7 @@
 import random
 from PyQt5.QtCore import QByteArray, QPoint, QRectF, Qt
 from PyQt5.QtGui import QFont, QFontMetricsF, QImage, QPixmap, QTextOption, QTransform
+from PyQt5.QtGui import QTextCursor
 from PyQt5.QtWidgets import (
     QAction,
     QApplication,
@@ -52,6 +53,23 @@ ROW_HEIGHT = 15  # by trial-and-error; seems to work very well
 SECTION_SPACING = ROW_HEIGHT
 
 
+class SelectableResultsTextItem(QGraphicsTextItem):
+    def __init__(self, text, results_window):
+        super(SelectableResultsTextItem, self).__init__(text)
+        self._results_window = results_window
+
+    def contextMenuEvent(self, event):
+        try:
+            self._results_window._show_text_context_menu(self, event)
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception as e:
+            app_error_handler.handle_exception(
+                type(e), e, e.__traceback__, parent=self._results_window
+            )
+            event.accept()
+
+
 class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
     def __init__(self, results, parent=None):
 
@@ -64,6 +82,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self.buffer_size = 2
         self.prev_point = QPoint()
         self.borders = []
+        self._active_text_context_menu = None
 
         self.nav_tree.itemClicked.connect(
             app_error_handler.safe_slot(self.item_clicked, parent=self)
@@ -291,7 +310,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self.graphics_view.centerOn(self.items_to_coords[id(item)])
 
     def create_text_item(self, text, position, wrap=False):
-        txt_item = QGraphicsTextItem(text)
+        txt_item = SelectableResultsTextItem(text, self)
         txt_item.setFont(QFont("courier", 12))
         if wrap:
             text_option = txt_item.document().defaultTextOption()
@@ -323,6 +342,48 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         txt_item.setPos(position)
 
         return (txt_item.boundingRect(), position)
+
+    def _show_text_context_menu(self, text_item, event):
+        if self._active_text_context_menu is not None:
+            event.accept()
+            return
+
+        context_menu = QMenu(self)
+        self._active_text_context_menu = context_menu
+
+        select_all_action = QAction("Select All", self)
+        select_all_action.triggered.connect(
+            app_error_handler.safe_slot(
+                lambda _checked=False: self._select_all_text(text_item), parent=self
+            )
+        )
+        context_menu.addAction(select_all_action)
+
+        copy_action = QAction("Copy", self)
+        copy_action.triggered.connect(
+            app_error_handler.safe_slot(
+                lambda _checked=False: self._copy_text_selection(text_item),
+                parent=self,
+            )
+        )
+        context_menu.addAction(copy_action)
+
+        context_menu.aboutToHide.connect(self._clear_text_context_menu)
+        context_menu.popup(event.screenPos())
+        event.accept()
+
+    def _clear_text_context_menu(self):
+        self._active_text_context_menu = None
+
+    def _select_all_text(self, text_item):
+        cursor = text_item.textCursor()
+        cursor.select(QTextCursor.Document)
+        text_item.setTextCursor(cursor)
+
+    def _copy_text_selection(self, text_item):
+        selected_text = text_item.textCursor().selectedText()
+        if selected_text:
+            QApplication.clipboard().setText(selected_text.replace("\u2029", "\n"))
 
     def _text_wrap_width(self):
         viewport_width = self.graphics_view.viewport().width()

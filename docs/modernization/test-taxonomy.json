@@ -819,6 +819,21 @@
     {
       "decision": "keep",
       "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_results_window_text_context_menu_is_reentrant_safe",
+      "reason": "Guards the Results window text context menu against re-entrant right-click events reported in issue #186.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
         "gui_compatibility"
       ],
       "external_dependencies": [
