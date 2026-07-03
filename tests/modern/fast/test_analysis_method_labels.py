@@ -6,8 +6,10 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "src"))
 
 from analysis_method_labels import (  # noqa: E402
+    diagnostic_metric_group_display_label,
     method_display_label,
     normalize_available_method_labels,
+    parameter_display_label,
     parameter_value_display_label,
 )
 
@@ -72,3 +74,21 @@ def test_parameter_value_labels_hide_internal_codes_without_changing_values():
     assert parameter_value_display_label("to", "only0") == "Only zero-event studies"
     assert parameter_value_display_label("to", "all") == "All studies"
     assert parameter_value_display_label("unknown", "raw-code") == "raw-code"
+
+
+def test_parameter_labels_hide_internal_names_when_metadata_is_missing():
+    assert parameter_display_label("theta.lower") == "Accuracy Prior Lower Bound"
+    assert parameter_display_label("theta.upper") == "Accuracy Prior Upper Bound"
+    assert parameter_display_label("lambda.lower") == "Threshold Prior Lower Bound"
+    assert parameter_display_label("num.iters") == "Number of Iterations"
+    assert parameter_display_label("conf.level") == "Confidence Level"
+    assert parameter_display_label("rm.method") == "Random-Effects Method"
+
+
+def test_diagnostic_metric_group_labels_spell_out_abbreviations():
+    assert diagnostic_metric_group_display_label("sens_spec") == (
+        "Sensitivity and Specificity"
+    )
+    assert diagnostic_metric_group_display_label("lr_dor") == (
+        "Likelihood Ratios and Diagnostic Odds Ratio"
+    )

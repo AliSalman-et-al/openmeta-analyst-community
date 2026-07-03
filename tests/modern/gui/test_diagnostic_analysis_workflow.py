@@ -123,7 +123,9 @@ def test_diagnostic_method_dialog_builds_with_working_backend():
         # Construction succeeded (no swallowed exception) and the diagnostic
         # window title was set via the PyQt5-compatible translate() call.
         assert form is not None
-        assert str(form.windowTitle()) == "Method & Parameters for Sens./Spec."
+        assert str(form.windowTitle()) == (
+            "Method & Parameters for Sensitivity and Specificity"
+        )
     finally:
         for name, value in saved.items():
             setattr(backend, name, value)

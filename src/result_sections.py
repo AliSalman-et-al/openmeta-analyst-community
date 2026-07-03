@@ -38,7 +38,16 @@ SECTION_TITLE_REPLACEMENTS = {
     "Density plots": "Density Plots",
     "Trace plots": "Trace Plots",
     "Leave-one-out Forest plot": "Leave-One-Out Forest Plot",
+    "SROC": "Summary ROC Plot",
 }
+
+METRIC_TITLE_REPLACEMENTS = (
+    ("NLR", "Negative Likelihood Ratio"),
+    ("PLR", "Positive Likelihood Ratio"),
+    ("DOR", "Diagnostic Odds Ratio"),
+    ("Sens", "Sensitivity"),
+    ("Spec", "Specificity"),
+)
 
 
 def format_references(references):
@@ -116,7 +125,7 @@ def section_display_title(title, context=None):
         return HSROC_SECTION_TITLES[title]
     if title in SECTION_TITLE_REPLACEMENTS:
         return SECTION_TITLE_REPLACEMENTS[title]
-    return title
+    return _normalize_metric_title(title)
 
 
 def pop_references_section(texts):
@@ -203,6 +212,17 @@ def _matching_sections(sections, predicate):
 
 def _is_primary_plot_title(title):
     return title in ("Forest Plot", "Regression Plot", "ROC Plot")
+
+
+def _normalize_metric_title(title):
+    display_title = str(title).replace("Forest plot", "Forest Plot")
+    for abbreviation, label in METRIC_TITLE_REPLACEMENTS:
+        display_title = re.sub(
+            r"\b%s\b" % re.escape(abbreviation),
+            label,
+            display_title,
+        )
+    return display_title
 
 
 def _group_items(items, *groups):

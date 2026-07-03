@@ -1122,6 +1122,84 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         os.chdir(REPO_ROOT)
 
 
+def test_method_parameters_dialog_normalizes_missing_parameter_metadata(monkeypatch):
+    import launch
+    from PyQt5 import QtWidgets
+
+    app, window = launch.start_automation()
+    meta_form = sys.modules["meta_form"]
+    meta_py_r = sys.modules["meta_py_r"]
+
+    params = {
+        "num.iters": "int",
+        "lambda.lower": "float",
+        "theta.upper": "float",
+        "conf.level": "float",
+    }
+    defaults = {
+        "num.iters": 5000,
+        "lambda.lower": -2.0,
+        "theta.upper": 2.0,
+        "conf.level": 95.0,
+    }
+
+    monkeypatch.setattr(
+        meta_py_r,
+        "get_available_methods",
+        lambda **kwargs: {"Binary Random-Effects": "binary.random"},
+        raising=False,
+    )
+    monkeypatch.setattr(
+        meta_py_r,
+        "get_params",
+        lambda method: (
+            dict(params),
+            dict(defaults),
+            ["num.iters", "lambda.lower", "theta.upper", "conf.level"],
+            {},
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        meta_py_r,
+        "get_method_description",
+        lambda method: "Random-effects analysis",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        meta_py_r,
+        "ma_dataset_to_simple_binary_robj",
+        lambda model, **kwargs: None,
+        raising=False,
+    )
+
+    try:
+        assert (
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            is True
+        )
+
+        window.action_go.trigger()
+        specs = window.findChildren(meta_form.ma_specs.MA_Specs)
+        assert len(specs) == 1
+
+        labels = {
+            str(label.text())
+            for label in specs[0].parameter_grp_box.findChildren(QtWidgets.QLabel)
+        }
+        assert "Number of Iterations" in labels
+        assert "Threshold Prior Lower Bound" in labels
+        assert "Accuracy Prior Upper Bound" in labels
+        assert "Confidence Level" in labels
+        assert "num.iters" not in labels
+        assert "lambda.lower" not in labels
+        assert "theta.upper" not in labels
+    finally:
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
 def test_method_parameters_dialog_stays_stable_when_method_description_changes(
     monkeypatch,
 ):

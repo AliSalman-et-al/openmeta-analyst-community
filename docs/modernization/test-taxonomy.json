@@ -665,6 +665,21 @@
     {
       "decision": "keep",
       "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_method_parameters_dialog_normalizes_missing_parameter_metadata",
+      "reason": "Protects method-parameter dialogs from exposing raw backend parameter names when metadata is absent.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
         "gui_compatibility",
         "analysis_behavior"
       ],
@@ -2214,6 +2229,36 @@
       "lane": "fast",
       "nodeid": "tests/modern/fast/test_analysis_method_labels.py::test_parameter_value_labels_hide_internal_codes_without_changing_values",
       "reason": "Fast modernization guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_analysis_method_labels.py::test_parameter_labels_hide_internal_names_when_metadata_is_missing",
+      "reason": "Fast guard that shared label normalization hides raw analysis parameter names.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_analysis_method_labels.py::test_diagnostic_metric_group_labels_spell_out_abbreviations",
+      "reason": "Fast guard that diagnostic method-selection labels spell out metric groups instead of exposing abbreviations.",
       "runtime_class": "subsecond",
       "size": "small"
     },

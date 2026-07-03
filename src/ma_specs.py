@@ -36,7 +36,10 @@ import sys
 
 import forms.ui_ma_specs
 from analysis_method_labels import (
+    diagnostic_metric_group_display_label,
     normalize_available_method_labels,
+    parameter_description,
+    parameter_display_label,
     parameter_value_display_label,
 )
 import app_error_handler
@@ -547,8 +550,8 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.add_label(
             layout,
             cur_grid_row,
-            self.param_d[name]["pretty.name"],
-            tool_tip_text=self.param_d[name]["description"],
+            self._parameter_display_label(name),
+            tool_tip_text=self._parameter_description(name),
         )
         cbo_box = QComboBox()
         for index, value in enumerate(values):
@@ -576,6 +579,12 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         return parameter_value_display_label(
             enum_name, item_name, self.param_d.get(enum_name)
         )
+
+    def _parameter_display_label(self, name):
+        return parameter_display_label(name, self.param_d.get(name))
+
+    def _parameter_description(self, name):
+        return parameter_description(name, self.param_d.get(name))
 
     def _find_enum_item_index(self, cbo_box, value):
         for index in range(cbo_box.count()):
@@ -607,8 +616,8 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.add_label(
             layout,
             cur_grid_row,
-            self.param_d[name]["pretty.name"],
-            tool_tip_text=self.param_d[name]["description"],
+            self._parameter_display_label(name),
+            tool_tip_text=self._parameter_description(name),
         )
         if name == "conf.level":
             self.add_confidence_level_box(layout, cur_grid_row, name)
@@ -663,8 +672,8 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.add_label(
             layout,
             cur_grid_row,
-            self.param_d[name]["pretty.name"],
-            tool_tip_text=self.param_d[name]["description"],
+            self._parameter_display_label(name),
+            tool_tip_text=self._parameter_description(name),
         )
         iinput = QSpinBox()
         if name == "digits":
@@ -703,8 +712,8 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.add_label(
             layout,
             cur_grid_row,
-            self.param_d[name]["pretty.name"],
-            tool_tip_text=self.param_d[name]["description"],
+            self._parameter_display_label(name),
+            tool_tip_text=self._parameter_description(name),
         )
         # now add the text
         txt_input = QLineEdit()
@@ -882,11 +891,11 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         # change some UI elements to refelct the current method
         window_title, method_label = "", ""
         if self.sens_spec:
-            window_title = "Method & Parameters for Sens./Spec."
-            method_label = "Method for Sens./Spec."
+            metric_group_label = diagnostic_metric_group_display_label("sens_spec")
         else:
-            window_title = "Method & Parameters for DOR/LR"
-            method_label = "Method for DOR/LR"
+            metric_group_label = diagnostic_metric_group_display_label("lr_dor")
+        window_title = "Method & Parameters for %s" % metric_group_label
+        method_label = "Method for %s" % metric_group_label
 
         self.setWindowTitle(QtCore.QCoreApplication.translate("Dialog", window_title))
         self.method_lbl.setText(method_label)

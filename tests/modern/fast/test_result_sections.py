@@ -71,6 +71,13 @@ def test_display_titles_normalize_result_navigation_labels():
         section_display_title("Within-study parameters - theta", context)
         == "Study-Level Threshold Parameters"
     )
+    assert section_display_title("NLR Summary", context) == (
+        "Negative Likelihood Ratio Summary"
+    )
+    assert section_display_title("DOR Forest plot", context) == (
+        "Diagnostic Odds Ratio Forest Plot"
+    )
+    assert section_display_title("SROC", context) == "Summary ROC Plot"
 
 
 def test_standard_meta_analysis_sections_keep_headline_result_with_plot():
