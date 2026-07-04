@@ -66,6 +66,23 @@ def test_issue_94_current_outcome_and_follow_up_labels_can_expand():
     app.processEvents()
 
 
+def test_issue_190_main_window_does_not_expose_toolbar_toggle_popup():
+    sys.path.insert(0, str(ROOT / "src"))
+    sys.path.insert(0, str(ROOT / "src" / "forms"))
+    from meta_form import MetaForm
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    window = MetaForm()
+
+    try:
+        assert window.createPopupMenu() is None
+        assert window.toolBar.toggleViewAction().isEnabled()
+    finally:
+        window.close()
+        window.deleteLater()
+    app.processEvents()
+
+
 def test_option_group_forms_fit_checkbox_and_radio_labels():
     sys.path.insert(0, str(ROOT / "src"))
     sys.path.insert(0, str(ROOT / "src" / "forms"))

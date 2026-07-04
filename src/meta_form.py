@@ -242,6 +242,9 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         else:
             self.action_view_network.setEnabled(False)
 
+    def createPopupMenu(self):
+        return None
+
     def start(self):
         # show the welcome dialog
         start_up_wizard = main_wizard.MainWizard(
