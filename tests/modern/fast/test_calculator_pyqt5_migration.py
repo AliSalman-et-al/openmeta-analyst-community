@@ -16,10 +16,7 @@ def test_calculator_cell_validators_accept_pyqt5_table_item_text():
     import diagnostic_data_form
 
     assert binary_data_form.BinaryDataForm2._cell_data_not_valid(None, "  ") is None
-    assert (
-        binary_data_form.BinaryDataForm2._cell_data_not_valid(None, " 1 ")
-        is None
-    )
+    assert binary_data_form.BinaryDataForm2._cell_data_not_valid(None, " 1 ") is None
     assert (
         binary_data_form.BinaryDataForm2._cell_data_not_valid(None, "1.5")
         == "Expected a whole number (count), but a decimal value was entered."
@@ -36,7 +33,9 @@ def test_calculator_cell_validators_accept_pyqt5_table_item_text():
         is None
     )
 
-    assert diagnostic_data_form.DiagnosticDataForm.cell_data_invalid(None, " 2 ") is None
+    assert (
+        diagnostic_data_form.DiagnosticDataForm.cell_data_invalid(None, " 2 ") is None
+    )
     assert (
         diagnostic_data_form.DiagnosticDataForm.cell_data_invalid(None, "-1")
         == "Counts cannot be negative."
@@ -79,7 +78,9 @@ def test_continuous_imputation_uses_r_keys_not_visible_headers(qapp, monkeypatch
         captured.append(params.copy())
         return {"succeeded": False}
 
-    monkeypatch.setattr(continuous_data_form.meta_py_r, "impute_cont_data", fake_impute_cont_data)
+    monkeypatch.setattr(
+        continuous_data_form.meta_py_r, "impute_cont_data", fake_impute_cont_data
+    )
 
     form = continuous_data_form.ContinuousDataForm.__new__(
         continuous_data_form.ContinuousDataForm
@@ -209,7 +210,9 @@ def test_binary_calculator_uses_table_headers_friendly_two_arm_metrics_and_clear
 ):
     import binary_data_form
 
-    monkeypatch.setattr(binary_data_form.meta_py_r, "get_mult_from_r", lambda conf: 1.96)
+    monkeypatch.setattr(
+        binary_data_form.meta_py_r, "get_mult_from_r", lambda conf: 1.96
+    )
     monkeypatch.setattr(
         binary_data_form.meta_py_r, "binary_convert_scale", lambda x, *args, **kwargs: x
     )

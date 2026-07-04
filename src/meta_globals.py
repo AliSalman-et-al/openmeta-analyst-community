@@ -189,9 +189,7 @@ INVALID_CONFIDENCE_LEVEL_MESSAGE = (
 )
 ANALYSIS_DIGITS_MIN = 0
 ANALYSIS_DIGITS_MAX = 15
-INVALID_ANALYSIS_DIGITS_MESSAGE = (
-    "Number of digits must be a non-negative integer."
-)
+INVALID_ANALYSIS_DIGITS_MESSAGE = "Number of digits must be a non-negative integer."
 ANALYSIS_NUMERIC_MIN = -1000000000.0
 ANALYSIS_NUMERIC_MAX = 1000000000.0
 ANALYSIS_COUNT_MAX = 1000000000
@@ -277,9 +275,8 @@ def validate_analysis_float(name, value):
     except (TypeError, ValueError):
         raise ValueError("%s must be a finite number." % name)
 
-    if (
-        not math.isfinite(value)
-        or not (ANALYSIS_NUMERIC_MIN <= value <= ANALYSIS_NUMERIC_MAX)
+    if not math.isfinite(value) or not (
+        ANALYSIS_NUMERIC_MIN <= value <= ANALYSIS_NUMERIC_MAX
     ):
         raise ValueError("%s must be a finite number." % name)
 

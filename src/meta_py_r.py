@@ -17,7 +17,10 @@ import math
 import os
 import re
 import r_runtime
-from analysis_method_labels import method_display_label, normalize_available_method_labels
+from analysis_method_labels import (
+    method_display_label,
+    normalize_available_method_labels,
+)
 import result_sections
 from study_effect_shapes import (
     effect_triplet,
@@ -515,7 +518,7 @@ def get_available_methods(for_data_type=None, data_obj_name=None, metric=None):
             ),
             "om.data": _r_null_if_none(data_arg),
             "metric": _r_null_if_none(None if metric is None else str(metric)),
-        }
+        },
     )
     return normalize_available_method_labels(R_parse_tools.recursioner(methods))
 
@@ -979,16 +982,14 @@ def _r_character_vector(values):
 
 def _r_year_vector(values):
     converted = [
-        ro.NA_Integer if _data_blank_or_none(value) else int(value)
-        for value in values
+        ro.NA_Integer if _data_blank_or_none(value) else int(value) for value in values
     ]
     return ro.IntVector(converted)
 
 
 def _r_numeric_vector(values):
     converted = [
-        ro.NA_Real if _data_blank_or_none(value) else float(value)
-        for value in values
+        ro.NA_Real if _data_blank_or_none(value) else float(value) for value in values
     ]
     return ro.FloatVector(converted)
 
@@ -1014,7 +1015,7 @@ def _r_covariate_values(cov, study_ids, dataset):
             "cov.vals": cov_vals,
             "cov.type": cov_type,
             "ref.var": _cov_ref_value(values),
-        }
+        },
     )
 
 
@@ -1125,6 +1126,7 @@ def _to_R_params(params):
         {str(param): _r_param_value(params[param]) for param in list(params.keys())}
     )
 
+
 def _r_symbol(name):
     name = str(name)
     if not name.replace(".", "_").isidentifier():
@@ -1140,7 +1142,14 @@ def _normalize_openmetar_workflow(workflow):
     if workflow is None:
         return "standard"
     workflow = str(workflow)
-    known_workflows = {"standard", "cumulative", "leave-one-out", "subgroup", "bootstrap", "meta-regression"}
+    known_workflows = {
+        "standard",
+        "cumulative",
+        "leave-one-out",
+        "subgroup",
+        "bootstrap",
+        "meta-regression",
+    }
     if workflow not in known_workflows:
         raise ValueError("Unknown OpenMetaR workflow: %s" % workflow)
     return workflow
@@ -1368,11 +1377,19 @@ def parse_out_results(result):
             if type(text) == rpy2.robjects.vectors.StrVector:
                 text_d[display_text_n] = _format_result_text(text[0])
             elif _is_summary_display(text):
-                text_d[display_text_n] = _format_result_text(_capture_formatted_summary(text))
+                text_d[display_text_n] = _format_result_text(
+                    _capture_formatted_summary(text)
+                )
             elif _is_table_summary(text):
-                text_d.update(_format_table_summary(display_text_n, text, study_names=study_names))
+                text_d.update(
+                    _format_table_summary(display_text_n, text, study_names=study_names)
+                )
             elif _is_named_table_summary(text):
-                text_d.update(_format_named_table_summary(display_text_n, text, study_names=study_names))
+                text_d.update(
+                    _format_named_table_summary(
+                        display_text_n, text, study_names=study_names
+                    )
+                )
             elif _is_named_text_summary(text):
                 text_d.update(_format_named_text_summary(display_text_n, text))
             else:
@@ -1427,7 +1444,9 @@ def _is_summary_display(r_object):
 
 
 def _capture_formatted_summary(r_object):
-    capture_summary = ro.r("function(x) paste(capture.output(print(x)), collapse='\\n')")
+    capture_summary = ro.r(
+        "function(x) paste(capture.output(print(x)), collapse='\\n')"
+    )
     return capture_summary(r_object)[0]
 
 
@@ -1436,7 +1455,9 @@ def _format_table_summary(section_name, r_object, title=None, study_names=None):
     if len(dims) == 2:
         return {section_name: _format_r_matrix(r_object, study_names=study_names)}
     if len(dims) == 3:
-        return _format_r_array_sections("Summary", section_name, r_object, study_names=study_names)
+        return _format_r_array_sections(
+            "Summary", section_name, r_object, study_names=study_names
+        )
     return {section_name: str(r_object)}
 
 
@@ -1468,7 +1489,9 @@ def _format_named_text_summary(parent_name, r_object):
     for name, item in zip(list(r_object.names), list(r_object)):
         if name == "" or not _is_r_string_vector(item):
             continue
-        sections[_summary_section_name(parent_name, _display_section_name(name))] = _format_result_text(item[0])
+        sections[_summary_section_name(parent_name, _display_section_name(name))] = (
+            _format_result_text(item[0])
+        )
 
     if not sections:
         sections[parent_name] = _format_result_text(str(r_object))
@@ -1493,9 +1516,15 @@ def _format_named_table_summary(parent_name, r_object, study_names=None):
                 )
             )
         elif len(dims) == 3:
-            sections.update(_format_r_array_sections(parent_name, display_name, item, study_names=study_names))
+            sections.update(
+                _format_r_array_sections(
+                    parent_name, display_name, item, study_names=study_names
+                )
+            )
         elif _is_r_string_vector(item):
-            sections[_summary_section_name(parent_name, display_name)] = _format_result_text(item[0])
+            sections[_summary_section_name(parent_name, display_name)] = (
+                _format_result_text(item[0])
+            )
 
     if not sections:
         sections[parent_name] = _format_result_text(str(r_object))
@@ -1549,7 +1578,9 @@ def _format_r_matrix(matrix, study_names=None):
     row_names = dimnames[0] if len(dimnames) > 0 and dimnames[0] is not None else None
     col_names = dimnames[1] if len(dimnames) > 1 and dimnames[1] is not None else None
     values = list(matrix)
-    return _format_matrix_values(values, dims[0], dims[1], row_names, col_names, study_names=study_names)
+    return _format_matrix_values(
+        values, dims[0], dims[1], row_names, col_names, study_names=study_names
+    )
 
 
 def _format_r_array_sections(parent_name, array_name, r_array, study_names=None):
@@ -1571,7 +1602,12 @@ def _format_r_array_sections(parent_name, array_name, r_array, study_names=None)
         end = start + slice_size
         title = "%s - %s" % (array_name, slice_name)
         sections[_summary_section_name(parent_name, title)] = _format_matrix_values(
-            values[start:end], dims[0], dims[1], row_names, col_names, study_names=study_names
+            values[start:end],
+            dims[0],
+            dims[1],
+            row_names,
+            col_names,
+            study_names=study_names,
         )
     return sections
 
@@ -1959,7 +1995,7 @@ def generic_convert_scale(
         "openmetar.convert.scale",
         x=x_arg,
         metric=str(metric_name),
-        **{"data.type": str(data_type), "convert.to": str(convert_to), "n1": n1_arg}
+        **{"data.type": str(data_type), "convert.to": str(convert_to), "n1": n1_arg},
     )
     transformed_ls = [x_i for x_i in transformed]
     if not islist:

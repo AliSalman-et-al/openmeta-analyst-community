@@ -99,7 +99,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             app_error_handler.safe_slot(self.select_out_path, parent=self)
         )
         self.method_cbo_box.currentIndexChanged[str].connect(
-            app_error_handler.safe_slot(lambda _text: self.method_changed(), parent=self)
+            app_error_handler.safe_slot(
+                lambda _text: self.method_changed(), parent=self
+            )
         )
 
         self.data_type = self.model.get_current_outcome_type()
@@ -266,7 +268,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                     if len(self.diag_metrics_to_analysis_details) == 0:
                         self.add_cur_analysis_details()
 
-                    method_names, list_of_param_vals = _diagnostic_analysis_requests(self)
+                    method_names, list_of_param_vals = _diagnostic_analysis_requests(
+                        self
+                    )
 
                     if self.meta_f_str is None:
                         # regular meta-analysis
@@ -568,7 +572,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             self.current_param_vals[name] = self.current_defaults[name]
 
         cbo_box.currentIndexChanged[int].connect(
-            app_error_handler.safe_slot(self.set_param_f_from_itemdata(name), parent=self)
+            app_error_handler.safe_slot(
+                self.set_param_f_from_itemdata(name), parent=self
+            )
         )
 
         self._cap_value_control_width(cbo_box)
@@ -644,7 +650,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         finput.setMaximumWidth(50)
         self._cap_value_control_width(finput)
         finput.valueChanged[float].connect(
-            app_error_handler.safe_slot(self.set_param_f(name, to_type=float), parent=self)
+            app_error_handler.safe_slot(
+                self.set_param_f(name, to_type=float), parent=self
+            )
         )
         self.current_widgets.append(finput)
         layout.addWidget(finput, cur_grid_row, 1)
@@ -662,7 +670,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             self.current_param_vals[name] = value
 
         conf_input.valueChanged[float].connect(
-            app_error_handler.safe_slot(self.set_param_f(name, to_type=float), parent=self)
+            app_error_handler.safe_slot(
+                self.set_param_f(name, to_type=float), parent=self
+            )
         )
         self._cap_value_control_width(conf_input)
         self.current_widgets.append(conf_input)
@@ -703,7 +713,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         iinput.setMaximumWidth(50)
         self._cap_value_control_width(iinput)
         iinput.valueChanged[int].connect(
-            app_error_handler.safe_slot(self.set_param_f(name, to_type=int), parent=self)
+            app_error_handler.safe_slot(
+                self.set_param_f(name, to_type=int), parent=self
+            )
         )
         self.current_widgets.append(iinput)
         layout.addWidget(iinput, cur_grid_row, 1)
@@ -726,7 +738,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         txt_input.setMaximumWidth(200)
         self._cap_value_control_width(txt_input)
         txt_input.textChanged.connect(
-            app_error_handler.safe_slot(self.set_param_f(name, to_type=str), parent=self)
+            app_error_handler.safe_slot(
+                self.set_param_f(name, to_type=str), parent=self
+            )
         )
         self.current_widgets.append(txt_input)
         layout.addWidget(txt_input, cur_grid_row, 1)
@@ -1106,7 +1120,9 @@ def _run_diagnostic_with_shared_data_per_metric(
         lambda method_name, param_vals: (
             meta_py_r.run_diagnostic_multi([method_name], [param_vals])
             if meta_f_str is None
-            else meta_py_r.run_diagnostic_workflow(meta_f_str, [method_name], [param_vals])
+            else meta_py_r.run_diagnostic_workflow(
+                meta_f_str, [method_name], [param_vals]
+            )
         ),
     )
 
@@ -1119,7 +1135,9 @@ def _run_diagnostic_with_metric_specific_data(
         meta_py_r.ma_dataset_to_simple_diagnostic_robj(model, metric=metric)
         if meta_f_str is None:
             return meta_py_r.run_diagnostic_multi([method_name], [param_vals])
-        return meta_py_r.run_diagnostic_workflow(meta_f_str, [method_name], [param_vals])
+        return meta_py_r.run_diagnostic_workflow(
+            meta_f_str, [method_name], [param_vals]
+        )
 
     return _run_diagnostic_methods_per_metric(
         method_names, list_of_param_vals, run_metric
@@ -1194,6 +1212,8 @@ def _writeout_test_data(meta_f_str, method, params, results, diag=False):
         # Write the data to the disk for sure
         f.flush()
         os.fsync(f)
+
+
 ####
 # simple progress bar
 import forms.ui_running

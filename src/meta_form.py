@@ -628,7 +628,8 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             # this allows the spec form to callback to this
             # module when specifications have been provided.
             form = self._build_analysis_specs_dialog(
-                meta_f_str="leave-one-out", conf_level=self.model.get_global_conf_level()
+                meta_f_str="leave-one-out",
+                conf_level=self.model.get_global_conf_level(),
             )
         else:
             # diagnostic data; we first have the user select metric(s),

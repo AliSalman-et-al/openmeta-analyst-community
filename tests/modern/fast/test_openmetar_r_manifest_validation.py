@@ -361,7 +361,9 @@ def test_default_r_openmetar_install_preserves_dependency_libraries(
 
     assert len(captured_envs) == 2
     install_env = captured_envs[0]
-    install_library, preserved_library = install_env["R_LIBS"].split(verifier.os.pathsep)
+    install_library, preserved_library = install_env["R_LIBS"].split(
+        verifier.os.pathsep
+    )
     assert Path(install_library).name == "library"
     assert preserved_library == str(dependency_library)
     assert install_env["R_LIBS_USER"] == str(dependency_library)
@@ -456,14 +458,17 @@ def test_openmetar_namespace_exports_only_core_interface():
 
     assert actual_exports == OPENMETAR_PUBLIC_EXPORTS
     assert all(name.startswith("openmetar.") for name in actual_exports)
-    assert not {
-        "binary.random",
-        "binary.random.parameters",
-        "diagnostic.hsroc.pretty.names",
-        "forest.plot",
-        "gimpute.cont.data",
-        "set.global.conf.level",
-    } & actual_exports
+    assert (
+        not {
+            "binary.random",
+            "binary.random.parameters",
+            "diagnostic.hsroc.pretty.names",
+            "forest.plot",
+            "gimpute.cont.data",
+            "set.global.conf.level",
+        }
+        & actual_exports
+    )
 
 
 def test_openmetar_namespace_preserves_s4_classes_explicitly():
@@ -513,8 +518,6 @@ def test_meta_py_r_does_not_interpolate_user_text_into_r_source():
         r"available\.methods\(.*%s",
     ]
 
-    offenders = [
-        pattern for pattern in risky_patterns if re.search(pattern, text)
-    ]
+    offenders = [pattern for pattern in risky_patterns if re.search(pattern, text)]
 
     assert offenders == []

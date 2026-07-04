@@ -291,9 +291,7 @@ def _direct_child_vertical_spacing(rows):
             if gap >= 0:
                 gaps.append(gap)
         previous_bottom = (
-            row_bottom
-            if previous_bottom is None
-            else max(previous_bottom, row_bottom)
+            row_bottom if previous_bottom is None else max(previous_bottom, row_bottom)
         )
     if not gaps:
         return None
@@ -432,8 +430,7 @@ def _fit_text_widgets_to_contents(root):
         combo_box.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         _fit_combo_width_to_contents(combo_box)
         combo_content_expanded = (
-            combo_content_expanded
-            or combo_box.minimumWidth() > previous_minimum_width
+            combo_content_expanded or combo_box.minimumWidth() > previous_minimum_width
         )
         if combo_box.view() is not None:
             combo_box.view().setMinimumWidth(combo_box.minimumWidth())
@@ -469,7 +466,9 @@ def _fit_widget_width_to_hint(widget, width):
     _raise_maximum_width(widget, width)
     widget.setMinimumWidth(max(widget.minimumWidth(), width))
     if widget.sizePolicy().horizontalPolicy() == QSizePolicy.Fixed:
-        widget.setSizePolicy(QSizePolicy.Preferred, widget.sizePolicy().verticalPolicy())
+        widget.setSizePolicy(
+            QSizePolicy.Preferred, widget.sizePolicy().verticalPolicy()
+        )
 
 
 def _fit_combo_width_to_contents(combo_box):
@@ -478,7 +477,9 @@ def _fit_combo_width_to_contents(combo_box):
     target_width = width
     combo_box.setMinimumWidth(target_width)
     combo_box.setMaximumWidth(max(target_width, target_maximum_width))
-    combo_box.setSizePolicy(QSizePolicy.Maximum, combo_box.sizePolicy().verticalPolicy())
+    combo_box.setSizePolicy(
+        QSizePolicy.Maximum, combo_box.sizePolicy().verticalPolicy()
+    )
 
 
 def _combo_contents_width(combo_box):

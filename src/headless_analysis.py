@@ -89,7 +89,9 @@ def run_headless_analysis(case):
                 conf_level=case.parameters.get("conf.level"),
             )
         if case.analysis_type == "subgroup":
-            return meta_py_r.run_workflow_analysis("subgroup", case.method, case.parameters)
+            return meta_py_r.run_workflow_analysis(
+                "subgroup", case.method, case.parameters
+            )
         return meta_py_r.run_binary_ma(case.method, case.parameters)
     if data_type == meta_globals.CONTINUOUS:
         meta_py_r.ma_dataset_to_simple_continuous_robj(model, **covariate_kwargs)
@@ -108,7 +110,9 @@ def run_headless_analysis(case):
                 conf_level=case.parameters.get("conf.level"),
             )
         if case.analysis_type == "subgroup":
-            return meta_py_r.run_workflow_analysis("subgroup", case.method, case.parameters)
+            return meta_py_r.run_workflow_analysis(
+                "subgroup", case.method, case.parameters
+            )
         return meta_py_r.run_continuous_ma(case.method, case.parameters)
     if data_type == meta_globals.DIAGNOSTIC:
         meta_py_r.ma_dataset_to_simple_diagnostic_robj(model)

@@ -139,15 +139,18 @@ def test_main_data_grid_display_headers_use_desktop_casing_without_changing_keys
     raw_columns, outcome_columns = ma_data_table_model.DatasetModel.get_column_indices(
         "continuous", None
     )
-    assert ma_data_table_model.DatasetModel.helper_basic_horizontal_headerData(
-        raw_columns[1],
-        meta_globals.CONTINUOUS,
-        None,
-        raw_columns,
-        outcome_columns,
-        "SMD",
-        ["eBay arm", "control arm"],
-    ) == "eBay arm Mean"
+    assert (
+        ma_data_table_model.DatasetModel.helper_basic_horizontal_headerData(
+            raw_columns[1],
+            meta_globals.CONTINUOUS,
+            None,
+            raw_columns,
+            outcome_columns,
+            "SMD",
+            ["eBay arm", "control arm"],
+        )
+        == "eBay arm Mean"
+    )
     assert _display_headers(
         "continuous", meta_globals.CONTINUOUS, "generic_effect", "MD"
     ) == [
@@ -192,18 +195,18 @@ def test_normal_study_cells_do_not_override_view_alternating_row_background():
 
     assert model.data(model.index(0, model.NAME), Qt.BackgroundColorRole) is None
     assert model.data(model.index(0, model.RAW_DATA[0]), Qt.BackgroundColorRole) is None
-    assert model.data(model.index(0, model.OUTCOMES[0]), Qt.BackgroundColorRole) == QColor(
-        Qt.yellow
-    )
+    assert model.data(
+        model.index(0, model.OUTCOMES[0]), Qt.BackgroundColorRole
+    ) == QColor(Qt.yellow)
 
 
 def test_one_arm_inactive_raw_data_cells_keep_disabled_background():
     model = _continuous_model_with_named_study()
     model.current_effect = "TX Mean"
 
-    assert model.data(model.index(0, model.RAW_DATA[3]), Qt.BackgroundColorRole) == QColor(
-        Qt.gray
-    )
+    assert model.data(
+        model.index(0, model.RAW_DATA[3]), Qt.BackgroundColorRole
+    ) == QColor(Qt.gray)
     assert model.data(model.index(0, model.RAW_DATA[0]), Qt.BackgroundColorRole) is None
 
 
@@ -236,12 +239,11 @@ def test_named_new_entry_row_keeps_populated_study_chrome():
 
     assert model.headerData(1, Qt.Vertical, Qt.DecorationRole).isNull() is False
     assert (
-        model.data(model.index(1, model.INCLUDE_STUDY), Qt.CheckStateRole)
-        == Qt.Checked
+        model.data(model.index(1, model.INCLUDE_STUDY), Qt.CheckStateRole) == Qt.Checked
     )
-    assert model.data(model.index(1, model.OUTCOMES[0]), Qt.BackgroundColorRole) == QColor(
-        Qt.yellow
-    )
+    assert model.data(
+        model.index(1, model.OUTCOMES[0]), Qt.BackgroundColorRole
+    ) == QColor(Qt.yellow)
 
 
 def test_raw_data_edit_on_placeholder_row_emits_study_name_error():

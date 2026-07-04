@@ -3,7 +3,7 @@ from collections import namedtuple
 
 
 OPENMETA_ANALYST_REFERENCE = (
-    'OpenMetaAnalyst: Wallace, Byron C., Issa J. Dahabreh, Thomas A. Trikalinos, '
+    "OpenMetaAnalyst: Wallace, Byron C., Issa J. Dahabreh, Thomas A. Trikalinos, "
     'Joseph Lau, Paul Trow, and Christopher H. Schmid. "Closing the Gap between '
     'Methodologists and End-Users: R as a Computational Back-End." Journal of '
     'Statistical Software 49 (2012): 5."'
@@ -13,9 +13,7 @@ OPENMETA_ANALYST_REFERENCE = (
 REFERENCE_SECTION_TITLE = "References"
 WEIGHTS_SECTION_TITLE = "Weights"
 
-DisplaySection = namedtuple(
-    "DisplaySection", ["kind", "key", "display_title", "value"]
-)
+DisplaySection = namedtuple("DisplaySection", ["kind", "key", "display_title", "value"])
 
 
 DIAGNOSTIC_SECTION_GROUPS = (
@@ -79,7 +77,7 @@ def order_text_sections(items, include_references=False):
             for title, value in items
             if include_references or title != REFERENCE_SECTION_TITLE
         ],
-        *DIAGNOSTIC_SECTION_GROUPS
+        *DIAGNOSTIC_SECTION_GROUPS,
     )
     if include_references:
         return ordered
@@ -103,7 +101,9 @@ def order_display_sections(texts, images, explicit_image_order=None):
     ]
     image_sections = [
         DisplaySection("image", title, section_display_title(title, context), value)
-        for title, value in order_image_sections(images, explicit_order=explicit_image_order)
+        for title, value in order_image_sections(
+            images, explicit_order=explicit_image_order
+        )
     ]
 
     if _is_hsroc_result(context):
@@ -163,7 +163,9 @@ def _is_hsroc_result(context):
 
 
 def _order_standard_meta_analysis_sections(text_sections, image_sections):
-    summary = _matching_sections(text_sections, lambda section: section.key == "Summary")
+    summary = _matching_sections(
+        text_sections, lambda section: section.key == "Summary"
+    )
     weights = _matching_sections(
         text_sections, lambda section: section.key == WEIGHTS_SECTION_TITLE
     )

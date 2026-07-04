@@ -855,7 +855,9 @@ def test_confidence_level_dialog_rejects_represented_100_percent():
         dialog.close()
 
 
-def test_dataset_model_rejects_invalid_confidence_levels_without_touching_r(monkeypatch):
+def test_dataset_model_rejects_invalid_confidence_levels_without_touching_r(
+    monkeypatch,
+):
     import launch
     import ma_data_table_model
 
@@ -872,9 +874,7 @@ def test_dataset_model_rejects_invalid_confidence_levels_without_touching_r(monk
         )
 
         for invalid_value in (0, 100, math.inf, math.nan, "not-a-number"):
-            with pytest.raises(
-                ValueError, match="greater than 0 and less than 100"
-            ):
+            with pytest.raises(ValueError, match="greater than 0 and less than 100"):
                 window.model.set_conf_level(invalid_value)
 
         assert calls == []

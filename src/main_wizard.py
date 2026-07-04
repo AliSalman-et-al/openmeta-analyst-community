@@ -354,10 +354,14 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
             )
         )
         self.from_excel_chkbx.stateChanged.connect(
-            app_error_handler.safe_slot(lambda _state: self._rebuild_display(), parent=self)
+            app_error_handler.safe_slot(
+                lambda _state: self._rebuild_display(), parent=self
+            )
         )
         self.has_headers_chkbx.stateChanged.connect(
-            app_error_handler.safe_slot(lambda _state: self._rebuild_display(), parent=self)
+            app_error_handler.safe_slot(
+                lambda _state: self._rebuild_display(), parent=self
+            )
         )
 
         self.setPixmap(

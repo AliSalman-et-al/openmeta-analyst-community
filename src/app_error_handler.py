@@ -88,12 +88,10 @@ def _call_with_compatible_signal_args(callback, args, kwargs):
 
     parameters = list(signature.parameters.values())
     accepts_varargs = any(
-        parameter.kind == inspect.Parameter.VAR_POSITIONAL
-        for parameter in parameters
+        parameter.kind == inspect.Parameter.VAR_POSITIONAL for parameter in parameters
     )
     accepts_varkwargs = any(
-        parameter.kind == inspect.Parameter.VAR_KEYWORD
-        for parameter in parameters
+        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters
     )
 
     if not accepts_varargs:
@@ -132,7 +130,9 @@ def safe_slot(callback, parent=None):
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception as e:
-            handle_exception(type(e), e, e.__traceback__, parent=_resolve_parent(parent))
+            handle_exception(
+                type(e), e, e.__traceback__, parent=_resolve_parent(parent)
+            )
             return None
 
     return _safe_slot

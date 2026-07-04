@@ -104,7 +104,9 @@ def validate_new_outcome_name(dataset, name):
 
 
 def validate_new_group_name(dataset, name):
-    return name_validation.validate_unique_name("group", name, dataset.get_group_names())
+    return name_validation.validate_unique_name(
+        "group", name, dataset.get_group_names()
+    )
 
 
 def validate_new_follow_up_name(dataset, outcome_name, name):
@@ -260,7 +262,9 @@ class DatasetModel(QAbstractTableModel):
 
         for effect_groups in ma_unit.effects_dict.values():
             for effect_data in effect_groups.values():
-                if any(not self._value_is_empty(value) for value in effect_data.values()):
+                if any(
+                    not self._value_is_empty(value) for value in effect_data.values()
+                ):
                     return True
 
         return False
@@ -274,7 +278,9 @@ class DatasetModel(QAbstractTableModel):
             return True
         if not self._value_is_empty(study.year) and study.year != 0:
             return True
-        if any(not self._value_is_empty(value) for value in study.covariate_dict.values()):
+        if any(
+            not self._value_is_empty(value) for value in study.covariate_dict.values()
+        ):
             return True
 
         for follow_ups in study.outcomes_to_follow_ups.values():
@@ -569,7 +575,9 @@ class DatasetModel(QAbstractTableModel):
             return _item_data(int(Qt.AlignLeft | Qt.AlignVCenter))
         elif role == Qt.CheckStateRole:
             # this is where we deal with the inclusion/exclusion of studies
-            if column == self.INCLUDE_STUDY and self._study_has_entered_data(index.row()):
+            if column == self.INCLUDE_STUDY and self._study_has_entered_data(
+                index.row()
+            ):
                 checked_state = Qt.Unchecked
                 if index.row() < self.rowCount() - 1 and study.include:
                     checked_state = Qt.Checked
@@ -903,8 +911,7 @@ class DatasetModel(QAbstractTableModel):
                 study.include = old_include
                 study.manually_excluded = old_manually_excluded
                 return self._reject_edit(
-                    "Could not compute study effects from the edited raw data: %s"
-                    % exc
+                    "Could not compute study effects from the edited raw data: %s" % exc
                 )
 
         elif column in self.OUTCOMES:

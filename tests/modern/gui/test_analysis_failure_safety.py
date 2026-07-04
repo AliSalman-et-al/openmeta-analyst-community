@@ -127,9 +127,9 @@ def test_continuous_workflow_failure_shows_dialog_and_does_not_open_results(
         }
         backend.get_params = lambda method: ({}, {}, [], {})
         backend.get_method_description = lambda method: "stub method"
-        backend.run_workflow_analysis = lambda *args, **kwargs: (
-            _ for _ in ()
-        ).throw(RuntimeError("simulated recompute failure"))
+        backend.run_workflow_analysis = lambda *args, **kwargs: (_ for _ in ()).throw(
+            RuntimeError("simulated recompute failure")
+        )
         backend.reset_Rs_working_dir = lambda: None
 
         monkeypatch.setattr(
@@ -309,6 +309,7 @@ def test_results_window_build_failure_reports_display_error(monkeypatch):
     app, window = launch.start_automation()
     shown = []
     try:
+
         def _boom(*args, **kwargs):
             raise RuntimeError("plot image could not be loaded")
 
@@ -676,9 +677,7 @@ def test_context_menu_popup_helper_ignores_reentrant_popups(monkeypatch):
     assert popups == [("first", QPoint(1, 2))]
 
     first_menu.aboutToHide.emit()
-    assert (
-        app_error_handler.popup_context_menu(second_menu, QPoint(3, 4)) is True
-    )
+    assert app_error_handler.popup_context_menu(second_menu, QPoint(3, 4)) is True
     assert popups == [("first", QPoint(1, 2)), ("second", QPoint(3, 4))]
 
 
@@ -720,9 +719,7 @@ def test_context_menu_popup_failure_clears_active_guard(monkeypatch):
         lambda *args, **kwargs: handled.append(args),
     )
 
-    assert (
-        app_error_handler.popup_context_menu(RaisingMenu(), QPoint(1, 2)) is False
-    )
+    assert app_error_handler.popup_context_menu(RaisingMenu(), QPoint(1, 2)) is False
 
     assert handled
     assert app_error_handler._active_context_menu is None

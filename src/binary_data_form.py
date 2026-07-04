@@ -91,7 +91,13 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         self.raw_data_table.verticalHeader().setHighlightSections(False)
         self.raw_data_table.setMinimumHeight(120)
         self.raw_data_table.setMaximumHeight(120)
-        for label in (self.label_18, self.label_19, self.label_20, self.label_21, self.label_22):
+        for label in (
+            self.label_18,
+            self.label_19,
+            self.label_20,
+            self.label_21,
+            self.label_22,
+        ):
             label.setVisible(False)
 
     def initialize_form(self):
@@ -317,7 +323,9 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         )
 
         self.effect_cbo_box.currentIndexChanged[str].connect(
-            app_error_handler.safe_slot(lambda _text: self.effect_changed(), parent=self)
+            app_error_handler.safe_slot(
+                lambda _text: self.effect_changed(), parent=self
+            )
         )
         self.clear_Btn.clicked.connect(
             app_error_handler.safe_slot(self.clear_form, parent=self)
@@ -353,7 +361,9 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         )
 
     def _populate_effect_data(self):
-        available_effects = set(str(effect) for effect in self.ma_unit.effects_dict.keys())
+        available_effects = set(
+            str(effect) for effect in self.ma_unit.effects_dict.keys()
+        )
         metric_family = (
             BINARY_ONE_ARM_METRICS
             if self.cur_effect in BINARY_ONE_ARM_METRICS

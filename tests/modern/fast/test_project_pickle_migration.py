@@ -31,11 +31,15 @@ def test_project_loader_migrates_old_qt_text_values_without_importing_old_qt():
         if name == old_qt_name or name.startswith(old_qt_name + "."):
             del sys.modules[name]
 
-    text = project_pickle.loads_project_pickle(_sip_value(b"Q" + b"String", b"Vhello\n"))
+    text = project_pickle.loads_project_pickle(
+        _sip_value(b"Q" + b"String", b"Vhello\n")
+    )
     text_list = project_pickle.loads_project_pickle(
         _sip_value(b"Q" + b"StringList", b"](Vone\nVtwo\ne")
     )
-    variant = project_pickle.loads_project_pickle(_sip_value(b"Q" + b"Variant", b"I7\n"))
+    variant = project_pickle.loads_project_pickle(
+        _sip_value(b"Q" + b"Variant", b"I7\n")
+    )
 
     assert text == "hello"
     assert type(text) is str

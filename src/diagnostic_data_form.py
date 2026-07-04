@@ -115,7 +115,9 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             app_error_handler.safe_slot(self.cell_changed, parent=self)
         )
         self.effect_cbo_box.currentIndexChanged[str].connect(
-            app_error_handler.safe_slot(lambda _text: self.effect_changed(), parent=self)
+            app_error_handler.safe_slot(
+                lambda _text: self.effect_changed(), parent=self
+            )
         )
         self.clear_Btn.clicked.connect(
             app_error_handler.safe_slot(self.clear_form, parent=self)

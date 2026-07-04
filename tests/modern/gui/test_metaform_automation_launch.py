@@ -210,9 +210,9 @@ def test_openmeta_logo_resource_is_valid_and_used_consistently():
     assert logo_pixmap.isNull() is False
     assert logo_pixmap.width() == logo_pixmap.height()
     assert logo_pixmap.width() >= 1024
-    assert sorted((size.width(), size.height()) for size in app_icon.availableSizes()) == [
-        (1024, 1024)
-    ]
+    assert sorted(
+        (size.width(), size.height()) for size in app_icon.availableSizes()
+    ) == [(1024, 1024)]
 
     checked_paths = [
         Path("src", "meta.ui"),
@@ -230,9 +230,9 @@ def test_openmeta_logo_resource_is_valid_and_used_consistently():
         if path.exists()
         for line in path.read_text(encoding="utf-8").splitlines()
         if "setWindowIcon" in line
-        or "<property name=\"windowIcon\">" in line
+        or '<property name="windowIcon">' in line
         or "<normaloff>:/misc/meta." in line
-        or "\":/misc/meta." in line
+        or '":/misc/meta.' in line
         or "':/misc/meta." in line
     ]
     low_resolution_icon_refs = [
@@ -1028,12 +1028,15 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         ]
         method_combo = specs[0].method_cbo_box
         assert method_combo.sizeAdjustPolicy() == QtWidgets.QComboBox.AdjustToContents
-        widest_method_label = max(
-            method_combo.fontMetrics().horizontalAdvance(
-                str(method_combo.itemText(index))
+        widest_method_label = (
+            max(
+                method_combo.fontMetrics().horizontalAdvance(
+                    str(method_combo.itemText(index))
+                )
+                for index in range(method_combo.count())
             )
-            for index in range(method_combo.count())
-        ) + 48
+            + 48
+        )
         assert method_combo.minimumWidth() >= widest_method_label
         assert method_combo.maximumWidth() >= widest_method_label
         assert (
@@ -1043,15 +1046,17 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
 
         for combo in enum_combos:
             assert combo.sizeAdjustPolicy() == QtWidgets.QComboBox.AdjustToContents
-            widest_enum_label = max(
-                combo.fontMetrics().horizontalAdvance(str(combo.itemText(index)))
-                for index in range(combo.count())
-            ) + 48
+            widest_enum_label = (
+                max(
+                    combo.fontMetrics().horizontalAdvance(str(combo.itemText(index)))
+                    for index in range(combo.count())
+                )
+                + 48
+            )
             assert combo.minimumWidth() >= widest_enum_label
             assert combo.maximumWidth() >= widest_enum_label
             assert (
-                combo.sizePolicy().horizontalPolicy()
-                != QtWidgets.QSizePolicy.Expanding
+                combo.sizePolicy().horizontalPolicy() != QtWidgets.QSizePolicy.Expanding
             )
 
         confidence_spinboxes = specs[0].parameter_grp_box.findChildren(
@@ -1303,10 +1308,7 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
         assert long_method_index >= 0
         specs.method_cbo_box.setCurrentIndex(long_method_index)
         app.processEvents()
-        assert (
-            specs.parameter_grp_box.title()
-            == "Binary Fixed-Effect Mantel-Haenszel"
-        )
+        assert specs.parameter_grp_box.title() == "Binary Fixed-Effect Mantel-Haenszel"
         assert specs.parameter_grp_box.title() != "binary.fixed.mh"
         short_method_index = specs.method_cbo_box.findText("Binary Random-Effects")
         specs.method_cbo_box.setCurrentIndex(short_method_index)
@@ -1317,8 +1319,7 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
         assert specs.width() == stable_width
         assert specs.minimumWidth() == stable_minimum_width
         assert (
-            specs.parameter_grp_box.layout().alignment()
-            & QtCore.Qt.AlignTop
+            specs.parameter_grp_box.layout().alignment() & QtCore.Qt.AlignTop
         ) == QtCore.Qt.AlignTop
 
         descriptions = [

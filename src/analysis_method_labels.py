@@ -35,9 +35,7 @@ _TOKEN_LABELS = {
     "regression": "Regression",
 }
 
-_CANONICAL_LABEL_REPLACEMENTS = (
-    ("Mantel Haenszel", "Mantel-Haenszel"),
-)
+_CANONICAL_LABEL_REPLACEMENTS = (("Mantel Haenszel", "Mantel-Haenszel"),)
 
 _KNOWN_PARAMETER_VALUE_LABELS = {
     ("rm.method", "HE"): "Hedges",

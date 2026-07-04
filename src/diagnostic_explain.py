@@ -16,9 +16,7 @@ class DiagnosticExplain(
         qt_layout.fit_application_dialog_to_contents(self)
 
         self.dont_show_again_chk_box.stateChanged.connect(
-            app_error_handler.safe_slot(
-                self.update_explain_diag_setting, parent=self
-            )
+            app_error_handler.safe_slot(self.update_explain_diag_setting, parent=self)
         )
 
     def update_explain_diag_setting(self, state):

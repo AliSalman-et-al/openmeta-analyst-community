@@ -144,7 +144,9 @@ class OutcomesModel(ResettableTableModel):
             new_outcome_name = name_validation.validate_unique_name(
                 "outcome",
                 value,
-                _without_current_name(self.dataset.get_outcome_names(), old_outcome_name),
+                _without_current_name(
+                    self.dataset.get_outcome_names(), old_outcome_name
+                ),
             )
         except ValueError as exc:
             return self.reject_edit(str(exc))

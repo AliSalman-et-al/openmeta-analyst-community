@@ -1148,9 +1148,7 @@ class StudyDelegate(QItemDelegate):
             if table is not None:
                 QtCore.QTimer.singleShot(
                     0,
-                    lambda: table._move_index_vertically_from(
-                        edited_index, direction
-                    ),
+                    lambda: table._move_index_vertically_from(edited_index, direction),
                 )
             event.accept()
             return True

@@ -221,7 +221,9 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         return pixmap
 
     def add_text(self):
-        for title, text in result_sections.order_text_sections(list(self.texts.items())):
+        for title, text in result_sections.order_text_sections(
+            list(self.texts.items())
+        ):
             self.add_text_section(
                 title,
                 result_sections.section_display_title(title),

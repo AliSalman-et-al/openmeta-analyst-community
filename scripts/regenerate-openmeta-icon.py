@@ -127,7 +127,9 @@ def main():
     _write_ico(master)
 
     icon = QtGui.QIcon(str(ICO_TARGET))
-    available_sizes = sorted((size.width(), size.height()) for size in icon.availableSizes())
+    available_sizes = sorted(
+        (size.width(), size.height()) for size in icon.availableSizes()
+    )
     expected_sizes = [(size, size) for size in ICO_SIZES]
     if available_sizes != expected_sizes:
         raise ValueError(f"Unexpected ICO sizes: {available_sizes}")

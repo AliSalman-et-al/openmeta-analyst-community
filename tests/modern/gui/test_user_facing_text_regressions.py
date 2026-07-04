@@ -170,9 +170,7 @@ def test_content_fit_resizes_dialog_roots_only(monkeypatch):
     dialog_layout = QtWidgets.QVBoxLayout(dialog)
     dialog_layout.addWidget(QtWidgets.QLabel("Dialog text that needs fitting"))
     dialog_adjust_calls = []
-    monkeypatch.setattr(
-        dialog, "adjustSize", lambda: dialog_adjust_calls.append(True)
-    )
+    monkeypatch.setattr(dialog, "adjustSize", lambda: dialog_adjust_calls.append(True))
 
     main_window = QtWidgets.QMainWindow()
     central = QtWidgets.QWidget(main_window)
@@ -378,19 +376,18 @@ def test_generated_ui_combo_boxes_do_not_stretch_to_wide_parent_geometry():
             for combo_box in combo_boxes:
                 if _hidden_for_fit(combo_box, root):
                     continue
-                assert combo_box.sizeAdjustPolicy() == QtWidgets.QComboBox.AdjustToContents
+                assert (
+                    combo_box.sizeAdjustPolicy() == QtWidgets.QComboBox.AdjustToContents
+                )
                 assert (
                     combo_box.sizePolicy().horizontalPolicy()
                     == QtWidgets.QSizePolicy.Maximum
                 ), module_name
                 assert combo_box.width() <= combo_box.maximumWidth(), module_name
                 if combo_box.count() > 0:
-                    assert (
-                        combo_box.maximumWidth()
-                        <= max(
-                            qt_layout.APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH,
-                            _combo_contents_width(combo_box),
-                        )
+                    assert combo_box.maximumWidth() <= max(
+                        qt_layout.APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH,
+                        _combo_contents_width(combo_box),
                     ), module_name
         finally:
             root.close()
@@ -647,10 +644,7 @@ def test_dialog_width_fit_does_not_lock_stretched_combo_geometry():
         assert combo.maximumWidth() <= qt_layout.ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH
         assert combo.width() <= combo.maximumWidth()
         assert combo.width() < root.width() - label.width()
-        assert (
-            combo.sizePolicy().horizontalPolicy()
-            == QtWidgets.QSizePolicy.Maximum
-        )
+        assert combo.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Maximum
     finally:
         root.close()
         root.deleteLater()
@@ -1107,31 +1101,31 @@ def test_issue_76_to_105_reported_bad_user_facing_strings_are_absent():
         '_translate("Dialog", "forest plot")',
         '_translate("new_covariate_dialog", "add new covariate")',
         '_translate("BinaryDataForm", "back-calculate table")',
-        '<string>back-calculate table</string>',
+        "<string>back-calculate table</string>",
         '_translate("diag_metric", "select metrics for analysis")',
-        '<string>select metrics for analysis</string>',
+        "<string>select metrics for analysis</string>",
         '_translate("edit_dialog", "edit dataset")',
-        '<string>edit dataset</string>',
+        "<string>edit dataset</string>",
         '_translate("edit_forest_plot_dlg", "edit forest plot")',
-        '<string>edit forest plot</string>',
+        "<string>edit forest plot</string>",
         '_translate("new_follow_up_dialog", "add new follow-up")',
-        '<string>add new follow-up</string>',
+        "<string>add new follow-up</string>",
         '_translate("new_outcome_dialog", "add new outcome")',
-        '<string>add new outcome</string>',
+        "<string>add new outcome</string>",
         '_translate("new_study_dlg", "add new study")',
-        '<string>add new study</string>',
+        "<string>add new study</string>",
         '_translate("running", "running analysis...")',
-        '<string>running analysis...</string>',
+        "<string>running analysis...</string>",
         '_translate("WizardPage", "Open recent...")',
-        '<string>Open recent...</string>',
+        "<string>Open recent...</string>",
         '_translate("WizardPage", "Create a new dataset")',
-        '<string>Create a new dataset</string>',
+        "<string>Create a new dataset</string>",
         '_translate("edit_forest_plot_dlg", "col 1 label:")',
-        '<string>col 1 label:</string>',
+        "<string>col 1 label:</string>",
         '_translate("edit_forest_plot_dlg", "show summary line:")',
-        '<string>show summary line:</string>',
+        "<string>show summary line:</string>",
         '_translate("edit_forest_plot_dlg", "save image to:")',
-        '<string>save image to:</string>',
+        "<string>save image to:</string>",
         'QAction("rename group %s..."',
         'QAction("rename covariate %s..."',
         'QAction("save pdf image as..."',
