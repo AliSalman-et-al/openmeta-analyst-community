@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
     QComboBox,
     QDialog,
     QGroupBox,
+    QGridLayout,
     QLabel,
     QToolButton,
     QRadioButton,
@@ -124,6 +125,8 @@ def fit_text_to_contents(
     if not _fit_root_is_available(root):
         return
 
+    _adopt_fixed_direct_children_into_root_layout(root)
+
     root_layout = root.layout()
     if root_layout is not None:
         _compact_expanding_vertical_spacers(root_layout)
@@ -177,6 +180,124 @@ def _fit_root_is_available(root):
     except RuntimeError:
         return False
     return True
+
+
+def _adopt_fixed_direct_children_into_root_layout(root):
+    if root.layout() is not None or not isinstance(root, QDialog):
+        return
+
+    direct_children = [
+        child
+        for child in root.findChildren(QWidget, options=Qt.FindDirectChildrenOnly)
+        if not child.isHidden() and not child.isWindow()
+    ]
+    if not direct_children:
+        return
+
+    rows = _direct_child_geometry_rows(direct_children)
+    margins = _direct_child_layout_margins(root, direct_children)
+    horizontal_spacing = _direct_child_horizontal_spacing(rows)
+    vertical_spacing = _direct_child_vertical_spacing(rows)
+
+    root_layout = QGridLayout(root)
+    root_layout.setContentsMargins(*margins)
+    if horizontal_spacing is not None:
+        root_layout.setHorizontalSpacing(horizontal_spacing)
+    if vertical_spacing is not None:
+        root_layout.setVerticalSpacing(vertical_spacing)
+
+    column_count = max(len(row_children) for row_children in rows)
+    for row_index, row_children in enumerate(rows):
+        for column_index, child in enumerate(row_children):
+            if len(row_children) == 1 or column_index == len(row_children) - 1:
+                _allow_layout_child_horizontal_expansion(child)
+            column_span = column_count if len(row_children) == 1 else 1
+            root_layout.addWidget(child, row_index, column_index, 1, column_span)
+        if row_children:
+            root_layout.setColumnStretch(len(row_children) - 1, 1)
+
+
+def _direct_child_layout_margins(root, children):
+    contents = root.contentsRect()
+    left = min(max(0, child.geometry().left() - contents.left()) for child in children)
+    top = min(max(0, child.geometry().top() - contents.top()) for child in children)
+    right = min(
+        max(0, contents.right() - child.geometry().right()) for child in children
+    )
+    bottom = min(
+        max(0, contents.bottom() - child.geometry().bottom()) for child in children
+    )
+    return left, top, right, bottom
+
+
+def _allow_layout_child_horizontal_expansion(widget):
+    policy = widget.sizePolicy()
+    if policy.horizontalPolicy() != QSizePolicy.Expanding:
+        widget.setSizePolicy(QSizePolicy.Expanding, policy.verticalPolicy())
+
+
+def _direct_child_geometry_rows(children):
+    rows = []
+    current_row = []
+    current_bottom = None
+    for child in sorted(children, key=lambda child: child.geometry().top()):
+        child_top = child.geometry().top()
+        if current_bottom is None or child_top <= current_bottom:
+            current_row.append(child)
+            current_bottom = (
+                child.geometry().bottom()
+                if current_bottom is None
+                else max(current_bottom, child.geometry().bottom())
+            )
+            continue
+
+        rows.append(sorted(current_row, key=lambda widget: widget.geometry().left()))
+        current_row = [child]
+        current_bottom = child.geometry().bottom()
+
+    if current_row:
+        rows.append(sorted(current_row, key=lambda widget: widget.geometry().left()))
+    return rows
+
+
+def _direct_child_horizontal_spacing(rows):
+    gaps = []
+    for row in rows:
+        previous_right = None
+        for child in row:
+            if previous_right is not None:
+                gap = child.geometry().left() - previous_right - 1
+                if gap >= 0:
+                    gaps.append(gap)
+            previous_right = max(
+                child.geometry().right(),
+                previous_right
+                if previous_right is not None
+                else child.geometry().right(),
+            )
+    if not gaps:
+        return None
+    return min(gaps)
+
+
+def _direct_child_vertical_spacing(rows):
+    gaps = []
+    previous_bottom = None
+    for row in rows:
+        row_top = min(child.geometry().top() for child in row)
+        row_bottom = max(child.geometry().bottom() for child in row)
+        if previous_bottom is not None:
+            gap = row_top - previous_bottom - 1
+            if gap >= 0:
+                gaps.append(gap)
+        previous_bottom = (
+            row_bottom
+            if previous_bottom is None
+            else max(previous_bottom, row_bottom)
+        )
+    if not gaps:
+        return None
+    return min(gaps)
 
 
 def _window_state_blocks_content_fit(root):

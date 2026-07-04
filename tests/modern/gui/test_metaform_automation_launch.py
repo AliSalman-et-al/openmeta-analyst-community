@@ -3034,6 +3034,41 @@ def test_analysis_dialog_family_uses_shared_base_size(monkeypatch):
         os.chdir(REPO_ROOT)
 
 
+def test_add_covariate_dialog_fields_and_buttons_fill_fitted_width():
+    import launch
+    import add_new_dialogs
+    import qt_layout
+
+    app, window = launch.start_automation()
+    dialog = add_new_dialogs.AddNewCovariateForm(parent=window)
+
+    try:
+        dialog.show()
+        app.processEvents()
+        if dialog.layout() is not None:
+            dialog.layout().activate()
+        app.processEvents()
+
+        contents = dialog.contentsRect()
+        dialog_layout = dialog.layout()
+        assert dialog_layout is not None
+        left_margin = dialog_layout.contentsMargins().left()
+        right_margin = dialog_layout.contentsMargins().right()
+        expected_content_width = contents.width() - left_margin - right_margin
+
+        assert dialog.minimumWidth() >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
+        assert dialog.layoutWidget.width() >= expected_content_width
+        assert dialog.buttonBox.width() >= expected_content_width
+        assert (
+            dialog.buttonBox.geometry().right() >= contents.right() - right_margin - 1
+        )
+    finally:
+        dialog.close()
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
 def test_csv_import_wizard_accepts_representative_csv(tmp_path, monkeypatch):
     import launch
     from PyQt5 import QtWidgets
