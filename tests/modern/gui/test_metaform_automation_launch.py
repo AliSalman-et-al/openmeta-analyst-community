@@ -2533,7 +2533,7 @@ def test_new_dataset_wizard_sizes_to_show_diagnostic_choice():
         diagnostic_button = data_type_page.diagnostic_Button
         assert data_type_page.rect().contains(diagnostic_button.geometry())
         assert wizard.minimumHeight() >= data_type_page.sizeHint().height()
-        assert wizard.minimumHeight() < wizard.sizeHint().height()
+        assert wizard.minimumHeight() >= wizard.sizeHint().height()
     finally:
         wizard.close()
         app.processEvents()

@@ -230,7 +230,11 @@ def _root_size_hint_for_current_contents(root):
     if not page_heights:
         return size_hint
 
-    chrome_height = max(0, size_hint.height() - max(page_heights))
+    max_page_height = max(page_heights)
+    if size_hint.height() >= max_page_height:
+        chrome_height = size_hint.height() - max_page_height
+    else:
+        chrome_height = max(0, size_hint.height() - current_hint.height())
     return QSize(size_hint.width(), current_hint.height() + chrome_height)
 
 
