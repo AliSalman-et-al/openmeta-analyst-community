@@ -67,7 +67,6 @@ def install_stub_meta_py_r():
     meta_py_r.get_R_libpaths = lambda: []
     meta_py_r.get_r_version_string = lambda: None
     meta_py_r.get_r_package_version = lambda package_name: None
-    meta_py_r.evaluate_r_console = lambda expression: [None]
     meta_py_r.reset_Rs_working_dir = lambda: None
     meta_py_r.execute_r_string = lambda expression: [95.0]
     meta_py_r.execute_r_function = lambda function_name, *args, **kwargs: [95.0]

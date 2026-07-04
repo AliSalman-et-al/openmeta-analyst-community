@@ -193,11 +193,6 @@ def get_r_package_version(package_name):
 
 
 @RfunctionCaller
-def evaluate_r_console(expression):
-    return execute_r_string(expression)
-
-
-@RfunctionCaller
 def reset_Rs_working_dir():
     """resets R's working directory to the the application base_path, not to r_tmp!"""
     print("resetting R working dir")

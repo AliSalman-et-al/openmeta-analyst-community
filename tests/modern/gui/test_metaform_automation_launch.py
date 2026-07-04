@@ -1838,7 +1838,8 @@ def test_results_window_renders_summary_text_and_plot_navigation(tmp_path):
         ]
 
         assert nav_titles == ["Meta-Analysis Summary", "Forest Plot"]
-        assert "forest_plot" in window.psuedo_console.toPlainText()
+        assert not hasattr(window, "psuedo_console")
+        assert window.findChild(QtWidgets.QTextEdit, "psuedo_console") is None
         assert any(
             isinstance(item, results_window.QGraphicsTextItem)
             for item in window.scene.items()

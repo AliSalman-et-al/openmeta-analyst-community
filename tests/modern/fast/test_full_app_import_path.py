@@ -34,6 +34,5 @@ def test_full_app_import_path_has_no_python2_syntax():
         "edit_list_models.py",
         "ma_text_edit.py",
         "meta_py_r.py",
-        "qconsole.py",
     ]:
         py_compile.compile(str(ROOT / "src" / module), doraise=True)

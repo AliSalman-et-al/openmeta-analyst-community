@@ -15,5 +15,19 @@
     "follow_up",
     "expires_at"
   ],
-  "exceptions": []
+  "exceptions": [
+    {
+      "id": "gui-exception-191-remove-results-r-console",
+      "status": "accepted",
+      "affected_workflows": [
+        "Results / Analysis window"
+      ],
+      "reason": "The R console panel was an inert plain text box that invited command entry but did not evaluate input or support history, and exposing a raw R console is outside the GUI meta-analysis workflow.",
+      "approved_by": "GitHub Issue #191",
+      "approved_at": "2026-07-04",
+      "before_behavior": "The Results / Analysis window showed a black and green pseudo-console strip below the results with a banner, image variable names, and a >> prompt.",
+      "after_behavior": "The Results / Analysis window shows only the results navigation and result content; the removed vertical space is available to summary text, plots, weights, and references.",
+      "follow_up": "None."
+    }
+  ]
 }

@@ -92,20 +92,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             )
         )
 
-        self.psuedo_console.blockSignals(False)
-        if hasattr(self.psuedo_console, "returnPressed"):
-            self.psuedo_console.returnPressed.connect(
-                app_error_handler.safe_slot(self.process_console_input, parent=self)
-            )
-        if hasattr(self.psuedo_console, "upArrowPressed"):
-            self.psuedo_console.upArrowPressed.connect(
-                app_error_handler.safe_slot(self.f, parent=self)
-            )
-        if hasattr(self.psuedo_console, "downArrowPressed"):
-            self.psuedo_console.downArrowPressed.connect(
-                app_error_handler.safe_slot(self.f, parent=self)
-            )
-
         self.nav_tree.setHeaderLabels(["Results"])
         self.nav_tree.setItemsExpandable(True)
         self.nav_tree.setMinimumWidth(250)
@@ -113,7 +99,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self.y_coord = 5
 
         # set (default) splitter sizes
-        self.splitter.setSizes([400, 100])
         self.results_nav_splitter.setSizes([260, 440])
 
         self.scene = QGraphicsScene(self)
@@ -131,8 +116,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         if "image_params_paths" in results:
             self.params_paths = results["image_params_paths"]
 
-        self.image_var_names = results["image_var_names"]
-        self.set_psuedo_console_text()
         self.items_to_coords = {}
         self._wrapped_text_items = []
         self.texts = results["texts"]
@@ -146,20 +129,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         # reset the scene
         self.graphics_view.setScene(self.scene)
         self.graphics_view.ensureVisible(QRectF(0, 0, 0, 0))
-
-    def f(self):
-        print(self.current_line())
-
-    def set_psuedo_console_text(self):
-        text = [
-            "\t\tOpenMeta(analyst)",
-            "This is a pipe to the R console. The image names are as follows:",
-        ]
-        if self.image_var_names is not None:
-            for image_var_name in list(self.image_var_names.values()):
-                text.append(image_var_name)
-        self.psuedo_console.setPlainText("\n".join(text))
-        self.psuedo_console.append(">> ")
 
     def add_result_sections(self):
         ordered_sections = result_sections.order_display_sections(
@@ -389,7 +358,9 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             QApplication.clipboard().setText(selected_text.replace("\u2029", "\n"))
 
     def _text_wrap_width(self):
-        viewport_width = self.graphics_view.viewport().width()
+        viewport_width = max(
+            self.graphics_view.viewport().width(), self.graphics_view.width()
+        )
         if viewport_width <= horizontal_padding:
             viewport_width = max(self.results_nav_splitter.width(), self.width())
         return max(300, viewport_width - self.x_coord - padding)
@@ -415,17 +386,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
     def resizeEvent(self, event):
         super(ResultsWindow, self).resizeEvent(event)
         self._update_wrapped_text_widths()
-
-    def process_console_input(self):
-        res = str(meta_py_r.evaluate_r_console(self.current_line()))
-
-        # echo the result
-        self.psuedo_console.append(res)
-        self.psuedo_console.append(">> ")
-
-    def current_line(self):
-        last_line = self.psuedo_console.toPlainText().split("\n")[-1]
-        return str(last_line.replace(">>", "")).strip()
 
     def _get_plot_type(self, title):
         # at present we use the *title* as the type --

@@ -22,10 +22,7 @@ class Ui_ResultsWindow(object):
         self.centralwidget.setObjectName("centralwidget")
         self.verticalLayout = QtWidgets.QVBoxLayout(self.centralwidget)
         self.verticalLayout.setObjectName("verticalLayout")
-        self.splitter = QtWidgets.QSplitter(self.centralwidget)
-        self.splitter.setOrientation(QtCore.Qt.Vertical)
-        self.splitter.setObjectName("splitter")
-        self.frame = QtWidgets.QFrame(self.splitter)
+        self.frame = QtWidgets.QFrame(self.centralwidget)
         self.frame.setMinimumSize(QtCore.QSize(733, 0))
         font = QtGui.QFont()
         font.setFamily("Verdana")
@@ -49,25 +46,7 @@ class Ui_ResultsWindow(object):
         self.graphics_view.setToolTip("")
         self.graphics_view.setObjectName("graphics_view")
         self.horizontalLayout.addWidget(self.results_nav_splitter)
-        self.psuedo_console = QtWidgets.QTextEdit(self.splitter)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.psuedo_console.sizePolicy().hasHeightForWidth())
-        self.psuedo_console.setSizePolicy(sizePolicy)
-        self.psuedo_console.setMinimumSize(QtCore.QSize(733, 0))
-        self.psuedo_console.setMaximumSize(QtCore.QSize(16777215, 16777215))
-        self.psuedo_console.setBaseSize(QtCore.QSize(0, 0))
-        font = QtGui.QFont()
-        font.setFamily("Terminal")
-        self.psuedo_console.setFont(font)
-        self.psuedo_console.setAutoFillBackground(False)
-        self.psuedo_console.setStyleSheet("background-color: rgb(0, 0, 0);\n"
-"color: rgb(0, 255, 0);")
-        self.psuedo_console.setLineWrapMode(QtWidgets.QTextEdit.NoWrap)
-        self.psuedo_console.setAcceptRichText(False)
-        self.psuedo_console.setObjectName("psuedo_console")
-        self.verticalLayout.addWidget(self.splitter)
+        self.verticalLayout.addWidget(self.frame)
         ResultsWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(ResultsWindow)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 799, 22))
@@ -83,8 +62,3 @@ class Ui_ResultsWindow(object):
     def retranslateUi(self, ResultsWindow):
         _translate = QtCore.QCoreApplication.translate
         ResultsWindow.setWindowTitle(_translate("ResultsWindow", "Results / Analysis"))
-        self.psuedo_console.setHtml(_translate("ResultsWindow", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
-"<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
-"p, li { white-space: pre-wrap; }\n"
-"</style></head><body style=\" font-family:\'Terminal\'; font-size:13pt; font-weight:400; font-style:normal;\">\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:8pt;\">&gt;&gt; </span></p></body></html>"))
