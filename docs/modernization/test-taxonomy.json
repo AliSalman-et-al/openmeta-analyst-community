@@ -1799,6 +1799,21 @@
         "filesystem"
       ],
       "lane": "gui",
+      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_generated_ui_combo_boxes_do_not_stretch_to_wide_parent_geometry",
+      "reason": "Guards every generated UI surface with combo boxes against inheriting stretched parent layout geometry.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
       "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_dialog_width_fit_does_not_lock_stretched_combo_geometry",
       "reason": "Guards analysis dialog combo boxes against inheriting stretched parent layout geometry instead of content-based widths.",
       "runtime_class": "seconds",

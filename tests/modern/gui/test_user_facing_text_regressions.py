@@ -10,6 +10,35 @@ HELP_HTML = sorted(
     path.relative_to(ROOT).as_posix() for path in (ROOT / "doc").glob("*.html")
 )
 
+GENERATED_UI_MODULE_NAMES = [
+    "forms.ui_binary_data_form",
+    "forms.ui_change_cov_type",
+    "forms.ui_choose_back_calc_result_form",
+    "forms.ui_choose_metric_page",
+    "forms.ui_cov_subgroup_dlg",
+    "forms.ui_csv_import_page",
+    "forms.ui_data_type_page",
+    "forms.ui_diagnostic_data_form",
+    "forms.ui_diagnostic_explain_dlg",
+    "forms.ui_diagnostic_metrics",
+    "forms.ui_edit_dialog",
+    "forms.ui_edit_forest_plot",
+    "forms.ui_edit_group_name",
+    "forms.ui_ma_specs",
+    "forms.ui_meta_reg",
+    "forms.ui_network_view",
+    "forms.ui_new_covariate",
+    "forms.ui_new_follow_up",
+    "forms.ui_new_group",
+    "forms.ui_new_outcome",
+    "forms.ui_new_study",
+    "forms.ui_outcome_name_page",
+    "forms.ui_running",
+    "forms.ui_welcome_page",
+    "ui_meta",
+    "ui_results_window",
+]
+
 
 def _read(relative_path):
     return (ROOT / relative_path).read_text(encoding="utf-8")
@@ -184,36 +213,7 @@ def test_generated_ui_surfaces_do_not_cap_visible_text_widgets_below_contents():
     import qt_layout
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-    module_names = [
-        "forms.ui_binary_data_form",
-        "forms.ui_change_cov_type",
-        "forms.ui_choose_back_calc_result_form",
-        "forms.ui_choose_metric_page",
-        "forms.ui_cov_subgroup_dlg",
-        "forms.ui_csv_import_page",
-        "forms.ui_data_type_page",
-        "forms.ui_diagnostic_data_form",
-        "forms.ui_diagnostic_explain_dlg",
-        "forms.ui_diagnostic_metrics",
-        "forms.ui_edit_dialog",
-        "forms.ui_edit_forest_plot",
-        "forms.ui_edit_group_name",
-        "forms.ui_ma_specs",
-        "forms.ui_meta_reg",
-        "forms.ui_network_view",
-        "forms.ui_new_covariate",
-        "forms.ui_new_follow_up",
-        "forms.ui_new_group",
-        "forms.ui_new_outcome",
-        "forms.ui_new_study",
-        "forms.ui_outcome_name_page",
-        "forms.ui_running",
-        "forms.ui_welcome_page",
-        "ui_meta",
-        "ui_results_window",
-    ]
-
-    for module_name in module_names:
+    for module_name in GENERATED_UI_MODULE_NAMES:
         module = importlib.import_module(module_name)
         ui_class = next(
             value for name, value in vars(module).items() if name.startswith("Ui_")
@@ -232,6 +232,61 @@ def test_generated_ui_surfaces_do_not_cap_visible_text_widgets_below_contents():
         finally:
             root.close()
             root.deleteLater()
+    app.processEvents()
+
+
+def test_generated_ui_combo_boxes_do_not_stretch_to_wide_parent_geometry():
+    sys.path.insert(0, str(ROOT / "src"))
+    sys.path.insert(0, str(ROOT / "src" / "forms"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    surfaces_with_combos = 0
+
+    for module_name in GENERATED_UI_MODULE_NAMES:
+        module = importlib.import_module(module_name)
+        ui_class = next(
+            value for name, value in vars(module).items() if name.startswith("Ui_")
+        )
+        root = _root_for_ui_class(ui_class)
+        ui = ui_class()
+        ui.setupUi(root)
+        combo_boxes = root.findChildren(QtWidgets.QComboBox)
+        if not combo_boxes:
+            root.deleteLater()
+            continue
+        surfaces_with_combos += 1
+
+        root.resize(900, max(root.sizeHint().height(), root.height()))
+        qt_layout.fit_text_to_contents(root)
+        root.show()
+        app.processEvents()
+        root.resize(900, root.height())
+        app.processEvents()
+
+        try:
+            for combo_box in combo_boxes:
+                if _hidden_for_fit(combo_box, root):
+                    continue
+                assert combo_box.sizeAdjustPolicy() == QtWidgets.QComboBox.AdjustToContents
+                assert (
+                    combo_box.sizePolicy().horizontalPolicy()
+                    == QtWidgets.QSizePolicy.Maximum
+                ), module_name
+                assert combo_box.width() <= combo_box.maximumWidth(), module_name
+                if combo_box.count() > 0:
+                    assert (
+                        combo_box.maximumWidth()
+                        <= max(
+                            qt_layout.APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH,
+                            _combo_contents_width(combo_box),
+                        )
+                    ), module_name
+        finally:
+            root.close()
+            root.deleteLater()
+
+    assert surfaces_with_combos > 0
     app.processEvents()
 
 
