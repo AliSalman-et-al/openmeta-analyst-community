@@ -347,20 +347,17 @@ def _fit_widget_width_to_hint(widget, width):
 
 
 def _fit_combo_width_to_contents(combo_box):
-    width = max(combo_box.sizeHint().width(), _combo_contents_width(combo_box))
+    width = _combo_contents_width(combo_box)
     target_maximum_width = _combo_maximum_width(combo_box)
     target_width = width
     combo_box.setMinimumWidth(target_width)
     combo_box.setMaximumWidth(max(target_width, target_maximum_width))
-    if combo_box.sizePolicy().horizontalPolicy() == QSizePolicy.Fixed:
-        combo_box.setSizePolicy(
-            QSizePolicy.Preferred, combo_box.sizePolicy().verticalPolicy()
-        )
+    combo_box.setSizePolicy(QSizePolicy.Maximum, combo_box.sizePolicy().verticalPolicy())
 
 
 def _combo_contents_width(combo_box):
     if combo_box.count() == 0:
-        return 0
+        return combo_box.sizeHint().width()
     metrics = combo_box.fontMetrics()
     widest_item = max(
         metrics.horizontalAdvance(str(combo_box.itemText(index)))

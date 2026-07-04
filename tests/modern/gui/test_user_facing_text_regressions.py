@@ -337,7 +337,7 @@ def _combo_contents_width(combo_box):
         metrics.horizontalAdvance(str(combo_box.itemText(index)))
         for index in range(combo_box.count())
     )
-    return max(combo_box.sizeHint().width(), widest_item + 48)
+    return widest_item + 48
 
 
 def _root_content_height(root):
@@ -419,6 +419,48 @@ def test_dialog_width_fit_includes_labels_combos_and_window_title():
 
         title_width = root.fontMetrics().horizontalAdvance(root.windowTitle())
         assert root.minimumWidth() >= title_width
+    finally:
+        root.close()
+        root.deleteLater()
+    app.processEvents()
+
+
+def test_dialog_width_fit_does_not_lock_stretched_combo_geometry():
+    sys.path.insert(0, str(ROOT / "src"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    root = QtWidgets.QDialog()
+    root.setWindowTitle("Method & Parameters")
+    layout = QtWidgets.QGridLayout(root)
+    label = QtWidgets.QLabel("Analysis method:")
+    label.setMinimumWidth(200)
+    label.setMaximumWidth(200)
+    combo = QtWidgets.QComboBox()
+    combo.addItems(
+        [
+            "Short",
+            "Medium option",
+        ]
+    )
+
+    layout.addWidget(label, 0, 0)
+    layout.addWidget(combo, 0, 1)
+    root.resize(900, root.sizeHint().height())
+
+    qt_layout.fit_analysis_dialog_to_contents(root)
+    root.show()
+    app.processEvents()
+
+    try:
+        assert combo.minimumWidth() >= _combo_contents_width(combo)
+        assert combo.maximumWidth() <= qt_layout.ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH
+        assert combo.width() <= combo.maximumWidth()
+        assert combo.width() < root.width() - label.width()
+        assert (
+            combo.sizePolicy().horizontalPolicy()
+            == QtWidgets.QSizePolicy.Maximum
+        )
     finally:
         root.close()
         root.deleteLater()
