@@ -86,7 +86,7 @@ def test_continuous_imputation_uses_r_keys_not_visible_headers(qapp, monkeypatch
     )
     form.simple_table = QTableWidget(2, 8)
     form.simple_table.setHorizontalHeaderLabels(
-        ["n", "Mean", "sd", "se", "Variance", "Lower", "Upper", "pval"]
+        ["N", "Mean", "SD", "SE", "Variance", "Lower", "Upper", "P-Value"]
     )
     form.cur_groups = ["Group 1", "Group 2"]
     form.conf_level = 95.0

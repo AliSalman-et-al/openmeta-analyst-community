@@ -40,18 +40,29 @@ import forms.ui_choose_back_calc_result_form
 default_col_width = 65
 CONTINUOUS_IMPUTATION_FIELD_NAMES = {
     "n": "n",
+    "N": "n",
     "Mean": "mean",
     "mean": "mean",
     "sd": "sd",
+    "SD": "sd",
     "se": "se",
+    "SE": "se",
     "Variance": "var",
     "var": "var",
     "Lower": "low",
     "low": "low",
     "Upper": "high",
     "high": "high",
+    "P-Value": "pval",
+    "p-value": "pval",
     "pval": "pval",
 }
+
+
+def continuous_imputation_field_name(visible_header):
+    return CONTINUOUS_IMPUTATION_FIELD_NAMES.get(
+        str(visible_header), str(visible_header)
+    )
 
 # because the output from R is a string ("TRUE"/"FALSE")
 # Remove this? GD
@@ -466,13 +477,14 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         if not is_a_float(celldata_string):
             return "Raw data needs to be numeric."
 
+        field_name = continuous_imputation_field_name(cell_header)
         if (
-            cell_header in ["n", "sd", "se", "var", "pval"]
+            field_name in ["n", "sd", "se", "var", "pval"]
             and float(celldata_string) < 0
         ):
-            return "%s cannot be negative." % (cell_header,)
+            return "%s cannot be negative." % (field_name,)
 
-        if cell_header == "pval" and not (0 <= float(celldata_string) <= 1):
+        if field_name == "pval" and not (0 <= float(celldata_string) <= 1):
             return "pval must be between 0 and 1"
         return None
 
@@ -733,9 +745,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         return alpha
 
     def _imputation_field_name(self, visible_header):
-        return CONTINUOUS_IMPUTATION_FIELD_NAMES.get(
-            str(visible_header), str(visible_header)
-        )
+        return continuous_imputation_field_name(visible_header)
 
     def impute_pre_post_data(self, table, group_index, row=None, col=None):
         """
@@ -1012,7 +1022,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                 value = lambda x: self._get_float(row_index, x)
                 tmp.append(
                     [
-                        (var_name, value(i))
+                        (self._imputation_field_name(var_name), value(i))
                         for i, var_name in enumerate(var_names)
                         if value(i) is not None
                     ]
@@ -1144,10 +1154,11 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         }
         for row in range(len(self.cur_groups)):
             for var_index, var_name in enumerate(var_names):
-                if var_name not in ["n", "sd", "mean"]:
+                field_name = self._imputation_field_name(var_name)
+                if field_name not in ["n", "sd", "mean"]:
                     continue
-                val = group1_data[var_name] if row == 0 else group2_data[var_name]
-                if var_name == "n" and val not in EMPTY_VALS:
+                val = group1_data[field_name] if row == 0 else group2_data[field_name]
+                if field_name == "n" and val not in EMPTY_VALS:
                     val = int(round(val))  # convert float to integer
                 self._set_val(row, var_index, val, self.simple_table)
 

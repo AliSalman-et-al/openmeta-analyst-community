@@ -90,7 +90,7 @@
      </row>
      <column>
       <property name="text">
-       <string>n</string>
+       <string>N</string>
       </property>
      </column>
      <column>
@@ -100,12 +100,12 @@
      </column>
      <column>
       <property name="text">
-       <string>sd</string>
+       <string>SD</string>
       </property>
      </column>
      <column>
       <property name="text">
-       <string>se</string>
+       <string>SE</string>
       </property>
      </column>
      <column>
@@ -115,7 +115,7 @@
      </column>
      <column>
       <property name="text">
-       <string>p-value</string>
+       <string>P-Value</string>
       </property>
      </column>
      <column>
@@ -200,7 +200,7 @@
         </row>
         <column>
          <property name="text">
-          <string>n</string>
+          <string>N</string>
          </property>
         </column>
         <column>
@@ -210,12 +210,12 @@
         </column>
         <column>
          <property name="text">
-          <string>sd</string>
+          <string>SD</string>
          </property>
         </column>
         <column>
          <property name="text">
-          <string>se</string>
+          <string>SE</string>
          </property>
         </column>
         <column>
@@ -307,7 +307,7 @@ p, li { white-space: pre-wrap; }
         </row>
         <column>
          <property name="text">
-          <string>n</string>
+          <string>N</string>
          </property>
         </column>
         <column>
@@ -317,12 +317,12 @@ p, li { white-space: pre-wrap; }
         </column>
         <column>
          <property name="text">
-          <string>sd</string>
+          <string>SD</string>
          </property>
         </column>
         <column>
          <property name="text">
-          <string>se</string>
+          <string>SE</string>
          </property>
         </column>
         <column>
