@@ -199,18 +199,19 @@ def test_open_project_preserves_main_window_state_without_duplicate_windows():
 def test_openmeta_logo_resource_is_valid_and_used_consistently():
     import icons_rc  # noqa: F401
     from PyQt5 import QtGui
+    import launch
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-    app_icon = QtGui.QIcon(":/misc/meta.ico")
+    app_icon = QtGui.QIcon(launch.APPLICATION_ICON_PATH)
     logo_pixmap = QtGui.QPixmap(":/misc/meta.png")
-    expected_icon_sizes = [16, 24, 32, 48, 64, 128, 256]
 
+    assert launch.APPLICATION_ICON_PATH == ":/misc/meta.png"
     assert app_icon.isNull() is False
     assert logo_pixmap.isNull() is False
     assert logo_pixmap.width() == logo_pixmap.height()
-    assert logo_pixmap.width() >= max(expected_icon_sizes)
+    assert logo_pixmap.width() >= 1024
     assert sorted((size.width(), size.height()) for size in app_icon.availableSizes()) == [
-        (size, size) for size in expected_icon_sizes
+        (1024, 1024)
     ]
 
     checked_paths = [
@@ -234,13 +235,13 @@ def test_openmeta_logo_resource_is_valid_and_used_consistently():
         or "\":/misc/meta." in line
         or "':/misc/meta." in line
     ]
-    broken_logo_refs = [
+    low_resolution_icon_refs = [
         f"{path}:{line.strip()}"
         for path, line in checked_window_icon_refs
-        if ":/misc/meta.png" in line
+        if ":/misc/meta.ico" in line
     ]
 
-    assert broken_logo_refs == []
+    assert low_resolution_icon_refs == []
 
 
 def test_automation_launch_shows_default_confidence_level_at_startup():

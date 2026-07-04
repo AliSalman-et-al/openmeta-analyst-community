@@ -18,7 +18,7 @@ import app_error_handler
 import settings
 
 SPLASH_DISPLAY_TIME = 0  # TODO: change to 5 seconds in production version
-APPLICATION_ICON_PATH = ":/misc/meta.ico"
+APPLICATION_ICON_PATH = ":/misc/meta.png"
 
 
 def _native_windows_command_line_argv():

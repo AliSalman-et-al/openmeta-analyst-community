@@ -22,7 +22,7 @@ class Ui_diag_metric(object):
         font.setFamily("Verdana")
         diag_metric.setFont(font)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/misc/meta.ico"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         diag_metric.setWindowIcon(icon)
         self.gridLayout_2 = QtWidgets.QGridLayout(diag_metric)
         self.gridLayout_2.setObjectName("gridLayout_2")

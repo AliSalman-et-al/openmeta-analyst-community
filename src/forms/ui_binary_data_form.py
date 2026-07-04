@@ -16,7 +16,7 @@ class Ui_BinaryDataForm(object):
         BinaryDataForm.setObjectName("BinaryDataForm")
         BinaryDataForm.resize(394, 382)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/misc/meta.ico"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         BinaryDataForm.setWindowIcon(icon)
         self.verticalLayout_4 = QtWidgets.QVBoxLayout(BinaryDataForm)
         self.verticalLayout_4.setObjectName("verticalLayout_4")

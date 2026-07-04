@@ -17,7 +17,7 @@
   </property>
   <property name="windowIcon">
    <iconset resource="../images/icons.qrc">
-    <normaloff>:/misc/meta.ico</normaloff>:/misc/meta.ico</iconset>
+    <normaloff>:/misc/meta.png</normaloff>:/misc/meta.png</iconset>
   </property>
   <property name="windowTitle">
    <string>Select Covariate</string>

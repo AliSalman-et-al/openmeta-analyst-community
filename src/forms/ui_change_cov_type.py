@@ -21,7 +21,7 @@ class Ui_ChangeCovTypeForm(object):
         font.setFamily("Verdana")
         ChangeCovTypeForm.setFont(font)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/misc/meta.ico"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         ChangeCovTypeForm.setWindowIcon(icon)
         self.verticalLayout_2 = QtWidgets.QVBoxLayout(ChangeCovTypeForm)
         self.verticalLayout_2.setObjectName("verticalLayout_2")

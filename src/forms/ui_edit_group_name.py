@@ -22,7 +22,7 @@ class Ui_group_name_dialog(object):
         font.setFamily("Verdana")
         group_name_dialog.setFont(font)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/misc/meta.ico"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         group_name_dialog.setWindowIcon(icon)
         self.verticalLayout = QtWidgets.QVBoxLayout(group_name_dialog)
         self.verticalLayout.setObjectName("verticalLayout")

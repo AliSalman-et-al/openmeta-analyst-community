@@ -20,7 +20,7 @@ class Ui_running(object):
         font.setFamily("Verdana")
         running.setFont(font)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/misc/meta.ico"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         running.setWindowIcon(icon)
         running.setSizeGripEnabled(False)
         running.setModal(True)

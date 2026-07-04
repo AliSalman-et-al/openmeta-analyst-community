@@ -22,7 +22,7 @@ class Ui_new_covariate_dialog(object):
         font.setFamily("Verdana")
         new_covariate_dialog.setFont(font)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/misc/meta.ico"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         new_covariate_dialog.setWindowIcon(icon)
         self.buttonBox = QtWidgets.QDialogButtonBox(new_covariate_dialog)
         self.buttonBox.setGeometry(QtCore.QRect(10, 90, 281, 32))
