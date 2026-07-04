@@ -1005,6 +1005,7 @@ def test_issue_76_to_105_reported_bad_user_facing_strings_are_absent():
         'QAction("save pdf image as"',
         'QAction("save png image as"',
         'QAction("edit plot"',
+        'QAction("Edit Plot"',
         "tau^2",
         "I^2",
         "Results (log scale)",
@@ -1155,7 +1156,6 @@ def test_issue_76_to_105_corrected_user_facing_strings_are_present():
         'QAction("Rename Covariate %s"',
         'QAction("Save PDF Image As"',
         'QAction("Save PNG Image As"',
-        'QAction("Edit Plot"',
     ]
 
     for expected_string in expected_strings:

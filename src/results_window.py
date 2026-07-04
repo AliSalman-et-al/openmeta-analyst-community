@@ -29,7 +29,6 @@ from PyQt5.QtWidgets import (
 import os
 import sys
 import ui_results_window
-import edit_forest_plot_form
 import app_error_handler
 import meta_py_r
 import qt_layout
@@ -448,7 +447,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
     ):
         item = QGraphicsPixmapItem(pixmap)
         item.setToolTip(
-            "To save the image:\nright-click on the image and choose \"save image as\".\nSave as png will correctly render non-latin fonts but does not respect changes to plot made through 'edit_plot ...'"
+            'To save the image:\nright-click on the image and choose "save image as".'
         )
 
         self.y_coord += item.boundingRect().size().height() + SECTION_SPACING
@@ -516,26 +515,10 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                 )
                 menu.addAction(action)
 
-            def add_edit_plot_menu_action(menu):
-                # only know how to edit *simple* (i.e., _not_ side-by-side, as
-                # in sens and spec plotted on the same canvass) forest plots for now
-                if plot_type == "forest" and not self._is_side_by_side_fp(title):
-                    action = QAction("Edit Plot", self)
-                    action.triggered.connect(
-                        app_error_handler.safe_slot(
-                            lambda _checked=False: self.edit_image(
-                                params_path, title, png_path, qpixmap_item
-                            ),
-                            parent=self,
-                        )
-                    )
-                    menu.addAction(action)
-
             context_menu = QMenu(self)
             if params_path:
                 add_save_as_pdf_menu_action(context_menu)
                 add_save_as_png_menu_action(context_menu)
-                add_edit_plot_menu_action(context_menu)
             else:  # no params path given, just give them the png
                 add_save_as_png_menu_action(context_menu)
 
@@ -594,16 +577,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                 default_path,
             )
             unscaled_image.save(file_path, "PNG")
-
-    def edit_image(self, params_path, title, png_path, pixmap_item):
-        plot_editor_window = edit_forest_plot_form.EditPlotWindow(
-            params_path, png_path, pixmap_item, parent=self
-        )
-        if plot_editor_window is not None:
-            plot_editor_window.show()
-        else:
-            # TODO show a warning
-            print("sorry - can't edit")
 
     def position(self):
         point = QPoint(int(self.x_coord), int(self.y_coord))

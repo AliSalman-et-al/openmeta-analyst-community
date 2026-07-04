@@ -2042,6 +2042,104 @@ def test_results_window_text_context_menu_is_reentrant_safe(monkeypatch):
         app.processEvents()
 
 
+def test_results_window_figure_context_menus_only_offer_save_actions(monkeypatch):
+    import launch
+    import modern_compat
+
+    modern_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    popups = []
+
+    class FakeEvent(object):
+        def __init__(self):
+            self.accepted = False
+
+        def screenPos(self):
+            return results_window.QPoint(10, 20)
+
+        def accept(self):
+            self.accepted = True
+
+    class FakeSignal(object):
+        def __init__(self):
+            self._callbacks = []
+
+        def connect(self, callback):
+            self._callbacks.append(callback)
+
+        def emit(self):
+            for callback in self._callbacks:
+                callback()
+
+    class FakeMenu(object):
+        current = None
+
+        def __init__(self, parent=None):
+            self.parent = parent
+            self.actions = []
+            self.aboutToHide = FakeSignal()
+            FakeMenu.current = self
+
+        def addAction(self, action):
+            self.actions.append(action)
+
+        def popup(self, pos):
+            popups.append((pos, [action.text() for action in self.actions]))
+
+    monkeypatch.setattr(results_window, "QMenu", FakeMenu)
+    window = results_window.ResultsWindow(
+        {
+            "texts": {},
+            "images": {},
+            "image_var_names": {},
+            "image_params_paths": {},
+            "image_order": [],
+        }
+    )
+
+    try:
+        menu_cases = [
+            ("plot.data", "Forest Plot", "forest"),
+            ("plot.data", "Sensitivity and Specificity", "forest"),
+            ("plot.data", "Regression Plot", "regression"),
+            (None, "Forest Plot", "forest"),
+        ]
+
+        for params_path, title, plot_type in menu_cases:
+            event = FakeEvent()
+            handler = window._make_context_menu(
+                params_path,
+                title,
+                "missing.png",
+                qpixmap_item=None,
+                plot_type=plot_type,
+            )
+            handler(event)
+            assert event.accepted is True
+            FakeMenu.current.aboutToHide.emit()
+
+        assert popups == [
+            (
+                results_window.QPoint(10, 20),
+                ["Save PDF Image As", "Save PNG Image As"],
+            ),
+            (
+                results_window.QPoint(10, 20),
+                ["Save PDF Image As", "Save PNG Image As"],
+            ),
+            (
+                results_window.QPoint(10, 20),
+                ["Save PDF Image As", "Save PNG Image As"],
+            ),
+            (results_window.QPoint(10, 20), ["Save PNG Image As"]),
+        ]
+    finally:
+        window.close()
+        app.processEvents()
+
+
 def test_results_window_ignores_missing_image_order_entries():
     import launch
     import modern_compat
