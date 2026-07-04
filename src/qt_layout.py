@@ -145,7 +145,7 @@ def fit_text_to_contents(
     if root_layout is not None:
         root_layout.activate()
 
-    _fit_wizard_page_height_to_contents(root)
+    _fit_wizard_page_to_contents(root)
 
     adjust_root = adjust_root and _root_allows_content_resize(root)
     if adjust_root:
@@ -198,12 +198,13 @@ def _stable_root_size(root):
     return None
 
 
-def _fit_wizard_page_height_to_contents(root):
+def _fit_wizard_page_to_contents(root):
     if not isinstance(root, QWizardPage):
         return
-    target_height = root.sizeHint().height()
-    _raise_maximum_height(root, target_height)
-    root.setMinimumHeight(max(root.minimumHeight(), target_height))
+    target_size = root.sizeHint()
+    _raise_maximum_height(root, target_size.height())
+    _raise_maximum_width(root, target_size.width())
+    root.setMinimumSize(root.minimumSize().expandedTo(target_size))
 
 
 def _root_size_hint_for_current_contents(root):

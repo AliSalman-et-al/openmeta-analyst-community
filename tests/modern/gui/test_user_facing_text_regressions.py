@@ -252,6 +252,35 @@ def test_generated_ui_surfaces_do_not_cap_visible_text_widgets_below_contents():
     app.processEvents()
 
 
+def test_generated_dialog_and_wizard_surfaces_fit_root_to_contents():
+    sys.path.insert(0, str(ROOT / "src"))
+    sys.path.insert(0, str(ROOT / "src" / "forms"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+
+    for module_name in GENERATED_UI_MODULE_NAMES:
+        module = importlib.import_module(module_name)
+        ui_class = next(
+            value for name, value in vars(module).items() if name.startswith("Ui_")
+        )
+        if ui_class.__name__ in {"Ui_MainWindow", "Ui_ResultsWindow"}:
+            continue
+
+        root = _root_for_ui_class(ui_class)
+        ui = ui_class()
+        ui.setupUi(root)
+        qt_layout.fit_application_dialog_to_contents(root)
+
+        try:
+            assert root.minimumWidth() >= root.sizeHint().width(), module_name
+            assert root.minimumHeight() >= root.sizeHint().height(), module_name
+        finally:
+            root.close()
+            root.deleteLater()
+    app.processEvents()
+
+
 def test_generated_ui_combo_boxes_do_not_stretch_to_wide_parent_geometry():
     sys.path.insert(0, str(ROOT / "src"))
     sys.path.insert(0, str(ROOT / "src" / "forms"))
