@@ -78,6 +78,96 @@ def _continuous_model_with_named_study():
     return model
 
 
+def _display_headers(data_type_name, data_type, sub_type, current_effect):
+    raw_columns, outcome_columns = ma_data_table_model.DatasetModel.get_column_indices(
+        data_type_name, sub_type
+    )
+    return [
+        ma_data_table_model.DatasetModel.helper_basic_horizontal_headerData(
+            column,
+            data_type,
+            sub_type,
+            raw_columns,
+            outcome_columns,
+            current_effect,
+            meta_globals.DEFAULT_GROUP_NAMES,
+        )
+        for column in range(
+            raw_columns[0] if raw_columns else outcome_columns[0],
+            outcome_columns[-1] + 1,
+        )
+    ]
+
+
+def test_main_data_grid_display_headers_use_desktop_casing_without_changing_keys():
+    assert ma_data_table_model.DatasetModel.headers == ["include", "study name", "year"]
+
+    base_headers = [
+        ma_data_table_model.DatasetModel.helper_basic_horizontal_headerData(
+            column,
+            "binary",
+            None,
+            [3, 4, 5, 6],
+            [7, 8, 9],
+            "OR",
+            meta_globals.DEFAULT_GROUP_NAMES,
+        )
+        for column in range(3)
+    ]
+    assert base_headers == ["Include", "Study Name", "Year"]
+
+    assert _display_headers("binary", meta_globals.BINARY, None, "OR") == [
+        "Tx A #evts",
+        "Tx A #total",
+        "Tx B #evts",
+        "Tx B #total",
+        "OR",
+        "Lower",
+        "Upper",
+    ]
+    assert _display_headers("continuous", meta_globals.CONTINUOUS, None, "SMD") == [
+        "Tx A N",
+        "Tx A Mean",
+        "Tx A SD",
+        "Tx B N",
+        "Tx B Mean",
+        "Tx B SD",
+        "SMD",
+        "Lower",
+        "Upper",
+    ]
+    raw_columns, outcome_columns = ma_data_table_model.DatasetModel.get_column_indices(
+        "continuous", None
+    )
+    assert ma_data_table_model.DatasetModel.helper_basic_horizontal_headerData(
+        raw_columns[1],
+        meta_globals.CONTINUOUS,
+        None,
+        raw_columns,
+        outcome_columns,
+        "SMD",
+        ["eBay arm", "control arm"],
+    ) == "eBay arm Mean"
+    assert _display_headers(
+        "continuous", meta_globals.CONTINUOUS, "generic_effect", "MD"
+    ) == [
+        "MD",
+        "SE",
+    ]
+    assert _display_headers("diagnostic", meta_globals.DIAGNOSTIC, None, "Sens") == [
+        "TP",
+        "FN",
+        "FP",
+        "TN",
+        "Sens.",
+        "Lower",
+        "Upper",
+        "Spec.",
+        "Lower",
+        "Upper",
+    ]
+
+
 def test_empty_editable_cells_return_blank_edit_text():
     model = _diagnostic_model_with_empty_cells()
     ma_unit = model.get_current_ma_unit_for_study(0)

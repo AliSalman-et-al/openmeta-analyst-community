@@ -823,13 +823,13 @@ def test_metric_selection_and_confidence_level_are_preserved_in_model_state():
 
         assert window.model.current_effect == "RR"
         assert window.model.get_global_conf_level() == 90.0
-        assert window.cl_label.text() == "confidence level: 90.0%"
+        assert window.cl_label.text() == "Confidence Level: 90.0%"
 
         window.set_model(window.model.dataset.copy(), state)
 
         assert window.model.current_effect == "RR"
         assert window.model.get_global_conf_level() == 90.0
-        assert window.cl_label.text() == "confidence level: 90.0%"
+        assert window.cl_label.text() == "Confidence Level: 90.0%"
         assert _metric_action(window, "RR").isChecked()
     finally:
         _close_without_prompt(app, window)

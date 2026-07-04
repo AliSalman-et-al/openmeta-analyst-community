@@ -250,7 +250,7 @@ def test_automation_launch_shows_default_confidence_level_at_startup():
     app, window = launch.start_automation()
 
     try:
-        assert window.cl_label.text() == "confidence level: 95.0%"
+        assert window.cl_label.text() == "Confidence Level: 95.0%"
     finally:
         window.close()
         app.processEvents()
@@ -477,22 +477,22 @@ def test_opened_sample_projects_return_native_table_values_for_pyqt5_rendering()
             "amino.oma",
             "Gonzalez",
             lambda groups: [
-                groups[0] + " #evts",
-                groups[0] + " #total",
-                groups[1] + " #evts",
-                groups[1] + " #total",
+                groups[0].title() + " #evts",
+                groups[0].title() + " #total",
+                groups[1].title() + " #evts",
+                groups[1].title() + " #total",
             ],
         ),
         (
             "continuous.oma",
             "Carroll",
             lambda groups: [
-                groups[0] + " N",
-                groups[0] + " mean",
-                groups[0] + " SD",
-                groups[1] + " N",
-                groups[1] + " mean",
-                groups[1] + " SD",
+                groups[0].title() + " N",
+                groups[0].title() + " Mean",
+                groups[0].title() + " SD",
+                groups[1].title() + " N",
+                groups[1].title() + " Mean",
+                groups[1].title() + " SD",
             ],
         ),
     ]
@@ -510,13 +510,13 @@ def test_opened_sample_projects_return_native_table_values_for_pyqt5_rendering()
                 model.headerData(
                     model.NAME, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole
                 )
-                == "study name"
+                == "Study Name"
             )
             assert (
                 model.headerData(
                     model.YEAR, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole
                 )
-                == "year"
+                == "Year"
             )
             raw_headers = raw_headers_for_groups(model.current_txs)
             assert [

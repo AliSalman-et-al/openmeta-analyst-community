@@ -31,6 +31,46 @@ import name_validation
 # following the last study.
 DUMMY_ROWS = 20
 STUDY_NAME_REQUIRED_MESSAGE = "Please enter a study name before entering study data."
+DISPLAY_LABEL_ACRONYMS = {
+    "sd": "SD",
+    "se": "SE",
+    "tp": "TP",
+    "fn": "FN",
+    "fp": "FP",
+    "tn": "TN",
+}
+DISPLAY_LABEL_ACRONYMS.update(
+    {metric.lower(): metric for metric in ALL_METRIC_NAMES.keys()}
+)
+
+
+def _display_label_token(token):
+    if token == "":
+        return token
+    label = DISPLAY_LABEL_ACRONYMS.get(token.lower())
+    if label is not None:
+        return label
+    if token.startswith("#"):
+        return token
+    if len(token) == 1:
+        return token.upper()
+    return token[0].upper() + token[1:]
+
+
+def _display_label(value):
+    if value is None:
+        return value
+    return " ".join(_display_label_token(token) for token in str(value).split(" "))
+
+
+def _display_group_label(value):
+    if str(value).lower().startswith("tx "):
+        return _display_label(value)
+    return value
+
+
+def _raw_data_display_label(group_name, suffix):
+    return "{} {}".format(_display_group_label(group_name), _display_label(suffix))
 
 
 def _item_data(value=None):
@@ -1101,11 +1141,13 @@ class DatasetModel(QAbstractTableModel):
         having to make a data model"""
 
         if section == DatasetModel.INCLUDE_STUDY:
-            return _item_data(DatasetModel.headers[DatasetModel.INCLUDE_STUDY])
+            return _item_data(
+                _display_label(DatasetModel.headers[DatasetModel.INCLUDE_STUDY])
+            )
         elif section == DatasetModel.NAME:
-            return _item_data(DatasetModel.headers[DatasetModel.NAME])
+            return _item_data(_display_label(DatasetModel.headers[DatasetModel.NAME]))
         elif section == DatasetModel.YEAR:
-            return _item_data(DatasetModel.headers[DatasetModel.YEAR])
+            return _item_data(_display_label(DatasetModel.headers[DatasetModel.YEAR]))
         # note that we're assuming here that raw data
         # always shows only two tx groups at once.
         elif outcome_not_None and section in raw_columns:
@@ -1116,9 +1158,9 @@ class DatasetModel(QAbstractTableModel):
                     current_tx = groups[1]
 
                 if section in (raw_columns[0], raw_columns[2]):
-                    return _item_data(current_tx + " #evts")
+                    return _item_data(_raw_data_display_label(current_tx, "#evts"))
                 else:
-                    return _item_data(current_tx + " #total")
+                    return _item_data(_raw_data_display_label(current_tx, "#total"))
             elif data_type == CONTINUOUS:
                 # continuous data
                 if len(raw_columns) < 6:
@@ -1130,11 +1172,11 @@ class DatasetModel(QAbstractTableModel):
                     if section in raw_columns[3:]:
                         current_tx = groups[1]
                     if section in (raw_columns[0], raw_columns[3]):
-                        return _item_data(current_tx + " N")
+                        return _item_data(_raw_data_display_label(current_tx, "N"))
                     elif section in (raw_columns[1], raw_columns[4]):
-                        return _item_data(current_tx + " mean")
+                        return _item_data(_raw_data_display_label(current_tx, "mean"))
                     else:
-                        return _item_data(current_tx + " SD")
+                        return _item_data(_raw_data_display_label(current_tx, "SD"))
             elif data_type == DIAGNOSTIC:
                 # ordering per sir Tom Trikalinos
                 # "it makes sense -- it goes like this in the matrix!"
@@ -1154,28 +1196,35 @@ class DatasetModel(QAbstractTableModel):
                 if section == outcome_columns[0]:
                     return _item_data(current_effect)
                 elif section == outcome_columns[1]:
-                    return _item_data("lower")
+                    return _item_data("Lower")
                 else:
-                    return _item_data("upper")
+                    return _item_data("Upper")
             elif data_type == CONTINUOUS:
                 if sub_type == "generic_effect":
                     if section == outcome_columns[0]:
                         return _item_data(current_effect)
                     if section == outcome_columns[1]:
-                        return _item_data("se")
+                        return _item_data("SE")
                 else:  # normal case with no outcome_subtype
                     if section == outcome_columns[0]:
                         return _item_data(current_effect)
                     elif section == outcome_columns[1]:
-                        return _item_data("lower")
+                        return _item_data("Lower")
                     elif section == outcome_columns[2]:
-                        return _item_data("upper")
+                        return _item_data("Upper")
             elif data_type == DIAGNOSTIC:
                 ####
                 # we're going to do three columns per outcome
                 #   est, lower, upper
                 outcome_index = section - outcome_columns[0]
-                outcome_headers = ["sens.", "lower", "upper", "spec.", "lower", "upper"]
+                outcome_headers = [
+                    "Sens.",
+                    "Lower",
+                    "Upper",
+                    "Spec.",
+                    "Lower",
+                    "Upper",
+                ]
                 return _item_data(outcome_headers[outcome_index])
 
         return None  # Only get here if section doesn't match

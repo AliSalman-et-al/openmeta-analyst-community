@@ -146,8 +146,8 @@ def _connect_action(action, callback):
 
 def _format_confidence_level_status(conf_level):
     if conf_level is None:
-        return "confidence level: not set"
-    return "confidence level: {:.1%}".format(float(conf_level) / 100.0)
+        return "Confidence Level: not set"
+    return "Confidence Level: {:.1%}".format(float(conf_level) / 100.0)
 
 
 class ImportProgress(QDialog, forms.ui_running.Ui_running):
