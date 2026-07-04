@@ -38,6 +38,20 @@ import forms.ui_continuous_data_form
 import forms.ui_choose_back_calc_result_form
 
 default_col_width = 65
+CONTINUOUS_IMPUTATION_FIELD_NAMES = {
+    "n": "n",
+    "Mean": "mean",
+    "mean": "mean",
+    "sd": "sd",
+    "se": "se",
+    "Variance": "var",
+    "var": "var",
+    "Lower": "low",
+    "low": "low",
+    "Upper": "high",
+    "high": "high",
+    "pval": "pval",
+}
 
 # because the output from R is a string ("TRUE"/"FALSE")
 # Remove this? GD
@@ -211,15 +225,30 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             table.setColumnWidth(column, default_col_width)
 
     def _populate_effect_data(self):
-        effect_names = self.ma_unit.get_effect_names()
-        q_effects = sorted([str(effect_str) for effect_str in effect_names])
+        available_effects = set(
+            str(effect_str) for effect_str in self.ma_unit.get_effect_names()
+        )
+        metric_family = (
+            CONTINUOUS_ONE_ARM_METRICS
+            if self.cur_effect in CONTINUOUS_ONE_ARM_METRICS
+            else CONTINUOUS_TWO_ARM_METRICS
+        )
+        q_effects = [effect for effect in metric_family if effect in available_effects]
+        if self.cur_effect not in q_effects:
+            q_effects.append(str(self.cur_effect))
         self.effect_cbo_box.blockSignals(True)
-        self.effect_cbo_box.addItems(q_effects)
+        self.effect_cbo_box.clear()
+        for effect in q_effects:
+            self.effect_cbo_box.addItem(
+                self._effect_display_label(effect), userData=effect
+            )
+        self.effect_cbo_box.setMaximumWidth(300)
+        self.effect_cbo_box.setMinimumWidth(self.effect_cbo_box.sizeHint().width())
         self.effect_cbo_box.setCurrentIndex(q_effects.index(str(self.cur_effect)))
         self.effect_cbo_box.blockSignals(False)
 
     def effect_changed(self):
-        self.cur_effect = str(self.effect_cbo_box.currentText())
+        self.cur_effect = self._selected_effect()
 
         # hide pre-post for SMD
         if self.cur_effect not in ["MD", "SMD"]:
@@ -661,8 +690,6 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
     def impute_data(self):
         """compute what we can for each study from what has been given in the table"""
 
-        # note that we rely on the variable names corresponding to what
-        # the meta_py_r routine expects.
         var_names = self.get_column_header_strs()
         for row_index, group_name in enumerate(self.cur_groups):
             # assemble the fields in a dictionary; pass off to meta_py_r
@@ -670,7 +697,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             for var_index, var_name in enumerate(var_names):
                 var_value = self._get_float(row_index, var_index)
                 if var_value is not None:
-                    cur_dict[var_name] = var_value
+                    cur_dict[self._imputation_field_name(var_name)] = var_value
 
             # now pass off what we have for this study to the
             # imputation routine
@@ -689,7 +716,11 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
 
                 print("Computed vals:", computed_vals)
                 for var_index, var_name in enumerate(var_names):
-                    self._set_val(row_index, var_index, computed_vals[var_name])
+                    self._set_val(
+                        row_index,
+                        var_index,
+                        computed_vals[self._imputation_field_name(var_name)],
+                    )
                 self._copy_raw_data_from_table_to_ma_unit()
             else:
                 try:
@@ -700,6 +731,11 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
     def conf_level_to_alpha(self):
         alpha = 1 - self.conf_level / 100.0
         return alpha
+
+    def _imputation_field_name(self, visible_header):
+        return CONTINUOUS_IMPUTATION_FIELD_NAMES.get(
+            str(visible_header), str(visible_header)
+        )
 
     def impute_pre_post_data(self, table, group_index, row=None, col=None):
         """
@@ -733,7 +769,9 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             for var_index, var_name in enumerate(var_names):
                 var_value = self._get_float(a_b_index, var_index, table)
                 if var_value is not None:
-                    params_dict["%s.%s" % (var_name, a_b_name)] = var_value
+                    params_dict[
+                        "%s.%s" % (self._imputation_field_name(var_name), a_b_name)
+                    ] = var_value
         params_dict["metric"] = "'%s'" % self.cur_effect
 
         # now pass off what we have for this study to the
@@ -756,13 +794,14 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         computed_vals = results_from_r["output"]
 
         for var_index, var_name in enumerate(self.get_column_header_strs()):
-            val = computed_vals[var_name]
+            field_name = self._imputation_field_name(var_name)
+            val = computed_vals[field_name]
             self._set_val(group_index, var_index, val)
 
             # update the raw data for N, mean and SD fields (this is all that is actually stored)
             if var_index < 3:
                 self.ma_unit.get_raw_data_for_group(group_name)[var_index] = (
-                    computed_vals[var_name]
+                    computed_vals[field_name]
                 )  #
 
         try:
@@ -782,8 +821,9 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         pre_vals = results_from_r["pre"]
         post_vals = results_from_r["post"]
         for var_index, var_name in enumerate(var_names):
-            pre_val = pre_vals[var_name]
-            post_val = post_vals[var_name]
+            field_name = self._imputation_field_name(var_name)
+            pre_val = pre_vals[field_name]
+            post_val = post_vals[field_name]
             self._set_val(0, var_index, pre_val, table)
             self._set_val(1, var_index, post_val, table)
 
@@ -1200,6 +1240,15 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
     def get_effect_names(self):
         effects = self.ma_unit.get_effect_names()
         return effects
+
+    def _effect_display_label(self, effect):
+        return "%s (%s)" % (CONTINUOUS_METRIC_NAMES.get(effect, effect), effect)
+
+    def _selected_effect(self):
+        effect = self.effect_cbo_box.currentData()
+        if effect is None:
+            effect = self.effect_cbo_box.currentText()
+        return str(effect)
 
     def get_cur_group_str(self):
         # Inspired from get_cur_group_str of ma_data_table_model

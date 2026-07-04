@@ -36,6 +36,7 @@ import app_error_handler
 # this is the maximum size of a residual that we're willing to accept
 # when computing 2x2 data
 THRESHOLD = 1e-5
+INCONSISTENT_2X2_EDIT_MESSAGE = calc_fncs.INCONSISTENT_2X2_EDIT_MESSAGE
 
 
 class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
@@ -44,6 +45,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
     ):
         super(BinaryDataForm2, self).__init__(parent)
         self.setupUi(self)
+        self._configure_raw_data_table()
 
         if conf_level is None:
             raise ValueError("Confidence level must be specified")
@@ -79,6 +81,18 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         self._update_data_table()  # fill in 2x2
         self.enable_back_calculation_btn()
         qt_layout.fit_analysis_dialog_to_contents(self)
+
+    def _configure_raw_data_table(self):
+        self.raw_data_table.setHorizontalHeaderLabels(["Event", "No Event", "Total"])
+        self.raw_data_table.setVerticalHeaderLabels(["Group 1", "Group 2", "Total"])
+        self.raw_data_table.horizontalHeader().setVisible(True)
+        self.raw_data_table.verticalHeader().setVisible(True)
+        self.raw_data_table.horizontalHeader().setHighlightSections(False)
+        self.raw_data_table.verticalHeader().setHighlightSections(False)
+        self.raw_data_table.setMinimumHeight(120)
+        self.raw_data_table.setMaximumHeight(120)
+        for label in (self.label_18, self.label_19, self.label_20, self.label_21, self.label_22):
+            label.setVisible(False)
 
     def initialize_form(self):
         """Initialize all cells to empty items"""
@@ -339,16 +353,37 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         )
 
     def _populate_effect_data(self):
-        q_effects = sorted(
-            [str(effect_str) for effect_str in list(self.ma_unit.effects_dict.keys())]
+        available_effects = set(str(effect) for effect in self.ma_unit.effects_dict.keys())
+        metric_family = (
+            BINARY_ONE_ARM_METRICS
+            if self.cur_effect in BINARY_ONE_ARM_METRICS
+            else BINARY_TWO_ARM_METRICS
         )
+        q_effects = [effect for effect in metric_family if effect in available_effects]
+        if self.cur_effect not in q_effects:
+            q_effects.append(str(self.cur_effect))
         self.effect_cbo_box.blockSignals(True)
-        self.effect_cbo_box.addItems(q_effects)
+        self.effect_cbo_box.clear()
+        for effect in q_effects:
+            self.effect_cbo_box.addItem(
+                self._effect_display_label(effect), userData=effect
+            )
+        self.effect_cbo_box.setMaximumWidth(260)
+        self.effect_cbo_box.setMinimumWidth(self.effect_cbo_box.sizeHint().width())
         self.effect_cbo_box.setCurrentIndex(q_effects.index(str(self.cur_effect)))
         self.effect_cbo_box.blockSignals(False)
 
     def get_effect_names(self):
         return self.ma_unit.get_effect_names()
+
+    def _effect_display_label(self, effect):
+        return "%s (%s)" % (BINARY_METRIC_NAMES.get(effect, effect), effect)
+
+    def _selected_effect(self):
+        effect = self.effect_cbo_box.currentData()
+        if effect is None:
+            effect = self.effect_cbo_box.currentText()
+        return str(effect)
 
     def set_current_effect(self):
         """Fills in text boxes with data from ma unit"""
@@ -387,7 +422,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
     def effect_changed(self):
         """Called when a new effect is selected in the combo box"""
 
-        self.cur_effect = str(self.effect_cbo_box.currentText())
+        self.cur_effect = self._selected_effect()
         self.group_str = self.get_cur_group_str()
 
         self.try_to_update_cur_outcome()
@@ -611,7 +646,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             self._update_data_table()  # calculate rest of table (provisionally) based on new entry
             warning_msg = self.check_table_consistency.run()
             if warning_msg:
-                raise Exception("Table no longer consistent.")
+                raise Exception(INCONSISTENT_2X2_EDIT_MESSAGE)
         except Exception as e:
             msg = e.args[0]
             QMessageBox.warning(self.parent(), "Warning", msg)  # popup warning

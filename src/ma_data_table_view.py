@@ -340,76 +340,84 @@ class MADataTable(QtWidgets.QTableView):
         # fix for issue # 184
         self.vert_header.blockSignals(True)
 
-        # dispatch on the data type
-        form = None
-        study_index = row
-        # fix for issue # 183
-        ma_unit = copy.deepcopy(self.model().get_current_ma_unit_for_study(study_index))
-        old_ma_unit = copy.deepcopy(ma_unit)
-        cur_txs = self.model().current_txs
-        cur_effect = self.model().current_effect
-        cur_group_str = self.model().get_cur_group_str()
-        data_type = self.model().get_current_outcome_type()
-
-        ####
-        # here we implement undo/redo.
-        # in particular, we cache the raw data prior to editing;
-        # then undo will simply overwrite the new raw data
-        if data_type == "binary":
-            ### need to back up
-            cur_raw_data_dict = {}
-            for group in cur_txs:
-                cur_raw_data_dict[group] = list(ma_unit.get_raw_data_for_group(group))
-
-            form = binary_data_form.BinaryDataForm2(
-                ma_unit,
-                cur_txs,
-                cur_group_str,
-                cur_effect,
-                conf_level=self.model().get_global_conf_level(),
-                parent=self,
+        try:
+            # dispatch on the data type
+            form = None
+            study_index = row
+            # fix for issue # 183
+            ma_unit = copy.deepcopy(
+                self.model().get_current_ma_unit_for_study(study_index)
             )
-            if form.exec():
-                # push the edit even
-                ma_edit = CommandEditMAUnit(self, study_index, ma_unit, old_ma_unit)
-                self.undoStack.push(ma_edit)
-        elif data_type == "continuous":
-            cur_raw_data_dict = {}
-            for group_name in cur_txs:
-                cur_raw_data_dict[group_name] = list(
-                    ma_unit.get_raw_data_for_group(group_name)
+            old_ma_unit = copy.deepcopy(ma_unit)
+            cur_txs = self.model().current_txs
+            cur_effect = self.model().current_effect
+            cur_group_str = self.model().get_cur_group_str()
+            data_type = self.model().get_current_outcome_type()
+
+            ####
+            # here we implement undo/redo.
+            # in particular, we cache the raw data prior to editing;
+            # then undo will simply overwrite the new raw data
+            if data_type == "binary":
+                ### need to back up
+                cur_raw_data_dict = {}
+                for group in cur_txs:
+                    cur_raw_data_dict[group] = list(
+                        ma_unit.get_raw_data_for_group(group)
+                    )
+
+                form = binary_data_form.BinaryDataForm2(
+                    ma_unit,
+                    cur_txs,
+                    cur_group_str,
+                    cur_effect,
+                    conf_level=self.model().get_global_conf_level(),
+                    parent=self,
                 )
+                if form.exec():
+                    # push the edit even
+                    ma_edit = CommandEditMAUnit(self, study_index, ma_unit, old_ma_unit)
+                    self.undoStack.push(ma_edit)
+            elif data_type == "continuous":
+                cur_raw_data_dict = {}
+                for group_name in cur_txs:
+                    cur_raw_data_dict[group_name] = list(
+                        ma_unit.get_raw_data_for_group(group_name)
+                    )
 
-            # old_raw_data_dict = copy.deepcopy(cur_raw_data_dict)
-            form = continuous_data_form.ContinuousDataForm(
-                ma_unit,
-                cur_txs,
-                cur_group_str,
-                cur_effect,
-                conf_level=self.model().get_global_conf_level(),
-                parent=self,
-            )
-            if form.exec():
-                # update the model; push this event onto the stack
-                ma_edit = CommandEditMAUnit(self, study_index, ma_unit, old_ma_unit)
-                self.undoStack.push(ma_edit)
-        else:
-            # then this is diagnostic data
-            cur_raw_data_dict = {}
-            for group in cur_txs:
-                cur_raw_data_dict[group] = list(ma_unit.get_raw_data_for_group(group))
+                # old_raw_data_dict = copy.deepcopy(cur_raw_data_dict)
+                form = continuous_data_form.ContinuousDataForm(
+                    ma_unit,
+                    cur_txs,
+                    cur_group_str,
+                    cur_effect,
+                    conf_level=self.model().get_global_conf_level(),
+                    parent=self,
+                )
+                if form.exec():
+                    # update the model; push this event onto the stack
+                    ma_edit = CommandEditMAUnit(self, study_index, ma_unit, old_ma_unit)
+                    self.undoStack.push(ma_edit)
+            else:
+                # then this is diagnostic data
+                cur_raw_data_dict = {}
+                for group in cur_txs:
+                    cur_raw_data_dict[group] = list(
+                        ma_unit.get_raw_data_for_group(group)
+                    )
 
-            form = diagnostic_data_form.DiagnosticDataForm(
-                ma_unit,
-                cur_txs,
-                cur_group_str,
-                conf_level=self.model().get_global_conf_level(),
-                parent=self,
-            )
-            if form.exec():
-                ma_edit = CommandEditMAUnit(self, study_index, ma_unit, old_ma_unit)
-                self.undoStack.push(ma_edit)
-        self.vert_header.blockSignals(False)
+                form = diagnostic_data_form.DiagnosticDataForm(
+                    ma_unit,
+                    cur_txs,
+                    cur_group_str,
+                    conf_level=self.model().get_global_conf_level(),
+                    parent=self,
+                )
+                if form.exec():
+                    ma_edit = CommandEditMAUnit(self, study_index, ma_unit, old_ma_unit)
+                    self.undoStack.push(ma_edit)
+        finally:
+            self.vert_header.blockSignals(False)
 
     def rowMoved(self, row, oldIndex, newIndex):
         pass

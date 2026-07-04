@@ -296,7 +296,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             self._update_data_table()  # calculate rest of table (provisionally) based on new entry
             warning_msg = self.check_table_consistency.run()
             if warning_msg:
-                raise Exception("Table no longer consistent.")
+                raise Exception(calc_fncs.INCONSISTENT_2X2_EDIT_MESSAGE)
         except Exception as e:
             msg = e.args[0]
             QMessageBox.warning(self.parent(), "Warning", msg)  # popup warning

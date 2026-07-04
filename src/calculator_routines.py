@@ -18,6 +18,11 @@ from meta_globals import *
 import meta_py_r
 import qt_text
 
+INCONSISTENT_2X2_EDIT_MESSAGE = (
+    "Editing a single value would make the 2x2 table inconsistent. "
+    "Use Clear Form and re-enter all four values."
+)
+
 
 def cell_text_is_blank(value):
     """Return whether Qt item text is blank."""

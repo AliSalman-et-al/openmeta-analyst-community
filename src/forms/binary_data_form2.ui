@@ -99,15 +99,15 @@
           </sizepolicy>
          </property>
          <property name="minimumSize">
-          <size>
+         <size>
            <width>305</width>
-           <height>93</height>
+           <height>120</height>
           </size>
          </property>
          <property name="maximumSize">
           <size>
            <width>305</width>
-           <height>84</height>
+           <height>120</height>
           </size>
          </property>
          <property name="font">
@@ -146,20 +146,44 @@
           <number>3</number>
          </property>
          <attribute name="horizontalHeaderVisible">
-          <bool>false</bool>
+          <bool>true</bool>
          </attribute>
          <attribute name="horizontalHeaderHighlightSections">
           <bool>false</bool>
          </attribute>
          <attribute name="verticalHeaderVisible">
-          <bool>false</bool>
+          <bool>true</bool>
          </attribute>
-         <row/>
-         <row/>
-         <row/>
-         <column/>
-         <column/>
-         <column/>
+         <row>
+          <property name="text">
+           <string>Group 1</string>
+          </property>
+         </row>
+         <row>
+          <property name="text">
+           <string>Group 2</string>
+          </property>
+         </row>
+         <row>
+          <property name="text">
+           <string>Total</string>
+          </property>
+         </row>
+         <column>
+          <property name="text">
+           <string>Event</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>No Event</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>Total</string>
+          </property>
+         </column>
         </widget>
        </item>
        <item row="2" column="0">
