@@ -12,7 +12,7 @@
 
 from functools import partial
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QMessageBox, QUndoCommand
+from PyQt5.QtWidgets import QMessageBox, QSizePolicy, QUndoCommand
 
 from meta_globals import *
 import meta_py_r
@@ -374,6 +374,34 @@ def get_CHANGE_CI_ALERT_MSG(conf_level):
     return CHANGE_CI_ALERT_BASE_MSG.format(conf_level / 100.0)
 
 
+def fit_effect_ci_line_edits_to_contents(line_edits, digits=CALC_NUM_DIGITS):
+    """Keep calculator effect/CI values wide enough to show signs and precision."""
+
+    signed_precision_sample = "-0." + ("8" * digits)
+    for line_edit in line_edits:
+        if line_edit is None:
+            continue
+
+        policy = line_edit.sizePolicy()
+        line_edit.setSizePolicy(QSizePolicy.Fixed, policy.verticalPolicy())
+
+        base_minimum_width = line_edit.property("oma_effect_ci_base_minimum_width")
+        if not isinstance(base_minimum_width, int):
+            base_minimum_width = line_edit.minimumWidth()
+            line_edit.setProperty(
+                "oma_effect_ci_base_minimum_width", base_minimum_width
+            )
+
+        text = str(line_edit.text())
+        content_width = max(
+            line_edit.fontMetrics().horizontalAdvance(value)
+            for value in (signed_precision_sample, text)
+        )
+        required_width = max(base_minimum_width, content_width + 12)
+        line_edit.setMinimumWidth(required_width)
+        line_edit.setMaximumWidth(required_width)
+
+
 def helper_set_current_effect(
     ma_unit, txt_boxes, current_effect, group_str, data_type, mult=None
 ):
@@ -413,6 +441,7 @@ def helper_set_current_effect(
         else:
             txt_box.setText("")
         txt_box.blockSignals(False)
+    fit_effect_ci_line_edits_to_contents([effect_tbox, lower_tbox, upper_tbox])
 
 
 def save_table_data(table):

@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QHeaderView,
+    QLineEdit,
     QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
@@ -323,6 +324,93 @@ def _assert_calculator_table_content_columns_fill_width(qapp, table):
     assert section_width >= table.viewport().width() - 1
     for column in range(table.columnCount()):
         assert table.columnWidth(column) >= table.sizeHintForColumn(column)
+
+
+def _assert_effect_ci_fields_fit_signed_precision(qapp, form):
+    import meta_globals
+
+    signed_value = "-0." + ("8" * meta_globals.CALC_NUM_DIGITS)
+    fields = [form.effect_txt_box, form.low_txt_box, form.high_txt_box]
+    for field in fields:
+        field.setText(signed_value)
+
+    form.show()
+    qapp.processEvents()
+
+    for field in fields:
+        assert isinstance(field, QLineEdit)
+        text_width = field.fontMetrics().horizontalAdvance(signed_value)
+        required_width = text_width + 12
+        assert field.width() >= required_width
+        assert field.maximumWidth() >= required_width
+
+
+def test_calculator_effect_ci_fields_fit_signed_precision(qapp, monkeypatch):
+    import binary_data_form
+    import continuous_data_form
+    import diagnostic_data_form
+
+    monkeypatch.setattr(
+        binary_data_form.meta_py_r, "get_mult_from_r", lambda conf: 1.96
+    )
+    monkeypatch.setattr(
+        binary_data_form.meta_py_r, "binary_convert_scale", lambda x, *args, **kwargs: x
+    )
+    monkeypatch.setattr(
+        binary_data_form.meta_py_r, "impute_bin_data", lambda data: {"FAIL": True}
+    )
+    monkeypatch.setattr(
+        continuous_data_form.meta_py_r, "get_mult_from_r", lambda conf: 1.96
+    )
+    monkeypatch.setattr(
+        continuous_data_form.meta_py_r,
+        "continuous_convert_scale",
+        lambda x, *args, **kwargs: x,
+    )
+    monkeypatch.setattr(
+        continuous_data_form.meta_py_r,
+        "impute_cont_data",
+        lambda data, alpha: {"succeeded": False, "comment": "stub"},
+    )
+    monkeypatch.setattr(
+        diagnostic_data_form.meta_py_r, "get_mult_from_r", lambda conf: 1.96
+    )
+    monkeypatch.setattr(
+        diagnostic_data_form.meta_py_r,
+        "diagnostic_convert_scale",
+        lambda x, *args, **kwargs: x,
+    )
+    monkeypatch.setattr(
+        diagnostic_data_form.meta_py_r,
+        "impute_diag_data",
+        lambda data: {"TP": None, "FP": None, "FN": None, "TN": None},
+    )
+
+    forms = [
+        binary_data_form.BinaryDataForm2(
+            FakeMAUnit(),
+            ["Group 1", "Group 2"],
+            "Group 1-Group 2",
+            "OR",
+            conf_level=95.0,
+        ),
+        continuous_data_form.ContinuousDataForm(
+            FakeContinuousMAUnit(),
+            ["Group 1", "Group 2"],
+            "Group 1-Group 2",
+            "ROM",
+            conf_level=95.0,
+        ),
+        diagnostic_data_form.DiagnosticDataForm(
+            FakeDiagnosticMAUnit(),
+            ["Group 1", "Group 2"],
+            "Group 1-Group 2",
+            conf_level=95.0,
+        ),
+    ]
+
+    for form in forms:
+        _assert_effect_ci_fields_fit_signed_precision(qapp, form)
 
 
 def test_binary_calculator_grid_columns_fill_expanded_table_width(qapp, monkeypatch):
