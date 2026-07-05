@@ -60,21 +60,34 @@ def _assert_compact_table_fits_visible_cells(table):
     assert section_width >= table.viewport().width() - 1
 
 
-def _assert_table_view_uses_spare_width(table_view):
+def _assert_table_view_leaves_spare_width_outside_data_columns(table_view):
     owner = table_view.window()
-    owner.resize(owner.width() + 180, owner.height())
     owner.show()
     QtWidgets.QApplication.processEvents()
 
-    assert table_view.horizontalHeader().stretchLastSection()
-    if table_view.model() is None or table_view.model().columnCount() == 0:
+    model = table_view.model()
+    if model is None or model.columnCount() == 0:
+        assert not table_view.horizontalHeader().stretchLastSection()
         return
 
-    section_width = sum(
-        table_view.horizontalHeader().sectionSize(column)
-        for column in range(table_view.model().columnCount())
+    header = table_view.horizontalHeader()
+    last_column = model.columnCount() - 1
+    original_last_width = header.sectionSize(last_column)
+    original_section_width = sum(
+        header.sectionSize(column) for column in range(model.columnCount())
     )
-    assert section_width >= table_view.viewport().width() - 1
+
+    owner.resize(owner.width() + 320, owner.height())
+    owner.show()
+    QtWidgets.QApplication.processEvents()
+
+    expanded_section_width = sum(
+        header.sectionSize(column) for column in range(model.columnCount())
+    )
+    assert not header.stretchLastSection()
+    assert header.sectionSize(last_column) == original_last_width
+    assert expanded_section_width == original_section_width
+    assert expanded_section_width < table_view.viewport().width()
 
 
 def test_full_app_imports_representative_csv_into_dataset():
@@ -344,7 +357,25 @@ def test_automation_launch_opens_sample_project_in_real_data_table():
             == "<font color='Blue'>clinical failure</font>"
         )
         assert window.cur_time_lbl.text() == "<font color='Blue'>first</font>"
-        _assert_table_view_uses_spare_width(window.tableView)
+        _assert_table_view_leaves_spare_width_outside_data_columns(window.tableView)
+    finally:
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
+@pytest.mark.parametrize(
+    "sample_project",
+    ["amino.oma", "continuous.oma", "lymph.oma", "meantime.oma"],
+)
+def test_main_data_grid_leaves_spare_width_outside_data_columns(sample_project):
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        assert window.open(os.path.abspath(os.path.join("sample_data", sample_project)))
+
+        _assert_table_view_leaves_spare_width_outside_data_columns(window.tableView)
     finally:
         window.close()
         app.processEvents()
@@ -824,7 +855,9 @@ def test_change_covariate_type_model_returns_native_values_and_accepts_native_ed
 
         dialog = change_cov_type_form.ChangeCovTypeForm(dataset, dataset.covariates[0])
         try:
-            _assert_table_view_uses_spare_width(dialog.cov_prev_table)
+            _assert_table_view_leaves_spare_width_outside_data_columns(
+                dialog.cov_prev_table
+            )
         finally:
             dialog.close()
     finally:

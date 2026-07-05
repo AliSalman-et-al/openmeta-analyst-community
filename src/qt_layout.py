@@ -229,12 +229,14 @@ def configure_compact_table(table, stretch_columns=False):
 
 
 def configure_spreadsheet_table_view(table_view):
-    """Preserve content-sized spreadsheet columns while filling spare viewport width."""
+    """Preserve content-sized spreadsheet columns inside an expanding viewport."""
     if table_view is None:
         return
 
     table_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-    table_view.horizontalHeader().setStretchLastSection(True)
+    header = table_view.horizontalHeader()
+    header.setStretchLastSection(False)
+    header.setSectionResizeMode(QHeaderView.Interactive)
 
 
 def _resize_table_columns_to_contents(table):
