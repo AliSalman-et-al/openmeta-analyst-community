@@ -194,7 +194,7 @@ def fit_text_to_contents(
         else:
             root.resize(target_size)
 
-    _fill_current_wizard_page_width(root)
+    _fill_current_wizard_page_width(root, minimum_width=minimum_width)
     _fill_embedded_pages_to_parent_width(root)
 
     _install_first_show_refit(
@@ -528,7 +528,7 @@ def _fit_current_wizard_page_to_contents(root):
     _fit_wizard_page_to_contents(current_page)
 
 
-def _fill_current_wizard_page_width(root):
+def _fill_current_wizard_page_width(root, minimum_width=0):
     if not isinstance(root, QWizard):
         return
 
@@ -540,16 +540,27 @@ def _fill_current_wizard_page_width(root):
     if page_parent is None:
         return
 
+    if root.layout() is not None:
+        root.layout().activate()
+    if page_parent.layout() is not None:
+        page_parent.layout().activate()
+
     parent_contents_width = page_parent.contentsRect().width()
-    if parent_contents_width <= 0:
+    root_contents_width = root.contentsRect().width()
+    root_width_floor = max(root.width(), root.minimumWidth(), minimum_width)
+    body_width = max(parent_contents_width, root_contents_width, root_width_floor)
+    if body_width <= 0:
         return
 
     horizontal_inset = max(0, current_page.geometry().left()) * 2
-    target_width = max(0, parent_contents_width - horizontal_inset)
+    target_width = max(0, body_width - horizontal_inset)
     if target_width <= 0:
         return
 
-    _raise_maximum_width(current_page, target_width)
+    current_page.setSizePolicy(
+        QSizePolicy.Expanding, current_page.sizePolicy().verticalPolicy()
+    )
+    _raise_maximum_width(current_page, QWIDGETSIZE_MAX)
     _set_fit_minimum_size(
         current_page, QSize(target_width, current_page.sizeHint().height())
     )

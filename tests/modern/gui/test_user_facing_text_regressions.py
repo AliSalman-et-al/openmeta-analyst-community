@@ -1046,6 +1046,42 @@ def test_wizard_refit_expands_stale_fixed_width_current_page_to_page_container()
     app.processEvents()
 
 
+def test_wizard_refit_propagates_root_width_floor_to_current_page_before_reflow():
+    sys.path.insert(0, str(ROOT / "src"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    wizard = QtWidgets.QWizard()
+    compact_page = QtWidgets.QWizardPage()
+    compact_layout = QtWidgets.QVBoxLayout(compact_page)
+    compact_layout.addWidget(QtWidgets.QLabel("Compact page"))
+
+    wizard.addPage(compact_page)
+    wizard.restart()
+
+    try:
+        qt_layout.fit_text_to_contents(
+            wizard,
+            minimum_width=900,
+            minimum_height=qt_layout.APPLICATION_DIALOG_MINIMUM_HEIGHT,
+            stable_root=True,
+        )
+
+        page_width_floor = wizard.minimumWidth() - (
+            max(0, wizard.currentPage().geometry().left()) * 2
+        )
+        assert compact_page.minimumWidth() >= page_width_floor
+        assert compact_page.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
+        assert (
+            compact_page.sizePolicy().horizontalPolicy()
+            == QtWidgets.QSizePolicy.Expanding
+        )
+    finally:
+        wizard.close()
+        wizard.deleteLater()
+    app.processEvents()
+
+
 def test_application_fit_allows_embedded_pages_to_fill_page_containers():
     sys.path.insert(0, str(ROOT / "src"))
     import qt_layout
