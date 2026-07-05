@@ -680,8 +680,9 @@ def test_diagnostic_direct_effects_do_not_offer_count_based_methods(monkeypatch)
         _close_without_prompt(app, window)
 
 
-def test_diagnostic_method_selector_fits_longest_available_label(monkeypatch):
+def test_diagnostic_method_selector_uses_capped_value_control_width(monkeypatch):
     import launch
+    import qt_layout
 
     app, window = launch.start_automation()
     import ma_specs
@@ -718,8 +719,16 @@ def test_diagnostic_method_selector_fits_longest_available_label(monkeypatch):
         label_width = form.method_cbo_box.fontMetrics().horizontalAdvance(label) + 48
 
         assert form.method_cbo_box.findText(label) >= 0
-        assert form.method_cbo_box.minimumWidth() >= label_width
-        assert form.method_cbo_box.maximumWidth() >= label_width
+        assert label_width > qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
+        assert (
+            form.method_cbo_box.minimumWidth()
+            == qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
+        )
+        assert (
+            form.method_cbo_box.maximumWidth()
+            == qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
+        )
+        assert form.method_cbo_box.width() <= form.method_cbo_box.maximumWidth()
     finally:
         for name, value in saved.items():
             setattr(backend, name, value)

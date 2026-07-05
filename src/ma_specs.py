@@ -98,6 +98,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.save_btn.pressed.connect(
             app_error_handler.safe_slot(self.select_out_path, parent=self)
         )
+        self._cap_value_control_width(self.method_cbo_box)
         self.method_cbo_box.currentIndexChanged[str].connect(
             app_error_handler.safe_slot(
                 lambda _text: self.method_changed(), parent=self

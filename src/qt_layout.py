@@ -575,9 +575,9 @@ def _fit_widget_width_to_hint(widget, width):
 def _fit_combo_width_to_contents(combo_box):
     width = _combo_contents_width(combo_box)
     target_maximum_width = _combo_maximum_width(combo_box)
-    target_width = width
+    target_width = min(width, target_maximum_width)
     combo_box.setMinimumWidth(target_width)
-    combo_box.setMaximumWidth(max(target_width, target_maximum_width))
+    combo_box.setMaximumWidth(target_maximum_width)
     combo_box.setSizePolicy(
         QSizePolicy.Maximum, combo_box.sizePolicy().verticalPolicy()
     )

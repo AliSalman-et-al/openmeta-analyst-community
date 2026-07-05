@@ -979,6 +979,8 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         "get_available_methods",
         lambda **kwargs: {
             "Binary Random-Effects": "binary.random",
+            "Binary Fixed-Effect Mantel-Haenszel": "binary.fixed.mh",
+            "Binary Fixed-Effect Inverse Variance": "binary.fixed.inv.var",
         },
         raising=False,
     )
@@ -1037,8 +1039,20 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
             )
             + 48
         )
-        assert method_combo.minimumWidth() >= widest_method_label
-        assert method_combo.maximumWidth() >= widest_method_label
+        assert widest_method_label > qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
+        assert (
+            method_combo.minimumWidth()
+            == qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
+        )
+        assert (
+            method_combo.maximumWidth()
+            == qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
+        )
+        assert method_combo.width() <= method_combo.maximumWidth()
+        assert (
+            method_combo.width()
+            < specs[0].width() - specs[0].method_lbl.width()
+        )
         assert (
             method_combo.sizePolicy().horizontalPolicy()
             != QtWidgets.QSizePolicy.Expanding
@@ -1053,8 +1067,14 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
                 )
                 + 48
             )
-            assert combo.minimumWidth() >= widest_enum_label
-            assert combo.maximumWidth() >= widest_enum_label
+            assert combo.minimumWidth() == min(
+                widest_enum_label,
+                qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH,
+            )
+            assert (
+                combo.maximumWidth()
+                == qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
+            )
             assert (
                 combo.sizePolicy().horizontalPolicy() != QtWidgets.QSizePolicy.Expanding
             )
