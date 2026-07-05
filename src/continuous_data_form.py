@@ -126,7 +126,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             self.g2_pre_post_table,
         ]
         for table in self.tables:
-            qt_layout.configure_compact_table(table, stretch_columns=False)
+            qt_layout.configure_compact_table(table, stretch_columns=True)
 
         self.grp_1_lbl.setText(str(self.cur_groups[0]))
         self.grp_2_lbl.setText(str(self.cur_groups[1]))
@@ -156,7 +156,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         for table in tables:
             if table is None:
                 continue
-            qt_layout.configure_compact_table(table, stretch_columns=False)
+            qt_layout.configure_compact_table(table, stretch_columns=True)
         qt_layout.fit_analysis_dialog_to_contents(self)
 
     def initialize_form(self, table=None):

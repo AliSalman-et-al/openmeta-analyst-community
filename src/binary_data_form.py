@@ -90,7 +90,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         table.verticalHeader().setVisible(True)
         table.horizontalHeader().setHighlightSections(False)
         table.verticalHeader().setHighlightSections(False)
-        qt_layout.configure_compact_table(table)
+        qt_layout.configure_compact_table(table, stretch_columns=True)
         for label in (
             self.event_lbl_3,
             self.label_18,

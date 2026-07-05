@@ -2,7 +2,13 @@ import sys
 from pathlib import Path
 
 from PyQt5 import QtCore
-from PyQt5.QtWidgets import QDialog, QSizePolicy, QTableWidget, QTableWidgetItem
+from PyQt5.QtWidgets import (
+    QDialog,
+    QHeaderView,
+    QSizePolicy,
+    QTableWidget,
+    QTableWidgetItem,
+)
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -290,3 +296,168 @@ def test_binary_calculator_table_layout_uses_real_headers_and_visible_total_row(
     )
     assert table.minimumHeight() >= required_height
     assert table.maximumHeight() >= required_height
+
+
+def _assert_calculator_table_grid_fills_width(qapp, table):
+    calculator = table.window()
+    calculator.resize(calculator.width() + 180, calculator.height())
+    calculator.show()
+    qapp.processEvents()
+
+    section_width = sum(
+        table.horizontalHeader().sectionSize(column)
+        for column in range(table.columnCount())
+    )
+
+    assert table.horizontalHeader().sectionResizeMode(0) == QHeaderView.Stretch
+    assert section_width >= table.viewport().width() - 1
+
+
+def test_binary_calculator_grid_columns_fill_expanded_table_width(qapp, monkeypatch):
+    import binary_data_form
+
+    monkeypatch.setattr(
+        binary_data_form.meta_py_r, "get_mult_from_r", lambda conf: 1.96
+    )
+    monkeypatch.setattr(
+        binary_data_form.meta_py_r, "binary_convert_scale", lambda x, *args, **kwargs: x
+    )
+    monkeypatch.setattr(
+        binary_data_form.meta_py_r, "impute_bin_data", lambda data: {"FAIL": True}
+    )
+
+    form = binary_data_form.BinaryDataForm2(
+        FakeMAUnit(),
+        ["Group 1", "Group 2"],
+        "Group 1-Group 2",
+        "OR",
+        conf_level=95.0,
+    )
+
+    _assert_calculator_table_grid_fills_width(qapp, form.raw_data_table)
+
+
+class FakeDiagnosticMAUnit:
+    def __init__(self):
+        self.raw_data = [1, 2, 3, 4]
+        self.tx_groups = {"Group 1-Group 2": FakeDiagnosticGroup(self.raw_data)}
+
+    def get_raw_data_for_group(self, group):
+        return self.raw_data
+
+    def get_effect_and_ci(self, metric, group_str, mult):
+        return None, None, None
+
+    def set_effect_and_ci(self, *args, **kwargs):
+        pass
+
+    def set_effect(self, *args, **kwargs):
+        pass
+
+    def set_lower(self, *args, **kwargs):
+        pass
+
+    def set_upper(self, *args, **kwargs):
+        pass
+
+
+class FakeDiagnosticGroup:
+    def __init__(self, raw_data):
+        self.raw_data = raw_data
+
+
+def test_diagnostic_calculator_grid_columns_fill_expanded_table_width(
+    qapp, monkeypatch
+):
+    import diagnostic_data_form
+
+    monkeypatch.setattr(
+        diagnostic_data_form.meta_py_r, "get_mult_from_r", lambda conf: 1.96
+    )
+    monkeypatch.setattr(
+        diagnostic_data_form.meta_py_r,
+        "diagnostic_convert_scale",
+        lambda x, *args, **kwargs: x,
+    )
+    monkeypatch.setattr(
+        diagnostic_data_form.meta_py_r,
+        "impute_diag_data",
+        lambda data: {"TP": None, "FP": None, "FN": None, "TN": None},
+    )
+
+    form = diagnostic_data_form.DiagnosticDataForm(
+        FakeDiagnosticMAUnit(),
+        ["Group 1", "Group 2"],
+        "Group 1-Group 2",
+        conf_level=95.0,
+    )
+
+    _assert_calculator_table_grid_fills_width(qapp, form.two_by_two_table)
+
+
+class FakeContinuousMAUnit:
+    def __init__(self):
+        self.raw_data = {
+            "Group 1": [10, 94, 2],
+            "Group 2": [12, 90, 3],
+        }
+
+    def get_effect_names(self):
+        return ["ROM"]
+
+    def get_raw_data_for_group(self, group):
+        return self.raw_data[group]
+
+    def get_raw_data_for_groups(self, groups):
+        values = []
+        for group in groups:
+            values.extend(self.raw_data[group])
+        return values
+
+    def get_se(self, *args, **kwargs):
+        return None
+
+    def get_effect_and_ci(self, *args, **kwargs):
+        return None, None, None
+
+    def set_effect_and_ci(self, *args, **kwargs):
+        pass
+
+    def set_effect(self, *args, **kwargs):
+        pass
+
+    def set_lower(self, *args, **kwargs):
+        pass
+
+    def set_upper(self, *args, **kwargs):
+        pass
+
+
+def test_continuous_calculator_grid_columns_fill_expanded_table_width(
+    qapp, monkeypatch
+):
+    import continuous_data_form
+
+    monkeypatch.setattr(
+        continuous_data_form.meta_py_r, "get_mult_from_r", lambda conf: 1.96
+    )
+    monkeypatch.setattr(
+        continuous_data_form.meta_py_r,
+        "continuous_convert_scale",
+        lambda x, *args, **kwargs: x,
+    )
+    monkeypatch.setattr(
+        continuous_data_form.meta_py_r,
+        "impute_cont_data",
+        lambda data, alpha: {"succeeded": False, "comment": "stub"},
+    )
+
+    form = continuous_data_form.ContinuousDataForm(
+        FakeContinuousMAUnit(),
+        ["Group 1", "Group 2"],
+        "Group 1-Group 2",
+        "ROM",
+        conf_level=95.0,
+    )
+
+    _assert_calculator_table_grid_fills_width(qapp, form.simple_table)
