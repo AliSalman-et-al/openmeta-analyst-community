@@ -216,7 +216,7 @@ Additional columns will be treated as covariates.</string>
         <property name="maximumSize">
          <size>
           <width>16777215</width>
-          <height>70</height>
+          <height>16777215</height>
          </size>
         </property>
         <property name="font">

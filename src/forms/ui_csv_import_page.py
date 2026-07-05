@@ -115,7 +115,7 @@ class Ui_WizardPage(object):
             self.required_fmt_table.sizePolicy().hasHeightForWidth()
         )
         self.required_fmt_table.setSizePolicy(sizePolicy)
-        self.required_fmt_table.setMaximumSize(QtCore.QSize(16777215, 70))
+        self.required_fmt_table.setMaximumSize(QtCore.QSize(16777215, 16777215))
         font = QtGui.QFont()
         font.setPointSize(8)
         font.setBold(True)

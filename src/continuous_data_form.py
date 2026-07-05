@@ -128,6 +128,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         ]
         for table in self.tables:
             self._set_col_widths(table)
+            qt_layout.configure_compact_table(table)
 
         self.grp_1_lbl.setText(str(self.cur_groups[0]))
         self.grp_2_lbl.setText(str(self.cur_groups[1]))

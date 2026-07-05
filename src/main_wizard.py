@@ -388,6 +388,9 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
             for col in range(self.required_fmt_table.columnCount()):
                 self.required_fmt_table.setItem(row, col, QTableWidgetItem(""))
                 self.required_fmt_table.item(row, col).setFlags(Qt.NoItemFlags)
+        qt_layout.configure_compact_table(
+            self.required_fmt_table, stretch_columns=False
+        )
 
     def isComplete(self):
         # We must have a file selected

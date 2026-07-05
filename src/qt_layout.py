@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (
     QDialog,
     QGroupBox,
     QGridLayout,
+    QHeaderView,
     QLabel,
     QToolButton,
     QRadioButton,
@@ -180,6 +181,35 @@ def fit_text_to_contents(
         minimum_width=minimum_width,
         minimum_height=minimum_height,
         stable_root=stable_root,
+    )
+
+
+def configure_compact_table(table, stretch_columns=True):
+    """Let compact tables expand horizontally and fit all visible rows."""
+    if table is None:
+        return
+
+    table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    table.setMinimumWidth(0)
+    _raise_maximum_width(table, QWIDGETSIZE_MAX)
+
+    if stretch_columns:
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+    table.resizeRowsToContents()
+    table_height = _table_height_for_visible_rows(table)
+    table.setMinimumHeight(table_height)
+    table.setMaximumHeight(table_height)
+
+
+def _table_height_for_visible_rows(table):
+    header_height = 0
+    if not table.horizontalHeader().isHidden():
+        header_height = table.horizontalHeader().sizeHint().height()
+    return (
+        header_height
+        + sum(table.rowHeight(row) for row in range(table.rowCount()))
+        + 2 * table.frameWidth()
     )
 
 

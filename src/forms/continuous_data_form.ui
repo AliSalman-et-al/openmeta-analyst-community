@@ -39,14 +39,14 @@
     <widget class="QTableWidget" name="simple_table">
      <property name="minimumSize">
       <size>
-       <width>550</width>
-       <height>80</height>
+       <width>0</width>
+       <height>0</height>
       </size>
      </property>
      <property name="maximumSize">
       <size>
-       <width>550</width>
-       <height>80</height>
+       <width>16777215</width>
+       <height>16777215</height>
       </size>
      </property>
      <property name="font">
@@ -146,14 +146,14 @@
        <widget class="QTableWidget" name="g1_pre_post_table">
         <property name="minimumSize">
          <size>
-          <width>490</width>
-          <height>81</height>
+          <width>0</width>
+          <height>0</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
-          <width>490</width>
-          <height>81</height>
+          <width>16777215</width>
+          <height>16777215</height>
          </size>
         </property>
         <property name="font">
@@ -261,14 +261,14 @@ p, li { white-space: pre-wrap; }
        <widget class="QTableWidget" name="g2_pre_post_table">
         <property name="minimumSize">
          <size>
-          <width>490</width>
-          <height>81</height>
+          <width>0</width>
+          <height>0</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
-          <width>490</width>
-          <height>81</height>
+          <width>16777215</width>
+          <height>16777215</height>
          </size>
         </property>
         <property name="frameShape">

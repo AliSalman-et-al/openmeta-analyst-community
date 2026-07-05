@@ -40,6 +40,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
     def __init__(self, ma_unit, cur_txs, cur_group_str, conf_level=None, parent=None):
         super(DiagnosticDataForm, self).__init__(parent)
         self.setupUi(self)
+        qt_layout.configure_compact_table(self.two_by_two_table)
 
         if conf_level is None:
             raise ValueError("Confidence level must be specified")

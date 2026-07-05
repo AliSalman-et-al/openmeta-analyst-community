@@ -18,12 +18,9 @@ from PyQt5.QtWidgets import (
     QAction,
     QDialog,
     QDialogButtonBox,
-    QHeaderView,
     QMessageBox,
-    QSizePolicy,
     QTableWidgetItem,
     QUndoStack,
-    QWIDGETSIZE_MAX,
 )
 
 import meta_py_r
@@ -93,14 +90,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         table.verticalHeader().setVisible(True)
         table.horizontalHeader().setHighlightSections(False)
         table.verticalHeader().setHighlightSections(False)
-        table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        table.setMinimumWidth(0)
-        table.setMaximumWidth(QWIDGETSIZE_MAX)
-        table.resizeRowsToContents()
-        table_height = self._raw_data_table_height_for_all_rows()
-        table.setMinimumHeight(table_height)
-        table.setMaximumHeight(table_height)
+        qt_layout.configure_compact_table(table)
         for label in (
             self.event_lbl_3,
             self.label_18,
@@ -110,14 +100,6 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             self.label_22,
         ):
             label.setVisible(False)
-
-    def _raw_data_table_height_for_all_rows(self):
-        table = self.raw_data_table
-        return (
-            table.horizontalHeader().sizeHint().height()
-            + sum(table.rowHeight(row) for row in range(table.rowCount()))
-            + 2 * table.frameWidth()
-        )
 
     def initialize_form(self):
         """Initialize all cells to empty items"""
