@@ -1074,10 +1074,19 @@ def test_application_fit_allows_embedded_pages_to_fill_page_containers():
 
     try:
         qt_layout.fit_application_dialog_to_contents(root)
+        root.show()
+        app.processEvents()
+        qt_layout.fit_application_dialog_to_contents(root)
+        app.processEvents()
 
         for page in (tab_page, stacked_page):
+            page_parent = page.parentWidget()
+            parent_width = page_parent.contentsRect().width()
+            page_target_width = parent_width - max(0, page.geometry().left()) * 2
+
             assert page.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
             assert page.maximumHeight() == QtWidgets.QWIDGETSIZE_MAX
+            assert page.minimumWidth() >= page_target_width
             assert (
                 page.sizePolicy().horizontalPolicy()
                 == QtWidgets.QSizePolicy.Expanding

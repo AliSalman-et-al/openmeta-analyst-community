@@ -195,6 +195,7 @@ def fit_text_to_contents(
             root.resize(target_size)
 
     _fill_current_wizard_page_width(root)
+    _fill_embedded_pages_to_parent_width(root)
 
     _install_first_show_refit(
         root,
@@ -543,7 +544,9 @@ def _fill_current_wizard_page_width(root):
         return
 
     _raise_maximum_width(current_page, target_width)
-    current_page.setMinimumWidth(max(current_page.minimumWidth(), target_width))
+    _set_fit_minimum_size(
+        current_page, QSize(target_width, current_page.sizeHint().height())
+    )
     if current_page.layout() is not None:
         current_page.layout().activate()
 
@@ -558,6 +561,39 @@ def _fit_embedded_pages_to_contents(root):
             _fit_embedded_page_to_contents(stacked_widget.widget(index))
 
 
+def _fill_embedded_pages_to_parent_width(root):
+    for tab_widget in root.findChildren(QTabWidget):
+        for index in range(tab_widget.count()):
+            _fill_page_to_parent_width(tab_widget.widget(index))
+
+    for stacked_widget in root.findChildren(QStackedWidget):
+        for index in range(stacked_widget.count()):
+            _fill_page_to_parent_width(stacked_widget.widget(index))
+
+
+def _fill_page_to_parent_width(page):
+    if page is None:
+        return
+
+    page_parent = page.parentWidget()
+    if page_parent is None:
+        return
+
+    parent_contents_width = page_parent.contentsRect().width()
+    if parent_contents_width <= 0:
+        return
+
+    horizontal_inset = max(0, page.geometry().left()) * 2
+    target_width = max(0, parent_contents_width - horizontal_inset)
+    if target_width <= 0:
+        return
+
+    _raise_maximum_width(page, target_width)
+    _set_fit_minimum_size(page, QSize(target_width, page.sizeHint().height()))
+    if page.layout() is not None:
+        page.layout().activate()
+
+
 def _fit_embedded_page_to_contents(page):
     if page is None:
         return
@@ -565,7 +601,22 @@ def _fit_embedded_page_to_contents(page):
     page.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
     _raise_maximum_height(page, QWIDGETSIZE_MAX)
     _raise_maximum_width(page, QWIDGETSIZE_MAX)
-    page.setMinimumSize(page.minimumSize().expandedTo(target_size))
+    _set_fit_minimum_size(page, target_size)
+
+
+def _set_fit_minimum_size(widget, target_size):
+    base_size = _fit_base_minimum_size(widget)
+    widget.setMinimumSize(base_size.expandedTo(target_size))
+
+
+def _fit_base_minimum_size(widget):
+    base_size = widget.property("oma_fit_base_minimum_size")
+    if isinstance(base_size, QSize):
+        return base_size
+
+    base_size = widget.minimumSize()
+    widget.setProperty("oma_fit_base_minimum_size", base_size)
+    return base_size
 
 
 def _root_size_hint_for_current_contents(root):
