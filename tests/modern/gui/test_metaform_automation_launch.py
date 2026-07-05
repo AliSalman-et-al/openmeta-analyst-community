@@ -2691,7 +2691,7 @@ def test_new_dataset_wizard_uses_declarative_minimum_size_policy():
 
 
 @pytest.mark.parametrize("path", [None, "new_dataset", "csv_import"])
-def test_wizard_uses_plain_style_with_explicit_back_navigation(path):
+def test_wizard_uses_modern_style_with_explicit_back_navigation(path):
     import launch
     from PyQt5 import QtWidgets
     import main_wizard
@@ -2699,7 +2699,7 @@ def test_wizard_uses_plain_style_with_explicit_back_navigation(path):
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     wizard = main_wizard.MainWizard(path=path)
     try:
-        assert wizard.wizardStyle() == main_wizard.QWizard.ClassicStyle
+        assert wizard.wizardStyle() == main_wizard.QWizard.ModernStyle
         assert wizard.button(main_wizard.QWizard.BackButton) is not None
     finally:
         wizard.close()

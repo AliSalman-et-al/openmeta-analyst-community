@@ -109,7 +109,7 @@ def configure_application_wizard(wizard):
     if not isinstance(wizard, QWizard):
         return
 
-    wizard.setWizardStyle(QWizard.ClassicStyle)
+    wizard.setWizardStyle(QWizard.ModernStyle)
     wizard.setOption(QWizard.NoBackButtonOnStartPage, True)
     wizard.setButtonLayout(
         [

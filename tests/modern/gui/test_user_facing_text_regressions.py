@@ -297,7 +297,7 @@ def test_application_dialog_fit_configures_wizard_navigation_chrome():
 
         qt_layout.fit_application_dialog_to_contents(wizard)
 
-        assert wizard.wizardStyle() == QtWidgets.QWizard.ClassicStyle
+        assert wizard.wizardStyle() == QtWidgets.QWizard.ModernStyle
         assert wizard.testOption(QtWidgets.QWizard.NoBackButtonOnStartPage)
         assert wizard.button(QtWidgets.QWizard.BackButton) is not None
     finally:

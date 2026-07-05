@@ -1828,6 +1828,36 @@
         "filesystem"
       ],
       "lane": "gui",
+      "nodeid": "tests/modern/gui/test_declarative_dialog_sizing.py::test_application_wizard_modern_style_renders_sized_nonblank_pages",
+      "reason": "Guards ModernStyle wizard rendering with real Qt screenshots for the app-owned wizard entry paths.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_application_dialog_fit_configures_wizard_navigation_chrome",
+      "reason": "Guards the shared application wizard chrome policy, including the selected Qt wizard style and explicit back navigation.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
       "nodeid": "tests/modern/gui/test_declarative_dialog_sizing.py::test_combo_policy_caps_closed_control_but_keeps_popup_full_width",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "seconds",
@@ -3004,6 +3034,51 @@
       "lane": "gui",
       "nodeid": "tests/modern/gui/test_analysis_failure_safety.py::test_continuous_workflow_failure_shows_dialog_and_does_not_open_results",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_wizard_uses_modern_style_with_explicit_back_navigation[None]",
+      "reason": "Guards startup wizard chrome against falling back to ClassicStyle or losing explicit back navigation.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_wizard_uses_modern_style_with_explicit_back_navigation[new_dataset]",
+      "reason": "Guards new dataset wizard chrome against falling back to ClassicStyle or losing explicit back navigation.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_wizard_uses_modern_style_with_explicit_back_navigation[csv_import]",
+      "reason": "Guards CSV import wizard chrome against falling back to ClassicStyle or losing explicit back navigation.",
       "runtime_class": "seconds",
       "size": "medium"
     },

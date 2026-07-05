@@ -79,3 +79,34 @@ def test_application_wizard_uses_minimum_layout_constraint_without_refit_filter(
     finally:
         wizard.close()
         qapp.processEvents()
+
+
+def test_application_wizard_modern_style_renders_sized_nonblank_pages(qapp, tmp_path):
+    import launch
+    import main_wizard
+
+    for path in ("new_dataset", "csv_import"):
+        wizard = main_wizard.MainWizard(path=path)
+        try:
+            wizard.restart()
+            wizard.show()
+            qapp.processEvents()
+            qapp.processEvents()
+
+            page = wizard.currentPage()
+            if page.layout() is not None:
+                page.layout().activate()
+            qapp.processEvents()
+
+            image_path = tmp_path / ("modern_wizard_%s.png" % path)
+            pixmap = wizard.grab()
+            assert pixmap.width() >= wizard.minimumWidth()
+            assert pixmap.height() >= wizard.minimumHeight()
+            assert pixmap.save(str(image_path), "PNG")
+            assert image_path.stat().st_size > 0
+            assert not pixmap.toImage().isGrayscale()
+            assert wizard.wizardStyle() == QtWidgets.QWizard.ModernStyle
+            assert page.width() >= page.parentWidget().contentsRect().width() - 4
+        finally:
+            wizard.close()
+            qapp.processEvents()
