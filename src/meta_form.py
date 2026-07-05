@@ -379,8 +379,6 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             elif event.key() == QtCore.Qt.Key_O:
                 # ctrl + o = open
                 self.open()
-            elif event.key() == QtCore.Qt.Key_A:
-                self.analysis()
 
     def _disconnections(self):
         """

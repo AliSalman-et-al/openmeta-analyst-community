@@ -63,6 +63,35 @@ def test_data_table_return_commits_editor_and_moves_down_same_column():
         _close_without_prompt(app, window)
 
 
+def test_data_table_ctrl_a_selects_all_cells_without_running_analysis(monkeypatch):
+    from PyQt5 import QtCore, QtTest
+
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        table = window.tableView
+        model = window.model
+        analysis_calls = []
+
+        monkeypatch.setattr(
+            window, "analysis", lambda *args, **kwargs: analysis_calls.append(args)
+        )
+        table.setFocus()
+        table.setCurrentIndex(model.index(0, model.NAME))
+
+        QtTest.QTest.keyClick(table, QtCore.Qt.Key_A, QtCore.Qt.ControlModifier)
+        app.processEvents()
+
+        assert analysis_calls == []
+        assert len(table.selectionModel().selectedIndexes()) == (
+            model.rowCount() * model.columnCount()
+        )
+    finally:
+        _close_without_prompt(app, window)
+
+
 def test_real_metaform_creates_binary_continuous_and_diagnostic_datasets():
     import launch
 

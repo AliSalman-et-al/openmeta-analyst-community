@@ -274,6 +274,9 @@ class MADataTable(QtWidgets.QTableView):
             elif event.key() == QtCore.Qt.Key_V:
                 # ctrl + v = paste
                 self.paste()
+            elif event.key() == QtCore.Qt.Key_A:
+                self.selectAll()
+                event.accept()
             else:
                 ###
                 # if the command hasn't anything to do with the table view
