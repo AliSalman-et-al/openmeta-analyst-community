@@ -2540,32 +2540,19 @@ def test_new_dataset_wizard_sizes_to_show_diagnostic_choice():
         app.processEvents()
 
 
-def test_new_dataset_wizard_refits_data_type_page_on_first_show(monkeypatch):
+def test_new_dataset_wizard_uses_shared_first_show_refit():
     import launch
-    from PyQt5 import QtGui, QtWidgets
+    from PyQt5 import QtWidgets
     import main_wizard
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     wizard = main_wizard.MainWizard(path="new_dataset")
-    fit_calls = []
     try:
         wizard.restart()
         app.processEvents()
-        real_fit = main_wizard.qt_layout.fit_application_dialog_to_contents
 
-        def record_fit(root, *args, **kwargs):
-            if root is wizard:
-                fit_calls.append(root.currentId())
-            return real_fit(root, *args, **kwargs)
-
-        monkeypatch.setattr(
-            main_wizard.qt_layout, "fit_application_dialog_to_contents", record_fit
-        )
-
-        wizard.showEvent(QtGui.QShowEvent())
-        app.processEvents()
-
-        assert main_wizard.Page_DataType in fit_calls
+        assert hasattr(wizard, "_oma_first_show_refit_filter")
+        assert wizard.property("oma_first_show_refit_options")["stable_root"] is True
     finally:
         wizard.close()
         app.processEvents()

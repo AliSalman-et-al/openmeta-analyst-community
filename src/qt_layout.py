@@ -1,4 +1,4 @@
-from PyQt5.QtCore import QPoint, QSize, Qt
+from PyQt5.QtCore import QEvent, QObject, QPoint, QSize, Qt, QTimer
 from PyQt5.QtGui import QGuiApplication
 from PyQt5.QtWidgets import (
     QAbstractButton,
@@ -173,6 +173,78 @@ def fit_text_to_contents(
             root.adjustSize()
         else:
             root.resize(target_size)
+
+    _install_first_show_refit(
+        root,
+        adjust_root=adjust_root,
+        minimum_width=minimum_width,
+        minimum_height=minimum_height,
+        stable_root=stable_root,
+    )
+
+
+class _FirstShowRefitFilter(QObject):
+    def __init__(self, root):
+        super(_FirstShowRefitFilter, self).__init__(root)
+        self._root = root
+        self._pending = False
+
+    def eventFilter(self, watched, event):
+        if watched is self._root and event.type() == QEvent.Show:
+            self._queue_refit()
+        return False
+
+    def _queue_refit(self):
+        if self._pending:
+            return
+        self._pending = True
+        QTimer.singleShot(0, self._refit)
+
+    def _refit(self):
+        self._pending = False
+        if not _fit_root_is_available(self._root):
+            return
+
+        options = _first_show_refit_options(self._root)
+        if options is None:
+            return
+        reset_stable_fit_size(self._root)
+        fit_text_to_contents(self._root, **options)
+
+
+def _install_first_show_refit(
+    root, adjust_root=True, minimum_width=0, minimum_height=0, stable_root=False
+):
+    if not _fit_root_is_available(root):
+        return
+
+    root.setProperty(
+        "oma_first_show_refit_options",
+        {
+            "adjust_root": adjust_root,
+            "minimum_width": minimum_width,
+            "minimum_height": minimum_height,
+            "stable_root": stable_root,
+        },
+    )
+    if getattr(root, "_oma_first_show_refit_filter", None) is not None:
+        return
+
+    event_filter = _FirstShowRefitFilter(root)
+    root.installEventFilter(event_filter)
+    root._oma_first_show_refit_filter = event_filter
+
+
+def _first_show_refit_options(root):
+    options = root.property("oma_first_show_refit_options")
+    if not isinstance(options, dict):
+        return None
+    return {
+        "adjust_root": bool(options.get("adjust_root", True)),
+        "minimum_width": int(options.get("minimum_width", 0)),
+        "minimum_height": int(options.get("minimum_height", 0)),
+        "stable_root": bool(options.get("stable_root", False)),
+    }
 
 
 def _fit_root_is_available(root):

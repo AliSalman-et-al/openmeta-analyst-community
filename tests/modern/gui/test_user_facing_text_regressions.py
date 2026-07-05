@@ -836,6 +836,41 @@ def test_application_dialog_fit_collapses_expanding_vertical_spacers():
     app.processEvents()
 
 
+def test_application_dialog_refits_after_first_show_content_changes():
+    sys.path.insert(0, str(ROOT / "src"))
+    import qt_layout
+
+    class FirstShowExpandingDialog(QtWidgets.QDialog):
+        def __init__(self):
+            super(FirstShowExpandingDialog, self).__init__()
+            self.label = QtWidgets.QLabel("Short")
+            layout = QtWidgets.QVBoxLayout(self)
+            layout.addWidget(self.label)
+
+        def showEvent(self, event):
+            super(FirstShowExpandingDialog, self).showEvent(event)
+            self.label.setText(
+                "A much longer first-show label that must be fitted before "
+                "the user interacts with the dialog."
+            )
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    root = FirstShowExpandingDialog()
+
+    try:
+        qt_layout.fit_application_dialog_to_contents(root)
+        root.show()
+        app.processEvents()
+        app.processEvents()
+
+        assert root.label.minimumWidth() >= root.label.sizeHint().width()
+        assert root.minimumWidth() >= root.sizeHint().width()
+    finally:
+        root.close()
+        root.deleteLater()
+    app.processEvents()
+
+
 def test_wizard_refit_shrinks_to_current_page_contents():
     sys.path.insert(0, str(ROOT / "src"))
     import qt_layout

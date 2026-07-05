@@ -4,7 +4,7 @@ import forms.ui_data_type_page
 import forms.ui_outcome_name_page
 import forms.ui_welcome_page
 
-from PyQt5.QtCore import QSize, Qt, QTimer
+from PyQt5.QtCore import QSize, Qt
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import (
     QAction,
@@ -708,11 +708,6 @@ class MainWizard(QWizard):
 
     def _change_size(self, pageid):
         self._fit_current_page_to_contents()
-
-    def showEvent(self, event):
-        super(MainWizard, self).showEvent(event)
-        self._fit_current_page_to_contents()
-        QTimer.singleShot(0, self._fit_current_page_to_contents)
 
     def _fit_current_page_to_contents(self):
         current_page = self.currentPage()
