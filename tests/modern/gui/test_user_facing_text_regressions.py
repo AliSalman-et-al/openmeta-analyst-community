@@ -279,6 +279,30 @@ def test_generated_dialog_and_wizard_surfaces_fit_root_to_contents():
     app.processEvents()
 
 
+def test_application_dialog_fit_configures_wizard_navigation_chrome():
+    sys.path.insert(0, str(ROOT / "src"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    wizard = QtWidgets.QWizard()
+    page = QtWidgets.QWizardPage()
+    page_layout = QtWidgets.QVBoxLayout(page)
+    page_layout.addWidget(QtWidgets.QLabel("Wizard page content"))
+    wizard.addPage(page)
+
+    try:
+        assert wizard.wizardStyle() == QtWidgets.QWizard.ClassicStyle
+
+        qt_layout.fit_application_dialog_to_contents(wizard)
+
+        assert wizard.wizardStyle() == QtWidgets.QWizard.ModernStyle
+        assert wizard.testOption(QtWidgets.QWizard.NoBackButtonOnStartPage)
+    finally:
+        wizard.close()
+        wizard.deleteLater()
+    app.processEvents()
+
+
 def test_generated_fixed_position_dialog_rows_fill_fitted_width():
     sys.path.insert(0, str(ROOT / "src"))
     sys.path.insert(0, str(ROOT / "src" / "forms"))

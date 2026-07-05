@@ -76,6 +76,7 @@ def fit_application_dialog_to_contents(root, adjust_root=True):
     """Apply the shared base sizing used by application dialogs."""
     if not _fit_root_is_available(root):
         return
+    configure_application_wizard(root)
     fit_option_groups_to_contents(
         root,
         adjust_root=adjust_root,
