@@ -870,6 +870,104 @@ def test_wizard_refit_shrinks_to_current_page_contents():
     app.processEvents()
 
 
+def test_wizard_refit_allows_current_page_to_fill_page_container():
+    sys.path.insert(0, str(ROOT / "src"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    wizard = QtWidgets.QWizard()
+    wide_page = QtWidgets.QWizardPage()
+    wide_layout = QtWidgets.QVBoxLayout(wide_page)
+    wide_label = QtWidgets.QLabel("Detailed setup that establishes the wizard width")
+    wide_label.setMinimumWidth(560)
+    wide_layout.addWidget(wide_label)
+
+    compact_page = QtWidgets.QWizardPage()
+    compact_page.setMinimumSize(QtCore.QSize(220, 80))
+    compact_page.setMaximumSize(QtCore.QSize(220, 80))
+    compact_layout = QtWidgets.QVBoxLayout(compact_page)
+    compact_layout.addWidget(QtWidgets.QLabel("Name:"))
+    compact_layout.addWidget(QtWidgets.QLineEdit())
+
+    wizard.addPage(wide_page)
+    wizard.addPage(compact_page)
+    wizard.restart()
+    app.processEvents()
+
+    try:
+        qt_layout.fit_application_dialog_to_contents(wizard)
+        wizard.next()
+        qt_layout.fit_application_dialog_to_contents(wizard)
+        app.processEvents()
+
+        page_width = wizard.minimumWidth() - (
+            wizard.width() - wizard.currentPage().width()
+        )
+        page_height = wizard.minimumHeight() - (
+            wizard.height() - wizard.currentPage().height()
+        )
+        assert compact_page.maximumWidth() >= page_width
+        assert compact_page.maximumHeight() >= page_height
+        assert (
+            compact_page.sizePolicy().horizontalPolicy()
+            == QtWidgets.QSizePolicy.Expanding
+        )
+        assert (
+            compact_page.sizePolicy().verticalPolicy()
+            == QtWidgets.QSizePolicy.Expanding
+        )
+    finally:
+        wizard.close()
+        wizard.deleteLater()
+    app.processEvents()
+
+
+def test_application_fit_allows_embedded_pages_to_fill_page_containers():
+    sys.path.insert(0, str(ROOT / "src"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    root = QtWidgets.QDialog()
+    root_layout = QtWidgets.QVBoxLayout(root)
+
+    tab_widget = QtWidgets.QTabWidget()
+    tab_page = QtWidgets.QWidget()
+    tab_page.setMinimumSize(QtCore.QSize(180, 70))
+    tab_page.setMaximumSize(QtCore.QSize(180, 70))
+    tab_layout = QtWidgets.QVBoxLayout(tab_page)
+    tab_layout.addWidget(QtWidgets.QLabel("Compact tab page"))
+    tab_widget.addTab(tab_page, "Options")
+    root_layout.addWidget(tab_widget)
+
+    stacked_widget = QtWidgets.QStackedWidget()
+    stacked_page = QtWidgets.QWidget()
+    stacked_page.setMinimumSize(QtCore.QSize(160, 60))
+    stacked_page.setMaximumSize(QtCore.QSize(160, 60))
+    stacked_layout = QtWidgets.QVBoxLayout(stacked_page)
+    stacked_layout.addWidget(QtWidgets.QLabel("Compact stacked page"))
+    stacked_widget.addWidget(stacked_page)
+    root_layout.addWidget(stacked_widget)
+
+    try:
+        qt_layout.fit_application_dialog_to_contents(root)
+
+        for page in (tab_page, stacked_page):
+            assert page.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
+            assert page.maximumHeight() == QtWidgets.QWIDGETSIZE_MAX
+            assert (
+                page.sizePolicy().horizontalPolicy()
+                == QtWidgets.QSizePolicy.Expanding
+            )
+            assert (
+                page.sizePolicy().verticalPolicy()
+                == QtWidgets.QSizePolicy.Expanding
+            )
+    finally:
+        root.close()
+        root.deleteLater()
+    app.processEvents()
+
+
 def test_analysis_dialog_refit_does_not_ratchet_after_hidden_content_changes():
     sys.path.insert(0, str(ROOT / "src"))
     import qt_layout
