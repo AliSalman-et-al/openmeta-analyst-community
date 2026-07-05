@@ -1005,6 +1005,47 @@ def test_wizard_refit_allows_current_page_to_fill_page_container():
     app.processEvents()
 
 
+def test_wizard_refit_expands_stale_fixed_width_current_page_to_page_container():
+    sys.path.insert(0, str(ROOT / "src"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    wizard = QtWidgets.QWizard()
+    wide_page = QtWidgets.QWizardPage()
+    wide_layout = QtWidgets.QVBoxLayout(wide_page)
+    wide_label = QtWidgets.QLabel("Detailed setup that establishes the wizard width")
+    wide_label.setMinimumWidth(560)
+    wide_layout.addWidget(wide_label)
+
+    stale_page = QtWidgets.QWizardPage()
+    stale_page.setMinimumSize(QtCore.QSize(220, 80))
+    stale_page.setMaximumSize(QtCore.QSize(220, 80))
+    stale_layout = QtWidgets.QVBoxLayout(stale_page)
+    stale_layout.addWidget(QtWidgets.QLabel("Name:"))
+    stale_layout.addWidget(QtWidgets.QLineEdit())
+
+    wizard.addPage(wide_page)
+    wizard.addPage(stale_page)
+    wizard.restart()
+    app.processEvents()
+
+    try:
+        qt_layout.fit_application_dialog_to_contents(wizard)
+        wizard.next()
+        qt_layout.fit_application_dialog_to_contents(wizard)
+        app.processEvents()
+
+        page_width = wizard.minimumWidth() - (
+            wizard.width() - wizard.currentPage().width()
+        )
+        assert stale_page.minimumWidth() >= page_width
+        assert stale_page.maximumWidth() >= page_width
+    finally:
+        wizard.close()
+        wizard.deleteLater()
+    app.processEvents()
+
+
 def test_application_fit_allows_embedded_pages_to_fill_page_containers():
     sys.path.insert(0, str(ROOT / "src"))
     import qt_layout

@@ -194,6 +194,8 @@ def fit_text_to_contents(
         else:
             root.resize(target_size)
 
+    _fill_current_wizard_page_width(root)
+
     _install_first_show_refit(
         root,
         adjust_root=adjust_root,
@@ -517,6 +519,33 @@ def _fit_current_wizard_page_to_contents(root):
     if current_page is None:
         return
     _fit_wizard_page_to_contents(current_page)
+
+
+def _fill_current_wizard_page_width(root):
+    if not isinstance(root, QWizard):
+        return
+
+    current_page = root.currentPage()
+    if current_page is None:
+        return
+
+    page_parent = current_page.parentWidget()
+    if page_parent is None:
+        return
+
+    parent_contents_width = page_parent.contentsRect().width()
+    if parent_contents_width <= 0:
+        return
+
+    horizontal_inset = max(0, current_page.geometry().left()) * 2
+    target_width = max(0, parent_contents_width - horizontal_inset)
+    if target_width <= 0:
+        return
+
+    _raise_maximum_width(current_page, target_width)
+    current_page.setMinimumWidth(max(current_page.minimumWidth(), target_width))
+    if current_page.layout() is not None:
+        current_page.layout().activate()
 
 
 def _fit_embedded_pages_to_contents(root):
