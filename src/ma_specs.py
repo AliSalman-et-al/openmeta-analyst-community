@@ -98,7 +98,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.save_btn.pressed.connect(
             app_error_handler.safe_slot(self.select_out_path, parent=self)
         )
-        self._cap_value_control_width(self.method_cbo_box)
+        self._cap_method_selector_width(self.method_cbo_box)
         self.method_cbo_box.currentIndexChanged[str].connect(
             app_error_handler.safe_slot(
                 lambda _text: self.method_changed(), parent=self
@@ -763,6 +763,19 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             min(
                 widget.maximumWidth(),
                 qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH,
+            )
+        )
+        widget.setSizePolicy(QSizePolicy.Maximum, widget.sizePolicy().verticalPolicy())
+
+    def _cap_method_selector_width(self, widget):
+        widget.setProperty(
+            "oma_maximum_combo_width",
+            qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH,
+        )
+        widget.setMaximumWidth(
+            min(
+                widget.maximumWidth(),
+                qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH,
             )
         )
         widget.setSizePolicy(QSizePolicy.Maximum, widget.sizePolicy().verticalPolicy())

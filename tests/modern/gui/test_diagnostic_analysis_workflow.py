@@ -680,7 +680,7 @@ def test_diagnostic_direct_effects_do_not_offer_count_based_methods(monkeypatch)
         _close_without_prompt(app, window)
 
 
-def test_diagnostic_method_selector_uses_capped_value_control_width(monkeypatch):
+def test_diagnostic_method_selector_uses_combo_width_policy(monkeypatch):
     import launch
     import qt_layout
 
@@ -720,14 +720,17 @@ def test_diagnostic_method_selector_uses_capped_value_control_width(monkeypatch)
 
         assert form.method_cbo_box.findText(label) >= 0
         assert label_width > qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
+        assert label_width <= qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH
         assert (
             form.method_cbo_box.minimumWidth()
-            == qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
+            == min(label_width, qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH)
         )
         assert (
             form.method_cbo_box.maximumWidth()
-            == qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
+            == qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH
         )
+        assert form.method_cbo_box.view().minimumWidth() >= label_width
+        assert form.method_cbo_box.toolTip() == form.method_cbo_box.currentText()
         assert form.method_cbo_box.width() <= form.method_cbo_box.maximumWidth()
     finally:
         for name, value in saved.items():

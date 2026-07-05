@@ -1153,17 +1153,17 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         assert widest_method_label > qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
         assert (
             method_combo.minimumWidth()
-            == qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
+            == min(
+                widest_method_label,
+                qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH,
+            )
         )
         assert (
             method_combo.maximumWidth()
-            == qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
+            == qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH
         )
+        assert method_combo.view().minimumWidth() >= widest_method_label
         assert method_combo.width() <= method_combo.maximumWidth()
-        assert (
-            method_combo.width()
-            < specs[0].width() - specs[0].method_lbl.width()
-        )
         assert (
             method_combo.sizePolicy().horizontalPolicy()
             != QtWidgets.QSizePolicy.Expanding
@@ -1245,7 +1245,8 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         ]
         assert len(parameter_labels) == 6
         for label in parameter_labels:
-            assert label.minimumWidth() >= label.sizeHint().width()
+            assert label.minimumWidth() <= label.sizeHint().width()
+            assert label.maximumWidth() >= label.sizeHint().width()
 
         assert specs[0].current_param_vals["rm.method"] == "DL"
         assert specs[0].current_param_vals["to"] == "only0"

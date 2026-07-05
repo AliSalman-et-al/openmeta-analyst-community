@@ -563,6 +563,9 @@ def _combo_maximum_width(combo_box):
     sys.path.insert(0, str(ROOT / "src"))
     import qt_layout
 
+    explicit_combo_cap = combo_box.property("oma_maximum_combo_width")
+    if isinstance(explicit_combo_cap, int) and explicit_combo_cap > 0:
+        return explicit_combo_cap
     explicit_cap = combo_box.property("oma_maximum_value_control_width")
     if isinstance(explicit_cap, int) and explicit_cap > 0:
         return min(explicit_cap, qt_layout.APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH)

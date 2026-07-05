@@ -29,6 +29,7 @@ APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH = 360
 ANALYSIS_DIALOG_MINIMUM_WIDTH = 520
 ANALYSIS_DIALOG_MINIMUM_HEIGHT = 160
 ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH = APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH
+ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH = 760
 ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH = 220
 COMBO_CONTENT_HORIZONTAL_PADDING = 48
 
@@ -694,6 +695,9 @@ def _combo_contents_width(combo_box):
 
 
 def _combo_maximum_width(combo_box):
+    explicit_combo_cap = combo_box.property("oma_maximum_combo_width")
+    if isinstance(explicit_combo_cap, int) and explicit_combo_cap > 0:
+        return explicit_combo_cap
     explicit_cap = combo_box.property("oma_maximum_value_control_width")
     if isinstance(explicit_cap, int) and explicit_cap > 0:
         return min(explicit_cap, APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH)
