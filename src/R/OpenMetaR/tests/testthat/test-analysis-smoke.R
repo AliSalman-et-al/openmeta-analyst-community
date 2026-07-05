@@ -168,6 +168,25 @@ test_that("core diagnostic multi-analysis facade preserves multi-metric results"
   expect_equal(attr(result, "openmetar.request")$workflow, "standard")
 })
 
+test_that("diagnostic study effects include confidence intervals for each metric", {
+  effects <- openmetar.diagnostic.study.effects(
+    tp = 19,
+    fn = 10,
+    fp = 1,
+    tn = 81,
+    metrics = c("Sens", "Spec", "PLR", "NLR", "DOR"),
+    conf.level = 95
+  )
+
+  expect_named(effects, c("Sens", "Spec", "PLR", "NLR", "DOR"))
+  for (metric in names(effects)) {
+    expect_length(effects[[metric]]$calc_scale, 3)
+    expect_length(effects[[metric]]$display_scale, 3)
+    expect_false(any(is.na(effects[[metric]]$calc_scale)))
+    expect_false(any(is.na(effects[[metric]]$display_scale)))
+  }
+})
+
 test_that("core facade rejects incompatible methods before dispatch", {
   fixture <- binary_fixture()
   expect_error(

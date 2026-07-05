@@ -310,7 +310,7 @@ openmetar.diagnostic.study.effects <- function(tp, fn, fp, tn, metrics=c("Spec",
             diagnostic.data,
             list(to="only0", measure=metric, conf.level=conf.level, adjust=0.5)
         )
-        calc.scale <- c(result$b[[1]], result$lb[[1]], result$ub[[1]])
+        calc.scale <- c(result$b[[1]], result$ci.lb[[1]], result$ci.ub[[1]])
         effects[[metric]] <- list(
             calc_scale=calc.scale,
             display_scale=openmetar.convert.scale(calc.scale, metric, "diagnostic")

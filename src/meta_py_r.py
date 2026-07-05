@@ -1890,7 +1890,10 @@ def diagnostic_effects_for_study(
         metrics=_r_character_vector(metrics),
         **{"conf.level": conf_level},
     )
-    return normalize_diagnostic_effects(R_parse_tools.recursioner(r_res))
+    return normalize_diagnostic_effects(
+        R_parse_tools.recursioner(r_res),
+        require_triplets=True,
+    )
 
 
 @RfunctionCaller

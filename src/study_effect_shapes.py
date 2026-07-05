@@ -7,7 +7,12 @@ def _is_effect_triplet(value):
         return False
 
 
-def effect_triplet(effect_entry, scale_name="calc_scale", metric=None):
+def effect_triplet(
+    effect_entry,
+    scale_name="calc_scale",
+    metric=None,
+    require_triplet=False,
+):
     """Return an ``(estimate, lower, upper)`` tuple from a study-effect result.
 
     Study-effect helpers normally return each scale as a three-value vector.
@@ -25,33 +30,50 @@ def effect_triplet(effect_entry, scale_name="calc_scale", metric=None):
         return tuple(scale_value)
 
     if isinstance(scale_value, (list, tuple)):
-        if len(scale_value) == 1:
+        if len(scale_value) == 1 and not require_triplet:
             return scale_value[0], None, None
         label = " for %s" % metric if metric is not None else ""
+        if len(scale_value) == 1:
+            raise ValueError(
+                "Expected %s study effect%s to contain 3 values; got 1"
+                % (scale_name, label)
+            )
         raise ValueError(
             "Expected %s study effect%s to contain 1 or 3 values; got %d"
             % (scale_name, label, len(scale_value))
         )
 
+    if require_triplet:
+        label = " for %s" % metric if metric is not None else ""
+        raise ValueError(
+            "Expected %s study effect%s to contain 3 values; got scalar"
+            % (scale_name, label)
+        )
+
     return scale_value, None, None
 
 
-def normalize_effect_result(effect_result, metric=None):
+def normalize_effect_result(effect_result, metric=None, require_triplets=False):
     for scale_name in ("calc_scale", "display_scale"):
         if scale_name in effect_result:
             effect_result[scale_name] = effect_triplet(
                 effect_result,
                 scale_name,
                 metric=metric,
+                require_triplet=require_triplets,
             )
     return effect_result
 
 
-def normalize_diagnostic_effects(effects):
+def normalize_diagnostic_effects(effects, require_triplets=False):
     for metric, effect_entry in list(effects.items()):
         if not isinstance(effect_entry, dict):
             effects[metric] = {"calc_scale": effect_entry}
             effect_entry = effects[metric]
 
-        normalize_effect_result(effect_entry, metric=metric)
+        normalize_effect_result(
+            effect_entry,
+            metric=metric,
+            require_triplets=require_triplets,
+        )
     return effects

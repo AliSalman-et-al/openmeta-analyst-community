@@ -1,6 +1,8 @@
 import os
 import sys
 
+import pytest
+
 
 sys.path.insert(0, os.path.abspath("src"))
 
@@ -592,3 +594,23 @@ def test_effect_normalizer_preserves_triplets_and_expands_scalars():
     assert effects["Sens"]["calc_scale"] == (0.75, None, None)
     assert effects["Spec"]["calc_scale"] == (0.95, 0.88, 0.99)
     assert effects["PLR"]["calc_scale"] == (15.0, None, None)
+
+
+def test_effect_normalizer_can_require_diagnostic_triplets():
+    with pytest.raises(
+        ValueError,
+        match="Expected calc_scale study effect for Sens to contain 3 values; got scalar",
+    ):
+        ma_data_table_model.meta_py_r.normalize_diagnostic_effects(
+            {"Sens": {"calc_scale": 0.75}},
+            require_triplets=True,
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="Expected calc_scale study effect for Spec to contain 3 values; got 1",
+    ):
+        ma_data_table_model.meta_py_r.normalize_diagnostic_effects(
+            {"Spec": {"calc_scale": [0.95]}},
+            require_triplets=True,
+        )
