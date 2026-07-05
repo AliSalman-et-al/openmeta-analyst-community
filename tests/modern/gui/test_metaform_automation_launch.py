@@ -2690,7 +2690,7 @@ def test_new_dataset_wizard_uses_shared_first_show_refit():
 
 
 @pytest.mark.parametrize("path", [None, "new_dataset", "csv_import"])
-def test_wizard_reserves_back_navigation_outside_page_body(path):
+def test_wizard_uses_plain_style_with_explicit_back_navigation(path):
     import launch
     from PyQt5 import QtWidgets
     import main_wizard
@@ -2698,10 +2698,59 @@ def test_wizard_reserves_back_navigation_outside_page_body(path):
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     wizard = main_wizard.MainWizard(path=path)
     try:
-        assert wizard.wizardStyle() == main_wizard.QWizard.ModernStyle
+        assert wizard.wizardStyle() == main_wizard.QWizard.ClassicStyle
+        assert wizard.button(main_wizard.QWizard.BackButton) is not None
     finally:
         wizard.close()
         app.processEvents()
+
+
+def test_new_dataset_wizard_pages_fill_body_without_clipping_content():
+    import launch
+    from PyQt5 import QtWidgets
+    import main_wizard
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    wizard = main_wizard.MainWizard(path="new_dataset")
+    try:
+        wizard.restart()
+        wizard.show()
+        app.processEvents()
+
+        page_sequence = [
+            main_wizard.Page_DataType,
+            main_wizard.Page_ChooseMetric,
+            main_wizard.Page_OutcomeName,
+        ]
+        wizard.page(main_wizard.Page_DataType).twoarm_proportions_Button.click()
+
+        for page_id in page_sequence:
+            if wizard.currentId() != page_id:
+                wizard.next()
+            app.processEvents()
+
+            page = wizard.page(page_id)
+            if page.layout() is not None:
+                page.layout().activate()
+            app.processEvents()
+
+            assert page.width() >= page.parentWidget().contentsRect().width() - 4
+            _assert_visible_children_fit_page(page)
+    finally:
+        wizard.close()
+        app.processEvents()
+
+
+def _assert_visible_children_fit_page(page):
+    page_rect = page.rect().adjusted(0, 0, 1, 1)
+    for child in page.findChildren(QtWidgets.QWidget):
+        if child is page or not child.isVisible():
+            continue
+        child_rect = child.geometry()
+        mapped_top_left = child.parentWidget().mapTo(page, child_rect.topLeft())
+        mapped_rect = child_rect
+        mapped_rect.moveTopLeft(mapped_top_left)
+        assert page_rect.contains(mapped_rect), child.objectName()
 
 
 def test_data_type_page_canonical_geometry_covers_normalized_content():
