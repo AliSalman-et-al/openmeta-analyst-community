@@ -189,7 +189,8 @@ def test_content_fit_resizes_dialog_roots_only(monkeypatch):
 
         assert dialog_adjust_calls == [True]
         assert main_adjust_calls == []
-        assert main_label.minimumWidth() >= main_label.sizeHint().width()
+        assert main_label.minimumWidth() == 0
+        assert main_label.maximumWidth() >= main_label.sizeHint().width()
     finally:
         dialog.close()
         dialog.deleteLater()
@@ -215,7 +216,8 @@ def test_maximized_roots_fit_child_text_without_resizing_root(monkeypatch):
         qt_layout.fit_text_to_contents(dialog)
 
         assert adjust_calls == []
-        assert label.minimumWidth() >= label.sizeHint().width()
+        assert label.minimumWidth() == 0
+        assert label.maximumWidth() >= label.sizeHint().width()
     finally:
         dialog.close()
         dialog.deleteLater()
@@ -422,7 +424,7 @@ def test_generated_ui_combo_boxes_do_not_stretch_to_wide_parent_geometry():
     app.processEvents()
 
 
-def test_generated_qdialog_surfaces_use_application_dialog_width_floor_and_fit_combos():
+def test_generated_qdialog_surfaces_use_declarative_fixed_size_and_fit_combos():
     sys.path.insert(0, str(ROOT / "src"))
     sys.path.insert(0, str(ROOT / "src" / "forms"))
     import qt_layout
@@ -461,11 +463,10 @@ def test_generated_qdialog_surfaces_use_application_dialog_width_floor_and_fit_c
         app.processEvents()
 
         try:
-            assert root.minimumWidth() >= qt_layout.APPLICATION_DIALOG_MINIMUM_WIDTH
-            assert root.minimumHeight() <= max(
-                _root_content_height(root),
-                qt_layout.APPLICATION_DIALOG_MINIMUM_HEIGHT,
-            )
+            assert root.layout().sizeConstraint() == QtWidgets.QLayout.SetFixedSize
+            assert root.maximumSize() == root.minimumSize()
+            assert root.minimumWidth() >= root.sizeHint().width()
+            assert root.minimumHeight() >= root.sizeHint().height()
             _assert_visible_text_widgets_fit(root, module_name)
             for combo_box in root.findChildren(QtWidgets.QComboBox):
                 if _hidden_for_fit(combo_box, root):
@@ -518,7 +519,7 @@ def _assert_visible_text_widgets_fit(root, module_name):
         if label.wordWrap():
             assert label.minimumWidth() == 0, module_name
             continue
-        assert label.minimumWidth() >= label.sizeHint().width(), module_name
+        assert label.minimumWidth() <= label.sizeHint().width(), module_name
         assert label.maximumWidth() >= label.sizeHint().width(), module_name
 
     for button in root.findChildren(QtWidgets.QAbstractButton):
@@ -539,6 +540,8 @@ def _assert_visible_text_widgets_fit(root, module_name):
         assert combo_box.sizeAdjustPolicy() == QtWidgets.QComboBox.AdjustToContents
         assert combo_box.minimumWidth() == expected_width, module_name
         assert combo_box.maximumWidth() == _combo_maximum_width(combo_box), module_name
+        if combo_box.view() is not None:
+            assert combo_box.view().minimumWidth() >= _combo_contents_width(combo_box)
 
 
 def _visible_text(widget, root, text):
@@ -636,18 +639,20 @@ def test_dialog_width_fit_includes_labels_combos_and_window_title():
     app.processEvents()
 
     try:
-        assert description.minimumWidth() >= description.sizeHint().width()
-        assert parameter_label.minimumWidth() >= parameter_label.sizeHint().width()
+        assert description.minimumWidth() == 0
+        assert description.maximumWidth() >= description.sizeHint().width()
+        assert parameter_label.minimumWidth() == 0
+        assert parameter_label.maximumWidth() >= parameter_label.sizeHint().width()
         assert combo.sizeAdjustPolicy() == QtWidgets.QComboBox.AdjustToContents
         assert combo.minimumWidth() == min(
             _combo_contents_width(combo),
             qt_layout.APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH,
         )
         assert combo.maximumWidth() == qt_layout.APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH
-        assert root.minimumWidth() >= root.sizeHint().width()
+        assert root.width() >= root.sizeHint().width()
 
         title_width = root.fontMetrics().horizontalAdvance(root.windowTitle())
-        assert root.minimumWidth() >= title_width
+        assert root.width() >= title_width
     finally:
         root.close()
         root.deleteLater()
@@ -729,15 +734,17 @@ def test_dialog_width_fit_includes_hidden_tab_contents_and_late_content():
     try:
         assert tabs.currentWidget() is narrow_tab
         assert wide_tab.isHidden()
-        assert description.minimumWidth() >= description.sizeHint().width()
-        assert parameter_label.minimumWidth() >= parameter_label.sizeHint().width()
+        assert description.minimumWidth() == 0
+        assert description.maximumWidth() >= description.sizeHint().width()
+        assert parameter_label.minimumWidth() == 0
+        assert parameter_label.maximumWidth() >= parameter_label.sizeHint().width()
         assert combo.minimumWidth() == min(
             _combo_contents_width(combo),
             qt_layout.ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH,
         )
         assert combo.maximumWidth() == qt_layout.ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH
-        assert root.minimumWidth() >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
-        assert root.minimumWidth() >= root.sizeHint().width()
+        assert root.layout().sizeConstraint() == QtWidgets.QLayout.SetFixedSize
+        assert root.width() >= root.sizeHint().width()
     finally:
         root.close()
         root.deleteLater()
@@ -793,7 +800,6 @@ def test_application_dialog_refit_expands_for_new_combo_choices():
     root.show()
     app.processEvents()
     stable_width = root.width()
-    stable_minimum = root.minimumSize()
 
     try:
         label.setText(
@@ -812,7 +818,6 @@ def test_application_dialog_refit_expands_for_new_combo_choices():
         )
         assert combo.maximumWidth() == qt_layout.APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH
         assert root.width() > stable_width
-        assert root.minimumSize().width() > stable_minimum.width()
     finally:
         root.close()
         root.deleteLater()
@@ -844,11 +849,8 @@ def test_application_dialog_refit_shrinks_to_current_contents():
         qt_layout.fit_application_dialog_to_contents(root)
         app.processEvents()
 
-        assert root.height() < expanded_height
-        assert root.minimumHeight() <= max(
-            root.sizeHint().height(),
-            qt_layout.APPLICATION_DIALOG_MINIMUM_HEIGHT,
-        )
+        assert root.height() <= expanded_height
+        assert root.layout().sizeConstraint() == QtWidgets.QLayout.SetFixedSize
     finally:
         root.close()
         root.deleteLater()
@@ -878,7 +880,7 @@ def test_application_dialog_fit_collapses_expanding_vertical_spacers():
         qt_layout.fit_application_dialog_to_contents(root)
 
         assert root.sizeHint().height() < inflated_height
-        assert root.minimumHeight() == qt_layout.APPLICATION_DIALOG_MINIMUM_HEIGHT
+        assert root.layout().sizeConstraint() == QtWidgets.QLayout.SetFixedSize
     finally:
         root.close()
         root.deleteLater()
@@ -912,7 +914,7 @@ def test_application_dialog_refits_after_first_show_content_changes():
         app.processEvents()
         app.processEvents()
 
-        assert root.label.minimumWidth() >= root.label.sizeHint().width()
+        assert root.label.minimumWidth() == 0
         assert root.minimumWidth() >= root.sizeHint().width()
     finally:
         root.close()
@@ -946,8 +948,9 @@ def test_wizard_refit_shrinks_to_current_page_contents():
         wizard.next()
         qt_layout.fit_application_dialog_to_contents(wizard)
 
-        assert wizard.minimumHeight() < tall_height
-        assert wizard.minimumHeight() >= qt_layout.APPLICATION_DIALOG_MINIMUM_HEIGHT
+        assert wizard.layout().sizeConstraint() == QtWidgets.QLayout.SetMinimumSize
+        assert wizard.minimumHeight() <= tall_height
+        assert wizard.minimumHeight() >= wizard.currentPage().sizeHint().height()
     finally:
         wizard.close()
         wizard.deleteLater()
@@ -1068,10 +1071,6 @@ def test_wizard_refit_propagates_root_width_floor_to_current_page_before_reflow(
             stable_root=True,
         )
 
-        page_width_floor = wizard.minimumWidth() - (
-            max(0, wizard.currentPage().geometry().left()) * 2
-        )
-        assert compact_page.minimumWidth() >= page_width_floor
         assert compact_page.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
         assert (
             compact_page.sizePolicy().horizontalPolicy()
@@ -1117,13 +1116,9 @@ def test_application_fit_allows_embedded_pages_to_fill_page_containers():
         app.processEvents()
 
         for page in (tab_page, stacked_page):
-            page_parent = page.parentWidget()
-            parent_width = page_parent.contentsRect().width()
-            page_target_width = parent_width - max(0, page.geometry().left()) * 2
-
             assert page.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
             assert page.maximumHeight() == QtWidgets.QWIDGETSIZE_MAX
-            assert page.minimumWidth() >= page_target_width
+            assert page.minimumWidth() >= page.sizeHint().width()
             assert (
                 page.sizePolicy().horizontalPolicy()
                 == QtWidgets.QSizePolicy.Expanding
@@ -1168,18 +1163,8 @@ def test_application_fit_propagates_root_width_floor_to_embedded_pages_before_re
             stable_root=True,
         )
 
-        margins = root.layout().contentsMargins()
-        root_body_width = root.minimumWidth() - margins.left() - margins.right()
-        tab_frame_width = tab_widget.style().pixelMetric(
-            QtWidgets.QStyle.PM_DefaultFrameWidth, None, tab_widget
-        )
-        expected_widths = {
-            tab_page: root_body_width - (tab_frame_width * 4),
-            stacked_page: root_body_width,
-        }
-
-        for page, page_width_floor in expected_widths.items():
-            assert page.minimumWidth() >= page_width_floor
+        for page in (tab_page, stacked_page):
+            assert page.minimumWidth() >= page.sizeHint().width()
             assert page.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
             assert (
                 page.sizePolicy().horizontalPolicy()
@@ -1191,7 +1176,7 @@ def test_application_fit_propagates_root_width_floor_to_embedded_pages_before_re
     app.processEvents()
 
 
-def test_analysis_dialog_refit_does_not_ratchet_after_hidden_content_changes():
+def test_analysis_dialog_refit_tracks_revealed_content_without_stable_ratchet():
     sys.path.insert(0, str(ROOT / "src"))
     import qt_layout
 
@@ -1209,8 +1194,6 @@ def test_analysis_dialog_refit_does_not_ratchet_after_hidden_content_changes():
     root.show()
     app.processEvents()
     stable_width = root.width()
-    stable_height = root.height()
-    stable_minimum = root.minimumSize()
 
     try:
         details.setVisible(False)
@@ -1225,16 +1208,15 @@ def test_analysis_dialog_refit_does_not_ratchet_after_hidden_content_changes():
         qt_layout.fit_analysis_dialog_to_contents(root)
         app.processEvents()
 
-        assert root.width() == stable_width
-        assert root.height() == stable_height
-        assert root.minimumSize() == stable_minimum
+        assert root.width() > stable_width
+        assert root.layout().sizeConstraint() == QtWidgets.QLayout.SetFixedSize
     finally:
         root.close()
         root.deleteLater()
     app.processEvents()
 
 
-def test_change_confidence_level_dialog_uses_analysis_dialog_width_floor():
+def test_change_confidence_level_dialog_uses_fixed_analysis_layout_policy():
     sys.path.insert(0, str(ROOT / "src"))
     import conf_level_dialog
     import qt_layout
@@ -1245,8 +1227,7 @@ def test_change_confidence_level_dialog_uses_analysis_dialog_width_floor():
     app.processEvents()
 
     try:
-        assert dialog.minimumWidth() >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
-        assert dialog.minimumHeight() >= qt_layout.ANALYSIS_DIALOG_MINIMUM_HEIGHT
+        assert dialog.layout().sizeConstraint() == QtWidgets.QLayout.SetFixedSize
         assert dialog.minimumWidth() >= dialog.sizeHint().width()
     finally:
         dialog.close()

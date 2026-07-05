@@ -1813,6 +1813,51 @@
         "filesystem"
       ],
       "lane": "gui",
+      "nodeid": "tests/modern/gui/test_declarative_dialog_sizing.py::test_analysis_dialog_uses_fixed_layout_constraint_without_refit_filter",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_declarative_dialog_sizing.py::test_combo_policy_caps_closed_control_but_keeps_popup_full_width",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_declarative_dialog_sizing.py::test_application_wizard_uses_minimum_layout_constraint_without_refit_filter",
+      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
       "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_generated_ui_combo_boxes_do_not_stretch_to_wide_parent_geometry",
       "reason": "Guards every generated UI surface with combo boxes against inheriting stretched parent layout geometry.",
       "runtime_class": "seconds",
@@ -3990,7 +4035,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_generated_qdialog_surfaces_use_application_dialog_floor_and_combo_cap",
+      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_generated_qdialog_surfaces_use_declarative_fixed_size_and_fit_combos",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -4036,7 +4081,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_analysis_dialog_combo_widths_are_content_aware_but_capped",
+      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_analysis_dialog_combo_widths_fit_long_selectable_items",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -4051,7 +4096,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_application_dialog_refit_does_not_ratchet_root_width",
+      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_application_dialog_refit_expands_for_new_combo_choices",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -4067,7 +4112,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_analysis_dialog_refit_does_not_ratchet_after_hidden_content_changes",
+      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_analysis_dialog_refit_tracks_revealed_content_without_stable_ratchet",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -4083,7 +4128,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_change_confidence_level_dialog_uses_analysis_dialog_width_floor",
+      "nodeid": "tests/modern/gui/test_user_facing_text_regressions.py::test_change_confidence_level_dialog_uses_fixed_analysis_layout_policy",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "seconds",
       "size": "medium"

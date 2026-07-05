@@ -1,4 +1,4 @@
-from PyQt5.QtCore import QEvent, QObject, QPoint, QSize, Qt, QTimer
+from PyQt5.QtCore import QPoint, QSize, Qt
 from PyQt5.QtGui import QGuiApplication
 from PyQt5.QtWidgets import (
     QAbstractButton,
@@ -9,10 +9,11 @@ from PyQt5.QtWidgets import (
     QGridLayout,
     QHeaderView,
     QLabel,
+    QLayout,
+    QMainWindow,
     QToolButton,
     QRadioButton,
     QSizePolicy,
-    QStyle,
     QStackedWidget,
     QTabWidget,
     QWidget,
@@ -29,6 +30,7 @@ ANALYSIS_DIALOG_MINIMUM_WIDTH = 520
 ANALYSIS_DIALOG_MINIMUM_HEIGHT = 160
 ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH = APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH
 ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH = 220
+COMBO_CONTENT_HORIZONTAL_PADDING = 48
 
 
 def exec_centered(dialog):
@@ -74,17 +76,32 @@ def center_dialog_over_parent(dialog):
 
 
 def fit_application_dialog_to_contents(root, adjust_root=True):
-    """Apply the shared base sizing used by application dialogs."""
+    """Apply the shared declarative sizing policy used by application dialogs."""
     if not _fit_root_is_available(root):
         return
     configure_application_wizard(root)
-    fit_option_groups_to_contents(
-        root,
-        adjust_root=adjust_root,
-        minimum_width=APPLICATION_DIALOG_MINIMUM_WIDTH,
-        minimum_height=APPLICATION_DIALOG_MINIMUM_HEIGHT,
-        stable_root=True,
+    _prepare_layout_managed_root(root)
+    _configure_text_bearing_widgets(root)
+    _configure_container_pages(root)
+    constraint = (
+        QLayout.SetMinimumSize if isinstance(root, QWizard) else QLayout.SetFixedSize
     )
+    if not isinstance(root, QWizard):
+        _clear_root_fit_maximum(root)
+    _apply_layout_size_constraint(root, constraint)
+    if isinstance(root, QWizard):
+        _apply_wizard_minimum_size(root)
+    else:
+        _apply_root_minimum_size(
+            root, APPLICATION_DIALOG_MINIMUM_WIDTH, APPLICATION_DIALOG_MINIMUM_HEIGHT
+        )
+    _adjust_root_to_layout(root, adjust_root)
+    if isinstance(root, QWizard):
+        _apply_wizard_minimum_size(root)
+    else:
+        _fix_dialog_to_current_layout(
+            root, APPLICATION_DIALOG_MINIMUM_WIDTH, APPLICATION_DIALOG_MINIMUM_HEIGHT
+        )
 
 
 def configure_application_wizard(wizard):
@@ -106,29 +123,27 @@ def configure_application_wizard(wizard):
 
 
 def fit_analysis_dialog_to_contents(root, adjust_root=True):
-    """Apply the shared width floor used by analysis parameter dialogs."""
+    """Apply the fixed content-sized policy used by analysis parameter dialogs."""
     if not _fit_root_is_available(root):
         return
-    fit_option_groups_to_contents(
-        root,
-        adjust_root=adjust_root,
-        minimum_width=ANALYSIS_DIALOG_MINIMUM_WIDTH,
-        minimum_height=ANALYSIS_DIALOG_MINIMUM_HEIGHT,
-        stable_root=True,
+    _prepare_layout_managed_root(root)
+    _configure_text_bearing_widgets(root)
+    _configure_container_pages(root)
+    _clear_root_fit_maximum(root)
+    _apply_layout_size_constraint(root, QLayout.SetFixedSize)
+    _apply_root_minimum_size(
+        root, ANALYSIS_DIALOG_MINIMUM_WIDTH, ANALYSIS_DIALOG_MINIMUM_HEIGHT
     )
-
-
-def reset_stable_fit_size(root):
-    """Allow a stable fitted root to recalculate its size for new content."""
-    if not _fit_root_is_available(root):
-        return
-    root.setProperty("oma_stable_fit_size", None)
+    _adjust_root_to_layout(root, adjust_root)
+    _fix_dialog_to_current_layout(
+        root, ANALYSIS_DIALOG_MINIMUM_WIDTH, ANALYSIS_DIALOG_MINIMUM_HEIGHT
+    )
 
 
 def fit_option_groups_to_contents(
     root, adjust_root=True, minimum_width=0, minimum_height=0, stable_root=False
 ):
-    """Prevent dialog contents from being compressed below visible text."""
+    """Apply text/control policies without computing a custom root geometry."""
     if not _fit_root_is_available(root):
         return
     fit_text_to_contents(
@@ -143,68 +158,26 @@ def fit_option_groups_to_contents(
 def fit_text_to_contents(
     root, adjust_root=True, minimum_width=0, minimum_height=0, stable_root=False
 ):
-    """Prevent visible text-bearing widgets from being compressed below content."""
+    """Normalize text-bearing child widgets and defer root sizing to Qt layouts."""
     if not _fit_root_is_available(root):
         return
 
-    _adopt_fixed_direct_children_into_root_layout(root)
+    _prepare_layout_managed_root(root)
+    _configure_text_bearing_widgets(root)
+    _configure_container_pages(root)
+    _apply_root_minimum_size(root, minimum_width, minimum_height)
+    _adjust_root_to_layout(root, adjust_root)
 
-    root_layout = root.layout()
-    if root_layout is not None:
-        _compact_expanding_vertical_spacers(root_layout)
-        root_layout.activate()
 
-    combo_content_expanded = _fit_text_widgets_to_contents(root)
-
-    for group_box in _option_group_boxes(root):
-        _raise_maximum_height(group_box, group_box.sizeHint().height())
-        group_box.setSizePolicy(
-            group_box.sizePolicy().horizontalPolicy(),
-            QSizePolicy.Preferred,
-        )
-        group_box.setMinimumHeight(
-            max(group_box.minimumHeight(), group_box.sizeHint().height())
-        )
-
-    root_layout = root.layout()
-    if root_layout is not None:
-        root_layout.activate()
-
-    _fit_embedded_pages_to_contents(root)
-    _fit_current_wizard_page_to_contents(root)
-    _fit_wizard_page_to_contents(root)
-
-    adjust_root = adjust_root and _root_allows_content_resize(root)
-    if adjust_root:
-        size_hint = _root_size_hint_for_current_contents(root)
-        title_width = _window_title_width_hint(root)
-        target_width = max(size_hint.width(), title_width, minimum_width)
-        target_height = max(size_hint.height(), minimum_height)
-        stable_size = _stable_root_size(root) if stable_root else None
-        if stable_size is not None and not combo_content_expanded:
-            target_width = max(target_width, stable_size.width())
-
-        target_size = QSize(target_width, target_height)
-        _raise_maximum_height(root, target_height)
-        _raise_maximum_width(root, target_width)
-        root.setMinimumSize(target_size)
-        if stable_root:
-            root.setProperty("oma_stable_fit_size", target_size)
-        if size_hint.isValid():
-            root.adjustSize()
-        else:
-            root.resize(target_size)
-
-    _fill_current_wizard_page_width(root, minimum_width=minimum_width)
-    _fill_embedded_pages_to_parent_width(root, minimum_width=minimum_width)
-
-    _install_first_show_refit(
-        root,
-        adjust_root=adjust_root,
-        minimum_width=minimum_width,
-        minimum_height=minimum_height,
-        stable_root=stable_root,
-    )
+def configure_resizable_window(root, minimum_width=0, minimum_height=0):
+    """Apply a minimum-size layout policy for windows that should own surplus space."""
+    if not _fit_root_is_available(root):
+        return
+    _prepare_layout_managed_root(root)
+    _configure_text_bearing_widgets(root)
+    _configure_container_pages(root)
+    _apply_layout_size_constraint(root, QLayout.SetMinimumSize)
+    _apply_root_minimum_size(root, minimum_width, minimum_height)
 
 
 def configure_compact_table(
@@ -305,70 +278,6 @@ def _table_height_for_visible_rows(table):
     )
 
 
-class _FirstShowRefitFilter(QObject):
-    def __init__(self, root):
-        super(_FirstShowRefitFilter, self).__init__(root)
-        self._root = root
-        self._pending = False
-
-    def eventFilter(self, watched, event):
-        if watched is self._root and event.type() == QEvent.Show:
-            self._queue_refit()
-        return False
-
-    def _queue_refit(self):
-        if self._pending:
-            return
-        self._pending = True
-        QTimer.singleShot(0, self._refit)
-
-    def _refit(self):
-        self._pending = False
-        if not _fit_root_is_available(self._root):
-            return
-
-        options = _first_show_refit_options(self._root)
-        if options is None:
-            return
-        reset_stable_fit_size(self._root)
-        fit_text_to_contents(self._root, **options)
-
-
-def _install_first_show_refit(
-    root, adjust_root=True, minimum_width=0, minimum_height=0, stable_root=False
-):
-    if not _fit_root_is_available(root):
-        return
-
-    root.setProperty(
-        "oma_first_show_refit_options",
-        {
-            "adjust_root": adjust_root,
-            "minimum_width": minimum_width,
-            "minimum_height": minimum_height,
-            "stable_root": stable_root,
-        },
-    )
-    if getattr(root, "_oma_first_show_refit_filter", None) is not None:
-        return
-
-    event_filter = _FirstShowRefitFilter(root)
-    root.installEventFilter(event_filter)
-    root._oma_first_show_refit_filter = event_filter
-
-
-def _first_show_refit_options(root):
-    options = root.property("oma_first_show_refit_options")
-    if not isinstance(options, dict):
-        return None
-    return {
-        "adjust_root": bool(options.get("adjust_root", True)),
-        "minimum_width": int(options.get("minimum_width", 0)),
-        "minimum_height": int(options.get("minimum_height", 0)),
-        "stable_root": bool(options.get("stable_root", False)),
-    }
-
-
 def _fit_root_is_available(root):
     if root is None:
         return False
@@ -377,6 +286,118 @@ def _fit_root_is_available(root):
     except RuntimeError:
         return False
     return True
+
+
+def _prepare_layout_managed_root(root):
+    _adopt_fixed_direct_children_into_root_layout(root)
+    layout = _managed_layout(root)
+    if layout is None:
+        return
+    _compact_expanding_vertical_spacers(layout)
+    layout.activate()
+
+
+def _managed_layout(root):
+    layout = root.layout()
+    if layout is not None:
+        return layout
+    if isinstance(root, QMainWindow) and root.centralWidget() is not None:
+        return root.centralWidget().layout()
+    return None
+
+
+def _apply_layout_size_constraint(root, constraint):
+    layout = _managed_layout(root)
+    if layout is None:
+        return
+    layout.setSizeConstraint(constraint)
+    layout.activate()
+
+
+def _apply_root_minimum_size(root, minimum_width=0, minimum_height=0):
+    if minimum_width <= 0 and minimum_height <= 0:
+        return
+    target = _root_base_minimum_size(root).expandedTo(
+        QSize(minimum_width, minimum_height)
+    )
+    _raise_maximum_width(root, target.width())
+    _raise_maximum_height(root, target.height())
+    root.setMinimumSize(target)
+
+
+def _clear_root_fit_maximum(root):
+    if isinstance(root, QDialog) and not _window_state_blocks_content_fit(root):
+        root.setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX)
+
+
+def _fix_dialog_to_current_layout(root, minimum_width=0, minimum_height=0):
+    if not _root_allows_content_resize(root):
+        return
+    target = _root_base_minimum_size(root).expandedTo(
+        QSize(minimum_width, minimum_height)
+    )
+    size_hint = root.sizeHint()
+    if size_hint.isValid():
+        target = target.expandedTo(size_hint)
+    root.setFixedSize(target)
+
+
+def _apply_wizard_minimum_size(root):
+    target = _root_base_minimum_size(root).expandedTo(
+        QSize(APPLICATION_DIALOG_MINIMUM_WIDTH, APPLICATION_DIALOG_MINIMUM_HEIGHT)
+    )
+    current_page = root.currentPage()
+    if current_page is not None:
+        hint = current_page.sizeHint()
+        if hint.isValid():
+            target = target.expandedTo(hint)
+    _raise_maximum_width(root, target.width())
+    _raise_maximum_height(root, target.height())
+    root.setMinimumSize(target)
+    if _managed_layout(root) is not None:
+        _managed_layout(root).activate()
+    root_hint = root.sizeHint()
+    if root_hint.isValid():
+        target = target.expandedTo(root_hint)
+        _raise_maximum_width(root, target.width())
+        _raise_maximum_height(root, target.height())
+        root.setMinimumSize(target)
+
+
+def _root_base_minimum_size(root):
+    base_size = root.property("oma_layout_base_minimum_size")
+    if isinstance(base_size, QSize):
+        return base_size
+    base_size = root.minimumSize()
+    root.setProperty("oma_layout_base_minimum_size", base_size)
+    return base_size
+
+
+def _adjust_root_to_layout(root, adjust_root=True):
+    layout = _managed_layout(root)
+    if layout is not None:
+        layout.activate()
+    if adjust_root and _root_allows_content_resize(root):
+        root.adjustSize()
+
+
+def _configure_text_bearing_widgets(root):
+    _fit_text_widgets_to_contents(root)
+    for group_box in _option_group_boxes(root):
+        _raise_maximum_height(group_box, group_box.sizeHint().height())
+        group_box.setSizePolicy(
+            group_box.sizePolicy().horizontalPolicy(),
+            QSizePolicy.Preferred,
+        )
+        group_box.setMinimumHeight(
+            max(group_box.minimumHeight(), group_box.sizeHint().height())
+        )
+
+
+def _configure_container_pages(root):
+    _fit_embedded_pages_to_contents(root)
+    _fit_current_wizard_page_to_contents(root)
+    _fit_wizard_page_to_contents(root)
 
 
 def _adopt_fixed_direct_children_into_root_layout(root):
@@ -507,13 +528,6 @@ def _root_allows_content_resize(root):
     return isinstance(root, QDialog) and not _window_state_blocks_content_fit(root)
 
 
-def _stable_root_size(root):
-    stable_size = root.property("oma_stable_fit_size")
-    if isinstance(stable_size, QSize) and stable_size.isValid():
-        return stable_size
-    return None
-
-
 def _fit_wizard_page_to_contents(root):
     if not isinstance(root, QWizardPage):
         return
@@ -529,32 +543,6 @@ def _fit_current_wizard_page_to_contents(root):
     _fit_wizard_page_to_contents(current_page)
 
 
-def _fill_current_wizard_page_width(root, minimum_width=0):
-    if not isinstance(root, QWizard):
-        return
-
-    current_page = root.currentPage()
-    if current_page is None:
-        return
-
-    page_parent = current_page.parentWidget()
-    if page_parent is None:
-        return
-
-    if root.layout() is not None:
-        root.layout().activate()
-
-    _fill_page_to_available_width(
-        current_page,
-        fallback_width=max(
-            root.contentsRect().width(),
-            root.width(),
-            root.minimumWidth(),
-            minimum_width,
-        ),
-    )
-
-
 def _fit_embedded_pages_to_contents(root):
     for tab_widget in root.findChildren(QTabWidget):
         for index in range(tab_widget.count()):
@@ -563,95 +551,6 @@ def _fit_embedded_pages_to_contents(root):
     for stacked_widget in root.findChildren(QStackedWidget):
         for index in range(stacked_widget.count()):
             _fit_embedded_page_to_contents(stacked_widget.widget(index))
-
-
-def _fill_embedded_pages_to_parent_width(root, minimum_width=0):
-    for tab_widget in root.findChildren(QTabWidget):
-        for index in range(tab_widget.count()):
-            page = tab_widget.widget(index)
-            _fill_page_to_parent_width(
-                page,
-                fallback_width=_embedded_page_width_floor(
-                    root, page, minimum_width
-                ),
-            )
-
-    for stacked_widget in root.findChildren(QStackedWidget):
-        for index in range(stacked_widget.count()):
-            page = stacked_widget.widget(index)
-            _fill_page_to_parent_width(
-                page,
-                fallback_width=_embedded_page_width_floor(
-                    root, page, minimum_width
-                ),
-            )
-
-
-def _fill_page_to_parent_width(page, fallback_width=0):
-    _fill_page_to_available_width(page, fallback_width=fallback_width)
-
-
-def _fill_page_to_available_width(page, fallback_width=0):
-    if page is None:
-        return
-
-    page_parent = page.parentWidget()
-    if page_parent is None:
-        return
-
-    if page_parent.layout() is not None:
-        page_parent.layout().activate()
-
-    parent_contents_width = page_parent.contentsRect().width()
-    available_width = max(parent_contents_width, fallback_width)
-    if available_width <= 0:
-        return
-
-    horizontal_inset = max(0, page.geometry().left()) * 2
-    target_width = max(0, available_width - horizontal_inset)
-    if target_width <= 0:
-        return
-
-    page.setSizePolicy(QSizePolicy.Expanding, page.sizePolicy().verticalPolicy())
-    _raise_maximum_width(page, QWIDGETSIZE_MAX)
-    _set_fit_minimum_size(page, QSize(target_width, page.sizeHint().height()))
-    if page.layout() is not None:
-        page.layout().activate()
-
-
-def _embedded_page_width_floor(root, page, minimum_width=0):
-    body_width = _root_layout_body_width_floor(root, minimum_width)
-    tab_widget = _ancestor_tab_widget(root, page)
-    if tab_widget is not None:
-        frame_width = tab_widget.style().pixelMetric(
-            QStyle.PM_DefaultFrameWidth, None, tab_widget
-        )
-        body_width = max(0, body_width - (frame_width * 4))
-    return body_width
-
-
-def _root_layout_body_width_floor(root, minimum_width=0):
-    width_floor = max(
-        root.contentsRect().width(),
-        root.width(),
-        root.minimumWidth(),
-        minimum_width,
-    )
-    root_layout = root.layout()
-    if root_layout is None:
-        return width_floor
-
-    margins = root_layout.contentsMargins()
-    return max(0, width_floor - margins.left() - margins.right())
-
-
-def _ancestor_tab_widget(root, page):
-    ancestor = page.parentWidget()
-    while ancestor is not None and ancestor is not root:
-        if isinstance(ancestor, QTabWidget):
-            return ancestor
-        ancestor = ancestor.parentWidget()
-    return None
 
 
 def _fit_embedded_page_to_contents(page):
@@ -677,61 +576,6 @@ def _fit_base_minimum_size(widget):
     base_size = widget.minimumSize()
     widget.setProperty("oma_fit_base_minimum_size", base_size)
     return base_size
-
-
-def _root_size_hint_for_current_contents(root):
-    size_hint = root.sizeHint()
-    if not size_hint.isValid():
-        return _direct_child_contents_size_hint(root)
-    if not isinstance(root, QWizard):
-        return size_hint
-
-    current_page = root.currentPage()
-    if current_page is None:
-        return size_hint
-
-    current_hint = current_page.sizeHint()
-    if not current_hint.isValid():
-        return size_hint
-
-    page_heights = [
-        page.sizeHint().height()
-        for page_id in root.pageIds()
-        for page in [root.page(page_id)]
-        if page is not None and page.sizeHint().isValid()
-    ]
-    if not page_heights:
-        return size_hint
-
-    max_page_height = max(page_heights)
-    if size_hint.height() >= max_page_height:
-        chrome_height = size_hint.height() - max_page_height
-    else:
-        chrome_height = max(0, size_hint.height() - current_hint.height())
-    return QSize(size_hint.width(), current_hint.height() + chrome_height)
-
-
-def _direct_child_contents_size_hint(root):
-    contents_rect = None
-    for child in root.findChildren(QWidget, options=Qt.FindDirectChildrenOnly):
-        if child.isHidden():
-            continue
-        child_rect = child.geometry()
-        if child_rect.isNull():
-            continue
-        contents_rect = (
-            child_rect if contents_rect is None else contents_rect.united(child_rect)
-        )
-
-    if contents_rect is None:
-        return QSize(-1, -1)
-
-    right_margin = max(0, contents_rect.left())
-    bottom_margin = max(0, contents_rect.top())
-    return QSize(
-        contents_rect.right() + 1 + right_margin,
-        contents_rect.bottom() + 1 + bottom_margin,
-    )
 
 
 def _compact_expanding_vertical_spacers(layout):
@@ -767,26 +611,19 @@ def _compact_expanding_vertical_spacers(layout):
 
 
 def _fit_text_widgets_to_contents(root):
-    combo_content_expanded = False
     for label in root.findChildren(QLabel):
         if _is_hidden_for_fit(label, root) or not str(label.text()).strip():
             continue
         if label.wordWrap():
             label.setMinimumWidth(0)
             continue
-        _fit_widget_width_to_hint(label, label.sizeHint().width())
+        _allow_widget_width_to_hint(label, label.sizeHint().width())
 
     for combo_box in root.findChildren(QComboBox):
         if _is_hidden_for_fit(combo_box, root):
             continue
-        previous_minimum_width = combo_box.minimumWidth()
         combo_box.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         _fit_combo_width_to_contents(combo_box)
-        combo_content_expanded = (
-            combo_content_expanded or combo_box.minimumWidth() > previous_minimum_width
-        )
-        if combo_box.view() is not None:
-            combo_box.view().setMinimumWidth(combo_box.minimumWidth())
 
     for button in root.findChildren(QAbstractButton):
         if isinstance(button, QToolButton):
@@ -794,7 +631,6 @@ def _fit_text_widgets_to_contents(root):
         if _is_hidden_for_fit(button, root) or not str(button.text()).strip():
             continue
         _fit_widget_width_to_hint(button, button.sizeHint().width())
-    return combo_content_expanded
 
 
 def _is_hidden_for_fit(widget, root):
@@ -824,6 +660,14 @@ def _fit_widget_width_to_hint(widget, width):
         )
 
 
+def _allow_widget_width_to_hint(widget, width):
+    _raise_maximum_width(widget, width)
+    if widget.sizePolicy().horizontalPolicy() == QSizePolicy.Fixed:
+        widget.setSizePolicy(
+            QSizePolicy.Preferred, widget.sizePolicy().verticalPolicy()
+        )
+
+
 def _fit_combo_width_to_contents(combo_box):
     width = _combo_contents_width(combo_box)
     target_maximum_width = _combo_maximum_width(combo_box)
@@ -833,6 +677,9 @@ def _fit_combo_width_to_contents(combo_box):
     combo_box.setSizePolicy(
         QSizePolicy.Maximum, combo_box.sizePolicy().verticalPolicy()
     )
+    if combo_box.view() is not None:
+        combo_box.view().setMinimumWidth(width)
+    _sync_combo_tooltip(combo_box)
 
 
 def _combo_contents_width(combo_box):
@@ -843,7 +690,7 @@ def _combo_contents_width(combo_box):
         metrics.horizontalAdvance(str(combo_box.itemText(index)))
         for index in range(combo_box.count())
     )
-    return widest_item + 48
+    return widest_item + COMBO_CONTENT_HORIZONTAL_PADDING
 
 
 def _combo_maximum_width(combo_box):
@@ -853,11 +700,14 @@ def _combo_maximum_width(combo_box):
     return APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH
 
 
-def _window_title_width_hint(root):
-    title = str(root.windowTitle()).strip()
-    if not title:
-        return 0
-    return root.fontMetrics().horizontalAdvance(title) + 96
+def _sync_combo_tooltip(combo_box):
+    combo_box.setToolTip(str(combo_box.currentText()))
+    if combo_box.property("oma_combo_tooltip_bound"):
+        return
+    combo_box.currentTextChanged.connect(
+        lambda text, combo_box=combo_box: combo_box.setToolTip(str(text))
+    )
+    combo_box.setProperty("oma_combo_tooltip_bound", True)
 
 
 def _option_group_boxes(root):

@@ -320,8 +320,8 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         ]
         self.setup_params()
         self._set_parameter_box_title(self.method_cbo_box, self.parameter_grp_box)
-        self.ui_for_params(adjust_root=False)
-        qt_layout.fit_analysis_dialog_to_contents(self, adjust_root=False)
+        self.ui_for_params()
+        qt_layout.fit_analysis_dialog_to_contents(self)
 
     def _set_parameter_box_title(self, cbo_box, param_box):
         param_box.setTitle(str(cbo_box.currentText()))

@@ -74,7 +74,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
         super(ResultsWindow, self).__init__(parent)
         self.setupUi(self)
-        qt_layout.fit_text_to_contents(self)
+        qt_layout.configure_resizable_window(self)
         self.copied_item = QByteArray()
         self.paste_offset = 5
         self.add_offset = 5

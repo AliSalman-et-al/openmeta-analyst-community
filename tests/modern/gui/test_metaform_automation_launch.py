@@ -2671,7 +2671,7 @@ def test_new_dataset_wizard_sizes_to_show_diagnostic_choice():
         app.processEvents()
 
 
-def test_new_dataset_wizard_uses_shared_first_show_refit():
+def test_new_dataset_wizard_uses_declarative_minimum_size_policy():
     import launch
     from PyQt5 import QtWidgets
     import main_wizard
@@ -2682,8 +2682,9 @@ def test_new_dataset_wizard_uses_shared_first_show_refit():
         wizard.restart()
         app.processEvents()
 
-        assert hasattr(wizard, "_oma_first_show_refit_filter")
-        assert wizard.property("oma_first_show_refit_options")["stable_root"] is True
+        assert wizard.layout().sizeConstraint() == QtWidgets.QLayout.SetMinimumSize
+        assert not hasattr(wizard, "_oma_first_show_refit_filter")
+        assert wizard.property("oma_first_show_refit_options") is None
     finally:
         wizard.close()
         app.processEvents()
