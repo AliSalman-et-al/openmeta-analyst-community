@@ -1431,8 +1431,21 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
         app.processEvents()
 
         stable_width = specs.width()
+        stable_height = specs.height()
         stable_minimum_width = specs.minimumWidth()
         assert stable_minimum_width >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
+        assert specs.layout().sizeConstraint() == QtWidgets.QLayout.SetFixedSize
+        assert specs.maximumSize() == specs.minimumSize()
+        assert (
+            specs.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Fixed
+        )
+        assert specs.sizePolicy().verticalPolicy() == QtWidgets.QSizePolicy.Fixed
+        assert specs.isSizeGripEnabled() is False
+
+        specs.resize(stable_width + 300, stable_height + 200)
+        app.processEvents()
+        assert specs.width() == stable_width
+        assert specs.height() == stable_height
 
         long_method_index = specs.method_cbo_box.findText(
             "Binary Fixed-Effect Mantel-Haenszel"

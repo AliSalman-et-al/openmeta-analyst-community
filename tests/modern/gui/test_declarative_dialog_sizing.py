@@ -30,6 +30,10 @@ def test_analysis_dialog_uses_fixed_layout_constraint_without_refit_filter(qapp)
     assert layout.sizeConstraint() == QtWidgets.QLayout.SetFixedSize
     assert dialog.minimumWidth() >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
     assert dialog.minimumHeight() >= qt_layout.ANALYSIS_DIALOG_MINIMUM_HEIGHT
+    assert dialog.maximumSize() == dialog.minimumSize()
+    assert dialog.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Fixed
+    assert dialog.sizePolicy().verticalPolicy() == QtWidgets.QSizePolicy.Fixed
+    assert dialog.isSizeGripEnabled() is False
     assert not hasattr(dialog, "_oma_first_show_refit_filter")
     assert dialog.property("oma_first_show_refit_options") is None
     assert dialog.property("oma_stable_fit_size") is None

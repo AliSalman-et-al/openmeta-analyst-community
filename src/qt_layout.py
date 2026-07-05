@@ -340,6 +340,8 @@ def _fix_dialog_to_current_layout(root, minimum_width=0, minimum_height=0):
     size_hint = root.sizeHint()
     if size_hint.isValid():
         target = target.expandedTo(size_hint)
+    root.setSizeGripEnabled(False)
+    root.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
     root.setFixedSize(target)
 
 
