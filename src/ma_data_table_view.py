@@ -287,6 +287,11 @@ class MADataTable(QtWidgets.QTableView):
                 -1 if event.modifiers() & QtCore.Qt.ShiftModifier else 1
             )
             event.accept()
+        elif self._is_clear_key(event):
+            if self.clear_selected_cells():
+                event.accept()
+            else:
+                QTableView.keyPressEvent(self, event)
         else:
             # fix for issue #180
             # if event.key() == QtCore.Qt.Key_Tab:
@@ -305,6 +310,45 @@ class MADataTable(QtWidgets.QTableView):
 
     def _is_return_key(self, event):
         return event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter)
+
+    def _is_clear_key(self, event):
+        return event.key() in (QtCore.Qt.Key_Delete, QtCore.Qt.Key_Backspace)
+
+    def clear_selected_cells(self):
+        model = self.model()
+        selection_model = self.selectionModel()
+        if model is None or selection_model is None:
+            return False
+
+        indexes = selection_model.selectedIndexes()
+        if not indexes:
+            indexes = [self.currentIndex()]
+
+        editable_indexes = []
+        seen = set()
+        for index in indexes:
+            if index is None or not index.isValid():
+                continue
+            key = (index.row(), index.column())
+            if key in seen:
+                continue
+            seen.add(key)
+            if model.flags(index) & Qt.ItemIsEditable:
+                editable_indexes.append(index)
+
+        if not editable_indexes:
+            return False
+
+        failed_messages = []
+        for index in sorted(editable_indexes, key=lambda i: (i.row(), i.column())):
+            if not model.setData(index, ""):
+                failed_messages.append(self._model_data_error_message())
+
+        model.reset_model()
+        if failed_messages:
+            self._report_model_data_error(failed_messages[0])
+        self._enable_analysis_menus_if_appropriate()
+        return True
 
     def _move_current_index_vertically(self, row_delta):
         self._move_index_vertically_from(self.currentIndex(), row_delta)

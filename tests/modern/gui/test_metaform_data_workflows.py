@@ -92,6 +92,57 @@ def test_data_table_ctrl_a_selects_all_cells_without_running_analysis(monkeypatc
         _close_without_prompt(app, window)
 
 
+def test_data_table_delete_and_backspace_clear_selected_cells(monkeypatch):
+    from PyQt5 import QtCore, QtTest
+
+    import launch
+    import ma_data_table_model
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        model = window.model
+        table = window.tableView
+        table.set_data_in_model(model.index(0, model.NAME), _variant("Alpha"))
+
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "binary_convert_scale",
+            lambda value, *args, **kwargs: value,
+        )
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "effect_for_study",
+            lambda *args, **kwargs: {"calc_scale": (0.5, 0.25, 1.0)},
+        )
+
+        table.paste_contents(
+            model.index(0, model.RAW_DATA[0]), [["41", "50", "3", "48"]]
+        )
+        assert _cell_text(model, 0, model.RAW_DATA[0]) == "41.0"
+        assert all(_cell_text(model, 0, col) != "" for col in model.OUTCOMES)
+
+        table.setFocus()
+        table.setCurrentIndex(model.index(0, model.RAW_DATA[0]))
+        QtTest.QTest.keyClick(table, QtCore.Qt.Key_Delete)
+        app.processEvents()
+
+        assert _cell_text(model, 0, model.RAW_DATA[0]) == ""
+        assert all(_cell_text(model, 0, col) == "" for col in model.OUTCOMES)
+
+        table.set_data_in_model(model.index(0, model.RAW_DATA[0]), _variant("41"))
+        assert _cell_text(model, 0, model.RAW_DATA[0]) == "41.0"
+
+        table.setCurrentIndex(model.index(0, model.RAW_DATA[0]))
+        QtTest.QTest.keyClick(table, QtCore.Qt.Key_Backspace)
+        app.processEvents()
+
+        assert _cell_text(model, 0, model.RAW_DATA[0]) == ""
+        assert all(_cell_text(model, 0, col) == "" for col in model.OUTCOMES)
+    finally:
+        _close_without_prompt(app, window)
+
+
 def test_real_metaform_creates_binary_continuous_and_diagnostic_datasets():
     import launch
 
