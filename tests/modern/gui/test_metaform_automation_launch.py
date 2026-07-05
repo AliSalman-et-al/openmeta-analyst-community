@@ -22,7 +22,11 @@ def _assert_compact_table_fits_visible_cells(table):
     QtWidgets.QApplication.processEvents()
     table_is_measurable = table.isVisible()
     if not table_is_measurable:
-        assert table.horizontalHeader().sectionResizeMode(0) == QHeaderView.Stretch
+        header = table.horizontalHeader()
+        assert (
+            header.sectionResizeMode(0) == QHeaderView.Stretch
+            or header.stretchLastSection()
+        )
 
     required_height = (
         table.horizontalHeader().height()
@@ -56,7 +60,11 @@ def _assert_compact_table_fits_visible_cells(table):
         table.horizontalHeader().sectionSize(column)
         for column in range(table.columnCount())
     )
-    assert table.horizontalHeader().sectionResizeMode(0) == QHeaderView.Stretch
+    header = table.horizontalHeader()
+    assert (
+        header.sectionResizeMode(0) == QHeaderView.Stretch
+        or header.stretchLastSection()
+    )
     assert section_width >= table.viewport().width() - 1
 
 

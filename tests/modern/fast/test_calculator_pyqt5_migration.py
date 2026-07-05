@@ -313,6 +313,24 @@ def _assert_calculator_table_grid_fills_width(qapp, table):
     assert section_width >= table.viewport().width() - 1
 
 
+def _assert_calculator_table_content_columns_fill_width(qapp, table):
+    calculator = table.window()
+    calculator.resize(calculator.width() + 180, calculator.height())
+    calculator.show()
+    qapp.processEvents()
+
+    header = table.horizontalHeader()
+    section_width = sum(
+        header.sectionSize(column) for column in range(table.columnCount())
+    )
+
+    assert header.sectionResizeMode(0) == QHeaderView.Interactive
+    assert header.stretchLastSection()
+    assert section_width >= table.viewport().width() - 1
+    for column in range(table.columnCount()):
+        assert table.columnWidth(column) >= table.sizeHintForColumn(column)
+
+
 def test_binary_calculator_grid_columns_fill_expanded_table_width(qapp, monkeypatch):
     import binary_data_form
 
@@ -460,4 +478,63 @@ def test_continuous_calculator_grid_columns_fill_expanded_table_width(
         conf_level=95.0,
     )
 
-    _assert_calculator_table_grid_fills_width(qapp, form.simple_table)
+    _assert_calculator_table_content_columns_fill_width(qapp, form.simple_table)
+
+
+def test_continuous_calculator_keeps_long_imputed_values_compact(qapp, monkeypatch):
+    import continuous_data_form
+    import qt_layout
+
+    long_imputed = {
+        "n": 10,
+        "mean": 92.89482413483651,
+        "sd": 2.604729426373378,
+        "se": 8.75360686626884e-310,
+        "var": 3.4972319657703745e-249,
+        "pval": 0.12345678912345678,
+        "low": 91.11111111111111,
+        "high": 94.99999999999999,
+    }
+
+    monkeypatch.setattr(
+        continuous_data_form.meta_py_r, "get_mult_from_r", lambda conf: 1.96
+    )
+    monkeypatch.setattr(
+        continuous_data_form.meta_py_r,
+        "continuous_convert_scale",
+        lambda x, *args, **kwargs: x,
+    )
+    monkeypatch.setattr(
+        continuous_data_form.meta_py_r,
+        "impute_cont_data",
+        lambda data, alpha: {"succeeded": True, "output": long_imputed},
+    )
+
+    form = continuous_data_form.ContinuousDataForm(
+        FakeContinuousMAUnit(),
+        ["Group 1", "Group 2"],
+        "Group 1-Group 2",
+        "ROM",
+        conf_level=95.0,
+    )
+
+    form.show()
+    qapp.processEvents()
+
+    displayed_values = [
+        form.simple_table.item(0, column).text()
+        for column in range(form.simple_table.columnCount())
+    ]
+    assert "2.604729426373378" not in displayed_values
+    assert "3.4972319657703745e-249" not in displayed_values
+    assert form.simple_table.item(0, 2).text() == "2.6047"
+
+    natural_width = sum(
+        max(
+            form.simple_table.horizontalHeader().sectionSizeHint(column),
+            form.simple_table.sizeHintForColumn(column),
+        )
+        for column in range(form.simple_table.columnCount())
+    )
+    assert form.simple_table.minimumWidth() < natural_width * 2
+    assert form.minimumWidth() < qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH * 2

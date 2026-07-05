@@ -206,7 +206,9 @@ def fit_text_to_contents(
     )
 
 
-def configure_compact_table(table, stretch_columns=False):
+def configure_compact_table(
+    table, stretch_columns=False, fill_available_width=False
+):
     """Let compact tables expand horizontally without clipping rows or columns."""
     if table is None:
         return
@@ -214,12 +216,14 @@ def configure_compact_table(table, stretch_columns=False):
     table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
     table.setMinimumWidth(0)
     _raise_maximum_width(table, QWIDGETSIZE_MAX)
+    table.horizontalHeader().setStretchLastSection(False)
 
     if stretch_columns:
         table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         table.setMinimumWidth(_table_width_for_stretched_content(table))
     else:
         _resize_table_columns_to_contents(table)
+        table.horizontalHeader().setStretchLastSection(fill_available_width)
         table.setMinimumWidth(_table_width_for_visible_columns(table))
 
     table.resizeRowsToContents()
