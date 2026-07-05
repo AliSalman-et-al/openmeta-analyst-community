@@ -170,18 +170,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
         self.items_to_coords[id(qt_item)] = pos
 
-    def add_images(self):
-        ordered_images = result_sections.order_image_sections(
-            list(self.images.items()), explicit_order=self.image_order
-        )
-
-        for title, image in ordered_images:
-            self.add_image_section(
-                title,
-                result_sections.section_display_title(title),
-                image,
-            )
-
     def add_text_section(self, title, display_title, text):
         try:
             print("title: %s; text: %s" % (title, text))
@@ -219,16 +207,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         )
 
         return pixmap
-
-    def add_text(self):
-        for title, text in result_sections.order_text_sections(
-            list(self.texts.items())
-        ):
-            self.add_text_section(
-                title,
-                result_sections.section_display_title(title),
-                text,
-            )
 
     def add_references(self):
         if self.references_text is None:

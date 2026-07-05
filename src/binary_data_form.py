@@ -768,18 +768,6 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             )
             raise
 
-    def _build_dict(self):
-        d = dict(
-            list(
-                zip(
-                    ["control.n.outcome", "control.N", "tx.n.outcome", "tx.N"],
-                    self.raw_data,
-                )
-            )
-        )
-        d["estimate"] = self.ma_unit.get_estimate(self.cur_effect, self.group_str)
-        return d
-
     def _update_data_table(self):
         """Fill in 2x2 table from other entries in the table"""
 

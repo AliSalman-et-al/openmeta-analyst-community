@@ -93,10 +93,6 @@ def _to_native_text(value):
     return qt_text.to_native_text(value)
 
 
-def normalize_outcome_name(value):
-    return name_validation.normalize_name(value)
-
-
 def validate_new_outcome_name(dataset, name):
     return name_validation.validate_unique_name(
         "outcome", name, dataset.get_outcome_names()
@@ -2351,24 +2347,6 @@ class DatasetModel(QAbstractTableModel):
                     ma_unit.add_group(tx_group)
 
         return ma_unit
-
-    def max_raw_data_cols_for_current_unit(self):
-        """
-        Returns the length of the biggest raw data list for the parametric ma_unit. e.g.,
-        if a two group, binary outcome is the current ma_unit, then the studies should
-        raw data vectors that contain, at most, 4 elements.
-        """
-        return max(
-            [
-                len(
-                    self.get_current_ma_unit_for_study(i).get_raw_data_for_groups(
-                        self.current_txs
-                    )
-                )
-                for i, study in enumerate(self.dataset.studies)
-                if self.current_outcome in study.outcomes_to_follow_ups
-            ]
-        )
 
     def recalculate_display_scale(self):
         effect = self.current_effect

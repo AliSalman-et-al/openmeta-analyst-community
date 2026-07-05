@@ -234,12 +234,6 @@ class Dataset:
             if cov.name == cov_name:
                 return cov
 
-    def ids_to_study_names(self):
-        ids_to_names = {}
-        for study in self.studies:
-            ids_to_names[study.id] = study.name
-        return ids_to_names
-
     def get_values_for_cov(self, covariate, ids_for_keys=False):
         """
         returns a dictionary mapping study names to values for
@@ -716,13 +710,6 @@ class Study:
 
         self.outcomes_to_follow_ups[outcome_name].pop(follow_up_name)
 
-    def add_ma_unit(self, unit, follow_up):
-        if not unit.outcome in self.outcomes_to_follow_ups:
-            self.add_outcome(unit.outcome, follow_up)
-
-        self.outcomes_to_follow_ups[unit.outcome.name][follow_up] = unit
-
-
 class MetaAnalyticUnit:
     """
     This class is the unit of analysis. It corresponds to a single
@@ -1109,9 +1096,6 @@ class MetaAnalyticUnit:
             self.effects_dict[effect][group_str]["lower"],
             self.effects_dict[effect][group_str]["upper"],
         )
-
-    def get_effect_dict(self, effect, group_str):
-        return self.effects_dict[effect][group_str]
 
     def get_group_strings(self, effect):
         return list(self.effects_dict[effect].keys())

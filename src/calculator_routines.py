@@ -56,91 +56,6 @@ def between_bounds(est=None, low=None, high=None):
     return True, None
 
 
-def cast_to_int(value, name=None):
-    """Converts value to int if possible"""
-    try:
-        rounded = round(float(value))
-        return int(rounded)
-    except:
-        if not name is None:
-            print(("Could not convert %s='%s' to int" % (name, str(value))))
-        else:
-            print(("Could not convert '%s' to int" % (str(value))))
-        return None
-
-
-def compute_2x2_table(params):
-    """Computes values for the whole 2x2 table if possible based on partial values from the rest of the table"""
-
-    # Realized R code is screwy.... now for some more screwy code that hopefully works better
-    table = [
-        [params["c11"], params["c12"], params["r1sum"]],
-        [params["c21"], params["c22"], params["r2sum"]],
-        [params["c1sum"], params["c2sum"], params["total"]],
-    ]
-
-    while True:
-        changed = False
-        for row in range(3):
-            for col in range(3):
-                # go through row-wise
-                if table[row][col] in EMPTY_VALS:
-                    if col == 0:
-                        try:
-                            table[row][col] = table[row][2] - table[row][1]
-                            changed = True
-                        except:
-                            pass
-                    if col == 1:
-                        try:
-                            table[row][col] = table[row][2] - table[row][0]
-                            changed = True
-                        except:
-                            pass
-                    if col == 2:
-                        try:
-                            table[row][col] = table[row][0] + table[row][1]
-                            changed = True
-                        except:
-                            pass
-                # and now column-wise
-                if table[row][col] in EMPTY_VALS:
-                    if row == 0:
-                        try:
-                            table[row][col] = table[2][col] - table[1][col]
-                            changed = True
-                        except:
-                            pass
-                    if row == 1:
-                        try:
-                            table[row][col] = table[2][col] - table[0][col]
-                            changed = True
-                        except:
-                            pass
-                    if row == 2:
-                        try:
-                            table[row][col] = table[0][col] + table[1][col]
-                            changed = True
-                        except:
-                            pass
-        if not changed:
-            break
-    ## end of big while loop
-
-    coef = {}
-    coef["c11"] = table[0][0]
-    coef["c12"] = table[0][1]
-    coef["r1sum"] = table[0][2]
-    coef["c21"] = table[1][0]
-    coef["c22"] = table[1][1]
-    coef["r2sum"] = table[1][2]
-    coef["c1sum"] = table[2][0]
-    coef["c2sum"] = table[2][1]
-    coef["total"] = table[2][2]
-
-    return coef
-
-
 def compute_2x2_table_from_inner_counts(params):
     """Derive 2x2 margins from the four independent inner count cells."""
 
@@ -349,31 +264,6 @@ def enable_txt_box_input(*args):
         text_box.blockSignals(False)
 
 
-def init_ci_spinbox_and_label(ci_spinbox, ci_label, value=None):
-    if value is None:
-        raise ValueError("Confidence level must be specified")
-
-    ci_spinbox.blockSignals(True)
-    ci_spinbox.setValue(value)
-    ci_label.setText("{0:.1f}% Confidence Interval".format(ci_spinbox.value()))
-    ci_spinbox.blockSignals(False)
-
-
-CHANGE_CI_ALERT_BASE_MSG = (
-    "The size of the confidence level used for a particular study in this "
-    "calculator need not correspond with the global confidence level "
-    "(currently set at {0:.1%}) chosen for data display on spreadsheets and "
-    "forest plots."
-)
-
-
-def get_CHANGE_CI_ALERT_MSG(conf_level):
-    if conf_level is None:
-        raise ValueError("Confidence level must be specified")
-
-    return CHANGE_CI_ALERT_BASE_MSG.format(conf_level / 100.0)
-
-
 def fit_effect_ci_line_edits_to_contents(line_edits, digits=CALC_NUM_DIGITS):
     """Keep calculator effect/CI values wide enough to show signs and precision."""
 
@@ -484,21 +374,6 @@ class CommandFieldChanged(QUndoCommand):
         print("Restoring old ma_unit")
         self.restore_old_f()
         # self.parent.enable_back_calculation_btn() ##
-
-
-# Currently unused?
-def reset_table_item_flags(table):
-    nrows = table.rowCount()
-    ncols = table.columnCount()
-
-    table.blockSignals(True)
-    for row in range(nrows):
-        for col in range(ncols):
-            item = table.item(row, col)
-            if not item is None:
-                newflags = item.flags() | Qt.ItemIsEditable
-                item.setFlags(newflags)
-    table.blockSignals(False)
 
 
 def block_signals(widgets, state):

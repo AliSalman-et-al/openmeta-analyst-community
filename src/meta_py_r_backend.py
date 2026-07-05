@@ -36,10 +36,6 @@ def install_meta_py_r_backend():
         return install_stub_meta_py_r()
 
 
-def _install_meta_py_r_backend():
-    return install_meta_py_r_backend()
-
-
 def install_stub_meta_py_r():
     existing = sys.modules.get("meta_py_r")
     if getattr(existing, "_oma_stub_backend", False):
@@ -115,10 +111,6 @@ def install_stub_meta_py_r():
     )()
     sys.modules["meta_py_r"] = meta_py_r
     return meta_py_r
-
-
-def _install_stub_meta_py_r():
-    return install_stub_meta_py_r()
 
 
 if os.environ.get("OMA_STUB_BACKEND") == "1" and "meta_py_r" not in sys.modules:

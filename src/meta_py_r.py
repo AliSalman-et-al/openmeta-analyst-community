@@ -127,13 +127,6 @@ class RlibLoader:
     def load_gemtc(self):
         return self._load_r_lib("gemtc")
 
-    def load_all(self):
-        self.load_metafor()
-        self.load_OpenMetaR()
-        self.load_igraph()
-        self.load_grid()
-        self.load_gemtc()
-
     def _load_r_lib(self, name):
         try:
             execute_r_function("library", name)
@@ -262,10 +255,6 @@ def remove_value(toRemove, t_dict):
     for param, val in list(t_dict.items()):
         if val == toRemove:
             t_dict.pop(param)
-
-
-def _gis_NA(x):
-    return str(x) == "NA"
 
 
 ###### R data structure tools #############
@@ -437,13 +426,6 @@ def set_global_conf_level(confidence_level):
 ################################################################################
 
 
-@RfunctionCaller
-def none_to_null(x):
-    if x is None:
-        return rpy2.rinterface.NULL
-    return x
-
-
 def _r_null_if_none(value):
     return rpy2.rinterface.NULL if value is None else value
 
@@ -468,26 +450,6 @@ def get_params(method_name):
         order_vars,
         pretty_names_and_descriptions,
     )
-
-
-@RfunctionCaller
-def get_pretty_names_and_descriptions_for_params(method_name, param_list):
-    params_d = R_parse_tools.recursioner(
-        execute_r_function("openmetar.method.parameters", str(method_name)).rx2(
-            "pretty.names"
-        )
-    )
-
-    # fill in entries for parameters for which pretty names/descriptions were
-    # not provided-- these are just place-holders to make processing this
-    # easier
-    names_index = param_list.names.index("parameters")
-    param_names = param_list[names_index].names  # pull out the list
-    for param in param_names:
-        if not param in list(params_d.keys()):
-            params_d[param] = {"pretty.name": param, "description": "None provided"}
-
-    return params_d
 
 
 @RfunctionCaller
@@ -604,13 +566,6 @@ def ma_dataset_to_simple_continuous_robj(
     ro.globalenv[var_name] = r_obj
     print("ok.")
     return r_obj
-
-
-def _get_str(M, col_index, reverse=True):
-    x = _get_col(M, col_index)
-    if reverse:
-        x.reverse()
-    return ", ".join(_to_strs(x))
 
 
 @RfunctionCaller
@@ -826,45 +781,6 @@ def _data_blank_or_none(*args):
         if x in EMPTY_VALS:
             return True
     return False
-
-
-def _make_table_string_from_dict(table_dict):
-    """Makes a string from dictionary d with the keys of d serving as the
-    column headers"""
-
-    keys, values = list(table_dict.keys()), list(table_dict.values())
-    if len(keys) == 0:
-        raise ValueError("Dictionary must have at least one key")
-
-    # import pdb; pdb.set_trace()
-
-    headers = [str(key) for key in keys]
-    header_str = " ".join(headers)
-    table_str = header_str + "\n"
-
-    table_row_data = list(zip(*values))
-
-    row_strings = []
-
-    def process_datum(x):
-        # quote strings
-        if type(x) in [str, str]:
-            return '"' + str(x) + '"'
-        else:
-            return str(x)
-
-    row_data_to_row_str = lambda row_data: " ".join(
-        [process_datum(datum) for datum in row_data]
-    )
-
-    for row_data in table_row_data:
-        row_str = row_data_to_row_str(row_data)
-        row_strings.append(row_str)
-    table_data_str = "\n".join(row_strings)
-
-    table_str += table_data_str
-
-    return table_str
 
 
 @RfunctionCaller
@@ -1200,18 +1116,6 @@ def run_diagnostic_multi(
 # def r_statement(statement):
 #    print("About to execute: %s" % statement)
 #    ro.r(statement)
-
-
-@RfunctionCaller
-def run_diagnostic_ma(
-    function_name, params, res_name="result", diag_data_name="tmp_obj"
-):
-    params = normalize_confidence_level_params(params)
-    result = execute_r_function(
-        str(function_name), _r_object_from_symbol(diag_data_name), _to_R_params(params)
-    )
-    ro.globalenv[_r_symbol(res_name)] = result
-    return parse_out_results(result)
 
 
 @RfunctionCaller
@@ -1749,37 +1653,6 @@ def make_weights_str(results):
     return table
 
 
-def _gen_cov_vals_obj_str(cov, study_ids, dataset):
-    values_str, cov_vals = cov_to_str(
-        cov, study_ids, dataset, named_list=False, return_cov_vals=True
-    )
-    ref_var = cov_vals[0].replace("'", "")  # arbitrary
-
-    ## setting the reference variable to the first entry
-    # for now -- this only matters for factors, obviously
-
-    r_str = (
-        "openmetar.create.covariate.values(cov.name='%s', cov.vals=%s, \
-                    cov.type='%s', ref.var='%s')"
-        % (cov.name, values_str, TYPE_TO_STR_DICT[cov.data_type], ref_var)
-    )
-    return r_str
-
-
-def list_of_cov_value_objects_str(dataset, study_ids, cov_list=None):
-    """makes r_string of covariate objects with their values"""
-
-    r_cov_str = []
-    if cov_list is None:
-        # then use all covariates that belong to the dataset
-        cov_list = dataset.covariates
-    for cov in cov_list:
-        r_cov_str.append(_gen_cov_vals_obj_str(cov, study_ids, dataset))
-    r_cov_str = "list(" + ",".join(r_cov_str) + ")"
-
-    return r_cov_str
-
-
 @RfunctionCaller
 def run_meta_regression(
     dataset,
@@ -1851,14 +1724,6 @@ def run_workflow_analysis(
         workflow=workflow,
         res_name=res_name,
     )
-
-
-def _get_c_str_for_col(m, i):
-    return ", ".join(_get_col(m, i))
-
-
-def _to_strs(v):
-    return [str(x) for x in v]
 
 
 def _get_col(m, i):
@@ -1997,8 +1862,3 @@ def generic_convert_scale(
         # scalar
         return transformed_ls[0]
     return transformed_ls
-
-
-@RfunctionCaller
-def turn_off_R_graphics():
-    execute_r_string("openmetar.graphics.off()")

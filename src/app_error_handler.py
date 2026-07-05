@@ -167,11 +167,6 @@ def connect_safely(signal, callback, parent=None):
     return SafeSignalConnection(signal, callback, parent=parent)
 
 
-def disconnect_safely(connection):
-    if connection is not None:
-        connection.disconnect()
-
-
 def _clear_active_context_menu(menu):
     global _active_context_menu
     if _active_context_menu is menu:

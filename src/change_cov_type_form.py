@@ -124,14 +124,6 @@ class CovModel(QAbstractTableModel):
         print(mapping)
         return mapping
 
-    def _is_a_num(self, x):
-        try:
-            y = float(x)
-            return y
-        except:
-            # nope.
-            return False
-
     def _to_alphabet_str(self, x):
         # base conversion.
         alphabet = string.ascii_lowercase

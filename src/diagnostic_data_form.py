@@ -215,19 +215,6 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         val = self.two_by_two_table.item(i, j)
         return val is None or val.text() == "" or val.text() == None
 
-    def _is_invalid(self, i, j):
-        val = self.two_by_two_table.item(i, j)
-        try:
-            int(val.text())
-        except:
-            return True
-        return False
-
-    def _is_txt_box_invalid(self, txt_box):
-        val = txt_box.text()
-        empty = val in EMPTY_VALS
-        return is_NaN(val) or empty or (not is_a_float(val))
-
     def _set_val(self, row, col, val):
         if is_NaN(val):  # get out quick
             print("%s is not a number" % val)
@@ -380,13 +367,6 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
 
     def getTotalSubjects(self):
         return self._get_int(2, 2)
-
-    def print_backup_table(self):
-        for row in range(3):
-            line = ""
-            for col in range(3):
-                line += self.table_backup[row][col] + ", "
-            print(line)
 
     def _get_table_vals(self):
         """Package table from 2x2 table in to a dictionary"""

@@ -182,25 +182,6 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         else:
             self.image_path.setText(out_f)
 
-    def make_indefinite_progress_bar(self):
-        bar = QtWidgets.QProgressBar(parent=self)
-        bar.setWindowTitle("Running Analysis...")
-        bar.setRange(0, 0)  # makes it indefinite
-        # specs_form_pos = self.pos()
-        # specs_form_width, specs_form_height = self.width(), self.height()
-
-        bar_width = 250  # seems to look ok?
-        bar.setFixedWidth(bar_width)
-        # center_width = specs_form_pos.x() + specs_form_width/2 - bar_width/2
-        # center_height = specs_form_pos.y() + specs_form_height/2
-
-        bar.setAlignment(Qt.AlignCenter)
-        # center_point = QPoint(center_width, center_height)
-
-        # bar.move(center_point)
-
-        return bar
-
     def run_network_analysis(self):
         # first, let's fire up a progress bar
         bar = MetaProgress(self)

@@ -47,9 +47,6 @@ class TwoWayDict(dict):
     def get_key(self, value, default=None):
         return self._reverse_map.get(value, default)
 
-    def has_value(self, value):
-        return value in self._reverse_map
-
     def reversed_items(self):
         return list(self._reverse_map.items())
 
@@ -68,21 +65,6 @@ class TwoWayDict(dict):
         del self._reverse_map[value]
         return key, value
 
-    def pop_key(self, value, *args):
-        try:
-            key = self._reverse_map[value]
-        except KeyError:
-            if not args:
-                raise
-            return args[0]
-        del self[key]
-        return key
-
-    def reversed_popitem(self):
-        value, key = self._reverse_map.popitem()
-        super().__delitem__(key)
-        return value, key
-
     def update(self, other=None, **kwargs):
         if other is not None:
             for key, value in dict(other).items():
@@ -94,12 +76,5 @@ class TwoWayDict(dict):
     def fromkeys(cls, iterable, value=None):
         mapping = cls()
         for key in iterable:
-            mapping[key] = value
-        return mapping
-
-    @classmethod
-    def fromvalues(cls, iterable, key=None):
-        mapping = cls()
-        for value in iterable:
             mapping[key] = value
         return mapping

@@ -11,7 +11,6 @@
 
 import pickle
 import os
-import sys
 from functools import cmp_to_key
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt
@@ -63,12 +62,6 @@ import webbrowser
 
 
 import forms.ui_running
-
-
-def _application_root():
-    if getattr(sys, "frozen", False):
-        return os.path.dirname(sys.executable)
-    return os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 
 
 def _qt_item_text(value):
@@ -1512,16 +1505,6 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
         self.model.reset_model()
         self._change_conf_level_label()
-
-    def undo_set_model(self, out_path, state_dict, dataset):
-        self.model = ma_data_table_model.DatasetModel(dataset)
-        self.model.set_state(state_dict)
-        self.out_path = out_path
-        self._disconnections()
-        self.tableView.setModel(self.model)
-        self.model_updated()
-        self.dataset_file_lbl.setText("Open File: %s" % self.out_path)
-        qt_layout.fit_text_to_contents(self)
 
     def update_outcome_lbl(self):
         self.cur_outcome_lbl.setText(

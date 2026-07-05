@@ -731,10 +731,6 @@ class MADataTable(QtWidgets.QTableView):
             for col_index in range(self.model().columnCount())
         ]
 
-    def set_column_widths(self, widths):
-        for col_index, width in enumerate(widths):
-            self.setColumnWidth(col_index, width)
-
     def set_metric_in_ui(self, metric):
         """
         calls the method on the UI to change
@@ -795,13 +791,6 @@ class MADataTable(QtWidgets.QTableView):
 
     def _normalize_matrix_rows(self, matrix):
         return tabular_data.normalize_rows(matrix)
-
-    def _print_row(self, r):
-        print("length of row: %s" % len(r))
-        for x in r:
-            print(x == "")
-            print("%s," % x)
-        print("\n")
 
     def _is_blank_row(self, r):
         return len(r) == 1 and r[0] == ""
