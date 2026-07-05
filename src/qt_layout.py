@@ -225,6 +225,15 @@ def configure_compact_table(table, stretch_columns=False):
     table.setMaximumHeight(table_height)
 
 
+def configure_spreadsheet_table_view(table_view):
+    """Preserve content-sized spreadsheet columns while filling spare viewport width."""
+    if table_view is None:
+        return
+
+    table_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+    table_view.horizontalHeader().setStretchLastSection(True)
+
+
 def _resize_table_columns_to_contents(table):
     header = table.horizontalHeader()
     header.setSectionResizeMode(QHeaderView.Interactive)

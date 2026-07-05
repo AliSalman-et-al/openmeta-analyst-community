@@ -39,6 +39,7 @@ class ChangeCovTypeForm(QDialog, Ui_ChangeCovTypeForm):
         )
         self.cov_prev_table.setModel(self.cov_model)
         self.cov_prev_table.resizeColumnsToContents()
+        qt_layout.configure_spreadsheet_table_view(self.cov_prev_table)
         qt_layout.fit_application_dialog_to_contents(self)
 
     def data_error(self, msg):

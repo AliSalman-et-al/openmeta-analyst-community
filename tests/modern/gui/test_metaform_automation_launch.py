@@ -10,11 +10,20 @@ sys.path.insert(0, os.path.abspath(os.path.join("src", "forms")))
 
 import pytest
 from PyQt5 import QtWidgets
+from PyQt5.QtWidgets import QHeaderView
 
 REPO_ROOT = os.getcwd()
 
 
 def _assert_compact_table_fits_visible_cells(table):
+    owner = table.window()
+    owner.resize(owner.width() + 180, owner.height())
+    owner.show()
+    QtWidgets.QApplication.processEvents()
+    table_is_measurable = table.isVisible()
+    if not table_is_measurable:
+        assert table.horizontalHeader().sectionResizeMode(0) == QHeaderView.Stretch
+
     required_height = (
         table.horizontalHeader().height()
         + sum(table.rowHeight(row) for row in range(table.rowCount()))
@@ -37,8 +46,35 @@ def _assert_compact_table_fits_visible_cells(table):
     required_width = vertical_header_width + sum(content_widths) + 2 * table.frameWidth()
     assert table.minimumWidth() >= required_width
 
+    if not table_is_measurable:
+        return
+
     for column, content_width in enumerate(content_widths):
         assert table.columnWidth(column) >= content_width
+
+    section_width = sum(
+        table.horizontalHeader().sectionSize(column)
+        for column in range(table.columnCount())
+    )
+    assert table.horizontalHeader().sectionResizeMode(0) == QHeaderView.Stretch
+    assert section_width >= table.viewport().width() - 1
+
+
+def _assert_table_view_uses_spare_width(table_view):
+    owner = table_view.window()
+    owner.resize(owner.width() + 180, owner.height())
+    owner.show()
+    QtWidgets.QApplication.processEvents()
+
+    assert table_view.horizontalHeader().stretchLastSection()
+    if table_view.model() is None or table_view.model().columnCount() == 0:
+        return
+
+    section_width = sum(
+        table_view.horizontalHeader().sectionSize(column)
+        for column in range(table_view.model().columnCount())
+    )
+    assert section_width >= table_view.viewport().width() - 1
 
 
 def test_full_app_imports_representative_csv_into_dataset():
@@ -308,6 +344,7 @@ def test_automation_launch_opens_sample_project_in_real_data_table():
             == "<font color='Blue'>clinical failure</font>"
         )
         assert window.cur_time_lbl.text() == "<font color='Blue'>first</font>"
+        _assert_table_view_uses_spare_width(window.tableView)
     finally:
         window.close()
         app.processEvents()
@@ -784,6 +821,12 @@ def test_change_covariate_type_model_returns_native_values_and_accepts_native_ed
             )
             == old_value
         )
+
+        dialog = change_cov_type_form.ChangeCovTypeForm(dataset, dataset.covariates[0])
+        try:
+            _assert_table_view_uses_spare_width(dialog.cov_prev_table)
+        finally:
+            dialog.close()
     finally:
         window.current_data_unsaved = False
         window.close()
@@ -3327,6 +3370,7 @@ def test_csv_import_wizard_pads_ragged_rows_before_previewing(tmp_path, monkeypa
     assert shown == []
     assert page.isComplete()
     assert page.preview_table.item(1, 5).text() == ""
+    _assert_compact_table_fits_visible_cells(page.preview_table)
     assert wizard.get_csv_data()["data"][-1] == ["Beta", "2021", "3", "11", "4", ""]
 
 

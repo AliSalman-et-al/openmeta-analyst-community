@@ -28,6 +28,7 @@ import binary_data_form
 import continuous_data_form
 import diagnostic_data_form
 import app_error_handler
+import qt_layout
 
 # it's a questionable practice to import the
 # underlying model into the view, but sometimes
@@ -107,6 +108,7 @@ class MADataTable(QtWidgets.QTableView):
         headers.customContextMenuRequested.connect(
             app_error_handler.safe_slot(self.header_context_menu, parent=self)
         )
+        qt_layout.configure_spreadsheet_table_view(self)
 
     def _make_context_menu(self):
         def _context_menu(event):
