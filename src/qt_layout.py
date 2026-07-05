@@ -195,11 +195,41 @@ def configure_compact_table(table, stretch_columns=True):
 
     if stretch_columns:
         table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+    else:
+        _resize_table_columns_to_contents(table)
+
+    table.setMinimumWidth(_table_width_for_visible_columns(table))
 
     table.resizeRowsToContents()
     table_height = _table_height_for_visible_rows(table)
     table.setMinimumHeight(table_height)
     table.setMaximumHeight(table_height)
+
+
+def _resize_table_columns_to_contents(table):
+    header = table.horizontalHeader()
+    header.setSectionResizeMode(QHeaderView.Interactive)
+    table.resizeColumnsToContents()
+    for column in range(table.columnCount()):
+        table.setColumnWidth(
+            column,
+            max(
+                table.columnWidth(column),
+                table.sizeHintForColumn(column),
+                header.sectionSizeHint(column),
+            ),
+        )
+
+
+def _table_width_for_visible_columns(table):
+    vertical_header_width = 0
+    if not table.verticalHeader().isHidden():
+        vertical_header_width = table.verticalHeader().sizeHint().width()
+    return (
+        vertical_header_width
+        + sum(table.columnWidth(column) for column in range(table.columnCount()))
+        + 2 * table.frameWidth()
+    )
 
 
 def _table_height_for_visible_rows(table):

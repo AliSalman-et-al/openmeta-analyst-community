@@ -3062,6 +3062,27 @@ def test_data_entry_dialog_tables_expand_and_show_all_rows(monkeypatch):
             assert table.maximumWidth() > table.minimumWidth()
             assert table.minimumHeight() >= required_height
             assert table.maximumHeight() >= required_height
+
+        for table in (
+            dialogs[1].simple_table,
+            dialogs[1].g1_pre_post_table,
+            dialogs[1].g2_pre_post_table,
+        ):
+            content_widths = [
+                max(
+                    table.horizontalHeader().sectionSizeHint(column),
+                    table.sizeHintForColumn(column),
+                )
+                for column in range(table.columnCount())
+            ]
+            required_width = (
+                table.verticalHeader().sizeHint().width()
+                + sum(content_widths)
+                + 2 * table.frameWidth()
+            )
+            assert table.minimumWidth() >= required_width
+            for column, content_width in enumerate(content_widths):
+                assert table.columnWidth(column) >= content_width
     finally:
         for dialog in dialogs:
             dialog.close()

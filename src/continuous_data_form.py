@@ -37,7 +37,6 @@ from meta_globals import *
 import forms.ui_continuous_data_form
 import forms.ui_choose_back_calc_result_form
 
-default_col_width = 65
 CONTINUOUS_IMPUTATION_FIELD_NAMES = {
     "n": "n",
     "N": "n",
@@ -127,8 +126,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             self.g2_pre_post_table,
         ]
         for table in self.tables:
-            self._set_col_widths(table)
-            qt_layout.configure_compact_table(table)
+            qt_layout.configure_compact_table(table, stretch_columns=False)
 
         self.grp_1_lbl.setText(str(self.cur_groups[0]))
         self.grp_2_lbl.setText(str(self.cur_groups[1]))
@@ -149,6 +147,16 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             self.grp_box_pre_post.setVisible(False)
 
         self.current_correlation = self._get_correlation_str()
+        qt_layout.fit_analysis_dialog_to_contents(self)
+
+    def _fit_tables_to_contents(self):
+        tables = self.__dict__.get("tables")
+        if tables is None:
+            tables = [self.__dict__.get("simple_table")]
+        for table in tables:
+            if table is None:
+                continue
+            qt_layout.configure_compact_table(table, stretch_columns=False)
         qt_layout.fit_analysis_dialog_to_contents(self)
 
     def initialize_form(self, table=None):
@@ -234,10 +242,6 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         redo.triggered.connect(
             app_error_handler.safe_slot(lambda _checked=False: self.redo(), parent=self)
         )
-
-    def _set_col_widths(self, table):
-        for column in range(table.columnCount()):
-            table.setColumnWidth(column, default_col_width)
 
     def _populate_effect_data(self):
         available_effects = set(
@@ -664,6 +668,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                     table.blockSignals(True)
                     self._set_val(row, col, old_table_data[row][col], table=table)
                     table.blockSignals(False)
+        self._fit_tables_to_contents()
 
     def restore_ma_unit_and_tables(self, old_ma_unit, old_tables_data, old_correlation):
         self.restore_ma_unit(old_ma_unit)
@@ -743,6 +748,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                     print(("Why didn't it succeed?: '%s'" % results_from_r["comment"]))
                 except KeyError:
                     pass
+        self._fit_tables_to_contents()
 
     def conf_level_to_alpha(self):
         alpha = 1 - self.conf_level / 100.0
@@ -799,6 +805,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         print("imputation results from R: %s" % results_from_r)
 
         if not results_from_r["succeeded"]:
+            self._fit_tables_to_contents()
             return None
 
         print("Prepost-imputation succeeded")
@@ -843,6 +850,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
 
         self._copy_raw_data_from_table_to_ma_unit()
         self.set_clear_btn_color()
+        self._fit_tables_to_contents()
 
         # function was invoked as a result of user interaction, not
         # programmatically
