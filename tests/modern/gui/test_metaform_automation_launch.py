@@ -14,6 +14,33 @@ from PyQt5 import QtWidgets
 REPO_ROOT = os.getcwd()
 
 
+def _assert_compact_table_fits_visible_cells(table):
+    required_height = (
+        table.horizontalHeader().height()
+        + sum(table.rowHeight(row) for row in range(table.rowCount()))
+        + 2 * table.frameWidth()
+    )
+    assert table.maximumWidth() > table.minimumWidth()
+    assert table.minimumHeight() >= required_height
+    assert table.maximumHeight() >= required_height
+
+    content_widths = [
+        max(
+            table.horizontalHeader().sectionSizeHint(column),
+            table.sizeHintForColumn(column),
+        )
+        for column in range(table.columnCount())
+    ]
+    vertical_header_width = 0
+    if not table.verticalHeader().isHidden():
+        vertical_header_width = table.verticalHeader().sizeHint().width()
+    required_width = vertical_header_width + sum(content_widths) + 2 * table.frameWidth()
+    assert table.minimumWidth() >= required_width
+
+    for column, content_width in enumerate(content_widths):
+        assert table.columnWidth(column) >= content_width
+
+
 def test_full_app_imports_representative_csv_into_dataset():
     import launch
     from PyQt5 import QtWidgets
@@ -3054,35 +3081,7 @@ def test_data_entry_dialog_tables_expand_and_show_all_rows(monkeypatch):
             dialogs[2].two_by_two_table,
         ]
         for table in tables:
-            required_height = (
-                table.horizontalHeader().height()
-                + sum(table.rowHeight(row) for row in range(table.rowCount()))
-                + 2 * table.frameWidth()
-            )
-            assert table.maximumWidth() > table.minimumWidth()
-            assert table.minimumHeight() >= required_height
-            assert table.maximumHeight() >= required_height
-
-        for table in (
-            dialogs[1].simple_table,
-            dialogs[1].g1_pre_post_table,
-            dialogs[1].g2_pre_post_table,
-        ):
-            content_widths = [
-                max(
-                    table.horizontalHeader().sectionSizeHint(column),
-                    table.sizeHintForColumn(column),
-                )
-                for column in range(table.columnCount())
-            ]
-            required_width = (
-                table.verticalHeader().sizeHint().width()
-                + sum(content_widths)
-                + 2 * table.frameWidth()
-            )
-            assert table.minimumWidth() >= required_width
-            for column, content_width in enumerate(content_widths):
-                assert table.columnWidth(column) >= content_width
+            _assert_compact_table_fits_visible_cells(table)
     finally:
         for dialog in dialogs:
             dialog.close()
@@ -3105,15 +3104,7 @@ def test_csv_required_format_table_expands_and_shows_all_rows(monkeypatch):
     try:
         page.initializePage()
         table = page.required_fmt_table
-        required_height = (
-            table.horizontalHeader().height()
-            + sum(table.rowHeight(row) for row in range(table.rowCount()))
-            + 2 * table.frameWidth()
-        )
-
-        assert table.maximumWidth() > table.minimumWidth()
-        assert table.minimumHeight() >= required_height
-        assert table.maximumHeight() >= required_height
+        _assert_compact_table_fits_visible_cells(table)
     finally:
         page.close()
         page.deleteLater()
