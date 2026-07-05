@@ -2605,6 +2605,21 @@ def test_new_dataset_wizard_uses_shared_first_show_refit():
         app.processEvents()
 
 
+@pytest.mark.parametrize("path", [None, "new_dataset", "csv_import"])
+def test_wizard_reserves_back_navigation_outside_page_body(path):
+    import launch
+    from PyQt5 import QtWidgets
+    import main_wizard
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    wizard = main_wizard.MainWizard(path=path)
+    try:
+        assert wizard.wizardStyle() == main_wizard.QWizard.ModernStyle
+    finally:
+        wizard.close()
+        app.processEvents()
+
+
 def test_data_type_page_canonical_geometry_covers_normalized_content():
     import launch
     from PyQt5 import QtWidgets

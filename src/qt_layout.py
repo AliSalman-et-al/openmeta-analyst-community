@@ -85,6 +85,24 @@ def fit_application_dialog_to_contents(root, adjust_root=True):
     )
 
 
+def configure_application_wizard(wizard):
+    """Use one wizard chrome policy for app-owned multi-page dialogs."""
+    if not isinstance(wizard, QWizard):
+        return
+
+    wizard.setWizardStyle(QWizard.ModernStyle)
+    wizard.setOption(QWizard.NoBackButtonOnStartPage, True)
+    wizard.setButtonLayout(
+        [
+            QWizard.Stretch,
+            QWizard.BackButton,
+            QWizard.NextButton,
+            QWizard.FinishButton,
+            QWizard.CancelButton,
+        ]
+    )
+
+
 def fit_analysis_dialog_to_contents(root, adjust_root=True):
     """Apply the shared width floor used by analysis parameter dialogs."""
     if not _fit_root_is_available(root):
