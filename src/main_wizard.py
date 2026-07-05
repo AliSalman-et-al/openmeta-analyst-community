@@ -5,7 +5,7 @@ import forms.ui_outcome_name_page
 import forms.ui_welcome_page
 
 from PyQt5.QtCore import QSize, Qt
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QIcon, QPainter, QPixmap
 from PyQt5.QtWidgets import (
     QAction,
     QApplication,
@@ -188,6 +188,7 @@ class DataTypePage(QWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
     def _normalize_data_type_button_sizes(self):
         buttons = self._data_type_buttons()
         for button in buttons:
+            self._center_button_icon_in_declared_slot(button)
             button.setMinimumSize(QSize(0, 0))
             button.setMaximumSize(QSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX))
 
@@ -198,6 +199,30 @@ class DataTypePage(QWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
         for button in buttons:
             button.setFixedSize(common_size)
             button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+
+    def _center_button_icon_in_declared_slot(self, button):
+        icon_size = button.iconSize()
+        if icon_size.isEmpty() or button.icon().isNull():
+            return
+
+        source = button.icon().pixmap(icon_size)
+        if source.isNull() or source.size() == icon_size:
+            return
+
+        canvas = QPixmap(icon_size)
+        canvas.fill(Qt.transparent)
+
+        painter = QPainter(canvas)
+        try:
+            painter.drawPixmap(
+                (icon_size.width() - source.width()) // 2,
+                (icon_size.height() - source.height()) // 2,
+                source,
+            )
+        finally:
+            painter.end()
+
+        button.setIcon(QIcon(canvas))
 
     def _fit_page_to_data_type_contents(self):
         layout = self.layout()

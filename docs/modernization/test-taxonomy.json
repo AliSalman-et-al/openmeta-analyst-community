@@ -3101,6 +3101,21 @@
     {
       "decision": "keep",
       "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_data_type_page_buttons_center_icons_inside_declared_slots",
+      "reason": "Guards data-type wizard tiles against painting short formula icons high inside their declared icon slots.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
         "gui_compatibility",
         "analysis_behavior"
       ],

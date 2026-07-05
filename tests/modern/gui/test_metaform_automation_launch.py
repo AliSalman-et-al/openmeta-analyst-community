@@ -2647,6 +2647,33 @@ def test_data_type_page_data_type_buttons_use_uniform_size():
         app.processEvents()
 
 
+def test_data_type_page_buttons_center_icons_inside_declared_slots():
+    import launch
+    from PyQt5 import QtWidgets
+    import main_wizard
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    wizard = main_wizard.MainWizard(path="new_dataset")
+    try:
+        wizard.restart()
+        app.processEvents()
+
+        data_type_page = wizard.page(main_wizard.Page_DataType)
+        icon_sizes = {
+            button.objectName(): (
+                button.icon().pixmap(button.iconSize()).size(),
+                button.iconSize(),
+            )
+            for button in data_type_page._data_type_buttons()
+        }
+        assert all(rendered == declared for rendered, declared in icon_sizes.values()), (
+            icon_sizes
+        )
+    finally:
+        wizard.close()
+        app.processEvents()
+
+
 def test_new_dataset_wizard_sizes_to_show_diagnostic_choice():
     import launch
     from PyQt5 import QtWidgets
