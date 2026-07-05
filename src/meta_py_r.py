@@ -57,14 +57,7 @@ print("succesfully imported rpy2.robjects")
 try:
     import rpy2.rinterface_lib.conversion as _rpy2_conversion
 
-    _rpy2_cchar_to_str_with_maxlen = _rpy2_conversion._cchar_to_str_with_maxlen
     _rpy2_rchar_to_str = _rpy2_conversion._rchar_to_str
-
-    def _cchar_to_str_with_latin1_fallback(c, maxlen, encoding):
-        try:
-            return _rpy2_cchar_to_str_with_maxlen(c, maxlen, encoding)
-        except UnicodeDecodeError:
-            return _rpy2_conversion.ffi.string(c, maxlen).decode("latin-1", "replace")
 
     def _rchar_to_str_as_utf8(rchar, encoding):
         try:
@@ -72,7 +65,6 @@ try:
         except UnicodeDecodeError:
             return _rpy2_rchar_to_str(rchar, encoding)
 
-    _rpy2_conversion._cchar_to_str_with_maxlen = _cchar_to_str_with_latin1_fallback
     _rpy2_conversion._rchar_to_str = _rchar_to_str_as_utf8
 except Exception:
     pass
@@ -888,19 +880,6 @@ def _make_table_string_from_dict(table_dict):
     return table_str
 
 
-def _sanitize_for_R(a_str):
-    # may want to do something fancier in the future...
-    if a_str is None:
-        return a_str
-    # Strip characters that can't be represented in latin-1 (the encoding R
-    # expects here) but keep the result a `str`. On Python 2 `str.encode`
-    # returned a `str`, so passing the bytes straight to rpy2 worked; on
-    # Python 3 `encode` returns `bytes`, which rpy2's `ro.r()` rejects with
-    # "text must be a string." Decoding back to `str` preserves the original
-    # non-latin-stripping intent while staying Python 3 / rpy2 compatible.
-    return a_str.encode("latin-1", "ignore").decode("latin-1")
-
-
 @RfunctionCaller
 def ma_dataset_to_simple_diagnostic_robj(
     table_model,
@@ -1039,6 +1018,16 @@ def _cov_ref_value(values):
     return ""
 
 
+def _r_source_string_literal(value):
+    text = str(value)
+    text = text.replace("\\", "\\\\")
+    text = text.replace("'", "\\'")
+    text = text.replace("\r", "\\r")
+    text = text.replace("\n", "\\n")
+    text = text.replace("\t", "\\t")
+    return "'%s'" % text
+
+
 def cov_to_str(cov, study_ids, dataset, named_list=True, return_cov_vals=False):
     """
     The string is constructed so that the covariate
@@ -1065,9 +1054,7 @@ def cov_to_str(cov, study_ids, dataset, named_list=True, return_cov_vals=False):
         else:
             if study_id in cov_value_d:
                 # factor; note the string.
-                cov_values.append(
-                    "'%s'" % str(str(cov_value_d[study_id]).encode("latin1"), "latin1")
-                )
+                cov_values.append(_r_source_string_literal(cov_value_d[study_id]))
             else:
                 cov_values.append("NA")
     cov_str += ",".join(cov_values) + ")"

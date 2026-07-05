@@ -1,13 +1,11 @@
 """Regression tests for the in-process rpy2 backend porting layer.
 
-When the modern build runs the real (in-process) rpy2 backend, six
+When the modern build runs the real (in-process) rpy2 backend, five
 Python-3 / rpy2-3.x incompatibilities each broke the Python<->R boundary and
 made analyses dead-end:
 
-1. ``_sanitize_for_R`` returned ``a_str.encode('latin-1', ...)``. On Python 2
-   that was a ``str``; on Python 3 it is ``bytes``, which rpy2's ``ro.r()``
-   rejects with "text must be a string." Every ``ma_dataset_to_simple_*_robj``
-   call raised before any analysis could start.
+1. Dead latin-1 sanitizers and R-source construction paths stripped or rejected
+   non-Latin-1 user text before it reached R.
 
 2. rpy2 >= 3.x honours R's "visibility" flag, so ``ro.r("foo.parameters()")``
    returned Python ``None`` for the (invisibly-returned) result of every
@@ -19,16 +17,12 @@ made analyses dead-end:
    ``str(x) == "NULL"`` silently misfired (e.g. treating a list with NULL
    names as a named list), raising ``'NULLType' object is not iterable``.
 
-4. rpy2's R console callback decoded all R bytes as UTF-8. Some R package
-   startup/subgroup output contains latin-1 bytes, which raised
-   ``UnicodeDecodeError`` inside the callback.
-
-5. Subgroup forest plots can compute vector-valued plot parameters such as
+4. Subgroup forest plots can compute vector-valued plot parameters such as
    ``fp_xticks``. Assigning those vectors directly into the one-row R params
    data frame emitted the "replacement element ... rows to replace 1 rows"
    warning and left saved plot params in an inconsistent shape.
 
-6. rpy2 asks R to translate CHARSXP values through the native Windows codepage
+5. rpy2 asks R to translate CHARSXP values through the native Windows codepage
    when the Python encoding is cp1252. R's native translation maps ``τ`` to
    ASCII ``t`` while preserving ``²``, so the heterogeneity label ``τ²``
    reached Python and the results window as ``t²``.
@@ -67,10 +61,8 @@ _DRIVER = textwrap.dedent(
 
     ro = meta_py_r.ro
 
-    # Fix 1: _sanitize_for_R must return a `str` (not bytes), and tolerate None.
-    sanitized = meta_py_r._sanitize_for_R("caf\\u00e9 x=1")
-    assert isinstance(sanitized, str), type(sanitized)
-    assert meta_py_r._sanitize_for_R(None) is None
+    # Fix 1: non-Latin-1 user text must remain valid text at the R boundary.
+    assert not hasattr(meta_py_r, "_sanitize_for_R")
 
     # Fix 2: invisibly-returned R results still reach Python (not None).
     assert int(meta_py_r.execute_r_string("invisible(42L)")[0]) == 42
@@ -79,7 +71,7 @@ _DRIVER = textwrap.dedent(
     assert meta_py_r._r_is_null(ro.r("list()").names) is True
     assert meta_py_r._r_is_null(ro.r("c(a=1)").names) is False
 
-    # Fix 4: R character scalars must reach Python as UTF-8 instead of first
+    # Fix 5: R character scalars must reach Python as UTF-8 instead of first
     # passing through cp1252/native translation, which maps τ² to t².
     from rpy2.rinterface_lib import conversion, openrlib
 
@@ -123,18 +115,18 @@ _DRIVER = textwrap.dedent(
             self._raw_data = raw_data
             self._data_type = data_type
             self._studies = [
-                FakeStudy(1, 'O\\'Brien "quote" \\\\back café', 1993),
+                FakeStudy(1, 'O\\'Brien "quote" \\\\back café τ', 1993),
                 FakeStudy(2, "Plain study", None),
             ]
             covariates = [
-                FakeCovariate('Group "label" \\\\ café', meta_py_r.FACTOR),
+                FakeCovariate('Group "label" \\\\ café τ', meta_py_r.FACTOR),
                 FakeCovariate("Dose", meta_py_r.CONTINUOUS),
             ]
             self.dataset = FakeDataset(
                 covariates,
                 {
                     covariates[0].name: {
-                        1: 'alpha "quoted" \\\\ café',
+                        1: 'alpha "quoted" \\\\ café τ',
                         2: "beta",
                     },
                     covariates[1].name: {
@@ -161,21 +153,39 @@ _DRIVER = textwrap.dedent(
 
     def assert_text_survived(var_name):
         assert list(ro.r("%s@study.names" % var_name)) == [
-            'O\\'Brien "quote" \\\\back café',
+            'O\\'Brien "quote" \\\\back café τ',
             "Plain study",
         ]
         assert list(ro.r("%s@years" % var_name))[0] == 1993
         assert bool(ro.r("is.na(%s@years[2])" % var_name)[0]) is True
         assert list(ro.r("%s@covariates[[1]]@cov.name" % var_name)) == [
-            'Group "label" \\\\ café'
+            'Group "label" \\\\ café τ'
         ]
         assert list(ro.r("%s@covariates[[1]]@cov.vals" % var_name)) == [
-            'alpha "quoted" \\\\ café',
+            'alpha "quoted" \\\\ café τ',
             "beta",
         ]
         assert list(ro.r("%s@covariates[[1]]@ref.var" % var_name)) == [
-            'alpha "quoted" \\\\ café'
+            'alpha "quoted" \\\\ café τ'
         ]
+
+    quoted_values_str, quoted_values = meta_py_r.cov_to_str(
+        FakeCovariate("region", meta_py_r.FACTOR),
+        [1, 2],
+        FakeDataset(
+            [],
+            {
+                "region": {
+                    1: "control τ",
+                    2: "O'Brien \\\\ north",
+                }
+            },
+        ),
+        named_list=False,
+        return_cov_vals=True,
+    )
+    assert quoted_values == ["'control τ'", "'O\\\\'Brien \\\\\\\\ north'"]
+    assert list(ro.r(quoted_values_str)) == ["control τ", "O'Brien \\\\ north"]
 
     binary_model = FakeModel("binary", [[6, 27, 9, 27], [3, 59, 7, 64]])
     meta_py_r.ma_dataset_to_simple_binary_robj(binary_model, var_name="issue146_binary")

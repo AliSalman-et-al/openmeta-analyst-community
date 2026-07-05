@@ -521,3 +521,20 @@ def test_meta_py_r_does_not_interpolate_user_text_into_r_source():
     offenders = [pattern for pattern in risky_patterns if re.search(pattern, text)]
 
     assert offenders == []
+
+
+def test_meta_py_r_retired_obsolete_latin1_bridge_hacks():
+    text = (APP_SRC / "meta_py_r.py").read_text(encoding="utf-8")
+
+    obsolete_tokens = [
+        "_sanitize_for_R",
+        "_cchar_to_str_with_latin1_fallback",
+        ".decode(\"latin-1\"",
+        ".decode(\"latin1\"",
+        ".encode(\"latin-1\"",
+        ".encode(\"latin1\"",
+    ]
+
+    offenders = [token for token in obsolete_tokens if token in text]
+
+    assert offenders == []

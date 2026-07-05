@@ -2280,6 +2280,21 @@
     {
       "decision": "keep",
       "evidence": [
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_openmetar_r_manifest_validation.py::test_meta_py_r_retired_obsolete_latin1_bridge_hacks",
+      "reason": "Guards the R bridge against reintroducing obsolete latin-1 text-boundary hacks while preserving explicit project-file compatibility elsewhere.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
         "gui_compatibility",
         "release_readiness"
       ],
