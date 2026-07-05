@@ -18,9 +18,12 @@ from PyQt5.QtWidgets import (
     QAction,
     QDialog,
     QDialogButtonBox,
+    QHeaderView,
     QMessageBox,
+    QSizePolicy,
     QTableWidgetItem,
     QUndoStack,
+    QWIDGETSIZE_MAX,
 )
 
 import meta_py_r
@@ -83,15 +86,23 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         qt_layout.fit_analysis_dialog_to_contents(self)
 
     def _configure_raw_data_table(self):
-        self.raw_data_table.setHorizontalHeaderLabels(["Event", "No Event", "Total"])
-        self.raw_data_table.setVerticalHeaderLabels(["Group 1", "Group 2", "Total"])
-        self.raw_data_table.horizontalHeader().setVisible(True)
-        self.raw_data_table.verticalHeader().setVisible(True)
-        self.raw_data_table.horizontalHeader().setHighlightSections(False)
-        self.raw_data_table.verticalHeader().setHighlightSections(False)
-        self.raw_data_table.setMinimumHeight(120)
-        self.raw_data_table.setMaximumHeight(120)
+        table = self.raw_data_table
+        table.setHorizontalHeaderLabels(["Event", "No Event", "Total"])
+        table.setVerticalHeaderLabels(["Group 1", "Group 2", "Total"])
+        table.horizontalHeader().setVisible(True)
+        table.verticalHeader().setVisible(True)
+        table.horizontalHeader().setHighlightSections(False)
+        table.verticalHeader().setHighlightSections(False)
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        table.setMinimumWidth(0)
+        table.setMaximumWidth(QWIDGETSIZE_MAX)
+        table.resizeRowsToContents()
+        table_height = self._raw_data_table_height_for_all_rows()
+        table.setMinimumHeight(table_height)
+        table.setMaximumHeight(table_height)
         for label in (
+            self.event_lbl_3,
             self.label_18,
             self.label_19,
             self.label_20,
@@ -99,6 +110,14 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             self.label_22,
         ):
             label.setVisible(False)
+
+    def _raw_data_table_height_for_all_rows(self):
+        table = self.raw_data_table
+        return (
+            table.horizontalHeader().sizeHint().height()
+            + sum(table.rowHeight(row) for row in range(table.rowCount()))
+            + 2 * table.frameWidth()
+        )
 
     def initialize_form(self):
         """Initialize all cells to empty items"""

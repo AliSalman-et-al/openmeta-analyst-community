@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 
 from PyQt5 import QtCore
-from PyQt5.QtWidgets import QDialog, QTableWidget, QTableWidgetItem
+from PyQt5.QtWidgets import QDialog, QSizePolicy, QTableWidget, QTableWidgetItem
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -252,3 +252,41 @@ def test_binary_calculator_uses_table_headers_friendly_two_arm_metrics_and_clear
         == "Editing a single value would make the 2x2 table inconsistent. "
         "Use Clear Form and re-enter all four values."
     )
+
+
+def test_binary_calculator_table_layout_uses_real_headers_and_visible_total_row(
+    qapp, monkeypatch
+):
+    import binary_data_form
+
+    monkeypatch.setattr(
+        binary_data_form.meta_py_r, "get_mult_from_r", lambda conf: 1.96
+    )
+    monkeypatch.setattr(
+        binary_data_form.meta_py_r, "binary_convert_scale", lambda x, *args, **kwargs: x
+    )
+    monkeypatch.setattr(
+        binary_data_form.meta_py_r, "impute_bin_data", lambda data: {"FAIL": True}
+    )
+
+    form = binary_data_form.BinaryDataForm2(
+        FakeMAUnit(),
+        ["Group 1", "Group 2"],
+        "Group 1-Group 2",
+        "OR",
+        conf_level=95.0,
+    )
+
+    table = form.raw_data_table
+
+    assert form.event_lbl_3.isHidden()
+    assert table.maximumWidth() > table.minimumWidth()
+    assert table.sizePolicy().horizontalPolicy() == QSizePolicy.Expanding
+
+    required_height = (
+        table.horizontalHeader().height()
+        + sum(table.rowHeight(row) for row in range(table.rowCount()))
+        + 2 * table.frameWidth()
+    )
+    assert table.minimumHeight() >= required_height
+    assert table.maximumHeight() >= required_height
