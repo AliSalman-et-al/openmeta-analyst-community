@@ -7,22 +7,17 @@ made analyses dead-end:
 1. Dead latin-1 sanitizers and R-source construction paths stripped or rejected
    non-Latin-1 user text before it reached R.
 
-2. rpy2 >= 3.x honours R's "visibility" flag, so ``ro.r("foo.parameters()")``
-   returned Python ``None`` for the (invisibly-returned) result of every
-   openmetar ``*.parameters()`` routine. ``get_params`` and the ``run_*``
-   helpers therefore operated on ``None``.
-
-3. rpy2 >= 3.x represents R's NULL as a ``NULLType`` whose ``str()`` is an
+2. rpy2 >= 3.x represents R's NULL as a ``NULLType`` whose ``str()`` is an
    object repr, not the literal ``"NULL"``. NULL detection done via
    ``str(x) == "NULL"`` silently misfired (e.g. treating a list with NULL
    names as a named list), raising ``'NULLType' object is not iterable``.
 
-4. Subgroup forest plots can compute vector-valued plot parameters such as
+3. Subgroup forest plots can compute vector-valued plot parameters such as
    ``fp_xticks``. Assigning those vectors directly into the one-row R params
    data frame emitted the "replacement element ... rows to replace 1 rows"
    warning and left saved plot params in an inconsistent shape.
 
-5. rpy2 asks R to translate CHARSXP values through the native Windows codepage
+4. rpy2 asks R to translate CHARSXP values through the native Windows codepage
    when the Python encoding is cp1252. R's native translation maps ``τ`` to
    ASCII ``t`` while preserving ``²``, so the heterogeneity label ``τ²``
    reached Python and the results window as ``t²``.
@@ -64,14 +59,11 @@ _DRIVER = textwrap.dedent(
     # Fix 1: non-Latin-1 user text must remain valid text at the R boundary.
     assert not hasattr(meta_py_r, "_sanitize_for_R")
 
-    # Fix 2: invisibly-returned R results still reach Python (not None).
-    assert int(meta_py_r.execute_r_string("invisible(42L)")[0]) == 42
-
-    # Fix 3: NULL detection works against rpy2's NULLType.
+    # Fix 2: NULL detection works against rpy2's NULLType.
     assert meta_py_r._r_is_null(ro.r("list()").names) is True
     assert meta_py_r._r_is_null(ro.r("c(a=1)").names) is False
 
-    # Fix 5: R character scalars must reach Python as UTF-8 instead of first
+    # Fix 4: R character scalars must reach Python as UTF-8 instead of first
     # passing through cp1252/native translation, which maps τ² to t².
     from rpy2.rinterface_lib import conversion, openrlib
 
@@ -83,7 +75,7 @@ _DRIVER = textwrap.dedent(
     assert conversion._rchar_to_str(rchar, "cp1252") == tau_squared
 
     # End-to-end through the core porting fixes: get_params parses a real method's
-    # (invisibly-returned, partly NULL-named) parameter structure.
+    # partly NULL-named parameter structure.
     params, defaults, var_order, pretty = meta_py_r.get_params("binary.random")
     assert isinstance(defaults, dict)
     assert "conf.level" in defaults or "rm.method" in defaults
@@ -184,7 +176,7 @@ _DRIVER = textwrap.dedent(
         named_list=False,
         return_cov_vals=True,
     )
-    assert quoted_values == ["'control τ'", "'O\\\\'Brien \\\\\\\\ north'"]
+    assert quoted_values == ["'control \\\\u03c4'", "'O\\\\'Brien \\\\\\\\ north'"]
     assert list(ro.r(quoted_values_str)) == ["control τ", "O'Brien \\\\ north"]
 
     binary_model = FakeModel("binary", [[6, 27, 9, 27], [3, 59, 7, 64]])

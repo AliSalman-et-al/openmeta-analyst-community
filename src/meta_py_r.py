@@ -89,19 +89,6 @@ def _r_is_null(r_object):
     return str(r_object) == "NULL"
 
 
-# rpy2 >= 3.x honours R's "visibility" flag: a top-level call whose result is
-# returned invisibly (as every OpenMetaR `*.parameters()` routine and many
-# analysis functions do) yields Python `None` from `ro.r(...)`. The legacy
-# Python-2 rpy2 always returned the value regardless of visibility, which the
-# whole backend relies on (e.g. get_params, run_*_ma). Restore that behaviour
-# globally so invisible R results still come back to Python. Harmless on older
-# rpy2 builds that never applied the visibility flag.
-try:
-    ro.r._invisible = False
-except Exception:
-    pass
-
-
 @serialized_r_call
 def execute_r_string(r_str):
 
@@ -1025,6 +1012,16 @@ def _r_source_string_literal(value):
     text = text.replace("\r", "\\r")
     text = text.replace("\n", "\\n")
     text = text.replace("\t", "\\t")
+    text = "".join(
+        (
+            "\\u%04x" % ord(character)
+            if ord(character) <= 0xFFFF
+            else "\\U%08x" % ord(character)
+        )
+        if ord(character) > 0x7F
+        else character
+        for character in text
+    )
     return "'%s'" % text
 
 
