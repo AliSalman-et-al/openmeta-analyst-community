@@ -2144,7 +2144,9 @@ class DatasetModel(QAbstractTableModel):
             one_arm_effect
             and self._raw_data_is_not_empty_for_study(study_index, first_arm_only=True)
         ):
-            if data_type in [
+            if data_type == DIAGNOSTIC:
+                self._clear_diagnostic_effects_for_study(ma_unit, group_str)
+            elif data_type in [
                 BINARY,
                 CONTINUOUS,
             ]:  # raw data is not blank but not full so clear outcome
@@ -2165,6 +2167,18 @@ class DatasetModel(QAbstractTableModel):
                 )
         else:  # raw data is all blank, do nothing
             pass
+
+    def _clear_effect_and_display_ci(self, ma_unit, effect, group_str):
+        ma_unit.set_effect_and_ci(effect, group_str, None, None, None, mult=self.mult)
+        ma_unit.set_SE(effect, group_str, None)
+        ma_unit.set_display_effect(effect, group_str, None)
+        ma_unit.set_display_lower(effect, group_str, None)
+        ma_unit.set_display_upper(effect, group_str, None)
+        ma_unit.set_display_se(effect, group_str, None)
+
+    def _clear_diagnostic_effects_for_study(self, ma_unit, group_str):
+        for metric in DIAGNOSTIC_METRICS:
+            self._clear_effect_and_display_ci(ma_unit, metric, group_str)
 
     def get_cur_raw_data(self, only_if_included=True, only_these_studies=None):
         raw_data = []

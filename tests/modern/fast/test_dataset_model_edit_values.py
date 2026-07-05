@@ -389,6 +389,93 @@ def test_diagnostic_raw_count_edit_accepts_scalar_metric_effects(monkeypatch):
     )
 
 
+def test_diagnostic_raw_count_edit_recomputes_sens_spec_confidence_intervals(
+    monkeypatch,
+):
+    model = _diagnostic_model_with_empty_cells()
+    ma_unit = model.get_current_ma_unit_for_study(0)
+    group_str = model.get_cur_group_str()
+    ma_unit.tx_groups[group_str].raw_data = [19.0, 10.0, 1.0, 81.0]
+    errors = []
+    model.dataError.connect(errors.append)
+
+    monkeypatch.setattr(
+        ma_data_table_model.meta_py_r,
+        "diagnostic_convert_scale",
+        lambda value, *args, **kwargs: value,
+    )
+
+    def diagnostic_effects_for_study(tp, fn, fp, tn, **kwargs):
+        assert (tp, fn, fp, tn) == (30.0, 10.0, 1.0, 81.0)
+        return {
+            "Sens": {"calc_scale": (0.750, 0.588, 0.873)},
+            "Spec": {"calc_scale": (0.988, 0.919, 0.998)},
+            "PLR": {"calc_scale": (61.5, 8.8, 431.0)},
+            "NLR": {"calc_scale": (0.253, 0.148, 0.431)},
+            "DOR": {"calc_scale": (243.0, 28.0, 2111.0)},
+        }
+
+    monkeypatch.setattr(
+        ma_data_table_model.meta_py_r,
+        "diagnostic_effects_for_study",
+        diagnostic_effects_for_study,
+    )
+
+    assert model.setData(model.index(0, model.RAW_DATA[0]), "30") is True
+
+    assert errors == []
+    assert ma_unit.get_entered_effect_and_ci("Sens", group_str) == (
+        0.750,
+        0.588,
+        0.873,
+    )
+    assert ma_unit.get_entered_effect_and_ci("Spec", group_str) == (
+        0.988,
+        0.919,
+        0.998,
+    )
+    assert all(model.data(model.index(0, col)) != "" for col in model.OUTCOMES)
+
+
+def test_diagnostic_partial_raw_count_edit_clears_all_derived_metrics(monkeypatch):
+    model = _diagnostic_model_with_empty_cells()
+    ma_unit = model.get_current_ma_unit_for_study(0)
+    group_str = model.get_cur_group_str()
+    ma_unit.tx_groups[group_str].raw_data = [19.0, 10.0, 1.0, 81.0]
+    for metric in meta_globals.DIAGNOSTIC_METRICS:
+        ma_unit.set_effect_and_ci(metric, group_str, 0.75, 0.50, 0.90, model.get_mult())
+        ma_unit.calculate_display_effect_and_ci(
+            metric,
+            group_str,
+            lambda value: value,
+            conf_level=model.get_global_conf_level(),
+            mult=model.get_mult(),
+        )
+    model.dataset.studies[0].include = True
+
+    monkeypatch.setattr(
+        ma_data_table_model.meta_py_r,
+        "diagnostic_convert_scale",
+        lambda value, *args, **kwargs: value,
+    )
+
+    assert model.setData(model.index(0, model.RAW_DATA[2]), "") is True
+
+    assert ma_unit.tx_groups[group_str].raw_data == [19.0, 10.0, "", 81.0]
+    assert model.dataset.studies[0].include is False
+    for metric in meta_globals.DIAGNOSTIC_METRICS:
+        assert ma_unit.get_entered_effect_and_ci(metric, group_str) == (
+            None,
+            None,
+            None,
+        )
+        assert ma_unit.get_display_effect_and_ci(metric, group_str) == (
+            None,
+            None,
+            None,
+        )
+
+
 def test_binary_raw_count_edit_accepts_scalar_metric_effect(monkeypatch):
     model = _binary_model_with_blank_study()
     model.dataset.studies[0].name = "Alpha"

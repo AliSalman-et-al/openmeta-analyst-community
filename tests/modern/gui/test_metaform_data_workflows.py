@@ -347,6 +347,115 @@ def test_copy_paste_undo_and_redo_work_through_real_table_path():
         _close_without_prompt(app, window)
 
 
+def test_diagnostic_complete_paste_recomputes_sens_spec_confidence_intervals(
+    monkeypatch,
+):
+    import launch
+    import ma_data_table_model
+
+    app, window = launch.start_automation()
+    try:
+        _create_diagnostic_dataset(window)
+        model = window.model
+        table = window.tableView
+        table.set_data_in_model(model.index(0, model.NAME), _variant("Kinderman"))
+
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "diagnostic_convert_scale",
+            lambda value, *args, **kwargs: value,
+        )
+
+        def diagnostic_effects_for_study(tp, fn, fp, tn, **kwargs):
+            assert (tp, fn, fp, tn) == (30.0, 10.0, 1.0, 81.0)
+            return {
+                "Sens": {"calc_scale": (0.750, 0.588, 0.873)},
+                "Spec": {"calc_scale": (0.988, 0.919, 0.998)},
+                "PLR": {"calc_scale": (61.5, 8.8, 431.0)},
+                "NLR": {"calc_scale": (0.253, 0.148, 0.431)},
+                "DOR": {"calc_scale": (243.0, 28.0, 2111.0)},
+            }
+
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "diagnostic_effects_for_study",
+            diagnostic_effects_for_study,
+        )
+
+        table.paste_contents(
+            model.index(0, model.RAW_DATA[0]), [["30", "10", "1", "81"]]
+        )
+
+        assert _cell_text(model, 0, model.OUTCOMES[0]) == "0.750"
+        assert all(_cell_text(model, 0, col) != "" for col in model.OUTCOMES)
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_diagnostic_partial_paste_clears_stale_sens_spec_confidence_intervals(
+    monkeypatch,
+):
+    import launch
+    import ma_data_table_model
+    import meta_globals
+
+    app, window = launch.start_automation()
+    try:
+        _create_diagnostic_dataset(window)
+        model = window.model
+        table = window.tableView
+        table.set_data_in_model(model.index(0, model.NAME), _variant("Lehman"))
+        table.set_data_in_model(model.index(1, model.NAME), _variant("Lagasse"))
+        ma_unit = model.get_current_ma_unit_for_study(1)
+        group_str = model.get_cur_group_str()
+        ma_unit.tx_groups[group_str].raw_data = [15.0, 11.0, 16.0, 49.0]
+        for metric in meta_globals.DIAGNOSTIC_METRICS:
+            ma_unit.set_effect_and_ci(
+                metric, group_str, 0.577, 0.385, 0.748, model.get_mult()
+            )
+            ma_unit.calculate_display_effect_and_ci(
+                metric,
+                group_str,
+                lambda value: value,
+                conf_level=model.get_global_conf_level(),
+                mult=model.get_mult(),
+            )
+        model.dataset.studies[1].include = True
+
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "diagnostic_convert_scale",
+            lambda value, *args, **kwargs: value,
+        )
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "diagnostic_effects_for_study",
+            lambda *args, **kwargs: {
+                "Sens": {"calc_scale": (0.800, 0.490, 0.943)},
+                "Spec": {"calc_scale": (0.842, 0.687, 0.930)},
+                "PLR": {"calc_scale": (5.0, 2.0, 12.0)},
+                "NLR": {"calc_scale": (0.25, 0.08, 0.75)},
+                "DOR": {"calc_scale": (20.0, 5.0, 80.0)},
+            },
+        )
+
+        table.paste_contents(
+            model.index(0, model.RAW_DATA[0]),
+            [["8", "2", "6", "32"], ["5", "3"]],
+        )
+
+        assert [_cell_text(model, 1, col) for col in model.RAW_DATA] == [
+            "5.0",
+            "3.0",
+            "",
+            "",
+        ]
+        assert all(_cell_text(model, 1, col) == "" for col in model.OUTCOMES)
+        assert model.dataset.studies[1].include is False
+    finally:
+        _close_without_prompt(app, window)
+
+
 def test_csv_import_progress_dialog_closes_when_model_write_raises(monkeypatch):
     import launch
     import ma_data_table_model
@@ -923,6 +1032,24 @@ def _create_binary_dataset(window):
                 "effect": "OR",
                 "metric_choices": [],
                 "name": "Mortality",
+            },
+            "csv_data": None,
+            "selected_dataset": None,
+        }
+    )
+
+
+def _create_diagnostic_dataset(window):
+    window._handle_wizard_results(
+        {
+            "path": "new_dataset",
+            "outcome_info": {
+                "arms": "two",
+                "data_type": "diagnostic",
+                "sub_type": None,
+                "effect": "Sens",
+                "metric_choices": [],
+                "name": "Accuracy",
             },
             "csv_data": None,
             "selected_dataset": None,
