@@ -36,7 +36,6 @@ import app_error_handler
 # this is the maximum size of a residual that we're willing to accept
 # when computing 2x2 data
 THRESHOLD = 1e-5
-INCONSISTENT_2X2_EDIT_MESSAGE = calc_fncs.INCONSISTENT_2X2_EDIT_MESSAGE
 BINARY_RAW_COUNT_CELLS = frozenset(((0, 0), (0, 1), (1, 0), (1, 1)))
 
 
@@ -72,7 +71,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             "{0:.1f}% Confidence Interval".format(self.global_conf_level)
         )
         self.initialize_form()  # initialize all cell to empty items
-        self.setup_inconsistency_checking()
+        self.setup_back_calculation_feedback()
         self.undoStack = QUndoStack(self)
 
         # self.setup_clear_button_palettes()    # Color for clear_button_pallette
@@ -295,26 +294,11 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         )
         self.undoStack.push(command)
 
-    def setup_inconsistency_checking(self):
-        # set-up inconsistency label
+    def setup_back_calculation_feedback(self):
         inconsistency_palette = QPalette()
         inconsistency_palette.setColor(QPalette.WindowText, Qt.red)
         self.inconsistencyLabel.setPalette(inconsistency_palette)
         self.inconsistencyLabel.setVisible(False)
-
-        def action_consistent_table():
-            self._mark_table_consistent()
-
-        def action_inconsistent_table():
-            # show label, disable OK buttonbox button
-            self.inconsistencyLabel.setVisible(True)
-            self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(False)
-
-        self.check_table_consistency = calc_fncs.ConsistencyChecker(
-            fn_consistent=action_consistent_table,
-            fn_inconsistent=action_inconsistent_table,
-            table_2x2=self.raw_data_table,
-        )
 
     def _mark_table_consistent(self):
         self.inconsistencyLabel.setVisible(False)

@@ -212,7 +212,7 @@ class FakeMAUnit:
         pass
 
 
-def test_binary_calculator_uses_table_headers_friendly_two_arm_metrics_and_clear_message(
+def test_binary_calculator_uses_table_headers_and_friendly_two_arm_metric_labels(
     qapp, monkeypatch
 ):
     import binary_data_form
@@ -254,13 +254,6 @@ def test_binary_calculator_uses_table_headers_friendly_two_arm_metrics_and_clear
         form.effect_cbo_box.itemText(index)
         for index in range(form.effect_cbo_box.count())
     ]
-    assert (
-        binary_data_form.INCONSISTENT_2X2_EDIT_MESSAGE
-        == "Editing a single value would make the 2x2 table inconsistent. "
-        "Use Clear Form and re-enter all four values."
-    )
-
-
 def test_binary_calculator_table_layout_uses_real_headers_and_visible_total_row(
     qapp, monkeypatch
 ):
@@ -354,6 +347,38 @@ def test_binary_calculator_grid_columns_fill_expanded_table_width(qapp, monkeypa
     )
 
     _assert_calculator_table_grid_fills_width(qapp, form.raw_data_table)
+
+
+def test_binary_calculator_does_not_wire_raw_edits_to_consistency_checker(
+    qapp, monkeypatch
+):
+    import binary_data_form
+
+    def fail_if_constructed(*args, **kwargs):
+        raise AssertionError("raw count edits must not use the consistency checker")
+
+    monkeypatch.setattr(
+        binary_data_form.meta_py_r, "get_mult_from_r", lambda conf: 1.96
+    )
+    monkeypatch.setattr(
+        binary_data_form.meta_py_r, "binary_convert_scale", lambda x, *args, **kwargs: x
+    )
+    monkeypatch.setattr(
+        binary_data_form.meta_py_r, "impute_bin_data", lambda data: {"FAIL": True}
+    )
+    monkeypatch.setattr(
+        binary_data_form.calc_fncs, "ConsistencyChecker", fail_if_constructed
+    )
+
+    form = binary_data_form.BinaryDataForm2(
+        FakeMAUnit(),
+        ["Group 1", "Group 2"],
+        "Group 1-Group 2",
+        "OR",
+        conf_level=95.0,
+    )
+
+    assert not hasattr(form, "check_table_consistency")
 
 
 def test_binary_calculator_accepts_single_raw_count_edit_and_recomputes_margins(
@@ -469,6 +494,41 @@ def test_diagnostic_calculator_grid_columns_fill_expanded_table_width(
     )
 
     _assert_calculator_table_grid_fills_width(qapp, form.two_by_two_table)
+
+
+def test_diagnostic_calculator_does_not_wire_raw_edits_to_consistency_checker(
+    qapp, monkeypatch
+):
+    import diagnostic_data_form
+
+    def fail_if_constructed(*args, **kwargs):
+        raise AssertionError("raw count edits must not use the consistency checker")
+
+    monkeypatch.setattr(
+        diagnostic_data_form.meta_py_r, "get_mult_from_r", lambda conf: 1.96
+    )
+    monkeypatch.setattr(
+        diagnostic_data_form.meta_py_r,
+        "diagnostic_convert_scale",
+        lambda x, *args, **kwargs: x,
+    )
+    monkeypatch.setattr(
+        diagnostic_data_form.meta_py_r,
+        "impute_diag_data",
+        lambda data: {"TP": None, "FP": None, "FN": None, "TN": None},
+    )
+    monkeypatch.setattr(
+        diagnostic_data_form.calc_fncs, "ConsistencyChecker", fail_if_constructed
+    )
+
+    form = diagnostic_data_form.DiagnosticDataForm(
+        FakeDiagnosticMAUnit(),
+        ["Group 1", "Group 2"],
+        "Group 1-Group 2",
+        conf_level=95.0,
+    )
+
+    assert not hasattr(form, "check_table_consistency")
 
 
 def test_diagnostic_calculator_accepts_single_raw_count_edit_and_recomputes_margins(

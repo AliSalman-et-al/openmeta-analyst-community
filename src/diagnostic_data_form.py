@@ -73,7 +73,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             "{0:.1f}% Confidence Interval".format(self.global_conf_level)
         )
         self.initialize_form()
-        self.setup_inconsistency_checking()
+        self.setup_back_calculation_feedback()
         self.undoStack = QUndoStack(self)
 
         # self.setup_clear_button_palettes()
@@ -170,26 +170,11 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             )
         )
 
-    def setup_inconsistency_checking(self):
-        # set-up inconsistency label
+    def setup_back_calculation_feedback(self):
         inconsistency_palette = QPalette()
         inconsistency_palette.setColor(QPalette.WindowText, Qt.red)
         self.inconsistencyLabel.setPalette(inconsistency_palette)
         self.inconsistencyLabel.setVisible(False)
-
-        def action_consistent_table():
-            self._mark_table_consistent()
-
-        def action_inconsistent_table():
-            # show label, disable OK buttonbox button
-            self.inconsistencyLabel.setVisible(True)
-            self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(False)
-
-        self.check_table_consistency = calc_fncs.ConsistencyChecker(
-            fn_consistent=action_consistent_table,
-            fn_inconsistent=action_inconsistent_table,
-            table_2x2=self.two_by_two_table,
-        )
 
     def _mark_table_consistent(self):
         self.inconsistencyLabel.setVisible(False)
