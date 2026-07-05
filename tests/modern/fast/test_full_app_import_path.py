@@ -4,6 +4,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 
+RETIRED_LEGACY_MODULES = {
+    "edit_forest_plot_form.py",
+    "ma_text_edit.py",
+    "new_outcome_form.py",
+    "win_prelaunch.py",
+}
+
 
 def test_full_app_import_path_has_no_python2_syntax():
     for module in [
@@ -30,9 +37,12 @@ def test_full_app_import_path_has_no_python2_syntax():
         "calculator_routines.py",
         "continuous_data_form.py",
         "diagnostic_data_form.py",
-        "edit_forest_plot_form.py",
         "edit_list_models.py",
-        "ma_text_edit.py",
         "meta_py_r.py",
     ]:
         py_compile.compile(str(ROOT / "src" / module), doraise=True)
+
+
+def test_retired_legacy_modules_are_not_on_the_modern_import_path():
+    for module in RETIRED_LEGACY_MODULES:
+        assert not (ROOT / "src" / module).exists()

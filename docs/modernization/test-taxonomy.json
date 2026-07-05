@@ -269,6 +269,20 @@
     {
       "decision": "keep",
       "evidence": [
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_full_app_import_path.py::test_retired_legacy_modules_are_not_on_the_modern_import_path",
+      "reason": "Guards retired legacy modules against re-entering the maintained Modern CI Path.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
         "golden",
         "analysis_behavior"
       ],
