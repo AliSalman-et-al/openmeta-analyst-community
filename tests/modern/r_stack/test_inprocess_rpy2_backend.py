@@ -1,6 +1,6 @@
 """Regression tests for the in-process rpy2 backend porting layer.
 
-When the modern build runs the real (in-process) rpy2 backend, five
+When the modern build runs the real (in-process) rpy2 backend, six
 Python-3 / rpy2-3.x incompatibilities each broke the Python<->R boundary and
 made analyses dead-end:
 
@@ -27,6 +27,11 @@ made analyses dead-end:
    ``fp_xticks``. Assigning those vectors directly into the one-row R params
    data frame emitted the "replacement element ... rows to replace 1 rows"
    warning and left saved plot params in an inconsistent shape.
+
+6. rpy2 asks R to translate CHARSXP values through the native Windows codepage
+   when the Python encoding is cp1252. R's native translation maps ``τ`` to
+   ASCII ``t`` while preserving ``²``, so the heterogeneity label ``τ²``
+   reached Python and the results window as ``t²``.
 
 Because importing the real ``meta_py_r`` initialises embedded R, this runs in a
 subprocess and skips when the in-process backend (R/rpy2) is unavailable, so it
@@ -74,7 +79,18 @@ _DRIVER = textwrap.dedent(
     assert meta_py_r._r_is_null(ro.r("list()").names) is True
     assert meta_py_r._r_is_null(ro.r("c(a=1)").names) is False
 
-    # End-to-end through all three: get_params parses a real method's
+    # Fix 4: R character scalars must reach Python as UTF-8 instead of first
+    # passing through cp1252/native translation, which maps τ² to t².
+    from rpy2.rinterface_lib import conversion, openrlib
+
+    tau_squared = chr(0x03C4) + chr(0x00B2)
+    rchar = openrlib.rlib.Rf_mkCharCE(
+        conversion.ffi.new("char[]", tau_squared.encode("utf-8")),
+        openrlib.rlib.CE_UTF8,
+    )
+    assert conversion._rchar_to_str(rchar, "cp1252") == tau_squared
+
+    # End-to-end through the core porting fixes: get_params parses a real method's
     # (invisibly-returned, partly NULL-named) parameter structure.
     params, defaults, var_order, pretty = meta_py_r.get_params("binary.random")
     assert isinstance(defaults, dict)
@@ -206,6 +222,57 @@ _DRIVER = textwrap.dedent(
     # Hard-exit so embedded-R finalizers don't run: rpy2/R teardown can
     # segfault on interpreter shutdown on Windows, which would turn a passing
     # check into a spurious non-zero exit.
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(0)
+    """
+).replace("__REPO_ROOT__", repr(REPO_ROOT))
+
+
+_RCHAR_UTF8_DRIVER = textwrap.dedent(
+    """
+    import os
+    import sys
+
+    repo_root = __REPO_ROOT__
+    os.environ.pop("OMA_STUB_BACKEND", None)
+    os.environ["OMA_REQUIRE_IN_PROCESS_RPY2"] = "1"
+    sys.path.insert(0, os.path.join(repo_root, "src"))
+
+    import modern_compat
+    modern_compat.install()
+    try:
+        import meta_py_r
+    except Exception as exc:
+        sys.stdout.write("SKIP %s: %s\\n" % (exc.__class__.__name__, exc))
+        sys.exit(42)
+
+    from rpy2.rinterface_lib import conversion, openrlib
+
+    tau_squared = chr(0x03C4) + chr(0x00B2)
+    rchar = openrlib.rlib.Rf_mkCharCE(
+        conversion.ffi.new("char[]", tau_squared.encode("utf-8")),
+        openrlib.rlib.CE_UTF8,
+    )
+    assert conversion._rchar_to_str(rchar, "cp1252") == tau_squared
+
+    r_result = meta_py_r.ro.r(
+        '''
+        tau_squared <- paste0(intToUtf8(0x03c4), intToUtf8(0x00b2))
+        i_squared <- paste0("I", intToUtf8(0x00b2))
+        list(Summary=paste(
+          "Heterogeneity",
+          paste(" ", tau_squared, "     Q(df=12)  Het. p-value       ", i_squared, sep=""),
+          " 0.366   163.165       < 0.001  92.645%",
+          sep="\\n"
+        ))
+        '''
+    )
+    text = meta_py_r.parse_out_results(r_result)["texts"]["Summary"]
+    assert tau_squared in text, text
+    assert "t²" not in text, text
+
+    sys.stdout.write("OK\\n")
     sys.stdout.flush()
     sys.stderr.flush()
     os._exit(0)
@@ -693,6 +760,29 @@ def test_inprocess_rpy2_backend_python3_porting_fixes():
     combined_output = result.stdout + result.stderr
     assert "UnicodeDecodeError" not in combined_output
     assert "replacement element" not in combined_output
+
+
+def test_rpy2_r_character_conversion_preserves_utf8_before_native_codepage():
+    env = dict(os.environ)
+    env.pop("OMA_STUB_BACKEND", None)
+    env["OMA_REQUIRE_IN_PROCESS_RPY2"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
+    result = subprocess.run(
+        [sys.executable, "-c", _RCHAR_UTF8_DRIVER],
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
+        env=env,
+    )
+    if result.returncode == 42:
+        pytest.skip("in-process rpy2 backend unavailable: %s" % result.stdout.strip())
+    assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
+        result.returncode,
+        result.stdout[-2000:],
+        result.stderr[-2000:],
+    )
+    assert "OK" in result.stdout
 
 
 def test_openmetar_summary_capture_uses_formatted_print_methods():

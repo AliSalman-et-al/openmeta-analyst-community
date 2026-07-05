@@ -58,6 +58,7 @@ try:
     import rpy2.rinterface_lib.conversion as _rpy2_conversion
 
     _rpy2_cchar_to_str_with_maxlen = _rpy2_conversion._cchar_to_str_with_maxlen
+    _rpy2_rchar_to_str = _rpy2_conversion._rchar_to_str
 
     def _cchar_to_str_with_latin1_fallback(c, maxlen, encoding):
         try:
@@ -65,7 +66,14 @@ try:
         except UnicodeDecodeError:
             return _rpy2_conversion.ffi.string(c, maxlen).decode("latin-1", "replace")
 
+    def _rchar_to_str_as_utf8(rchar, encoding):
+        try:
+            return _rpy2_conversion._utf8_rchar_to_str(rchar)
+        except UnicodeDecodeError:
+            return _rpy2_rchar_to_str(rchar, encoding)
+
     _rpy2_conversion._cchar_to_str_with_maxlen = _cchar_to_str_with_latin1_fallback
+    _rpy2_conversion._rchar_to_str = _rchar_to_str_as_utf8
 except Exception:
     pass
 
