@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import (
     QToolButton,
     QRadioButton,
     QSizePolicy,
+    QStyle,
     QStackedWidget,
     QTabWidget,
     QWidget,
@@ -195,7 +196,7 @@ def fit_text_to_contents(
             root.resize(target_size)
 
     _fill_current_wizard_page_width(root, minimum_width=minimum_width)
-    _fill_embedded_pages_to_parent_width(root)
+    _fill_embedded_pages_to_parent_width(root, minimum_width=minimum_width)
 
     _install_first_show_refit(
         root,
@@ -542,30 +543,16 @@ def _fill_current_wizard_page_width(root, minimum_width=0):
 
     if root.layout() is not None:
         root.layout().activate()
-    if page_parent.layout() is not None:
-        page_parent.layout().activate()
 
-    parent_contents_width = page_parent.contentsRect().width()
-    root_contents_width = root.contentsRect().width()
-    root_width_floor = max(root.width(), root.minimumWidth(), minimum_width)
-    body_width = max(parent_contents_width, root_contents_width, root_width_floor)
-    if body_width <= 0:
-        return
-
-    horizontal_inset = max(0, current_page.geometry().left()) * 2
-    target_width = max(0, body_width - horizontal_inset)
-    if target_width <= 0:
-        return
-
-    current_page.setSizePolicy(
-        QSizePolicy.Expanding, current_page.sizePolicy().verticalPolicy()
+    _fill_page_to_available_width(
+        current_page,
+        fallback_width=max(
+            root.contentsRect().width(),
+            root.width(),
+            root.minimumWidth(),
+            minimum_width,
+        ),
     )
-    _raise_maximum_width(current_page, QWIDGETSIZE_MAX)
-    _set_fit_minimum_size(
-        current_page, QSize(target_width, current_page.sizeHint().height())
-    )
-    if current_page.layout() is not None:
-        current_page.layout().activate()
 
 
 def _fit_embedded_pages_to_contents(root):
@@ -578,17 +565,33 @@ def _fit_embedded_pages_to_contents(root):
             _fit_embedded_page_to_contents(stacked_widget.widget(index))
 
 
-def _fill_embedded_pages_to_parent_width(root):
+def _fill_embedded_pages_to_parent_width(root, minimum_width=0):
     for tab_widget in root.findChildren(QTabWidget):
         for index in range(tab_widget.count()):
-            _fill_page_to_parent_width(tab_widget.widget(index))
+            page = tab_widget.widget(index)
+            _fill_page_to_parent_width(
+                page,
+                fallback_width=_embedded_page_width_floor(
+                    root, page, minimum_width
+                ),
+            )
 
     for stacked_widget in root.findChildren(QStackedWidget):
         for index in range(stacked_widget.count()):
-            _fill_page_to_parent_width(stacked_widget.widget(index))
+            page = stacked_widget.widget(index)
+            _fill_page_to_parent_width(
+                page,
+                fallback_width=_embedded_page_width_floor(
+                    root, page, minimum_width
+                ),
+            )
 
 
-def _fill_page_to_parent_width(page):
+def _fill_page_to_parent_width(page, fallback_width=0):
+    _fill_page_to_available_width(page, fallback_width=fallback_width)
+
+
+def _fill_page_to_available_width(page, fallback_width=0):
     if page is None:
         return
 
@@ -596,19 +599,59 @@ def _fill_page_to_parent_width(page):
     if page_parent is None:
         return
 
+    if page_parent.layout() is not None:
+        page_parent.layout().activate()
+
     parent_contents_width = page_parent.contentsRect().width()
-    if parent_contents_width <= 0:
+    available_width = max(parent_contents_width, fallback_width)
+    if available_width <= 0:
         return
 
     horizontal_inset = max(0, page.geometry().left()) * 2
-    target_width = max(0, parent_contents_width - horizontal_inset)
+    target_width = max(0, available_width - horizontal_inset)
     if target_width <= 0:
         return
 
-    _raise_maximum_width(page, target_width)
+    page.setSizePolicy(QSizePolicy.Expanding, page.sizePolicy().verticalPolicy())
+    _raise_maximum_width(page, QWIDGETSIZE_MAX)
     _set_fit_minimum_size(page, QSize(target_width, page.sizeHint().height()))
     if page.layout() is not None:
         page.layout().activate()
+
+
+def _embedded_page_width_floor(root, page, minimum_width=0):
+    body_width = _root_layout_body_width_floor(root, minimum_width)
+    tab_widget = _ancestor_tab_widget(root, page)
+    if tab_widget is not None:
+        frame_width = tab_widget.style().pixelMetric(
+            QStyle.PM_DefaultFrameWidth, None, tab_widget
+        )
+        body_width = max(0, body_width - (frame_width * 4))
+    return body_width
+
+
+def _root_layout_body_width_floor(root, minimum_width=0):
+    width_floor = max(
+        root.contentsRect().width(),
+        root.width(),
+        root.minimumWidth(),
+        minimum_width,
+    )
+    root_layout = root.layout()
+    if root_layout is None:
+        return width_floor
+
+    margins = root_layout.contentsMargins()
+    return max(0, width_floor - margins.left() - margins.right())
+
+
+def _ancestor_tab_widget(root, page):
+    ancestor = page.parentWidget()
+    while ancestor is not None and ancestor is not root:
+        if isinstance(ancestor, QTabWidget):
+            return ancestor
+        ancestor = ancestor.parentWidget()
+    return None
 
 
 def _fit_embedded_page_to_contents(page):

@@ -1137,6 +1137,59 @@ def test_application_fit_allows_embedded_pages_to_fill_page_containers():
     app.processEvents()
 
 
+def test_application_fit_propagates_root_width_floor_to_embedded_pages_before_reflow():
+    sys.path.insert(0, str(ROOT / "src"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    root = QtWidgets.QDialog()
+    root_layout = QtWidgets.QVBoxLayout(root)
+
+    tab_widget = QtWidgets.QTabWidget()
+    tab_page = QtWidgets.QWidget()
+    tab_layout = QtWidgets.QVBoxLayout(tab_page)
+    tab_layout.addWidget(QtWidgets.QLabel("Compact tab page"))
+    tab_widget.addTab(tab_page, "Options")
+    root_layout.addWidget(tab_widget)
+
+    stacked_widget = QtWidgets.QStackedWidget()
+    stacked_page = QtWidgets.QWidget()
+    stacked_layout = QtWidgets.QVBoxLayout(stacked_page)
+    stacked_layout.addWidget(QtWidgets.QLabel("Compact stacked page"))
+    stacked_widget.addWidget(stacked_page)
+    root_layout.addWidget(stacked_widget)
+
+    try:
+        qt_layout.fit_text_to_contents(
+            root,
+            minimum_width=900,
+            minimum_height=qt_layout.APPLICATION_DIALOG_MINIMUM_HEIGHT,
+            stable_root=True,
+        )
+
+        margins = root.layout().contentsMargins()
+        root_body_width = root.minimumWidth() - margins.left() - margins.right()
+        tab_frame_width = tab_widget.style().pixelMetric(
+            QtWidgets.QStyle.PM_DefaultFrameWidth, None, tab_widget
+        )
+        expected_widths = {
+            tab_page: root_body_width - (tab_frame_width * 4),
+            stacked_page: root_body_width,
+        }
+
+        for page, page_width_floor in expected_widths.items():
+            assert page.minimumWidth() >= page_width_floor
+            assert page.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
+            assert (
+                page.sizePolicy().horizontalPolicy()
+                == QtWidgets.QSizePolicy.Expanding
+            )
+    finally:
+        root.close()
+        root.deleteLater()
+    app.processEvents()
+
+
 def test_analysis_dialog_refit_does_not_ratchet_after_hidden_content_changes():
     sys.path.insert(0, str(ROOT / "src"))
     import qt_layout
