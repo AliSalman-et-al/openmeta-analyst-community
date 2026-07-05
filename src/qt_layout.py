@@ -14,6 +14,7 @@ from PyQt5.QtWidgets import (
     QStackedWidget,
     QTabWidget,
     QWidget,
+    QWIDGETSIZE_MAX,
     QWizard,
     QWizardPage,
 )
@@ -148,6 +149,7 @@ def fit_text_to_contents(
     if root_layout is not None:
         root_layout.activate()
 
+    _fit_current_wizard_page_to_contents(root)
     _fit_wizard_page_to_contents(root)
 
     adjust_root = adjust_root and _root_allows_content_resize(root)
@@ -321,9 +323,19 @@ def _fit_wizard_page_to_contents(root):
     if not isinstance(root, QWizardPage):
         return
     target_size = root.sizeHint()
-    _raise_maximum_height(root, target_size.height())
-    _raise_maximum_width(root, target_size.width())
+    root.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+    _raise_maximum_height(root, QWIDGETSIZE_MAX)
+    _raise_maximum_width(root, QWIDGETSIZE_MAX)
     root.setMinimumSize(root.minimumSize().expandedTo(target_size))
+
+
+def _fit_current_wizard_page_to_contents(root):
+    if not isinstance(root, QWizard):
+        return
+    current_page = root.currentPage()
+    if current_page is None:
+        return
+    _fit_wizard_page_to_contents(current_page)
 
 
 def _root_size_hint_for_current_contents(root):

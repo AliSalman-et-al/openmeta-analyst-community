@@ -870,6 +870,58 @@ def test_wizard_refit_shrinks_to_current_page_contents():
     app.processEvents()
 
 
+def test_wizard_refit_allows_current_page_to_fill_page_container():
+    sys.path.insert(0, str(ROOT / "src"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    wizard = QtWidgets.QWizard()
+    wide_page = QtWidgets.QWizardPage()
+    wide_layout = QtWidgets.QVBoxLayout(wide_page)
+    wide_label = QtWidgets.QLabel("Detailed setup that establishes the wizard width")
+    wide_label.setMinimumWidth(560)
+    wide_layout.addWidget(wide_label)
+
+    compact_page = QtWidgets.QWizardPage()
+    compact_page.setMinimumSize(QtCore.QSize(220, 80))
+    compact_page.setMaximumSize(QtCore.QSize(220, 80))
+    compact_layout = QtWidgets.QVBoxLayout(compact_page)
+    compact_layout.addWidget(QtWidgets.QLabel("Name:"))
+    compact_layout.addWidget(QtWidgets.QLineEdit())
+
+    wizard.addPage(wide_page)
+    wizard.addPage(compact_page)
+    wizard.restart()
+    app.processEvents()
+
+    try:
+        qt_layout.fit_application_dialog_to_contents(wizard)
+        wizard.next()
+        qt_layout.fit_application_dialog_to_contents(wizard)
+        app.processEvents()
+
+        page_width = wizard.minimumWidth() - (
+            wizard.width() - wizard.currentPage().width()
+        )
+        page_height = wizard.minimumHeight() - (
+            wizard.height() - wizard.currentPage().height()
+        )
+        assert compact_page.maximumWidth() >= page_width
+        assert compact_page.maximumHeight() >= page_height
+        assert (
+            compact_page.sizePolicy().horizontalPolicy()
+            == QtWidgets.QSizePolicy.Expanding
+        )
+        assert (
+            compact_page.sizePolicy().verticalPolicy()
+            == QtWidgets.QSizePolicy.Expanding
+        )
+    finally:
+        wizard.close()
+        wizard.deleteLater()
+    app.processEvents()
+
+
 def test_analysis_dialog_refit_does_not_ratchet_after_hidden_content_changes():
     sys.path.insert(0, str(ROOT / "src"))
     import qt_layout
