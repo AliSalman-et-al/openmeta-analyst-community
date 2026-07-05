@@ -439,6 +439,67 @@ _HSROC_CLINICAL_SUMMARY_DRIVER = textwrap.dedent(
 ).replace("__REPO_ROOT__", repr(REPO_ROOT).replace("\\", "/"))
 
 
+_HSROC_SUMMARY_WIDTH_DRIVER = textwrap.dedent(
+    r"""
+    repo <- normalizePath(__REPO_ROOT__, winslash = "/")
+    suppressPackageStartupMessages(source(file.path(repo, "src/R/OpenMetaR/R/classes.r")))
+    suppressPackageStartupMessages(source(file.path(repo, "src/R/OpenMetaR/R/utilities.r")))
+    suppressPackageStartupMessages(source(file.path(repo, "src/R/OpenMetaR/R/diagnostic_methods.r")))
+
+    with.width.80 <- function(expr) {
+      old.options <- options(width=80)
+      on.exit(options(old.options), add=TRUE)
+      force(expr)
+    }
+
+    expect.single.table <- function(table.text, expected.header) {
+      lines <- strsplit(table.text, "\n", fixed=TRUE)[[1]]
+      normalized.lines <- gsub("[[:space:]]+", " ", trimws(lines))
+      header.index <- which(normalized.lines == expected.header)
+      if (length(header.index) != 1) {
+        stop(paste("expected one complete header line containing:", expected.header, "\n", table.text))
+      }
+      lone.headers <- c("Parameter", "Description", "Upper bound", "Metric")
+      wrapped <- lone.headers[vapply(lone.headers, function(header) {
+        any(trimws(lines[-header.index]) == header)
+      }, logical(1))]
+      if (length(wrapped) > 0) {
+        stop(paste("table wrapped into stacked blocks at:", paste(wrapped, collapse=", "), "\n", table.text))
+      }
+    }
+
+    model.rows <- list(
+      "Accuracy parameter"=c(estimate=0.131, lower=-0.121, upper=0.417),
+      "Threshold parameter"=c(estimate=1.395, lower=1.002, upper=1.814),
+      "Shape parameter"=c(estimate=0.332, lower=-0.224, upper=0.749),
+      "Between-study accuracy SD"=c(estimate=0.633, lower=0.288, upper=1.027),
+      "Between-study threshold SD"=c(estimate=0.287, lower=0.113, upper=0.487)
+    )
+    descriptions <- c(
+      "Higher values increase diagnostic accuracy.",
+      "Higher values reflect a stricter positivity threshold.",
+      "Controls HSROC curve asymmetry or covariate effects.",
+      "Between-study variation in diagnostic accuracy.",
+      "Between-study variation in positivity threshold."
+    )
+    model.text <- with.width.80(hsroc.model.parameter.table.text(model.rows, descriptions, 3))
+    expect.single.table(model.text, "Parameter Description Estimate Lower bound Upper bound")
+
+    clinical.rows <- list(
+      "Predicted Sensitivity (new study)"=c(estimate=0.793, lower=0.522, upper=1.000),
+      "Predicted Specificity (new study) with deliberately wide display label"=c(estimate=0.677, lower=0.584, upper=0.767),
+      "Positive Likelihood Ratio"=c(estimate=2.438, lower=1.253, upper=4.125),
+      "Negative Likelihood Ratio"=c(estimate=0.306, lower=0.000, upper=0.812),
+      "Diagnostic Odds Ratio"=c(estimate=7.981, lower=1.543, upper=18.723)
+    )
+    clinical.text <- with.width.80(hsroc.summary.table.text(clinical.rows, 3))
+    expect.single.table(clinical.text, "Metric Estimate Lower bound Upper bound")
+
+    cat("OK\n")
+    """
+).replace("__REPO_ROOT__", repr(REPO_ROOT).replace("\\", "/"))
+
+
 def test_hsroc_retries_failed_chain_once_in_clean_directory():
     rscript = shutil.which("Rscript")
     if not rscript:
@@ -520,6 +581,28 @@ def test_hsroc_summary_uses_clinical_labels_and_study_names():
         [rscript, "-"],
         cwd=REPO_ROOT,
         input=_HSROC_CLINICAL_SUMMARY_DRIVER,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
+    )
+
+    assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
+        result.returncode,
+        result.stdout[-2000:],
+        result.stderr[-2000:],
+    )
+    assert "OK" in result.stdout
+
+
+def test_hsroc_summary_tables_do_not_wrap_at_default_r_print_width():
+    rscript = shutil.which("Rscript")
+    if not rscript:
+        pytest.skip("Rscript executable not found")
+
+    result = subprocess.run(
+        [rscript, "-"],
+        cwd=REPO_ROOT,
+        input=_HSROC_SUMMARY_WIDTH_DRIVER,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         universal_newlines=True,

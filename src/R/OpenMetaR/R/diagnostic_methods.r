@@ -1339,6 +1339,12 @@ hsroc.format.summary.number <- function(x, digits) {
     sprintf(paste("%.", digits, "f", sep=""), x)
 }
 
+hsroc.capture.print.output <- function(x, ..., width=10000) {
+    old.options <- options(width=width)
+    on.exit(options(old.options), add=TRUE)
+    paste(capture.output(print(x, ...)), collapse="\n")
+}
+
 hsroc.summary.table.text <- function(rows, digits) {
     formatted <- data.frame(
         Metric=names(rows),
@@ -1347,7 +1353,7 @@ hsroc.summary.table.text <- function(rows, digits) {
         `Upper bound`=vapply(rows, function(row) hsroc.format.summary.number(row[["upper"]], digits), character(1)),
         check.names=FALSE
     )
-    paste(capture.output(print(formatted, row.names=FALSE, right=FALSE)), collapse="\n")
+    hsroc.capture.print.output(formatted, row.names=FALSE, right=FALSE)
 }
 
 hsroc.model.parameter.label <- function(parameter.name) {
@@ -1373,7 +1379,7 @@ hsroc.model.parameter.table.text <- function(rows, descriptions, digits) {
         `Upper bound`=vapply(rows, function(row) hsroc.format.summary.number(row[["upper"]], digits), character(1)),
         check.names=FALSE
     )
-    paste(capture.output(print(formatted, row.names=FALSE, right=FALSE)), collapse="\n")
+    hsroc.capture.print.output(formatted, row.names=FALSE, right=FALSE)
 }
 
 hsroc.model.parameter.summary <- function(between.study, clinical.rows, digits) {
@@ -1404,7 +1410,7 @@ hsroc.model.parameter.summary <- function(between.study, clinical.rows, digits) 
         return(hsroc.model.parameter.table.text(rows, descriptions, digits))
     }
 
-    paste(capture.output(print(model.parameters)), collapse="\n")
+    hsroc.capture.print.output(model.parameters)
 }
 
 hsroc.add.study.names.to.within.study.summary <- function(hsroc.sum, diagnostic.data=NULL) {
