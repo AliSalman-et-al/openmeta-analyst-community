@@ -147,6 +147,63 @@ def compute_2x2_table(params):
     return coef
 
 
+def compute_2x2_table_from_inner_counts(params):
+    """Derive 2x2 margins from the four independent inner count cells."""
+
+    c11 = params["c11"]
+    c12 = params["c12"]
+    c21 = params["c21"]
+    c22 = params["c22"]
+
+    def add_if_present(left, right):
+        if left in EMPTY_VALS or right in EMPTY_VALS:
+            return None
+        return left + right
+
+    r1sum = add_if_present(c11, c12)
+    r2sum = add_if_present(c21, c22)
+    c1sum = add_if_present(c11, c21)
+    c2sum = add_if_present(c12, c22)
+    total = add_if_present(r1sum, r2sum)
+    if total in EMPTY_VALS:
+        total = add_if_present(c1sum, c2sum)
+
+    return {
+        "c11": c11,
+        "c12": c12,
+        "r1sum": r1sum,
+        "c21": c21,
+        "c22": c22,
+        "r2sum": r2sum,
+        "c1sum": c1sum,
+        "c2sum": c2sum,
+        "total": total,
+    }
+
+
+def set_table_item_editable(item, editable):
+    if item is None:
+        return
+    flags = item.flags()
+    if editable:
+        flags = flags | Qt.ItemIsEditable
+    else:
+        flags = flags & ~Qt.ItemIsEditable
+    item.setFlags(flags)
+
+
+def set_table_cells_editable(table, editable_cells):
+    table.blockSignals(True)
+    try:
+        for row in range(table.rowCount()):
+            for col in range(table.columnCount()):
+                set_table_item_editable(
+                    table.item(row, col), (row, col) in editable_cells
+                )
+    finally:
+        table.blockSignals(False)
+
+
 # Consistency checking code for 2x2 tables (binary and diagnostic)
 ########################### CONSISTENCY CHECKING CODE ##########################
 class ConsistencyChecker:

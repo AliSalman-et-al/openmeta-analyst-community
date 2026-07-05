@@ -88,6 +88,18 @@ _Avoid_: Pre-computed diagnostic data, manual diagnostic value
 A study-level effect estimate entered directly with its confidence interval or standard error instead of being computed from raw study measurements.
 _Avoid_: Manual outcome, precomputed row
 
+**Raw Count Entry**:
+Study-level binary or diagnostic count data entered as the primary evidence for an effect estimate, such as event/non-event counts or TP/FP/FN/TN counts.
+_Avoid_: Manual 2x2, reconstructed counts
+
+**Derived 2x2 Margin**:
+A displayed row, column, or grand total in a binary or diagnostic 2x2 calculator that is calculated from Raw Count Entry rather than entered as primary evidence.
+_Avoid_: Editable total, independent margin
+
+**Back-Calculation**:
+The optional workflow that infers compatible raw counts from a Direct Effect-Size Entry when the user has a published estimate and interval but not the original raw counts.
+_Avoid_: Raw-data edit, consistency check
+
 **Count-Based Diagnostic Accuracy Method**:
 A diagnostic method that needs complete TP/FN/FP/TN counts for each included study because direct entered estimates do not carry the paired count information the model requires.
 _Avoid_: Direct-effect bivariate method, manual HSROC

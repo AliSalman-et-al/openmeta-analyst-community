@@ -37,6 +37,7 @@ import app_error_handler
 # when computing 2x2 data
 THRESHOLD = 1e-5
 INCONSISTENT_2X2_EDIT_MESSAGE = calc_fncs.INCONSISTENT_2X2_EDIT_MESSAGE
+BINARY_RAW_COUNT_CELLS = frozenset(((0, 0), (0, 1), (1, 0), (1, 1)))
 
 
 class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
@@ -269,10 +270,14 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
 
         # set values in table & save in ma_unit
         self.raw_data_table.blockSignals(True)
-        self._set_val(0, 0, int(round(imputed[choice]["a"])))
-        self._set_val(0, 2, int(round(imputed[choice]["b"])))
-        self._set_val(1, 0, int(round(imputed[choice]["c"])))
-        self._set_val(1, 2, int(round(imputed[choice]["d"])))
+        group_1_events = int(round(imputed[choice]["a"]))
+        group_1_total = int(round(imputed[choice]["b"]))
+        group_2_events = int(round(imputed[choice]["c"]))
+        group_2_total = int(round(imputed[choice]["d"]))
+        self._set_val(0, 0, group_1_events)
+        self._set_val(0, 1, group_1_total - group_1_events)
+        self._set_val(1, 0, group_2_events)
+        self._set_val(1, 1, group_2_total - group_2_events)
         self.raw_data_table.blockSignals(False)
 
         self._update_data_table()
@@ -298,8 +303,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         self.inconsistencyLabel.setVisible(False)
 
         def action_consistent_table():
-            self.inconsistencyLabel.setVisible(False)
-            self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(True)
+            self._mark_table_consistent()
 
         def action_inconsistent_table():
             # show label, disable OK buttonbox button
@@ -311,6 +315,13 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             fn_inconsistent=action_inconsistent_table,
             table_2x2=self.raw_data_table,
         )
+
+    def _mark_table_consistent(self):
+        self.inconsistencyLabel.setVisible(False)
+        self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(True)
+
+    def _raw_count_cell_is_editable(self, row, col):
+        return (row, col) in BINARY_RAW_COUNT_CELLS
 
     def on_raw_data_table_currentCellChanged(
         self, currentRow, currentColumn, previousRow, previousColumn
@@ -542,14 +553,16 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
 
     def _update_raw_data(self):
         """Generates the 2x2 table with whatever parametric data was provided"""
-        """ Sets #events and #subjects in binary table"""
+        """Sets events and non-events from stored events and arm totals."""
 
         print("_update_raw_data:")
         for row, group in enumerate(self.cur_groups):
-            for col in (0, 2):
-                adjusted_index = 0 if col == 0 else 1
-                val = self.ma_unit.get_raw_data_for_group(group)[adjusted_index]
-                self._set_val(row, col, val)
+            events, total = self.ma_unit.get_raw_data_for_group(group)
+            no_events = None
+            if events not in EMPTY_VALS and total not in EMPTY_VALS:
+                no_events = total - events
+            self._set_val(row, 0, events)
+            self._set_val(row, 1, no_events)
 
     def _update_ma_unit(self):
         """Copy data from binary data table to the MA_unit"""
@@ -559,13 +572,16 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         raw data in the underlying meta-analytic unit and update the values.
         """
         for row in range(2):
-            for col in (0, 2):
-                adjusted_col = 1 if col == 2 else 0
-                self.ma_unit.get_raw_data_for_group(self.cur_groups[row])[
-                    adjusted_col
-                ] = self._get_int(row, col)
+            events = self._get_int(row, 0)
+            no_events = self._get_int(row, 1)
+            total = None
+            if events not in EMPTY_VALS and no_events not in EMPTY_VALS:
+                total = events + no_events
+            raw_data = self.ma_unit.get_raw_data_for_group(self.cur_groups[row])
+            raw_data[0] = events
+            raw_data[1] = total
 
-                print("%s, %s: %s" % (row, col, self._get_int(row, col)))
+            print("%s events: %s, total: %s" % (row, events, total))
         print(
             "ok -- raw data is now: %s"
             % calc_fncs.get_raw_data(self.ma_unit, self.cur_groups)
@@ -615,7 +631,8 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
                 self.raw_data_table.blockSignals(True)
                 self._set_val(row, col, old_table[row][col])
                 self.raw_data_table.blockSignals(False)
-        self.check_table_consistency.run()
+        self._update_data_table()
+        self._mark_table_consistent()
 
     def restore_ma_unit_and_table(self, old_ma_unit, old_table):
         self.restore_ma_unit(old_ma_unit)
@@ -637,6 +654,11 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         # tries to make sense of user input before passing
         # on to the R routine
 
+        if not self._raw_count_cell_is_editable(row, col):
+            self._update_data_table()
+            self._mark_table_consistent()
+            return
+
         old_ma_unit, old_table = self._save_ma_unit_and_table_state(
             table=self.raw_data_table,
             ma_unit=self.ma_unit,
@@ -654,10 +676,8 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             if warning_msg:
                 raise Exception("Invalid Cell Data")
 
-            self._update_data_table()  # calculate rest of table (provisionally) based on new entry
-            warning_msg = self.check_table_consistency.run()
-            if warning_msg:
-                raise Exception(INCONSISTENT_2X2_EDIT_MESSAGE)
+            self._update_data_table()  # calculate derived margins from raw counts
+            self._mark_table_consistent()
         except Exception as e:
             msg = e.args[0]
             QMessageBox.warning(self.parent(), "Warning", msg)  # popup warning
@@ -742,6 +762,10 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
                 self.raw_data_table.setItem(row, col, QTableWidgetItem(str_val))
             else:
                 self.raw_data_table.item(row, col).setText(str_val)
+            calc_fncs.set_table_item_editable(
+                self.raw_data_table.item(row, col),
+                self._raw_count_cell_is_editable(row, col),
+            )
             print(("    setting (%d,%d) to '%s'" % (row, col, str_val)))
 
             #            # disable item
@@ -778,7 +802,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         self.raw_data_table.blockSignals(True)
 
         params = self._get_table_vals()
-        computed_params = calc_fncs.compute_2x2_table(params)
+        computed_params = calc_fncs.compute_2x2_table_from_inner_counts(params)
         print("Computed Params", computed_params)
         if computed_params:
             self._set_vals(computed_params)  # computed --> table widget
@@ -880,7 +904,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
 
         # clear line edits
         self.set_current_effect()
-        calc_fncs.reset_table_item_flags(self.raw_data_table)
+        calc_fncs.set_table_cells_editable(self.raw_data_table, BINARY_RAW_COUNT_CELLS)
         ####self.enable_txt_box_input()
 
         new_ma_unit, new_table = self._save_ma_unit_and_table_state(

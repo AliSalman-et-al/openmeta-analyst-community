@@ -28,6 +28,20 @@
       "before_behavior": "The Results / Analysis window showed a black and green pseudo-console strip below the results with a banner, image variable names, and a >> prompt.",
       "after_behavior": "The Results / Analysis window shows only the results navigation and result content; the removed vertical space is available to summary text, plots, weights, and references.",
       "follow_up": "None."
+    },
+    {
+      "id": "gui-exception-212-derived-calculator-margins",
+      "status": "accepted",
+      "affected_workflows": [
+        "Binary data-entry calculator",
+        "Diagnostic data-entry calculator"
+      ],
+      "reason": "Editable 2x2 margins made routine raw count corrections over-determined and blocked single-cell edits with an inconsistent-table warning. The redesign keeps raw counts as the editable inputs and treats margins as derived displays.",
+      "approved_by": "GitHub Issue #212",
+      "approved_at": "2026-07-05",
+      "before_behavior": "Binary and Diagnostic calculators exposed 2x2 margin totals as editable cells and ran consistency checking during raw-data edits, so changing one raw count could be reverted as an inconsistent table.",
+      "after_behavior": "Binary and Diagnostic calculators keep only the four inner raw-count cells editable during raw-data entry, recompute the displayed margins live, and do not run the 2x2 consistency gate for raw-count edits.",
+      "follow_up": "None."
     }
   ]
 }

@@ -4,6 +4,7 @@ from pathlib import Path
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import (
     QDialog,
+    QDialogButtonBox,
     QHeaderView,
     QSizePolicy,
     QTableWidget,
@@ -355,6 +356,63 @@ def test_binary_calculator_grid_columns_fill_expanded_table_width(qapp, monkeypa
     _assert_calculator_table_grid_fills_width(qapp, form.raw_data_table)
 
 
+def test_binary_calculator_accepts_single_raw_count_edit_and_recomputes_margins(
+    qapp, monkeypatch
+):
+    import binary_data_form
+
+    warnings = []
+
+    monkeypatch.setattr(
+        binary_data_form.meta_py_r, "get_mult_from_r", lambda conf: 1.96
+    )
+    monkeypatch.setattr(
+        binary_data_form.meta_py_r, "binary_convert_scale", lambda x, *args, **kwargs: x
+    )
+    monkeypatch.setattr(
+        binary_data_form.meta_py_r, "impute_bin_data", lambda data: {"FAIL": True}
+    )
+    monkeypatch.setattr(
+        binary_data_form.meta_py_r,
+        "effect_for_study",
+        lambda *args, **kwargs: {"calc_scale": (1.2, 0.8, 1.8)},
+    )
+    monkeypatch.setattr(
+        binary_data_form.meta_py_r,
+        "effect_triplet",
+        lambda effect, scale, metric=None: effect[scale],
+    )
+    monkeypatch.setattr(
+        binary_data_form.QMessageBox,
+        "warning",
+        lambda parent, title, message: warnings.append(message),
+    )
+
+    form = binary_data_form.BinaryDataForm2(
+        FakeMAUnit(),
+        ["Group 1", "Group 2"],
+        "Group 1-Group 2",
+        "OR",
+        conf_level=95.0,
+    )
+
+    table = form.raw_data_table
+    form.current_item_data = 6
+    table.item(0, 0).setText("7")
+    qapp.processEvents()
+
+    assert warnings == []
+    assert table.item(0, 0).text() == "7"
+    assert table.item(0, 1).text() == "14"
+    assert table.item(0, 2).text() == "21"
+    assert table.item(2, 0).text() == "15"
+    assert table.item(2, 1).text() == "28"
+    assert table.item(2, 2).text() == "43"
+    assert form.ma_unit.get_raw_data_for_group("Group 1") == [7, 21]
+    assert not form.inconsistencyLabel.isVisible()
+    assert form.buttonBox.button(QDialogButtonBox.Ok).isEnabled()
+
+
 class FakeDiagnosticMAUnit:
     def __init__(self):
         self.raw_data = [1, 2, 3, 4]
@@ -411,6 +469,68 @@ def test_diagnostic_calculator_grid_columns_fill_expanded_table_width(
     )
 
     _assert_calculator_table_grid_fills_width(qapp, form.two_by_two_table)
+
+
+def test_diagnostic_calculator_accepts_single_raw_count_edit_and_recomputes_margins(
+    qapp, monkeypatch
+):
+    import diagnostic_data_form
+
+    warnings = []
+
+    monkeypatch.setattr(
+        diagnostic_data_form.meta_py_r, "get_mult_from_r", lambda conf: 1.96
+    )
+    monkeypatch.setattr(
+        diagnostic_data_form.meta_py_r,
+        "diagnostic_convert_scale",
+        lambda x, *args, **kwargs: x,
+    )
+    monkeypatch.setattr(
+        diagnostic_data_form.meta_py_r,
+        "impute_diag_data",
+        lambda data: {"TP": None, "FP": None, "FN": None, "TN": None},
+    )
+    monkeypatch.setattr(
+        diagnostic_data_form.meta_py_r,
+        "diagnostic_effects_for_study",
+        lambda *args, metrics, **kwargs: {
+            metric: {"calc_scale": (0.5, 0.4, 0.6)} for metric in metrics
+        },
+    )
+    monkeypatch.setattr(
+        diagnostic_data_form.meta_py_r,
+        "effect_triplet",
+        lambda effect, scale, metric=None: effect[scale],
+    )
+    monkeypatch.setattr(
+        diagnostic_data_form.QMessageBox,
+        "warning",
+        lambda parent, title, message: warnings.append(message),
+    )
+
+    form = diagnostic_data_form.DiagnosticDataForm(
+        FakeDiagnosticMAUnit(),
+        ["Group 1", "Group 2"],
+        "Group 1-Group 2",
+        conf_level=95.0,
+    )
+
+    table = form.two_by_two_table
+    form.current_item_data = 1
+    table.item(0, 0).setText("5")
+    qapp.processEvents()
+
+    assert warnings == []
+    assert table.item(0, 0).text() == "5"
+    assert table.item(0, 2).text() == "8"
+    assert table.item(1, 2).text() == "6"
+    assert table.item(2, 0).text() == "7"
+    assert table.item(2, 1).text() == "7"
+    assert table.item(2, 2).text() == "14"
+    assert form.ma_unit.raw_data == [5.0, 2.0, 3.0, 4.0]
+    assert not form.inconsistencyLabel.isVisible()
+    assert form.buttonBox.button(QDialogButtonBox.Ok).isEnabled()
 
 
 class FakeContinuousMAUnit:

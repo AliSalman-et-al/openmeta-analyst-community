@@ -34,6 +34,7 @@ import calculator_routines as calc_fncs
 from forms.ui_diagnostic_data_form import Ui_DiagnosticDataForm
 
 BACK_CALCULATABLE_DIAGNOSTIC_EFFECTS = ["Sens", "Spec"]
+DIAGNOSTIC_RAW_COUNT_CELLS = frozenset(((0, 0), (0, 1), (1, 0), (1, 1)))
 
 
 class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
@@ -177,8 +178,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         self.inconsistencyLabel.setVisible(False)
 
         def action_consistent_table():
-            self.inconsistencyLabel.setVisible(False)
-            self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(True)
+            self._mark_table_consistent()
 
         def action_inconsistent_table():
             # show label, disable OK buttonbox button
@@ -190,6 +190,13 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             fn_inconsistent=action_inconsistent_table,
             table_2x2=self.two_by_two_table,
         )
+
+    def _mark_table_consistent(self):
+        self.inconsistencyLabel.setVisible(False)
+        self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(True)
+
+    def _raw_count_cell_is_editable(self, row, col):
+        return (row, col) in DIAGNOSTIC_RAW_COUNT_CELLS
 
     def _get_int(self, i, j):
         try:
@@ -248,14 +255,11 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
                 self.two_by_two_table.setItem(row, col, QTableWidgetItem(str_val))
             else:
                 self.two_by_two_table.item(row, col).setText(str_val)
+            calc_fncs.set_table_item_editable(
+                self.two_by_two_table.item(row, col),
+                self._raw_count_cell_is_editable(row, col),
+            )
             self.two_by_two_table.blockSignals(False)
-
-            if str_val != "":  # disable item
-                self.two_by_two_table.blockSignals(True)
-                item = self.two_by_two_table.item(row, col)
-                newflags = item.flags() & ~Qt.ItemIsEditable
-                item.setFlags(newflags)
-                self.two_by_two_table.blockSignals(False)
         except:
             print(("Got to except in _set_val when trying to set (%d,%d)" % (row, col)))
 
@@ -278,6 +282,11 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         return str(self.prevalence_txt_box.text())
 
     def cell_changed(self, row, col):
+        if not self._raw_count_cell_is_editable(row, col):
+            self._update_data_table()
+            self._mark_table_consistent()
+            return
+
         old_ma_unit, old_table = self._save_ma_unit_and_table_state(
             table=self.two_by_two_table,
             ma_unit=self.ma_unit,
@@ -296,10 +305,8 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             if warning_msg:
                 raise Exception("Invalid Cell Data")
 
-            self._update_data_table()  # calculate rest of table (provisionally) based on new entry
-            warning_msg = self.check_table_consistency.run()
-            if warning_msg:
-                raise Exception(calc_fncs.INCONSISTENT_2X2_EDIT_MESSAGE)
+            self._update_data_table()  # calculate derived margins from raw counts
+            self._mark_table_consistent()
         except Exception as e:
             msg = e.args[0]
             QMessageBox.warning(self.parent(), "Warning", msg)  # popup warning
@@ -366,7 +373,8 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
                 self.two_by_two_table.blockSignals(True)
                 self._set_val(row, col, old_table_data[row][col])
                 self.two_by_two_table.blockSignals(False)
-        self.check_table_consistency.run()
+        self._update_data_table()
+        self._mark_table_consistent()
 
     def restore_ma_unit_and_table(self, old_ma_unit, old_table, old_prevalence):
         self.restore_ma_unit(old_ma_unit)
@@ -386,10 +394,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         return old_ma_unit, old_table
 
     def getTotalSubjects(self):
-        try:
-            return int(self.table_backup[2][2])
-        except:
-            return None
+        return self._get_int(2, 2)
 
     def print_backup_table(self):
         for row in range(3):
@@ -686,7 +691,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         calc_fncs.block_signals(self.entry_widgets, True)
 
         params = self._get_table_vals()
-        computed_params = calc_fncs.compute_2x2_table(params)
+        computed_params = calc_fncs.compute_2x2_table_from_inner_counts(params)
         print("Computed Params", computed_params)
         if computed_params:
             self._set_vals(computed_params)  # computed --> table widget
@@ -738,7 +743,9 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         self.prevalence_txt_box.setText("")
         self.prevalence_txt_box.blockSignals(False)
 
-        calc_fncs.reset_table_item_flags(self.two_by_two_table)
+        calc_fncs.set_table_cells_editable(
+            self.two_by_two_table, DIAGNOSTIC_RAW_COUNT_CELLS
+        )
         # self.enable_txt_box_input()
 
         new_ma_unit, new_table = self._save_ma_unit_and_table_state(
