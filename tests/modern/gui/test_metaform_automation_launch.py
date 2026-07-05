@@ -2540,6 +2540,37 @@ def test_new_dataset_wizard_sizes_to_show_diagnostic_choice():
         app.processEvents()
 
 
+def test_new_dataset_wizard_refits_data_type_page_on_first_show(monkeypatch):
+    import launch
+    from PyQt5 import QtGui, QtWidgets
+    import main_wizard
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    wizard = main_wizard.MainWizard(path="new_dataset")
+    fit_calls = []
+    try:
+        wizard.restart()
+        app.processEvents()
+        real_fit = main_wizard.qt_layout.fit_application_dialog_to_contents
+
+        def record_fit(root, *args, **kwargs):
+            if root is wizard:
+                fit_calls.append(root.currentId())
+            return real_fit(root, *args, **kwargs)
+
+        monkeypatch.setattr(
+            main_wizard.qt_layout, "fit_application_dialog_to_contents", record_fit
+        )
+
+        wizard.showEvent(QtGui.QShowEvent())
+        app.processEvents()
+
+        assert main_wizard.Page_DataType in fit_calls
+    finally:
+        wizard.close()
+        app.processEvents()
+
+
 def test_data_type_page_canonical_geometry_covers_normalized_content():
     import launch
     from PyQt5 import QtWidgets
