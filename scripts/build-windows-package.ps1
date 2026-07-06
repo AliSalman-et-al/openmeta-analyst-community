@@ -384,7 +384,7 @@ try {
         "--hidden-import", "icons_rc",
         "--hidden-import", "rpy2.robjects",
         "--hidden-import", "rpy2.rinterface",
-        "src\rc_metastudio\launch.py"
+        "src\rc_metastudio\__main__.py"
     )
     if (-not $SkipClean) {
         $pyInstallerArgs = @("--clean") + $pyInstallerArgs

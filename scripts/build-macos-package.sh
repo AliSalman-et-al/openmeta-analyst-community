@@ -6,7 +6,7 @@ architecture=""
 python_exe=""
 r_runtime_root="${RCMS_R_HOME:-${R_HOME:-}}"
 r_package_cache_root=""
-bundle_identifier="org.RCMetaStudio.community"
+bundle_identifier="org.researchconsultancy.rc-metastudio"
 skip_dependency_install=0
 skip_clean=0
 skip_smoke=0
@@ -233,7 +233,7 @@ require_free_space_gb "$repo_root" 6
     --hidden-import icons_rc
     --hidden-import rpy2.robjects
     --hidden-import rpy2.rinterface
-    src/rc_metastudio/launch.py
+    "src/rc_metastudio/__main__.py"
   )
   if [ "$skip_clean" -eq 0 ]; then
     pyinstaller_args=(--clean "${pyinstaller_args[@]}")

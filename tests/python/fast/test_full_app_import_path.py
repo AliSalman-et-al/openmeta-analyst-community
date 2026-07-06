@@ -63,7 +63,9 @@ def test_application_source_lives_under_rc_metastudio_package():
 
 
 def test_polyglot_roots_hold_r_package_and_packaging_definitions():
+    retired_product_spec = "OpenMeta" + "Analyst.spec"
+
     assert (ROOT / "r" / "RCMetaR" / "DESCRIPTION").exists()
     assert (ROOT / "packaging" / "pyinstaller" / "rc-metastudio.spec").exists()
     assert not (ROOT / "src" / "R" / "RCMetaR").exists()
-    assert not (ROOT / "src" / "OpenMetaAnalyst.spec").exists()
+    assert not (ROOT / "src" / retired_product_spec).exists()

@@ -114,6 +114,7 @@ def project_dependencies():
 
 def test_windows_distributable_contract_is_declared():
     script = ps_contract("scripts", "build-windows-package.ps1")
+    spec = read_repo_text("packaging", "pyinstaller", "rc-metastudio.spec")
 
     assert {"ArtifactName", "PythonExe", "RRuntimeRoot", "RPackageCacheRoot"} <= script[
         "params"
@@ -151,6 +152,10 @@ def test_windows_distributable_contract_is_declared():
         "docs\\verification\\RCMetaR-r-dependencies.json",
         "r\\RCMetaR\\DESCRIPTION",
     } <= script["paths"]
+    assert "src\\rc_metastudio\\__main__.py" in script["paths"]
+    assert "src/rc_metastudio/__main__.py" in spec
+    assert "src\\rc_metastudio\\launch.py" not in script["text"]
+    assert "src/rc_metastudio/launch.py" not in spec
 
 
 def test_windows_r_cache_reinstalls_local_packages_after_cache_restore():
@@ -356,6 +361,7 @@ def test_lane_named_local_scripts_replace_old_workflow_wrappers():
 
 def test_macos_distributable_contract_is_declared():
     script = sh_contract("scripts", "build-macos-package.sh")
+    local_script = sh_contract("scripts", "package-macos.sh")
 
     assert {
         "--architecture",
@@ -388,6 +394,15 @@ def test_macos_distributable_contract_is_declared():
         "LaunchRCMetaStudio.command",
     } <= script["app_paths"]
     assert "scripts/install-r-deps.R" in script["text"]
+    assert "src/rc_metastudio/__main__.py" in script["text"]
+    assert "src/rc_metastudio/launch.py" not in script["text"]
+    assert 'bundle_identifier="org.researchconsultancy.rc-metastudio"' in script["text"]
+    assert (
+        'bundle_identifier="org.researchconsultancy.rc-metastudio"'
+        in local_script["text"]
+    )
+    assert "org.RCMetaStudio.community" not in script["text"]
+    assert "org.RCMetaStudio.community" not in local_script["text"]
 
 
 def test_local_macos_package_script_uses_shared_build_script():

@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['src/rc_metastudio/launch.py'],
+    ['src/rc_metastudio/__main__.py'],
     pathex=['src/rc_metastudio', 'src/rc_metastudio/forms'],
     binaries=[],
     datas=[],

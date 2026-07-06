@@ -9,7 +9,7 @@ recreate_venv=0
 skip_tests=0
 skip_clean=0
 skip_smoke=0
-bundle_identifier="org.RCMetaStudio.community"
+bundle_identifier="org.researchconsultancy.rc-metastudio"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in

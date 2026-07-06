@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'C:\Users\Ali-Salman\Documents\Biostatistics\openmeta-analyst-community\src\rc_metastudio\forms\outcome_name_page.ui'
+# Form implementation generated from reading ui file 'src\rc_metastudio\forms\outcome_name_page.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
