@@ -84,6 +84,7 @@ def fit_application_dialog_to_contents(root, adjust_root=True):
     _prepare_layout_managed_root(root)
     _configure_text_bearing_widgets(root)
     _configure_container_pages(root)
+    _configure_application_wizard_pages(root)
     constraint = (
         QLayout.SetMinimumSize if isinstance(root, QWizard) else QLayout.SetFixedSize
     )
@@ -403,6 +404,63 @@ def _configure_container_pages(root):
     _fit_wizard_page_to_contents(root)
 
 
+def _configure_application_wizard_pages(root):
+    if not isinstance(root, QWizard):
+        return
+
+    body_width = _application_wizard_body_width(root)
+    for page in _wizard_pages(root):
+        _fit_wizard_page_to_contents(page, minimum_width=body_width)
+        _constrain_wrapped_labels_to_width(page, body_width)
+
+
+def _application_wizard_body_width(wizard):
+    width = APPLICATION_DIALOG_MINIMUM_WIDTH
+    stable_width = wizard.property("oma_wizard_body_width")
+    if isinstance(stable_width, int) and stable_width > 0:
+        width = stable_width
+
+    for page in _wizard_pages(wizard):
+        width = max(width, _wizard_page_content_width(page))
+
+    wizard.setProperty("oma_wizard_body_width", width)
+    return width
+
+
+def _wizard_pages(wizard):
+    page_ids = getattr(wizard, "pageIds", None)
+    if not callable(page_ids):
+        return []
+    return [wizard.page(page_id) for page_id in page_ids() if wizard.page(page_id)]
+
+
+def _wizard_page_content_width(page):
+    base_size = _fit_base_minimum_size(page)
+    width = max(base_size.width(), page.minimumWidth())
+    if _has_wrapped_text(page):
+        return width
+
+    hint = page.sizeHint()
+    if hint.isValid():
+        width = max(width, hint.width())
+    return width
+
+
+def _has_wrapped_text(root):
+    return any(label.wordWrap() for label in root.findChildren(QLabel))
+
+
+def _constrain_wrapped_labels_to_width(root, width):
+    layout = root.layout()
+    if layout is not None:
+        margins = layout.contentsMargins()
+        width = max(0, width - margins.left() - margins.right())
+
+    for label in root.findChildren(QLabel):
+        if label.wordWrap():
+            label.setMaximumWidth(width)
+
+
 def _adopt_fixed_direct_children_into_root_layout(root):
     if root.layout() is not None or not isinstance(root, QDialog):
         return
@@ -531,10 +589,10 @@ def _root_allows_content_resize(root):
     return isinstance(root, QDialog) and not _window_state_blocks_content_fit(root)
 
 
-def _fit_wizard_page_to_contents(root):
+def _fit_wizard_page_to_contents(root, minimum_width=None):
     if not isinstance(root, QWizardPage):
         return
-    _fit_embedded_page_to_contents(root)
+    _fit_embedded_page_to_contents(root, minimum_width=minimum_width)
 
 
 def _fit_current_wizard_page_to_contents(root):
@@ -556,10 +614,14 @@ def _fit_embedded_pages_to_contents(root):
             _fit_embedded_page_to_contents(stacked_widget.widget(index))
 
 
-def _fit_embedded_page_to_contents(page):
+def _fit_embedded_page_to_contents(page, minimum_width=None):
     if page is None:
         return
     target_size = page.sizeHint()
+    if minimum_width is not None:
+        target_size = QSize(minimum_width, target_size.height())
+    elif isinstance(page, QWizardPage) and _has_wrapped_text(page):
+        target_size = QSize(_fit_base_minimum_size(page).width(), target_size.height())
     page.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
     _raise_maximum_height(page, QWIDGETSIZE_MAX)
     _raise_maximum_width(page, QWIDGETSIZE_MAX)
