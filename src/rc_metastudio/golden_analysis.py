@@ -74,6 +74,12 @@ def _common_plot_params(path):
     }
 
 
+def _analysis_output_path(filename):
+    import settings
+
+    return settings.analysis_output_path(filename)
+
+
 def golden_coverage_matrix(root_dir=None, method_discoverer=None):
     root_dir = os.path.abspath(
         root_dir or os.path.join(os.path.dirname(__file__), "..")
@@ -367,7 +373,7 @@ def curated_golden_bundles(root_dir=None):
     )
     sample = lambda name: os.path.join(root_dir, "sample_projects", name)
     binary_params = dict(
-        _common_plot_params("./r_tmp/golden_amino_forest.png"),
+        _common_plot_params(_analysis_output_path("golden_amino_forest.png")),
         **{
             "measure": "OR",
             "rm.method": "DL",
@@ -376,7 +382,7 @@ def curated_golden_bundles(root_dir=None):
         },
     )
     continuous_params = dict(
-        _common_plot_params("./r_tmp/golden_continuous_forest.png"),
+        _common_plot_params(_analysis_output_path("golden_continuous_forest.png")),
         **{
             "fp_show_col3": False,
             "fp_show_col4": False,
@@ -385,7 +391,7 @@ def curated_golden_bundles(root_dir=None):
         },
     )
     diagnostic_params = dict(
-        _common_plot_params("./r_tmp/golden_lymph_forest_dor.png"),
+        _common_plot_params(_analysis_output_path("golden_lymph_forest_dor.png")),
         **{
             "fp_col3_str": "[default]",
             "fp_show_col4": False,
@@ -401,28 +407,37 @@ def curated_golden_bundles(root_dir=None):
         binary_params,
         **{
             "cov_name": "golden_group",
-            "fp_outpath": "./r_tmp/golden_amino_subgroup_forest.png",
+            "fp_outpath": _analysis_output_path("golden_amino_subgroup_forest.png"),
         },
     )
     continuous_subgroup_params = dict(
         continuous_params,
         **{
             "cov_name": "golden_group",
-            "fp_outpath": "./r_tmp/golden_continuous_subgroup_forest.png",
+            "fp_outpath": _analysis_output_path(
+                "golden_continuous_subgroup_forest.png"
+            ),
         },
     )
     binary_cumulative_params = dict(
-        binary_params, **{"fp_outpath": "./r_tmp/golden_amino_cumulative_forest.png"}
+        binary_params,
+        **{"fp_outpath": _analysis_output_path("golden_amino_cumulative_forest.png")}
     )
     binary_loo_params = dict(
-        binary_params, **{"fp_outpath": "./r_tmp/golden_amino_loo_forest.png"}
+        binary_params,
+        **{"fp_outpath": _analysis_output_path("golden_amino_loo_forest.png")}
     )
     continuous_cumulative_params = dict(
         continuous_params,
-        **{"fp_outpath": "./r_tmp/golden_continuous_cumulative_forest.png"},
+        **{
+            "fp_outpath": _analysis_output_path(
+                "golden_continuous_cumulative_forest.png"
+            )
+        },
     )
     continuous_loo_params = dict(
-        continuous_params, **{"fp_outpath": "./r_tmp/golden_continuous_loo_forest.png"}
+        continuous_params,
+        **{"fp_outpath": _analysis_output_path("golden_continuous_loo_forest.png")}
     )
     amino_group = dict(
         (name, "early" if i % 2 == 0 else "late")
@@ -635,7 +650,7 @@ def curated_golden_bundles(root_dir=None):
             "parameters": binary_regression_params,
             "tolerances": DEFAULT_TOLERANCES,
             "expected": {"Summary": {}},
-            "artifacts": {"Regression Plot": "./r_tmp/reg.png"},
+            "artifacts": {"Regression Plot": _analysis_output_path("reg.png")},
             "case": headless_analysis.HeadlessAnalysisCase(
                 sample("amino.rcms"),
                 None,
@@ -657,7 +672,7 @@ def curated_golden_bundles(root_dir=None):
             "parameters": continuous_regression_params,
             "tolerances": DEFAULT_TOLERANCES,
             "expected": {"Summary": {}},
-            "artifacts": {"Regression Plot": "./r_tmp/reg.png"},
+            "artifacts": {"Regression Plot": _analysis_output_path("reg.png")},
             "case": headless_analysis.HeadlessAnalysisCase(
                 sample("continuous.rcms"),
                 None,

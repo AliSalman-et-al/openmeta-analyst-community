@@ -203,7 +203,7 @@ class Ui_Dialog(object):
         self.plot_ub_le.setText(_translate("Dialog", "[default]"))
         self.label_11.setText(_translate("Dialog", "Show summary line:"))
         self.label_3.setText(_translate("Dialog", "Save image to:"))
-        self.image_path.setText(_translate("Dialog", "./r_tmp/forest.png"))
+        self.image_path.setText("")
         self.save_btn.setText(_translate("Dialog", "..."))
         self.specs_tab.setTabText(self.specs_tab.indexOf(self.plot_tab), _translate("Dialog", "Forest Plot"))
 import icons_rc

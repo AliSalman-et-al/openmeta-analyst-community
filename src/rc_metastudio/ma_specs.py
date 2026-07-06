@@ -76,6 +76,8 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         super(MA_Specs, self).__init__(parent)
         self.setupUi(self)
+        if _text_value(self.image_path) == "":
+            self.image_path.setText(analysis_output_path("forest.png"))
         global meta_py_r
         meta_py_r = sys.modules.get("meta_py_r", meta_py_r)
 
@@ -203,7 +205,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                 data_type=None,
                 outcome=None,
                 follow_up=None,
-                network_path="./r_tmp/network.png",
+                network_path=analysis_output_path("network.png"),
             )
         finally:
             progress_dialog.hide_once(bar)

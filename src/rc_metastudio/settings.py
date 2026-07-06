@@ -17,6 +17,7 @@ import qt_text
 QColor = QtGui.QColor
 QDir = QtCore.QDir
 QSettings = QtCore.QSettings
+ANALYSIS_SCRATCH_ENV_VAR = "RCMS_ANALYSIS_SCRATCH_DIR"
 
 ##################### HANDLE SETTINGS #####################
 
@@ -293,14 +294,33 @@ def get_base_path(normalize=False):
     return base_path
 
 
+def get_r_tmp_path(normalize=False):
+    """Return the managed analysis scratch directory."""
+    override_path = os.environ.get(ANALYSIS_SCRATCH_ENV_VAR)
+    r_tmp_path = (
+        override_path if override_path else os.path.join(get_base_path(), "r_tmp")
+    )
+    if normalize:
+        r_tmp_path = str(QDir.toNativeSeparators(r_tmp_path))
+    return r_tmp_path
+
+
 def make_r_tmp():
-    """Makes the r_tmp folder and returns the path to it"""
-    r_tmp_path = "/".join([get_base_path(), "r_tmp"])
+    """Makes the managed analysis scratch folder and returns the path to it"""
+    r_tmp_path = get_r_tmp_path()
     success = QDir().mkpath(r_tmp_path)
     if not success:
         raise Exception("Could not create r_tmp path at %s" % r_tmp_path)
     print(("Made r_tmp_path at %s" % r_tmp_path))
     return r_tmp_path
+
+
+def analysis_output_path(filename, normalize=False):
+    """Return a file path inside the managed analysis scratch directory."""
+    path = os.path.join(make_r_tmp(), filename)
+    if normalize:
+        return str(QDir.toNativeSeparators(path))
+    return to_posix_path(path)
 
 
 def to_posix_path(path):
@@ -312,8 +332,10 @@ def to_posix_path(path):
 
 
 def clear_r_tmp():
-    r_tmp_dir = os.path.join(get_base_path(), "r_tmp")
+    r_tmp_dir = get_r_tmp_path(normalize=True)
     print(("Clearing %s" % r_tmp_dir))
+    if not os.path.isdir(r_tmp_dir):
+        return
     for file_p in os.listdir(r_tmp_dir):
         file_path = os.path.join(r_tmp_dir, file_p)
         try:

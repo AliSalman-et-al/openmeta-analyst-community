@@ -481,8 +481,14 @@ def get_method_description(method_name):
 #    pass
 
 
+def _analysis_output_path(filename):
+    import settings
+
+    return settings.analysis_output_path(filename)
+
+
 @RfunctionCaller
-def draw_network(edge_list, unconnected_vertices, network_path='"./r_tmp/network.png"'):
+def draw_network(edge_list, unconnected_vertices, network_path=None):
     """
     This draws the parametric network specified by edge_list.
     The latter is assumed to be in form:
@@ -492,7 +498,9 @@ def draw_network(edge_list, unconnected_vertices, network_path='"./r_tmp/network
     implementing a method on the R side that takes a graph/
     edge list. We may want to change this eventually.
     """
-    network_path = _strip_wrapping_quotes(network_path)
+    network_path = _strip_wrapping_quotes(
+        network_path or _analysis_output_path("network.png")
+    )
     if len(edge_list) > 0:
         edge_matrix = execute_r_function(
             "matrix", _r_character_vector(edge_list), ncol=2, byrow=True
@@ -515,7 +523,7 @@ def draw_network(edge_list, unconnected_vertices, network_path='"./r_tmp/network
         "plot(g, vertex.label=V(g)$name, layout=layout.circle, vertex.size=25, asp=.3, margin=-.05)"
     )
     execute_r_string("dev.off()")
-    return "r_tmp/network.png"
+    return network_path
 
 
 @RfunctionCaller
@@ -664,10 +672,12 @@ def ma_dataset_to_simple_network(
     data_type=None,
     outcome=None,
     follow_up=None,
-    network_path="./r_tmp/network.png",
+    network_path=None,
 ):
     """This converts a DatasetModel to an mtc.network R object as described
     in the getmc documentation for mtc.network"""
+
+    network_path = network_path or _analysis_output_path("network.png")
 
     if data_type not in [BINARY, CONTINUOUS]:
         raise ValueError("Given data type: '%s' is unknown." % str(data_type))

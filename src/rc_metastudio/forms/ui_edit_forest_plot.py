@@ -154,6 +154,6 @@ class Ui_edit_forest_plot_dlg(object):
         self.label_16.setText(_translate("edit_forest_plot_dlg", "Show summary line:"))
         self.x_lbl_le.setText(_translate("edit_forest_plot_dlg", "[default]"))
         self.label_3.setText(_translate("edit_forest_plot_dlg", "Save image to:"))
-        self.image_path.setText(_translate("edit_forest_plot_dlg", "./r_tmp/forest.png"))
+        self.image_path.setText("")
         self.save_btn.setText(_translate("edit_forest_plot_dlg", "..."))
 import icons_rc

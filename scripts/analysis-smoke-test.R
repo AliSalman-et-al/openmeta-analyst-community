@@ -1,6 +1,10 @@
 options(warn = 1)
 
-dir.create("r_tmp", showWarnings = FALSE)
+analysis_scratch_dir <- Sys.getenv(
+  "RCMS_ANALYSIS_SCRATCH_DIR",
+  unset = file.path(tempdir(), "rc-metastudio-analysis")
+)
+dir.create(analysis_scratch_dir, recursive = TRUE, showWarnings = FALSE)
 suppressPackageStartupMessages(library(RCMetaR))
 rcmetar.set.global.conf.level(95)
 
@@ -47,7 +51,7 @@ base_params <- function(measure) {
     "fp_show_col2" = TRUE,
     "fp_show_col1" = TRUE,
     "fp_plot_lb" = "[default]",
-    "fp_outpath" = "./r_tmp/forest.png",
+    "fp_outpath" = file.path(analysis_scratch_dir, "forest.png"),
     "rm.method" = "DL",
     "adjust" = 0.5,
     "fp_plot_ub" = "[default]",

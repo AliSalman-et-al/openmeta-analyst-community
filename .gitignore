@@ -1,12 +1,22 @@
 # Python
 *.pyc
+*.pyo
+*/__pycache__/*
 .venv/
+.pytest_cache/*
+.ruff_cache/*
+.mypy_cache/*
+.tox/*
+*.egg-info/*
+.coverage
+coverage.xml
+htmlcov/*
 
 # R
 .RData
 .Rhistory
-r_tmp/
-src/R/rtmp/
+r_tmp/*
+src/R/rtmp/*
 HSROC_2.0.5.tar.gz
 openmetar_1.0.tar.gz
 openmetar_1.0.zip
@@ -21,15 +31,15 @@ openmetar_1.0.zip
 Thumbs.db
 
 # Build outputs
-build/
-dist/
+build/*
+dist/*
 dist.zip
-artifacts/
-artifacts/golden-baseline/
-src/build/
-src/build-debug/
-src/dist/
-src/dist-debug/
+artifacts/*
+src/build/*
+src/build-debug/*
+src/dist/*
+src/dist-debug/*
+OpenMetaAnalyst*.spec
 src/OpenMetaAnalyst*.spec
 
 # Local agent scratch files

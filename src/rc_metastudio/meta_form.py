@@ -642,8 +642,8 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             "RC MetaStudio is distributed without warranty, including without "
             "the implied warranty of merchantability or fitness for a particular "
             "purpose.\n\n"
-            "RC MetaStudio is derived from the Original OpenMeta[Analyst] "
-            "Project and is independently maintained. See NOTICE.md for "
+            "RC MetaStudio is derived from the Original OpenMeta[Analyst] Project "
+            "and is independently maintained. See NOTICE.md for "
             "provenance and affiliation details.".format(version=meta_globals.VERSION),
         )
 

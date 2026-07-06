@@ -5,6 +5,7 @@ import ma_dataset
 import meta_globals
 import meta_py_r
 import project_pickle
+import settings
 
 
 class HeadlessAnalysisCase:
@@ -66,8 +67,7 @@ def run_headless_analysis(case):
     covariate_kwargs = (
         {"covs_to_include": selected_covariates} if selected_covariates else {}
     )
-    if not os.path.exists("r_tmp"):
-        os.mkdir("r_tmp")
+    settings.make_r_tmp()
     if case.metric is not None:
         model.set_current_metric(case.metric)
     data_type = case.data_type or model.get_current_outcome_type(get_str=False)

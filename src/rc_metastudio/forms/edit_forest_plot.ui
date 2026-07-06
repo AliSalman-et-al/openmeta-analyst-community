@@ -222,7 +222,7 @@
      <item>
       <widget class="QLineEdit" name="image_path">
        <property name="text">
-        <string>./r_tmp/forest.png</string>
+        <string/>
        </property>
       </widget>
      </item>
