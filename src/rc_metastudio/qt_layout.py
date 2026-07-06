@@ -135,9 +135,7 @@ def sync_application_wizard_pages_to_body(wizard):
     content_width = _application_wizard_body_width(wizard)
     live_body_width = _application_wizard_live_body_width(wizard)
     body_width = content_width
-    if _wizard_should_adopt_live_body_width(
-        wizard, live_body_width, content_width
-    ):
+    if _wizard_should_adopt_live_body_width(wizard, live_body_width, content_width):
         body_width = live_body_width
     if body_width <= 0:
         return
@@ -215,9 +213,7 @@ def configure_resizable_window(root, minimum_width=0, minimum_height=0):
     _apply_root_minimum_size(root, minimum_width, minimum_height)
 
 
-def configure_compact_table(
-    table, stretch_columns=False, fill_available_width=False
-):
+def configure_compact_table(table, stretch_columns=False, fill_available_width=False):
     """Let compact tables expand horizontally without clipping rows or columns."""
     if table is None:
         return

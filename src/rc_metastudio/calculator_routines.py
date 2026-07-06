@@ -10,6 +10,7 @@ from meta_globals import *
 import meta_py_r
 import qt_text
 
+
 def cell_text_is_blank(value):
     """Return whether Qt item text is blank."""
     return qt_text.is_blank(value)

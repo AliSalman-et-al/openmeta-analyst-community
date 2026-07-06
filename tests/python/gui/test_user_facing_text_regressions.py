@@ -1168,13 +1168,9 @@ def test_application_fit_allows_embedded_pages_to_fill_page_containers():
             assert page.maximumHeight() == QtWidgets.QWIDGETSIZE_MAX
             assert page.minimumWidth() >= page.sizeHint().width()
             assert (
-                page.sizePolicy().horizontalPolicy()
-                == QtWidgets.QSizePolicy.Expanding
+                page.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Expanding
             )
-            assert (
-                page.sizePolicy().verticalPolicy()
-                == QtWidgets.QSizePolicy.Expanding
-            )
+            assert page.sizePolicy().verticalPolicy() == QtWidgets.QSizePolicy.Expanding
     finally:
         root.close()
         root.deleteLater()
@@ -1223,8 +1219,7 @@ def test_application_fit_wraps_embedded_page_text_inside_container_width():
             assert page.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
             assert page.width() >= container.contentsRect().width() - 4
             assert (
-                page.minimumWidth()
-                >= qt_layout.APPLICATION_WRAPPED_PAGE_MINIMUM_WIDTH
+                page.minimumWidth() >= qt_layout.APPLICATION_WRAPPED_PAGE_MINIMUM_WIDTH
             )
             assert page.minimumWidth() < 700
     finally:
@@ -1267,8 +1262,7 @@ def test_application_fit_propagates_root_width_floor_to_embedded_pages_before_re
             assert page.minimumWidth() >= page.sizeHint().width()
             assert page.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
             assert (
-                page.sizePolicy().horizontalPolicy()
-                == QtWidgets.QSizePolicy.Expanding
+                page.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Expanding
             )
     finally:
         root.close()

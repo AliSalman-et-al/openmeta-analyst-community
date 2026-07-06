@@ -15,7 +15,9 @@ ACCEPTED_EXCEPTION = "accepted_exception"
 def compare_golden_baseline(reference, current, exceptions=None, manifest=None):
     exceptions = exceptions or []
     manifest_rows = _manifest_rows(manifest)
-    current_by_id = _by_id(current.get("curated_golden_set", current.get("results", [])))
+    current_by_id = _by_id(
+        current.get("curated_golden_set", current.get("results", []))
+    )
     reference_rows = reference.get("curated_golden_set", reference.get("results", []))
     reference_by_id = _by_id(reference_rows)
     rows = []
@@ -60,7 +62,9 @@ def _compare_row(expected, actual, exceptions):
             _row(
                 expected,
                 _maybe_accepted(UNSUPPORTED_WORKFLOW, accepted),
-                actual.get("reason", "Workflow is not supported by the maintained path."),
+                actual.get(
+                    "reason", "Workflow is not supported by the maintained path."
+                ),
                 accepted,
             )
         ]

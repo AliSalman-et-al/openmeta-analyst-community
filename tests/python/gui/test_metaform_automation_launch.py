@@ -47,7 +47,9 @@ def _assert_compact_table_fits_visible_cells(table):
     vertical_header_width = 0
     if not table.verticalHeader().isHidden():
         vertical_header_width = table.verticalHeader().sizeHint().width()
-    required_width = vertical_header_width + sum(content_widths) + 2 * table.frameWidth()
+    required_width = (
+        vertical_header_width + sum(content_widths) + 2 * table.frameWidth()
+    )
     assert table.minimumWidth() >= required_width
 
     if not table_is_measurable:
@@ -386,7 +388,9 @@ def test_main_data_grid_leaves_spare_width_outside_data_columns(sample_project):
 
     app, window = launch.start_automation()
     try:
-        assert window.open(os.path.abspath(os.path.join("sample_projects", sample_project)))
+        assert window.open(
+            os.path.abspath(os.path.join("sample_projects", sample_project))
+        )
 
         _assert_table_view_leaves_spare_width_outside_data_columns(window.tableView)
     finally:
@@ -404,7 +408,9 @@ def test_undo_immediately_after_open_does_not_clear_loaded_project(sample_projec
 
     app, window = launch.start_automation()
     try:
-        assert window.open(os.path.abspath(os.path.join("sample_projects", sample_project)))
+        assert window.open(
+            os.path.abspath(os.path.join("sample_projects", sample_project))
+        )
 
         loaded_model = window.model
         loaded_row_count = loaded_model.rowCount()
@@ -558,7 +564,9 @@ def test_automation_launch_opens_meantime_project_and_enables_subgroup_analysis(
     app, window = launch.start_automation()
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "meantime.rcms")))
+            window.open(
+                os.path.abspath(os.path.join("sample_projects", "meantime.rcms"))
+            )
             is True
         )
 
@@ -609,7 +617,9 @@ def test_opened_sample_projects_return_native_table_values_for_pyqt5_rendering()
         app, window = launch.start_automation()
         try:
             assert (
-                window.open(os.path.abspath(os.path.join("sample_projects", project_name)))
+                window.open(
+                    os.path.abspath(os.path.join("sample_projects", project_name))
+                )
                 is True
             )
             model = window.tableView.model()
@@ -1007,7 +1017,8 @@ def test_standard_meta_analysis_opens_specs_and_runs_through_backend(monkeypatch
 
         try:
             assert (
-                window.open(os.path.abspath(os.path.join("sample_projects", name))) is True
+                window.open(os.path.abspath(os.path.join("sample_projects", name)))
+                is True
             )
 
             window.action_go.trigger()
@@ -1155,13 +1166,12 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
             )
             + 48
         )
-        assert widest_method_label > qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
         assert (
-            method_combo.minimumWidth()
-            == min(
-                widest_method_label,
-                qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH,
-            )
+            widest_method_label > qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
+        )
+        assert method_combo.minimumWidth() == min(
+            widest_method_label,
+            qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH,
         )
         assert (
             method_combo.maximumWidth()
@@ -1441,9 +1451,7 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
         assert stable_minimum_width >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
         assert specs.layout().sizeConstraint() == QtWidgets.QLayout.SetFixedSize
         assert specs.maximumSize() == specs.minimumSize()
-        assert (
-            specs.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Fixed
-        )
+        assert specs.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Fixed
         assert specs.sizePolicy().verticalPolicy() == QtWidgets.QSizePolicy.Fixed
         assert specs.isSizeGripEnabled() is False
 
@@ -1536,7 +1544,8 @@ def test_required_advanced_analysis_actions_open_real_gui_dialogs(monkeypatch):
 
         try:
             assert (
-                window.open(os.path.abspath(os.path.join("sample_projects", name))) is True
+                window.open(os.path.abspath(os.path.join("sample_projects", name)))
+                is True
             )
             cov_values = {
                 study.name: index
@@ -2409,7 +2418,8 @@ def test_real_metaform_save_as_round_trips_representative_projects(
 
         try:
             assert (
-                window.open(os.path.abspath(os.path.join("sample_projects", name))) is True
+                window.open(os.path.abspath(os.path.join("sample_projects", name)))
+                is True
             )
             expected = _dataset_summary(window.model.dataset)
             meta_form = sys.modules["meta_form"]
@@ -2685,9 +2695,9 @@ def test_data_type_page_buttons_center_icons_inside_declared_slots():
             )
             for button in data_type_page._data_type_buttons()
         }
-        assert all(rendered == declared for rendered, declared in icon_sizes.values()), (
-            icon_sizes
-        )
+        assert all(
+            rendered == declared for rendered, declared in icon_sizes.values()
+        ), icon_sizes
     finally:
         wizard.close()
         app.processEvents()
@@ -3228,7 +3238,9 @@ def test_data_entry_dialogs_construct_with_stub_backend(monkeypatch):
         binary_dialog.close()
 
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "continuous.rcms")))
+            window.open(
+                os.path.abspath(os.path.join("sample_projects", "continuous.rcms"))
+            )
             is True
         )
         model = window.model
@@ -3292,7 +3304,9 @@ def test_data_entry_dialog_tables_expand_and_show_all_rows(monkeypatch):
         )
 
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "continuous.rcms")))
+            window.open(
+                os.path.abspath(os.path.join("sample_projects", "continuous.rcms"))
+            )
             is True
         )
         model = window.model
@@ -3405,7 +3419,9 @@ def test_analysis_dialog_family_uses_shared_base_size(monkeypatch):
         )
 
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "continuous.rcms")))
+            window.open(
+                os.path.abspath(os.path.join("sample_projects", "continuous.rcms"))
+            )
             is True
         )
         model = window.model

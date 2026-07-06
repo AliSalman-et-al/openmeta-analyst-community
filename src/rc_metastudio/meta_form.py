@@ -572,7 +572,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     # facade exposes richer method metadata.
     def cum_ma(self):
         # NOTE that we do not allow cumulative meta-analysis on
-            # Diagnostic data are not routed through cumulative MA here.
+        # Diagnostic data are not routed through cumulative MA here.
         # if we're dealing with diag data.
         form = None
         # note that the spec form gets *this* form as a parameter.

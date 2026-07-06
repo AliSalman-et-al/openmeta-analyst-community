@@ -249,9 +249,7 @@ class DataTypePage(QWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
         elif button == self.onearm_generic_effect_size_Button:
             self.summary["arms"] = "one"
             self.summary["data_type"] = "continuous"
-            self.summary["sub_type"] = (
-                "generic_effect"
-            )
+            self.summary["sub_type"] = "generic_effect"
             self.summary["effect"] = meta_globals.DEFAULT_CONTINUOUS_ONE_ARM
             self.summary["metric_choices"] = meta_globals.CONTINUOUS_ONE_ARM_METRICS
         # twoarm
@@ -400,9 +398,7 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
             for col in range(self.required_fmt_table.columnCount()):
                 self.required_fmt_table.setItem(row, col, QTableWidgetItem(""))
                 self.required_fmt_table.item(row, col).setFlags(Qt.NoItemFlags)
-        qt_layout.configure_compact_table(
-            self.required_fmt_table, stretch_columns=True
-        )
+        qt_layout.configure_compact_table(self.required_fmt_table, stretch_columns=True)
 
     def isComplete(self):
         # We must have a file selected

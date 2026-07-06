@@ -721,9 +721,8 @@ def test_diagnostic_method_selector_uses_combo_width_policy(monkeypatch):
         assert form.method_cbo_box.findText(label) >= 0
         assert label_width > qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
         assert label_width <= qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH
-        assert (
-            form.method_cbo_box.minimumWidth()
-            == min(label_width, qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH)
+        assert form.method_cbo_box.minimumWidth() == min(
+            label_width, qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH
         )
         assert (
             form.method_cbo_box.maximumWidth()

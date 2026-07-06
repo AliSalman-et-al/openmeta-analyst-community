@@ -421,11 +421,11 @@ def curated_golden_bundles(root_dir=None):
     )
     binary_cumulative_params = dict(
         binary_params,
-        **{"fp_outpath": _analysis_output_path("golden_amino_cumulative_forest.png")}
+        **{"fp_outpath": _analysis_output_path("golden_amino_cumulative_forest.png")},
     )
     binary_loo_params = dict(
         binary_params,
-        **{"fp_outpath": _analysis_output_path("golden_amino_loo_forest.png")}
+        **{"fp_outpath": _analysis_output_path("golden_amino_loo_forest.png")},
     )
     continuous_cumulative_params = dict(
         continuous_params,
@@ -437,7 +437,7 @@ def curated_golden_bundles(root_dir=None):
     )
     continuous_loo_params = dict(
         continuous_params,
-        **{"fp_outpath": _analysis_output_path("golden_continuous_loo_forest.png")}
+        **{"fp_outpath": _analysis_output_path("golden_continuous_loo_forest.png")},
     )
     amino_group = dict(
         (name, "early" if i % 2 == 0 else "late")

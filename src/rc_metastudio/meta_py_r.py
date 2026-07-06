@@ -1263,9 +1263,12 @@ def parse_out_results(result):
             text_d[display_text_n] = result_sections.format_references(text)
         elif text_n in ("weights", "Weights"):
             text_d["Weights"] = make_weights_str(result)
-        elif (
-            text_n in ["res", "res.info", "input_data", "input_params"]
-        ):  # skip low-level RCMetaR internals that are not display sections
+        elif text_n in [
+            "res",
+            "res.info",
+            "input_data",
+            "input_params",
+        ]:  # skip low-level RCMetaR internals that are not display sections
             pass
         elif "gui.ignore" in text_n:
             pass

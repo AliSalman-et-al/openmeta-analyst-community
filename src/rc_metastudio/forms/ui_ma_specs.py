@@ -20,7 +20,9 @@ class Ui_Dialog(object):
         font.setFamily("Verdana")
         Dialog.setFont(font)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(
+            QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
+        )
         Dialog.setWindowIcon(icon)
         self.verticalLayout = QtWidgets.QVBoxLayout(Dialog)
         self.verticalLayout.setObjectName("verticalLayout")
@@ -45,10 +47,14 @@ class Ui_Dialog(object):
         self.method_cbo_box.setObjectName("method_cbo_box")
         self.gridLayout.addWidget(self.method_cbo_box, 0, 1, 1, 1)
         self.parameter_grp_box = QtWidgets.QGroupBox(self.methods_tab)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(40)
-        sizePolicy.setHeightForWidth(self.parameter_grp_box.sizePolicy().hasHeightForWidth())
+        sizePolicy.setHeightForWidth(
+            self.parameter_grp_box.sizePolicy().hasHeightForWidth()
+        )
         self.parameter_grp_box.setSizePolicy(sizePolicy)
         self.parameter_grp_box.setMinimumSize(QtCore.QSize(0, 200))
         font = QtGui.QFont()
@@ -163,7 +169,9 @@ class Ui_Dialog(object):
         self.specs_tab.addTab(self.plot_tab, "")
         self.verticalLayout.addWidget(self.specs_tab)
         self.buttonBox = QtWidgets.QDialogButtonBox(Dialog)
-        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setStandardButtons(
+            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
+        )
         self.buttonBox.setObjectName("buttonBox")
         self.verticalLayout.addWidget(self.buttonBox)
 
@@ -175,21 +183,31 @@ class Ui_Dialog(object):
         _translate = QtCore.QCoreApplication.translate
         Dialog.setWindowTitle(_translate("Dialog", "Method & Parameters"))
         self.method_lbl.setText(_translate("Dialog", "Analysis method:"))
-        self.specs_tab.setTabText(self.specs_tab.indexOf(self.methods_tab), _translate("Dialog", "Method"))
+        self.specs_tab.setTabText(
+            self.specs_tab.indexOf(self.methods_tab), _translate("Dialog", "Method")
+        )
         self.groupBox.setTitle(_translate("Dialog", "Column Labels"))
-        self.label_2.setToolTip(_translate("Dialog", "Text for column title that appears on forest plot"))
+        self.label_2.setToolTip(
+            _translate("Dialog", "Text for column title that appears on forest plot")
+        )
         self.label_2.setText(_translate("Dialog", "Column 1 label:"))
         self.col1_str_edit.setText(_translate("Dialog", "Studies"))
         self.show_1.setText(_translate("Dialog", "Show"))
-        self.label_4.setToolTip(_translate("Dialog", "Text for column title that appears on forest plot"))
+        self.label_4.setToolTip(
+            _translate("Dialog", "Text for column title that appears on forest plot")
+        )
         self.label_4.setText(_translate("Dialog", "Column 2 label:"))
         self.col2_str_edit.setText(_translate("Dialog", "[default]"))
         self.show_2.setText(_translate("Dialog", "Show"))
-        self.label_5.setToolTip(_translate("Dialog", "Text for column title that appears on forest plot"))
+        self.label_5.setToolTip(
+            _translate("Dialog", "Text for column title that appears on forest plot")
+        )
         self.label_5.setText(_translate("Dialog", "Column 3 label:"))
         self.col3_str_edit.setText(_translate("Dialog", "Ev/Trt"))
         self.show_3.setText(_translate("Dialog", "Show"))
-        self.label_6.setToolTip(_translate("Dialog", "Text for column title that appears on forest plot"))
+        self.label_6.setToolTip(
+            _translate("Dialog", "Text for column title that appears on forest plot")
+        )
         self.label_6.setText(_translate("Dialog", "Column 4 label:"))
         self.col4_str_edit.setText(_translate("Dialog", "Ev/Ctrl"))
         self.show_4.setText(_translate("Dialog", "Show"))
@@ -205,5 +223,9 @@ class Ui_Dialog(object):
         self.label_3.setText(_translate("Dialog", "Save image to:"))
         self.image_path.setText("")
         self.save_btn.setText(_translate("Dialog", "..."))
-        self.specs_tab.setTabText(self.specs_tab.indexOf(self.plot_tab), _translate("Dialog", "Forest Plot"))
+        self.specs_tab.setTabText(
+            self.specs_tab.indexOf(self.plot_tab), _translate("Dialog", "Forest Plot")
+        )
+
+
 import icons_rc

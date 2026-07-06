@@ -255,6 +255,8 @@ def test_binary_calculator_uses_table_headers_and_friendly_two_arm_metric_labels
         form.effect_cbo_box.itemText(index)
         for index in range(form.effect_cbo_box.count())
     ]
+
+
 def test_binary_calculator_table_layout_uses_real_headers_and_visible_total_row(
     qapp, monkeypatch
 ):

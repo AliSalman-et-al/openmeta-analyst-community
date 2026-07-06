@@ -20,7 +20,9 @@ class Ui_running(object):
         font.setFamily("Verdana")
         running.setFont(font)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(
+            QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
+        )
         running.setWindowIcon(icon)
         running.setSizeGripEnabled(False)
         running.setModal(True)
@@ -39,4 +41,6 @@ class Ui_running(object):
     def retranslateUi(self, running):
         _translate = QtCore.QCoreApplication.translate
         running.setWindowTitle(_translate("running", "Running Analysis..."))
+
+
 import icons_rc

@@ -120,10 +120,10 @@ def test_headless_and_golden_analysis_use_managed_scratch_paths(monkeypatch, tmp
     monkeypatch.setattr(
         headless_analysis.settings,
         "make_r_tmp",
-        lambda: created.append(
-            headless_analysis.settings.get_r_tmp_path(normalize=True)
-        )
-        or created[-1],
+        lambda: (
+            created.append(headless_analysis.settings.get_r_tmp_path(normalize=True))
+            or created[-1]
+        ),
     )
     monkeypatch.setattr(
         headless_analysis,
@@ -131,13 +131,15 @@ def test_headless_and_golden_analysis_use_managed_scratch_paths(monkeypatch, tmp
         lambda _path: type(
             "Model",
             (),
-                {
-                    "dataset": object(),
-                    "set_current_metric": lambda self, _metric: None,
-                    "get_current_outcome_type": lambda self, get_str=False: headless_analysis.meta_globals.BINARY,
-                },
-            )(),
-        )
+            {
+                "dataset": object(),
+                "set_current_metric": lambda self, _metric: None,
+                "get_current_outcome_type": lambda self, get_str=False: (
+                    headless_analysis.meta_globals.BINARY
+                ),
+            },
+        )(),
+    )
     monkeypatch.setattr(
         headless_analysis.meta_py_r,
         "ma_dataset_to_simple_binary_robj",

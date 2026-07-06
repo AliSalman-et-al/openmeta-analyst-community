@@ -51,9 +51,7 @@ def test_retired_modules_are_not_on_the_application_import_path():
 
 def test_application_source_lives_under_rc_metastudio_package():
     loose_python_source = sorted(
-        path.name
-        for path in (ROOT / "src").glob("*.py")
-        if path.name != "__init__.py"
+        path.name for path in (ROOT / "src").glob("*.py") if path.name != "__init__.py"
     )
 
     assert loose_python_source == []

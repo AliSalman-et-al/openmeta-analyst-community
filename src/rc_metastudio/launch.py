@@ -363,17 +363,13 @@ def _assert_wizard_layout_smoke_page(app, wizard, scenario_name):
     if body_rect.width() <= 0 or body_rect.height() <= 0:
         raise SystemExit("Wizard layout smoke saw an empty body: %s" % scenario_name)
     if wizard.wizardStyle() != QtWidgets.QWizard.ModernStyle:
-        raise SystemExit(
-            "Wizard layout smoke expected ModernStyle: %s" % scenario_name
-        )
+        raise SystemExit("Wizard layout smoke expected ModernStyle: %s" % scenario_name)
     if page.sizeHint().width() <= 0 or page.sizeHint().height() <= 0:
         raise SystemExit(
             "Wizard layout smoke saw an invalid page size hint: %s" % scenario_name
         )
     if page.width() <= 0 or page.height() <= 0:
-        raise SystemExit(
-            "Wizard layout smoke saw an unsized page: %s" % scenario_name
-        )
+        raise SystemExit("Wizard layout smoke saw an unsized page: %s" % scenario_name)
 
     _assert_visible_children_are_laid_out(page, scenario_name)
     pixmap = wizard.grab()

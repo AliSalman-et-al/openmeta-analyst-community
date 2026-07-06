@@ -16,7 +16,9 @@ class Ui_diag_explain_window(object):
         diag_explain_window.setObjectName("diag_explain_window")
         diag_explain_window.resize(510, 239)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(
+            QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
+        )
         diag_explain_window.setWindowIcon(icon)
         diag_explain_window.setModal(True)
         self.verticalLayout_2 = QtWidgets.QVBoxLayout(diag_explain_window)
@@ -37,21 +39,32 @@ class Ui_diag_explain_window(object):
         self.verticalLayout_2.addLayout(self.verticalLayout)
 
         self.retranslateUi(diag_explain_window)
-        self.buttonBox.accepted.connect(diag_explain_window.accept) # type: ignore
-        self.buttonBox.rejected.connect(diag_explain_window.reject) # type: ignore
+        self.buttonBox.accepted.connect(diag_explain_window.accept)  # type: ignore
+        self.buttonBox.rejected.connect(diag_explain_window.reject)  # type: ignore
         QtCore.QMetaObject.connectSlotsByName(diag_explain_window)
 
     def retranslateUi(self, diag_explain_window):
         _translate = QtCore.QCoreApplication.translate
-        diag_explain_window.setWindowTitle(_translate("diag_explain_window", "Diagnostic MA with Multiple Metrics"))
-        self.textBrowser.setHtml(_translate("diag_explain_window", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
-"<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
-"p, li { white-space: pre-wrap; }\n"
-"</style></head><body style=\" font-family:\'Lucida Grande\'; font-size:13pt; font-weight:400; font-style:normal;\">\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:\'MS Shell Dlg 2\'; font-size:14pt; font-weight:600;\">A note on diagnostic meta-analysis for multiple metrics</span></p>\n"
-"<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:\'MS Shell Dlg 2\'; font-size:14pt;\"><br /></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:\'MS Shell Dlg 2\'; font-size:12pt;\">It looks like you\'re conducting meta-analyses for multiple diagnostic metrics. </span></p>\n"
-"<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:\'MS Shell Dlg 2\'; font-size:12pt;\"><br /></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:\'MS Shell Dlg 2\'; font-size:12pt;\">Due to statistical properties of these metrics, different methods are available for sensitivity and specificity than are for likelihood and diagnostic odds ratios. So now we\'re going to first ask you to pick a meta-analysis method (and parameters) to use for sensitivity/specificity, and then we\'re going to ask you to pick a method to use for likelihood and diagnostic odds ratios. </span></p></body></html>"))
-        self.dont_show_again_chk_box.setText(_translate("diag_explain_window", "Don\'t show this message next time"))
+        diag_explain_window.setWindowTitle(
+            _translate("diag_explain_window", "Diagnostic MA with Multiple Metrics")
+        )
+        self.textBrowser.setHtml(
+            _translate(
+                "diag_explain_window",
+                '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd">\n'
+                '<html><head><meta name="qrichtext" content="1" /><style type="text/css">\n'
+                "p, li { white-space: pre-wrap; }\n"
+                "</style></head><body style=\" font-family:'Lucida Grande'; font-size:13pt; font-weight:400; font-style:normal;\">\n"
+                '<p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><span style=" font-family:\'MS Shell Dlg 2\'; font-size:14pt; font-weight:600;">A note on diagnostic meta-analysis for multiple metrics</span></p>\n'
+                "<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:'MS Shell Dlg 2'; font-size:14pt;\"><br /></p>\n"
+                '<p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><span style=" font-family:\'MS Shell Dlg 2\'; font-size:12pt;">It looks like you\'re conducting meta-analyses for multiple diagnostic metrics. </span></p>\n'
+                "<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:'MS Shell Dlg 2'; font-size:12pt;\"><br /></p>\n"
+                "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'MS Shell Dlg 2'; font-size:12pt;\">Due to statistical properties of these metrics, different methods are available for sensitivity and specificity than are for likelihood and diagnostic odds ratios. So now we're going to first ask you to pick a meta-analysis method (and parameters) to use for sensitivity/specificity, and then we're going to ask you to pick a method to use for likelihood and diagnostic odds ratios. </span></p></body></html>",
+            )
+        )
+        self.dont_show_again_chk_box.setText(
+            _translate("diag_explain_window", "Don't show this message next time")
+        )
+
+
 import icons_rc

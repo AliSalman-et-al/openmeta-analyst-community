@@ -152,15 +152,14 @@ ALLOWLISTED_PATHS = {
     "scripts/audit_rc_metastudio_identity.py",
 }
 
-ALLOWLISTED_PATH_PREFIXES = (
-    "docs/adr/",
-)
+ALLOWLISTED_PATH_PREFIXES = ("docs/adr/",)
 
 ALLOWLISTED_PROVENANCE_LINES = (
     re.compile(r"\bOriginal OpenMeta\[Analyst\] Project\b"),
     re.compile(r"\bderived from OpenMeta\[Analyst\]\b"),
     re.compile(r"\bOpenMeta\[Analyst\] portions\b"),
 )
+
 
 def normalized_relative_path(path: Path, root: Path) -> str:
     return path.relative_to(root).as_posix()

@@ -529,10 +529,10 @@ def test_meta_py_r_retired_obsolete_latin1_bridge_hacks():
     obsolete_tokens = [
         "_sanitize_for_R",
         "_cchar_to_str_with_latin1_fallback",
-        ".decode(\"latin-1\"",
-        ".decode(\"latin1\"",
-        ".encode(\"latin-1\"",
-        ".encode(\"latin1\"",
+        '.decode("latin-1"',
+        '.decode("latin1"',
+        '.encode("latin-1"',
+        '.encode("latin1"',
     ]
 
     offenders = [token for token in obsolete_tokens if token in text]
