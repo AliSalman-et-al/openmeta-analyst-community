@@ -746,6 +746,14 @@ class MainWizard(QWizard):
         qt_layout.fit_text_to_contents(current_page, adjust_root=False)
         qt_layout.fit_application_dialog_to_contents(self)
 
+    def showEvent(self, event):
+        super(MainWizard, self).showEvent(event)
+        qt_layout.sync_application_wizard_pages_to_body(self)
+
+    def resizeEvent(self, event):
+        super(MainWizard, self).resizeEvent(event)
+        qt_layout.sync_application_wizard_pages_to_body(self)
+
     def set_wizard_path(self, path):
         self.info_d["path"] = path
 

@@ -1053,6 +1053,53 @@ def test_wizard_refit_expands_stale_fixed_width_current_page_to_page_container()
     app.processEvents()
 
 
+def test_wizard_body_sync_repairs_late_fixed_width_page_constraints():
+    sys.path.insert(0, str(ROOT / "src"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    wizard = QtWidgets.QWizard()
+    wide_page = QtWidgets.QWizardPage()
+    wide_layout = QtWidgets.QVBoxLayout(wide_page)
+    wide_label = QtWidgets.QLabel("Detailed setup that establishes the wizard width")
+    wide_label.setMinimumWidth(560)
+    wide_layout.addWidget(wide_label)
+
+    stale_page = QtWidgets.QWizardPage()
+    stale_layout = QtWidgets.QVBoxLayout(stale_page)
+    stale_layout.addWidget(QtWidgets.QLabel("Name:"))
+    stale_layout.addWidget(QtWidgets.QLineEdit())
+
+    wizard.addPage(wide_page)
+    wizard.addPage(stale_page)
+    wizard.restart()
+    app.processEvents()
+
+    try:
+        qt_layout.fit_application_dialog_to_contents(wizard)
+        wizard.next()
+        app.processEvents()
+
+        body_width = wizard.width() - 4
+        stale_page.setMinimumWidth(220)
+        stale_page.setMaximumWidth(220)
+        stale_page.resize(220, stale_page.height())
+        app.processEvents()
+
+        assert stale_page.width() < body_width - 4
+
+        qt_layout.sync_application_wizard_pages_to_body(wizard)
+        app.processEvents()
+
+        assert stale_page.minimumWidth() >= body_width
+        assert stale_page.maximumWidth() >= body_width
+        assert stale_page.width() >= body_width - 4
+    finally:
+        wizard.close()
+        wizard.deleteLater()
+    app.processEvents()
+
+
 def test_wizard_refit_propagates_root_width_floor_to_current_page_before_reflow():
     sys.path.insert(0, str(ROOT / "src"))
     import qt_layout

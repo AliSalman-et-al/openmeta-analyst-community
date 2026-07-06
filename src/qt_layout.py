@@ -101,6 +101,7 @@ def fit_application_dialog_to_contents(root, adjust_root=True):
     _adjust_root_to_layout(root, adjust_root)
     if isinstance(root, QWizard):
         _apply_wizard_minimum_size(root)
+        sync_application_wizard_pages_to_body(root)
     else:
         _fix_dialog_to_current_layout(
             root, APPLICATION_DIALOG_MINIMUM_WIDTH, APPLICATION_DIALOG_MINIMUM_HEIGHT
@@ -123,6 +124,33 @@ def configure_application_wizard(wizard):
             QWizard.CancelButton,
         ]
     )
+
+
+def sync_application_wizard_pages_to_body(wizard):
+    """Keep app-owned wizard pages as wide as the live QWizard body area."""
+    if not isinstance(wizard, QWizard):
+        return
+
+    body_width = _application_wizard_live_body_width(wizard)
+    if body_width <= 0:
+        return
+
+    stable_width = wizard.property("oma_wizard_body_width")
+    if isinstance(stable_width, int) and stable_width > 0:
+        body_width = max(body_width, stable_width)
+    wizard.setProperty("oma_wizard_body_width", body_width)
+
+    for page in _wizard_pages(wizard):
+        _fit_wizard_page_to_contents(page, minimum_width=body_width)
+        _constrain_wrapped_labels_to_width(page, body_width)
+
+    current_page = wizard.currentPage()
+    if current_page is None:
+        return
+    if current_page.width() < body_width - 4:
+        current_page.resize(body_width, current_page.height())
+    if current_page.layout() is not None:
+        current_page.layout().activate()
 
 
 def fit_analysis_dialog_to_contents(root, adjust_root=True):
@@ -426,6 +454,20 @@ def _application_wizard_body_width(wizard):
 
     wizard.setProperty("oma_wizard_body_width", width)
     return width
+
+
+def _application_wizard_live_body_width(wizard):
+    current_page = wizard.currentPage()
+    if current_page is not None and current_page.parentWidget() is not None:
+        parent = current_page.parentWidget()
+        contents = parent.contentsRect()
+        if contents.width() > 0:
+            left_inset = max(0, current_page.geometry().left() - contents.left())
+            return max(0, contents.width() - (2 * left_inset))
+
+    if wizard.width() > 0:
+        return wizard.width()
+    return 0
 
 
 def _wizard_pages(wizard):
