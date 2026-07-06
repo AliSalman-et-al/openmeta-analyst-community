@@ -19,14 +19,21 @@ function Write-Step {
     Write-Host ("[{0}] {1}" -f (Get-Date -Format "HH:mm:ss"), $Message)
 }
 
+function Resolve-FirstCommandSource {
+    param([string]$Name)
+    $command = Get-Command $Name -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($command) { return $command.Source }
+    return $null
+}
+
 function Resolve-RRuntimeRoot {
     if ($RRuntimeRoot) { return (Resolve-Path -LiteralPath $RRuntimeRoot).ProviderPath }
     if ($env:RCMS_R_HOME) { return (Resolve-Path -LiteralPath $env:RCMS_R_HOME).ProviderPath }
     if ($env:R_HOME) { return (Resolve-Path -LiteralPath $env:R_HOME).ProviderPath }
 
-    $rCommand = Get-Command "R" -CommandType Application -ErrorAction SilentlyContinue
-    if ($rCommand) {
-        $rHome = & $rCommand.Source RHOME
+    $rCommandSource = Resolve-FirstCommandSource "R"
+    if ($rCommandSource) {
+        $rHome = & $rCommandSource RHOME
         if ($LASTEXITCODE -eq 0 -and $rHome -and (Test-Path $rHome)) {
             return (Resolve-Path -LiteralPath $rHome).ProviderPath
         }
@@ -60,8 +67,8 @@ function Resolve-RRuntimeRoot {
 function Resolve-RscriptForDefaultEvidence {
     if ($Rscript) {
         if (Test-Path $Rscript) { return (Resolve-Path -LiteralPath $Rscript).ProviderPath }
-        $command = Get-Command $Rscript -CommandType Application -ErrorAction SilentlyContinue
-        if ($command) { return $command.Source }
+        $commandSource = Resolve-FirstCommandSource $Rscript
+        if ($commandSource) { return $commandSource }
         throw "Rscript was not found at '$Rscript'."
     }
 
@@ -77,8 +84,8 @@ function Resolve-RscriptForDefaultEvidence {
         return (Resolve-Path -LiteralPath $runtimeRscript).ProviderPath
     }
 
-    $pathRscript = Get-Command "Rscript" -CommandType Application -ErrorAction SilentlyContinue
-    if ($pathRscript) { return $pathRscript.Source }
+    $pathRscript = Resolve-FirstCommandSource "Rscript"
+    if ($pathRscript) { return $pathRscript }
     return "Rscript"
 }
 
