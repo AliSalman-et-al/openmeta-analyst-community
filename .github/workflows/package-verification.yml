@@ -18,6 +18,16 @@ on:
         required: true
         default: false
         type: boolean
+      publish_release:
+        description: Upload selected package artifacts to the GitHub release.
+        required: true
+        default: false
+        type: boolean
+      release_tag:
+        description: Existing release tag to receive uploaded package artifacts.
+        required: true
+        default: v0.1.0
+        type: string
   push:
     tags:
       - "v*"
@@ -236,3 +246,73 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
           compression-level: 0
+
+  publish-release-assets:
+    name: Publish Release Assets
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.publish_release }}
+    needs:
+      - windows-package
+      - macos-package-intel
+      - macos-package-arm64
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Validate selected package lanes
+        run: |
+          if [[ "${{ inputs.build_windows }}" == "true" && "${{ needs.windows-package.result }}" != "success" ]]; then
+            echo "Windows package was selected but did not succeed: ${{ needs.windows-package.result }}" >&2
+            exit 1
+          fi
+          if [[ "${{ inputs.build_macos }}" == "true" && "${{ needs.macos-package-intel.result }}" != "success" ]]; then
+            echo "macOS Intel package was selected but did not succeed: ${{ needs.macos-package-intel.result }}" >&2
+            exit 1
+          fi
+          if [[ "${{ inputs.build_macos_arm64 }}" == "true" && "${{ needs.macos-package-arm64.result }}" != "success" ]]; then
+            echo "macOS Apple Silicon package was selected but did not succeed: ${{ needs.macos-package-arm64.result }}" >&2
+            exit 1
+          fi
+
+      - name: Download Windows package artifact
+        if: ${{ inputs.build_windows }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: RCMetaStudio-windows-x64
+          path: release-assets
+
+      - name: Download macOS Intel package artifact
+        if: ${{ inputs.build_macos }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: RCMetaStudio-macos-x64
+          path: release-assets
+
+      - name: Download macOS Apple Silicon package artifact
+        if: ${{ inputs.build_macos_arm64 }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: RCMetaStudio-macos-arm64
+          path: release-assets
+
+      - name: Upload package artifacts to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          if [[ -z "$RELEASE_TAG" ]]; then
+            echo "release_tag is required when publish_release is true." >&2
+            exit 1
+          fi
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+          shopt -s nullglob
+          assets=(release-assets/*.zip)
+          if [[ ${#assets[@]} -eq 0 ]]; then
+            echo "No release ZIP assets were downloaded." >&2
+            exit 1
+          fi
+          gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber --repo "$GITHUB_REPOSITORY"

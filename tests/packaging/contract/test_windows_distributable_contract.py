@@ -274,6 +274,7 @@ def test_package_workflow_builds_path_aware_artifacts():
         "windows-package",
         "macos-package-intel",
         "macos-package-arm64",
+        "publish-release-assets",
     } <= workflow["jobs"]
     assert workflow["env"]["RCMS_CRAN_REPO"] == "https://cloud.r-project.org"
     assert workflow["events"] == {"workflow_dispatch", "push"}
@@ -306,6 +307,12 @@ def test_package_workflow_builds_path_aware_artifacts():
     )
     assert "-RRuntimeRoot" in workflow["text"]
     assert "--r-runtime-root" in workflow["text"]
+    assert "publish_release:" in workflow["text"]
+    assert "release_tag:" in workflow["text"]
+    assert "Publish Release Assets" in workflow["text"]
+    assert "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093" in workflow["text"]
+    assert 'gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber' in workflow["text"]
+    assert "contents: write" in workflow["text"]
     assert "timeout-minutes: 45" in workflow["text"]
     assert "timeout-minutes: 60" in workflow["text"]
 
