@@ -229,7 +229,7 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
         "fast-verification",
     }
     assert workflow["env"]["RCMS_CRAN_REPO"] == "https://cloud.r-project.org"
-    assert workflow["events"] == {"workflow_dispatch", "pull_request"}
+    assert workflow["events"] == {"workflow_dispatch", "push", "pull_request"}
     assert workflow["legacy_uses"] == []
     assert all(re.fullmatch(r"[0-9a-f]{40}", ref) for _, ref, _ in workflow["uses"])
     assert "src/*" in workflow["text"]
@@ -260,6 +260,9 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
     assert "Fast Verification Gate" in workflow["text"]
     assert "pull-requests: read" in workflow["text"]
     assert "gh api --paginate" in workflow["text"]
+    assert "branches:" in workflow["text"]
+    assert "- master" in workflow["text"]
+    assert 'if [ "$EVENT_NAME" = "push" ]; then' in workflow["text"]
     assert (
         "No fast verification inputs changed; Windows lanes intentionally skipped."
         in workflow["text"]
@@ -307,6 +310,11 @@ def test_package_workflow_builds_path_aware_artifacts():
     )
     assert "-RRuntimeRoot" in workflow["text"]
     assert "--r-runtime-root" in workflow["text"]
+    assert "if: ${{ github.event_name == 'push' || inputs.build_windows }}" in workflow["text"]
+    assert "if: ${{ github.event_name == 'push' || inputs.build_macos }}" in workflow["text"]
+    assert "${{ github.event_name == 'push' || inputs.build_windows }}" in workflow["text"]
+    assert "${{ github.event_name == 'push' || inputs.build_macos }}" in workflow["text"]
+    assert "RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}" in workflow["text"]
     assert "publish_release:" in workflow["text"]
     assert "release_tag:" in workflow["text"]
     assert "Publish Release Assets" in workflow["text"]

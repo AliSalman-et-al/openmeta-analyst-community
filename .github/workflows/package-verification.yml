@@ -46,7 +46,7 @@ concurrency:
 jobs:
   windows-package:
     name: Windows Packaging Lane
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_windows }}
+    if: ${{ github.event_name == 'push' || inputs.build_windows }}
     runs-on: windows-latest
     timeout-minutes: 45
     defaults:
@@ -115,7 +115,7 @@ jobs:
 
   macos-package-intel:
     name: macOS Packaging Lane (Intel)
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_macos }}
+    if: ${{ github.event_name == 'push' || inputs.build_macos }}
     runs-on: macos-15-intel
     timeout-minutes: 60
     defaults:
@@ -249,7 +249,7 @@ jobs:
 
   publish-release-assets:
     name: Publish Release Assets
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.publish_release }}
+    if: ${{ always() && ((github.event_name == 'workflow_dispatch' && inputs.publish_release) || github.event_name == 'push') }}
     needs:
       - windows-package
       - macos-package-intel
@@ -265,11 +265,11 @@ jobs:
     steps:
       - name: Validate selected package lanes
         run: |
-          if [[ "${{ inputs.build_windows }}" == "true" && "${{ needs.windows-package.result }}" != "success" ]]; then
+          if [[ "${{ github.event_name == 'push' || inputs.build_windows }}" == "true" && "${{ needs.windows-package.result }}" != "success" ]]; then
             echo "Windows package was selected but did not succeed: ${{ needs.windows-package.result }}" >&2
             exit 1
           fi
-          if [[ "${{ inputs.build_macos }}" == "true" && "${{ needs.macos-package-intel.result }}" != "success" ]]; then
+          if [[ "${{ github.event_name == 'push' || inputs.build_macos }}" == "true" && "${{ needs.macos-package-intel.result }}" != "success" ]]; then
             echo "macOS Intel package was selected but did not succeed: ${{ needs.macos-package-intel.result }}" >&2
             exit 1
           fi
@@ -279,14 +279,14 @@ jobs:
           fi
 
       - name: Download Windows package artifact
-        if: ${{ inputs.build_windows }}
+        if: ${{ github.event_name == 'push' || inputs.build_windows }}
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: RCMetaStudio-windows-x64
           path: release-assets
 
       - name: Download macOS Intel package artifact
-        if: ${{ inputs.build_macos }}
+        if: ${{ github.event_name == 'push' || inputs.build_macos }}
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: RCMetaStudio-macos-x64
@@ -302,7 +302,7 @@ jobs:
       - name: Upload package artifacts to release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
         run: |
           if [[ -z "$RELEASE_TAG" ]]; then
             echo "release_tag is required when publish_release is true." >&2
