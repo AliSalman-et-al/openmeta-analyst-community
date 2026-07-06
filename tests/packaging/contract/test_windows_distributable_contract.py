@@ -438,9 +438,13 @@ def test_shared_r_dependency_installer_is_used_by_packagers():
 
     assert cran_default == "https://cloud.r-project.org"
     assert archive_url.endswith("/Archive/HSROC/HSROC_2.1.9.tar.gz")
-    assert {"Get-RPackageCacheKey", "Test-RDependencyPackages"} <= windows["functions"]
+    assert {
+        "Get-RPackageCacheKey",
+        "Get-Sha256FileHash",
+        "Test-RDependencyPackages",
+    } <= windows["functions"]
     assert "docs\\verification\\RCMetaR-r-dependencies.json" in windows["paths"]
-    assert ".Hash.ToLowerInvariant()" in windows["text"]
+    assert "Get-Sha256FileHash -Path $installDeps" in windows["text"]
     assert "RCMetaR/DESCRIPTION" in macos["text"]
     assert "RCMS_CRAN_REPO" in windows["text"]
     assert "RCMS_CRAN_REPO" in macos["text"]
