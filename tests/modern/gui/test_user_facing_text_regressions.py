@@ -1136,6 +1136,58 @@ def test_application_fit_allows_embedded_pages_to_fill_page_containers():
     app.processEvents()
 
 
+def test_application_fit_wraps_embedded_page_text_inside_container_width():
+    sys.path.insert(0, str(ROOT / "src"))
+    import qt_layout
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    root = QtWidgets.QDialog()
+    root_layout = QtWidgets.QVBoxLayout(root)
+
+    long_text = (
+        "This explanatory text should wrap inside the visible page area instead "
+        "of widening the containing dialog or leaving unused container chrome. "
+    ) * 4
+
+    containers_and_pages = []
+    for container in (QtWidgets.QTabWidget(), QtWidgets.QStackedWidget()):
+        page = QtWidgets.QWidget()
+        page.setMinimumSize(QtCore.QSize(180, 70))
+        page.setMaximumSize(QtCore.QSize(180, 70))
+        page_layout = QtWidgets.QVBoxLayout(page)
+        label = QtWidgets.QLabel(long_text)
+        label.setWordWrap(True)
+        page_layout.addWidget(label)
+        if isinstance(container, QtWidgets.QTabWidget):
+            container.addTab(page, "Options")
+        else:
+            container.addWidget(page)
+        root_layout.addWidget(container)
+        containers_and_pages.append((container, page))
+
+    try:
+        qt_layout.fit_application_dialog_to_contents(root)
+        root.show()
+        app.processEvents()
+        qt_layout.fit_application_dialog_to_contents(root)
+        app.processEvents()
+
+        assert root.width() < 700
+        assert root.height() < 900
+        for container, page in containers_and_pages:
+            assert page.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
+            assert page.width() >= container.contentsRect().width() - 4
+            assert (
+                page.minimumWidth()
+                >= qt_layout.APPLICATION_WRAPPED_PAGE_MINIMUM_WIDTH
+            )
+            assert page.minimumWidth() < 700
+    finally:
+        root.close()
+        root.deleteLater()
+    app.processEvents()
+
+
 def test_application_fit_propagates_root_width_floor_to_embedded_pages_before_reflow():
     sys.path.insert(0, str(ROOT / "src"))
     import qt_layout

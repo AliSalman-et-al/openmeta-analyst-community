@@ -25,6 +25,7 @@ from PyQt5.QtWidgets import (
 APPLICATION_DIALOG_MINIMUM_WIDTH = 420
 APPLICATION_DIALOG_MINIMUM_HEIGHT = 96
 APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH = 360
+APPLICATION_WRAPPED_PAGE_MINIMUM_WIDTH = 560
 
 ANALYSIS_DIALOG_MINIMUM_WIDTH = 520
 ANALYSIS_DIALOG_MINIMUM_HEIGHT = 160
@@ -83,7 +84,7 @@ def fit_application_dialog_to_contents(root, adjust_root=True):
     configure_application_wizard(root)
     _prepare_layout_managed_root(root)
     _configure_text_bearing_widgets(root)
-    _configure_container_pages(root)
+    _configure_container_pages(root, minimum_width=APPLICATION_DIALOG_MINIMUM_WIDTH)
     _configure_application_wizard_pages(root)
     constraint = (
         QLayout.SetMinimumSize if isinstance(root, QWizard) else QLayout.SetFixedSize
@@ -130,7 +131,7 @@ def fit_analysis_dialog_to_contents(root, adjust_root=True):
         return
     _prepare_layout_managed_root(root)
     _configure_text_bearing_widgets(root)
-    _configure_container_pages(root)
+    _configure_container_pages(root, minimum_width=ANALYSIS_DIALOG_MINIMUM_WIDTH)
     _clear_root_fit_maximum(root)
     _apply_layout_size_constraint(root, QLayout.SetFixedSize)
     _apply_root_minimum_size(
@@ -166,7 +167,7 @@ def fit_text_to_contents(
 
     _prepare_layout_managed_root(root)
     _configure_text_bearing_widgets(root)
-    _configure_container_pages(root)
+    _configure_container_pages(root, minimum_width=minimum_width)
     _apply_root_minimum_size(root, minimum_width, minimum_height)
     _adjust_root_to_layout(root, adjust_root)
 
@@ -177,7 +178,7 @@ def configure_resizable_window(root, minimum_width=0, minimum_height=0):
         return
     _prepare_layout_managed_root(root)
     _configure_text_bearing_widgets(root)
-    _configure_container_pages(root)
+    _configure_container_pages(root, minimum_width=minimum_width)
     _apply_layout_size_constraint(root, QLayout.SetMinimumSize)
     _apply_root_minimum_size(root, minimum_width, minimum_height)
 
@@ -398,10 +399,10 @@ def _configure_text_bearing_widgets(root):
         )
 
 
-def _configure_container_pages(root):
-    _fit_embedded_pages_to_contents(root)
-    _fit_current_wizard_page_to_contents(root)
-    _fit_wizard_page_to_contents(root)
+def _configure_container_pages(root, minimum_width=0):
+    _fit_embedded_pages_to_contents(root, minimum_width=minimum_width)
+    _fit_current_wizard_page_to_contents(root, minimum_width=minimum_width)
+    _fit_wizard_page_to_contents(root, minimum_width=minimum_width)
 
 
 def _configure_application_wizard_pages(root):
@@ -595,37 +596,53 @@ def _fit_wizard_page_to_contents(root, minimum_width=None):
     _fit_embedded_page_to_contents(root, minimum_width=minimum_width)
 
 
-def _fit_current_wizard_page_to_contents(root):
+def _fit_current_wizard_page_to_contents(root, minimum_width=None):
     if not isinstance(root, QWizard):
         return
     current_page = root.currentPage()
     if current_page is None:
         return
-    _fit_wizard_page_to_contents(current_page)
+    _fit_wizard_page_to_contents(current_page, minimum_width=minimum_width)
 
 
-def _fit_embedded_pages_to_contents(root):
+def _fit_embedded_pages_to_contents(root, minimum_width=None):
     for tab_widget in root.findChildren(QTabWidget):
         for index in range(tab_widget.count()):
-            _fit_embedded_page_to_contents(tab_widget.widget(index))
+            _fit_embedded_page_to_contents(
+                tab_widget.widget(index), minimum_width=minimum_width
+            )
 
     for stacked_widget in root.findChildren(QStackedWidget):
         for index in range(stacked_widget.count()):
-            _fit_embedded_page_to_contents(stacked_widget.widget(index))
+            _fit_embedded_page_to_contents(
+                stacked_widget.widget(index), minimum_width=minimum_width
+            )
 
 
 def _fit_embedded_page_to_contents(page, minimum_width=None):
     if page is None:
         return
+    target_width = _embedded_page_target_width(page, minimum_width)
+    if _has_wrapped_text(page):
+        _constrain_wrapped_labels_to_width(page, target_width)
+        if page.layout() is not None:
+            page.layout().activate()
     target_size = page.sizeHint()
-    if minimum_width is not None:
-        target_size = QSize(minimum_width, target_size.height())
-    elif isinstance(page, QWizardPage) and _has_wrapped_text(page):
-        target_size = QSize(_fit_base_minimum_size(page).width(), target_size.height())
+    if target_width is not None:
+        target_size = target_size.expandedTo(QSize(target_width, 0))
     page.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
     _raise_maximum_height(page, QWIDGETSIZE_MAX)
     _raise_maximum_width(page, QWIDGETSIZE_MAX)
     _set_fit_minimum_size(page, target_size)
+
+
+def _embedded_page_target_width(page, minimum_width=None):
+    width = _fit_base_minimum_size(page).width()
+    if isinstance(minimum_width, int) and minimum_width > 0:
+        width = max(width, minimum_width)
+    if _has_wrapped_text(page):
+        width = max(width, APPLICATION_WRAPPED_PAGE_MINIMUM_WIDTH)
+    return width if width > 0 else None
 
 
 def _set_fit_minimum_size(widget, target_size):
