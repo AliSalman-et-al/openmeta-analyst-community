@@ -1042,9 +1042,7 @@ def test_wizard_refit_expands_stale_fixed_width_current_page_to_page_container()
         qt_layout.fit_application_dialog_to_contents(wizard)
         app.processEvents()
 
-        page_width = wizard.minimumWidth() - (
-            wizard.width() - wizard.currentPage().width()
-        )
+        page_width = stale_page.parentWidget().contentsRect().width()
         assert stale_page.minimumWidth() >= page_width
         assert stale_page.maximumWidth() >= page_width
     finally:
@@ -1080,7 +1078,7 @@ def test_wizard_body_sync_repairs_late_fixed_width_page_constraints():
         wizard.next()
         app.processEvents()
 
-        body_width = wizard.width() - 4
+        body_width = stale_page.parentWidget().contentsRect().width()
         stale_page.setMinimumWidth(220)
         stale_page.setMaximumWidth(220)
         stale_page.resize(220, stale_page.height())

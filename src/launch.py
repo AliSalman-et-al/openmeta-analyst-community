@@ -242,8 +242,18 @@ def start_wizard_layout_smoke():
 
     import main_wizard
 
+    parent_shell = QtWidgets.QMainWindow()
+    parent_shell.resize(1600, 900)
+    parent_shell.show()
+    _flush_gui_events(app)
+
     scenarios = [
         ("startup welcome", main_wizard.MainWizard(), []),
+        (
+            "parented startup welcome",
+            main_wizard.MainWizard(parent=parent_shell),
+            [],
+        ),
         (
             "new dataset",
             main_wizard.MainWizard(path="new_dataset"),
@@ -276,6 +286,7 @@ def start_wizard_layout_smoke():
     finally:
         for _scenario_name, wizard, _actions in scenarios:
             wizard.close()
+        parent_shell.close()
         app.processEvents()
     return 0
 
@@ -326,6 +337,14 @@ def _assert_wizard_layout_smoke_page(app, wizard, scenario_name):
     body_rect = parent.contentsRect()
     if body_rect.width() <= 0 or body_rect.height() <= 0:
         raise SystemExit("Wizard layout smoke saw an empty body: %s" % scenario_name)
+    if (
+        wizard.parentWidget() is not None
+        and wizard.width() > int(wizard.parentWidget().width() * 0.75)
+    ):
+        raise SystemExit(
+            "Wizard layout smoke inherited parent shell width in %s: wizard=%s parent=%s"
+            % (scenario_name, wizard.width(), wizard.parentWidget().width())
+        )
     if page.width() < body_rect.width() - 4:
         raise SystemExit(
             "Wizard page leaves unused body width in %s: page=%s body=%s"

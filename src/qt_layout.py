@@ -26,6 +26,7 @@ APPLICATION_DIALOG_MINIMUM_WIDTH = 420
 APPLICATION_DIALOG_MINIMUM_HEIGHT = 96
 APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH = 360
 APPLICATION_WRAPPED_PAGE_MINIMUM_WIDTH = 560
+APPLICATION_WIZARD_LIVE_BODY_GROWTH_TOLERANCE = 96
 
 ANALYSIS_DIALOG_MINIMUM_WIDTH = 520
 ANALYSIS_DIALOG_MINIMUM_HEIGHT = 160
@@ -131,13 +132,16 @@ def sync_application_wizard_pages_to_body(wizard):
     if not isinstance(wizard, QWizard):
         return
 
-    body_width = _application_wizard_live_body_width(wizard)
+    content_width = _application_wizard_body_width(wizard)
+    live_body_width = _application_wizard_live_body_width(wizard)
+    body_width = content_width
+    if _wizard_should_adopt_live_body_width(
+        wizard, live_body_width, content_width
+    ):
+        body_width = live_body_width
     if body_width <= 0:
         return
 
-    stable_width = wizard.property("oma_wizard_body_width")
-    if isinstance(stable_width, int) and stable_width > 0:
-        body_width = max(body_width, stable_width)
     wizard.setProperty("oma_wizard_body_width", body_width)
 
     for page in _wizard_pages(wizard):
@@ -445,15 +449,27 @@ def _configure_application_wizard_pages(root):
 
 def _application_wizard_body_width(wizard):
     width = APPLICATION_DIALOG_MINIMUM_WIDTH
-    stable_width = wizard.property("oma_wizard_body_width")
-    if isinstance(stable_width, int) and stable_width > 0:
-        width = stable_width
 
     for page in _wizard_pages(wizard):
         width = max(width, _wizard_page_content_width(page))
 
     wizard.setProperty("oma_wizard_body_width", width)
     return width
+
+
+def _wizard_should_adopt_live_body_width(wizard, live_body_width, content_width):
+    if live_body_width <= 0:
+        return False
+    if live_body_width <= content_width:
+        return True
+
+    parent_widget = wizard.parentWidget()
+    if parent_widget is not None:
+        return live_body_width <= (
+            content_width + APPLICATION_WIZARD_LIVE_BODY_GROWTH_TOLERANCE
+        )
+
+    return True
 
 
 def _application_wizard_live_body_width(wizard):

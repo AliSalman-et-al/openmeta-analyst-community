@@ -116,6 +116,31 @@ def test_application_wizard_modern_style_renders_sized_nonblank_pages(qapp, tmp_
             qapp.processEvents()
 
 
+def test_parented_application_wizard_does_not_inherit_shell_width(qapp):
+    import main_wizard
+    import qt_layout
+
+    parent = QtWidgets.QMainWindow()
+    parent.resize(1600, 900)
+    parent.show()
+    qapp.processEvents()
+
+    wizard = main_wizard.MainWizard(parent=parent)
+    try:
+        qt_layout.show_centered(wizard)
+        qapp.processEvents()
+        qapp.processEvents()
+
+        page = wizard.currentPage()
+
+        assert wizard.width() <= int(parent.width() * 0.75)
+        assert page.width() >= page.parentWidget().contentsRect().width() - 4
+    finally:
+        wizard.close()
+        parent.close()
+        qapp.processEvents()
+
+
 def test_application_wizard_pages_do_not_use_background_pixmaps(qapp):
     import main_wizard
 

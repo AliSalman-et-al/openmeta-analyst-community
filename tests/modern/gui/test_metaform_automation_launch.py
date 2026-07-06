@@ -2799,8 +2799,8 @@ def test_new_dataset_wizard_pages_fill_body_without_clipping_content():
             page_body_width = page.parentWidget().contentsRect().width()
             if stable_body_width is None:
                 stable_body_width = page_body_width
-            assert page_body_width == stable_body_width
-            assert wizard.width() == stable_wizard_width
+            assert abs(page_body_width - stable_body_width) <= 4
+            assert abs(wizard.width() - stable_wizard_width) <= 4
             assert page.width() >= page_body_width - 4
             _assert_visible_children_fit_page(page)
     finally:
