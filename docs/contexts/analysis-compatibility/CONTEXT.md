@@ -48,12 +48,12 @@ _Avoid_: Migration complete, switch over
 The R runtime, rpy2 bridge, bundled R packages, and external R packages used to execute meta-analysis calculations.
 _Avoid_: R dependencies, statistical backend
 
-**OpenMetaR R Stack Slice**:
-The R Stack modernization increment scoped to the bundled `OpenMetaR` package, its direct runtime package declarations, and the external packages its functions call directly.
-_Avoid_: Full R dependency refresh, all CRAN transitive dependency migration
+**RCMetaR R Stack Slice**:
+The R Stack modernization increment scoped to the bundled `RCMetaR` package, its direct runtime package declarations, and the external packages its functions call directly.
+_Avoid_: OpenMetaR R Stack Slice, Full R dependency refresh, all CRAN transitive dependency migration
 
 **Default R Evidence**:
-The small R Stack check included in the Fast Verification Lane, intended to prove manifest validity and a deterministic OpenMetaR load or smoke path without running the full package/build/distributable verification sequence.
+The small R Stack check included in the Fast Verification Lane, intended to prove manifest validity and a deterministic RCMetaR load or smoke path without running the full package/build/distributable verification sequence.
 _Avoid_: R Stack verification, quick R test
 
 **Degraded Local R Evidence**:
@@ -61,7 +61,7 @@ A local-only Default R Evidence mode that reports missing or mismatched R depend
 _Avoid_: Passing CI evidence, soft CI failure
 
 **Full R Stack Evidence**:
-The opt-in, scheduled, release, or packaging-gated verification that installs the R dependency bundle, builds and checks OpenMetaR, validates installed package versions, runs R analysis smoke coverage, and exercises real rpy2 bridge behavior.
+The opt-in, scheduled, release, or packaging-gated verification that installs the R dependency bundle, builds and checks RCMetaR, validates installed package versions, runs R analysis smoke coverage, and exercises real rpy2 bridge behavior.
 _Avoid_: Required PR R check, default R test
 
 **R Dependency Cache**:
@@ -109,7 +109,7 @@ A regression test that compares modernized analysis behavior against outputs cap
 _Avoid_: Snapshot test, golden master
 
 **Modern Behavior Baseline**:
-A regression baseline captured from the maintained modern application, current R Stack, and `OpenMetaR` package after the Reference Implementation is retired as the compatibility oracle.
+A regression baseline captured from the maintained modern application, current R Stack, and `RCMetaR` package after the Reference Implementation is retired as the compatibility oracle.
 _Avoid_: Legacy golden set, reference environment
 
 **Golden Output Bundle**:
