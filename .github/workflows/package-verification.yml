@@ -85,7 +85,7 @@ jobs:
           key: bundled-r-library-v2-windows-${{ steps.r-cache-key.outputs.version }}-${{ env.RCMS_CRAN_REPO_KEY }}-${{ hashFiles('scripts/install-r-deps.R', 'docs/verification/RCMetaR-r-dependencies.json', 'r/RCMetaR/DESCRIPTION') }}
 
       - name: Build Windows package
-        run: .\scripts\package-windows.ps1 -ArtifactName RCMetaStudio-windows-x64 -RRuntimeRoot "${{ steps.r-cache-key.outputs.runtime-root }}"
+        run: .\scripts\package-windows.ps1 -ArtifactName RCMetaStudio-windows-x64 -ArchiveRootName "RCMetaStudio-${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}-windows-x64" -RRuntimeRoot "${{ steps.r-cache-key.outputs.runtime-root }}"
 
       - name: Upload Windows package artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -154,7 +154,7 @@ jobs:
           key: bundled-r-library-v2-macos-x64-${{ steps.r-cache-key.outputs.version }}-${{ env.RCMS_CRAN_REPO_KEY }}-${{ hashFiles('scripts/install-r-deps.R', 'docs/verification/RCMetaR-r-dependencies.json', 'r/RCMetaR/DESCRIPTION') }}
 
       - name: Build macOS package
-        run: bash scripts/package-macos.sh --architecture x64 --artifact-name RCMetaStudio-macos-x64 --r-runtime-root "${{ steps.r-cache-key.outputs.runtime-root }}"
+        run: bash scripts/package-macos.sh --architecture x64 --artifact-name RCMetaStudio-macos-x64 --archive-root-name "RCMetaStudio-${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}-macos-x64" --r-runtime-root "${{ steps.r-cache-key.outputs.runtime-root }}"
 
       - name: Upload macOS package artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -224,7 +224,7 @@ jobs:
           echo "The shared lock currently pins PyQt5-Qt5==5.15.2, which has no macOS arm64 wheel."
 
       - name: Build macOS package
-        run: bash scripts/package-macos.sh --architecture arm64 --artifact-name RCMetaStudio-macos-arm64 --r-runtime-root "${{ steps.r-cache-key.outputs.runtime-root }}"
+        run: bash scripts/package-macos.sh --architecture arm64 --artifact-name RCMetaStudio-macos-arm64 --archive-root-name "RCMetaStudio-${{ inputs.release_tag }}-macos-arm64" --r-runtime-root "${{ steps.r-cache-key.outputs.runtime-root }}"
 
       - name: Upload macOS package artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

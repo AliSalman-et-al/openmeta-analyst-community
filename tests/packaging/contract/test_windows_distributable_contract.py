@@ -116,9 +116,13 @@ def test_windows_distributable_contract_is_declared():
     script = ps_contract("scripts", "build-windows-package.ps1")
     spec = read_repo_text("packaging", "pyinstaller", "rc-metastudio.spec")
 
-    assert {"ArtifactName", "PythonExe", "RRuntimeRoot", "RPackageCacheRoot"} <= script[
-        "params"
-    ]
+    assert {
+        "ArtifactName",
+        "ArchiveRootName",
+        "PythonExe",
+        "RRuntimeRoot",
+        "RPackageCacheRoot",
+    } <= script["params"]
     assert {"SkipDependencyInstall", "SkipClean", "SkipSmoke"} <= script["params"]
     assert {
         "Resolve-CommandOrRepoPath",
@@ -157,6 +161,14 @@ def test_windows_distributable_contract_is_declared():
     assert "src/rc_metastudio/__main__.py" in spec
     assert "src\\rc_metastudio\\launch.py" not in script["text"]
     assert "src/rc_metastudio/launch.py" not in spec
+    assert 'if ($ArchiveRootName) { $ArchiveRootName } else { $ArtifactName }' in script["text"]
+    assert "ArchiveRootName must be a single portable directory name" in script["text"]
+    assert '$archiveStagingRoot = Join-Path $workRoot "zip-staging"' in script["text"]
+    assert "Copy-DirectoryTree -Source $SourceDirectory -Destination $ArchiveRootDirectory" in script["text"]
+    assert "CreateFromDirectory($ArchiveStagingRoot, $tmpZipPath" in script["text"]
+    assert "Assert-ZipLayout -Path $zipPath -ArchiveRootName $archiveRootName" in script["text"]
+    assert 'if (-not $entryName.StartsWith("$ArchiveRootName\\"))' in script["text"]
+    assert '$ArchiveRootName\\_internal\\PyQt5\\' in script["text"]
 
 
 def test_windows_r_cache_reinstalls_local_packages_after_cache_restore():
@@ -310,6 +322,9 @@ def test_package_workflow_builds_path_aware_artifacts():
     )
     assert "-RRuntimeRoot" in workflow["text"]
     assert "--r-runtime-root" in workflow["text"]
+    assert '-ArchiveRootName "RCMetaStudio-${{ github.event_name == \'push\' && github.ref_name || inputs.release_tag }}-windows-x64"' in workflow["text"]
+    assert '--archive-root-name "RCMetaStudio-${{ github.event_name == \'push\' && github.ref_name || inputs.release_tag }}-macos-x64"' in workflow["text"]
+    assert '--archive-root-name "RCMetaStudio-${{ inputs.release_tag }}-macos-arm64"' in workflow["text"]
     assert "if: ${{ github.event_name == 'push' || inputs.build_windows }}" in workflow["text"]
     assert "if: ${{ github.event_name == 'push' || inputs.build_macos }}" in workflow["text"]
     assert "${{ github.event_name == 'push' || inputs.build_windows }}" in workflow["text"]
@@ -356,7 +371,7 @@ def test_lane_named_local_scripts_replace_old_workflow_wrappers():
     assert "Current Version" in fast["text"]
     assert "ProgramFiles" not in smoke["text"]
     assert "ProgramFiles" not in fast["text"]
-    assert {"RPackageCacheRoot", "RRuntimeRoot"} <= package["params"]
+    assert {"ArchiveRootName", "RPackageCacheRoot", "RRuntimeRoot"} <= package["params"]
     assert {"Resolve-RRuntimeRoot", "Resolve-RscriptFromRuntime"} <= package[
         "functions"
     ]
@@ -389,6 +404,7 @@ def test_macos_distributable_contract_is_declared():
 
     assert {
         "--architecture",
+        "--archive-root-name",
         "--bundle-identifier",
         "--r-package-cache-root",
     } <= script["case_options"]
@@ -422,6 +438,14 @@ def test_macos_distributable_contract_is_declared():
     assert "src/rc_metastudio/__main__.py" in script["text"]
     assert "src/rc_metastudio/launch.py" not in script["text"]
     assert 'bundle_identifier="org.researchconsultancy.rc-metastudio"' in script["text"]
+    assert "--archive-root-name must be a single portable directory name" in script["text"]
+    assert 'archive_root_name="${archive_root_name:-$artifact_name}"' in script["text"]
+    assert 'archive_staging_root="$work_root/zip-staging"' in script["text"]
+    assert 'copy_tree "$app_bundle" "$archive_root_dir/RCMetaStudio.app"' in script["text"]
+    assert 'cd "$archive_staging_root"' in script["text"]
+    assert 'zip -qry "$tmp_zip_path" "$archive_root_name"' in script["text"]
+    assert 'name for name in names if name and not name.startswith(f"{archive_root_name}/")' in script["text"]
+    assert 'f"{archive_root_name}/RCMetaStudio.app/Contents/MacOS/RCMetaStudio"' in script["text"]
     assert (
         'bundle_identifier="org.researchconsultancy.rc-metastudio"'
         in local_script["text"]
@@ -435,6 +459,7 @@ def test_local_macos_package_script_uses_shared_build_script():
 
     assert {
         "--architecture",
+        "--archive-root-name",
         "--artifact-name",
         "--bundle-identifier",
         "--r-package-cache-root",

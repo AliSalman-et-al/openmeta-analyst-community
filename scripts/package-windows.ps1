@@ -1,5 +1,6 @@
 param(
     [string]$ArtifactName = "RCMetaStudio-windows-x64",
+    [string]$ArchiveRootName,
     [string]$RRuntimeRoot,
     [string]$RPackageCacheRoot,
     [switch]$RecreateVenv,
@@ -64,6 +65,7 @@ try {
     Write-Step "Building Windows package artifact with PyInstaller"
     $buildArgs = @{
         ArtifactName = $ArtifactName
+        ArchiveRootName = $ArchiveRootName
         PythonExe = $pythonExe
         RRuntimeRoot = $resolvedRRuntimeRoot
         RPackageCacheRoot = $RPackageCacheRoot

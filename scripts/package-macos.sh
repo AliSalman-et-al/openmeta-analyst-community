@@ -3,6 +3,7 @@ set -euo pipefail
 
 architecture=""
 artifact_name=""
+archive_root_name=""
 r_package_cache_root=""
 r_runtime_root="${RCMS_R_HOME:-${R_HOME:-}}"
 recreate_venv=0
@@ -19,6 +20,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --artifact-name)
       artifact_name="$2"
+      shift 2
+      ;;
+    --archive-root-name)
+      archive_root_name="$2"
       shift 2
       ;;
     --r-package-cache-root)
@@ -117,6 +122,7 @@ fi
 build_args=(
   --architecture "$architecture"
   --artifact-name "$artifact_name"
+  --archive-root-name "${archive_root_name:-$artifact_name}"
   --bundle-identifier "$bundle_identifier"
   --python-exe "$python_exe"
   --r-runtime-root "$r_runtime_root"

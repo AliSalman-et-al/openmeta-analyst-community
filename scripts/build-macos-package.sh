@@ -2,6 +2,7 @@
 set -euo pipefail
 
 artifact_name=""
+archive_root_name=""
 architecture=""
 python_exe=""
 r_runtime_root="${RCMS_R_HOME:-${R_HOME:-}}"
@@ -15,6 +16,10 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --artifact-name)
       artifact_name="$2"
+      shift 2
+      ;;
+    --archive-root-name)
+      archive_root_name="$2"
       shift 2
       ;;
     --architecture)
@@ -172,6 +177,13 @@ dist_root="$repo_root/build/macos-package/$architecture/dist"
 work_root="$repo_root/build/macos-package/$architecture/work"
 app_bundle="$dist_root/RCMetaStudio.app"
 app_root="$app_bundle/Contents/MacOS"
+archive_root_name="${archive_root_name:-$artifact_name}"
+if [[ -z "$archive_root_name" || "$archive_root_name" == *"/"* || "$archive_root_name" == *"\\"* ]]; then
+  echo "--archive-root-name must be a single portable directory name." >&2
+  exit 2
+fi
+archive_staging_root="$work_root/zip-staging"
+archive_root_dir="$archive_staging_root/$archive_root_name"
 zip_path="$artifact_dir/$artifact_name.zip"
 tmp_zip_path="$zip_path.tmp"
 r_package_cache_root="${r_package_cache_root:-$artifact_dir/r-library-cache}"
@@ -384,26 +396,37 @@ fi
 
 (
   step "Creating macOS artifact ZIP"
-  cd "$dist_root"
-  zip -qry "$tmp_zip_path" "RCMetaStudio.app"
+  rm -rf "$archive_staging_root"
+  copy_tree "$app_bundle" "$archive_root_dir/RCMetaStudio.app"
+  cd "$archive_staging_root"
+  zip -qry "$tmp_zip_path" "$archive_root_name"
 )
 mv "$tmp_zip_path" "$zip_path"
 
-python3 - "$zip_path" <<'PY'
+python3 - "$zip_path" "$archive_root_name" <<'PY'
 import sys
 import zipfile
 
 zip_path = sys.argv[1]
+archive_root_name = sys.argv[2].rstrip("/")
 required = [
-    "RCMetaStudio.app/Contents/MacOS/RCMetaStudio",
-    "RCMetaStudio.app/Contents/MacOS/sample_projects/BCG.rcms",
-    "RCMetaStudio.app/Contents/MacOS/sample_projects/amino.rcms",
-    "RCMetaStudio.app/Contents/MacOS/R/bin/Rscript",
-    "RCMetaStudio.app/Contents/MacOS/R/library/RCMetaR/DESCRIPTION",
-    "RCMetaStudio.app/Contents/MacOS/LaunchRCMetaStudio.command",
+    f"{archive_root_name}/RCMetaStudio.app/Contents/MacOS/RCMetaStudio",
+    f"{archive_root_name}/RCMetaStudio.app/Contents/MacOS/sample_projects/BCG.rcms",
+    f"{archive_root_name}/RCMetaStudio.app/Contents/MacOS/sample_projects/amino.rcms",
+    f"{archive_root_name}/RCMetaStudio.app/Contents/MacOS/R/bin/Rscript",
+    f"{archive_root_name}/RCMetaStudio.app/Contents/MacOS/R/library/RCMetaR/DESCRIPTION",
+    f"{archive_root_name}/RCMetaStudio.app/Contents/MacOS/LaunchRCMetaStudio.command",
 ]
 with zipfile.ZipFile(zip_path) as archive:
     names = set(archive.namelist())
+outside_root = [
+    name for name in names if name and not name.startswith(f"{archive_root_name}/")
+]
+if outside_root:
+    raise SystemExit(
+        "Created ZIP has entries outside "
+        f"{archive_root_name}: " + ", ".join(sorted(outside_root)[:10])
+    )
 missing = [path for path in required if path not in names]
 if missing:
     raise SystemExit("Created ZIP is missing: " + ", ".join(missing))

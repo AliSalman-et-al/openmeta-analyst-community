@@ -1,5 +1,6 @@
 param(
     [string]$ArtifactName = "RCMetaStudio-windows-x64",
+    [string]$ArchiveRootName,
     [string]$PythonExe = "python",
     [string]$RRuntimeRoot,
     [string]$RPackageCacheRoot,
@@ -16,6 +17,12 @@ $artifactDir = Join-Path $repoRoot "artifacts"
 $distRoot = Join-Path $repoRoot "build\windows-package\dist"
 $workRoot = Join-Path $repoRoot "build\windows-package\work"
 $appDir = Join-Path $distRoot "RCMetaStudio"
+$archiveRootName = if ($ArchiveRootName) { $ArchiveRootName } else { $ArtifactName }
+if ($archiveRootName -match '[\\/:*?"<>|]') {
+    throw "ArchiveRootName must be a single portable directory name, not '$archiveRootName'."
+}
+$archiveStagingRoot = Join-Path $workRoot "zip-staging"
+$archiveRootDir = Join-Path $archiveStagingRoot $archiveRootName
 $zipPath = Join-Path $artifactDir "$ArtifactName.zip"
 $tmpZipPath = "$zipPath.tmp"
 if (-not $RPackageCacheRoot) {
@@ -149,27 +156,34 @@ function Invoke-PackagedWizardLayoutSmokeTest {
 }
 
 function Compress-AppDirectory {
-    param([string]$SourceDirectory, [string]$DestinationPath)
+    param([string]$SourceDirectory, [string]$ArchiveStagingRoot, [string]$ArchiveRootDirectory, [string]$DestinationPath)
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     if (Test-Path $DestinationPath) { Remove-Item -LiteralPath $DestinationPath -Force }
     if (Test-Path $tmpZipPath) { Remove-Item -LiteralPath $tmpZipPath -Force }
-    [System.IO.Compression.ZipFile]::CreateFromDirectory($SourceDirectory, $tmpZipPath, [System.IO.Compression.CompressionLevel]::Fastest, $false)
+    if (Test-Path $ArchiveStagingRoot) { Remove-Item -LiteralPath $ArchiveStagingRoot -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $ArchiveStagingRoot | Out-Null
+    Copy-DirectoryTree -Source $SourceDirectory -Destination $ArchiveRootDirectory
+    [System.IO.Compression.ZipFile]::CreateFromDirectory($ArchiveStagingRoot, $tmpZipPath, [System.IO.Compression.CompressionLevel]::Fastest, $false)
     Move-Item -LiteralPath $tmpZipPath -Destination $DestinationPath -Force
 }
 
 function Assert-ZipLayout {
-    param([string]$Path)
+    param([string]$Path, [string]$ArchiveRootName)
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $zip = [System.IO.Compression.ZipFile]::OpenRead($Path)
     try {
         $entryNames = @{}
         foreach ($entry in $zip.Entries) { $entryNames[$entry.FullName -replace "/", "\"] = $true }
+        foreach ($entryName in $entryNames.Keys) {
+            if (-not $entryName.StartsWith("$ArchiveRootName\")) { throw "Created ZIP entry is outside '$ArchiveRootName': $entryName" }
+        }
         foreach ($requiredEntry in @("RCMetaStudio.exe", "sample_projects\BCG.rcms", "sample_projects\amino.rcms", "R\bin\x64\R.dll", "R\library\RCMetaR\DESCRIPTION", "LaunchRCMetaStudio.bat")) {
+            $requiredEntry = Join-Path $ArchiveRootName $requiredEntry
             if (-not $entryNames.ContainsKey($requiredEntry)) { throw "Created ZIP is missing '$requiredEntry'." }
         }
         $hasPyQt5Runtime = $false
         foreach ($entryName in $entryNames.Keys) {
-            if ($entryName.StartsWith("_internal\PyQt5\")) {
+            if ($entryName.StartsWith("$ArchiveRootName\_internal\PyQt5\")) {
                 $hasPyQt5Runtime = $true
                 break
             }
@@ -442,6 +456,6 @@ if (-not $SkipSmoke) {
     Invoke-PackagedAppSmokeTest -Root $appDir
     Invoke-PackagedWizardLayoutSmokeTest -Root $appDir
 }
-Compress-AppDirectory -SourceDirectory $appDir -DestinationPath $zipPath
-Assert-ZipLayout -Path $zipPath
+Compress-AppDirectory -SourceDirectory $appDir -ArchiveStagingRoot $archiveStagingRoot -ArchiveRootDirectory $archiveRootDir -DestinationPath $zipPath
+Assert-ZipLayout -Path $zipPath -ArchiveRootName $archiveRootName
 Write-Host "Created $zipPath"
