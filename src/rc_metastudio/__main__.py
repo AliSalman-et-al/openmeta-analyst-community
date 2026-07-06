@@ -7,10 +7,12 @@ from pathlib import Path
 
 
 def _ensure_transitional_source_path() -> None:
-    src_root = Path(__file__).resolve().parents[1]
-    src_root_text = str(src_root)
-    if src_root_text not in sys.path:
-        sys.path.insert(0, src_root_text)
+    package_root = Path(__file__).resolve().parent
+    forms_root = package_root / "forms"
+    for path in (package_root, forms_root):
+        path_text = str(path)
+        if path_text not in sys.path:
+            sys.path.insert(0, path_text)
 
 
 def main() -> int:

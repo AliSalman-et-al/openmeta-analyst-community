@@ -12,11 +12,11 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 VALIDATOR = REPO_ROOT / "scripts" / "validate_RCMetaR_r_manifests.py"
 DEPENDENCY_MANIFEST = Path("docs") / "modernization" / "RCMetaR-r-dependencies.json"
 DRIFT_MANIFEST = Path("docs") / "modernization" / "RCMetaR-statistical-drift.json"
-RCMetaR_PACKAGE = REPO_ROOT / "src" / "R" / "RCMetaR"
+RCMetaR_PACKAGE = REPO_ROOT / "r" / "RCMetaR"
 RCMetaR_R_DIR = RCMetaR_PACKAGE / "R"
 RCMetaR_DESCRIPTION = RCMetaR_PACKAGE / "DESCRIPTION"
 RCMetaR_NAMESPACE = RCMetaR_PACKAGE / "NAMESPACE"
-APP_SRC = REPO_ROOT / "src"
+APP_SRC = REPO_ROOT / "src" / "rc_metastudio"
 
 LEGACY_EXPORT_PATTERN = re.compile(
     r"^([A-Za-z][A-Za-z0-9._]*)\s*<-\s*function\s*\(", re.MULTILINE

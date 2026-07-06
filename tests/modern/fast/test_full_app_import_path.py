@@ -3,6 +3,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
+APP_PACKAGE = ROOT / "src" / "rc_metastudio"
 
 RETIRED_LEGACY_MODULES = {
     "edit_forest_plot_form.py",
@@ -40,9 +41,29 @@ def test_full_app_import_path_has_no_python2_syntax():
         "edit_list_models.py",
         "meta_py_r.py",
     ]:
-        py_compile.compile(str(ROOT / "src" / module), doraise=True)
+        py_compile.compile(str(APP_PACKAGE / module), doraise=True)
 
 
 def test_retired_legacy_modules_are_not_on_the_modern_import_path():
     for module in RETIRED_LEGACY_MODULES:
-        assert not (ROOT / "src" / module).exists()
+        assert not (APP_PACKAGE / module).exists()
+
+
+def test_application_source_lives_under_rc_metastudio_package():
+    loose_python_source = sorted(
+        path.name
+        for path in (ROOT / "src").glob("*.py")
+        if path.name != "__init__.py"
+    )
+
+    assert loose_python_source == []
+    assert (APP_PACKAGE / "launch.py").exists()
+    assert (APP_PACKAGE / "forms" / "ui_binary_data_form.py").exists()
+    assert (APP_PACKAGE / "images" / "icons.qrc").exists()
+
+
+def test_polyglot_roots_hold_r_package_and_packaging_definitions():
+    assert (ROOT / "r" / "RCMetaR" / "DESCRIPTION").exists()
+    assert (ROOT / "packaging" / "pyinstaller" / "rc-metastudio.spec").exists()
+    assert not (ROOT / "src" / "R" / "RCMetaR").exists()
+    assert not (ROOT / "src" / "OpenMetaAnalyst.spec").exists()

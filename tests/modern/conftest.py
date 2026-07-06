@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -8,6 +9,13 @@ import pytest
 # Modern tests run without a live R backend; use the pure-Python stub.
 os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+_ROOT = Path(__file__).resolve().parents[2]
+_APP_PACKAGE = _ROOT / "src" / "rc_metastudio"
+for _path in (_APP_PACKAGE, _APP_PACKAGE / "forms"):
+    _path_text = str(_path)
+    if _path_text not in sys.path:
+        sys.path.insert(0, _path_text)
 
 _QAPPLICATION = None
 
@@ -36,8 +44,7 @@ def _qapplication_for_qt_test_selections(request):
 
 
 def _taxonomy_entries():
-    root = Path(__file__).resolve().parents[2]
-    taxonomy_path = root / "docs" / "modernization" / "test-taxonomy.json"
+    taxonomy_path = _ROOT / "docs" / "modernization" / "test-taxonomy.json"
     try:
         taxonomy = json.loads(taxonomy_path.read_text(encoding="utf-8"))
     except FileNotFoundError:

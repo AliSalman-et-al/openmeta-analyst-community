@@ -11,7 +11,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$srcDir = Join-Path $repoRoot "src"
+$appSourceDir = Join-Path (Join-Path $repoRoot "src") "rc_metastudio"
 $artifactDir = Join-Path $repoRoot "artifacts"
 $distRoot = Join-Path $repoRoot "build\modern-windows\dist"
 $workRoot = Join-Path $repoRoot "build\modern-windows\work"
@@ -187,7 +187,7 @@ function Get-RPackageCacheKey {
     $cranRepo = if ($env:RCMS_CRAN_REPO) { $env:RCMS_CRAN_REPO } else { "https://cloud.r-project.org" }
     $installDeps = Join-Path $repoRoot "scripts\install-modern-r-deps.R"
     $manifest = Join-Path $repoRoot "docs\modernization\RCMetaR-r-dependencies.json"
-    $description = Join-Path $repoRoot "src\R\RCMetaR\DESCRIPTION"
+    $description = Join-Path $repoRoot "r\RCMetaR\DESCRIPTION"
     $hashInput = @(
         (Get-FileHash -Algorithm SHA256 -LiteralPath $installDeps).Hash.ToLowerInvariant()
         (Get-FileHash -Algorithm SHA256 -LiteralPath $manifest).Hash.ToLowerInvariant()
@@ -281,7 +281,7 @@ function Install-LocalRPackagesFromSource {
     $packageBuildRoot = Join-Path $workRoot "r-package-build"
     if (Test-Path $packageBuildRoot) { Remove-Item -LiteralPath $packageBuildRoot -Recurse -Force }
     New-Item -ItemType Directory -Force -Path $packageBuildRoot | Out-Null
-    Copy-Item -Path (Join-Path $srcDir "R\RCMetaR") -Destination (Join-Path $packageBuildRoot "RCMetaR") -Recurse -Force
+    Copy-Item -Path (Join-Path $repoRoot "r\RCMetaR") -Destination (Join-Path $packageBuildRoot "RCMetaR") -Recurse -Force
     Get-ChildItem -Path $packageBuildRoot -Recurse -Include *.o,*.so,*.dll | Remove-Item -Force
 
     & $rExe CMD INSTALL --library="$rLibrary" (Join-Path $packageBuildRoot "RCMetaR")
@@ -369,21 +369,22 @@ if (Test-Path $tmpZipPath) { Remove-Item -LiteralPath $tmpZipPath -Force }
 New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 $resolvedRRuntimeRoot = Resolve-RRuntimeRoot
 
-Push-Location $srcDir
+Push-Location $repoRoot
 try {
     $env:RPY2_CFFI_MODE = "ABI"
     $pyInstallerArgs = @(
         "--noconfirm",
         "--windowed",
         "--name", "RCMetaStudio",
-        "--icon", "images\rc-metastudio-app-icon.ico",
+        "--icon", "src\rc_metastudio\images\rc-metastudio-app-icon.ico",
         "--distpath", $distRoot,
         "--workpath", $workRoot,
-        "--paths", "forms",
+        "--paths", $appSourceDir,
+        "--paths", (Join-Path $appSourceDir "forms"),
         "--hidden-import", "icons_rc",
         "--hidden-import", "rpy2.robjects",
         "--hidden-import", "rpy2.rinterface",
-        "launch.py"
+        "src\rc_metastudio\launch.py"
     )
     if (-not $SkipClean) {
         $pyInstallerArgs = @("--clean") + $pyInstallerArgs

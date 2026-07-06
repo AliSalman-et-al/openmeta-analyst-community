@@ -12,7 +12,7 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", 
 _METRIC_LABEL_DRIVER = textwrap.dedent(
     r"""
     repo <- normalizePath(__REPO_ROOT__, winslash = "/")
-    suppressPackageStartupMessages(source(file.path(repo, "src/R/RCMetaR/R/plotting.r")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/plotting.r")))
 
     expected <- list(
       OR = "Odds Ratio",

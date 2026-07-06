@@ -64,7 +64,7 @@ def test_dataset_group_and_follow_up_order_is_stable_across_hash_seeds():
         env = os.environ.copy()
         env["RCMS_STUB_BACKEND"] = "1"
         env["PYTHONHASHSEED"] = seed
-        env["PYTHONPATH"] = os.path.abspath("src")
+        env["PYTHONPATH"] = os.path.abspath(os.path.join("src", "rc_metastudio"))
         result = subprocess.run(
             [sys.executable, "-c", script],
             check=True,

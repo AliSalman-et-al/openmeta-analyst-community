@@ -6,4 +6,4 @@ Regenerate the checked-in Python UI modules from the canonical Qt Designer files
 python scripts/regenerate-pyqt5-ui.py
 ```
 
-The script compiles `src/*.ui` and `src/forms/*.ui` with PyQt5 and rebuilds `src/forms/icons_rc.py` from `src/images/icons.qrc`.
+The script compiles Qt Designer files under `src/rc_metastudio/forms/*.ui` with PyQt5 and rebuilds `src/rc_metastudio/forms/icons_rc.py` from `src/rc_metastudio/images/icons.qrc`.

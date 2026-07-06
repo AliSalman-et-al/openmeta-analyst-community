@@ -149,7 +149,7 @@ def test_modern_windows_distributable_contract_is_declared():
         "LaunchRCMetaStudio.bat",
         "scripts\\install-modern-r-deps.R",
         "docs\\modernization\\RCMetaR-r-dependencies.json",
-        "src\\R\\RCMetaR\\DESCRIPTION",
+        "r\\RCMetaR\\DESCRIPTION",
     } <= script["paths"]
 
 
@@ -437,7 +437,7 @@ def test_macos_packager_resolves_relative_python_before_changing_directory():
     assert relative_order(
         script,
         'python_exe="$(repo_path "$python_exe")"',
-        'cd "$src_dir"',
+        'cd "$repo_root"\n  pyinstaller_args=(',
         '"$python_exe" -m PyInstaller',
     )
 

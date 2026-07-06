@@ -84,7 +84,7 @@ This checklist defines the first modernization milestone for RC MetaStudio Commu
 - Normalize legacy text and variant types at project-file, model, and R-bridge boundaries. See [ADR 0015](../adr/0015-normalize-text-and-variant-types-at-boundaries.md).
 - Migrate PyQt signals by compatibility slice rather than with a global rewrite. See [ADR 0016](../adr/0016-migrate-pyqt-signals-by-compatibility-slice.md).
 - Avoid a broad PyQt4 compatibility shim; use direct PyQt5 replacements or small focused helpers. See [ADR 0040](../adr/0040-avoid-a-broad-pyqt4-compatibility-shim.md).
-- Do not install fake `PyQt4` modules on the modern path. Use `src/modern_compat.py` only for R-backend bootstrap, and keep project-file compatibility in `src/legacy_pickle.py`. See [ADR 0054](../adr/0054-retire-the-fake-pyqt4-runtime-surface.md).
+- Do not install fake `PyQt4` modules on the modern path. Use `src/rc_metastudio/modern_compat.py` only for R-backend bootstrap, and keep project-file compatibility in `src/rc_metastudio/project_pickle.py`. See [ADR 0054](../adr/0054-retire-the-fake-pyqt4-runtime-surface.md).
 
 ## Environment and Packaging
 

@@ -30,6 +30,12 @@ package-dir = {"" = "src"}
 where = ["src"]
 include = ["rc_metastudio*"]
 
+[tool.setuptools.package-data]
+rc_metastudio = [
+    "forms/*.ui",
+    "images/**/*",
+]
+
 [tool.pytest.ini_options]
 markers = [
     "fast: default fast verification lane tests.",

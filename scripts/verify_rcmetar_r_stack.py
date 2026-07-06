@@ -13,7 +13,7 @@ import tempfile
 from pathlib import Path
 
 
-RCMetaR_PACKAGE = Path("src") / "R" / "RCMetaR"
+RCMetaR_PACKAGE = Path("r") / "RCMetaR"
 R_DEP_INSTALLER = Path("scripts") / "install-modern-r-deps.R"
 R_SMOKE_TEST = Path("scripts") / "analysis-smoke-test.R"
 R_MANIFEST_VALIDATOR = Path("scripts") / "validate_rcmetar_r_manifests.py"

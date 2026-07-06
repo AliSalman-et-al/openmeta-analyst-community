@@ -58,7 +58,7 @@ done
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
-src_dir="$repo_root/src"
+app_source_dir="$repo_root/src/rc_metastudio"
 artifact_dir="$repo_root/artifacts"
 
 step() {
@@ -219,7 +219,7 @@ mkdir -p "$artifact_dir"
 require_free_space_gb "$repo_root" 6
 
 (
-  cd "$src_dir"
+  cd "$repo_root"
   pyinstaller_args=(
     --noconfirm
     --windowed
@@ -228,11 +228,12 @@ require_free_space_gb "$repo_root" 6
     --osx-bundle-identifier "$bundle_identifier"
     --distpath "$dist_root"
     --workpath "$work_root"
-    --paths forms
+    --paths "$app_source_dir"
+    --paths "$app_source_dir/forms"
     --hidden-import icons_rc
     --hidden-import rpy2.robjects
     --hidden-import rpy2.rinterface
-    launch.py
+    src/rc_metastudio/launch.py
   )
   if [ "$skip_clean" -eq 0 ]; then
     pyinstaller_args=(--clean "${pyinstaller_args[@]}")
@@ -281,7 +282,7 @@ sha256_stdin_12() {
 r_dependency_policy_hash="$({
   printf '%s' "$(sha256_file "$repo_root/scripts/install-modern-r-deps.R")"
   printf '%s' "$(sha256_file "$repo_root/docs/modernization/RCMetaR-r-dependencies.json")"
-  printf '%s' "$(sha256_file "$repo_root/src/R/RCMetaR/DESCRIPTION")"
+  printf '%s' "$(sha256_file "$repo_root/r/RCMetaR/DESCRIPTION")"
   printf '%s' "${RCMS_CRAN_REPO:-https://cloud.r-project.org}"
 } | sha256_stdin_12)"
 r_package_cache_key="${r_version_cache_key}-rdeps-${r_dependency_policy_hash}"
@@ -323,7 +324,7 @@ install_local_r_packages() {
   local package_build_root="$work_root/r-package-build"
   rm -rf "$package_build_root"
   mkdir -p "$package_build_root"
-  cp -R "$src_dir/R/RCMetaR" "$package_build_root/RCMetaR"
+  cp -R "$repo_root/r/RCMetaR" "$package_build_root/RCMetaR"
   find "$package_build_root" \( -name '*.o' -o -name '*.so' -o -name '*.dll' \) -delete
 
   R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$r_binary" CMD INSTALL --library="$r_lib" "$package_build_root/RCMetaR"

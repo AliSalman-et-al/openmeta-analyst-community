@@ -80,7 +80,7 @@ Steps:
 
 1. Replace the hard-coded CRAN origin with a configurable repository value, such as `RCMS_CRAN_REPO`, defaulting to a documented reliable binary-capable mirror.
 2. Evaluate and document using Posit Package Manager or another reliable CRAN mirror for faster binary/package resolution where appropriate.
-3. Include CRAN repository policy, R version, installer script hash, dependency manifest hash, and `src/R/RCMetaR/DESCRIPTION` hash in R cache keys.
+3. Include CRAN repository policy, R version, installer script hash, dependency manifest hash, and `r/RCMetaR/DESCRIPTION` hash in R cache keys.
 4. Use a persistent local R package cache root for Full R Stack Evidence so local re-runs do not always rebuild from an empty temporary library.
 5. Keep CI cache restoration explicit and visible. Cache dependency libraries; never cache final app directories or ZIPs as trusted outputs. Do not use broad restore prefixes for R library caches because stale cache directories can make each saved cache larger than the active dependency library.
 6. Keep archived `HSROC` pinned to the exact archive URL/version unless a future ADR changes it.

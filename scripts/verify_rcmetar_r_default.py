@@ -13,7 +13,7 @@ import tempfile
 from pathlib import Path
 
 
-RCMetaR_PACKAGE = Path("src") / "R" / "RCMetaR"
+RCMetaR_PACKAGE = Path("r") / "RCMetaR"
 DEFAULT_R_VERIFIER = Path("scripts") / "verify_rcmetar_r_default.py"
 R_MANIFEST_VALIDATOR = Path("scripts") / "validate_rcmetar_r_manifests.py"
 DEFAULT_CRAN_REPO = "https://cloud.r-project.org"

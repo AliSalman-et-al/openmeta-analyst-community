@@ -19,9 +19,9 @@ _BIVARIATE_SUMMARY_DRIVER = textwrap.dedent(
       quit(status=42)
     }
 
-    suppressPackageStartupMessages(source(file.path(repo, "src/R/RCMetaR/R/classes.r")))
-    suppressPackageStartupMessages(source(file.path(repo, "src/R/RCMetaR/R/utilities.r")))
-    suppressPackageStartupMessages(source(file.path(repo, "src/R/RCMetaR/R/diagnostic_methods.r")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/classes.r")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/utilities.r")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/diagnostic_methods.r")))
 
     work <- tempfile("bivariate_summary_")
     dir.create(work)

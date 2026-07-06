@@ -6,12 +6,12 @@ The Full Legacy App Port covers all non-network desktop workflows before Release
 
 ## Inventory Sources
 
-- `src/meta.ui` and generated `src/ui_meta.py` for main-window menus, toolbar actions, and visible controls.
-- `src/meta_form.py` for action handlers, navigation behavior, project open/save, analysis dispatch, and result display.
-- `src/main_wizard.py` and `src/forms/*.ui` for startup, dataset creation, and CSV import workflows.
+- `src/rc_metastudio/forms/meta.ui` and generated `src/rc_metastudio/ui_meta.py` for main-window menus, toolbar actions, and visible controls.
+- `src/rc_metastudio/meta_form.py` for action handlers, navigation behavior, project open/save, analysis dispatch, and result display.
+- `src/rc_metastudio/main_wizard.py` and `src/rc_metastudio/forms/*.ui` for startup, dataset creation, and CSV import workflows.
 - `doc/*.html` and `doc/images/*` for documented user workflows and expected concepts.
 - `sample_projects/*.rcms` for representative legacy projects.
-- `src/R/RCMetaR` and related R analysis calls for preserved Analysis Behavior.
+- `r/RCMetaR` and related R analysis calls for preserved Analysis Behavior.
 
 ## Release Cutover Scope
 

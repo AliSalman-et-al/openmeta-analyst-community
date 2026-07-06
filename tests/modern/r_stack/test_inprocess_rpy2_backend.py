@@ -305,7 +305,7 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
             else r_lib + os.pathsep + existing_r_libs
         )
         install = subprocess.run(
-            [r_exe, "CMD", "INSTALL", "--library=" + r_lib, os.path.join(repo_root, "src", "R", "RCMetaR")],
+            [r_exe, "CMD", "INSTALL", "--library=" + r_lib, os.path.join(repo_root, "r", "RCMetaR")],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             universal_newlines=True,
@@ -565,7 +565,7 @@ _HSROC_SUMMARY_DRIVER = textwrap.dedent(
     assert parsed_direct["texts"]["Other Summary"] == "Lower bound Upper bound", parsed_direct
     assert parsed_direct["texts"]["Raw Text Summary"] == "Lower bound Upper bound", parsed_direct
 
-    classes_path = os.path.join(repo_root, "src", "R", "RCMetaR", "R", "classes.r")
+    classes_path = os.path.join(repo_root, "r", "RCMetaR", "R", "classes.r")
     ro.r("source(%r)" % classes_path.replace(os.sep, "/"))
     context_summary = ro.r(
         '''
@@ -631,7 +631,7 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
             else r_lib + os.pathsep + existing_r_libs
         )
         install = subprocess.run(
-            [r_exe, "CMD", "INSTALL", "--library=" + r_lib, os.path.join(repo_root, "src", "R", "RCMetaR")],
+            [r_exe, "CMD", "INSTALL", "--library=" + r_lib, os.path.join(repo_root, "r", "RCMetaR")],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             universal_newlines=True,
