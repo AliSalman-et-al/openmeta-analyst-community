@@ -55,6 +55,24 @@ function Copy-DirectoryTree {
     $global:LASTEXITCODE = 0
 }
 
+function Get-Sha256FileHash {
+    param([string]$Path)
+    $resolvedPath = (Resolve-Path -LiteralPath $Path).ProviderPath
+    $stream = [System.IO.File]::OpenRead($resolvedPath)
+    try {
+        $sha256 = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            return [System.BitConverter]::ToString($sha256.ComputeHash($stream)).Replace("-", "").ToLowerInvariant()
+        }
+        finally {
+            $sha256.Dispose()
+        }
+    }
+    finally {
+        $stream.Dispose()
+    }
+}
+
 function Assert-AppLayout {
     param([string]$Root)
     Assert-PathExists -Path (Join-Path $Root "RCMetaStudio.exe") -Description "RCMetaStudio executable"
@@ -188,9 +206,9 @@ function Get-RPackageCacheKey {
     $manifest = Join-Path $repoRoot "docs\verification\RCMetaR-r-dependencies.json"
     $description = Join-Path $repoRoot "r\RCMetaR\DESCRIPTION"
     $hashInput = @(
-        (Get-FileHash -Algorithm SHA256 -LiteralPath $installDeps).Hash.ToLowerInvariant()
-        (Get-FileHash -Algorithm SHA256 -LiteralPath $manifest).Hash.ToLowerInvariant()
-        (Get-FileHash -Algorithm SHA256 -LiteralPath $description).Hash.ToLowerInvariant()
+        (Get-Sha256FileHash -Path $installDeps)
+        (Get-Sha256FileHash -Path $manifest)
+        (Get-Sha256FileHash -Path $description)
         $cranRepo
     ) -join ""
     $policyHash = [System.BitConverter]::ToString(
