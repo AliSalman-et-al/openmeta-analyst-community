@@ -1,95 +1,75 @@
-# OpenMeta[Analyst] Community
+# RC MetaStudio
 
-OpenMeta[Analyst] Community is a community-maintained fork of the original OpenMeta[Analyst] project. It is not affiliated with or endorsed by Brown University or the original maintainers.
+RC MetaStudio is open-source desktop software for advanced meta-analysis, developed and maintained by Research Consultancy (RC).
 
-OpenMeta[Analyst] is an open-source application for conducting meta-analyses from a graphical desktop interface.
+RC MetaStudio is derived from the Original OpenMeta[Analyst] Project and is independently maintained by Ali Salman and RC MetaStudio contributors. See [NOTICE.md](NOTICE.md) for original-project provenance, current maintainership, license posture, warranty terms, and the affiliation disclaimer.
+
+## What It Provides
+
+- A graphical desktop workflow for study data entry, meta-analysis setup, and result review.
+- Python 3.11 and PyQt5 application code for the maintained desktop path.
+- The bundled private RCMetaR R package interface for R-backed analysis behavior.
+- `.rcms` project files as the maintained RC MetaStudio project-file identity.
+
+Analysis behavior is preserved unless a reviewed compatibility exception or statistical modernization drift record says otherwise.
 
 ## Running From Source
 
-The maintained application path uses Python 3.11, PyQt5, and the uv-managed environment committed in `pyproject.toml` and `uv.lock`.
+Use the locked uv environment from the repository root:
 
 ```powershell
 uv sync --locked
 uv run python src\launch.py
 ```
 
-## R Dependencies
+Developer source runs need an R installation with the packages used by the analysis backend. Normal desktop users should not need to install R packages manually when using a packaged release.
 
-Normal desktop users do not need to manually install R or R packages before running the Windows distributable. Developer source runs need an R installation with the packages used by the analysis backend.
-
-Install the required R packages. The installer uses `OMA_CRAN_REPO` when set and defaults to `https://cloud.r-project.org`.
+Install the required R packages into a local R library:
 
 ```r
 Sys.setenv(R_LIBS_USER = "path/to/local/r-library")
-Sys.setenv(OMA_CRAN_REPO = "https://cloud.r-project.org")
 source("scripts/install-modern-r-deps.R")
 ```
 
-Build and install the local `OpenMetaR` package from `src/R`. `HSROC` is installed from the CRAN Archive by `scripts/install-modern-r-deps.R`; `OpenMetaR` is the only local R package.
+The bundled R package is RCMetaR. Some source paths, script filenames, and package-build commands are still being renamed in later phase issues. Prefer the product names and policy in this README, [NOTICE.md](NOTICE.md), and [CHANGELOG.md](CHANGELOG.md) when documentation conflicts with older implementation names.
 
-```sh
-cd src/R
-R CMD build OpenMetaR
-R CMD INSTALL OpenMetaR_1.0.tar.gz
-```
+## Verification
 
-## Tests
-
-Warm local verification skips dependency sync by default. Run the Smoke Verification Lane for the fastest first check:
+Run the smoke verification lane for the fastest local check:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-modern-smoke.ps1
 ```
 
-Daily source verification uses the Fast Verification Lane:
+Run the fast verification lane for routine local evidence:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-modern-fast.ps1
 ```
 
-Use `-Sync` when dependency inputs changed, or `-RecreateVenv` for a clean environment rebuild. The Fast Verification Lane runs `tests\modern\fast`, `tests\modern\golden`, and `tests\modern\packaging_contract` with a bounded pytest-xdist worker count by default. Use `-FastWorkers 1` when debugging a fast-lane failure without parallel workers. CI always calls the lane scripts with `-Sync`.
-
-Run GUI or R Stack lanes directly when working in those areas:
+Run area-specific checks when changing GUI, R Stack, golden analysis, or packaging behavior:
 
 ```powershell
 uv run pytest tests\modern -m gui
-powershell -ExecutionPolicy Bypass -File .\scripts\verify-modern-r-stack-full.ps1
+uv run pytest tests\modern -m r_stack
+uv run pytest tests\modern -m golden
+uv run pytest tests\modern -m packaging_contract
 ```
 
-## Windows Binary Builds
+## Packaging Scope
 
-Fast verification and packaging are separate GitHub workflows:
+Windows is the active packaged release target. macOS package jobs are available for release-candidate validation but remain opt-in.
 
-```text
-.github/workflows/modern-fast.yml
-.github/workflows/modern-package.yml
-```
+Before release packaging, bundled third-party components and assets must be inventoried and their license notices preserved separately from RC MetaStudio copyright and provenance. See [docs/release/third-party-inventory.md](docs/release/third-party-inventory.md).
 
-It packages `src/launch.py` through PyInstaller so the artifact starts the real `MetaForm` application path. The ZIP includes the PyQt5 runtime, bundled R package sources, sample data, bundled help, and a launcher script as `OpenMetaAnalyst-modern-windows-x64.zip`.
+## Feedback And Contributions
 
-Build the modern Windows package locally only when packaging evidence is needed:
+Public [GitHub Issues](https://github.com/AliSalman-et-al/openmeta-analyst-community/issues) may be used for bug reports and feedback. Issue reports should not include private project data unless the reporter deliberately chooses to share it.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\package-modern-windows.ps1 -ArtifactName OpenMetaAnalyst-modern-windows-x64
-```
+RC MetaStudio does not automatically collect, upload, or attach diagnostics for issue reports. Any future diagnostic export must be explicit, local, user-controlled, and clear about its contents.
 
-The packaging script syncs the committed `uv.lock`, runs Full R Stack Evidence unless skipped, and builds the modern Windows artifact through PyInstaller.
+Unsolicited public code contributions are not currently accepted. See [CONTRIBUTING.md](CONTRIBUTING.md) for the maintainer policy.
 
-Smoke/Fast Default R Evidence uses `artifacts\r-default-library-cache`; Full R Stack Evidence and packaging use `artifacts\r-library-cache`. Keeping those caches separate prevents the fast lane from restoring the larger bundled-R packaging cache. The package wrapper uses one source R runtime for both verification and artifact assembly, then reinstalls only the local `OpenMetaR` package into the bundle. Delete the relevant cache only when debugging dependency acquisition or intentionally forcing a cold R package install.
+## License
 
-## macOS Binary Builds
-
-macOS packaging is available as an explicit opt-in path for Intel and Apple Silicon runners:
-
-```bash
-bash ./scripts/package-modern-macos.sh --architecture x64
-bash ./scripts/package-modern-macos.sh --architecture arm64
-```
-
-The GitHub fast workflow runs on pull requests and manual dispatch, not every feature-branch push. Pull requests always run a lightweight classifier and stable gate check; the Windows smoke/fast lanes run only when modern source, tests, dependency files, or validated manifests changed. Package jobs run from `workflow_dispatch` and release tags; macOS package jobs remain manual opt-in.
-
-Apple Silicon packaging is present as an opt-in CI target. With the current single Qt runtime policy (`PyQt5-Qt5==5.15.2` everywhere), it is experimental because the common PyPI Qt wheel is Intel-only on macOS; the job is isolated from the default Windows build.
-
-## Release Scope
-
-Windows is the active packaged release target. macOS packages are available for build validation and release-candidate work.
+RC MetaStudio is distributed under the GNU General Public License, version 3 or later, where permitted by the original GPL-2.0-or-later grant covering derived OpenMeta[Analyst] portions. See [LICENSE](LICENSE), [NOTICE.md](NOTICE.md), and [docs/legal/source-headers.md](docs/legal/source-headers.md).
