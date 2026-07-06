@@ -2747,6 +2747,20 @@ def test_wizard_uses_modern_style_with_explicit_back_navigation(path):
         app.processEvents()
 
 
+def test_wizard_layout_smoke_renders_core_wizard_pages():
+    import launch
+    from PyQt5 import QtWidgets
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+
+    assert launch.start_wizard_layout_smoke() == 0
+    assert [
+        widget
+        for widget in app.topLevelWidgets()
+        if widget.isVisible() and widget.__class__.__name__ == "MainWizard"
+    ] == []
+
+
 def test_new_dataset_wizard_pages_fill_body_without_clipping_content():
     import launch
     from PyQt5 import QtWidgets

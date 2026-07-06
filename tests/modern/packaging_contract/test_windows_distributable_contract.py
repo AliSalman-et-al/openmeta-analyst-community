@@ -124,6 +124,7 @@ def test_modern_windows_distributable_contract_is_declared():
         "Copy-DirectoryTree",
         "Assert-AppLayout",
         "Invoke-PackagedAppSmokeTest",
+        "Invoke-PackagedWizardLayoutSmokeTest",
         "Get-RPackageCacheKey",
         "Test-BundledRPackages",
         "Copy-RLibraryPackages",
@@ -178,6 +179,24 @@ def test_packaged_smoke_launches_with_positional_project_argument():
         '$env:OMA_STARTUP_PROJECT_SMOKE = "1"',
         "Start-Process -FilePath $exePath -ArgumentList @($samplePath)",
     )
+
+
+def test_packaged_smoke_launches_visual_wizard_layout_gate():
+    script = ps_contract("scripts", "build-modern-windows-binary.ps1")["text"]
+
+    assert relative_order(
+        script,
+        "function Invoke-PackagedAppSmokeTest",
+        "function Invoke-PackagedWizardLayoutSmokeTest",
+        "Invoke-PackagedAppSmokeTest -Root $appDir",
+        "Invoke-PackagedWizardLayoutSmokeTest -Root $appDir",
+    )
+    assert (
+        'Start-Process -FilePath $exePath -ArgumentList @("--automation-wizard-layout-smoke")'
+        in script
+    )
+    assert '$env:QT_QPA_PLATFORM = "windows"' in script
+    assert "QT_QPA_PLATFORM = $env:QT_QPA_PLATFORM" in script
 
 
 def test_modern_fast_workflow_runs_smoke_before_fast_verification():

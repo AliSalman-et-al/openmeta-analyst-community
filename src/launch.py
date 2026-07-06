@@ -128,6 +128,8 @@ def start():
             else os.path.join("sample_data", "amino.oma")
         )
         return start_automation_smoke(sample_path)
+    if len(startup_argv) > 1 and startup_argv[1] == "--automation-wizard-layout-smoke":
+        return start_wizard_layout_smoke()
 
     startup_project_path = _startup_project_path(startup_argv)
     meta_form = _import_meta_form()
@@ -228,6 +230,140 @@ def start_automation_smoke(sample_path):
         meta.close()
         app.processEvents()
     return 0
+
+
+def start_wizard_layout_smoke():
+    app_error_handler.install_global_exception_handler()
+    app = app_error_handler.get_or_create_application(sys.argv)
+    app.setApplicationName(meta_globals.APPLICATION_NAME)
+    app.setOrganizationName(meta_globals.ORGANIZATION_NAME)
+    _set_application_icon(app)
+    settings.setup_directories()
+
+    import main_wizard
+
+    scenarios = [
+        ("startup welcome", main_wizard.MainWizard(), []),
+        (
+            "new dataset",
+            main_wizard.MainWizard(path="new_dataset"),
+            [
+                ("select", main_wizard.Page_DataType, "twoarm_proportions_Button"),
+                ("next", main_wizard.Page_ChooseMetric, None),
+                ("text", main_wizard.Page_OutcomeName, "Packaged Layout Smoke"),
+            ],
+        ),
+        (
+            "csv import",
+            main_wizard.MainWizard(path="csv_import"),
+            [
+                ("select", main_wizard.Page_DataType, "twoarm_proportions_Button"),
+                ("next", main_wizard.Page_ChooseMetric, None),
+                ("text", main_wizard.Page_OutcomeName, "Packaged Layout Smoke"),
+                ("next", main_wizard.Page_CsvImport, None),
+            ],
+        ),
+    ]
+
+    try:
+        for scenario_name, wizard, actions in scenarios:
+            _show_wizard_for_layout_smoke(app, wizard, scenario_name)
+            for action, expected_page_id, value in actions:
+                _advance_wizard_layout_smoke_page(
+                    app, wizard, action, expected_page_id, value
+                )
+                _assert_wizard_layout_smoke_page(app, wizard, scenario_name)
+    finally:
+        for _scenario_name, wizard, _actions in scenarios:
+            wizard.close()
+        app.processEvents()
+    return 0
+
+
+def _show_wizard_for_layout_smoke(app, wizard, scenario_name):
+    wizard.restart()
+    wizard.show()
+    _flush_gui_events(app)
+    _assert_wizard_layout_smoke_page(app, wizard, scenario_name)
+
+
+def _advance_wizard_layout_smoke_page(app, wizard, action, expected_page_id, value):
+    if wizard.currentId() != expected_page_id:
+        wizard.next()
+        _flush_gui_events(app)
+    if wizard.currentId() != expected_page_id:
+        raise SystemExit(
+            "Wizard layout smoke expected page %s but reached %s"
+            % (expected_page_id, wizard.currentId())
+        )
+
+    page = wizard.currentPage()
+    if action == "select":
+        getattr(page, value).click()
+    elif action == "text":
+        page.outcome_name_LineEdit.setText(value)
+    elif action != "next":
+        raise SystemExit("Unknown wizard layout smoke action: %s" % action)
+    _flush_gui_events(app)
+
+
+def _assert_wizard_layout_smoke_page(app, wizard, scenario_name):
+    _flush_gui_events(app)
+    page = wizard.currentPage()
+    if page is None:
+        raise SystemExit("Wizard layout smoke has no current page: %s" % scenario_name)
+
+    parent = page.parentWidget()
+    if parent is None:
+        raise SystemExit(
+            "Wizard layout smoke page has no body parent: %s" % scenario_name
+        )
+
+    if page.layout() is not None:
+        page.layout().activate()
+    _flush_gui_events(app)
+
+    body_rect = parent.contentsRect()
+    if body_rect.width() <= 0 or body_rect.height() <= 0:
+        raise SystemExit("Wizard layout smoke saw an empty body: %s" % scenario_name)
+    if page.width() < body_rect.width() - 4:
+        raise SystemExit(
+            "Wizard page leaves unused body width in %s: page=%s body=%s"
+            % (scenario_name, page.width(), body_rect.width())
+        )
+    if page.height() < body_rect.height() - 4:
+        raise SystemExit(
+            "Wizard page leaves unused body height in %s: page=%s body=%s"
+            % (scenario_name, page.height(), body_rect.height())
+        )
+
+    _assert_visible_children_inside_page(page, scenario_name)
+    pixmap = wizard.grab()
+    image = pixmap.toImage()
+    if pixmap.isNull() or image.isNull() or image.width() <= 0 or image.height() <= 0:
+        raise SystemExit("Wizard layout smoke could not render: %s" % scenario_name)
+
+
+def _assert_visible_children_inside_page(page, scenario_name):
+    page_rect = page.rect().adjusted(0, 0, 1, 1)
+    for child in page.findChildren(QtWidgets.QWidget):
+        if child is page or child.isWindow() or not child.isVisible():
+            continue
+        if not child.objectName():
+            continue
+        mapped_top_left = child.parentWidget().mapTo(page, child.geometry().topLeft())
+        mapped_rect = child.geometry()
+        mapped_rect.moveTopLeft(mapped_top_left)
+        if not page_rect.contains(mapped_rect):
+            raise SystemExit(
+                "Wizard child is clipped in %s: %s"
+                % (scenario_name, child.objectName() or child.__class__.__name__)
+            )
+
+
+def _flush_gui_events(app):
+    for _index in range(3):
+        app.processEvents()
 
 
 def _assert_opened_project_for_startup_smoke(app, meta, sample_path, opened):

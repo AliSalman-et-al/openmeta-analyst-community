@@ -98,6 +98,29 @@ function Invoke-PackagedAppSmokeTest {
     }
 }
 
+function Invoke-PackagedWizardLayoutSmokeTest {
+    param([string]$Root)
+    $exePath = Join-Path $Root "OpenMetaAnalyst.exe"
+    $previousEnv = @{
+        QT_QPA_PLATFORM = $env:QT_QPA_PLATFORM
+    }
+    try {
+        $env:QT_QPA_PLATFORM = "windows"
+        $process = Start-Process -FilePath $exePath -ArgumentList @("--automation-wizard-layout-smoke") -Wait -PassThru -WindowStyle Normal
+        if ($process.ExitCode -ne 0) { throw "Packaged wizard layout smoke test failed with exit code $($process.ExitCode)." }
+    }
+    finally {
+        foreach ($name in $previousEnv.Keys) {
+            if ($null -eq $previousEnv[$name]) {
+                Remove-Item "Env:\$name" -ErrorAction SilentlyContinue
+            }
+            else {
+                Set-Item "Env:\$name" $previousEnv[$name]
+            }
+        }
+    }
+}
+
 function Compress-AppDirectory {
     param([string]$SourceDirectory, [string]$DestinationPath)
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -390,6 +413,7 @@ Assert-AppLayout -Root $appDir
 if (-not $SkipSmoke) {
     Write-Step "Running packaged Windows smoke checks"
     Invoke-PackagedAppSmokeTest -Root $appDir
+    Invoke-PackagedWizardLayoutSmokeTest -Root $appDir
 }
 Compress-AppDirectory -SourceDirectory $appDir -DestinationPath $zipPath
 Assert-ZipLayout -Path $zipPath
