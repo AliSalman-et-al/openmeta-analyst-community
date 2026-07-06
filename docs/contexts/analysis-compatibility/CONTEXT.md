@@ -1,12 +1,16 @@
 # Analysis Compatibility
 
-This context defines what must remain stable while OpenMeta[Analyst] Community is migrated from its legacy Python 2.7 and Qt 4 implementation to a modern Python 3 and Qt 5 implementation.
+This context defines what must remain stable while RC MetaStudio Community is migrated from its legacy Python 2.7 and Qt 4 implementation to a modern Python 3 and Qt 5 implementation.
 
 ## Language
 
 **Reference Implementation**:
 The current Python 2.7, PyQt4, and bundled R-package application used as the source of truth for preserved behavior during migration.
 _Avoid_: Legacy app, old version
+
+**Retired Reference Implementation**:
+The former Python 2.7, PyQt4, and bundled R-package application after it no longer serves as the maintained compatibility oracle.
+_Avoid_: Active baseline, fallback app
 
 **Reference Environment**:
 The reproducible Windows CI conda environment used to run the Reference Implementation and capture Golden Analysis Test outputs.
@@ -20,6 +24,22 @@ _Avoid_: Active fallback, maintained legacy build
 The Python 3 and PyQt5 test/build workflow used for the maintained release path.
 _Avoid_: New workflow, preview build
 
+**Fast Verification Lane**:
+The pull-request and push path of the Modern CI Path that proves source changes against locked dependencies, manifests, modern tests, and R Stack verification without producing a full distributable.
+_Avoid_: Quick build, lightweight CI
+
+**Smoke Verification Lane**:
+The smallest required Modern CI Path gate that fails quickly on broken collection, manifest sanity, representative compatibility parsing, project-load compatibility, or required Default R Evidence prerequisites before the broader Fast Verification Lane runs.
+_Avoid_: Mini build, partial CI
+
+**Fast Feedback Budget**:
+The target that the Fast Verification Lane should return automated pass/fail feedback in under ten minutes on GitHub and under two minutes locally after dependencies are warm.
+_Avoid_: Nice-to-have speed goal, rough timing target
+
+**Packaging Lane**:
+The Modern CI Path route that produces a Windows Distributable or macOS application artifact through PyInstaller, bundled R runtime assembly, packaged smoke checks, and artifact upload.
+_Avoid_: Release test, build-all path
+
 **Release Cutover**:
 The point where the Modern CI Path replaces the Legacy CI Path as the accepted release path.
 _Avoid_: Migration complete, switch over
@@ -27,6 +47,30 @@ _Avoid_: Migration complete, switch over
 **R Stack**:
 The R runtime, rpy2 bridge, bundled R packages, and external R packages used to execute meta-analysis calculations.
 _Avoid_: R dependencies, statistical backend
+
+**RCMetaR R Stack Slice**:
+The R Stack modernization increment scoped to the bundled `RCMetaR` package, its direct runtime package declarations, and the external packages its functions call directly.
+_Avoid_: RCMetaR R Stack Slice, Full R dependency refresh, all CRAN transitive dependency migration
+
+**Default R Evidence**:
+The small R Stack check included in the Fast Verification Lane, intended to prove manifest validity and a deterministic RCMetaR load or smoke path without running the full package/build/distributable verification sequence.
+_Avoid_: R Stack verification, quick R test
+
+**Degraded Local R Evidence**:
+A local-only Default R Evidence mode that reports missing or mismatched R dependencies without satisfying CI-required R evidence.
+_Avoid_: Passing CI evidence, soft CI failure
+
+**Full R Stack Evidence**:
+The opt-in, scheduled, release, or packaging-gated verification that installs the R dependency bundle, builds and checks RCMetaR, validates installed package versions, runs R analysis smoke coverage, and exercises real rpy2 bridge behavior.
+_Avoid_: Required PR R check, default R test
+
+**R Dependency Cache**:
+A cache of installed R package dependency inputs keyed by R runtime version, R dependency policy, package metadata, and repository policy, used to avoid repeated CRAN downloads without trusting assembled application outputs.
+_Avoid_: Cached distributable, cached build output
+
+**CRAN Repository Policy**:
+The configured CRAN-compatible package repository or mirror used by R dependency installation, recorded as part of R dependency acquisition so slow or unreliable package downloads can be improved without hidden behavior changes.
+_Avoid_: Hard-coded CRAN mirror, implicit package source
 
 **Out-of-Process R Bridge**:
 A process boundary where the Python 3 application invokes analysis code running in a separate R-capable environment instead of embedding R through in-process rpy2.
@@ -40,6 +84,22 @@ _Avoid_: Exact functionality, analysis functionality
 A diagnostic sensitivity, specificity, likelihood-ratio, or diagnostic-odds-ratio estimate entered directly with its confidence interval instead of being computed from TP/FN/FP/TN counts.
 _Avoid_: Pre-computed diagnostic data, manual diagnostic value
 
+**Direct Effect-Size Entry**:
+A study-level effect estimate entered directly with its confidence interval or standard error instead of being computed from raw study measurements.
+_Avoid_: Manual outcome, precomputed row
+
+**Raw Count Entry**:
+Study-level binary or diagnostic count data entered as the primary evidence for an effect estimate, such as event/non-event counts or TP/FP/FN/TN counts.
+_Avoid_: Manual 2x2, reconstructed counts
+
+**Derived 2x2 Margin**:
+A displayed row, column, or grand total in a binary or diagnostic 2x2 calculator that is calculated from Raw Count Entry rather than entered as primary evidence.
+_Avoid_: Editable total, independent margin
+
+**Back-Calculation**:
+The optional workflow that infers compatible raw counts from a Direct Effect-Size Entry when the user has a published estimate and interval but not the original raw counts.
+_Avoid_: Raw-data edit, consistency check
+
 **Count-Based Diagnostic Accuracy Method**:
 A diagnostic method that needs complete TP/FN/FP/TN counts for each included study because direct entered estimates do not carry the paired count information the model requires.
 _Avoid_: Direct-effect bivariate method, manual HSROC
@@ -47,6 +107,10 @@ _Avoid_: Direct-effect bivariate method, manual HSROC
 **Golden Analysis Test**:
 A regression test that compares modernized analysis behavior against outputs captured from the Reference Implementation using representative project data.
 _Avoid_: Snapshot test, golden master
+
+**Modern Behavior Baseline**:
+A regression baseline captured from the maintained modern application, current R Stack, and `RCMetaR` package after the Reference Implementation is retired as the compatibility oracle.
+_Avoid_: Legacy golden set, reference environment
 
 **Golden Output Bundle**:
 A structured set of reference outputs for a Golden Analysis Test, including JSON comparison data and external generated artifacts such as plots.
@@ -68,9 +132,9 @@ _Avoid_: Full capture, all snapshots
 Golden Analysis Test coverage that samples the major analysis data families before exhaustively covering every method within one family.
 _Avoid_: Broad test coverage, representative tests
 
-**Initial Golden Datasets**:
-The first committed project files used to capture and compare Golden Output Bundles: `amino.oma`, `continuous.oma`, and `lymph.oma`.
-_Avoid_: Sample data, fixture set
+**Initial Golden Projects**:
+The first committed project files used to capture and compare Golden Output Bundles: `amino.rcms`, `continuous.rcms`, and `lymph.rcms`.
+_Avoid_: Sample data, fixture set, initial golden datasets
 
 **Initial Golden Methods**:
 The first analysis methods captured for the Curated Golden Set, prioritizing random-effects analyses across the Initial Golden Datasets.
@@ -100,6 +164,26 @@ _Avoid_: CI setting, interval percentage, confidence placeholder
 The test runner used by Python 3 modernization tests and compatibility harness work.
 _Avoid_: Test cleanup, new tests
 
+**Test Taxonomy & Audit**:
+The review pass that classifies modern tests by evidence type, execution cost, external dependencies, and CI lane before the Modern CI Path is restructured around selective execution.
+_Avoid_: Test cleanup, marker pass
+
+**Taxonomy Enforcement Backlog**:
+The Test Taxonomy & Audit manifest when it is used to record keep, rewrite, merge, move, and remove decisions before every cleanup action has been implemented.
+_Avoid_: Aspirational test list, all-keep inventory
+
+**Evidence-Carrying Test**:
+A test whose failure would identify a meaningful regression against Analysis Behavior, GUI compatibility, R Stack integration, packaging contract, or migration infrastructure.
+_Avoid_: Useful test, important test
+
+**Low-Value Test**:
+A test that mainly asserts implementation text, duplicates stronger coverage, preserves obsolete behavior, or creates CI cost without carrying distinct compatibility or release-readiness evidence.
+_Avoid_: Useless test, bad test
+
+**Structured Contract Test**:
+A packaging, workflow, manifest, or script contract test that inspects parsed structure, function behavior, command outcomes, or stable data models instead of asserting raw source text substrings.
+_Avoid_: Raw string assertion, source-text check
+
 **Compatibility Report**:
 A CI artifact that records the datasets, analysis methods, metrics, tolerances, and observed drift values from Golden Analysis Tests.
 _Avoid_: Test log, CI summary
@@ -115,6 +199,10 @@ _Avoid_: Pixel-perfect plot diff, unchecked plot artifact, cosmetic clone
 **Compatibility Exception**:
 An explicitly documented, reviewed difference from Reference Implementation Analysis Behavior that is accepted despite failing normal golden-test equivalence.
 _Avoid_: Known failure, acceptable drift
+
+**Statistical Modernization Drift**:
+A reviewed Analysis Behavior difference caused by moving the R Stack to current statistical package behavior, where the modern output is accepted because it is correct for the updated methods and APIs even though it differs from the Reference Implementation.
+_Avoid_: Regression, silent statistical change
 
 **Compatibility Exception Manifest**:
 A machine-readable list of accepted Compatibility Exceptions with stable IDs, affected workflows, reasons, approval references, and follow-up expectations.
@@ -177,19 +265,23 @@ A machine-readable map from each Release Cutover workflow to its Golden Analysis
 _Avoid_: Manual checklist, prose-only trace, informal audit
 
 **Standard Binary Analysis Workflow**:
-The first GUI Compatibility Slice: open an existing `.oma` sample dataset, display the data table, run a standard binary random-effects meta-analysis, and show the result summary plus forest plot.
+The first GUI Compatibility Slice: open an existing `.rcms` sample project, display the data table, run a standard binary random-effects meta-analysis, and show the result summary plus forest plot.
 _Avoid_: First GUI test, binary demo
 
 **Project File Read Compatibility**:
-The requirement that the modernized application can open existing `.oma` project files without user-visible migration steps.
+The requirement that the modernized application can open existing `.rcms` project files without user-visible migration steps.
 _Avoid_: File support, import compatibility
 
+**Legacy Project Data Compatibility**:
+The requirement that user project files created by earlier RC MetaStudio releases remain usable in the maintained modern application.
+_Avoid_: Reference Implementation support, legacy runtime support
+
 **Project File Round Trip**:
-A compatibility check that opens a representative `.oma` project file, saves it through the modernized application, and verifies that the saved project can be reopened by the modernized application with equivalent project data.
+A compatibility check that opens a representative `.rcms` project file, saves it through the modernized application, and verifies that the saved project can be reopened by the modernized application with equivalent project data.
 _Avoid_: Byte-perfect save, file snapshot
 
 **Versioned Project Format**:
-A future project file format that can evolve beyond the current `.oma` representation while preserving access to existing projects through migration tooling.
+A future project file format that can evolve beyond the current `.rcms` representation while preserving access to existing projects through migration tooling.
 _Avoid_: New save format, file rewrite
 
 **Windows Distributable**:
@@ -258,6 +350,6 @@ _Avoid_: PyQt4 bootstrap, fake Qt module installer
 
 ## Headless Harness Notes
 
-The first Headless Analysis Harness loads `.oma` files into `DatasetModel`, normalizes legacy state, converts the model through the existing Analysis Adapter functions in `meta_py_r`, and runs one binary or continuous method without creating `QApplication` or `MetaForm`.
+The first Headless Analysis Harness loads `.rcms` files into `DatasetModel`, normalizes legacy state, converts the model through the existing Analysis Adapter functions in `meta_py_r`, and runs one binary or continuous method without creating `QApplication` or `MetaForm`.
 
 Remaining GUI coupling: `DatasetModel` still subclasses `QAbstractTableModel` and uses Qt signal/reset behavior while shaping analysis inputs. It now imports PyQt5 directly and owns its Qt5 reset behavior locally.

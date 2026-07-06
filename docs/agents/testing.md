@@ -1,49 +1,66 @@
 # Testing
 
-The maintained test workflow uses the uv-managed Python 3.11/PyQt5 environment in `pyproject.toml` and `uv.lock`, with pytest tests under `tests/modern`.
+The maintained test workflow uses the uv-managed Python 3.11/PyQt5 environment in `pyproject.toml` and `uv.lock`, with pytest tests under `tests`.
 
-## Modern uv environment
+## Python/Qt uv environment
 
-Sync the locked modern environment from the repository root:
+Sync the locked verification environment from the repository root:
 
 ```powershell
 uv sync --locked
 ```
 
-Run the modern full-app automation test first when checking GUI launch behavior:
+Warm local verification skips dependency sync by default. Run the Smoke Verification Lane for the fastest first check:
 
 ```powershell
-uv run pytest tests\modern\test_metaform_automation_launch.py
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-smoke.ps1
 ```
 
-Run the remaining modern pytest suite with the automation test excluded:
+Daily local verification uses the Fast Verification Lane:
 
 ```powershell
-uv run pytest tests\modern --ignore=tests\modern\test_metaform_automation_launch.py
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-fast.ps1
 ```
 
-For the full local modern verification and packaging path, use the repository script:
+Use `-Sync` when dependency inputs changed, or `-RecreateVenv` for a clean environment rebuild. The Fast Verification Lane runs `tests\python\fast`, `tests\analysis_regression\golden`, and `tests\packaging\contract` with a bounded pytest-xdist worker count by default. Use `-FastWorkers 1` when debugging a fast-lane failure without parallel workers. GitHub calls smoke and fast verification with `-Sync`.
+
+Run lane-specific tests when working in an area:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run-modern-workflow-local.ps1 -ArtifactName OpenMetaAnalyst-modern-windows-x64
+uv run pytest tests -m gui
+uv run pytest tests -m r_stack
+uv run pytest tests -m golden
+uv run pytest tests -m packaging_contract
 ```
 
-That script syncs `uv.lock` into `.venv`, runs the modern pytest suite through `uv run`, and builds the modern Windows PyInstaller artifact. Use this workflow for Python 3/PyQt5 work, modern GUI slices, and modern Windows packaging checks.
+Run Full R Stack Evidence before R Stack changes:
 
-On macOS, use the shell workflow for the matching host architecture:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-r-stack-full.ps1
+```
+
+Smoke/Fast Default R Evidence uses `artifacts\r-default-library-cache`; Full R Stack Evidence and packaging use `artifacts\r-library-cache`. Keeping those caches separate prevents fast verification from restoring the larger bundled-R packaging cache. Set `RCMS_CRAN_REPO` to choose a faster reliable CRAN-compatible mirror when needed. The package wrappers resolve one source R runtime and pass that same runtime into R Stack Evidence and artifact assembly, so the dependency cache can be reused before only the local `RCMetaR` package is reinstalled into the bundle.
+
+Build the Windows package only when packaging evidence is needed:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\package-windows.ps1 -ArtifactName RCMetaStudio-windows-x64
+```
+
+On macOS, use the package script for the matching host architecture:
 
 ```bash
-bash ./scripts/run-modern-workflow-local.sh --target macos-intel
-bash ./scripts/run-modern-workflow-local.sh --target macos-arm64
+bash ./scripts/package-macos.sh --architecture x64
+bash ./scripts/package-macos.sh --architecture arm64
 ```
 
-Windows remains the default active CI package. macOS package jobs are opt-in through the GitHub Actions `workflow_dispatch` inputs.
+Windows remains the default active package target. Fast GitHub verification runs on pull requests and manual dispatch, not every feature-branch push. Pull requests always run a lightweight classifier and stable gate check; the Windows smoke/fast lanes run only when source, tests, dependency files, or validated manifests changed. Package jobs run from manual dispatch and release tags; macOS package jobs are opt-in through the GitHub Actions `workflow_dispatch` inputs.
 
 The Apple Silicon package job is currently experimental under the single Qt runtime policy because `PyQt5-Qt5==5.15.2` is the newest PyPI Qt5 runtime wheel with Windows support, but its macOS wheel is Intel-only.
 
 ## GUI paint coverage
 
-Modern GUI tests run with `QT_QPA_PLATFORM=offscreen`, which lays out widgets but never
+Python GUI tests run with `QT_QPA_PLATFORM=offscreen`, which lays out widgets but never
 paints them. Paint-only code paths are therefore invisible to most tests: Qt queries
 `data()`/`headerData()` for paint roles such as `Qt.BackgroundColorRole`, `Qt.DecorationRole`,
 and `Qt.FontRole` only while rendering, not during offscreen layout or `sizeHint`. A
@@ -53,7 +70,7 @@ aborts the process with exit code `0xC0000409` and no traceback.
 Two mechanisms guard this class of bug; keep both working when touching table models or
 delegates:
 
-- `tests/modern/test_metaform_automation_launch.py::test_table_paint_roles_do_not_raise_across_all_cells`
+- `tests/python/gui/test_metaform_automation_launch.py::test_table_paint_roles_do_not_raise_across_all_cells`
   sweeps every cell and header section against all paint roles in-process, turning a
   paint-time abort into a clean test failure. Extend it when a model gains new roles.
 - The packaged smoke test (`launch.start_automation_smoke` via `Invoke-PackagedAppSmokeTest`)
@@ -63,10 +80,10 @@ delegates:
 
 ## R package setup in focused tests
 
-`DatasetModel` initialization calls OpenMeta R functions such as `set.global.conf.level`. Focused tests that instantiate `DatasetModel` without the full application setup should load only the needed package:
+`DatasetModel` initialization calls RCMetaR functions such as `set.global.conf.level`. Focused tests that instantiate `DatasetModel` without the full application setup should load only the needed package:
 
 ```python
-meta_py_r.RlibLoader().load_openmetar()
+meta_py_r.RlibLoader().load_RCMetaR()
 ```
 
 Avoid `load_all()` for narrow tests unless network meta-analysis packages are required; this local environment currently lacks `gemtc`.

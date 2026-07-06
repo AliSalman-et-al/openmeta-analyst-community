@@ -1,8 +1,12 @@
 options(warn = 1)
 
-dir.create("r_tmp", showWarnings = FALSE)
-suppressPackageStartupMessages(library(openmetar))
-CONF.LEVEL.GLOBAL <- 95
+analysis_scratch_dir <- Sys.getenv(
+  "RCMS_ANALYSIS_SCRATCH_DIR",
+  unset = file.path(tempdir(), "rc-metastudio-analysis")
+)
+dir.create(analysis_scratch_dir, recursive = TRUE, showWarnings = FALSE)
+suppressPackageStartupMessages(library(RCMetaR))
+rcmetar.set.global.conf.level(95)
 
 failures <- list()
 passes <- character()
@@ -13,7 +17,7 @@ record <- function(name, expr) {
   if (inherits(result, "try-error")) {
     failures[[name]] <<- as.character(result)
     cat("FAIL", name, "\n")
-    graphics.off()
+    rcmetar.graphics.off()
     return(invisible(NULL))
   }
   if (!is.list(result) || length(result) == 0) {
@@ -25,7 +29,7 @@ record <- function(name, expr) {
   if (length(expected) == 0) {
     failures[[name]] <<- paste("Unexpected result names:", paste(names(result), collapse = ", "))
     cat("FAIL", name, "\n")
-    graphics.off()
+    rcmetar.graphics.off()
     return(invisible(NULL))
   }
   passes <<- c(passes, name)
@@ -47,7 +51,7 @@ base_params <- function(measure) {
     "fp_show_col2" = TRUE,
     "fp_show_col1" = TRUE,
     "fp_plot_lb" = "[default]",
-    "fp_outpath" = "./r_tmp/forest.png",
+    "fp_outpath" = file.path(analysis_scratch_dir, "forest.png"),
     "rm.method" = "DL",
     "adjust" = 0.5,
     "fp_plot_ub" = "[default]",
@@ -75,9 +79,7 @@ binary_data <- new(
     new("CovariateValues", cov.name = "groups", cov.vals = c("1", "1", "2", "2", "1", "2", "2", "1"), cov.type = "factor", ref.var = "1")
   )
 )
-binary_effects <- compute.for.one.bin.study(binary_data, binary_params)
-binary_data@y <- binary_effects$yi
-binary_data@SE <- sqrt(binary_effects$vi)
+binary_data <- rcmetar.prepare.analysis.data(binary_data, binary_params)
 
 continuous_params <- base_params("MD")
 continuous_params$cov_name <- "groups"
@@ -96,9 +98,7 @@ continuous_data <- new(
     new("CovariateValues", cov.name = "groups", cov.vals = c("1", "1", "2", "1", "2", "2"), cov.type = "factor", ref.var = "1")
   )
 )
-continuous_effects <- compute.for.one.cont.study(continuous_data, continuous_params)
-continuous_data@y <- continuous_effects$yi
-continuous_data@SE <- sqrt(continuous_effects$vi)
+continuous_data <- rcmetar.prepare.analysis.data(continuous_data, continuous_params)
 
 diagnostic_base <- new(
   "DiagnosticData",
@@ -118,29 +118,27 @@ diag_with_measure <- function(measure) {
   data <- diagnostic_base
   params <- base_params(measure)
   params$cov_name <- "quality"
-  effects <- get.res.for.one.diag.study(data, params)
-  data@y <- effects$b
-  data@SE <- effects$se
+  data <- rcmetar.prepare.analysis.data(data, params)
   list(data = data, params = params)
 }
 
 binary_methods <- c("binary.fixed.inv.var", "binary.fixed.mh", "binary.fixed.peto", "binary.random")
 for (method in binary_methods) {
-  record(paste("binary standard", method), eval(call(method, binary_data, binary_params)))
-  record(paste("binary cumulative", method), cum.ma.binary(method, binary_data, binary_params))
-  record(paste("binary leave-one-out", method), loo.ma.binary(method, binary_data, binary_params))
-  record(paste("binary subgroup", method), subgroup.ma.binary(method, binary_data, binary_params))
+  record(paste("binary standard", method), rcmetar.run.analysis(binary_data, list(method = method, params = binary_params)))
+  record(paste("binary cumulative", method), rcmetar.run.analysis(binary_data, list(method = method, params = binary_params, workflow = "cumulative")))
+  record(paste("binary leave-one-out", method), rcmetar.run.analysis(binary_data, list(method = method, params = binary_params, workflow = "leave-one-out")))
+  record(paste("binary subgroup", method), rcmetar.run.analysis(binary_data, list(method = method, params = binary_params, workflow = "subgroup")))
 }
-record("binary meta-regression continuous covariate", meta.regression(binary_data, binary_params))
+record("binary meta-regression continuous covariate", rcmetar.run.analysis(binary_data, list(method = "meta.regression", params = binary_params, workflow = "meta-regression")))
 
 continuous_methods <- c("continuous.fixed", "continuous.random")
 for (method in continuous_methods) {
-  record(paste("continuous standard", method), eval(call(method, continuous_data, continuous_params)))
-  record(paste("continuous cumulative", method), cum.ma.continuous(method, continuous_data, continuous_params))
-  record(paste("continuous leave-one-out", method), loo.ma.continuous(method, continuous_data, continuous_params))
-  record(paste("continuous subgroup", method), subgroup.ma.continuous(method, continuous_data, continuous_params))
+  record(paste("continuous standard", method), rcmetar.run.analysis(continuous_data, list(method = method, params = continuous_params)))
+  record(paste("continuous cumulative", method), rcmetar.run.analysis(continuous_data, list(method = method, params = continuous_params, workflow = "cumulative")))
+  record(paste("continuous leave-one-out", method), rcmetar.run.analysis(continuous_data, list(method = method, params = continuous_params, workflow = "leave-one-out")))
+  record(paste("continuous subgroup", method), rcmetar.run.analysis(continuous_data, list(method = method, params = continuous_params, workflow = "subgroup")))
 }
-record("continuous meta-regression continuous covariate", meta.regression(continuous_data, continuous_params))
+record("continuous meta-regression continuous covariate", rcmetar.run.analysis(continuous_data, list(method = "meta.regression", params = continuous_params, workflow = "meta-regression")))
 
 diagnostic_metric_methods <- list(
   Sens = c("diagnostic.fixed.inv.var", "diagnostic.random"),
@@ -153,10 +151,10 @@ diagnostic_metric_methods <- list(
 for (metric in names(diagnostic_metric_methods)) {
   fixture <- diag_with_measure(metric)
   for (method in diagnostic_metric_methods[[metric]]) {
-    record(paste("diagnostic standard", metric, method), eval(call(method, fixture$data, fixture$params)))
-    record(paste("diagnostic cumulative", metric, method), cum.ma.diagnostic(method, fixture$data, fixture$params))
-    record(paste("diagnostic leave-one-out", metric, method), loo.ma.diagnostic(method, fixture$data, fixture$params))
-    record(paste("diagnostic subgroup", metric, method), subgroup.ma.diagnostic(method, fixture$data, fixture$params, get.cov(fixture$data, "quality")))
+    record(paste("diagnostic standard", metric, method), rcmetar.run.analysis(fixture$data, list(method = method, params = fixture$params)))
+    record(paste("diagnostic cumulative", metric, method), rcmetar.run.analysis(fixture$data, list(method = method, params = fixture$params, workflow = "cumulative")))
+    record(paste("diagnostic leave-one-out", metric, method), rcmetar.run.analysis(fixture$data, list(method = method, params = fixture$params, workflow = "leave-one-out")))
+    record(paste("diagnostic subgroup", metric, method), rcmetar.run.analysis(fixture$data, list(method = method, params = fixture$params, workflow = "subgroup")))
   }
 }
 
@@ -167,37 +165,40 @@ multi_spec_params <- base_params("Spec")
 multi_spec_params$cov_name <- "quality"
 record(
   "diagnostic multiple standard sens/spec",
-  multiple.diagnostic(
+  rcmetar.run.diagnostic.analyses(
+    multi_fixture$data,
     c("diagnostic.random", "diagnostic.random"),
-    list(multi_sens_params, multi_spec_params),
-    multi_fixture$data
+    list(multi_sens_params, multi_spec_params)
   )
 )
 record(
   "diagnostic multiple cumulative sens/spec",
-  multiple.cum.ma.diagnostic(
+  rcmetar.run.diagnostic.analyses(
+    multi_fixture$data,
     c("diagnostic.random", "diagnostic.random"),
     list(multi_sens_params, multi_spec_params),
-    multi_fixture$data
+    workflow = "cumulative"
   )
 )
 record(
   "diagnostic multiple leave-one-out sens/spec",
-  multiple.loo.diagnostic(
+  rcmetar.run.diagnostic.analyses(
+    multi_fixture$data,
     c("diagnostic.random", "diagnostic.random"),
     list(multi_sens_params, multi_spec_params),
-    multi_fixture$data
+    workflow = "leave-one-out"
   )
 )
 record(
   "diagnostic multiple subgroup sens/spec",
-  multiple.subgroup.diagnostic(
+  rcmetar.run.diagnostic.analyses(
+    multi_fixture$data,
     c("diagnostic.random", "diagnostic.random"),
     list(multi_sens_params, multi_spec_params),
-    multi_fixture$data
+    workflow = "subgroup"
   )
 )
-record("diagnostic meta-regression factor covariate", meta.regression(multi_fixture$data, base_params("Sens")))
+record("diagnostic meta-regression factor covariate", rcmetar.run.analysis(multi_fixture$data, list(method = "meta.regression", params = base_params("Sens"), workflow = "meta-regression")))
 
 cat("\nSUMMARY\n")
 cat("Passed:", length(passes), "\n")

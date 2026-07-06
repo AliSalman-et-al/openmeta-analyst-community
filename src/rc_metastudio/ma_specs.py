@@ -1,0 +1,1210 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Method-selection dialog and analysis specification builder."""
+
+from PyQt5 import QtCore, QtWidgets
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
+    QGridLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QDoubleSpinBox,
+    QSizePolicy,
+    QSpinBox,
+)
+
+import copy
+import sys
+
+import forms.ui_ma_specs
+from analysis_method_labels import (
+    diagnostic_metric_group_display_label,
+    normalize_available_method_labels,
+    parameter_description,
+    parameter_display_label,
+    parameter_value_display_label,
+)
+import app_error_handler
+import meta_py_r
+import progress_bar as progress_dialog
+import qt_layout
+import qt_text
+from meta_globals import *
+from settings import *
+import diagnostic_explain
+
+_fromUtf8 = lambda s: s
+
+COUNT_BASED_DIAGNOSTIC_METHODS = set(
+    [
+        "diagnostic.bivariate.ml",
+        "diagnostic.hsroc",
+    ]
+)
+
+
+class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
+    def __init__(
+        self,
+        model,
+        parent=None,
+        meta_f_str=None,
+        external_params=None,
+        diag_metrics=None,
+        diag_metrics_to_analysis_details_d=None,
+        fp_specs_only=False,
+        conf_level=None,
+    ):
+
+        super(MA_Specs, self).__init__(parent)
+        self.setupUi(self)
+        if _text_value(self.image_path) == "":
+            self.image_path.setText(analysis_output_path("forest.png"))
+        global meta_py_r
+        meta_py_r = sys.modules.get("meta_py_r", meta_py_r)
+
+        self.current_param_vals = external_params or {}
+        self.model = model
+
+        if conf_level is None:
+            raise ValueError("CONFIDENCE LEVEL MUST BE SPECIFIED")
+        self.conf_level = validate_confidence_level(conf_level)
+
+        # if not none, we assume we're running a meta
+        # method
+        self.meta_f_str = meta_f_str
+
+        self._accepted_connection = None
+        self._set_accepted_handler(self.run_ma)
+        self.buttonBox.rejected.connect(
+            app_error_handler.safe_slot(self.cancel, parent=self)
+        )
+        self.save_btn.pressed.connect(
+            app_error_handler.safe_slot(self.select_out_path, parent=self)
+        )
+        self._cap_method_selector_width(self.method_cbo_box)
+        self.method_cbo_box.currentIndexChanged[str].connect(
+            app_error_handler.safe_slot(
+                lambda _text: self.method_changed(), parent=self
+            )
+        )
+
+        self.data_type = self.model.get_current_outcome_type()
+        print("data type: %s" % self.data_type)
+        if self.data_type != "binary":
+            self.disable_bin_only_fields()
+            if self.data_type == "diagnostic":
+                self.enable_diagnostic_fields()
+
+        # disable second arm display for one-arm analyses
+        if self.model.current_effect in ONE_ARM_METRICS:
+            self.setup_fields_for_one_arm()
+
+        self.current_widgets = []
+        self.current_method = None
+        self.current_params = None
+        self.current_defaults = None
+        self.var_order = None
+
+        ####
+        # the following are variables for the case of diagnostic
+        # data. in other cases, these are meaningless/None.
+        # diagnostic data is special because we allow the user to
+        # to run analyses on multiple metrics at once.
+        #
+        # this dictionary maps metrics to analysis methods and
+        # corresponding parameters. e.g.,
+        #   diag_metrics["sens"] -> (method, parameters)
+        # for each metric selected by the user. note that
+        # the method and parameters will in fact be the same for
+        # sens/spec (and for lr/dor), but we map the metrics
+        # to their own tuples for convenience.
+        self.diag_metrics_to_analysis_details = diag_metrics_to_analysis_details_d or {}
+
+        # note that we assume the metrics for which analysis
+        # details have already been acquired (i.e,. those in
+        # the above dictionary) are not included in the diag_metrics
+        # list -- we do not explicitly check for this here.
+        self.diag_metrics = diag_metrics
+
+        # diagnostic data requires a different UI because multiple
+        # metrics can be selected. we handle this by allowing the
+        # user to specify different methods for different groups
+        # of metrics.
+        if self.diag_metrics is not None:
+            # these are the two 'groups' of metrics (sens/spec & DOR/LR+/-)
+            # these booleans tell us for which of these groups we're getting parameters
+            self.sens_spec = any([m in ("sens", "spec") for m in self.diag_metrics])
+            self.lr_dor = any([m in ("lr", "dor") for m in self.diag_metrics])
+            self.setup_diagnostic_ui()
+
+        self.populate_cbo_box()
+        qt_layout.fit_analysis_dialog_to_contents(self)
+
+    def cancel(self):
+        print("(cancel)")
+        self.reject()
+
+    def _set_accepted_handler(self, handler):
+        if self._accepted_connection is None:
+            self._accepted_connection = app_error_handler.connect_safely(
+                self.buttonBox.accepted, handler, parent=self
+            )
+        else:
+            self._accepted_connection.replace(handler, parent=self)
+
+    def select_out_path(self):
+        out_f = "."
+        out_f, _selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "RCMetaStudio - Plot Path",
+            out_f,
+            "png image files: (.png)",
+        )
+        if out_f == "" or out_f == None:
+            return None
+        else:
+            self.image_path.setText(out_f)
+
+    def run_network_analysis(self):
+        # first, let's fire up a progress bar
+        bar = MetaProgress(self)
+        bar.show()
+        result = None
+
+        try:
+            if self.data_type == "binary":
+                data_type = BINARY
+
+            if self.data_type not in ["binary", "continuous"]:
+                raise ValueError(
+                    "Network Analysis can currently only be done with binary or continuous data"
+                )
+
+            meta_py_r.ma_dataset_to_simple_network(
+                table_model=self.model,
+                var_name="tmp_obj",
+                data_type=None,
+                outcome=None,
+                follow_up=None,
+                network_path=analysis_output_path("network.png"),
+            )
+        finally:
+            progress_dialog.hide_once(bar)
+
+    def run_ma(self):
+        ###
+        # first, let's fire up a progress bar
+        bar = MetaProgress(self)
+        bar.show()
+        result = None
+
+        try:
+            # this method is defined statically, below
+            add_plot_params(self)
+
+            # also add the metric to the parameters
+            # -- this is for scaling
+
+            if not self.data_type == "diagnostic":
+                self.current_param_vals["measure"] = self.model.current_effect
+
+            # dispatch on type; build an R object, then run the analysis
+            if self.data_type == "binary":
+                result = _run_guarded_analysis(
+                    self, bar, lambda: _run_binary_analysis(self)
+                )
+                if result is None:
+                    return
+
+                # _writeout_test_data(self.meta_f_str, self.current_method, self.current_param_vals, result) # FOR MAKING TESTS
+            elif self.data_type == "continuous":
+                result = _run_guarded_analysis(
+                    self, bar, lambda: _run_continuous_analysis(self)
+                )
+                if result is None:
+                    return
+
+                # _writeout_test_data(self.meta_f_str, self.current_method, self.current_param_vals, result) # FOR MAKING TESTS
+            elif self.data_type == "diagnostic":
+                try:
+                    # add the current metrics (e.g., PLR, etc.) to the method/params
+                    # dictionary
+                    self.add_cur_analysis_details()
+                    if len(self.diag_metrics_to_analysis_details) == 0:
+                        self.add_cur_analysis_details()
+
+                    method_names, list_of_param_vals = _diagnostic_analysis_requests(
+                        self
+                    )
+
+                    if self.meta_f_str is None:
+                        # regular meta-analysis
+                        result = _run_diagnostic_analysis_isolating_metric_failures(
+                            self.model, method_names, list_of_param_vals
+                        )
+                        # _writeout_test_data(self.meta_f_str, method_names, list_of_param_vals, result, diag=True) # FOR MAKING TESTS
+                    else:
+                        # in the case of diagnostic, we pass in lists
+                        # of param values to the meta_method
+                        result = _run_diagnostic_analysis_isolating_metric_failures(
+                            self.model,
+                            method_names,
+                            list_of_param_vals,
+                            meta_f_str=self.meta_f_str,
+                        )
+                        # _writeout_test_data(self.meta_f_str, method_names, list_of_param_vals, result, diag=True) # FOR MAKING TESTS
+                except Exception as e:
+                    app_error_handler.log_exception(type(e), e, e.__traceback__)
+                    error_message = (
+                        "Sorry, this analysis could not be completed:\n\n%s" % e
+                    )
+
+                    QMessageBox.critical(self, "Analysis Failed", error_message)
+                    # reset Rs working directory
+                    _reset_r_working_dir_safely()
+                    self.accept()
+                    return
+        finally:
+            progress_dialog.hide_once(bar)
+
+        self.parent().analysis(result)
+        self.accept()
+
+    def enable_diagnostic_fields(self):
+        # self.col3_str_edit.setEnabled(True)
+        self.col3_str_edit.setText("[default]")
+        self.show_3.setEnabled(True)
+        self.show_3.setChecked(True)
+
+    def disable_bin_only_fields(self):
+        self.col3_str_edit.setEnabled(False)
+        self.col4_str_edit.setEnabled(False)
+        self.show_3.setChecked(False)
+        self.show_3.setEnabled(False)
+        self.show_4.setChecked(False)
+        self.show_4.setEnabled(False)
+
+    def setup_fields_for_one_arm(self):
+        self.show_4.setChecked(False)
+        self.show_4.setEnabled(False)
+
+    def method_changed(self):
+        if self.parameter_grp_box.layout() is not None:
+            print(
+                (
+                    "Layout items count before: %d"
+                    % self.parameter_grp_box.layout().count()
+                )
+            )
+        self.clear_param_ui()
+        self.current_widgets = []
+        self.current_method = self.available_method_d[
+            str(self.method_cbo_box.currentText())
+        ]
+        self.setup_params()
+        self._set_parameter_box_title(self.method_cbo_box, self.parameter_grp_box)
+        self.ui_for_params()
+        qt_layout.fit_analysis_dialog_to_contents(self)
+
+    def _set_parameter_box_title(self, cbo_box, param_box):
+        param_box.setTitle(str(cbo_box.currentText()))
+
+    def populate_cbo_box(self, cbo_box=None, param_box=None):
+        # if no combo box is passed in, use the default 'method_cbo_box'
+        if cbo_box is None:
+            cbo_box = self.method_cbo_box
+            param_box = self.parameter_grp_box
+
+        # we first build an R object with the current data. this is to pass off
+        # to the R side to check the feasibility of the methods over the current data.
+        # i.e., we do not display methods that cannot be performed over the
+        # current data.
+        tmp_obj_name = "tmp_obj"
+        if self.data_type == "binary":
+            meta_py_r.ma_dataset_to_simple_binary_robj(
+                self.model, var_name=tmp_obj_name
+            )
+        elif self.data_type == "continuous":
+            meta_py_r.ma_dataset_to_simple_continuous_robj(
+                self.model, var_name=tmp_obj_name
+            )
+        elif self.data_type == "diagnostic":
+            meta_py_r.ma_dataset_to_simple_diagnostic_robj(
+                self.model, var_name=tmp_obj_name
+            )
+
+        self.available_method_d = None
+        ###
+        # in the case of diagnostic data, the is.feasible methods need also to know
+        # which metric the analysis is to be run over. here we check this. note that
+        # we're setting params for multiple metrics (e.g., sens./spec.) but the is.feasible
+        # method only wants *one* metric. thus we arbitrarily select one or the other --
+        # this is tacitly assuming that the *same* methods are feasible for, say, sens.
+        # as for spec. this is a reasonable assumption is all cases of which I'm aware,
+        # but a more conservative/correct thing to do would be to pass in the *most restrictive*
+        # metric to the _get_available_methods_routine
+        ###
+        metric = self.model.current_effect
+        if self.data_type == "diagnostic":
+            if self.meta_f_str is None:
+                metric = "Sens" if self.sens_spec else "DOR"
+            else:
+                metric = "Sens"
+
+        self.available_method_d = meta_py_r.get_available_methods(
+            for_data_type=self.data_type, data_obj_name=tmp_obj_name, metric=metric
+        )
+        self.available_method_d = normalize_available_method_labels(
+            self.available_method_d
+        )
+
+        print(
+            "\n\navailable %s methods: %s"
+            % (self.data_type, ", ".join(list(self.available_method_d.keys())))
+        )
+
+        # print("----------------------------------\nAvailable methods dictionary:",self.available_method_d)
+
+        # issue #110 -- this is NOT a general/good/flexible solution
+        # -- we sort here in reverse because this will put .random
+        # first. otherwise, the default is that R provides the functions
+        # in alphabetical (ascending).
+        method_names = list(self.available_method_d.keys())
+
+        ###
+        # Hide bivariate diagnostic methods when sensitivity and specificity
+        # cannot both be estimated from the selected effects.
+        if self.data_type == "diagnostic":
+            biv_ml_name = "Bivariate (Maximum Likelihood)"
+            for biv_method in (biv_ml_name, "HSROC"):
+                method_function = self.available_method_d.get(biv_method)
+                should_remove_bivariate_method = (
+                    metric != "Sens"
+                    or self.meta_f_str is not None
+                    or not ("sens" in self.diag_metrics and "spec" in self.diag_metrics)
+                    or (
+                        method_function in COUNT_BASED_DIAGNOSTIC_METHODS
+                        and not self.model.included_studies_have_raw_data()
+                    )
+                )
+                if biv_method in method_names and should_remove_bivariate_method:
+                    method_names.remove(biv_method)
+            # Fix for issue # 175
+            if all(metric in self.diag_metrics for metric in ("lr", "dor")):
+                try:
+                    method_names.remove("Diagnostic Fixed-Effect Peto")
+                    # QMessageBox.warning(self.parent(), "Warning", "Removed Peto")
+                except:
+                    print(
+                        "Couldn't remove 'Diagnostic Fixed-Effect Peto' for some reason... don't know why"
+                    )
+
+        method_names.sort(reverse=True)
+
+        ###
+        # default to bivariate method for diagnostic
+        if self.data_type == "diagnostic" and biv_ml_name in method_names:
+            method_names.remove(biv_ml_name)
+            method_names.insert(0, biv_ml_name)
+
+        signals_were_blocked = cbo_box.blockSignals(True)
+        try:
+            for method in method_names:
+                cbo_box.addItem(method)
+        finally:
+            cbo_box.blockSignals(signals_were_blocked)
+        self.current_method = self.available_method_d[str(cbo_box.currentText())]
+        self.setup_params()
+        self._set_parameter_box_title(cbo_box, param_box)
+        if cbo_box is self.method_cbo_box:
+            self.ui_for_params()
+
+    def clear_param_ui(self):
+        for widget in self.current_widgets:
+            if self.parameter_grp_box.layout() is not None:
+                self.parameter_grp_box.layout().removeWidget(widget)
+            widget.setParent(None)
+            widget.deleteLater()
+            widget = None
+
+    def ui_for_params(self, adjust_root=True):
+        if self.parameter_grp_box.layout() is None:
+            layout = QGridLayout()
+            layout.setAlignment(Qt.AlignTop)
+            self.parameter_grp_box.setLayout(layout)
+
+        cur_grid_row = 0
+
+        # add the method description
+        method_description = meta_py_r.get_method_description(self.current_method)
+
+        self.add_method_description(
+            self.parameter_grp_box.layout(),
+            cur_grid_row,
+            "Description: %s" % method_description,
+        )
+        cur_grid_row += 1
+
+        if self.var_order is not None:
+            for var_name in self.var_order:
+                val = self.current_params[var_name]
+                self.add_param(
+                    self.parameter_grp_box.layout(), cur_grid_row, var_name, val
+                )
+                cur_grid_row += 1
+        else:
+            # no ordering was provided; let's try and do something
+            # sane with respect to the order in which parameters
+            # are displayed.
+            #
+            # we want to add the parameters in groups, for example,
+            # we add combo boxes (which will be lists of values) together,
+            # followed by numerical inputs. thus we create an ordered list
+            # of functions to check if the argument is the corresponding
+            # type (float, list); if it is, we add it otherwise we pass. this isn't
+            # the most efficient way to do things, but the number of parameters
+            # is going to be relatively tiny anyway
+            ordered_types = [
+                lambda x: isinstance(x, list),
+                lambda x: isinstance(x, str) and x.lower() == "float",
+            ]
+
+            for is_right_type in ordered_types:
+                for key, val in list(self.current_params.items()):
+                    if is_right_type(val):
+                        self.add_param(
+                            self.parameter_grp_box.layout(), cur_grid_row, key, val
+                        )
+                        cur_grid_row += 1
+
+        # do we need to set forest plot parameters? if not,
+        # e.g., in the case of HSROC or other methdos that
+        # don't use our forest plotting, we don't show the
+        # corresponding tab for forest plot params.
+        # Prefer the explicit no-forest-plot list until method metadata exposes
+        # a positive "accepts forest plot params" capability.
+        if self.current_method in METHODS_WITH_NO_FOREST_PLOT:
+            self.plot_tab.setEnabled(False)
+        else:
+            self.plot_tab.setEnabled(True)
+        qt_layout.fit_analysis_dialog_to_contents(self, adjust_root=adjust_root)
+
+    def add_param(self, layout, cur_grid_row, name, value):
+        print("adding param. name: %s, value: %s" % (name, value))
+        if isinstance(value, list):
+            # then it's an enumeration of values
+            self.add_enum(layout, cur_grid_row, name, value)
+        elif _is_integer_analysis_param(name):
+            self.add_int_box(layout, cur_grid_row, name)
+        elif value.lower() == "float":
+            self.add_float_box(layout, cur_grid_row, name)
+        elif value.lower() == "int":
+            self.add_int_box(layout, cur_grid_row, name)
+        # should we add an array type?
+        elif value.lower() == "string":
+            self.add_text_box(layout, cur_grid_row, name)
+        else:
+            print("unknown type! throwing up. bleccch.")
+            print("name:%s. value: %s" % (name, value))
+            # throw exception here
+
+    def add_enum(self, layout, cur_grid_row, name, values):
+        """
+        Adds an enumeration to the UI, with the name and possible
+        values as specified per the parameters.
+        """
+
+        ###
+        # using the pretty name for the label now.
+        self.add_label(
+            layout,
+            cur_grid_row,
+            self._parameter_display_label(name),
+            tool_tip_text=self._parameter_description(name),
+        )
+        cbo_box = QComboBox()
+        for index, value in enumerate(values):
+            name_str = self._get_enum_item_pretty_name(name, value)
+            cbo_box.addItem(name_str)
+            cbo_box.setItemData(index, value)
+
+        if name in self.current_defaults:
+            default_index = self._find_enum_item_index(
+                cbo_box, self.current_defaults[name]
+            )
+            if default_index >= 0:
+                cbo_box.setCurrentIndex(default_index)
+            self.current_param_vals[name] = self.current_defaults[name]
+
+        cbo_box.currentIndexChanged[int].connect(
+            app_error_handler.safe_slot(
+                self.set_param_f_from_itemdata(name), parent=self
+            )
+        )
+
+        self._cap_value_control_width(cbo_box)
+        self.current_widgets.append(cbo_box)
+        layout.addWidget(cbo_box, cur_grid_row, 1)
+
+    def _get_enum_item_pretty_name(self, enum_name, item_name):
+        return parameter_value_display_label(
+            enum_name, item_name, self.param_d.get(enum_name)
+        )
+
+    def _parameter_display_label(self, name):
+        return parameter_display_label(name, self.param_d.get(name))
+
+    def _parameter_description(self, name):
+        return parameter_description(name, self.param_d.get(name))
+
+    def _find_enum_item_index(self, cbo_box, value):
+        for index in range(cbo_box.count()):
+            if self._enum_item_value(cbo_box.itemData(index)) == str(value):
+                return index
+        return -1
+
+    def _enum_item_value(self, item_data):
+        if hasattr(item_data, "value"):
+            item_data = item_data.value()
+        return qt_text.to_native_text(item_data)
+
+    def set_param_f_from_itemdata(self, name, to_type=str):
+        """
+        hackier version....
+        Returns a function f(x) such that f(x) will set the key
+        name in the parameters dictionary to the value x.
+        """
+
+        def set_param(index):
+            combo_box = self.sender()
+            x = self._enum_item_value(combo_box.itemData(index))
+            self.current_param_vals[name] = to_type(x)
+            print(str(self.current_param_vals) + " -> weirdo sender thing")
+
+        return set_param
+
+    def add_float_box(self, layout, cur_grid_row, name):
+        self.add_label(
+            layout,
+            cur_grid_row,
+            self._parameter_display_label(name),
+            tool_tip_text=self._parameter_description(name),
+        )
+        if name == "conf.level":
+            self.add_confidence_level_box(layout, cur_grid_row, name)
+            return
+
+        finput = QDoubleSpinBox()
+        finput.setDecimals(6)
+        if name in ANALYSIS_NON_NEGATIVE_FLOAT_PARAMS:
+            finput.setRange(0, ANALYSIS_NUMERIC_MAX)
+        else:
+            finput.setRange(ANALYSIS_NUMERIC_MIN, ANALYSIS_NUMERIC_MAX)
+        finput.setCorrectionMode(QtWidgets.QAbstractSpinBox.CorrectToPreviousValue)
+
+        # if a default value has been specified, use it
+        if name in self.current_defaults:
+            value = (
+                validate_correction_factor(self.current_defaults[name])
+                if name in ANALYSIS_NON_NEGATIVE_FLOAT_PARAMS
+                else validate_analysis_float(name, self.current_defaults[name])
+            )
+            finput.setValue(value)
+            self.current_param_vals[name] = value
+
+        finput.setMaximumWidth(50)
+        self._cap_value_control_width(finput)
+        finput.valueChanged[float].connect(
+            app_error_handler.safe_slot(
+                self.set_param_f(name, to_type=float), parent=self
+            )
+        )
+        self.current_widgets.append(finput)
+        layout.addWidget(finput, cur_grid_row, 1)
+
+    def add_confidence_level_box(self, layout, cur_grid_row, name):
+        conf_input = QDoubleSpinBox()
+        conf_input.setDecimals(1)
+        conf_input.setRange(50, CONFIDENCE_LEVEL_DISPLAY_MAX)
+        conf_input.setSingleStep(0.1)
+        conf_input.setSuffix("%")
+
+        if name in self.current_defaults:
+            value = validate_confidence_level(self.current_defaults[name])
+            conf_input.setValue(value)
+            self.current_param_vals[name] = value
+
+        conf_input.valueChanged[float].connect(
+            app_error_handler.safe_slot(
+                self.set_param_f(name, to_type=float), parent=self
+            )
+        )
+        self._cap_value_control_width(conf_input)
+        self.current_widgets.append(conf_input)
+        layout.addWidget(conf_input, cur_grid_row, 1)
+
+    def add_int_box(self, layout, cur_grid_row, name):
+        self.add_label(
+            layout,
+            cur_grid_row,
+            self._parameter_display_label(name),
+            tool_tip_text=self._parameter_description(name),
+        )
+        iinput = QSpinBox()
+        if name == "digits":
+            iinput.setRange(ANALYSIS_DIGITS_MIN, ANALYSIS_DIGITS_MAX)
+        elif name in ANALYSIS_POSITIVE_INTEGER_PARAMS:
+            iinput.setRange(1, ANALYSIS_COUNT_MAX)
+        elif name in ANALYSIS_NON_NEGATIVE_INTEGER_PARAMS:
+            iinput.setRange(0, ANALYSIS_COUNT_MAX)
+        else:
+            iinput.setRange(-2147483648, 2147483647)
+        iinput.setCorrectionMode(QtWidgets.QAbstractSpinBox.CorrectToPreviousValue)
+
+        # if a default value has been specified, use it
+        if name in self.current_defaults:
+            value = (
+                validate_analysis_digits(self.current_defaults[name])
+                if name == "digits"
+                else (
+                    validate_analysis_count(name, self.current_defaults[name])
+                    if _is_count_analysis_param(name)
+                    else int(self.current_defaults[name])
+                )
+            )
+            iinput.setValue(value)
+            self.current_param_vals[name] = value
+
+        iinput.setMaximumWidth(50)
+        self._cap_value_control_width(iinput)
+        iinput.valueChanged[int].connect(
+            app_error_handler.safe_slot(
+                self.set_param_f(name, to_type=int), parent=self
+            )
+        )
+        self.current_widgets.append(iinput)
+        layout.addWidget(iinput, cur_grid_row, 1)
+
+    def add_text_box(self, layout, cur_grid_row, name):
+        self.add_label(
+            layout,
+            cur_grid_row,
+            self._parameter_display_label(name),
+            tool_tip_text=self._parameter_description(name),
+        )
+        # now add the text
+        txt_input = QLineEdit()
+
+        # if a default value has been specified, use it
+        if name in self.current_defaults:
+            txt_input.setText(str(self.current_defaults[name]))
+            self.current_param_vals[name] = self.current_defaults[name]
+
+        txt_input.setMaximumWidth(200)
+        self._cap_value_control_width(txt_input)
+        txt_input.textChanged.connect(
+            app_error_handler.safe_slot(
+                self.set_param_f(name, to_type=str), parent=self
+            )
+        )
+        self.current_widgets.append(txt_input)
+        layout.addWidget(txt_input, cur_grid_row, 1)
+
+    def set_param_f(self, name, to_type=str):
+        """
+        Returns a function f(x) such that f(x) will set the key
+        name in the parameters dictionary to the value x.
+        """
+
+        def set_param(x):
+            self.current_param_vals[name] = to_type(x)
+            print(self.current_param_vals)
+
+        return set_param
+
+    def add_label(self, layout, cur_grid_row, name, tool_tip_text=None):
+        lbl = QLabel(name, self.parameter_grp_box)
+        if not tool_tip_text is None:
+            lbl.setToolTip(tool_tip_text)
+        self.current_widgets.append(lbl)
+        layout.addWidget(lbl, cur_grid_row, 0)
+
+    def add_method_description(self, layout, cur_grid_row, text):
+        lbl = QLabel(text, self.parameter_grp_box)
+        lbl.setWordWrap(True)
+        lbl.setMinimumWidth(0)
+        lbl.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.current_widgets.append(lbl)
+        layout.addWidget(lbl, cur_grid_row, 0, 1, 2)
+
+    def _cap_value_control_width(self, widget):
+        widget.setProperty(
+            "RCMS_maximum_value_control_width",
+            qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH,
+        )
+        widget.setMaximumWidth(
+            min(
+                widget.maximumWidth(),
+                qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH,
+            )
+        )
+        widget.setSizePolicy(QSizePolicy.Maximum, widget.sizePolicy().verticalPolicy())
+
+    def _cap_method_selector_width(self, widget):
+        widget.setProperty(
+            "RCMS_maximum_combo_width",
+            qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH,
+        )
+        widget.setMaximumWidth(
+            min(
+                widget.maximumWidth(),
+                qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH,
+            )
+        )
+        widget.setSizePolicy(QSizePolicy.Maximum, widget.sizePolicy().verticalPolicy())
+
+    def setup_params(self):
+        # parses out information about the parameters of the current method
+        # param_d holds (meta) information about the parameter -- it's a each param
+        # itself maps to a dictionary with a pretty name and description (assuming
+        # they were provided for the given param)
+        self.current_params, self.current_defaults, self.var_order, self.param_d = (
+            meta_py_r.get_params(self.current_method)
+        )
+
+        ###
+        # user selections overwrite the current parameter defaults.
+        # ie., if the user has run this analysis before, the preferences
+        # they selected then are automatically set as the defaults now.
+        # these defaults, if they exist, are stored in the user_preferences
+        # dictionary
+        #         method_params = self.parent().user_prefs["method_params"]
+        #         if self.current_method in method_params:
+        #             print "loading default from user preferences!"
+        #             self.current_defaults = method_params[self.current_method]
+
+        # override conf.level with global conf.level
+        self.current_defaults["conf.level"] = self.conf_level
+
+        print(self.current_defaults)
+
+    def diag_next(self):
+        add_plot_params(self)
+
+        # if the user selected both sens/spec and lr/dor
+        # then we will always show them the former first.
+        # thus the parameters we have now are for sens/spec
+        # note that we first add the forest plot parameters!
+        self.add_cur_analysis_details()
+
+        # we're going to show another analysis details form for the
+        # likelihood ratio and diagnostic odds ratio analyses.
+        # we pass along the parameters acquired for sens/spec
+        # in the diag_metrics* dictionary.
+        form = MA_Specs(
+            self.model,
+            parent=self.parent(),
+            diag_metrics=[
+                metric for metric in ("lr", "dor") if metric in self.diag_metrics
+            ],
+            meta_f_str=self.meta_f_str,
+            diag_metrics_to_analysis_details_d=self.diag_metrics_to_analysis_details,
+            conf_level=self.model.get_global_conf_level(),
+        )
+        form.show()
+        self.hide()
+
+    def add_cur_analysis_details(self):
+        """
+        this method only applicable for diagnostic data, wherein
+        we have multiple metrics. here the parameters/method for
+        these metrics are added to a dictionary.
+        """
+
+        # this was extracted earlier, ultimately from the checkboxes
+        # selected by the user
+        metrics_to_run = list(self.diag_metrics_to_analysis_details.keys())
+
+        if self.sens_spec:
+            for metric in [m for m in ("Sens", "Spec") if m in metrics_to_run]:
+                self.diag_metrics_to_analysis_details[metric] = (
+                    self.current_method,
+                    self.current_param_vals,
+                )
+        else:
+            # lr/dor
+            for metric in [m for m in ("DOR", "PLR", "NLR") if m in metrics_to_run]:
+                self.diag_metrics_to_analysis_details[metric] = (
+                    self.current_method,
+                    self.current_param_vals,
+                )
+
+    def setup_diagnostic_ui(self):
+        ###
+        # here is where we set the keys of the _to_analysis_details
+        # dictionary to the metrics the user selected
+
+        # the names of the metrics internally are different than those that
+        # are displayed to the user, e.g., the user selects Likelihood Ratio
+        # instead of LR+/LR-. we map from the UI names to the internal names
+        # here
+        ####
+
+        # lr_dor is, by convention, the 'second screen' shown to the user
+        if len(self.diag_metrics_to_analysis_details) == 0:
+            metrics_to_run = []
+            for m in self.diag_metrics:
+                metrics_to_run.extend(DIAG_METRIC_NAMES_D[m])
+
+            self.diag_metrics_to_analysis_details = dict(
+                list(zip(metrics_to_run, [None for m in metrics_to_run]))
+            )
+
+        if self.sens_spec and self.lr_dor:
+            self.buttonBox.clear()
+            next_button = self.buttonBox.addButton(
+                "next >", QDialogButtonBox.AcceptRole
+            )
+
+            # if both sets of metrics are selected, we need to next prompt the
+            # user for parameters regarding the second
+            self._set_accepted_handler(self.diag_next)
+
+            # in the case that both 'families' of metrics are selected,
+            # we prompt the user for two different methods (because different
+            # methods are available for these). this is confusing, so
+            # we'll here tell the user what's up (issue #83, issue #115)
+            # (but we only show it if they haven't disabled this)
+
+            if get_setting("explain_diag"):
+                diag_explain_window = diagnostic_explain.DiagnosticExplain(parent=self)
+                diag_explain_window.show()
+
+        # change some UI elements to refelct the current method
+        window_title, method_label = "", ""
+        if self.sens_spec:
+            metric_group_label = diagnostic_metric_group_display_label("sens_spec")
+        else:
+            metric_group_label = diagnostic_metric_group_display_label("lr_dor")
+        window_title = "Method & Parameters for %s" % metric_group_label
+        method_label = "Method for %s" % metric_group_label
+
+        self.setWindowTitle(QtCore.QCoreApplication.translate("Dialog", window_title))
+        self.method_lbl.setText(method_label)
+
+
+###
+# the following methods are defined statically because
+# they are also used by the forest plot editing window,
+# which isn't really a 'child' of ma_specs, so inheritance
+# didn't feel appropriate
+###
+def _run_binary_analysis(specs_form):
+    # Creates a tmp object in R called tmp_obj unless a caller passes another name.
+    meta_py_r.ma_dataset_to_simple_binary_robj(specs_form.model)
+    if specs_form.meta_f_str is None:
+        return meta_py_r.run_binary_ma(
+            specs_form.current_method, specs_form.current_param_vals
+        )
+    return meta_py_r.run_workflow_analysis(
+        specs_form.meta_f_str, specs_form.current_method, specs_form.current_param_vals
+    )
+
+
+def _run_continuous_analysis(specs_form):
+    meta_py_r.ma_dataset_to_simple_continuous_robj(specs_form.model)
+    if specs_form.meta_f_str is None:
+        return meta_py_r.run_continuous_ma(
+            specs_form.current_method, specs_form.current_param_vals
+        )
+    return meta_py_r.run_workflow_analysis(
+        specs_form.meta_f_str, specs_form.current_method, specs_form.current_param_vals
+    )
+
+
+def _run_guarded_analysis(specs_form, progress_bar, run_analysis):
+    try:
+        return run_analysis()
+    except Exception as e:
+        app_error_handler.log_exception(type(e), e, e.__traceback__)
+        QMessageBox.critical(
+            specs_form,
+            "Analysis Failed",
+            "Sorry, this analysis could not be completed:\n\n%s" % e,
+        )
+        progress_dialog.hide_once(progress_bar)
+        _reset_r_working_dir_safely()
+        specs_form.accept()
+        return None
+
+
+def _reset_r_working_dir_safely():
+    try:
+        meta_py_r.reset_Rs_working_dir()
+    except Exception:
+        pass
+
+
+def _is_count_analysis_param(name):
+    return name in (
+        ANALYSIS_POSITIVE_INTEGER_PARAMS | ANALYSIS_NON_NEGATIVE_INTEGER_PARAMS
+    )
+
+
+def _is_integer_analysis_param(name):
+    return name == "digits" or _is_count_analysis_param(name)
+
+
+def add_plot_params(specs_form):
+    specs_form.current_param_vals["fp_show_col1"] = specs_form.show_1.isChecked()
+    specs_form.current_param_vals["fp_col1_str"] = _text_value(specs_form.col1_str_edit)
+    specs_form.current_param_vals["fp_show_col2"] = specs_form.show_2.isChecked()
+    specs_form.current_param_vals["fp_col2_str"] = _text_value(specs_form.col2_str_edit)
+    specs_form.current_param_vals["fp_show_col3"] = specs_form.show_3.isChecked()
+    specs_form.current_param_vals["fp_col3_str"] = _text_value(specs_form.col3_str_edit)
+    specs_form.current_param_vals["fp_show_col4"] = specs_form.show_4.isChecked()
+    specs_form.current_param_vals["fp_col4_str"] = _text_value(specs_form.col4_str_edit)
+    specs_form.current_param_vals["fp_xlabel"] = _text_value(specs_form.x_lbl_le)
+    specs_form.current_param_vals["fp_outpath"] = _text_value(specs_form.image_path)
+
+    plot_lb = _text_value(specs_form.plot_lb_le)
+    specs_form.current_param_vals["fp_plot_lb"] = "[default]"
+    if plot_lb != "[default]" and check_plot_bound(plot_lb):
+        specs_form.current_param_vals["fp_plot_lb"] = plot_lb
+
+    plot_ub = _text_value(specs_form.plot_ub_le)
+    specs_form.current_param_vals["fp_plot_ub"] = "[default]"
+    if plot_ub != "[default]" and check_plot_bound(plot_ub):
+        specs_form.current_param_vals["fp_plot_ub"] = plot_ub
+
+    xticks = _text_value(specs_form.x_ticks_le)
+    specs_form.current_param_vals["fp_xticks"] = "[default]"
+    if xticks != "[default]" and seems_sane(xticks):
+        specs_form.current_param_vals["fp_xticks"] = xticks
+
+    specs_form.current_param_vals["fp_show_summary_line"] = (
+        specs_form.show_summary_line.isChecked()
+    )
+
+
+def _diagnostic_analysis_requests(specs_form):
+    method_names, list_of_param_vals = [], []
+    missing_metrics = []
+
+    ordered_metrics = ["Sens", "Spec", "NLR", "PLR", "DOR"]
+    for diag_metric in [
+        metric
+        for metric in ordered_metrics
+        if metric in specs_form.diag_metrics_to_analysis_details
+    ]:
+        details = specs_form.diag_metrics_to_analysis_details[diag_metric]
+        if details is None:
+            missing_metrics.append(diag_metric)
+            continue
+
+        try:
+            method, param_vals = details
+        except (TypeError, ValueError):
+            raise ValueError(
+                "Invalid method and parameter selection for: %s." % diag_metric
+            )
+
+        if method is None or param_vals is None:
+            missing_metrics.append(diag_metric)
+            continue
+
+        param_vals = copy.deepcopy(param_vals)
+
+        # update the forest plot path
+        split_fp_path = specs_form.current_param_vals["fp_outpath"].split(".")
+        new_str = (
+            split_fp_path[0]
+            if len(split_fp_path) == 1
+            else ".".join(split_fp_path[:-1])
+        )
+        new_str = new_str + "_%s" % diag_metric.lower() + ".png"
+        param_vals["fp_outpath"] = new_str
+
+        # update the metric
+        param_vals["measure"] = diag_metric
+
+        method_names.append(method)
+        list_of_param_vals.append(param_vals)
+
+    if missing_metrics:
+        raise ValueError(
+            "No method and parameters were selected for: %s. "
+            "Complete all diagnostic method screens before running analysis."
+            % ", ".join(missing_metrics)
+        )
+
+    if not method_names:
+        raise ValueError("No diagnostic metrics were configured for analysis.")
+
+    return method_names, list_of_param_vals
+
+
+def _text_value(widget):
+    return qt_text.to_native_text(widget.text())
+
+
+def _diagnostic_direct_effects_need_metric_specific_data(model, list_of_param_vals):
+    if model.included_studies_have_raw_data():
+        return False
+
+    missing_metrics = [
+        params["measure"]
+        for params in list_of_param_vals
+        if not model.included_studies_have_point_estimates(effect=params["measure"])
+    ]
+    if missing_metrics:
+        raise ValueError(
+            "Diagnostic analysis requires complete TP/FN/FP/TN counts or "
+            "complete entered effect estimates and confidence intervals for "
+            "each selected metric. Missing entered estimates for: %s."
+            % ", ".join(missing_metrics)
+        )
+
+    return True
+
+
+def _run_diagnostic_analysis_isolating_metric_failures(
+    model, method_names, list_of_param_vals, meta_f_str=None
+):
+    if _diagnostic_direct_effects_need_metric_specific_data(model, list_of_param_vals):
+        return _run_diagnostic_with_metric_specific_data(
+            model, method_names, list_of_param_vals, meta_f_str=meta_f_str
+        )
+
+    meta_py_r.ma_dataset_to_simple_diagnostic_robj(model)
+    try:
+        if meta_f_str is None:
+            return meta_py_r.run_diagnostic_multi(method_names, list_of_param_vals)
+        return meta_py_r.run_diagnostic_workflow(
+            meta_f_str, method_names, list_of_param_vals
+        )
+    except Exception:
+        return _run_diagnostic_with_shared_data_per_metric(
+            method_names, list_of_param_vals, meta_f_str=meta_f_str
+        )
+
+
+def _run_diagnostic_with_shared_data_per_metric(
+    method_names, list_of_param_vals, meta_f_str=None
+):
+    return _run_diagnostic_methods_per_metric(
+        method_names,
+        list_of_param_vals,
+        lambda method_name, param_vals: (
+            meta_py_r.run_diagnostic_multi([method_name], [param_vals])
+            if meta_f_str is None
+            else meta_py_r.run_diagnostic_workflow(
+                meta_f_str, [method_name], [param_vals]
+            )
+        ),
+    )
+
+
+def _run_diagnostic_with_metric_specific_data(
+    model, method_names, list_of_param_vals, meta_f_str=None
+):
+    def run_metric(method_name, param_vals):
+        metric = param_vals["measure"]
+        meta_py_r.ma_dataset_to_simple_diagnostic_robj(model, metric=metric)
+        if meta_f_str is None:
+            return meta_py_r.run_diagnostic_multi([method_name], [param_vals])
+        return meta_py_r.run_diagnostic_workflow(
+            meta_f_str, [method_name], [param_vals]
+        )
+
+    return _run_diagnostic_methods_per_metric(
+        method_names, list_of_param_vals, run_metric
+    )
+
+
+def _run_diagnostic_methods_per_metric(method_names, list_of_param_vals, run_metric):
+    merged_result = _empty_diagnostic_result()
+    failures = []
+    for method_name, param_vals in zip(method_names, list_of_param_vals):
+        metric = param_vals["measure"]
+        try:
+            metric_result = run_metric(method_name, param_vals)
+        except Exception as e:
+            failures.append((metric, e))
+            merged_result["texts"]["%s Error" % metric] = str(e)
+        else:
+            _merge_diagnostic_result(merged_result, metric_result)
+
+    if failures and not _diagnostic_result_has_successes(merged_result):
+        raise RuntimeError(_format_diagnostic_failures(failures))
+
+    if not merged_result["image_order"]:
+        merged_result["image_order"] = None
+    return merged_result
+
+
+def _empty_diagnostic_result():
+    return {
+        "texts": {},
+        "images": {},
+        "image_var_names": {},
+        "image_params_paths": {},
+        "image_order": [],
+    }
+
+
+def _merge_diagnostic_result(merged_result, metric_result):
+    for key in ("texts", "images", "image_var_names", "image_params_paths"):
+        merged_result[key].update(metric_result.get(key, {}))
+
+    image_order = metric_result.get("image_order")
+    if image_order:
+        if isinstance(image_order, (list, tuple)):
+            merged_result["image_order"].extend(image_order)
+        else:
+            merged_result["image_order"].append(image_order)
+
+
+def _diagnostic_result_has_successes(result):
+    return bool(
+        result["images"] or any(not key.endswith(" Error") for key in result["texts"])
+    )
+
+
+def _format_diagnostic_failures(failures):
+    return "\n".join("%s failed: %s" % (metric, error) for metric, error in failures)
+
+
+def _writeout_test_data(meta_f_str, method, params, results, diag=False):
+    with open("test_data.txt", "a") as f:
+        f.write("method_and_params.append({\n")
+        f.write("                          'meta_f_str': '%s',\n" % meta_f_str)
+        if diag:
+            f.write("                          'method': %s,\n" % str(method))
+        else:
+            f.write("                          'method': '%s',\n" % method)
+        f.write("                          'parameters': %s,\n" % str(params))
+        f.write("                          'results': %s,\n" % str(results))
+        f.write("                         })\n\n")
+
+        # Write the data to the disk for sure
+        f.flush()
+        os.fsync(f)
+
+
+####
+# simple progress bar
+import forms.ui_running
+
+
+class MetaProgress(QDialog, forms.ui_running.Ui_running):
+    def __init__(self, parent=None):
+        super(MetaProgress, self).__init__(parent)
+        self.setupUi(self)
+        qt_layout.fit_application_dialog_to_contents(self)

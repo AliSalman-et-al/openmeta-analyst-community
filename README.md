@@ -1,85 +1,75 @@
-# OpenMeta[Analyst] Community
+# RC MetaStudio
 
-OpenMeta[Analyst] Community is a community-maintained fork of the original OpenMeta[Analyst] project. It is not affiliated with or endorsed by Brown University or the original maintainers.
+RC MetaStudio is open-source desktop software for advanced meta-analysis, developed and maintained by Research Consultancy (RC).
 
-OpenMeta[Analyst] is an open-source application for conducting meta-analyses from a graphical desktop interface.
+RC MetaStudio is derived from the Original OpenMeta[Analyst] Project and is independently maintained by Ali Salman and RC MetaStudio contributors. See [NOTICE.md](NOTICE.md) for original-project provenance, current maintainership, license posture, warranty terms, and the affiliation disclaimer.
+
+## What It Provides
+
+- A graphical desktop workflow for study data entry, meta-analysis setup, and result review.
+- Python 3.11 and PyQt5 application code for the maintained desktop path.
+- The bundled private RCMetaR R package interface for R-backed analysis behavior.
+- `.rcms` project files as the maintained RC MetaStudio project-file identity.
+
+Analysis behavior is preserved unless a reviewed compatibility exception or statistical modernization drift record says otherwise.
 
 ## Running From Source
 
-The maintained application path uses Python 3.11, PyQt5, and the uv-managed environment committed in `pyproject.toml` and `uv.lock`.
+Use the locked uv environment from the repository root:
 
 ```powershell
 uv sync --locked
-uv run python src\launch.py
+uv run rc-metastudio
 ```
 
-## R Dependencies
+Developer source runs need an R installation with the packages used by the analysis backend. Normal desktop users should not need to install R packages manually when using a packaged release.
 
-Normal desktop users do not need to manually install R or R packages before running the Windows distributable. Developer source runs need an R installation with the packages used by the analysis backend.
-
-Install the required R packages:
+Install the required R packages into a local R library:
 
 ```r
-install.packages(c("metafor", "lme4", "MCMCpack", "igraph"))
+Sys.setenv(R_LIBS_USER = "path/to/local/r-library")
+source("scripts/install-r-deps.R")
 ```
 
-Build and install the bundled `HSROC` package and the bundled `openmetar` package from `src/R`.
+The bundled R package is rcmetar. Prefer the product names and policy in this README, [NOTICE.md](NOTICE.md), and [CHANGELOG.md](CHANGELOG.md) when documentation conflicts with older historical records.
 
-These packages are distributed with the source tree. Use the bundled `HSROC` package, not the CRAN package.
+## Verification
 
-```sh
-cd src/R
-R CMD build HSROC
-R CMD build openmetar
-R CMD INSTALL HSROC_2.0.5.tar.gz
-R CMD INSTALL openmetar_1.0.tar.gz
-```
-
-## Tests
-
-Run the modern full-app automation test first when checking GUI launch behavior:
+Run the smoke verification lane for the fastest local check:
 
 ```powershell
-uv run pytest tests\modern\test_metaform_automation_launch.py
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-smoke.ps1
 ```
 
-Run the remaining modern pytest suite with the automation test excluded:
+Run the fast verification lane for routine local evidence:
 
 ```powershell
-uv run pytest tests\modern --ignore=tests\modern\test_metaform_automation_launch.py
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-fast.ps1
 ```
 
-## Windows Binary Builds
-
-The maintained Windows build path is the modern Python 3/PyQt5 workflow:
-
-```text
-.github/workflows/modern-python.yml
-```
-
-It packages `src/launch.py` through PyInstaller so the artifact starts the real `MetaForm` application path. The ZIP includes the PyQt5 runtime, bundled R package sources, sample data, bundled help, and a launcher script as `OpenMetaAnalyst-modern-windows-x64.zip`.
-
-Run the same modern workflow locally with `uv`:
+Run area-specific checks when changing GUI, R Stack, golden analysis, or packaging behavior:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run-modern-workflow-local.ps1 -ArtifactName OpenMetaAnalyst-modern-windows-x64
+uv run pytest tests -m gui
+uv run pytest tests -m r_stack
+uv run pytest tests -m golden
+uv run pytest tests -m packaging_contract
 ```
 
-The local script syncs the committed `uv.lock` into `.venv`, runs `tests\modern` through `uv run`, and builds the modern Windows artifact through PyInstaller.
+## Packaging Scope
 
-## macOS Binary Builds
+Windows is the active packaged release target. macOS package jobs are available for release-candidate validation but remain opt-in.
 
-macOS packaging is available as an explicit opt-in path for Intel and Apple Silicon runners:
+Before release packaging, bundled third-party components and assets must be inventoried and their license notices preserved separately from RC MetaStudio copyright and provenance. See [docs/release/third-party-inventory.md](docs/release/third-party-inventory.md).
 
-```bash
-bash ./scripts/run-modern-workflow-local.sh --target macos-intel
-bash ./scripts/run-modern-workflow-local.sh --target macos-arm64
-```
+## Feedback And Contributions
 
-The GitHub workflow keeps Windows active by default on push and pull request. macOS package jobs run from `workflow_dispatch` when `build_macos` is enabled.
+Public [GitHub Issues](https://github.com/AliSalman-et-al/rc-metastudio/issues) may be used for bug reports and feedback. Issue reports should not include private project data unless the reporter deliberately chooses to share it.
 
-Apple Silicon packaging is present as an opt-in CI target. With the current single Qt runtime policy (`PyQt5-Qt5==5.15.2` everywhere), it is experimental because the common PyPI Qt wheel is Intel-only on macOS; the job is isolated from the default Windows build.
+RC MetaStudio does not automatically collect, upload, or attach diagnostics for issue reports. Any future diagnostic export must be explicit, local, user-controlled, and clear about its contents.
 
-## Release Scope
+Unsolicited public code contributions are not currently accepted. See [CONTRIBUTING.md](CONTRIBUTING.md) for the maintainer policy.
 
-Windows is the active packaged release target. macOS packages are available for build validation and release-candidate work.
+## License
+
+RC MetaStudio is distributed under the GNU General Public License, version 3 or later, where permitted by the original GPL-2.0-or-later grant covering derived OpenMeta[Analyst] portions. See [LICENSE](LICENSE), [NOTICE.md](NOTICE.md), and [docs/legal/source-headers.md](docs/legal/source-headers.md).

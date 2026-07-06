@@ -1,2 +1,18 @@
+* text=auto
+
+*.md text eol=lf
+*.py text eol=lf
+*.r text eol=lf
+*.R text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+*.ui text eol=lf
+*.qrc text eol=lf
 *.sh text eol=lf
+*.ps1 text eol=crlf
 *.yml text eol=lf
+*.yaml text eol=lf
+
+*.rcms binary
+*.png binary
+*.ico binary

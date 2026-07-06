@@ -16,4 +16,4 @@ This repo uses a multi-context domain documentation layout. See `docs/agents/dom
 
 ### Testing
 
-Use the uv-managed modern environment for Python 3/PyQt5 pytest work. See `docs/agents/testing.md`.
+Use the uv-managed verification environment for Python 3/PyQt5 pytest work. See `docs/agents/testing.md`.

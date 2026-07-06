@@ -1,0 +1,39 @@
+Package: RCMetaR
+Version: 0.1.0
+Date: 2026-07-06
+Type: Package
+Title: R Component for RC MetaStudio
+Authors@R: c(
+    person("Ali", "Salman", email = "alisalman.et.al@gmail.com", role = c("aut", "cre")),
+    person("Research Consultancy", role = "cph")
+    )
+Author: Ali Salman [aut, cre],
+    Research Consultancy [cph]
+Maintainer: Ali Salman <alisalman.et.al@gmail.com>
+Description: R component for RC MetaStudio, a graphical user interface
+    for performing meta-analysis.
+License: GPL (>= 2)
+URL: https://github.com/AliSalman-et-al/rc-metastudio
+BugReports: https://github.com/AliSalman-et-al/rc-metastudio/issues
+Depends:
+    R (>= 4.6.0)
+Imports:
+    boot,
+    grDevices,
+    graphics,
+    grid,
+    HSROC,
+    lme4,
+    methods,
+    metafor,
+    pdftools,
+    stats,
+    utils
+Suggests:
+    coda,
+    roxygen2,
+    testthat
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE, roclets = c("rd"))
+RoxygenNote: 8.0.0
+Config/testthat/edition: 3

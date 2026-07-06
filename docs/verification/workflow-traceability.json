@@ -1,0 +1,127 @@
+{
+  "manifest": "workflow-traceability",
+  "source_inventory": "docs/verification/user-facing-workflow-inventory.md",
+  "trace_targets": {
+    "golden_coverage": "docs/verification/golden-coverage-manifest.json",
+    "gui_evidence": "docs/verification/gui-verification-evidence.md",
+    "compatibility_exceptions": "docs/verification/compatibility-exceptions.json",
+    "gui_compatibility_exceptions": "docs/verification/gui-compatibility-exceptions.json"
+  },
+  "gate_status": "open",
+  "workflows": [
+    {
+      "id": "startup-project-selection",
+      "name": "Startup and project selection workflows",
+      "trace_type": "gui_evidence_entry",
+      "trace": "Real MetaForm Project Shell Workflow"
+    },
+    {
+      "id": "oma-open-display-save-save-as",
+      "name": "Existing .rcms project open, display, save, and save-as workflows",
+      "trace_type": "gui_evidence_entry",
+      "trace": "Existing .rcms Open Display Save-As Workflow"
+    },
+    {
+      "id": "recent-files-settings",
+      "name": "Recent files and persisted settings workflows",
+      "trace_type": "gui_evidence_entry",
+      "trace": "Recent Files and Settings Workflow"
+    },
+    {
+      "id": "dataset-creation",
+      "name": "Dataset creation workflows for binary, continuous, and diagnostic data",
+      "trace_type": "gui_evidence_entry",
+      "trace": "Data Creation and Editing Workflow"
+    },
+    {
+      "id": "data-table-editing",
+      "name": "Data-table editing workflows, including adding studies, groups, outcomes, follow-ups, and covariates",
+      "trace_type": "gui_evidence_entry",
+      "trace": "Data Creation and Editing Workflow"
+    },
+    {
+      "id": "copy-paste-undo-redo",
+      "name": "Copy, paste, undo, and redo workflows",
+      "trace_type": "gui_evidence_entry",
+      "trace": "Copy Paste Undo Redo Workflow"
+    },
+    {
+      "id": "metric-confidence-level",
+      "name": "Metric selection and confidence-level workflows",
+      "trace_type": "gui_evidence_entry",
+      "trace": "Metric and Confidence Level Workflow"
+    },
+    {
+      "id": "standard-meta-analysis",
+      "name": "Standard meta-analysis workflows for binary, continuous, and diagnostic data",
+      "trace_type": "golden_coverage_row",
+      "trace": [
+        "binary-standard-OR",
+        "continuous-standard-SMD",
+        "diagnostic-standard-DOR"
+      ]
+    },
+    {
+      "id": "cumulative-analysis",
+      "name": "Cumulative analysis workflows",
+      "trace_type": "golden_coverage_row",
+      "trace": [
+        "binary-cumulative-OR",
+        "continuous-cumulative-SMD"
+      ]
+    },
+    {
+      "id": "leave-one-out-analysis",
+      "name": "Leave-one-out analysis workflows",
+      "trace_type": "golden_coverage_row",
+      "trace": [
+        "binary-leave-one-out-OR",
+        "continuous-leave-one-out-SMD"
+      ]
+    },
+    {
+      "id": "meta-regression",
+      "name": "Meta-Regression workflows",
+      "trace_type": "golden_coverage_row",
+      "trace": [
+        "binary-meta-regression-OR",
+        "continuous-meta-regression-SMD"
+      ]
+    },
+    {
+      "id": "subgroup-analysis",
+      "name": "Subgroup Analysis workflows",
+      "trace_type": "golden_coverage_row",
+      "trace": [
+        "binary-subgroup-OR",
+        "continuous-subgroup-SMD"
+      ]
+    },
+    {
+      "id": "csv-import",
+      "name": "CSV import workflows",
+      "trace_type": "golden_coverage_row",
+      "trace": [
+        "binary-csv-created-project-OR"
+      ]
+    },
+    {
+      "id": "results-window-summary-plot-display",
+      "name": "Results-window summary and plot display workflows",
+      "trace_type": "gui_evidence_entry",
+      "trace": "Results Window Summary Plot Display Workflow"
+    },
+    {
+      "id": "about-legal-static-links",
+      "name": "About/Legal and static project-link workflows",
+      "trace_type": "gui_evidence_entry",
+      "trace": "About/Legal and Static Project Links Workflow"
+    },
+    {
+      "id": "windows-distributable-launch",
+      "name": "Windows distributable launch workflow",
+      "trace_type": "gui_evidence_entry",
+      "trace": "Windows Distributable Launch Workflow"
+    }
+  ]
+}
