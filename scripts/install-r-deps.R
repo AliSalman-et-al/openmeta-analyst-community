@@ -41,7 +41,15 @@ required_packages <- unique(c(
   app_cran_bundle_packages,
   recommended_bundle_packages
 ))
-package_install_type <- if (.Platform$OS.type == "windows") "binary" else "source"
+
+cran_package_install_types <- function() {
+  if (.Platform$pkgType != "source") {
+    return(c("binary", "source"))
+  }
+  "source"
+}
+
+package_install_types <- cran_package_install_types()
 
 is_installed_in_target_library <- function(package) {
   package %in% rownames(utils::installed.packages(lib.loc = lib))
@@ -49,8 +57,29 @@ is_installed_in_target_library <- function(package) {
 
 install_cran_packages <- function(packages) {
   missing <- packages[!vapply(packages, is_installed_in_target_library, logical(1))]
-  if (length(missing)) {
-    install.packages(missing, lib = lib, dependencies = NA, type = package_install_type)
+  for (package_install_type in package_install_types) {
+    if (!length(missing)) {
+      break
+    }
+    message(sprintf(
+      "Installing %d CRAN package(s) with type=%s",
+      length(missing),
+      package_install_type
+    ))
+    tryCatch(
+      install.packages(missing, lib = lib, dependencies = NA, type = package_install_type),
+      error = function(error) {
+        if (identical(package_install_type, tail(package_install_types, 1))) {
+          stop(error)
+        }
+        message(sprintf(
+          "CRAN package install with type=%s did not complete: %s",
+          package_install_type,
+          conditionMessage(error)
+        ))
+      }
+    )
+    missing <- packages[!vapply(packages, is_installed_in_target_library, logical(1))]
   }
 }
 

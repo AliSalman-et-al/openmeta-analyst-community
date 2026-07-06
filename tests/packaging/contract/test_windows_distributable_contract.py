@@ -446,6 +446,11 @@ def test_shared_r_dependency_installer_is_used_by_packagers():
 
     assert cran_default == "https://cloud.r-project.org"
     assert archive_url.endswith("/Archive/HSROC/HSROC_2.1.9.tar.gz")
+    assert "cran_package_install_types <- function()" in installer
+    assert '.Platform$pkgType != "source"' in installer
+    assert 'return(c("binary", "source"))' in installer
+    assert 'install.packages(missing, lib = lib, dependencies = NA, type = package_install_type)' in installer
+    assert 'Sys.info()[["sysname"]]' not in installer
     assert {
         "Get-RPackageCacheKey",
         "Get-Sha256FileHash",
