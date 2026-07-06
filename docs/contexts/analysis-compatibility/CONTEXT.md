@@ -348,6 +348,38 @@ _Avoid_: Fake PyQt4 layer, QString clone, QVariant clone
 A minimal setup helper for modern tests and automation that selects the modern R backend. It is not a Qt binding compatibility layer.
 _Avoid_: PyQt4 bootstrap, fake Qt module installer
 
+**metafor Forest Renderer**:
+The post-cutover forest-plot renderer that draws plots with `metafor::forest()` and `addpoly()` from the `rma` result, replacing the retired custom grid-graphics engine. It reuses the existing `metafor` dependency and changes presentation only, not Analysis Behavior.
+_Avoid_: New plotting library, custom grid engine
+
+**Forest Render Bundle**:
+The self-contained render spec persisted for a forest plot (the redefined `.plotdata` object): the `rma` result or normalized effect/CI/`slab` vectors, a precomputed ilab spec (ilab column matrix, headers, weights, effect/CI values, subgroup structure) for the chosen style, params, data-type, side-by-side flag, and Forest Plot Style. A builder (`rcmetar.regenerate.plot.data`) emits it from `(om.data, res, params, style)`; the renderer (`rcmetar.draw.forest.plot`) is a pure placer over `metafor::forest()`. It keeps the edit, save-as, and regenerate round-trip stable without reloading `om.data`.
+_Avoid_: Legacy plot.data, pickled plot
+
+**Forest Plot Style**:
+The per-plot presentation template chosen for a forest plot, stored as the `fp_style` param and selectable in the Edit Forest Plot dialog: one of Default Forest Style, RevMan Forest Style, or BMJ Forest Style. Defaults to Default Forest Style, including for projects saved before the param existed.
+_Avoid_: Plot theme, forest skin
+
+**Default Forest Style**:
+The plain `metafor::forest()` layout, the universal fallback that renders every data family and forest variant and the style of the first auto-generated plot.
+_Avoid_: Basic plot, no style
+
+**RevMan Forest Style**:
+A full faithful reproduction of the Cochrane Review Manager forest layout on the metafor Forest Renderer, with per-data-family column templates and weight, effect/CI, subtotal, and heterogeneity blocks. Implemented without risk-of-bias columns, symbols, or legend.
+_Avoid_: Cochrane theme, RevMan clone with risk of bias
+
+**BMJ Forest Style**:
+A full faithful reproduction of the BMJ house forest layout on the metafor Forest Renderer, using the BMJ accent color and house column arrangement. Brand fonts are approximated with a clean default family rather than shipped.
+_Avoid_: BMJ theme, journal skin
+
+**Universal Appearance Controls**:
+The Edit Forest Plot controls that apply to every Forest Plot Style: a single accent-color picker driving study points, CI lines, and the summary diamond, plus weight-scaled point sizing with a size multiplier. Distinct from the per-style control panels that own each style's columns.
+_Avoid_: Global plot theme, per-style colors only
+
+**Twin-Panel Side-by-Side Forest Plot**:
+The paired diagnostic forest plot that shows two metrics over the same studies in aligned panels (Sensitivity|Specificity and PLR|NLR), historically `two.forest.plots`. On the metafor Forest Renderer it is composed from two `metafor::forest()` panels under base-graphics `layout()` with a shared `ylim`/`rows`, not with `patchwork`; rows align by construction because both panels share the same studies in the same order.
+_Avoid_: Dual forest plot, patchwork panel
+
 ## Headless Harness Notes
 
 The first Headless Analysis Harness loads `.rcms` files into `DatasetModel`, normalizes legacy state, converts the model through the existing Analysis Adapter functions in `meta_py_r`, and runs one binary or continuous method without creating `QApplication` or `MetaForm`.
