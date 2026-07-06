@@ -29,6 +29,6 @@ If bundled third-party materials remain beyond normal package metadata, create o
 
 ## Boundaries
 
-`NOTICE.md` remains focused on RC MetaStudio maintainership, Original OpenMeta[Analyst] Project provenance, GPL posture, warranty terms, and affiliation disclaimers.
+`NOTICE.md` remains focused on RC MetaStudio maintainership, Original RC MetaStudio Project provenance, GPL posture, warranty terms, and affiliation disclaimers.
 
 `THIRD_PARTY_NOTICES.md`, when required, records third-party bundled materials and their licenses so those materials are not accidentally represented as RC MetaStudio-owned work.

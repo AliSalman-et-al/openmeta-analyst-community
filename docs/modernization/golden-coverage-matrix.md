@@ -8,11 +8,11 @@ If a user-facing branch is omitted, record the reason in the omission log. If it
 
 | Project | Data family | Baseline role |
 | --- | --- | --- |
-| `sample_data/amino.oma` | Binary | Primary two-arm binary project; standard analysis and plot coverage. |
-| `sample_data/BCG.oma` | Binary | Additional binary project for metric/method variation and sensitivity to project shape. |
-| `sample_data/continuous.oma` | Continuous | Primary continuous project. |
-| `sample_data/lymph.oma` | Diagnostic | Primary diagnostic project, including multi-metric diagnostic workflows. |
-| `sample_data/meantime.oma` | Mixed or larger legacy project | Stress project for open/display/save and additional workflow coverage after its contents are characterized. |
+| `sample_data/amino.rcms` | Binary | Primary two-arm binary project; standard analysis and plot coverage. |
+| `sample_data/BCG.rcms` | Binary | Additional binary project for metric/method variation and sensitivity to project shape. |
+| `sample_data/continuous.rcms` | Continuous | Primary continuous project. |
+| `sample_data/lymph.rcms` | Diagnostic | Primary diagnostic project, including multi-metric diagnostic workflows. |
+| `sample_data/meantime.rcms` | Mixed or larger legacy project | Stress project for open/display/save and additional workflow coverage after its contents are characterized. |
 
 ## Data Families and Metrics
 

@@ -1,6 +1,6 @@
 # Python 3 and Qt 5 Modernization Milestone
 
-This checklist defines the first modernization milestone for OpenMeta[Analyst] Community. The goal is to port from Python 2.7 and Qt 4 to Python 3 and Qt 5 while preserving analysis behavior and a roughly similar desktop GUI.
+This checklist defines the first modernization milestone for RC MetaStudio Community. The goal is to port from Python 2.7 and Qt 4 to Python 3 and Qt 5 while preserving analysis behavior and a roughly similar desktop GUI.
 
 ## Scope
 
@@ -39,7 +39,7 @@ This checklist defines the first modernization milestone for OpenMeta[Analyst] C
 - Commit a small curated golden set for CI and archive larger captures as artifacts. See [ADR 0031](../adr/0031-commit-a-curated-golden-set-and-archive-larger-captures.md).
 - Commit golden schemas, manifests, tooling, and the Curated Golden Set; store the broader Comprehensive Golden Baseline as ignored local artifacts or CI/release artifact bundles.
 - Cover data-family breadth before method depth in the initial curated golden set. See [ADR 0032](../adr/0032-cover-data-family-breadth-before-method-depth.md).
-- Use `amino.oma`, `continuous.oma`, and `lymph.oma` as the initial committed golden datasets. See [ADR 0033](../adr/0033-use-amino-continuous-and-lymph-as-the-initial-golden-datasets.md).
+- Use `amino.rcms`, `continuous.rcms`, and `lymph.rcms` as the initial committed golden datasets. See [ADR 0033](../adr/0033-use-amino-continuous-and-lymph-as-the-initial-golden-datasets.md).
 - Prioritize random-effects methods in the initial golden method set. See [ADR 0034](../adr/0034-prioritize-random-effects-in-the-initial-golden-methods.md).
 - Add binary and continuous meta-regression and subgroup analysis golden coverage before release. See [ADR 0036](../adr/0036-require-meta-regression-and-subgroup-compatibility-before-release.md) and [ADR 0037](../adr/0037-require-binary-and-continuous-advanced-analysis-coverage.md).
 - Compare parsed numeric outputs with explicit tolerances, not exact string equality. See [ADR 0018](../adr/0018-use-explicit-tolerances-for-golden-analysis-tests.md).
@@ -54,7 +54,7 @@ This checklist defines the first modernization milestone for OpenMeta[Analyst] C
 - Use runnable compatibility slices instead of a repository-wide mechanical conversion. See [ADR 0007](../adr/0007-port-by-runnable-compatibility-slices.md).
 - Treat GUI similarity as workflow and recognizable-layout preservation, not pixel-perfect matching. See [ADR 0038](../adr/0038-define-gui-similarity-as-workflow-and-recognizable-layout-preservation.md).
 - Preserve GUI workflows unless a GUI compatibility exception is documented. See [ADR 0039](../adr/0039-preserve-gui-workflows-unless-an-exception-is-documented.md).
-- First GUI slice: open an existing `.oma` sample dataset, display the data table, run a binary random-effects meta-analysis, and show the result summary plus forest plot. See [ADR 0008](../adr/0008-use-standard-binary-analysis-as-the-first-gui-slice.md).
+- First GUI slice: open an existing `.rcms` sample dataset, display the data table, run a binary random-effects meta-analysis, and show the result summary plus forest plot. See [ADR 0008](../adr/0008-use-standard-binary-analysis-as-the-first-gui-slice.md).
 - Use automated headless analysis regression as the first hard gate; allow manual or lightweight scripted GUI verification initially. See [ADR 0017](../adr/0017-use-analysis-regression-as-the-first-automated-gate.md).
 
 ## Full Legacy App Port Sequence
@@ -69,7 +69,7 @@ This checklist defines the first modernization milestone for OpenMeta[Analyst] C
 
 ## Project Files
 
-- Existing `.oma` files must open without user-visible migration steps. See [ADR 0009](../adr/0009-require-oma-read-compatibility-before-byte-perfect-writes.md).
+- Existing `.rcms` files must open without user-visible migration steps. See [ADR 0009](../adr/0009-require-oma-read-compatibility-before-byte-perfect-writes.md).
 - Save compatibility is initially proven through representative round-trip tests rather than byte-for-byte identical output. See [ADR 0009](../adr/0009-require-oma-read-compatibility-before-byte-perfect-writes.md).
 - Defer project file format evolution until after the port is stable. See [ADR 0019](../adr/0019-defer-project-file-format-evolution.md).
 
@@ -106,7 +106,7 @@ This checklist defines the first modernization milestone for OpenMeta[Analyst] C
 - Headless golden analysis tests pass against reference outputs and publish a compatibility report.
 - Binary and continuous meta-regression and subgroup compatibility coverage is included before release.
 - The first GUI compatibility slice can be completed with documented GUI verification evidence.
-- Existing representative `.oma` files open, and selected project files round-trip successfully.
+- Existing representative `.rcms` files open, and selected project files round-trip successfully.
 - A Windows distributable is produced.
 - Minimal user documentation exists for the Windows distributable.
 - Any accepted analysis drift is documented as a compatibility exception.

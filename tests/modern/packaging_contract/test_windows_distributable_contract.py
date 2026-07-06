@@ -24,7 +24,7 @@ def ps_contract(*parts):
         "env_writes": set(re.findall(r"\$env:([A-Za-z0-9_]+)\s*=", text)),
         "paths": set(
             re.findall(
-                r'"([^"]+(?:\.(?:oma|html|exe|dll|bat|ps1|py|json|R|sh)|DESCRIPTION))"',
+                r'"([^"]+(?:\.(?:rcms|html|exe|dll|bat|ps1|py|json|R|sh)|DESCRIPTION))"',
                 text,
             )
         ),
@@ -128,28 +128,28 @@ def test_modern_windows_distributable_contract_is_declared():
         "Get-RPackageCacheKey",
         "Test-BundledRPackages",
         "Copy-RLibraryPackages",
-        "Assert-OpenMetaRSummaryFormatting",
+        "Assert-RCMetaRSummaryFormatting",
         "Install-LocalRPackagesFromSource",
         "Install-BundledRPackages",
     } <= script["functions"]
     assert {"robocopy", "Start-Process", "Move-Item"} <= script["commands"]
     assert {
-        "OMA_REQUIRE_IN_PROCESS_RPY2",
-        "OMA_STARTUP_PROJECT_SMOKE",
+        "RCMS_REQUIRE_IN_PROCESS_RPY2",
+        "RCMS_STARTUP_PROJECT_SMOKE",
         "RPY2_CFFI_MODE",
     } <= script["env_writes"]
     assert {"icons_rc", "rpy2.robjects", "rpy2.rinterface"} <= script["hidden_imports"]
     assert {
-        "OpenMetaAnalyst.exe",
-        "sample_data\\BCG.oma",
-        "sample_data\\amino.oma",
+        "RCMetaStudio.exe",
+        "sample_data\\BCG.rcms",
+        "sample_data\\amino.rcms",
         "doc\\openMA_help.html",
         "R\\bin\\x64\\R.dll",
-        "R\\library\\OpenMetaR\\DESCRIPTION",
-        "LaunchOpenMetaAnalyst.bat",
+        "R\\library\\RCMetaR\\DESCRIPTION",
+        "LaunchRCMetaStudio.bat",
         "scripts\\install-modern-r-deps.R",
-        "docs\\modernization\\OpenMetaR-r-dependencies.json",
-        "src\\R\\OpenMetaR\\DESCRIPTION",
+        "docs\\modernization\\RCMetaR-r-dependencies.json",
+        "src\\R\\RCMetaR\\DESCRIPTION",
     } <= script["paths"]
 
 
@@ -167,7 +167,7 @@ def test_modern_windows_r_cache_reinstalls_local_packages_after_cache_restore():
         "Installing bundled R package dependencies",
         "Test-RDependencyPackages -RscriptExe $rscriptExe -Library $rLibrary",
         "Caching bundled R dependency library at $cacheLibrary",
-        "Installing local OpenMetaR package",
+        "Installing local RCMetaR package",
     )
 
 
@@ -176,7 +176,7 @@ def test_packaged_smoke_launches_with_positional_project_argument():
 
     assert relative_order(
         script,
-        '$env:OMA_STARTUP_PROJECT_SMOKE = "1"',
+        '$env:RCMS_STARTUP_PROJECT_SMOKE = "1"',
         "Start-Process -FilePath $exePath -ArgumentList @($samplePath)",
     )
 
@@ -218,13 +218,13 @@ def test_modern_fast_workflow_runs_smoke_before_fast_verification():
         "smoke-verification",
         "fast-verification",
     }
-    assert workflow["env"]["OMA_CRAN_REPO"] == "https://cloud.r-project.org"
+    assert workflow["env"]["RCMS_CRAN_REPO"] == "https://cloud.r-project.org"
     assert workflow["events"] == {"workflow_dispatch", "pull_request"}
     assert workflow["legacy_uses"] == []
     assert all(re.fullmatch(r"[0-9a-f]{40}", ref) for _, ref, _ in workflow["uses"])
     assert "src/*" in workflow["text"]
     assert "tests/modern/*" in workflow["text"]
-    assert "docs/modernization/OpenMetaR-r-dependencies.json" in workflow["text"]
+    assert "docs/modernization/RCMetaR-r-dependencies.json" in workflow["text"]
     assert "docs/modernization/test-taxonomy.json" in workflow["text"]
     assert (
         ".\\scripts\\verify-modern-smoke.ps1 -Sync -RequireREvidence"
@@ -241,7 +241,7 @@ def test_modern_fast_workflow_runs_smoke_before_fast_verification():
         for key in workflow["cache_keys"]
     )
     assert all(
-        "scripts/verify_openmetar_r_default.py" in key for key in workflow["cache_keys"]
+        "scripts/verify_rcmetar_r_default.py" in key for key in workflow["cache_keys"]
     )
     assert all(
         "steps.r-cache-key.outputs.version" in key for key in workflow["cache_keys"]
@@ -265,24 +265,24 @@ def test_modern_package_workflow_builds_path_aware_artifacts():
         "macos-package-intel",
         "macos-package-arm64",
     } <= workflow["jobs"]
-    assert workflow["env"]["OMA_CRAN_REPO"] == "https://cloud.r-project.org"
+    assert workflow["env"]["RCMS_CRAN_REPO"] == "https://cloud.r-project.org"
     assert workflow["events"] == {"workflow_dispatch", "push"}
     assert workflow["legacy_uses"] == []
     assert all(re.fullmatch(r"[0-9a-f]{40}", ref) for _, ref, _ in workflow["uses"])
     assert workflow["paths"] == {"v*"}
     assert any(
-        "OpenMetaAnalyst-modern-windows-x64.zip" in run
+        "RCMetaStudio-modern-windows-x64.zip" in run
         for run in workflow["text"].splitlines()
     )
     assert any(
-        "OpenMetaAnalyst-modern-macos-x64" in run
+        "RCMetaStudio-modern-macos-x64" in run
         for run in workflow["text"].splitlines()
     )
     assert any(
-        "OpenMetaAnalyst-modern-macos-arm64" in run
+        "RCMetaStudio-modern-macos-arm64" in run
         for run in workflow["text"].splitlines()
     )
-    assert all("OMA_CRAN_REPO_KEY" in key for key in workflow["cache_keys"])
+    assert all("RCMS_CRAN_REPO_KEY" in key for key in workflow["cache_keys"])
     assert workflow["restore_keys"] == []
     assert all(
         key.startswith("modern-bundled-r-library-v2-") for key in workflow["cache_keys"]
@@ -349,7 +349,7 @@ def test_lane_named_local_scripts_replace_old_workflow_wrappers():
         "validate_golden_baseline_manifests.py",
         "validate_test_taxonomy.py",
         "Running parallel fast verification pytest lanes",
-        "verify_openmetar_r_default.py",
+        "verify_rcmetar_r_default.py",
     )
     assert not (ROOT / "scripts" / "run-modern-workflow-local.ps1").exists()
     assert not (ROOT / "scripts" / "run-modern-workflow-local.sh").exists()
@@ -379,15 +379,15 @@ def test_modern_macos_distributable_contract_is_declared():
     ]
     assert {
         "QT_QPA_PLATFORM",
-        "OMA_REQUIRE_IN_PROCESS_RPY2",
-        "OMA_STARTUP_PROJECT_SMOKE",
+        "RCMS_REQUIRE_IN_PROCESS_RPY2",
+        "RCMS_STARTUP_PROJECT_SMOKE",
         "RPY2_CFFI_MODE",
     } <= script["env_names"]
     assert {
-        "sample_data/amino.oma",
+        "sample_data/amino.rcms",
         "doc/openMA_help.html",
-        "R/library/OpenMetaR/DESCRIPTION",
-        "LaunchOpenMetaAnalyst.command",
+        "R/library/RCMetaR/DESCRIPTION",
+        "LaunchRCMetaStudio.command",
     } <= script["app_paths"]
     assert "scripts/install-modern-r-deps.R" in script["text"]
 
@@ -417,18 +417,18 @@ def test_shared_modern_r_dependency_installer_is_used_by_packagers():
     macos = sh_contract("scripts", "build-modern-macos-binary.sh")
 
     cran_default = re.search(
-        r'Sys.getenv\("OMA_CRAN_REPO",\s+"([^"]+)"\)', installer
+        r'Sys.getenv\("RCMS_CRAN_REPO",\s+"([^"]+)"\)', installer
     ).group(1)
     archive_url = re.search(r'HSROC\s+=\s+"([^"]+)"', installer).group(1)
 
     assert cran_default == "https://cloud.r-project.org"
     assert archive_url.endswith("/Archive/HSROC/HSROC_2.1.9.tar.gz")
     assert {"Get-RPackageCacheKey", "Test-RDependencyPackages"} <= windows["functions"]
-    assert "docs\\modernization\\OpenMetaR-r-dependencies.json" in windows["paths"]
+    assert "docs\\modernization\\RCMetaR-r-dependencies.json" in windows["paths"]
     assert ".Hash.ToLowerInvariant()" in windows["text"]
-    assert "OpenMetaR/DESCRIPTION" in macos["text"]
-    assert "OMA_CRAN_REPO" in windows["text"]
-    assert "OMA_CRAN_REPO" in macos["text"]
+    assert "RCMetaR/DESCRIPTION" in macos["text"]
+    assert "RCMS_CRAN_REPO" in windows["text"]
+    assert "RCMS_CRAN_REPO" in macos["text"]
 
 
 def test_macos_packager_resolves_relative_python_before_changing_directory():

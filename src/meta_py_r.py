@@ -3,7 +3,7 @@
 #  Byron C. Wallace                                                         #
 #  George Dietz                                                             #
 #  CEBM @ Brown                                                             #
-#  OpenMeta[analyst]                                                        #
+#  RC MetaStudio                                                        #
 #                                                                           #
 #  This is a proxy module that is responsible for communicating with R.     #
 #  An unholy mixture of R and Python                                        #
@@ -115,8 +115,8 @@ class RlibLoader:
     def load_metafor(self):
         return self._load_r_lib("metafor")
 
-    def load_OpenMetaR(self):
-        return self._load_r_lib("OpenMetaR")
+    def load_RCMetaR(self):
+        return self._load_r_lib("RCMetaR")
 
     def load_igraph(self):
         return self._load_r_lib("igraph")
@@ -205,7 +205,7 @@ def impute_diag_data(diag_data_dict):
             diag_data_dict.pop(param)
 
     dataf = ro.r["data.frame"](**diag_data_dict)
-    two_by_two = execute_r_function("openmetar.impute.diagnostic", dataf)
+    two_by_two = execute_r_function("rcmetar.impute.diagnostic", dataf)
 
     imputed_2x2 = R_parse_tools.rlist_to_pydict(two_by_two)
     print(("Imputed 2x2: %s" % str(imputed_2x2)))
@@ -219,7 +219,7 @@ def impute_bin_data(bin_data_dict):
     remove_value(None, bin_data_dict)
 
     dataf = ro.r["data.frame"](**bin_data_dict)
-    two_by_two = execute_r_function("openmetar.impute.binary", dataf)
+    two_by_two = execute_r_function("rcmetar.impute.binary", dataf)
 
     res_as_dict = R_parse_tools.recursioner(two_by_two)
 
@@ -238,7 +238,7 @@ def back_calc_cont_data(group1_data, group2_data, effect_data, conf_level):
     dataf_effect = ro.r["data.frame"](**effect_data)
 
     r_res = execute_r_function(
-        "openmetar.back.calculate.continuous",
+        "rcmetar.back.calculate.continuous",
         dataf_grp1,
         dataf_grp2,
         dataf_effect,
@@ -378,7 +378,7 @@ def impute_cont_data(cont_data_dict, alpha):
         return {"succeeded": False}
 
     dataf = ro.r["data.frame"](**cont_data_dict)
-    c_data = execute_r_function("openmetar.impute.continuous.study", dataf, alpha=alpha)
+    c_data = execute_r_function("rcmetar.impute.continuous.study", dataf, alpha=alpha)
 
     results = R_parse_tools.recursioner(c_data)
 
@@ -392,7 +392,7 @@ def impute_pre_post_cont_data(cont_data_dict, correlation, alpha):
 
     dataf = ro.r["data.frame"](**cont_data_dict)
     c_data = execute_r_function(
-        "openmetar.impute.continuous.prepost",
+        "rcmetar.impute.continuous.prepost",
         dataf,
         correlation=correlation,
         alpha=alpha,
@@ -407,7 +407,7 @@ def impute_pre_post_cont_data(cont_data_dict, correlation, alpha):
 def get_mult_from_r(confidence_level):
     confidence_level = validate_confidence_level(confidence_level)
     alpha = 1 - float(confidence_level) / 100.0
-    mult = execute_r_function("openmetar.get.mult.from.conf.level", confidence_level)
+    mult = execute_r_function("rcmetar.get.mult.from.conf.level", confidence_level)
     multiplier = float(mult[0])
     if not math.isfinite(multiplier):
         raise ValueError(INVALID_CONFIDENCE_LEVEL_MESSAGE)
@@ -418,7 +418,7 @@ def get_mult_from_r(confidence_level):
 def set_global_conf_level(confidence_level):
     confidence_level = validate_confidence_level(confidence_level)
     new_level = execute_r_function(
-        "openmetar.set.global.conf.level", float(confidence_level)
+        "rcmetar.set.global.conf.level", float(confidence_level)
     )
     return float(new_level[0])
 
@@ -431,7 +431,7 @@ def _r_null_if_none(value):
 
 
 def get_params(method_name):
-    param_list = execute_r_function("openmetar.method.parameters", str(method_name))
+    param_list = execute_r_function("rcmetar.method.parameters", str(method_name))
     param_d = {}
     for name, r_obj in zip(param_list.names, param_list):
         param_d[name] = r_obj
@@ -460,7 +460,7 @@ def get_available_methods(for_data_type=None, data_obj_name=None, metric=None):
     """
     data_arg = None if data_obj_name is None else ro.globalenv[str(data_obj_name)]
     methods = execute_r_function(
-        "openmetar.available.methods",
+        "rcmetar.available.methods",
         **{
             "data.type": _r_null_if_none(
                 None if for_data_type is None else str(for_data_type)
@@ -474,7 +474,7 @@ def get_available_methods(for_data_type=None, data_obj_name=None, metric=None):
 
 @RfunctionCaller
 def get_method_description(method_name):
-    return execute_r_function("openmetar.method.description", str(method_name))[0]
+    return execute_r_function("rcmetar.method.description", str(method_name))[0]
 
 
 # def ma_dataset_to_binary_robj(table_model, var_name):
@@ -562,7 +562,7 @@ def ma_dataset_to_simple_continuous_robj(
     else:
         print("no raw data (or one-arm)... using effects")
 
-    r_obj = execute_r_function("openmetar.create.continuous.data", **data_kwargs)
+    r_obj = execute_r_function("rcmetar.create.continuous.data", **data_kwargs)
     ro.globalenv[var_name] = r_obj
     print("ok.")
     return r_obj
@@ -651,7 +651,7 @@ def ma_dataset_to_simple_binary_robj(
         )
         # @TODO complain to the user here
 
-    r_obj = execute_r_function("openmetar.create.binary.data", **data_kwargs)
+    r_obj = execute_r_function("rcmetar.create.binary.data", **data_kwargs)
     ro.globalenv[var_name] = r_obj
     print("ok.")
     return r_obj
@@ -846,7 +846,7 @@ def ma_dataset_to_simple_diagnostic_robj(
             "for %s." % metric
         )
 
-    r_obj = execute_r_function("openmetar.create.diagnostic.data", **data_kwargs)
+    r_obj = execute_r_function("rcmetar.create.diagnostic.data", **data_kwargs)
     ro.globalenv[var_name] = r_obj
     print("ok.")
     return r_obj
@@ -899,7 +899,7 @@ def _r_covariate_values(cov, study_ids, dataset):
     else:
         cov_vals = _r_character_vector(values)
     return execute_r_function(
-        "openmetar.create.covariate.values",
+        "rcmetar.create.covariate.values",
         **{
             "cov.name": str(cov.name),
             "cov.vals": cov_vals,
@@ -981,14 +981,14 @@ def cov_to_str(cov, study_ids, dataset, named_list=True, return_cov_vals=False):
 def run_continuous_ma(
     function_name, params, res_name="result", cont_data_name="tmp_obj"
 ):
-    return _run_openmetar_core_analysis(
+    return _run_RCMetaR_core_analysis(
         cont_data_name, function_name, params, res_name=res_name
     )
 
 
 @RfunctionCaller
 def run_binary_ma(function_name, params, res_name="result", bin_data_name="tmp_obj"):
-    return _run_openmetar_core_analysis(
+    return _run_RCMetaR_core_analysis(
         bin_data_name, function_name, params, res_name=res_name
     )
 
@@ -1046,7 +1046,7 @@ def _r_object_from_symbol(name):
     return ro.globalenv[_r_symbol(name)]
 
 
-def _normalize_openmetar_workflow(workflow):
+def _normalize_RCMetaR_workflow(workflow):
     if workflow is None:
         return "standard"
     workflow = str(workflow)
@@ -1059,11 +1059,11 @@ def _normalize_openmetar_workflow(workflow):
         "meta-regression",
     }
     if workflow not in known_workflows:
-        raise ValueError("Unknown OpenMetaR workflow: %s" % workflow)
+        raise ValueError("Unknown RCMetaR workflow: %s" % workflow)
     return workflow
 
 
-def _run_openmetar_core_analysis(
+def _run_RCMetaR_core_analysis(
     data_name,
     method_name,
     params,
@@ -1072,7 +1072,7 @@ def _run_openmetar_core_analysis(
     cond_means_data="NULL",
     stop_at_rma=False,
 ):
-    workflow = _normalize_openmetar_workflow(workflow)
+    workflow = _normalize_RCMetaR_workflow(workflow)
     params = normalize_confidence_level_params(params)
     request = ro.ListVector(
         {
@@ -1088,7 +1088,7 @@ def _run_openmetar_core_analysis(
         }
     )
     result = execute_r_function(
-        "openmetar.run.analysis", _r_object_from_symbol(data_name), request
+        "rcmetar.run.analysis", _r_object_from_symbol(data_name), request
     )
     ro.globalenv[_r_symbol(res_name)] = result
     return parse_out_results(result)
@@ -1100,7 +1100,7 @@ def run_diagnostic_multi(
 ):
     list_of_params = [normalize_confidence_level_params(p) for p in list_of_params]
     result = execute_r_function(
-        "openmetar.run.diagnostic.analyses",
+        "rcmetar.run.diagnostic.analyses",
         _r_object_from_symbol(diag_data_name),
         _r_character_vector(function_names),
         execute_r_function("list", *[_to_R_params(p) for p in list_of_params]),
@@ -1145,7 +1145,7 @@ def load_vars_for_plot(params_path, return_params_dict=False):
 @RfunctionCaller
 def write_out_plot_data(params_out_path, plot_data_name="plot.data"):
     execute_r_function(
-        "openmetar.save.plot.data",
+        "rcmetar.save.plot.data",
         _r_object_from_symbol(plot_data_name),
         str(params_out_path),
     )
@@ -1186,7 +1186,7 @@ def regenerate_plot_data(
 ):
 
     plot_data = execute_r_function(
-        "openmetar.regenerate.plot.data",
+        "rcmetar.regenerate.plot.data",
         _r_object_from_symbol(om_data_name),
         _r_object_from_symbol(res_name),
         _r_object_from_symbol(plot_params_name),
@@ -1197,7 +1197,7 @@ def regenerate_plot_data(
 @RfunctionCaller
 def generate_reg_plot(file_path, params_name="plot.data"):
     execute_r_function(
-        "openmetar.draw.regression.plot",
+        "rcmetar.draw.regression.plot",
         _r_object_from_symbol(params_name),
         str(file_path),
     )
@@ -1208,7 +1208,7 @@ def generate_forest_plot(file_path, side_by_side=False, params_name="plot.data")
     if side_by_side:
         print("generating a side-by-side forest plot...")
         execute_r_function(
-            "openmetar.draw.forest.plot",
+            "rcmetar.draw.forest.plot",
             _r_object_from_symbol(params_name),
             str(file_path),
             **{"side.by.side": True},
@@ -1216,7 +1216,7 @@ def generate_forest_plot(file_path, side_by_side=False, params_name="plot.data")
     else:
         print("generating a forest plot....")
         execute_r_function(
-            "openmetar.draw.forest.plot",
+            "rcmetar.draw.forest.plot",
             _r_object_from_symbol(params_name),
             str(file_path),
             **{"side.by.side": False},
@@ -1677,7 +1677,7 @@ def run_meta_regression(
         "rm.method": "ML",
         "measure": metric_name,
     }
-    return _run_openmetar_core_analysis(
+    return _run_RCMetaR_core_analysis(
         data_name,
         "meta.regression",
         params,
@@ -1697,9 +1697,9 @@ def run_diagnostic_workflow(
     # list of parameter objects
     list_of_params = [normalize_confidence_level_params(p) for p in list_of_params]
 
-    workflow = _normalize_openmetar_workflow(workflow)
+    workflow = _normalize_RCMetaR_workflow(workflow)
     result = execute_r_function(
-        "openmetar.run.diagnostic.analyses",
+        "rcmetar.run.diagnostic.analyses",
         _r_object_from_symbol(diag_data_name),
         _r_character_vector(function_names),
         execute_r_function("list", *[_to_R_params(p) for p in list_of_params]),
@@ -1715,9 +1715,9 @@ def run_workflow_analysis(
     workflow, function_name, params, res_name="result", data_name="tmp_obj"
 ):
     """
-    Runs a non-standard OpenMetaR workflow through the core analysis facade.
+    Runs a non-standard RCMetaR workflow through the core analysis facade.
     """
-    return _run_openmetar_core_analysis(
+    return _run_RCMetaR_core_analysis(
         data_name,
         function_name,
         params,
@@ -1739,7 +1739,7 @@ def diagnostic_effects_for_study(
 ):
     conf_level = validate_confidence_level(conf_level)
     r_res = execute_r_function(
-        "openmetar.diagnostic.study.effects",
+        "rcmetar.diagnostic.study.effects",
         tp,
         fn,
         fp,
@@ -1769,7 +1769,7 @@ def continuous_effect_for_study(
 ):
     conf_level = validate_confidence_level(conf_level)
     r_res = execute_r_function(
-        "openmetar.continuous.study.effect",
+        "rcmetar.continuous.study.effect",
         n1=_r_null_if_none(n1),
         m1=_r_null_if_none(m1),
         sd1=_r_null_if_none(sd1),
@@ -1807,7 +1807,7 @@ def effect_for_study(
     """
     conf_level = validate_confidence_level(conf_level)
     r_res = execute_r_function(
-        "openmetar.binary.study.effect",
+        "rcmetar.binary.study.effect",
         e1=_r_null_if_none(e1),
         n1=_r_null_if_none(n1),
         e2=_r_null_if_none(e2),
@@ -1852,7 +1852,7 @@ def generic_convert_scale(
         n1_arg = _r_null_if_none(n1)
 
     transformed = execute_r_function(
-        "openmetar.convert.scale",
+        "rcmetar.convert.scale",
         x=x_arg,
         metric=str(metric_name),
         **{"data.type": str(data_type), "convert.to": str(convert_to), "n1": n1_arg},

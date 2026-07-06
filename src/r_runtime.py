@@ -8,7 +8,7 @@ def configure_bundled_r_environment(app_root=None):
     root = app_root or _app_root()
     r_home = _first_existing(
         [
-            os.environ.get("OMA_R_HOME"),
+            os.environ.get("RCMS_R_HOME"),
             os.path.join(root, "R"),
         ],
         required_child=os.path.join("bin"),
@@ -31,10 +31,10 @@ def configure_bundled_r_environment(app_root=None):
 
     r_libs = _first_existing(
         [
-            os.environ.get("OMA_R_LIBS"),
+            os.environ.get("RCMS_R_LIBS"),
             os.path.join(root, "R", "library"),
         ],
-        required_child=os.path.join("OpenMetaR"),
+        required_child=os.path.join("RCMetaR"),
     )
     if r_libs:
         os.environ["R_LIBS"] = r_libs

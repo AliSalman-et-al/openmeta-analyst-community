@@ -3,7 +3,7 @@
 #  Byron C. Wallace                                                                     #
 #  George Dietz                                                                         #
 #  CEBM @ Brown                                                                         #
-#  OpenMeta[analyst]                                                                    #
+#  RC MetaStudio                                                                    #
 #  ---                                                                                  #
 #  Proxy class, interfaces between the underlying representation (in ma_dataset.py)     #
 #  and the DataTableView UI. Basically deals with keeping track of which outcomes/      #
@@ -2323,7 +2323,7 @@ class DatasetModel(QAbstractTableModel):
         # first check to see that the current outcome is contained in this study
         if not outcome in study.outcomes_to_follow_ups:
             ###
-            # Issue 7 (RESOLVED) http://github.com/bwallace/OpenMeta-analyst-/issues/#issue/7
+            # Issue 7 (RESOLVED) http://github.com/bwallace/rc-metastudio-/issues/#issue/7
             study.add_outcome(
                 self.dataset.get_outcome_obj(outcome),
                 group_names=self.dataset.get_group_names(),

@@ -3,7 +3,7 @@
 #  Byron C. Wallace                                                                         #
 #  George Dietz                                                                             #
 #  CEBM @ Brown                                                                             #
-#  OpenMeta[analyst]                                                                        #
+#  RC MetaStudio                                                                        #
 #                                                                                           #
 #  Dataset module; a roll your own back end. This is a model for manipulating               #
 #  datasets. Note that *no QT lives here*, i.e., it is divorced from the UI entirely.       #

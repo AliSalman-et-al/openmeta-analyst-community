@@ -27,9 +27,9 @@ DEFAULT_TOLERANCES = {
 
 
 GOLDEN_MATRIX_SOURCE_PROJECTS = {
-    "binary": "amino.oma",
-    "continuous": "continuous.oma",
-    "diagnostic": "lymph.oma",
+    "binary": "amino.rcms",
+    "continuous": "continuous.rcms",
+    "diagnostic": "lymph.rcms",
 }
 
 GOLDEN_MATRIX_METRICS = {
@@ -39,17 +39,17 @@ GOLDEN_MATRIX_METRICS = {
 }
 
 
-OPENMETAR_R_PACKAGE = "OpenMetaR"
+RCMetaR_R_PACKAGE = "RCMetaR"
 
 
 MODERN_BASELINE_ENVIRONMENT_EXPECTED = {
-    "id": "modern-ci-python3-pyqt5-r4-OpenMetaR",
+    "id": "modern-ci-python3-pyqt5-r4-RCMetaR",
     "os": "Windows",
     "python": "3.11",
     "pyqt": "5.15.11",
     "r": "R version 4.6.0",
     "rpy2": "3.6.7",
-    "package": OPENMETAR_R_PACKAGE,
+    "package": RCMetaR_R_PACKAGE,
 }
 
 
@@ -79,7 +79,7 @@ def golden_coverage_matrix(root_dir=None, method_discoverer=None):
         root_dir or os.path.join(os.path.dirname(__file__), "..")
     )
     if method_discoverer is None:
-        meta_py_r.RlibLoader().load_OpenMetaR()
+        meta_py_r.RlibLoader().load_RCMetaR()
         method_discoverer = lambda data_family, dataset, metric: (
             discover_reference_methods(root_dir, data_family, dataset, metric)
         )
@@ -114,7 +114,7 @@ def golden_coverage_matrix(root_dir=None, method_discoverer=None):
             _coverage_row(
                 "binary",
                 "meta-regression",
-                "amino.oma",
+                "amino.rcms",
                 "OR",
                 {"Random": "binary.random"},
                 ["headless", "gui"],
@@ -122,7 +122,7 @@ def golden_coverage_matrix(root_dir=None, method_discoverer=None):
             _coverage_row(
                 "continuous",
                 "meta-regression",
-                "continuous.oma",
+                "continuous.rcms",
                 "SMD",
                 {"Random": "continuous.random"},
                 ["headless", "gui"],
@@ -130,7 +130,7 @@ def golden_coverage_matrix(root_dir=None, method_discoverer=None):
             _coverage_row(
                 "binary",
                 "subgroup",
-                "amino.oma",
+                "amino.rcms",
                 "OR",
                 {"Random": "binary.random"},
                 ["headless", "gui"],
@@ -138,7 +138,7 @@ def golden_coverage_matrix(root_dir=None, method_discoverer=None):
             _coverage_row(
                 "continuous",
                 "subgroup",
-                "continuous.oma",
+                "continuous.rcms",
                 "SMD",
                 {"Random": "continuous.random"},
                 ["headless", "gui"],
@@ -146,20 +146,20 @@ def golden_coverage_matrix(root_dir=None, method_discoverer=None):
             _coverage_row(
                 "diagnostic",
                 "diagnostic-multi-metric",
-                "lymph.oma",
+                "lymph.rcms",
                 "Sens-Spec",
                 _discover_or_omit(
-                    method_discoverer, omissions, "diagnostic", "lymph.oma", "Sens"
+                    method_discoverer, omissions, "diagnostic", "lymph.rcms", "Sens"
                 ),
                 ["headless", "gui"],
             ),
             _coverage_row(
                 "diagnostic",
                 "diagnostic-multi-metric",
-                "lymph.oma",
+                "lymph.rcms",
                 "PLR-NLR-DOR",
                 _discover_or_omit(
-                    method_discoverer, omissions, "diagnostic", "lymph.oma", "DOR"
+                    method_discoverer, omissions, "diagnostic", "lymph.rcms", "DOR"
                 ),
                 ["headless", "gui"],
             ),
@@ -291,7 +291,7 @@ def _coverage_row(data_family, workflow, dataset, metric, methods, capture_modes
         "artifacts": _workflow_artifacts(workflow),
         "options": _workflow_options(workflow),
         "project_state": "sample_data/%s" % dataset
-        if dataset.endswith(".oma")
+        if dataset.endswith(".rcms")
         else dataset,
         "status": "included",
     }
@@ -463,7 +463,7 @@ def curated_golden_bundles(root_dir=None):
     return [
         {
             "id": "amino-binary-random",
-            "dataset": "amino.oma",
+            "dataset": "amino.rcms",
             "data_family": "binary",
             "method": "binary.random",
             "metric": "OR",
@@ -482,7 +482,7 @@ def curated_golden_bundles(root_dir=None):
             },
             "artifacts": {"Forest Plot": binary_params["fp_outpath"]},
             "case": headless_analysis.HeadlessAnalysisCase(
-                sample("amino.oma"),
+                sample("amino.rcms"),
                 "binary.random",
                 binary_params,
                 metric="OR",
@@ -491,7 +491,7 @@ def curated_golden_bundles(root_dir=None):
         },
         {
             "id": "continuous-random",
-            "dataset": "continuous.oma",
+            "dataset": "continuous.rcms",
             "data_family": "continuous",
             "method": "continuous.random",
             "metric": "SMD",
@@ -510,7 +510,7 @@ def curated_golden_bundles(root_dir=None):
             },
             "artifacts": {"Forest Plot": continuous_params["fp_outpath"]},
             "case": headless_analysis.HeadlessAnalysisCase(
-                sample("continuous.oma"),
+                sample("continuous.rcms"),
                 "continuous.random",
                 continuous_params,
                 metric="SMD",
@@ -519,7 +519,7 @@ def curated_golden_bundles(root_dir=None):
         },
         {
             "id": "lymph-diagnostic-random-dor",
-            "dataset": "lymph.oma",
+            "dataset": "lymph.rcms",
             "data_family": "diagnostic",
             "method": ["diagnostic.random"],
             "metric": "DOR",
@@ -538,7 +538,7 @@ def curated_golden_bundles(root_dir=None):
             },
             "artifacts": {"Odds Ratio Forest Plot": diagnostic_params["fp_outpath"]},
             "case": headless_analysis.HeadlessAnalysisCase(
-                sample("lymph.oma"),
+                sample("lymph.rcms"),
                 ["diagnostic.random"],
                 [diagnostic_params],
                 data_type=meta_globals.DIAGNOSTIC,
@@ -546,7 +546,7 @@ def curated_golden_bundles(root_dir=None):
         },
         {
             "id": "amino-binary-cumulative",
-            "dataset": "amino.oma",
+            "dataset": "amino.rcms",
             "data_family": "binary",
             "method": "binary.random",
             "metric": "OR",
@@ -557,7 +557,7 @@ def curated_golden_bundles(root_dir=None):
                 "Cumulative Forest Plot": binary_cumulative_params["fp_outpath"]
             },
             "case": headless_analysis.HeadlessAnalysisCase(
-                sample("amino.oma"),
+                sample("amino.rcms"),
                 "binary.random",
                 binary_cumulative_params,
                 metric="OR",
@@ -567,7 +567,7 @@ def curated_golden_bundles(root_dir=None):
         },
         {
             "id": "amino-binary-leave-one-out",
-            "dataset": "amino.oma",
+            "dataset": "amino.rcms",
             "data_family": "binary",
             "method": "binary.random",
             "metric": "OR",
@@ -576,7 +576,7 @@ def curated_golden_bundles(root_dir=None):
             "expected": {"Leave-one-out Summary": {}},
             "artifacts": {"Leave-one-out Forest plot": binary_loo_params["fp_outpath"]},
             "case": headless_analysis.HeadlessAnalysisCase(
-                sample("amino.oma"),
+                sample("amino.rcms"),
                 "binary.random",
                 binary_loo_params,
                 metric="OR",
@@ -586,7 +586,7 @@ def curated_golden_bundles(root_dir=None):
         },
         {
             "id": "continuous-cumulative",
-            "dataset": "continuous.oma",
+            "dataset": "continuous.rcms",
             "data_family": "continuous",
             "method": "continuous.random",
             "metric": "SMD",
@@ -597,7 +597,7 @@ def curated_golden_bundles(root_dir=None):
                 "Cumulative Forest Plot": continuous_cumulative_params["fp_outpath"]
             },
             "case": headless_analysis.HeadlessAnalysisCase(
-                sample("continuous.oma"),
+                sample("continuous.rcms"),
                 "continuous.random",
                 continuous_cumulative_params,
                 metric="SMD",
@@ -607,7 +607,7 @@ def curated_golden_bundles(root_dir=None):
         },
         {
             "id": "continuous-leave-one-out",
-            "dataset": "continuous.oma",
+            "dataset": "continuous.rcms",
             "data_family": "continuous",
             "method": "continuous.random",
             "metric": "SMD",
@@ -618,7 +618,7 @@ def curated_golden_bundles(root_dir=None):
                 "Leave-one-out Forest plot": continuous_loo_params["fp_outpath"]
             },
             "case": headless_analysis.HeadlessAnalysisCase(
-                sample("continuous.oma"),
+                sample("continuous.rcms"),
                 "continuous.random",
                 continuous_loo_params,
                 metric="SMD",
@@ -628,7 +628,7 @@ def curated_golden_bundles(root_dir=None):
         },
         {
             "id": "amino-binary-meta-regression",
-            "dataset": "amino.oma",
+            "dataset": "amino.rcms",
             "data_family": "binary",
             "method": "meta_regression",
             "metric": "OR",
@@ -637,7 +637,7 @@ def curated_golden_bundles(root_dir=None):
             "expected": {"Summary": {}},
             "artifacts": {"Regression Plot": "./r_tmp/reg.png"},
             "case": headless_analysis.HeadlessAnalysisCase(
-                sample("amino.oma"),
+                sample("amino.rcms"),
                 None,
                 binary_regression_params,
                 metric="OR",
@@ -650,7 +650,7 @@ def curated_golden_bundles(root_dir=None):
         },
         {
             "id": "continuous-meta-regression",
-            "dataset": "continuous.oma",
+            "dataset": "continuous.rcms",
             "data_family": "continuous",
             "method": "meta_regression",
             "metric": "SMD",
@@ -659,7 +659,7 @@ def curated_golden_bundles(root_dir=None):
             "expected": {"Summary": {}},
             "artifacts": {"Regression Plot": "./r_tmp/reg.png"},
             "case": headless_analysis.HeadlessAnalysisCase(
-                sample("continuous.oma"),
+                sample("continuous.rcms"),
                 None,
                 continuous_regression_params,
                 metric="SMD",
@@ -676,7 +676,7 @@ def curated_golden_bundles(root_dir=None):
         },
         {
             "id": "amino-binary-subgroup",
-            "dataset": "amino.oma",
+            "dataset": "amino.rcms",
             "data_family": "binary",
             "method": "binary.random",
             "metric": "OR",
@@ -685,7 +685,7 @@ def curated_golden_bundles(root_dir=None):
             "expected": {"Subgroup Summary": {}},
             "artifacts": {"Subgroup Forest Plot": binary_subgroup_params["fp_outpath"]},
             "case": headless_analysis.HeadlessAnalysisCase(
-                sample("amino.oma"),
+                sample("amino.rcms"),
                 "binary.random",
                 binary_subgroup_params,
                 metric="OR",
@@ -698,7 +698,7 @@ def curated_golden_bundles(root_dir=None):
         },
         {
             "id": "continuous-subgroup",
-            "dataset": "continuous.oma",
+            "dataset": "continuous.rcms",
             "data_family": "continuous",
             "method": "continuous.random",
             "metric": "SMD",
@@ -709,7 +709,7 @@ def curated_golden_bundles(root_dir=None):
                 "Subgroups Forest Plot": continuous_subgroup_params["fp_outpath"]
             },
             "case": headless_analysis.HeadlessAnalysisCase(
-                sample("continuous.oma"),
+                sample("continuous.rcms"),
                 "continuous.random",
                 continuous_subgroup_params,
                 metric="SMD",
@@ -802,7 +802,7 @@ def _matching_key(mapping, expected):
 
 
 def run_curated_golden_set(report_path=None):
-    meta_py_r.RlibLoader().load_OpenMetaR()
+    meta_py_r.RlibLoader().load_RCMetaR()
     reports = []
     for bundle in curated_golden_bundles():
         result = headless_analysis.run_headless_analysis(bundle["case"])
@@ -843,11 +843,11 @@ def capture_bundle(
         timestamp or datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
     )
     capture_mode = capture_mode or os.environ.get(
-        "OMA_GOLDEN_CAPTURE_MODE", "local-debug"
+        "RCMS_GOLDEN_CAPTURE_MODE", "local-debug"
     )
     capture_command = (
         capture_command
-        or os.environ.get("OMA_GOLDEN_CAPTURE_COMMAND")
+        or os.environ.get("RCMS_GOLDEN_CAPTURE_COMMAND")
         or _capture_command()
     )
     tool_versions = _tool_versions()
@@ -896,7 +896,7 @@ def capture_bundle(
 
 
 def capture_curated_binary_bundle(report_path=None):
-    meta_py_r.RlibLoader().load_OpenMetaR()
+    meta_py_r.RlibLoader().load_RCMetaR()
     capture = capture_bundle(curated_golden_bundles()[0])
     if report_path:
         with open(report_path, "w") as f:
@@ -923,7 +923,7 @@ def capture_comprehensive_golden_baseline(
     _ensure_dir(captures_dir)
     _ensure_dir(artifacts_dir)
 
-    meta_py_r.RlibLoader().load_OpenMetaR()
+    meta_py_r.RlibLoader().load_RCMetaR()
     rows = []
     for bundle in curated_golden_bundles(root_dir):
         capture = capture_bundle(
@@ -1021,7 +1021,7 @@ def _sha256(path):
 
 def _tool_versions():
     versions = {
-        "openmeta_analyst": str(meta_globals.VERSION),
+        "rc_metastudio": str(meta_globals.VERSION),
         "python": sys.version.split()[0],
         "os": platform.system(),
         "platform": platform.platform(),
@@ -1052,11 +1052,11 @@ def _pyqt_version():
 
 def _package_versions(tool_versions):
     return {
-        "openmeta_analyst": tool_versions.get("openmeta_analyst"),
+        "rc_metastudio": tool_versions.get("rc_metastudio"),
         "r": tool_versions.get("r"),
         "rpy2": tool_versions.get("rpy2"),
         "pyqt": tool_versions.get("pyqt"),
-        "OpenMetaR": _r_package_version(OPENMETAR_R_PACKAGE),
+        "RCMetaR": _r_package_version(RCMetaR_R_PACKAGE),
     }
 
 
@@ -1101,23 +1101,23 @@ def _baseline_environment(baseline_environment, tool_versions):
 
 def _baseline_environment_from_env(tool_versions):
     return {
-        "id": os.environ.get("OMA_MODERN_BASELINE_ENVIRONMENT_ID", "local-debug"),
+        "id": os.environ.get("RCMS_MODERN_BASELINE_ENVIRONMENT_ID", "local-debug"),
         "os": os.environ.get(
-            "OMA_MODERN_BASELINE_ENVIRONMENT_OS", tool_versions.get("os")
+            "RCMS_MODERN_BASELINE_ENVIRONMENT_OS", tool_versions.get("os")
         ),
         "python": os.environ.get(
-            "OMA_MODERN_BASELINE_ENVIRONMENT_PYTHON", tool_versions.get("python")
+            "RCMS_MODERN_BASELINE_ENVIRONMENT_PYTHON", tool_versions.get("python")
         ),
         "pyqt": os.environ.get(
-            "OMA_MODERN_BASELINE_ENVIRONMENT_PYQT", tool_versions.get("pyqt")
+            "RCMS_MODERN_BASELINE_ENVIRONMENT_PYQT", tool_versions.get("pyqt")
         ),
         "r": os.environ.get(
-            "OMA_MODERN_BASELINE_ENVIRONMENT_R", tool_versions.get("r")
+            "RCMS_MODERN_BASELINE_ENVIRONMENT_R", tool_versions.get("r")
         ),
         "rpy2": os.environ.get(
-            "OMA_MODERN_BASELINE_ENVIRONMENT_RPY2", tool_versions.get("rpy2")
+            "RCMS_MODERN_BASELINE_ENVIRONMENT_RPY2", tool_versions.get("rpy2")
         ),
-        "package": os.environ.get("OMA_MODERN_BASELINE_PACKAGE", OPENMETAR_R_PACKAGE),
+        "package": os.environ.get("RCMS_MODERN_BASELINE_PACKAGE", RCMetaR_R_PACKAGE),
     }
 
 

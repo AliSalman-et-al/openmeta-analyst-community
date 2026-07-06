@@ -1,1136 +1,1136 @@
 {
-  "matrix": "golden-coverage", 
+  "matrix": "golden-coverage",
   "omissions": [
     {
-      "branch": "Network Meta-Analysis", 
-      "follow_up": "Add a post-cutover network baseline before porting network workflows.", 
+      "branch": "Network Meta-Analysis",
+      "follow_up": "Add a post-cutover network baseline before porting network workflows.",
       "reason": "Deferred from Release Cutover by ADR 0035."
-    }, 
+    },
     {
-      "branch": "Diagnostic Meta-Regression and Subgroup Analysis", 
-      "follow_up": "Add rows if method discovery reports feasible diagnostic advanced-analysis paths.", 
+      "branch": "Diagnostic Meta-Regression and Subgroup Analysis",
+      "follow_up": "Add rows if method discovery reports feasible diagnostic advanced-analysis paths.",
       "reason": "Not a minimum Release Cutover gate until Reference Implementation feasibility is discovered."
-    }, 
+    },
     {
-      "branch": "binary amino.oma RD methods", 
-      "follow_up": "Re-run method discovery in the Reference Environment.", 
+      "branch": "binary amino.rcms RD methods",
+      "follow_up": "Re-run method discovery in the Reference Environment.",
       "reason": "Error in initialize(value, ...) : object 'None' not found\n"
-    }, 
+    },
     {
-      "branch": "binary amino.oma AS methods", 
-      "follow_up": "Re-run method discovery in the Reference Environment.", 
+      "branch": "binary amino.rcms AS methods",
+      "follow_up": "Re-run method discovery in the Reference Environment.",
       "reason": "Error in initialize(value, ...) : object 'None' not found\n"
-    }, 
+    },
     {
-      "branch": "binary amino.oma YUQ methods", 
-      "follow_up": "Re-run method discovery in the Reference Environment.", 
+      "branch": "binary amino.rcms YUQ methods",
+      "follow_up": "Re-run method discovery in the Reference Environment.",
       "reason": "Error in initialize(value, ...) : object 'None' not found\n"
-    }, 
+    },
     {
-      "branch": "binary amino.oma YUY methods", 
-      "follow_up": "Re-run method discovery in the Reference Environment.", 
+      "branch": "binary amino.rcms YUY methods",
+      "follow_up": "Re-run method discovery in the Reference Environment.",
       "reason": "Error in initialize(value, ...) : object 'None' not found\n"
     }
-  ], 
+  ],
   "rows": [
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
-        "headless", 
+        "headless",
         "gui"
-      ], 
-      "data_family": "binary", 
-      "dataset": "amino.oma", 
-      "id": "binary-standard-OR", 
+      ],
+      "data_family": "binary",
+      "dataset": "amino.rcms",
+      "id": "binary-standard-OR",
       "method_classes": [
-        "fixed", 
+        "fixed",
         "random"
-      ], 
+      ],
       "methods": [
-        "binary.fixed.inv.var", 
-        "binary.fixed.mh", 
-        "binary.fixed.peto", 
+        "binary.fixed.inv.var",
+        "binary.fixed.mh",
+        "binary.fixed.peto",
         "binary.random"
-      ], 
+      ],
       "metrics": [
         "OR"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/amino.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/amino.rcms",
+      "status": "included",
       "workflow": "standard"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
         "headless"
-      ], 
-      "data_family": "binary", 
-      "dataset": "amino.oma", 
-      "id": "binary-cumulative-OR", 
+      ],
+      "data_family": "binary",
+      "dataset": "amino.rcms",
+      "id": "binary-cumulative-OR",
       "method_classes": [
-        "fixed", 
+        "fixed",
         "random"
-      ], 
+      ],
       "methods": [
-        "binary.fixed.inv.var", 
-        "binary.fixed.mh", 
-        "binary.fixed.peto", 
+        "binary.fixed.inv.var",
+        "binary.fixed.mh",
+        "binary.fixed.peto",
         "binary.random"
-      ], 
+      ],
       "metrics": [
         "OR"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/amino.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/amino.rcms",
+      "status": "included",
       "workflow": "cumulative"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
         "headless"
-      ], 
-      "data_family": "binary", 
-      "dataset": "amino.oma", 
-      "id": "binary-leave-one-out-OR", 
+      ],
+      "data_family": "binary",
+      "dataset": "amino.rcms",
+      "id": "binary-leave-one-out-OR",
       "method_classes": [
-        "fixed", 
+        "fixed",
         "random"
-      ], 
+      ],
       "methods": [
-        "binary.fixed.inv.var", 
-        "binary.fixed.mh", 
-        "binary.fixed.peto", 
+        "binary.fixed.inv.var",
+        "binary.fixed.mh",
+        "binary.fixed.peto",
         "binary.random"
-      ], 
+      ],
       "metrics": [
         "OR"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/amino.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/amino.rcms",
+      "status": "included",
       "workflow": "leave-one-out"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
-        "headless", 
+        "headless",
         "gui"
-      ], 
-      "data_family": "binary", 
-      "dataset": "amino.oma", 
-      "id": "binary-standard-RD", 
-      "method_classes": [], 
-      "methods": [], 
+      ],
+      "data_family": "binary",
+      "dataset": "amino.rcms",
+      "id": "binary-standard-RD",
+      "method_classes": [],
+      "methods": [],
       "metrics": [
         "RD"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/amino.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/amino.rcms",
+      "status": "included",
       "workflow": "standard"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
         "headless"
-      ], 
-      "data_family": "binary", 
-      "dataset": "amino.oma", 
-      "id": "binary-cumulative-RD", 
-      "method_classes": [], 
-      "methods": [], 
+      ],
+      "data_family": "binary",
+      "dataset": "amino.rcms",
+      "id": "binary-cumulative-RD",
+      "method_classes": [],
+      "methods": [],
       "metrics": [
         "RD"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/amino.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/amino.rcms",
+      "status": "included",
       "workflow": "cumulative"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
         "headless"
-      ], 
-      "data_family": "binary", 
-      "dataset": "amino.oma", 
-      "id": "binary-leave-one-out-RD", 
-      "method_classes": [], 
-      "methods": [], 
+      ],
+      "data_family": "binary",
+      "dataset": "amino.rcms",
+      "id": "binary-leave-one-out-RD",
+      "method_classes": [],
+      "methods": [],
       "metrics": [
         "RD"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/amino.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/amino.rcms",
+      "status": "included",
       "workflow": "leave-one-out"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
-        "headless", 
+        "headless",
         "gui"
-      ], 
-      "data_family": "binary", 
-      "dataset": "amino.oma", 
-      "id": "binary-standard-RR", 
+      ],
+      "data_family": "binary",
+      "dataset": "amino.rcms",
+      "id": "binary-standard-RR",
       "method_classes": [
-        "fixed", 
+        "fixed",
         "random"
-      ], 
+      ],
       "methods": [
-        "binary.fixed.inv.var", 
-        "binary.fixed.mh", 
+        "binary.fixed.inv.var",
+        "binary.fixed.mh",
         "binary.random"
-      ], 
+      ],
       "metrics": [
         "RR"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/amino.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/amino.rcms",
+      "status": "included",
       "workflow": "standard"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
         "headless"
-      ], 
-      "data_family": "binary", 
-      "dataset": "amino.oma", 
-      "id": "binary-cumulative-RR", 
+      ],
+      "data_family": "binary",
+      "dataset": "amino.rcms",
+      "id": "binary-cumulative-RR",
       "method_classes": [
-        "fixed", 
+        "fixed",
         "random"
-      ], 
+      ],
       "methods": [
-        "binary.fixed.inv.var", 
-        "binary.fixed.mh", 
+        "binary.fixed.inv.var",
+        "binary.fixed.mh",
         "binary.random"
-      ], 
+      ],
       "metrics": [
         "RR"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/amino.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/amino.rcms",
+      "status": "included",
       "workflow": "cumulative"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
         "headless"
-      ], 
-      "data_family": "binary", 
-      "dataset": "amino.oma", 
-      "id": "binary-leave-one-out-RR", 
+      ],
+      "data_family": "binary",
+      "dataset": "amino.rcms",
+      "id": "binary-leave-one-out-RR",
       "method_classes": [
-        "fixed", 
+        "fixed",
         "random"
-      ], 
+      ],
       "methods": [
-        "binary.fixed.inv.var", 
-        "binary.fixed.mh", 
+        "binary.fixed.inv.var",
+        "binary.fixed.mh",
         "binary.random"
-      ], 
+      ],
       "metrics": [
         "RR"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/amino.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/amino.rcms",
+      "status": "included",
       "workflow": "leave-one-out"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
-        "headless", 
+        "headless",
         "gui"
-      ], 
-      "data_family": "binary", 
-      "dataset": "amino.oma", 
-      "id": "binary-standard-AS", 
-      "method_classes": [], 
-      "methods": [], 
+      ],
+      "data_family": "binary",
+      "dataset": "amino.rcms",
+      "id": "binary-standard-AS",
+      "method_classes": [],
+      "methods": [],
       "metrics": [
         "AS"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/amino.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/amino.rcms",
+      "status": "included",
       "workflow": "standard"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
         "headless"
-      ], 
-      "data_family": "binary", 
-      "dataset": "amino.oma", 
-      "id": "binary-cumulative-AS", 
-      "method_classes": [], 
-      "methods": [], 
+      ],
+      "data_family": "binary",
+      "dataset": "amino.rcms",
+      "id": "binary-cumulative-AS",
+      "method_classes": [],
+      "methods": [],
       "metrics": [
         "AS"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/amino.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/amino.rcms",
+      "status": "included",
       "workflow": "cumulative"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
         "headless"
-      ], 
-      "data_family": "binary", 
-      "dataset": "amino.oma", 
-      "id": "binary-leave-one-out-AS", 
-      "method_classes": [], 
-      "methods": [], 
+      ],
+      "data_family": "binary",
+      "dataset": "amino.rcms",
+      "id": "binary-leave-one-out-AS",
+      "method_classes": [],
+      "methods": [],
       "metrics": [
         "AS"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/amino.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/amino.rcms",
+      "status": "included",
       "workflow": "leave-one-out"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
-        "headless", 
+        "headless",
         "gui"
-      ], 
-      "data_family": "binary", 
-      "dataset": "amino.oma", 
-      "id": "binary-standard-YUQ", 
-      "method_classes": [], 
-      "methods": [], 
+      ],
+      "data_family": "binary",
+      "dataset": "amino.rcms",
+      "id": "binary-standard-YUQ",
+      "method_classes": [],
+      "methods": [],
       "metrics": [
         "YUQ"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/amino.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/amino.rcms",
+      "status": "included",
       "workflow": "standard"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
         "headless"
-      ], 
-      "data_family": "binary", 
-      "dataset": "amino.oma", 
-      "id": "binary-cumulative-YUQ", 
-      "method_classes": [], 
-      "methods": [], 
+      ],
+      "data_family": "binary",
+      "dataset": "amino.rcms",
+      "id": "binary-cumulative-YUQ",
+      "method_classes": [],
+      "methods": [],
       "metrics": [
         "YUQ"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/amino.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/amino.rcms",
+      "status": "included",
       "workflow": "cumulative"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
         "headless"
-      ], 
-      "data_family": "binary", 
-      "dataset": "amino.oma", 
-      "id": "binary-leave-one-out-YUQ", 
-      "method_classes": [], 
-      "methods": [], 
+      ],
+      "data_family": "binary",
+      "dataset": "amino.rcms",
+      "id": "binary-leave-one-out-YUQ",
+      "method_classes": [],
+      "methods": [],
       "metrics": [
         "YUQ"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/amino.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/amino.rcms",
+      "status": "included",
       "workflow": "leave-one-out"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
-        "headless", 
+        "headless",
         "gui"
-      ], 
-      "data_family": "binary", 
-      "dataset": "amino.oma", 
-      "id": "binary-standard-YUY", 
-      "method_classes": [], 
-      "methods": [], 
+      ],
+      "data_family": "binary",
+      "dataset": "amino.rcms",
+      "id": "binary-standard-YUY",
+      "method_classes": [],
+      "methods": [],
       "metrics": [
         "YUY"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/amino.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/amino.rcms",
+      "status": "included",
       "workflow": "standard"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
         "headless"
-      ], 
-      "data_family": "binary", 
-      "dataset": "amino.oma", 
-      "id": "binary-cumulative-YUY", 
-      "method_classes": [], 
-      "methods": [], 
+      ],
+      "data_family": "binary",
+      "dataset": "amino.rcms",
+      "id": "binary-cumulative-YUY",
+      "method_classes": [],
+      "methods": [],
       "metrics": [
         "YUY"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/amino.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/amino.rcms",
+      "status": "included",
       "workflow": "cumulative"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
         "headless"
-      ], 
-      "data_family": "binary", 
-      "dataset": "amino.oma", 
-      "id": "binary-leave-one-out-YUY", 
-      "method_classes": [], 
-      "methods": [], 
+      ],
+      "data_family": "binary",
+      "dataset": "amino.rcms",
+      "id": "binary-leave-one-out-YUY",
+      "method_classes": [],
+      "methods": [],
       "metrics": [
         "YUY"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/amino.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/amino.rcms",
+      "status": "included",
       "workflow": "leave-one-out"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
-        "headless", 
+        "headless",
         "gui"
-      ], 
-      "data_family": "continuous", 
-      "dataset": "continuous.oma", 
-      "id": "continuous-standard-MD", 
+      ],
+      "data_family": "continuous",
+      "dataset": "continuous.rcms",
+      "id": "continuous-standard-MD",
       "method_classes": [
-        "fixed", 
+        "fixed",
         "random"
-      ], 
+      ],
       "methods": [
-        "continuous.fixed", 
+        "continuous.fixed",
         "continuous.random"
-      ], 
+      ],
       "metrics": [
         "MD"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/continuous.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/continuous.rcms",
+      "status": "included",
       "workflow": "standard"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
         "headless"
-      ], 
-      "data_family": "continuous", 
-      "dataset": "continuous.oma", 
-      "id": "continuous-cumulative-MD", 
+      ],
+      "data_family": "continuous",
+      "dataset": "continuous.rcms",
+      "id": "continuous-cumulative-MD",
       "method_classes": [
-        "fixed", 
+        "fixed",
         "random"
-      ], 
+      ],
       "methods": [
-        "continuous.fixed", 
+        "continuous.fixed",
         "continuous.random"
-      ], 
+      ],
       "metrics": [
         "MD"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/continuous.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/continuous.rcms",
+      "status": "included",
       "workflow": "cumulative"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
         "headless"
-      ], 
-      "data_family": "continuous", 
-      "dataset": "continuous.oma", 
-      "id": "continuous-leave-one-out-MD", 
+      ],
+      "data_family": "continuous",
+      "dataset": "continuous.rcms",
+      "id": "continuous-leave-one-out-MD",
       "method_classes": [
-        "fixed", 
+        "fixed",
         "random"
-      ], 
+      ],
       "methods": [
-        "continuous.fixed", 
+        "continuous.fixed",
         "continuous.random"
-      ], 
+      ],
       "metrics": [
         "MD"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/continuous.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/continuous.rcms",
+      "status": "included",
       "workflow": "leave-one-out"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
-        "headless", 
+        "headless",
         "gui"
-      ], 
-      "data_family": "continuous", 
-      "dataset": "continuous.oma", 
-      "id": "continuous-standard-SMD", 
+      ],
+      "data_family": "continuous",
+      "dataset": "continuous.rcms",
+      "id": "continuous-standard-SMD",
       "method_classes": [
-        "fixed", 
+        "fixed",
         "random"
-      ], 
+      ],
       "methods": [
-        "continuous.fixed", 
+        "continuous.fixed",
         "continuous.random"
-      ], 
+      ],
       "metrics": [
         "SMD"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/continuous.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/continuous.rcms",
+      "status": "included",
       "workflow": "standard"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
         "headless"
-      ], 
-      "data_family": "continuous", 
-      "dataset": "continuous.oma", 
-      "id": "continuous-cumulative-SMD", 
+      ],
+      "data_family": "continuous",
+      "dataset": "continuous.rcms",
+      "id": "continuous-cumulative-SMD",
       "method_classes": [
-        "fixed", 
+        "fixed",
         "random"
-      ], 
+      ],
       "methods": [
-        "continuous.fixed", 
+        "continuous.fixed",
         "continuous.random"
-      ], 
+      ],
       "metrics": [
         "SMD"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/continuous.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/continuous.rcms",
+      "status": "included",
       "workflow": "cumulative"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
         "headless"
-      ], 
-      "data_family": "continuous", 
-      "dataset": "continuous.oma", 
-      "id": "continuous-leave-one-out-SMD", 
+      ],
+      "data_family": "continuous",
+      "dataset": "continuous.rcms",
+      "id": "continuous-leave-one-out-SMD",
       "method_classes": [
-        "fixed", 
+        "fixed",
         "random"
-      ], 
+      ],
       "methods": [
-        "continuous.fixed", 
+        "continuous.fixed",
         "continuous.random"
-      ], 
+      ],
       "metrics": [
         "SMD"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/continuous.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/continuous.rcms",
+      "status": "included",
       "workflow": "leave-one-out"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
-        "headless", 
+        "headless",
         "gui"
-      ], 
-      "data_family": "diagnostic", 
-      "dataset": "lymph.oma", 
-      "id": "diagnostic-standard-Sens", 
+      ],
+      "data_family": "diagnostic",
+      "dataset": "lymph.rcms",
+      "id": "diagnostic-standard-Sens",
       "method_classes": [
-        "bivariate", 
-        "fixed", 
-        "hsroc", 
+        "bivariate",
+        "fixed",
+        "hsroc",
         "random"
-      ], 
+      ],
       "methods": [
-        "diagnostic.bivariate.ml", 
-        "diagnostic.fixed.inv.var", 
-        "diagnostic.hsroc", 
+        "diagnostic.bivariate.ml",
+        "diagnostic.fixed.inv.var",
+        "diagnostic.hsroc",
         "diagnostic.random"
-      ], 
+      ],
       "metrics": [
         "Sens"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/lymph.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/lymph.rcms",
+      "status": "included",
       "workflow": "standard"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
-        "headless", 
+        "headless",
         "gui"
-      ], 
-      "data_family": "diagnostic", 
-      "dataset": "lymph.oma", 
-      "id": "diagnostic-standard-Spec", 
+      ],
+      "data_family": "diagnostic",
+      "dataset": "lymph.rcms",
+      "id": "diagnostic-standard-Spec",
       "method_classes": [
-        "bivariate", 
-        "fixed", 
-        "hsroc", 
+        "bivariate",
+        "fixed",
+        "hsroc",
         "random"
-      ], 
+      ],
       "methods": [
-        "diagnostic.bivariate.ml", 
-        "diagnostic.fixed.inv.var", 
-        "diagnostic.hsroc", 
+        "diagnostic.bivariate.ml",
+        "diagnostic.fixed.inv.var",
+        "diagnostic.hsroc",
         "diagnostic.random"
-      ], 
+      ],
       "metrics": [
         "Spec"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/lymph.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/lymph.rcms",
+      "status": "included",
       "workflow": "standard"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
-        "headless", 
+        "headless",
         "gui"
-      ], 
-      "data_family": "diagnostic", 
-      "dataset": "lymph.oma", 
-      "id": "diagnostic-standard-PLR", 
+      ],
+      "data_family": "diagnostic",
+      "dataset": "lymph.rcms",
+      "id": "diagnostic-standard-PLR",
       "method_classes": [
-        "bivariate", 
-        "fixed", 
-        "hsroc", 
+        "bivariate",
+        "fixed",
+        "hsroc",
         "random"
-      ], 
+      ],
       "methods": [
-        "diagnostic.bivariate.ml", 
-        "diagnostic.fixed.inv.var", 
-        "diagnostic.fixed.mh", 
-        "diagnostic.hsroc", 
+        "diagnostic.bivariate.ml",
+        "diagnostic.fixed.inv.var",
+        "diagnostic.fixed.mh",
+        "diagnostic.hsroc",
         "diagnostic.random"
-      ], 
+      ],
       "metrics": [
         "PLR"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/lymph.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/lymph.rcms",
+      "status": "included",
       "workflow": "standard"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
-        "headless", 
+        "headless",
         "gui"
-      ], 
-      "data_family": "diagnostic", 
-      "dataset": "lymph.oma", 
-      "id": "diagnostic-standard-NLR", 
+      ],
+      "data_family": "diagnostic",
+      "dataset": "lymph.rcms",
+      "id": "diagnostic-standard-NLR",
       "method_classes": [
-        "bivariate", 
-        "fixed", 
-        "hsroc", 
+        "bivariate",
+        "fixed",
+        "hsroc",
         "random"
-      ], 
+      ],
       "methods": [
-        "diagnostic.bivariate.ml", 
-        "diagnostic.fixed.inv.var", 
-        "diagnostic.fixed.mh", 
-        "diagnostic.hsroc", 
+        "diagnostic.bivariate.ml",
+        "diagnostic.fixed.inv.var",
+        "diagnostic.fixed.mh",
+        "diagnostic.hsroc",
         "diagnostic.random"
-      ], 
+      ],
       "metrics": [
         "NLR"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/lymph.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/lymph.rcms",
+      "status": "included",
       "workflow": "standard"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
-        "headless", 
+        "headless",
         "gui"
-      ], 
-      "data_family": "diagnostic", 
-      "dataset": "lymph.oma", 
-      "id": "diagnostic-standard-DOR", 
+      ],
+      "data_family": "diagnostic",
+      "dataset": "lymph.rcms",
+      "id": "diagnostic-standard-DOR",
       "method_classes": [
-        "bivariate", 
-        "fixed", 
-        "hsroc", 
+        "bivariate",
+        "fixed",
+        "hsroc",
         "random"
-      ], 
+      ],
       "methods": [
-        "diagnostic.bivariate.ml", 
-        "diagnostic.fixed.inv.var", 
-        "diagnostic.fixed.mh", 
-        "diagnostic.fixed.peto", 
-        "diagnostic.hsroc", 
+        "diagnostic.bivariate.ml",
+        "diagnostic.fixed.inv.var",
+        "diagnostic.fixed.mh",
+        "diagnostic.fixed.peto",
+        "diagnostic.hsroc",
         "diagnostic.random"
-      ], 
+      ],
       "metrics": [
         "DOR"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/lymph.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/lymph.rcms",
+      "status": "included",
       "workflow": "standard"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "regression plot"
-      ], 
+      ],
       "capture_modes": [
-        "headless", 
+        "headless",
         "gui"
-      ], 
-      "data_family": "binary", 
-      "dataset": "amino.oma", 
-      "id": "binary-meta-regression-OR", 
+      ],
+      "data_family": "binary",
+      "dataset": "amino.rcms",
+      "id": "binary-meta-regression-OR",
       "method_classes": [
         "random"
-      ], 
+      ],
       "methods": [
         "binary.random"
-      ], 
+      ],
       "metrics": [
         "OR"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "covariate selection"
-      ], 
-      "project_state": "sample_data/amino.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/amino.rcms",
+      "status": "included",
       "workflow": "meta-regression"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "regression plot"
-      ], 
+      ],
       "capture_modes": [
-        "headless", 
+        "headless",
         "gui"
-      ], 
-      "data_family": "continuous", 
-      "dataset": "continuous.oma", 
-      "id": "continuous-meta-regression-SMD", 
+      ],
+      "data_family": "continuous",
+      "dataset": "continuous.rcms",
+      "id": "continuous-meta-regression-SMD",
       "method_classes": [
         "random"
-      ], 
+      ],
       "methods": [
         "continuous.random"
-      ], 
+      ],
       "metrics": [
         "SMD"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "covariate selection"
-      ], 
-      "project_state": "sample_data/continuous.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/continuous.rcms",
+      "status": "included",
       "workflow": "meta-regression"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
-        "headless", 
+        "headless",
         "gui"
-      ], 
-      "data_family": "binary", 
-      "dataset": "amino.oma", 
-      "id": "binary-subgroup-OR", 
+      ],
+      "data_family": "binary",
+      "dataset": "amino.rcms",
+      "id": "binary-subgroup-OR",
       "method_classes": [
         "random"
-      ], 
+      ],
       "methods": [
         "binary.random"
-      ], 
+      ],
       "metrics": [
         "OR"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
-        "default plot parameters", 
+        "default confidence level",
+        "default plot parameters",
         "covariate selection"
-      ], 
-      "project_state": "sample_data/amino.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/amino.rcms",
+      "status": "included",
       "workflow": "subgroup"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
-        "headless", 
+        "headless",
         "gui"
-      ], 
-      "data_family": "continuous", 
-      "dataset": "continuous.oma", 
-      "id": "continuous-subgroup-SMD", 
+      ],
+      "data_family": "continuous",
+      "dataset": "continuous.rcms",
+      "id": "continuous-subgroup-SMD",
       "method_classes": [
         "random"
-      ], 
+      ],
       "methods": [
         "continuous.random"
-      ], 
+      ],
       "metrics": [
         "SMD"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
-        "default plot parameters", 
+        "default confidence level",
+        "default plot parameters",
         "covariate selection"
-      ], 
-      "project_state": "sample_data/continuous.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/continuous.rcms",
+      "status": "included",
       "workflow": "subgroup"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
-        "headless", 
+        "headless",
         "gui"
-      ], 
-      "data_family": "diagnostic", 
-      "dataset": "lymph.oma", 
-      "id": "diagnostic-multi-metric-Sens-Spec", 
+      ],
+      "data_family": "diagnostic",
+      "dataset": "lymph.rcms",
+      "id": "diagnostic-multi-metric-Sens-Spec",
       "method_classes": [
-        "bivariate", 
-        "fixed", 
-        "hsroc", 
+        "bivariate",
+        "fixed",
+        "hsroc",
         "random"
-      ], 
+      ],
       "methods": [
-        "diagnostic.bivariate.ml", 
-        "diagnostic.fixed.inv.var", 
-        "diagnostic.hsroc", 
+        "diagnostic.bivariate.ml",
+        "diagnostic.fixed.inv.var",
+        "diagnostic.hsroc",
         "diagnostic.random"
-      ], 
+      ],
       "metrics": [
         "Sens-Spec"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/lymph.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/lymph.rcms",
+      "status": "included",
       "workflow": "diagnostic-multi-metric"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
-        "headless", 
+        "headless",
         "gui"
-      ], 
-      "data_family": "diagnostic", 
-      "dataset": "lymph.oma", 
-      "id": "diagnostic-multi-metric-PLR-NLR-DOR", 
+      ],
+      "data_family": "diagnostic",
+      "dataset": "lymph.rcms",
+      "id": "diagnostic-multi-metric-PLR-NLR-DOR",
       "method_classes": [
-        "bivariate", 
-        "fixed", 
-        "hsroc", 
+        "bivariate",
+        "fixed",
+        "hsroc",
         "random"
-      ], 
+      ],
       "methods": [
-        "diagnostic.bivariate.ml", 
-        "diagnostic.fixed.inv.var", 
-        "diagnostic.fixed.mh", 
-        "diagnostic.fixed.peto", 
-        "diagnostic.hsroc", 
+        "diagnostic.bivariate.ml",
+        "diagnostic.fixed.inv.var",
+        "diagnostic.fixed.mh",
+        "diagnostic.fixed.peto",
+        "diagnostic.hsroc",
         "diagnostic.random"
-      ], 
+      ],
       "metrics": [
         "PLR-NLR-DOR"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
+        "default confidence level",
         "default plot parameters"
-      ], 
-      "project_state": "sample_data/lymph.oma", 
-      "status": "included", 
+      ],
+      "project_state": "sample_data/lymph.rcms",
+      "status": "included",
       "workflow": "diagnostic-multi-metric"
-    }, 
+    },
     {
       "artifacts": [
-        "summary", 
-        "numeric outputs", 
+        "summary",
+        "numeric outputs",
         "forest plot"
-      ], 
+      ],
       "capture_modes": [
-        "headless", 
+        "headless",
         "gui"
-      ], 
-      "data_family": "binary", 
-      "dataset": "csv-import", 
-      "id": "binary-csv-created-project-OR", 
+      ],
+      "data_family": "binary",
+      "dataset": "csv-import",
+      "id": "binary-csv-created-project-OR",
       "method_classes": [
         "random"
-      ], 
+      ],
       "methods": [
         "binary.random"
-      ], 
+      ],
       "metrics": [
         "OR"
-      ], 
+      ],
       "options": [
-        "default confidence level", 
-        "default plot parameters", 
+        "default confidence level",
+        "default plot parameters",
         "CSV import mapping"
-      ], 
-      "project_state": "csv-import", 
-      "status": "included", 
+      ],
+      "project_state": "csv-import",
+      "status": "included",
       "workflow": "csv-created-project"
     }
   ]

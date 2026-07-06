@@ -6,7 +6,7 @@ import pytest
 
 
 # Modern tests run without a live R backend; use the pure-Python stub.
-os.environ.setdefault("OMA_STUB_BACKEND", "1")
+os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 _QAPPLICATION = None

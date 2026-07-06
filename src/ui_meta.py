@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'C:\Users\Ali-Salman\Documents\Biostatistics\openmeta-analyst-community\src\meta.ui'
+# Form implementation generated from reading ui file 'C:\Users\Ali-Salman\Documents\Biostatistics\rc-metastudio\src\meta.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -446,7 +446,7 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "OpenMetaAnalyst"))
+        MainWindow.setWindowTitle(_translate("MainWindow", "RCMetaStudio"))
         self.label.setText(_translate("MainWindow", "Outcome:"))
         self.label_3.setText(_translate("MainWindow", "Follow-up:"))
         self.menu_file.setTitle(_translate("MainWindow", "File"))

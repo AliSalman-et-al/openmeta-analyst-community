@@ -19,7 +19,7 @@ function Write-Step {
 
 function Resolve-RRuntimeRoot {
     if ($RRuntimeRoot) { return (Resolve-Path -LiteralPath $RRuntimeRoot).ProviderPath }
-    if ($env:OMA_R_HOME) { return (Resolve-Path -LiteralPath $env:OMA_R_HOME).ProviderPath }
+    if ($env:RCMS_R_HOME) { return (Resolve-Path -LiteralPath $env:RCMS_R_HOME).ProviderPath }
     if ($env:R_HOME) { return (Resolve-Path -LiteralPath $env:R_HOME).ProviderPath }
 
     $rCommand = Get-Command "R" -CommandType Application -ErrorAction SilentlyContinue
@@ -63,9 +63,9 @@ function Resolve-RscriptForDefaultEvidence {
         throw "Rscript was not found at '$Rscript'."
     }
 
-    if ($env:OMA_RSCRIPT) {
-        if (Test-Path $env:OMA_RSCRIPT) { return (Resolve-Path -LiteralPath $env:OMA_RSCRIPT).ProviderPath }
-        throw "Rscript was not found at OMA_RSCRIPT='$env:OMA_RSCRIPT'."
+    if ($env:RCMS_RSCRIPT) {
+        if (Test-Path $env:RCMS_RSCRIPT) { return (Resolve-Path -LiteralPath $env:RCMS_RSCRIPT).ProviderPath }
+        throw "Rscript was not found at RCMS_RSCRIPT='$env:RCMS_RSCRIPT'."
     }
 
     $resolvedRRuntimeRoot = Resolve-RRuntimeRoot
@@ -107,14 +107,14 @@ try {
 
     Write-Step "Running smoke pytest nodes"
     uv run pytest `
-        tests\modern\golden\test_modern_golden_compare.py::test_golden_summary_parser_reads_current_openmetar_summary_display `
+        tests\modern\golden\test_modern_golden_compare.py::test_golden_summary_parser_reads_current_RCMetaR_summary_display `
         tests\modern\fast\test_project_pickle_migration.py::test_project_loader_migrates_old_qt_text_values_without_importing_old_qt `
         tests\modern\fast\test_qt_text_boundaries.py::test_old_qt_string_and_item_color_apis_stay_inside_compat_boundaries
     if ($LASTEXITCODE -ne 0) { throw "Smoke pytest nodes failed." }
 
     Write-Step "Checking Default R Evidence prerequisites"
     $resolvedRscript = Resolve-RscriptForDefaultEvidence
-    $rEvidenceArgs = @("run", "python", "scripts\verify_openmetar_r_default.py", "--rscript", $resolvedRscript)
+    $rEvidenceArgs = @("run", "python", "scripts\verify_rcmetar_r_default.py", "--rscript", $resolvedRscript)
     if ($RequireREvidence) {
         $rEvidenceArgs += @("--require-r", "--require-installed-packages", "--install-missing", "--r-library-cache-root", $rDefaultPackageCacheRoot)
     }

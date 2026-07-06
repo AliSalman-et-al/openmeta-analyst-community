@@ -1,5 +1,5 @@
 param(
-    [string]$ArtifactName = "OpenMetaAnalyst-modern-windows-x64",
+    [string]$ArtifactName = "RCMetaStudio-modern-windows-x64",
     [string]$PythonExe = "python",
     [string]$RRuntimeRoot,
     [string]$RPackageCacheRoot,
@@ -15,7 +15,7 @@ $srcDir = Join-Path $repoRoot "src"
 $artifactDir = Join-Path $repoRoot "artifacts"
 $distRoot = Join-Path $repoRoot "build\modern-windows\dist"
 $workRoot = Join-Path $repoRoot "build\modern-windows\work"
-$appDir = Join-Path $distRoot "OpenMetaAnalyst"
+$appDir = Join-Path $distRoot "RCMetaStudio"
 $zipPath = Join-Path $artifactDir "$ArtifactName.zip"
 $tmpZipPath = "$zipPath.tmp"
 if (-not $RPackageCacheRoot) {
@@ -57,32 +57,32 @@ function Copy-DirectoryTree {
 
 function Assert-AppLayout {
     param([string]$Root)
-    Assert-PathExists -Path (Join-Path $Root "OpenMetaAnalyst.exe") -Description "OpenMetaAnalyst executable"
+    Assert-PathExists -Path (Join-Path $Root "RCMetaStudio.exe") -Description "RCMetaStudio executable"
     Assert-PathExists -Path (Join-Path $Root "_internal\PyQt5") -Description "Bundled PyQt5 runtime"
-    Assert-PathExists -Path (Join-Path $Root "sample_data\BCG.oma") -Description "Bundled sample data"
-    Assert-PathExists -Path (Join-Path $Root "sample_data\amino.oma") -Description "Bundled GUI slice sample data"
+    Assert-PathExists -Path (Join-Path $Root "sample_data\BCG.rcms") -Description "Bundled sample data"
+    Assert-PathExists -Path (Join-Path $Root "sample_data\amino.rcms") -Description "Bundled GUI slice sample data"
     Assert-PathExists -Path (Join-Path $Root "doc\openMA_help.html") -Description "Bundled help"
     Assert-PathExists -Path (Join-Path $Root "R\bin\x64\R.dll") -Description "Bundled R runtime"
-    Assert-PathExists -Path (Join-Path $Root "R\library\OpenMetaR\DESCRIPTION") -Description "Bundled OpenMetaR R package"
-    Assert-PathExists -Path (Join-Path $Root "LaunchOpenMetaAnalyst.bat") -Description "Windows launcher"
+    Assert-PathExists -Path (Join-Path $Root "R\library\RCMetaR\DESCRIPTION") -Description "Bundled RCMetaR R package"
+    Assert-PathExists -Path (Join-Path $Root "LaunchRCMetaStudio.bat") -Description "Windows launcher"
 }
 
 function Invoke-PackagedAppSmokeTest {
     param([string]$Root)
-    $exePath = Join-Path $Root "OpenMetaAnalyst.exe"
-    $samplePath = Join-Path $Root "sample_data\amino.oma"
+    $exePath = Join-Path $Root "RCMetaStudio.exe"
+    $samplePath = Join-Path $Root "sample_data\amino.rcms"
     $previousEnv = @{
-        OMA_REQUIRE_IN_PROCESS_RPY2 = $env:OMA_REQUIRE_IN_PROCESS_RPY2
-        OMA_STARTUP_PROJECT_SMOKE = $env:OMA_STARTUP_PROJECT_SMOKE
+        RCMS_REQUIRE_IN_PROCESS_RPY2 = $env:RCMS_REQUIRE_IN_PROCESS_RPY2
+        RCMS_STARTUP_PROJECT_SMOKE = $env:RCMS_STARTUP_PROJECT_SMOKE
         RPY2_CFFI_MODE = $env:RPY2_CFFI_MODE
     }
     try {
-        $env:OMA_REQUIRE_IN_PROCESS_RPY2 = "1"
+        $env:RCMS_REQUIRE_IN_PROCESS_RPY2 = "1"
         $env:RPY2_CFFI_MODE = "ABI"
         $process = Start-Process -FilePath $exePath -ArgumentList @("--automation-smoke", $samplePath) -Wait -PassThru -WindowStyle Hidden
         if ($process.ExitCode -ne 0) { throw "Packaged app smoke test failed while opening '$samplePath' with exit code $($process.ExitCode)." }
 
-        $env:OMA_STARTUP_PROJECT_SMOKE = "1"
+        $env:RCMS_STARTUP_PROJECT_SMOKE = "1"
         $startupProcess = Start-Process -FilePath $exePath -ArgumentList @($samplePath) -Wait -PassThru -WindowStyle Hidden
         if ($startupProcess.ExitCode -ne 0) { throw "Packaged startup project smoke test failed while opening '$samplePath' with exit code $($startupProcess.ExitCode)." }
     }
@@ -100,7 +100,7 @@ function Invoke-PackagedAppSmokeTest {
 
 function Invoke-PackagedWizardLayoutSmokeTest {
     param([string]$Root)
-    $exePath = Join-Path $Root "OpenMetaAnalyst.exe"
+    $exePath = Join-Path $Root "RCMetaStudio.exe"
     $previousEnv = @{
         QT_QPA_PLATFORM = $env:QT_QPA_PLATFORM
     }
@@ -137,7 +137,7 @@ function Assert-ZipLayout {
     try {
         $entryNames = @{}
         foreach ($entry in $zip.Entries) { $entryNames[$entry.FullName -replace "/", "\"] = $true }
-        foreach ($requiredEntry in @("OpenMetaAnalyst.exe", "sample_data\BCG.oma", "sample_data\amino.oma", "doc\openMA_help.html", "R\bin\x64\R.dll", "R\library\OpenMetaR\DESCRIPTION", "LaunchOpenMetaAnalyst.bat")) {
+        foreach ($requiredEntry in @("RCMetaStudio.exe", "sample_data\BCG.rcms", "sample_data\amino.rcms", "doc\openMA_help.html", "R\bin\x64\R.dll", "R\library\RCMetaR\DESCRIPTION", "LaunchRCMetaStudio.bat")) {
             if (-not $entryNames.ContainsKey($requiredEntry)) { throw "Created ZIP is missing '$requiredEntry'." }
         }
         $hasPyQt5Runtime = $false
@@ -156,14 +156,14 @@ function Assert-ZipLayout {
 
 function Resolve-RRuntimeRoot {
     if ($RRuntimeRoot) { return (Resolve-Path -LiteralPath $RRuntimeRoot).ProviderPath }
-    if ($env:OMA_R_HOME) { return (Resolve-Path -LiteralPath $env:OMA_R_HOME).ProviderPath }
+    if ($env:RCMS_R_HOME) { return (Resolve-Path -LiteralPath $env:RCMS_R_HOME).ProviderPath }
     if ($env:R_HOME) { return (Resolve-Path -LiteralPath $env:R_HOME).ProviderPath }
     $programFilesR = Join-Path $env:ProgramFiles "R"
     if (Test-Path $programFilesR) {
         $latestR = Get-ChildItem -Path $programFilesR -Directory | Sort-Object Name -Descending | Select-Object -First 1
         if ($latestR) { return (Resolve-Path -LiteralPath $latestR.FullName).ProviderPath }
     }
-    throw "No source R runtime was found. Pass -RRuntimeRoot or set OMA_R_HOME/R_HOME."
+    throw "No source R runtime was found. Pass -RRuntimeRoot or set RCMS_R_HOME/R_HOME."
 }
 
 function Copy-RRuntime {
@@ -184,10 +184,10 @@ function Get-RPackageCacheKey {
     param([string]$RscriptExe)
     $version = & $RscriptExe -e "cat(paste0('R-', getRversion()))"
     if ($LASTEXITCODE -ne 0 -or -not $version) { throw "Could not determine R runtime version." }
-    $cranRepo = if ($env:OMA_CRAN_REPO) { $env:OMA_CRAN_REPO } else { "https://cloud.r-project.org" }
+    $cranRepo = if ($env:RCMS_CRAN_REPO) { $env:RCMS_CRAN_REPO } else { "https://cloud.r-project.org" }
     $installDeps = Join-Path $repoRoot "scripts\install-modern-r-deps.R"
-    $manifest = Join-Path $repoRoot "docs\modernization\OpenMetaR-r-dependencies.json"
-    $description = Join-Path $repoRoot "src\R\OpenMetaR\DESCRIPTION"
+    $manifest = Join-Path $repoRoot "docs\modernization\RCMetaR-r-dependencies.json"
+    $description = Join-Path $repoRoot "src\R\RCMetaR\DESCRIPTION"
     $hashInput = @(
         (Get-FileHash -Algorithm SHA256 -LiteralPath $installDeps).Hash.ToLowerInvariant()
         (Get-FileHash -Algorithm SHA256 -LiteralPath $manifest).Hash.ToLowerInvariant()
@@ -211,18 +211,18 @@ function Test-RDependencyPackages {
 function Test-BundledRPackages {
     param([string]$RscriptExe, [string]$Library)
     if (-not (Test-Path $Library)) { return $false }
-    $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','OpenMetaR','metafor','lme4','pdftools','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }; if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
+    $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','RCMetaR','metafor','lme4','pdftools','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }; if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
     & $RscriptExe -e $verify
     return ($LASTEXITCODE -eq 0)
 }
 
-function Assert-OpenMetaRSummaryFormatting {
+function Assert-RCMetaRSummaryFormatting {
     param([string]$RscriptExe, [string]$Library)
     $libraryPath = $Library -replace '\\', '/'
     $verify = @"
 lib <- normalizePath('$libraryPath', winslash='/')
 .libPaths(c(lib, .libPaths()))
-library(OpenMetaR)
+library(RCMetaR)
 if (is.null(getS3method('print', 'summary.display', optional=TRUE))) {
   stop('print.summary.display is not registered')
 }
@@ -256,7 +256,7 @@ if (any(vapply(leaks, function(value) grepl(value, rendered, fixed=TRUE), logica
 }
 "@
     & $RscriptExe -e $verify
-    if ($LASTEXITCODE -ne 0) { throw "Bundled OpenMetaR summary formatting verification failed." }
+    if ($LASTEXITCODE -ne 0) { throw "Bundled RCMetaR summary formatting verification failed." }
 }
 
 function Copy-RLibrary {
@@ -281,13 +281,13 @@ function Install-LocalRPackagesFromSource {
     $packageBuildRoot = Join-Path $workRoot "r-package-build"
     if (Test-Path $packageBuildRoot) { Remove-Item -LiteralPath $packageBuildRoot -Recurse -Force }
     New-Item -ItemType Directory -Force -Path $packageBuildRoot | Out-Null
-    Copy-Item -Path (Join-Path $srcDir "R\OpenMetaR") -Destination (Join-Path $packageBuildRoot "OpenMetaR") -Recurse -Force
+    Copy-Item -Path (Join-Path $srcDir "R\RCMetaR") -Destination (Join-Path $packageBuildRoot "RCMetaR") -Recurse -Force
     Get-ChildItem -Path $packageBuildRoot -Recurse -Include *.o,*.so,*.dll | Remove-Item -Force
 
-    & $rExe CMD INSTALL --library="$rLibrary" (Join-Path $packageBuildRoot "OpenMetaR")
-    if ($LASTEXITCODE -ne 0) { throw "R CMD INSTALL OpenMetaR failed." }
+    & $rExe CMD INSTALL --library="$rLibrary" (Join-Path $packageBuildRoot "RCMetaR")
+    if ($LASTEXITCODE -ne 0) { throw "R CMD INSTALL RCMetaR failed." }
 
-    Assert-OpenMetaRSummaryFormatting -RscriptExe $rscriptExe -Library $rLibrary
+    Assert-RCMetaRSummaryFormatting -RscriptExe $rscriptExe -Library $rLibrary
 }
 
 function Install-BundledRPackages {
@@ -326,12 +326,12 @@ function Install-BundledRPackages {
         }
     }
 
-    Write-Step "Installing local OpenMetaR package"
+    Write-Step "Installing local RCMetaR package"
     Install-LocalRPackagesFromSource -Root $Root
-    & $rscriptExe -e "pkgs <- c('HSROC','OpenMetaR','metafor','lme4','pdftools','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
+    & $rscriptExe -e "pkgs <- c('HSROC','RCMetaR','metafor','lme4','pdftools','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
     if ($LASTEXITCODE -ne 0) { throw "Bundled R package verification failed." }
 
-    if (-not (Test-BundledRPackages -RscriptExe $rscriptExe -Library $rLibrary)) { throw "Bundled R package verification failed after local OpenMetaR install." }
+    if (-not (Test-BundledRPackages -RscriptExe $rscriptExe -Library $rLibrary)) { throw "Bundled R package verification failed after local RCMetaR install." }
 }
 
 if (-not $SkipDependencyInstall) {
@@ -375,8 +375,8 @@ try {
     $pyInstallerArgs = @(
         "--noconfirm",
         "--windowed",
-        "--name", "OpenMetaAnalyst",
-        "--icon", "images\openmeta-app-icon.ico",
+        "--name", "RCMetaStudio",
+        "--icon", "images\rc-metastudio-app-icon.ico",
         "--distpath", $distRoot,
         "--workpath", $workRoot,
         "--paths", "forms",
@@ -406,8 +406,8 @@ Install-BundledRPackages -Root $appDir
 @echo off
 set APP_DIR=%~dp0
 set RPY2_CFFI_MODE=ABI
-start "" "%APP_DIR%OpenMetaAnalyst.exe" "%APP_DIR%sample_data\amino.oma"
-'@ | Set-Content -Path (Join-Path $appDir "LaunchOpenMetaAnalyst.bat") -Encoding ASCII
+start "" "%APP_DIR%RCMetaStudio.exe" "%APP_DIR%sample_data\amino.rcms"
+'@ | Set-Content -Path (Join-Path $appDir "LaunchRCMetaStudio.bat") -Encoding ASCII
 
 Assert-AppLayout -Root $appDir
 if (-not $SkipSmoke) {

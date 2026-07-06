@@ -1,5 +1,5 @@
 param(
-    [string]$ArtifactName = "OpenMetaAnalyst-modern-windows-x64",
+    [string]$ArtifactName = "RCMetaStudio-modern-windows-x64",
     [string]$RRuntimeRoot,
     [string]$RPackageCacheRoot,
     [switch]$RecreateVenv,
@@ -24,14 +24,14 @@ function Write-Step {
 
 function Resolve-RRuntimeRoot {
     if ($RRuntimeRoot) { return (Resolve-Path -LiteralPath $RRuntimeRoot).ProviderPath }
-    if ($env:OMA_R_HOME) { return (Resolve-Path -LiteralPath $env:OMA_R_HOME).ProviderPath }
+    if ($env:RCMS_R_HOME) { return (Resolve-Path -LiteralPath $env:RCMS_R_HOME).ProviderPath }
     if ($env:R_HOME) { return (Resolve-Path -LiteralPath $env:R_HOME).ProviderPath }
     $programFilesR = Join-Path $env:ProgramFiles "R"
     if (Test-Path $programFilesR) {
         $latestR = Get-ChildItem -Path $programFilesR -Directory | Sort-Object Name -Descending | Select-Object -First 1
         if ($latestR) { return (Resolve-Path -LiteralPath $latestR.FullName).ProviderPath }
     }
-    throw "No source R runtime was found. Pass -RRuntimeRoot or set OMA_R_HOME/R_HOME."
+    throw "No source R runtime was found. Pass -RRuntimeRoot or set RCMS_R_HOME/R_HOME."
 }
 
 function Resolve-RscriptFromRuntime {
@@ -57,7 +57,7 @@ try {
 
     if (-not $SkipVerification) {
         Write-Step "Verifying Full R Stack Evidence"
-        uv run python scripts\verify_openmetar_r_stack.py --rscript $resolvedRscript --r-library-cache-root $RPackageCacheRoot
+        uv run python scripts\verify_rcmetar_r_stack.py --rscript $resolvedRscript --r-library-cache-root $RPackageCacheRoot
         if ($LASTEXITCODE -ne 0) { throw "Full R Stack Evidence failed." }
     }
 

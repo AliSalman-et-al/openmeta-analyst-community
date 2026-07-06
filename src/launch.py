@@ -102,8 +102,8 @@ def load_R_libraries(app, splash=None):
     _status("Loading metafor\n....")
     rloader.load_metafor()
 
-    _status("Loading OpenMetaR\n........")
-    rloader.load_OpenMetaR()
+    _status("Loading RCMetaR\n........")
+    rloader.load_RCMetaR()
 
     _status("Loading igraph\n............")
     rloader.load_igraph()
@@ -125,7 +125,7 @@ def start():
         sample_path = (
             startup_argv[2]
             if len(startup_argv) > 2
-            else os.path.join("sample_data", "amino.oma")
+            else os.path.join("sample_data", "amino.rcms")
         )
         return start_automation_smoke(sample_path)
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-wizard-layout-smoke":
@@ -163,12 +163,12 @@ def start():
     _show_main_window(meta)
     if startup_project_path:
         opened = meta.open(startup_project_path)
-        if os.environ.get("OMA_STARTUP_PROJECT_SMOKE") == "1":
+        if os.environ.get("RCMS_STARTUP_PROJECT_SMOKE") == "1":
             return _assert_opened_project_for_startup_smoke(
                 app, meta, startup_project_path, opened
             )
     else:
-        if os.environ.get("OMA_STARTUP_PROJECT_SMOKE") == "1":
+        if os.environ.get("RCMS_STARTUP_PROJECT_SMOKE") == "1":
             raise SystemExit(
                 "Startup project smoke test did not receive a project path."
             )
@@ -184,7 +184,7 @@ def start_automation():
     app.setOrganizationName(meta_globals.ORGANIZATION_NAME)
     _set_application_icon(app)
     settings.setup_directories()
-    if os.environ.get("OMA_REQUIRE_IN_PROCESS_RPY2") == "1":
+    if os.environ.get("RCMS_REQUIRE_IN_PROCESS_RPY2") == "1":
         load_R_libraries(app, None)
     meta = meta_form.MetaForm()
     _show_main_window(meta)

@@ -118,7 +118,7 @@ def test_curated_golden_set_includes_sequential_binary_and_continuous_workflows(
     assert "Leave-one-out Summary" in bundles["continuous-leave-one-out"]["expected"]
 
 
-def test_golden_summary_parser_reads_current_openmetar_summary_display():
+def test_golden_summary_parser_reads_current_RCMetaR_summary_display():
     with _import_legacy_golden_modules() as (golden_analysis, _, _):
         parsed = golden_analysis._parse_summary(
             """
@@ -196,7 +196,7 @@ def test_compare_bundle_requires_expected_plot_artifacts(tmp_path):
 def test_headless_analysis_dispatches_sequential_binary_and_continuous_workflows(
     monkeypatch, tmp_path
 ):
-    monkeypatch.delenv("OMA_STUB_BACKEND", raising=False)
+    monkeypatch.delenv("RCMS_STUB_BACKEND", raising=False)
     with _import_legacy_golden_modules() as (_, headless_analysis, meta_globals):
         calls = []
 
@@ -231,7 +231,7 @@ def test_headless_analysis_dispatches_sequential_binary_and_continuous_workflows
         )
 
         binary = headless_analysis.HeadlessAnalysisCase(
-            str(tmp_path / "b.oma"),
+            str(tmp_path / "b.rcms"),
             "binary.random",
             {},
             metric="OR",
@@ -239,7 +239,7 @@ def test_headless_analysis_dispatches_sequential_binary_and_continuous_workflows
             analysis_type="cumulative",
         )
         continuous = headless_analysis.HeadlessAnalysisCase(
-            str(tmp_path / "c.oma"),
+            str(tmp_path / "c.rcms"),
             "continuous.random",
             {},
             metric="SMD",
@@ -260,7 +260,7 @@ def test_headless_analysis_dispatches_sequential_binary_and_continuous_workflows
 def test_headless_analysis_dispatches_meta_regression_with_selected_covariates(
     monkeypatch, tmp_path
 ):
-    monkeypatch.delenv("OMA_STUB_BACKEND", raising=False)
+    monkeypatch.delenv("RCMS_STUB_BACKEND", raising=False)
     with _import_legacy_golden_modules() as (_, headless_analysis, meta_globals):
         calls = []
 
@@ -297,7 +297,7 @@ def test_headless_analysis_dispatches_meta_regression_with_selected_covariates(
         )
 
         case = headless_analysis.HeadlessAnalysisCase(
-            str(tmp_path / "b.oma"),
+            str(tmp_path / "b.rcms"),
             None,
             {"conf.level": 95.0},
             metric="OR",
@@ -315,8 +315,8 @@ def test_comprehensive_golden_baseline_capture_writes_reproducible_bundle(
 ):
     with _import_legacy_golden_modules() as (golden_analysis, _, _):
         bundles = [
-            _capture_bundle("amino-binary-random", "amino.oma", "binary.random"),
-            _capture_bundle("continuous-random", "continuous.oma", "continuous.random"),
+            _capture_bundle("amino-binary-random", "amino.rcms", "binary.random"),
+            _capture_bundle("continuous-random", "continuous.rcms", "continuous.random"),
         ]
         plot = tmp_path / "plot.png"
         plot.write_bytes(b"plot")
@@ -327,14 +327,14 @@ def test_comprehensive_golden_baseline_capture_writes_reproducible_bundle(
         monkeypatch.setattr(
             golden_analysis.meta_py_r,
             "RlibLoader",
-            lambda: types.SimpleNamespace(load_OpenMetaR=lambda: None),
+            lambda: types.SimpleNamespace(load_RCMetaR=lambda: None),
         )
         monkeypatch.setattr(golden_analysis, "_commit_sha", lambda: "abc123")
         monkeypatch.setattr(
             golden_analysis,
             "_tool_versions",
             lambda: {
-                "openmeta_analyst": "0.005",
+                "rc_metastudio": "0.005",
                 "python": "3.11.15",
                 "os": "Windows",
                 "r": "R version 4.6.0",
@@ -427,7 +427,7 @@ def _baseline():
         "curated_golden_set": [
             {
                 "id": "amino-binary-random",
-                "dataset": "amino.oma",
+                "dataset": "amino.rcms",
                 "method": "binary.random",
                 "metric": "OR",
                 "tolerances": {"estimate": 0.001},

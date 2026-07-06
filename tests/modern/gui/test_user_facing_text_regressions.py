@@ -563,10 +563,10 @@ def _combo_maximum_width(combo_box):
     sys.path.insert(0, str(ROOT / "src"))
     import qt_layout
 
-    explicit_combo_cap = combo_box.property("oma_maximum_combo_width")
+    explicit_combo_cap = combo_box.property("RCMS_maximum_combo_width")
     if isinstance(explicit_combo_cap, int) and explicit_combo_cap > 0:
         return explicit_combo_cap
-    explicit_cap = combo_box.property("oma_maximum_value_control_width")
+    explicit_cap = combo_box.property("RCMS_maximum_value_control_width")
     if isinstance(explicit_cap, int) and explicit_cap > 0:
         return min(explicit_cap, qt_layout.APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH)
     return qt_layout.APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH
@@ -1398,12 +1398,12 @@ def test_issue_76_to_105_reported_bad_user_facing_strings_are_absent():
             "src/ma_data_table_model.py",
             "src/ma_data_table_view.py",
             "src/meta_globals.py",
-            "src/R/OpenMetaR/R/binary_methods.r",
-            "src/R/OpenMetaR/R/continuous_methods.r",
-            "src/R/OpenMetaR/R/diagnostic_methods.r",
-            "src/R/OpenMetaR/R/meta_methods.r",
-            "src/R/OpenMetaR/R/plotting.r",
-            "src/R/OpenMetaR/R/utilities.r",
+            "src/R/RCMetaR/R/binary_methods.r",
+            "src/R/RCMetaR/R/continuous_methods.r",
+            "src/R/RCMetaR/R/diagnostic_methods.r",
+            "src/R/RCMetaR/R/meta_methods.r",
+            "src/R/RCMetaR/R/plotting.r",
+            "src/R/RCMetaR/R/utilities.r",
             *HELP_HTML,
         ]
     )
@@ -1452,9 +1452,9 @@ def test_issue_76_to_105_reported_bad_user_facing_strings_are_absent():
         "Log Proportion",
         "Arcsine of Square Root Proportion",
         "Freeman-Tukey Double Arcsine Proportion",
-        "OpenMeta[analyst] -",
+        "RC MetaStudio -",
         "Open Meta-Analysis",
-        "Open Meta-Analyst",
+        "RC MetaStudio",
         "you've made unsaved changes to your data.",
         "Data Set",
         "Data Sets",
@@ -1606,12 +1606,12 @@ def test_issue_76_to_105_corrected_user_facing_strings_are_present():
             "src/ma_data_table_model.py",
             "src/ma_data_table_view.py",
             "src/meta_globals.py",
-            "src/R/OpenMetaR/R/continuous_methods.r",
-            "src/R/OpenMetaR/R/meta_reg.r",
-            "src/R/OpenMetaR/R/binary_methods.r",
-            "src/R/OpenMetaR/R/meta_methods.r",
-            "src/R/OpenMetaR/R/plotting.r",
-            "src/R/OpenMetaR/R/utilities.r",
+            "src/R/RCMetaR/R/continuous_methods.r",
+            "src/R/RCMetaR/R/meta_reg.r",
+            "src/R/RCMetaR/R/binary_methods.r",
+            "src/R/RCMetaR/R/meta_methods.r",
+            "src/R/RCMetaR/R/plotting.r",
+            "src/R/RCMetaR/R/utilities.r",
             *HELP_HTML,
         ]
     )
@@ -1633,7 +1633,7 @@ def test_issue_76_to_105_corrected_user_facing_strings_are_present():
         "Outcomes must be numeric.",
         "Negative Predictive Value",
         "Yule's Y",
-        "OpenMetaAnalyst",
+        "RCMetaStudio",
         "You've made unsaved changes to your data. Do you want to save your changes?",
         "Choose CSV File",
         "Open Existing Dataset",

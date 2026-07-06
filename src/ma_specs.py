@@ -7,7 +7,7 @@
 #  that handles the method selection        #
 #  and algorithm specifications             #
 #                                           #
-#  OpenMeta[analyst]                        #
+#  RC MetaStudio                        #
 #                                           #
 #  This is also where the calls to run      #
 #  meta-analyses originate, via a callback  #
@@ -173,7 +173,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         out_f = "."
         out_f, _selected_filter = QFileDialog.getSaveFileName(
             self,
-            "OpenMetaAnalyst - Plot Path",
+            "RCMetaStudio - Plot Path",
             out_f,
             "png image files: (.png)",
         )
@@ -756,7 +756,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
     def _cap_value_control_width(self, widget):
         widget.setProperty(
-            "oma_maximum_value_control_width",
+            "RCMS_maximum_value_control_width",
             qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH,
         )
         widget.setMaximumWidth(
@@ -769,7 +769,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
     def _cap_method_selector_width(self, widget):
         widget.setProperty(
-            "oma_maximum_combo_width",
+            "RCMS_maximum_combo_width",
             qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH,
         )
         widget.setMaximumWidth(

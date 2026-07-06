@@ -136,7 +136,7 @@
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout_2">
      <item>
-      <widget class="QLabel" name="oma_onlineLabel">
+      <widget class="QLabel" name="RCMS_onlineLabel">
        <property name="minimumSize">
         <size>
          <width>120</width>

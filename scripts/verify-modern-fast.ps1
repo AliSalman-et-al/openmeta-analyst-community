@@ -21,7 +21,7 @@ function Write-Step {
 
 function Resolve-RRuntimeRoot {
     if ($RRuntimeRoot) { return (Resolve-Path -LiteralPath $RRuntimeRoot).ProviderPath }
-    if ($env:OMA_R_HOME) { return (Resolve-Path -LiteralPath $env:OMA_R_HOME).ProviderPath }
+    if ($env:RCMS_R_HOME) { return (Resolve-Path -LiteralPath $env:RCMS_R_HOME).ProviderPath }
     if ($env:R_HOME) { return (Resolve-Path -LiteralPath $env:R_HOME).ProviderPath }
 
     $rCommand = Get-Command "R" -CommandType Application -ErrorAction SilentlyContinue
@@ -65,9 +65,9 @@ function Resolve-RscriptForDefaultEvidence {
         throw "Rscript was not found at '$Rscript'."
     }
 
-    if ($env:OMA_RSCRIPT) {
-        if (Test-Path $env:OMA_RSCRIPT) { return (Resolve-Path -LiteralPath $env:OMA_RSCRIPT).ProviderPath }
-        throw "Rscript was not found at OMA_RSCRIPT='$env:OMA_RSCRIPT'."
+    if ($env:RCMS_RSCRIPT) {
+        if (Test-Path $env:RCMS_RSCRIPT) { return (Resolve-Path -LiteralPath $env:RCMS_RSCRIPT).ProviderPath }
+        throw "Rscript was not found at RCMS_RSCRIPT='$env:RCMS_RSCRIPT'."
     }
 
     $resolvedRRuntimeRoot = Resolve-RRuntimeRoot
@@ -121,7 +121,7 @@ try {
 
     Write-Step "Verifying Default R Evidence"
     $resolvedRscript = Resolve-RscriptForDefaultEvidence
-    $rEvidenceArgs = @("run", "python", "scripts\verify_openmetar_r_default.py", "--rscript", $resolvedRscript)
+    $rEvidenceArgs = @("run", "python", "scripts\verify_rcmetar_r_default.py", "--rscript", $resolvedRscript)
     if ($RequireREvidence) {
         $rEvidenceArgs += @("--require-r", "--require-installed-packages", "--install-missing", "--r-library-cache-root", $rDefaultPackageCacheRoot)
     }

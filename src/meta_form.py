@@ -2,7 +2,7 @@
 #                                    #
 #  Byron C. Wallace                  #
 #  Tufts Medical Center              #
-#  OpenMeta[analyst]                 #
+#  RC MetaStudio                 #
 #                                    #
 #  Container form for UI. Handles    #
 #  user interaction.                 #
@@ -105,7 +105,7 @@ def _validate_open_project_dataset(dataset):
     if isinstance(dataset, ma_dataset.Dataset):
         return dataset
     raise InvalidProjectFileError(
-        "This file is not a valid OpenMeta[Analyst] project file."
+        "This file is not a valid RC MetaStudio project file."
     )
 
 
@@ -578,7 +578,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     # which operate over the output of meta-analytic methods. Note
     # that we don't care what sort of data we're operating over here;
     # ma_specs takes care of that. The convention is that each meta
-    # Repeated-analysis actions pass workflow names to the OpenMetaR core facade.
+    # Repeated-analysis actions pass workflow names to the RCMetaR core facade.
     # implementation.
     ### TODO pull out meta methods auto-magically via introspection.
     def cum_ma(self):
@@ -691,14 +691,14 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def _show_analysis_backend_error(self, exception):
         message = (
             "The analysis backend could not be reached, so "
-            "OpenMeta[Analyst] cannot build the Method & Parameters dialog.\n\n"
+            "RC MetaStudio cannot build the Method & Parameters dialog.\n\n"
             "Details: %s: %s" % (exception.__class__.__name__, exception)
         )
         QMessageBox.critical(self, "Analysis Backend Unavailable", message)
 
     def _show_analysis_preparation_error(self, exception):
         message = (
-            "OpenMeta[Analyst] could not prepare the Method & Parameters dialog "
+            "RC MetaStudio could not prepare the Method & Parameters dialog "
             "for this analysis.\n\n"
             "Details: %s: %s" % (exception.__class__.__name__, exception)
         )
@@ -893,7 +893,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             QMessageBox.critical(
                 self,
                 "Could Not Display Analysis Results",
-                "The analysis completed, but OpenMeta[Analyst] could not display "
+                "The analysis completed, but RC MetaStudio could not display "
                 "the results.\n\nDetails: %s: %s" % (e.__class__.__name__, e),
             )
             return
@@ -1063,7 +1063,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         print("trying to display: %s" % previously_displayed_outcome)
         ##
         # RESOLVED previously, if previous outcome was None, this threw up
-        # (see Issue 4: http://github.com/bwallace/OpenMeta-analyst-/issues#issue/4)
+        # (see Issue 4: http://github.com/bwallace/rc-metastudio-/issues#issue/4)
         self.display_outcome(previously_displayed_outcome)
 
     def _add_new_outcome(self, outcome_name, outcome_type, sub_type=None):
@@ -1243,7 +1243,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def open(self, file_path=None):
         """
         This gets called when the user opts to open an existing dataset. Note that we make use
-        of the pickled dataset itself (.oma) and we also look for a corresponding `state`
+        of the pickled dataset itself (.rcms) and we also look for a corresponding `state`
         dictionary, which contains things like which outcome was currently displayed, etc.
 
         Opening a project is a document boundary, not an undoable edit. The undo stack is
@@ -1265,9 +1265,9 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         if file_path is None:
             file_path = QFileDialog.getOpenFileName(
                 parent=self,
-                caption="OpenMetaAnalyst - Open File",
+                caption="RCMetaStudio - Open File",
                 directory=get_default_open_directory(),
-                filter="open meta files (*.oma)",
+                filter="open meta files (*.rcms)",
             )
             file_path = _qt_dialog_path(file_path)
 
@@ -1551,9 +1551,9 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
             out_f = QFileDialog.getSaveFileName(
                 parent=self,
-                caption="OpenMetaAnalyst - Save File",
+                caption="RCMetaStudio - Save File",
                 directory=out_f,
-                filter="open meta files: (.oma)",
+                filter="open meta files: (.rcms)",
             )
             out_f = _qt_dialog_path(out_f)
             if out_f == "" or out_f == None:
@@ -1563,8 +1563,8 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
         # add proper file extension
         try:
-            if self.out_path[-4:] != ".oma":
-                self.out_path += ".oma"
+            if self.out_path[-4:] != ".rcms":
+                self.out_path += ".rcms"
                 print("added proper file extension")
         except Exception as e:
             print("")
@@ -1593,7 +1593,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             QMessageBox.critical(
                 self,
                 "Could Not Save Project",
-                "OpenMeta[Analyst] could not save %s.\n\nDetails: %s: %s"
+                "RC MetaStudio could not save %s.\n\nDetails: %s: %s"
                 % (self.out_path, e.__class__.__name__, e),
             )
             return False

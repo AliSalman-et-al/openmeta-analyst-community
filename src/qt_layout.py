@@ -142,7 +142,7 @@ def sync_application_wizard_pages_to_body(wizard):
     if body_width <= 0:
         return
 
-    wizard.setProperty("oma_wizard_body_width", body_width)
+    wizard.setProperty("RCMS_wizard_body_width", body_width)
 
     for page in _wizard_pages(wizard):
         _fit_wizard_page_to_contents(page, minimum_width=body_width)
@@ -402,11 +402,11 @@ def _apply_wizard_minimum_size(root):
 
 
 def _root_base_minimum_size(root):
-    base_size = root.property("oma_layout_base_minimum_size")
+    base_size = root.property("RCMS_layout_base_minimum_size")
     if isinstance(base_size, QSize):
         return base_size
     base_size = root.minimumSize()
-    root.setProperty("oma_layout_base_minimum_size", base_size)
+    root.setProperty("RCMS_layout_base_minimum_size", base_size)
     return base_size
 
 
@@ -453,7 +453,7 @@ def _application_wizard_body_width(wizard):
     for page in _wizard_pages(wizard):
         width = max(width, _wizard_page_content_width(page))
 
-    wizard.setProperty("oma_wizard_body_width", width)
+    wizard.setProperty("RCMS_wizard_body_width", width)
     return width
 
 
@@ -709,12 +709,12 @@ def _set_fit_minimum_size(widget, target_size):
 
 
 def _fit_base_minimum_size(widget):
-    base_size = widget.property("oma_fit_base_minimum_size")
+    base_size = widget.property("RCMS_fit_base_minimum_size")
     if isinstance(base_size, QSize):
         return base_size
 
     base_size = widget.minimumSize()
-    widget.setProperty("oma_fit_base_minimum_size", base_size)
+    widget.setProperty("RCMS_fit_base_minimum_size", base_size)
     return base_size
 
 
@@ -834,10 +834,10 @@ def _combo_contents_width(combo_box):
 
 
 def _combo_maximum_width(combo_box):
-    explicit_combo_cap = combo_box.property("oma_maximum_combo_width")
+    explicit_combo_cap = combo_box.property("RCMS_maximum_combo_width")
     if isinstance(explicit_combo_cap, int) and explicit_combo_cap > 0:
         return explicit_combo_cap
-    explicit_cap = combo_box.property("oma_maximum_value_control_width")
+    explicit_cap = combo_box.property("RCMS_maximum_value_control_width")
     if isinstance(explicit_cap, int) and explicit_cap > 0:
         return min(explicit_cap, APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH)
     return APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH
@@ -845,12 +845,12 @@ def _combo_maximum_width(combo_box):
 
 def _sync_combo_tooltip(combo_box):
     combo_box.setToolTip(str(combo_box.currentText()))
-    if combo_box.property("oma_combo_tooltip_bound"):
+    if combo_box.property("RCMS_combo_tooltip_bound"):
         return
     combo_box.currentTextChanged.connect(
         lambda text, combo_box=combo_box: combo_box.setToolTip(str(text))
     )
-    combo_box.setProperty("oma_combo_tooltip_bound", True)
+    combo_box.setProperty("RCMS_combo_tooltip_bound", True)
 
 
 def _option_group_boxes(root):

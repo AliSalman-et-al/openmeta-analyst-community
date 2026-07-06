@@ -39,12 +39,12 @@ Run Full R Stack Evidence before R Stack changes:
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-modern-r-stack-full.ps1
 ```
 
-Smoke/Fast Default R Evidence uses `artifacts\r-default-library-cache`; Full R Stack Evidence and packaging use `artifacts\r-library-cache`. Keeping those caches separate prevents fast verification from restoring the larger bundled-R packaging cache. Set `OMA_CRAN_REPO` to choose a faster reliable CRAN-compatible mirror when needed. The package wrappers resolve one source R runtime and pass that same runtime into R Stack Evidence and artifact assembly, so the dependency cache can be reused before only the local `OpenMetaR` package is reinstalled into the bundle.
+Smoke/Fast Default R Evidence uses `artifacts\r-default-library-cache`; Full R Stack Evidence and packaging use `artifacts\r-library-cache`. Keeping those caches separate prevents fast verification from restoring the larger bundled-R packaging cache. Set `RCMS_CRAN_REPO` to choose a faster reliable CRAN-compatible mirror when needed. The package wrappers resolve one source R runtime and pass that same runtime into R Stack Evidence and artifact assembly, so the dependency cache can be reused before only the local `RCMetaR` package is reinstalled into the bundle.
 
 Build the Windows package only when packaging evidence is needed:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\package-modern-windows.ps1 -ArtifactName OpenMetaAnalyst-modern-windows-x64
+powershell -ExecutionPolicy Bypass -File .\scripts\package-modern-windows.ps1 -ArtifactName RCMetaStudio-modern-windows-x64
 ```
 
 On macOS, use the package script for the matching host architecture:
@@ -83,7 +83,7 @@ delegates:
 `DatasetModel` initialization calls OpenMeta R functions such as `set.global.conf.level`. Focused tests that instantiate `DatasetModel` without the full application setup should load only the needed package:
 
 ```python
-meta_py_r.RlibLoader().load_OpenMetaR()
+meta_py_r.RlibLoader().load_RCMetaR()
 ```
 
 Avoid `load_all()` for narrow tests unless network meta-analysis packages are required; this local environment currently lacks `gemtc`.

@@ -62,7 +62,7 @@ def test_dataset_group_and_follow_up_order_is_stable_across_hash_seeds():
 
     for seed in ("1", "2"):
         env = os.environ.copy()
-        env["OMA_STUB_BACKEND"] = "1"
+        env["RCMS_STUB_BACKEND"] = "1"
         env["PYTHONHASHSEED"] = seed
         env["PYTHONPATH"] = os.path.abspath("src")
         result = subprocess.run(

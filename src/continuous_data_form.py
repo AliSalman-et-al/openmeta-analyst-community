@@ -2,7 +2,7 @@
 #
 #  Byron C. Wallace
 #  George Dietz
-#  OpenMeta[analyst]
+#  RC MetaStudio
 #  ---
 #  Continuous data form module; for flexible entry of continuous
 #  outcome data.

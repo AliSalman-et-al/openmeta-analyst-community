@@ -41,16 +41,16 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", 
 _DRIVER = textwrap.dedent(
     """
     import os, sys
-    os.environ["OMA_REQUIRE_IN_PROCESS_RPY2"] = "1"
+    os.environ["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     sys.path.insert(0, os.path.join(__REPO_ROOT__, "src"))
 
     import modern_compat
     modern_compat.install()
     try:
         import meta_py_r
-        meta_py_r.RlibLoader().load_OpenMetaR()
+        meta_py_r.RlibLoader().load_RCMetaR()
     except Exception as exc:
-        # R / rpy2 / OpenMetaR not available in this environment.
+        # R / rpy2 / RCMetaR not available in this environment.
         sys.stdout.write("SKIP %s: %s\\n" % (exc.__class__.__name__, exc))
         sys.exit(42)
 
@@ -203,10 +203,10 @@ _DRIVER = textwrap.dedent(
 
     invalid_conf_level_checks = ro.r('''
       c(
-        inherits(try(openmetar.set.global.conf.level(100), silent=TRUE), "try-error"),
-        inherits(try(openmetar.get.mult.from.conf.level(100), silent=TRUE), "try-error"),
-        inherits(try(openmetar.get.mult.from.conf.level(0), silent=TRUE), "try-error"),
-        inherits(try(openmetar.get.mult.from.conf.level(Inf), silent=TRUE), "try-error")
+        inherits(try(rcmetar.set.global.conf.level(100), silent=TRUE), "try-error"),
+        inherits(try(rcmetar.get.mult.from.conf.level(100), silent=TRUE), "try-error"),
+        inherits(try(rcmetar.get.mult.from.conf.level(0), silent=TRUE), "try-error"),
+        inherits(try(rcmetar.get.mult.from.conf.level(Inf), silent=TRUE), "try-error")
       )
     ''')
     assert all(bool(value) for value in invalid_conf_level_checks)
@@ -237,8 +237,8 @@ _RCHAR_UTF8_DRIVER = textwrap.dedent(
     import sys
 
     repo_root = __REPO_ROOT__
-    os.environ.pop("OMA_STUB_BACKEND", None)
-    os.environ["OMA_REQUIRE_IN_PROCESS_RPY2"] = "1"
+    os.environ.pop("RCMS_STUB_BACKEND", None)
+    os.environ["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     sys.path.insert(0, os.path.join(repo_root, "src"))
 
     import modern_compat
@@ -305,18 +305,18 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
             else r_lib + os.pathsep + existing_r_libs
         )
         install = subprocess.run(
-            [r_exe, "CMD", "INSTALL", "--library=" + r_lib, os.path.join(repo_root, "src", "R", "OpenMetaR")],
+            [r_exe, "CMD", "INSTALL", "--library=" + r_lib, os.path.join(repo_root, "src", "R", "RCMetaR")],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             universal_newlines=True,
             env=env,
         )
         if install.returncode != 0:
-            sys.stdout.write("SKIP R CMD INSTALL OpenMetaR failed\\n%s\\n%s\\n" % (install.stdout[-2000:], install.stderr[-2000:]))
+            sys.stdout.write("SKIP R CMD INSTALL RCMetaR failed\\n%s\\n%s\\n" % (install.stdout[-2000:], install.stderr[-2000:]))
             sys.exit(42)
 
-        env.pop("OMA_STUB_BACKEND", None)
-        env["OMA_REQUIRE_IN_PROCESS_RPY2"] = "1"
+        env.pop("RCMS_STUB_BACKEND", None)
+        env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
         env["R_LIBS"] = (
             r_lib if not existing_r_libs
             else r_lib + os.pathsep + existing_r_libs
@@ -328,7 +328,7 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
         modern_compat.install()
         try:
             import meta_py_r
-            meta_py_r.RlibLoader().load_OpenMetaR()
+            meta_py_r.RlibLoader().load_RCMetaR()
         except Exception as exc:
             sys.stdout.write("SKIP %s: %s\\n" % (exc.__class__.__name__, exc))
             sys.exit(42)
@@ -368,15 +368,15 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
         assert 'attr(,"class")' not in rendered, rendered
         assert bool(ro.r('!is.null(getS3method("print", "summary.display", optional=TRUE))')[0])
         assert bool(ro.r('!is.null(getS3method("print", "summary.data", optional=TRUE))')[0])
-        assert str(ro.r('OpenMetaR:::forest.plot.p.value.label(0.0002, 3)')[0]) == "P< 0.001"
-        assert str(ro.r('OpenMetaR:::forest.plot.p.value.label(0.015, 3)')[0]) == "P=0.015"
+        assert str(ro.r('RCMetaR:::forest.plot.p.value.label(0.0002, 3)')[0]) == "P< 0.001"
+        assert str(ro.r('RCMetaR:::forest.plot.p.value.label(0.015, 3)')[0]) == "P=0.015"
 
         meta_regression_expr = textwrap.dedent(
             '''
             dir.create("r_tmp", showWarnings=FALSE)
-            openmetar.set.global.conf.level(95)
+            rcmetar.set.global.conf.level(95)
 
-            regression_display <- OpenMetaR:::create.regression.display(
+            regression_display <- RCMetaR:::create.regression.display(
               list(
                 b = c(0.1, 0.2),
                 ci.lb = c(0.0, 0.1),
@@ -420,7 +420,7 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
               fp_show_col2=TRUE, fp_show_col3=TRUE, fp_show_col4=TRUE,
               fp_show_summary_line=TRUE, fp_xticks="[default]"
             )
-            openmetar.run.analysis(
+            rcmetar.run.analysis(
               advanced_data,
               list(method="meta.regression", params=params, workflow="meta-regression")
             )
@@ -463,8 +463,8 @@ _HSROC_SUMMARY_DRIVER = textwrap.dedent(
     import sys
 
     repo_root = __REPO_ROOT__
-    os.environ.pop("OMA_STUB_BACKEND", None)
-    os.environ["OMA_REQUIRE_IN_PROCESS_RPY2"] = "1"
+    os.environ.pop("RCMS_STUB_BACKEND", None)
+    os.environ["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     sys.path.insert(0, os.path.join(repo_root, "src"))
 
     import modern_compat
@@ -565,7 +565,7 @@ _HSROC_SUMMARY_DRIVER = textwrap.dedent(
     assert parsed_direct["texts"]["Other Summary"] == "Lower bound Upper bound", parsed_direct
     assert parsed_direct["texts"]["Raw Text Summary"] == "Lower bound Upper bound", parsed_direct
 
-    classes_path = os.path.join(repo_root, "src", "R", "OpenMetaR", "R", "classes.r")
+    classes_path = os.path.join(repo_root, "src", "R", "RCMetaR", "R", "classes.r")
     ro.r("source(%r)" % classes_path.replace(os.sep, "/"))
     context_summary = ro.r(
         '''
@@ -609,7 +609,7 @@ _HSROC_SUMMARY_DRIVER = textwrap.dedent(
 ).replace("__REPO_ROOT__", repr(REPO_ROOT))
 
 
-_ADVANCED_OPENMETAR_DRIVER = textwrap.dedent(
+_ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
     """
     import os
     import shutil
@@ -631,18 +631,18 @@ _ADVANCED_OPENMETAR_DRIVER = textwrap.dedent(
             else r_lib + os.pathsep + existing_r_libs
         )
         install = subprocess.run(
-            [r_exe, "CMD", "INSTALL", "--library=" + r_lib, os.path.join(repo_root, "src", "R", "OpenMetaR")],
+            [r_exe, "CMD", "INSTALL", "--library=" + r_lib, os.path.join(repo_root, "src", "R", "RCMetaR")],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             universal_newlines=True,
             env=env,
         )
         if install.returncode != 0:
-            sys.stdout.write("SKIP R CMD INSTALL OpenMetaR failed\\n%s\\n%s\\n" % (install.stdout[-2000:], install.stderr[-2000:]))
+            sys.stdout.write("SKIP R CMD INSTALL RCMetaR failed\\n%s\\n%s\\n" % (install.stdout[-2000:], install.stderr[-2000:]))
             sys.exit(42)
 
-        env.pop("OMA_STUB_BACKEND", None)
-        env["OMA_REQUIRE_IN_PROCESS_RPY2"] = "1"
+        env.pop("RCMS_STUB_BACKEND", None)
+        env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
         os.environ.update(env)
         sys.path.insert(0, os.path.join(repo_root, "src"))
 
@@ -650,7 +650,7 @@ _ADVANCED_OPENMETAR_DRIVER = textwrap.dedent(
         modern_compat.install()
         try:
             import meta_py_r
-            meta_py_r.RlibLoader().load_OpenMetaR()
+            meta_py_r.RlibLoader().load_RCMetaR()
         except Exception as exc:
             sys.stdout.write("SKIP %s: %s\\n" % (exc.__class__.__name__, exc))
             sys.exit(42)
@@ -660,7 +660,7 @@ _ADVANCED_OPENMETAR_DRIVER = textwrap.dedent(
             '''
             set.seed(113)
             dir.create("r_tmp", showWarnings=FALSE)
-            openmetar.set.global.conf.level(95)
+            rcmetar.set.global.conf.level(95)
             advanced_data <- new(
               "BinaryData",
               g1O1=c(6, 3, 19, 26, 8, 6),
@@ -687,7 +687,7 @@ _ADVANCED_OPENMETAR_DRIVER = textwrap.dedent(
               bootstrap.plot.path="./r_tmp/issue113_bootstrap.png",
               histogram.title="Bootstrap", histogram.xlab="Effect"
             )
-            boot.result <- openmetar.run.analysis(
+            boot.result <- rcmetar.run.analysis(
               advanced_data,
               list(method="binary.random", params=params, workflow="bootstrap")
             )
@@ -697,7 +697,7 @@ _ADVANCED_OPENMETAR_DRIVER = textwrap.dedent(
 
             params$bootstrap.type <- "boot.meta.reg"
             params$bootstrap.plot.path <- "./r_tmp/issue113_bootstrap_meta_reg.png"
-            boot.reg.result <- openmetar.run.analysis(
+            boot.reg.result <- rcmetar.run.analysis(
               advanced_data,
               list(method="binary.random", params=params, workflow="bootstrap")
             )
@@ -711,11 +711,11 @@ _ADVANCED_OPENMETAR_DRIVER = textwrap.dedent(
               slab=advanced_data@study.names,
               year=advanced_data@covariates[[1]]@cov.vals
             )
-            perm.ma <- openmetar.run.permutation(perm.data, method="DL", iter=20, digits=3)
+            perm.ma <- rcmetar.run.permutation(perm.data, method="DL", iter=20, digits=3)
             stopifnot("Summary" %in% names(perm.ma))
             stopifnot(nchar(perm.ma$Summary) > 0)
 
-            perm.reg <- openmetar.run.permutation(
+            perm.reg <- rcmetar.run.permutation(
               perm.data,
               method="DL",
               mods=list(numeric=c("year"), categorical=c(), interactions=list()),
@@ -738,11 +738,11 @@ _ADVANCED_OPENMETAR_DRIVER = textwrap.dedent(
 
 def test_inprocess_rpy2_backend_python3_porting_fixes():
     # Force the real in-process backend: the surrounding test suite sets
-    # OMA_STUB_BACKEND=1 (which selects the no-R stub), so clear it in the child
+    # RCMS_STUB_BACKEND=1 (which selects the no-R stub), so clear it in the child
     # env and require the real rpy2 path instead.
     env = dict(os.environ)
-    env.pop("OMA_STUB_BACKEND", None)
-    env["OMA_REQUIRE_IN_PROCESS_RPY2"] = "1"
+    env.pop("RCMS_STUB_BACKEND", None)
+    env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     result = subprocess.run(
         [sys.executable, "-c", _DRIVER],
         cwd=REPO_ROOT,
@@ -766,8 +766,8 @@ def test_inprocess_rpy2_backend_python3_porting_fixes():
 
 def test_rpy2_r_character_conversion_preserves_utf8_before_native_codepage():
     env = dict(os.environ)
-    env.pop("OMA_STUB_BACKEND", None)
-    env["OMA_REQUIRE_IN_PROCESS_RPY2"] = "1"
+    env.pop("RCMS_STUB_BACKEND", None)
+    env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
     result = subprocess.run(
         [sys.executable, "-c", _RCHAR_UTF8_DRIVER],
@@ -787,10 +787,10 @@ def test_rpy2_r_character_conversion_preserves_utf8_before_native_codepage():
     assert "OK" in result.stdout
 
 
-def test_openmetar_summary_capture_uses_formatted_print_methods():
+def test_RCMetaR_summary_capture_uses_formatted_print_methods():
     env = dict(os.environ)
-    env.pop("OMA_STUB_BACKEND", None)
-    env["OMA_REQUIRE_IN_PROCESS_RPY2"] = "1"
+    env.pop("RCMS_STUB_BACKEND", None)
+    env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     result = subprocess.run(
         [sys.executable, "-c", _SUMMARY_PRINT_DRIVER],
         cwd=REPO_ROOT,
@@ -801,7 +801,7 @@ def test_openmetar_summary_capture_uses_formatted_print_methods():
     )
     if result.returncode == 42:
         pytest.skip(
-            "OpenMetaR summary print regression unavailable: %s" % result.stdout.strip()
+            "RCMetaR summary print regression unavailable: %s" % result.stdout.strip()
         )
     assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
         result.returncode,
@@ -813,8 +813,8 @@ def test_openmetar_summary_capture_uses_formatted_print_methods():
 
 def test_hsroc_direct_table_summaries_expand_to_formatted_sections():
     env = dict(os.environ)
-    env.pop("OMA_STUB_BACKEND", None)
-    env["OMA_REQUIRE_IN_PROCESS_RPY2"] = "1"
+    env.pop("RCMS_STUB_BACKEND", None)
+    env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     result = subprocess.run(
         [sys.executable, "-c", _HSROC_SUMMARY_DRIVER],
         cwd=REPO_ROOT,
@@ -836,12 +836,12 @@ def test_hsroc_direct_table_summaries_expand_to_formatted_sections():
     assert "OK" in result.stdout
 
 
-def test_openmetar_advanced_bootstrap_and_permutation_paths_execute():
+def test_RCMetaR_advanced_bootstrap_and_permutation_paths_execute():
     env = dict(os.environ)
-    env.pop("OMA_STUB_BACKEND", None)
-    env["OMA_REQUIRE_IN_PROCESS_RPY2"] = "1"
+    env.pop("RCMS_STUB_BACKEND", None)
+    env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     result = subprocess.run(
-        [sys.executable, "-c", _ADVANCED_OPENMETAR_DRIVER],
+        [sys.executable, "-c", _ADVANCED_RCMetaR_DRIVER],
         cwd=REPO_ROOT,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -850,7 +850,7 @@ def test_openmetar_advanced_bootstrap_and_permutation_paths_execute():
     )
     if result.returncode == 42:
         pytest.skip(
-            "advanced OpenMetaR workflow regression unavailable: %s"
+            "advanced RCMetaR workflow regression unavailable: %s"
             % result.stdout.strip()
         )
     assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (

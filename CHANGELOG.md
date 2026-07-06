@@ -2,7 +2,7 @@
 
 All notable RC MetaStudio changes will be recorded in this file.
 
-RC MetaStudio starts a fresh maintained-product changelog. Historical release history for the Original OpenMeta[Analyst] Project is not reconstructed here; see [NOTICE.md](NOTICE.md) for provenance.
+RC MetaStudio starts a fresh maintained-product changelog. Historical release history for the Original RC MetaStudio Project is not reconstructed here; see [NOTICE.md](NOTICE.md) for provenance.
 
 ## 0.1.0 - Unreleased
 
@@ -15,11 +15,11 @@ RC MetaStudio starts a fresh maintained-product changelog. Historical release hi
 
 ### Changed
 
-- Started the maintained RC MetaStudio release history instead of extending the Original OpenMeta[Analyst] Project release history.
+- Started the maintained RC MetaStudio release history instead of extending the Original RC MetaStudio Project release history.
 - Adopted GPL-3.0-or-later as the maintained distribution posture where permitted by the original GPL-2.0-or-later grant.
 - Defined `.rcms` as the maintained RC MetaStudio project-file identity and RCMetaR as the private bundled R package identity for the rebrand.
 
 ### Removed
 
-- Removed README language that presented the maintained product as OpenMeta[Analyst] Community or as a community fork.
-- Recorded the breaking identity direction away from `.oma`, OpenMetaR, and abandoned support channels for future phase issues.
+- Removed README language that presented the maintained product as RC MetaStudio Community or as a community fork.
+- Recorded the breaking identity direction away from `.rcms`, RCMetaR, and abandoned support channels for future phase issues.

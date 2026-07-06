@@ -2,7 +2,7 @@
 #                                                                     #
 #  George Dietz                                                       #
 #  CEBM @ Brown                                                       #
-#  OpenMeta[analyst]                                                  #
+#  RC MetaStudio                                                  #
 #                                                                     #
 #  Handle application settings and manage workspace (temp directory)  #
 #                                                                     #
@@ -268,7 +268,7 @@ def setup_directories():
 
 def make_base_path():
     """Creates the base path if it doesn't exist and returns the path
-    On mac, this is something like: /Users/george/Library/Application Support/OpenMetaAnalyst"""
+    On mac, this is something like: /Users/george/Library/Application Support/RCMetaStudio"""
 
     base_path = get_base_path()
 

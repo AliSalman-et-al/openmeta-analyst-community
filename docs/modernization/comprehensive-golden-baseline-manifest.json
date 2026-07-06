@@ -21,9 +21,9 @@
     ],
     "baseline": "modern-behavior",
     "baseline_environment": {
-      "id": "modern-ci-python3-pyqt5-r4-OpenMetaR",
+      "id": "modern-ci-python3-pyqt5-r4-RCMetaR",
       "os": "Windows",
-      "package": "OpenMetaR",
+      "package": "RCMetaR",
       "pyqt": "5.15.11",
       "python": "3.11",
       "r": "R version 4.6.0",

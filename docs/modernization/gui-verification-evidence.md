@@ -13,7 +13,7 @@ Record one entry for every Release Cutover workflow that is verified through GUI
 ## Standard Binary Analysis Workflow
 
 - Issue: #5
-- Dataset: `sample_data/amino.oma`
+- Dataset: `sample_data/amino.rcms`
 - Evidence: `tests/modern/gui/test_gui_binary_slice.py`
 - Verified workflow: open the existing project, display binary study rows, run the random-effects action, and render a result summary plus forest plot path in the PyQt5 window.
 - Command: `uv run pytest -q tests\\modern`
@@ -29,17 +29,17 @@ Record one entry for every Release Cutover workflow that is verified through GUI
 ## Real MetaForm Project Shell Workflow
 
 - Issue: #41
-- Dataset: `sample_data/amino.oma`
+- Dataset: `sample_data/amino.rcms`
 - Evidence: `tests/modern/gui/test_metaform_automation_launch.py::test_automation_launch_creates_and_closes_real_metaform_shell`, `tests/modern/gui/test_metaform_automation_launch.py::test_automation_launch_opens_sample_project_in_real_data_table`, `tests/modern/gui/test_metaform_automation_launch.py::test_welcome_wizard_recent_action_selects_project`, and `tests/modern/gui/test_metaform_automation_launch.py::test_welcome_wizard_open_existing_selects_project`
-- Verified workflow: launch through the real `launch.py` automation entry, create a real `MetaForm` shell, display an existing project in the real data table, and route welcome wizard project selection to the selected `.oma` file.
+- Verified workflow: launch through the real `launch.py` automation entry, create a real `MetaForm` shell, display an existing project in the real data table, and route welcome wizard project selection to the selected `.rcms` file.
 - Command: `uv run pytest tests\\modern\\gui\\test_metaform_automation_launch.py`
 
-## Existing .oma Open Display Save-As Workflow
+## Existing .rcms Open Display Save-As Workflow
 
 - Issue: #41
-- Dataset: `sample_data/amino.oma`, `sample_data/continuous.oma`, and `sample_data/lymph.oma`
+- Dataset: `sample_data/amino.rcms`, `sample_data/continuous.rcms`, and `sample_data/lymph.rcms`
 - Evidence: `tests/modern/gui/test_metaform_automation_launch.py::test_automation_launch_opens_sample_project_in_real_data_table` and `tests/modern/gui/test_metaform_automation_launch.py::test_real_metaform_save_as_round_trips_representative_projects`
-- Verified workflow: open existing legacy `.oma` files without a user-visible migration step, display project rows in the real `MetaForm` data table, save representative binary, continuous, and diagnostic/additional sample projects through Save As, and reload the saved project files as compatible pickled `.oma` data.
+- Verified workflow: open existing legacy `.rcms` files without a user-visible migration step, display project rows in the real `MetaForm` data table, save representative binary, continuous, and diagnostic/additional sample projects through Save As, and reload the saved project files as compatible pickled `.rcms` data.
 - Command: `uv run pytest tests\\modern\\gui\\test_metaform_automation_launch.py`
 
 ## Recent Files and Settings Workflow
@@ -55,7 +55,7 @@ Record one entry for every Release Cutover workflow that is verified through GUI
 - Issue: #42
 - Dataset: synthetic binary, continuous, and diagnostic projects created through the real `MetaForm` wizard result path.
 - Evidence: `tests/modern/gui/test_metaform_data_workflows.py::test_real_metaform_creates_binary_continuous_and_diagnostic_datasets` and `tests/modern/gui/test_metaform_data_workflows.py::test_data_table_editing_preserves_project_state_and_round_trips`
-- Verified workflow: create binary, continuous, and diagnostic datasets under PyQt5; edit study name, year, and raw data through the real table/model path; add a group, outcome, follow-up, and covariate; save the project; and reload the saved `.oma` with the analysis-relevant project state intact.
+- Verified workflow: create binary, continuous, and diagnostic datasets under PyQt5; edit study name, year, and raw data through the real table/model path; add a group, outcome, follow-up, and covariate; save the project; and reload the saved `.rcms` with the analysis-relevant project state intact.
 - Command: `uv run pytest tests\\modern\\gui\\test_metaform_data_workflows.py`
 
 ## Copy Paste Undo Redo Workflow
@@ -85,8 +85,8 @@ Record one entry for every Release Cutover workflow that is verified through GUI
 ## Windows Distributable Launch Workflow
 
 - Issue: #41
-- Dataset: `sample_data/BCG.oma` and `sample_data/amino.oma`
+- Dataset: `sample_data/BCG.rcms` and `sample_data/amino.rcms`
 - Evidence: `tests/modern/packaging_contract/test_windows_distributable_contract.py::test_modern_windows_distributable_contract_is_declared` and `tests/modern/packaging_contract/test_windows_distributable_contract.py::test_lane_named_local_scripts_replace_old_workflow_wrappers`
-- Verified workflow: package the modern Windows artifact around the real `launch.py` entry point, include the sample project files needed for real `.oma` launch checks, and run the local modern workflow through the targeted `MetaForm` automation suite before packaging.
+- Verified workflow: package the modern Windows artifact around the real `launch.py` entry point, include the sample project files needed for real `.rcms` launch checks, and run the local modern workflow through the targeted `MetaForm` automation suite before packaging.
 - Command: `uv run pytest tests\\modern\\packaging_contract\\test_windows_distributable_contract.py`
 

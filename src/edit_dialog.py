@@ -2,7 +2,7 @@
 #
 #  Byron C. Wallace
 #  Tufts Medical Center
-#  OpenMeta[analyst]
+#  RC MetaStudio
 #
 #  This form is for 'batch' editing a dataset. Note that any
 #  edits apply to *all* MetaAnalyticUnit objects known. So

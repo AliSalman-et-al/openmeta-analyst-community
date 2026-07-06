@@ -3,7 +3,7 @@
 #  Byron C. Wallace                  #
 #  George Dietz                      #
 #  CEBM @ Brown                      #
-#  OpenMeta[analyst]                 #
+#  RC MetaStudio                 #
 #                                    #
 #  Contains globals used             #
 #   throughout.                      #
@@ -19,7 +19,7 @@ import math
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QUndoCommand
 
-APPLICATION_NAME = "OpenMetaAnalyst"
+APPLICATION_NAME = "RCMetaStudio"
 ORGANIZATION_NAME = "CEBM"
 
 # number of digits to display

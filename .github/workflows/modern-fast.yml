@@ -9,8 +9,8 @@ permissions:
   pull-requests: read
 
 env:
-  OMA_CRAN_REPO: https://cloud.r-project.org
-  OMA_CRAN_REPO_KEY: cloud-r-project-org
+  RCMS_CRAN_REPO: https://cloud.r-project.org
+  RCMS_CRAN_REPO_KEY: cloud-r-project-org
 
 concurrency:
   group: modern-fast-${{ github.ref }}
@@ -47,7 +47,7 @@ jobs:
           reason="no modern fast inputs changed"
           while IFS= read -r file; do
             case "$file" in
-              .github/workflows/modern-fast.yml|pyproject.toml|uv.lock|src/*|tests/modern/*|scripts/verify-modern-smoke.ps1|scripts/verify-modern-fast.ps1|scripts/verify_openmetar_r_default.py|scripts/validate_openmetar_r_manifests.py|scripts/validate_golden_baseline_manifests.py|scripts/validate_test_taxonomy.py|docs/modernization/OpenMetaR-r-dependencies.json|docs/modernization/OpenMetaR-statistical-drift.json|docs/modernization/comprehensive-golden-baseline-manifest.json|docs/modernization/golden-coverage-manifest.json|docs/modernization/workflow-traceability.json|docs/modernization/test-taxonomy.json)
+              .github/workflows/modern-fast.yml|pyproject.toml|uv.lock|src/*|tests/modern/*|scripts/verify-modern-smoke.ps1|scripts/verify-modern-fast.ps1|scripts/verify_rcmetar_r_default.py|scripts/validate_rcmetar_r_manifests.py|scripts/validate_golden_baseline_manifests.py|scripts/validate_test_taxonomy.py|docs/modernization/RCMetaR-r-dependencies.json|docs/modernization/RCMetaR-statistical-drift.json|docs/modernization/comprehensive-golden-baseline-manifest.json|docs/modernization/golden-coverage-manifest.json|docs/modernization/workflow-traceability.json|docs/modernization/test-taxonomy.json)
                 run_windows=true
                 reason="matched $file"
                 break
@@ -96,7 +96,7 @@ jobs:
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: artifacts\r-default-library-cache
-          key: modern-default-r-library-v2-windows-${{ steps.r-cache-key.outputs.version }}-${{ env.OMA_CRAN_REPO_KEY }}-${{ hashFiles('scripts/verify_openmetar_r_default.py', 'docs/modernization/OpenMetaR-r-dependencies.json', 'src/R/OpenMetaR/DESCRIPTION') }}
+          key: modern-default-r-library-v2-windows-${{ steps.r-cache-key.outputs.version }}-${{ env.RCMS_CRAN_REPO_KEY }}-${{ hashFiles('scripts/verify_rcmetar_r_default.py', 'docs/modernization/RCMetaR-r-dependencies.json', 'src/R/RCMetaR/DESCRIPTION') }}
 
       - name: Run Smoke Verification Lane
         run: .\scripts\verify-modern-smoke.ps1 -Sync -RequireREvidence
@@ -144,7 +144,7 @@ jobs:
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: artifacts\r-default-library-cache
-          key: modern-default-r-library-v2-windows-${{ steps.r-cache-key.outputs.version }}-${{ env.OMA_CRAN_REPO_KEY }}-${{ hashFiles('scripts/verify_openmetar_r_default.py', 'docs/modernization/OpenMetaR-r-dependencies.json', 'src/R/OpenMetaR/DESCRIPTION') }}
+          key: modern-default-r-library-v2-windows-${{ steps.r-cache-key.outputs.version }}-${{ env.RCMS_CRAN_REPO_KEY }}-${{ hashFiles('scripts/verify_rcmetar_r_default.py', 'docs/modernization/RCMetaR-r-dependencies.json', 'src/R/RCMetaR/DESCRIPTION') }}
 
       - name: Run Fast Verification Lane
         run: .\scripts\verify-modern-fast.ps1 -Sync -RequireREvidence -StrictTaxonomy

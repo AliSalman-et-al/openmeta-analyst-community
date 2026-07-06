@@ -4,9 +4,9 @@ set -euo pipefail
 artifact_name=""
 architecture=""
 python_exe=""
-r_runtime_root="${OMA_R_HOME:-${R_HOME:-}}"
+r_runtime_root="${RCMS_R_HOME:-${R_HOME:-}}"
 r_package_cache_root=""
-bundle_identifier="org.openmetaanalyst.community"
+bundle_identifier="org.RCMetaStudio.community"
 skip_dependency_install=0
 skip_clean=0
 skip_smoke=0
@@ -136,24 +136,24 @@ case "${architecture:-}" in
   x64)
     expected_machine="x86_64"
     pyinstaller_target_architecture="x86_64"
-    default_artifact="OpenMetaAnalyst-modern-macos-x64"
+    default_artifact="RCMetaStudio-modern-macos-x64"
     ;;
   arm64)
     expected_machine="arm64"
     pyinstaller_target_architecture="arm64"
-    default_artifact="OpenMetaAnalyst-modern-macos-arm64"
+    default_artifact="RCMetaStudio-modern-macos-arm64"
     ;;
   "")
     if [ "$host_machine" = "arm64" ]; then
       architecture="arm64"
       expected_machine="arm64"
       pyinstaller_target_architecture="arm64"
-      default_artifact="OpenMetaAnalyst-modern-macos-arm64"
+      default_artifact="RCMetaStudio-modern-macos-arm64"
     else
       architecture="x64"
       expected_machine="x86_64"
       pyinstaller_target_architecture="x86_64"
-      default_artifact="OpenMetaAnalyst-modern-macos-x64"
+      default_artifact="RCMetaStudio-modern-macos-x64"
     fi
     ;;
   *)
@@ -170,7 +170,7 @@ fi
 artifact_name="${artifact_name:-$default_artifact}"
 dist_root="$repo_root/build/modern-macos/$architecture/dist"
 work_root="$repo_root/build/modern-macos/$architecture/work"
-app_bundle="$dist_root/OpenMetaAnalyst.app"
+app_bundle="$dist_root/RCMetaStudio.app"
 app_root="$app_bundle/Contents/MacOS"
 zip_path="$artifact_dir/$artifact_name.zip"
 tmp_zip_path="$zip_path.tmp"
@@ -202,7 +202,7 @@ if [ -z "$r_runtime_root" ]; then
   r_runtime_root="$(R RHOME)"
 fi
 if [ -z "$r_runtime_root" ]; then
-  echo "No source R runtime was found. Pass --r-runtime-root or set OMA_R_HOME/R_HOME." >&2
+  echo "No source R runtime was found. Pass --r-runtime-root or set RCMS_R_HOME/R_HOME." >&2
   exit 1
 fi
 r_runtime_root="$(resolve_existing_dir "$r_runtime_root" "Source R runtime")"
@@ -223,7 +223,7 @@ require_free_space_gb "$repo_root" 6
   pyinstaller_args=(
     --noconfirm
     --windowed
-    --name OpenMetaAnalyst
+    --name RCMetaStudio
     --target-architecture "$pyinstaller_target_architecture"
     --osx-bundle-identifier "$bundle_identifier"
     --distpath "$dist_root"
@@ -241,8 +241,8 @@ require_free_space_gb "$repo_root" 6
   R_HOME="$r_runtime_root" RPY2_CFFI_MODE=ABI "$python_exe" -m PyInstaller "${pyinstaller_args[@]}"
 )
 
-if [ ! -x "$app_root/OpenMetaAnalyst" ]; then
-  echo "OpenMetaAnalyst executable was not created at $app_root/OpenMetaAnalyst." >&2
+if [ ! -x "$app_root/RCMetaStudio" ]; then
+  echo "RCMetaStudio executable was not created at $app_root/RCMetaStudio." >&2
   exit 1
 fi
 
@@ -280,9 +280,9 @@ sha256_stdin_12() {
 
 r_dependency_policy_hash="$({
   printf '%s' "$(sha256_file "$repo_root/scripts/install-modern-r-deps.R")"
-  printf '%s' "$(sha256_file "$repo_root/docs/modernization/OpenMetaR-r-dependencies.json")"
-  printf '%s' "$(sha256_file "$repo_root/src/R/OpenMetaR/DESCRIPTION")"
-  printf '%s' "${OMA_CRAN_REPO:-https://cloud.r-project.org}"
+  printf '%s' "$(sha256_file "$repo_root/docs/modernization/RCMetaR-r-dependencies.json")"
+  printf '%s' "$(sha256_file "$repo_root/src/R/RCMetaR/DESCRIPTION")"
+  printf '%s' "${RCMS_CRAN_REPO:-https://cloud.r-project.org}"
 } | sha256_stdin_12)"
 r_package_cache_key="${r_version_cache_key}-rdeps-${r_dependency_policy_hash}"
 cache_library="$r_package_cache_root/$r_package_cache_key/library"
@@ -296,7 +296,7 @@ test_r_dependency_packages() {
 test_bundled_r_packages() {
   local library="$1"
   [ -d "$library" ] || return 1
-  R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" "$rscript" -e "lib <- normalizePath('$library', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','OpenMetaR','metafor','lme4','pdftools','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)" >/dev/null 2>&1
+  R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" "$rscript" -e "lib <- normalizePath('$library', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','RCMetaR','metafor','lme4','pdftools','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)" >/dev/null 2>&1
 }
 
 copy_r_library() {
@@ -323,10 +323,10 @@ install_local_r_packages() {
   local package_build_root="$work_root/r-package-build"
   rm -rf "$package_build_root"
   mkdir -p "$package_build_root"
-  cp -R "$src_dir/R/OpenMetaR" "$package_build_root/OpenMetaR"
+  cp -R "$src_dir/R/RCMetaR" "$package_build_root/RCMetaR"
   find "$package_build_root" \( -name '*.o' -o -name '*.so' -o -name '*.dll' \) -delete
 
-  R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$r_binary" CMD INSTALL --library="$r_lib" "$package_build_root/OpenMetaR"
+  R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$r_binary" CMD INSTALL --library="$r_lib" "$package_build_root/RCMetaR"
 }
 
 if test_r_dependency_packages "$cache_library"; then
@@ -341,34 +341,34 @@ else
   fi
 fi
 
-step "Installing local OpenMetaR package"
+step "Installing local RCMetaR package"
 install_local_r_packages
-R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$rscript" -e "pkgs <- c('HSROC','OpenMetaR','metafor','lme4','pdftools','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
+R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$rscript" -e "pkgs <- c('HSROC','RCMetaR','metafor','lme4','pdftools','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
 
 if ! test_bundled_r_packages "$r_lib"; then
-  echo "Bundled R package verification failed after local OpenMetaR install." >&2
+  echo "Bundled R package verification failed after local RCMetaR install." >&2
   exit 1
 fi
 
-cat > "$app_root/LaunchOpenMetaAnalyst.command" <<'SH'
+cat > "$app_root/LaunchRCMetaStudio.command" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export RPY2_CFFI_MODE=ABI
-export OMA_R_HOME="$APP_DIR/R"
-export OMA_R_LIBS="$APP_DIR/R/library"
-exec "$APP_DIR/OpenMetaAnalyst" "$APP_DIR/sample_data/amino.oma"
+export RCMS_R_HOME="$APP_DIR/R"
+export RCMS_R_LIBS="$APP_DIR/R/library"
+exec "$APP_DIR/RCMetaStudio" "$APP_DIR/sample_data/amino.rcms"
 SH
-chmod +x "$app_root/LaunchOpenMetaAnalyst.command"
+chmod +x "$app_root/LaunchRCMetaStudio.command"
 
 for required_path in \
-  "$app_root/OpenMetaAnalyst" \
-  "$app_root/sample_data/BCG.oma" \
-  "$app_root/sample_data/amino.oma" \
+  "$app_root/RCMetaStudio" \
+  "$app_root/sample_data/BCG.rcms" \
+  "$app_root/sample_data/amino.rcms" \
   "$app_root/doc/openMA_help.html" \
   "$app_root/R/bin/Rscript" \
-  "$app_root/R/library/OpenMetaR/DESCRIPTION" \
-  "$app_root/LaunchOpenMetaAnalyst.command"
+  "$app_root/R/library/RCMetaR/DESCRIPTION" \
+  "$app_root/LaunchRCMetaStudio.command"
 do
   if [ ! -e "$required_path" ]; then
     echo "Packaged macOS app is missing $required_path." >&2
@@ -377,16 +377,16 @@ do
 done
 
 if [ "$skip_smoke" -eq 0 ]; then
-  sample_path="$app_root/sample_data/amino.oma"
+  sample_path="$app_root/sample_data/amino.rcms"
   step "Running packaged macOS smoke checks"
-  QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}" OMA_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=ABI OMA_R_HOME="$r_home" OMA_R_LIBS="$r_lib" "$app_root/OpenMetaAnalyst" --automation-smoke "$sample_path"
-  QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}" OMA_STARTUP_PROJECT_SMOKE=1 OMA_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=ABI OMA_R_HOME="$r_home" OMA_R_LIBS="$r_lib" "$app_root/OpenMetaAnalyst" "$sample_path"
+  QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}" RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=ABI RCMS_R_HOME="$r_home" RCMS_R_LIBS="$r_lib" "$app_root/RCMetaStudio" --automation-smoke "$sample_path"
+  QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}" RCMS_STARTUP_PROJECT_SMOKE=1 RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=ABI RCMS_R_HOME="$r_home" RCMS_R_LIBS="$r_lib" "$app_root/RCMetaStudio" "$sample_path"
 fi
 
 (
   step "Creating macOS artifact ZIP"
   cd "$dist_root"
-  zip -qry "$tmp_zip_path" "OpenMetaAnalyst.app"
+  zip -qry "$tmp_zip_path" "RCMetaStudio.app"
 )
 mv "$tmp_zip_path" "$zip_path"
 
@@ -396,13 +396,13 @@ import zipfile
 
 zip_path = sys.argv[1]
 required = [
-    "OpenMetaAnalyst.app/Contents/MacOS/OpenMetaAnalyst",
-    "OpenMetaAnalyst.app/Contents/MacOS/sample_data/BCG.oma",
-    "OpenMetaAnalyst.app/Contents/MacOS/sample_data/amino.oma",
-    "OpenMetaAnalyst.app/Contents/MacOS/doc/openMA_help.html",
-    "OpenMetaAnalyst.app/Contents/MacOS/R/bin/Rscript",
-    "OpenMetaAnalyst.app/Contents/MacOS/R/library/OpenMetaR/DESCRIPTION",
-    "OpenMetaAnalyst.app/Contents/MacOS/LaunchOpenMetaAnalyst.command",
+    "RCMetaStudio.app/Contents/MacOS/RCMetaStudio",
+    "RCMetaStudio.app/Contents/MacOS/sample_data/BCG.rcms",
+    "RCMetaStudio.app/Contents/MacOS/sample_data/amino.rcms",
+    "RCMetaStudio.app/Contents/MacOS/doc/openMA_help.html",
+    "RCMetaStudio.app/Contents/MacOS/R/bin/Rscript",
+    "RCMetaStudio.app/Contents/MacOS/R/library/RCMetaR/DESCRIPTION",
+    "RCMetaStudio.app/Contents/MacOS/LaunchRCMetaStudio.command",
 ]
 with zipfile.ZipFile(zip_path) as archive:
     names = set(archive.namelist())

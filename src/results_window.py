@@ -2,7 +2,7 @@
 #                                           #
 #  Byron C. Wallace     George E. Dietz     #
 #  Brown University     CEBM@Brown          #
-#  OpenMeta[analyst]                        #
+#  RC MetaStudio                        #
 #                                           #
 #                                           #
 #  This is the component responsible        #
@@ -494,7 +494,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             # where to save the graphic?
             file_path, _selected_filter = QFileDialog.getSaveFileName(
                 self,
-                "OpenMeta[Analyst] -- save plot as",
+                "RC MetaStudio -- save plot as",
                 default_path,
             )
 
@@ -513,7 +513,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             default_path = ".".join([title.replace(" ", "_"), "png"])
             file_path, _selected_filter = QFileDialog.getSaveFileName(
                 self,
-                "OpenMeta[Analyst] -- save plot as",
+                "RC MetaStudio -- save plot as",
                 default_path,
             )
             unscaled_image.save(file_path, "PNG")

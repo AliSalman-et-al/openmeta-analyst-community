@@ -1,6 +1,6 @@
 # Analysis Compatibility
 
-This context defines what must remain stable while OpenMeta[Analyst] Community is migrated from its legacy Python 2.7 and Qt 4 implementation to a modern Python 3 and Qt 5 implementation.
+This context defines what must remain stable while RC MetaStudio Community is migrated from its legacy Python 2.7 and Qt 4 implementation to a modern Python 3 and Qt 5 implementation.
 
 ## Language
 
@@ -50,7 +50,7 @@ _Avoid_: R dependencies, statistical backend
 
 **RCMetaR R Stack Slice**:
 The R Stack modernization increment scoped to the bundled `RCMetaR` package, its direct runtime package declarations, and the external packages its functions call directly.
-_Avoid_: OpenMetaR R Stack Slice, Full R dependency refresh, all CRAN transitive dependency migration
+_Avoid_: RCMetaR R Stack Slice, Full R dependency refresh, all CRAN transitive dependency migration
 
 **Default R Evidence**:
 The small R Stack check included in the Fast Verification Lane, intended to prove manifest validity and a deterministic RCMetaR load or smoke path without running the full package/build/distributable verification sequence.
@@ -133,7 +133,7 @@ Golden Analysis Test coverage that samples the major analysis data families befo
 _Avoid_: Broad test coverage, representative tests
 
 **Initial Golden Datasets**:
-The first committed project files used to capture and compare Golden Output Bundles: `amino.oma`, `continuous.oma`, and `lymph.oma`.
+The first committed project files used to capture and compare Golden Output Bundles: `amino.rcms`, `continuous.rcms`, and `lymph.rcms`.
 _Avoid_: Sample data, fixture set
 
 **Initial Golden Methods**:
@@ -265,23 +265,23 @@ A machine-readable map from each Release Cutover workflow to its Golden Analysis
 _Avoid_: Manual checklist, prose-only trace, informal audit
 
 **Standard Binary Analysis Workflow**:
-The first GUI Compatibility Slice: open an existing `.oma` sample dataset, display the data table, run a standard binary random-effects meta-analysis, and show the result summary plus forest plot.
+The first GUI Compatibility Slice: open an existing `.rcms` sample dataset, display the data table, run a standard binary random-effects meta-analysis, and show the result summary plus forest plot.
 _Avoid_: First GUI test, binary demo
 
 **Project File Read Compatibility**:
-The requirement that the modernized application can open existing `.oma` project files without user-visible migration steps.
+The requirement that the modernized application can open existing `.rcms` project files without user-visible migration steps.
 _Avoid_: File support, import compatibility
 
 **Legacy Project Data Compatibility**:
-The requirement that user project files created by earlier OpenMeta[Analyst] releases remain usable in the maintained modern application.
+The requirement that user project files created by earlier RC MetaStudio releases remain usable in the maintained modern application.
 _Avoid_: Reference Implementation support, legacy runtime support
 
 **Project File Round Trip**:
-A compatibility check that opens a representative `.oma` project file, saves it through the modernized application, and verifies that the saved project can be reopened by the modernized application with equivalent project data.
+A compatibility check that opens a representative `.rcms` project file, saves it through the modernized application, and verifies that the saved project can be reopened by the modernized application with equivalent project data.
 _Avoid_: Byte-perfect save, file snapshot
 
 **Versioned Project Format**:
-A future project file format that can evolve beyond the current `.oma` representation while preserving access to existing projects through migration tooling.
+A future project file format that can evolve beyond the current `.rcms` representation while preserving access to existing projects through migration tooling.
 _Avoid_: New save format, file rewrite
 
 **Windows Distributable**:
@@ -350,6 +350,6 @@ _Avoid_: PyQt4 bootstrap, fake Qt module installer
 
 ## Headless Harness Notes
 
-The first Headless Analysis Harness loads `.oma` files into `DatasetModel`, normalizes legacy state, converts the model through the existing Analysis Adapter functions in `meta_py_r`, and runs one binary or continuous method without creating `QApplication` or `MetaForm`.
+The first Headless Analysis Harness loads `.rcms` files into `DatasetModel`, normalizes legacy state, converts the model through the existing Analysis Adapter functions in `meta_py_r`, and runs one binary or continuous method without creating `QApplication` or `MetaForm`.
 
 Remaining GUI coupling: `DatasetModel` still subclasses `QAbstractTableModel` and uses Qt signal/reset behavior while shaping analysis inputs. It now imports PyQt5 directly and owns its Qt5 reset behavior locally.

@@ -71,14 +71,14 @@ def test_project_loader_reports_unsupported_old_qt_values_as_project_format_erro
     try:
         project_pickle.loads_project_pickle(_sip_value(b"Q" + b"MadeUp", b""))
     except project_pickle.ProjectFileFormatError as error:
-        assert "older OpenMeta[Analyst] release" in str(error)
+        assert "older RC MetaStudio release" in str(error)
         assert "QMadeUp" in str(error)
     else:
         raise AssertionError("expected ProjectFileFormatError")
 
 
 def test_representative_sample_projects_load_with_current_project_loader():
-    for name in ["amino.oma", "BCG.oma", "continuous.oma", "lymph.oma", "meantime.oma"]:
+    for name in ["amino.rcms", "BCG.rcms", "continuous.rcms", "lymph.rcms", "meantime.rcms"]:
         dataset = project_pickle.load_project_pickle(
             os.path.abspath(os.path.join("sample_data", name))
         )

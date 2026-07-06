@@ -12,7 +12,7 @@ import settings
 
 UNEXPECTED_ERROR_TITLE = "Unexpected error"
 UNEXPECTED_ERROR_MESSAGE = (
-    "Sorry, an unexpected error occurred. OpenMeta[Analyst] is still running, "
+    "Sorry, an unexpected error occurred. RC MetaStudio is still running, "
     "but the action could not be completed.\n\nDetails: {details}"
 )
 
@@ -24,7 +24,7 @@ _active_context_menu = None
 def exception_log_path():
     base_path = settings.get_base_path()
     os.makedirs(base_path, exist_ok=True)
-    return os.path.join(base_path, "openmeta-analyst-error.log")
+    return os.path.join(base_path, "rc-metastudio-error.log")
 
 
 def log_exception(exc_type, exc_value, exc_traceback):

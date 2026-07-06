@@ -19,7 +19,7 @@ Use the locked uv environment from the repository root:
 
 ```powershell
 uv sync --locked
-uv run python src\launch.py
+uv run rc-metastudio
 ```
 
 Developer source runs need an R installation with the packages used by the analysis backend. Normal desktop users should not need to install R packages manually when using a packaged release.
@@ -31,7 +31,7 @@ Sys.setenv(R_LIBS_USER = "path/to/local/r-library")
 source("scripts/install-modern-r-deps.R")
 ```
 
-The bundled R package is RCMetaR. Some source paths, script filenames, and package-build commands are still being renamed in later phase issues. Prefer the product names and policy in this README, [NOTICE.md](NOTICE.md), and [CHANGELOG.md](CHANGELOG.md) when documentation conflicts with older implementation names.
+The bundled R package is rcmetar. Prefer the product names and policy in this README, [NOTICE.md](NOTICE.md), and [CHANGELOG.md](CHANGELOG.md) when documentation conflicts with older historical records.
 
 ## Verification
 
@@ -64,7 +64,7 @@ Before release packaging, bundled third-party components and assets must be inve
 
 ## Feedback And Contributions
 
-Public [GitHub Issues](https://github.com/AliSalman-et-al/openmeta-analyst-community/issues) may be used for bug reports and feedback. Issue reports should not include private project data unless the reporter deliberately chooses to share it.
+Public [GitHub Issues](https://github.com/AliSalman-et-al/rc-metastudio/issues) may be used for bug reports and feedback. Issue reports should not include private project data unless the reporter deliberately chooses to share it.
 
 RC MetaStudio does not automatically collect, upload, or attach diagnostics for issue reports. Any future diagnostic export must be explicit, local, user-controlled, and clear about its contents.
 

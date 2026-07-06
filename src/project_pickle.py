@@ -55,7 +55,7 @@ def _unpickle_serialized_qt_value(module, name, args):
 
 def _unsupported_serialized_qt_value(module, name):
     return ProjectFileFormatError(
-        "This project contains serialized Qt data from an older OpenMeta[Analyst] "
+        "This project contains serialized Qt data from an older RC MetaStudio "
         "release that this version cannot migrate: %s.%s" % (module, name)
     )
 

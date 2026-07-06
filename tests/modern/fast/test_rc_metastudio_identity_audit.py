@@ -36,6 +36,18 @@ def legacy_product_name():
     return "Open" + "MetaAnalyst"
 
 
+def legacy_bracketed_product_name():
+    return "OpenMeta" + "[Analyst]"
+
+
+def retired_project_extension():
+    return "." + "oma"
+
+
+def retired_env_name():
+    return "O" + "MA_STUB_BACKEND"
+
+
 def legacy_r_package_name():
     return "Open" + "MetaR"
 
@@ -48,22 +60,28 @@ def test_identity_boundary_constants_define_rc_metastudio_names():
     audit = load_audit_module()
 
     assert audit.SUPPORTED_PROJECT_EXTENSION == ".rcms"
-    assert audit.RETIRED_PROJECT_EXTENSIONS == {".oma"}
+    assert audit.RETIRED_PROJECT_EXTENSIONS == {retired_project_extension()}
     assert audit.R_PACKAGE_NAME == "RCMetaR"
     assert audit.R_FACADE_PREFIX == "rcmetar."
 
 
 def test_identity_audit_reports_forbidden_tokens_across_active_surfaces(tmp_path):
     write_text(tmp_path / "src" / "app.py", f'title = "{legacy_product_name()}"\n')
-    write_text(tmp_path / "docs" / "usage.md", "Save as project.oma\n")
-    write_text(tmp_path / "scripts" / "run.ps1", "$env:OMA_STUB_BACKEND = '1'\n")
+    write_text(
+        tmp_path / "docs" / "usage.md",
+        f"Save as project{retired_project_extension()}\n",
+    )
+    write_text(
+        tmp_path / "scripts" / "run.ps1",
+        f"$env:{retired_env_name()} = '1'\n",
+    )
     write_text(
         tmp_path / "src" / "bridge.py",
         f'pkg = "{legacy_r_package_name()}"\ncall = "{legacy_r_facade_name()}"\n',
     )
     write_text(
         tmp_path / "src" / "forms" / "project.ui",
-        '<string>open meta files (*.oma)</string>\n',
+        f"<string>open meta files (*{retired_project_extension()})</string>\n",
     )
 
     result = run_audit(tmp_path)
@@ -83,15 +101,15 @@ def test_identity_audit_allows_history_provenance_and_original_headers(tmp_path)
     )
     write_text(
         tmp_path / "NOTICE.md",
-        "RC MetaStudio is derived from OpenMeta[Analyst].\n",
+        f"RC MetaStudio is derived from {legacy_bracketed_product_name()}.\n",
     )
     write_text(
         tmp_path / "docs" / "contexts" / "project-provenance" / "CONTEXT.md",
-        "Original OpenMeta[Analyst] Project: historical provenance term.\n",
+        f"Original {legacy_bracketed_product_name()} Project: historical provenance term.\n",
     )
     write_text(
         tmp_path / "src" / "module.py",
-        "# Original header: OpenMeta[analyst]\n"
+        f"# Original header: {legacy_bracketed_product_name()}\n"
         "# CEBM @ Brown\n"
         "\n"
         'PRODUCT_NAME = "RC MetaStudio"\n',
@@ -122,7 +140,10 @@ def test_identity_audit_accepts_current_project_and_rcmetar_boundaries(tmp_path)
 
 
 def test_identity_audit_json_report_is_machine_readable(tmp_path):
-    write_text(tmp_path / "tests" / "fixture.py", 'path = "sample.oma"\n')
+    write_text(
+        tmp_path / "tests" / "fixture.py",
+        f'path = "sample{retired_project_extension()}"\n',
+    )
 
     result = subprocess.run(
         [sys.executable, str(AUDIT_SCRIPT), "--root", str(tmp_path), "--json"],

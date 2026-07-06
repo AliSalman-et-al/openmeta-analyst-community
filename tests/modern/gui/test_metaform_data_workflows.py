@@ -323,7 +323,7 @@ def test_data_table_editing_preserves_project_state_and_round_trips(
     import launch
 
     app, window = launch.start_automation()
-    saved_path = str(tmp_path / "edited.oma")
+    saved_path = str(tmp_path / "edited.rcms")
     try:
         _create_binary_dataset(window)
 

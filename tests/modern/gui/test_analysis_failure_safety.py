@@ -6,7 +6,7 @@ import pytest
 
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-os.environ.setdefault("OMA_STUB_BACKEND", "1")
+os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 sys.path.insert(0, os.path.abspath("src"))
 
 REPO_ROOT = os.getcwd()
@@ -337,7 +337,7 @@ def test_project_save_failure_reports_original_error(monkeypatch, tmp_path):
     app, window = launch.start_automation()
     shown = []
     try:
-        window.out_path = str(tmp_path / "project.oma")
+        window.out_path = str(tmp_path / "project.rcms")
 
         def _boom(*args, **kwargs):
             raise OSError("disk is full")
@@ -362,7 +362,7 @@ def test_opening_pickled_non_dataset_reports_invalid_project(monkeypatch, tmp_pa
     import launch
     import meta_form
 
-    invalid_project = tmp_path / "not-a-dataset.oma"
+    invalid_project = tmp_path / "not-a-dataset.rcms"
     invalid_project.write_bytes(pickle.dumps({"not": "a dataset"}, protocol=2))
 
     app, window = launch.start_automation()
@@ -379,7 +379,7 @@ def test_opening_pickled_non_dataset_reports_invalid_project(monkeypatch, tmp_pa
 
         assert shown
         assert shown[0][1] == "Could Not Open Project"
-        assert "is not a valid OpenMeta[Analyst] project file" in shown[0][2]
+        assert "is not a valid RC MetaStudio project file" in shown[0][2]
         assert "get_outcome_names" not in shown[0][2]
         assert window.out_path is None
     finally:
@@ -394,7 +394,7 @@ def test_global_exception_handler_logs_trace_and_shows_recoverable_dialog(
     import app_error_handler
 
     app = QApplication.instance() or QApplication([])
-    log_path = tmp_path / "openmeta-analyst-error.log"
+    log_path = tmp_path / "rc-metastudio-error.log"
     shown = []
     monkeypatch.setattr(app_error_handler, "exception_log_path", lambda: str(log_path))
     monkeypatch.setattr(
@@ -561,7 +561,7 @@ def test_main_window_action_exceptions_are_recoverable(monkeypatch, tmp_path):
     import meta_form
 
     app, window = launch.start_automation()
-    log_path = tmp_path / "openmeta-analyst-error.log"
+    log_path = tmp_path / "rc-metastudio-error.log"
     shown = []
     try:
         monkeypatch.setattr(
@@ -597,7 +597,7 @@ def test_safe_application_notify_reports_event_handler_exceptions(
     import app_error_handler
 
     app = app_error_handler.get_or_create_application([])
-    log_path = tmp_path / "openmeta-analyst-error.log"
+    log_path = tmp_path / "rc-metastudio-error.log"
     shown = []
     monkeypatch.setattr(app_error_handler, "exception_log_path", lambda: str(log_path))
     monkeypatch.setattr(

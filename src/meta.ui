@@ -16,7 +16,7 @@
    </font>
   </property>
   <property name="windowTitle">
-   <string>OpenMetaAnalyst</string>
+   <string>RCMetaStudio</string>
   </property>
   <property name="windowIcon">
    <iconset resource="../images/icons.qrc">

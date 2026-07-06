@@ -4,7 +4,7 @@ import sys
 import xml.etree.ElementTree as ET
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-os.environ.setdefault("OMA_STUB_BACKEND", "1")
+os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 sys.path.insert(0, os.path.abspath("src"))
 sys.path.insert(0, os.path.abspath(os.path.join("src", "forms")))
 
@@ -262,7 +262,7 @@ def test_open_project_preserves_main_window_state_without_duplicate_windows():
             if isinstance(widget, meta_form.MetaForm) and widget.isVisible()
         ]
 
-        assert window.open(os.path.abspath("sample_data/amino.oma")) is True
+        assert window.open(os.path.abspath("sample_data/amino.rcms")) is True
         app.processEvents()
 
         visible_metaforms_after = [
@@ -280,7 +280,7 @@ def test_open_project_preserves_main_window_state_without_duplicate_windows():
         os.chdir(REPO_ROOT)
 
 
-def test_openmeta_logo_resource_is_valid_and_used_consistently():
+def test_rc_metastudio_logo_resource_is_valid_and_used_consistently():
     import icons_rc  # noqa: F401
     from PyQt5 import QtGui
     import launch
@@ -344,7 +344,7 @@ def test_automation_launch_shows_default_confidence_level_at_startup():
 def test_automation_launch_opens_sample_project_in_real_data_table():
     import launch
 
-    sample_project = os.path.abspath("sample_data/amino.oma")
+    sample_project = os.path.abspath("sample_data/amino.rcms")
     app, window = launch.start_automation()
 
     try:
@@ -374,7 +374,7 @@ def test_automation_launch_opens_sample_project_in_real_data_table():
 
 @pytest.mark.parametrize(
     "sample_project",
-    ["amino.oma", "continuous.oma", "lymph.oma", "meantime.oma"],
+    ["amino.rcms", "continuous.rcms", "lymph.rcms", "meantime.rcms"],
 )
 def test_main_data_grid_leaves_spare_width_outside_data_columns(sample_project):
     import launch
@@ -392,7 +392,7 @@ def test_main_data_grid_leaves_spare_width_outside_data_columns(sample_project):
 
 @pytest.mark.parametrize(
     "sample_project",
-    ["amino.oma", "continuous.oma", "lymph.oma", "meantime.oma"],
+    ["amino.rcms", "continuous.rcms", "lymph.rcms", "meantime.rcms"],
 )
 def test_undo_immediately_after_open_does_not_clear_loaded_project(sample_project):
     import launch
@@ -434,38 +434,38 @@ def test_undo_immediately_after_open_does_not_clear_loaded_project(sample_projec
 def test_frozen_startup_argv_falls_back_to_native_windows_command_line():
     import launch
 
-    sample_project = os.path.abspath("sample_data/amino.oma")
+    sample_project = os.path.abspath("sample_data/amino.rcms")
 
     argv = launch._resolve_startup_argv(
-        argv=["OpenMetaAnalyst.exe"],
-        native_argv=["OpenMetaAnalyst.exe", sample_project],
+        argv=["RCMetaStudio.exe"],
+        native_argv=["RCMetaStudio.exe", sample_project],
         frozen=True,
     )
 
-    assert argv == ["OpenMetaAnalyst.exe", sample_project]
+    assert argv == ["RCMetaStudio.exe", sample_project]
     assert launch._startup_project_path(argv) == sample_project
 
 
 def test_frozen_startup_argv_keeps_existing_project_argument():
     import launch
 
-    sample_project = os.path.abspath("sample_data/amino.oma")
-    other_project = os.path.abspath("sample_data/continuous.oma")
+    sample_project = os.path.abspath("sample_data/amino.rcms")
+    other_project = os.path.abspath("sample_data/continuous.rcms")
 
     argv = launch._resolve_startup_argv(
-        argv=["OpenMetaAnalyst.exe", sample_project],
-        native_argv=["OpenMetaAnalyst.exe", other_project],
+        argv=["RCMetaStudio.exe", sample_project],
+        native_argv=["RCMetaStudio.exe", other_project],
         frozen=True,
     )
 
-    assert argv == ["OpenMetaAnalyst.exe", sample_project]
+    assert argv == ["RCMetaStudio.exe", sample_project]
     assert launch._startup_project_path(argv) == sample_project
 
 
 def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch):
     import launch
 
-    sample_project = os.path.abspath("sample_data/amino.oma")
+    sample_project = os.path.abspath("sample_data/amino.rcms")
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     opened = []
     started = []
@@ -505,7 +505,7 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch):
             pass
 
     monkeypatch.setattr(
-        launch, "_resolve_startup_argv", lambda: ["OpenMetaAnalyst.exe", sample_project]
+        launch, "_resolve_startup_argv", lambda: ["RCMetaStudio.exe", sample_project]
     )
     monkeypatch.setattr(
         launch,
@@ -517,7 +517,7 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch):
     monkeypatch.setattr(launch, "QSplashScreen", Splash)
     monkeypatch.setattr(launch, "load_R_libraries", lambda app, splash: None)
     monkeypatch.setattr(launch, "_force_table_paint", lambda app, meta: None)
-    monkeypatch.setenv("OMA_STARTUP_PROJECT_SMOKE", "1")
+    monkeypatch.setenv("RCMS_STARTUP_PROJECT_SMOKE", "1")
 
     assert launch.start() == 0
     assert opened == [sample_project]
@@ -533,7 +533,7 @@ def test_meantime_sample_project_loads_native_factor_covariate():
     import headless_analysis
 
     model = headless_analysis.load_dataset_model(
-        os.path.abspath(os.path.join("sample_data", "meantime.oma"))
+        os.path.abspath(os.path.join("sample_data", "meantime.rcms"))
     )
     dataset = model.dataset
 
@@ -553,7 +553,7 @@ def test_automation_launch_opens_meantime_project_and_enables_subgroup_analysis(
     app, window = launch.start_automation()
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_data", "meantime.oma")))
+            window.open(os.path.abspath(os.path.join("sample_data", "meantime.rcms")))
             is True
         )
 
@@ -577,7 +577,7 @@ def test_opened_sample_projects_return_native_table_values_for_pyqt5_rendering()
 
     cases = [
         (
-            "amino.oma",
+            "amino.rcms",
             "Gonzalez",
             lambda groups: [
                 groups[0].title() + " #evts",
@@ -587,7 +587,7 @@ def test_opened_sample_projects_return_native_table_values_for_pyqt5_rendering()
             ],
         ),
         (
-            "continuous.oma",
+            "continuous.rcms",
             "Carroll",
             lambda groups: [
                 groups[0].title() + " N",
@@ -675,7 +675,7 @@ def test_edit_list_models_return_native_values_and_accept_native_edits():
     app, window = launch.start_automation()
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.rcms")))
             is True
         )
         dataset = window.model.dataset
@@ -787,7 +787,7 @@ def test_change_covariate_type_model_returns_native_values_and_accepts_native_ed
     app, window = launch.start_automation()
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.rcms")))
             is True
         )
         dataset = window.model.dataset
@@ -882,7 +882,7 @@ def test_factor_covariate_edits_render_as_native_paint_text():
     app, window = launch.start_automation()
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.rcms")))
             is True
         )
         model = window.tableView.model()
@@ -929,7 +929,7 @@ def test_sequential_analysis_actions_open_real_specs_dialog(monkeypatch):
     monkeypatch.setattr(meta_form.ma_specs, "MA_Specs", SpecsDialog)
 
     try:
-        assert window.open(os.path.abspath("sample_data/amino.oma")) is True
+        assert window.open(os.path.abspath("sample_data/amino.rcms")) is True
         window.action_cum_ma.trigger()
         window.action_loo_ma.trigger()
 
@@ -949,8 +949,8 @@ def test_standard_meta_analysis_opens_specs_and_runs_through_backend(monkeypatch
     import launch
 
     for name, method_name, method_label in [
-        ("amino.oma", "binary.random", "Binary Random-Effects"),
-        ("continuous.oma", "continuous.random", "Continuous Random-Effects"),
+        ("amino.rcms", "binary.random", "Binary Random-Effects"),
+        ("continuous.rcms", "continuous.random", "Continuous Random-Effects"),
     ]:
         calls = []
         shown = []
@@ -1121,7 +1121,7 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
 
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.rcms")))
             is True
         )
 
@@ -1313,7 +1313,7 @@ def test_method_parameters_dialog_normalizes_missing_parameter_metadata(monkeypa
 
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.rcms")))
             is True
         )
 
@@ -1419,7 +1419,7 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
 
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.rcms")))
             is True
         )
 
@@ -1519,8 +1519,8 @@ def test_required_advanced_analysis_actions_open_real_gui_dialogs(monkeypatch):
             pass
 
     for name, outcome_type in [
-        ("amino.oma", "binary"),
-        ("continuous.oma", "continuous"),
+        ("amino.rcms", "binary"),
+        ("continuous.rcms", "continuous"),
     ]:
         app, window = launch.start_automation()
         meta_form = sys.modules["meta_form"]
@@ -1632,7 +1632,7 @@ def test_diagnostic_meta_regression_dialog_fits_radio_group_labels():
 
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_data", "lymph.oma")))
+            window.open(os.path.abspath(os.path.join("sample_data", "lymph.rcms")))
             is True
         )
         cov_values = {
@@ -1669,7 +1669,7 @@ def test_diagnostic_metric_dialog_fits_checkbox_group_labels():
 
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_data", "lymph.oma")))
+            window.open(os.path.abspath(os.path.join("sample_data", "lymph.rcms")))
             is True
         )
 
@@ -1718,7 +1718,7 @@ def test_deleting_last_covariate_refreshes_advanced_analysis_actions():
 
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.rcms")))
             is True
         )
         window._add_new_covariate("region", "factor")
@@ -1833,7 +1833,7 @@ def test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe(monke
 
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.rcms")))
             is True
         )
         group_values = {
@@ -1899,7 +1899,7 @@ def test_subgroup_covariate_dialog_constructs_with_factor_covariate():
     app, window = launch.start_automation()
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.rcms")))
             is True
         )
         group_values = {
@@ -2398,7 +2398,7 @@ def test_real_metaform_save_as_round_trips_representative_projects(
 ):
     import launch
 
-    for name in ["amino.oma", "continuous.oma", "lymph.oma", "meantime.oma"]:
+    for name in ["amino.rcms", "continuous.rcms", "lymph.rcms", "meantime.rcms"]:
         app, window = launch.start_automation()
         saved_path = str(tmp_path / name)
 
@@ -2420,7 +2420,7 @@ def test_real_metaform_save_as_round_trips_representative_projects(
             meta_form = sys.modules["meta_form"]
             reopened = meta_form._load_project_pickle(saved_path)
             assert _dataset_summary(reopened) == expected
-            if name == "meantime.oma":
+            if name == "meantime.rcms":
                 values = [
                     study.covariate_dict["treatment group"]
                     for study in reopened.studies
@@ -2443,11 +2443,11 @@ def test_recent_files_persist_through_pyqt5_settings(tmp_path):
     QtCore.QSettings.setDefaultFormat(QtCore.QSettings.IniFormat)
     settings.reset_settings()
 
-    settings.add_file_to_recent_files("first.oma")
-    settings.add_file_to_recent_files("second.oma")
+    settings.add_file_to_recent_files("first.rcms")
+    settings.add_file_to_recent_files("second.rcms")
     settings.load_settings()
 
-    assert settings.get_setting("recent_files") == ["first.oma", "second.oma"]
+    assert settings.get_setting("recent_files") == ["first.rcms", "second.rcms"]
 
 
 def test_main_window_maximized_state_persists_through_pyqt5_settings(tmp_path):
@@ -2485,7 +2485,7 @@ def test_welcome_wizard_recent_action_selects_project():
     import main_wizard
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-    wizard = main_wizard.MainWizard(recent_datasets=["first.oma", "second.oma"])
+    wizard = main_wizard.MainWizard(recent_datasets=["first.rcms", "second.rcms"])
     try:
         page = wizard.page(main_wizard.Page_Welcome)
         action = page.open_recent_btn.menu().actions()[0]
@@ -2493,7 +2493,7 @@ def test_welcome_wizard_recent_action_selects_project():
         page.dataset_selected(action)
 
         assert wizard.get_wizard_path() == "open"
-        assert wizard.get_selected_dataset() == "second.oma"
+        assert wizard.get_selected_dataset() == "second.rcms"
     finally:
         wizard.close()
         app.processEvents()
@@ -2511,13 +2511,13 @@ def test_welcome_wizard_open_existing_selects_project(monkeypatch):
         monkeypatch.setattr(
             main_wizard.QFileDialog,
             "getOpenFileName",
-            lambda **kwargs: ("chosen.oma", ""),
+            lambda **kwargs: ("chosen.rcms", ""),
         )
 
         page.open_dataset()
 
         assert wizard.get_wizard_path() == "open"
-        assert wizard.get_selected_dataset() == "chosen.oma"
+        assert wizard.get_selected_dataset() == "chosen.rcms"
     finally:
         wizard.close()
         app.processEvents()
@@ -2572,7 +2572,7 @@ def test_startup_wizard_cancel_preserves_loaded_dataset(monkeypatch):
     meta_form = launch._import_meta_form()
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     window = meta_form.MetaForm()
-    sample_project = os.path.abspath(os.path.join("sample_data", "amino.oma"))
+    sample_project = os.path.abspath(os.path.join("sample_data", "amino.rcms"))
 
     class RejectedWizard:
         def __init__(self, *args, **kwargs):
@@ -2725,7 +2725,7 @@ def test_new_dataset_wizard_uses_declarative_minimum_size_policy():
 
         assert wizard.layout().sizeConstraint() == QtWidgets.QLayout.SetMinimumSize
         assert not hasattr(wizard, "_oma_first_show_refit_filter")
-        assert wizard.property("oma_first_show_refit_options") is None
+        assert wizard.property("RCMS_first_show_refit_options") is None
     finally:
         wizard.close()
         app.processEvents()
@@ -3179,7 +3179,7 @@ def test_data_entry_dialogs_construct_with_stub_backend(monkeypatch):
 
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.rcms")))
             is True
         )
         model = window.model
@@ -3194,7 +3194,7 @@ def test_data_entry_dialogs_construct_with_stub_backend(monkeypatch):
         binary_dialog.close()
 
         assert (
-            window.open(os.path.abspath(os.path.join("sample_data", "continuous.oma")))
+            window.open(os.path.abspath(os.path.join("sample_data", "continuous.rcms")))
             is True
         )
         model = window.model
@@ -3209,7 +3209,7 @@ def test_data_entry_dialogs_construct_with_stub_backend(monkeypatch):
         continuous_dialog.close()
 
         assert (
-            window.open(os.path.abspath(os.path.join("sample_data", "lymph.oma")))
+            window.open(os.path.abspath(os.path.join("sample_data", "lymph.rcms")))
             is True
         )
         model = window.model
@@ -3242,7 +3242,7 @@ def test_data_entry_dialog_tables_expand_and_show_all_rows(monkeypatch):
 
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.rcms")))
             is True
         )
         model = window.model
@@ -3258,7 +3258,7 @@ def test_data_entry_dialog_tables_expand_and_show_all_rows(monkeypatch):
         )
 
         assert (
-            window.open(os.path.abspath(os.path.join("sample_data", "continuous.oma")))
+            window.open(os.path.abspath(os.path.join("sample_data", "continuous.rcms")))
             is True
         )
         model = window.model
@@ -3274,7 +3274,7 @@ def test_data_entry_dialog_tables_expand_and_show_all_rows(monkeypatch):
         )
 
         assert (
-            window.open(os.path.abspath(os.path.join("sample_data", "lymph.oma")))
+            window.open(os.path.abspath(os.path.join("sample_data", "lymph.rcms")))
             is True
         )
         model = window.model
@@ -3345,7 +3345,7 @@ def test_analysis_dialog_family_uses_shared_base_size(monkeypatch):
 
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.rcms")))
             is True
         )
         model = window.model
@@ -3371,7 +3371,7 @@ def test_analysis_dialog_family_uses_shared_base_size(monkeypatch):
         )
 
         assert (
-            window.open(os.path.abspath(os.path.join("sample_data", "continuous.oma")))
+            window.open(os.path.abspath(os.path.join("sample_data", "continuous.rcms")))
             is True
         )
         model = window.model
@@ -3387,7 +3387,7 @@ def test_analysis_dialog_family_uses_shared_base_size(monkeypatch):
         )
 
         assert (
-            window.open(os.path.abspath(os.path.join("sample_data", "lymph.oma")))
+            window.open(os.path.abspath(os.path.join("sample_data", "lymph.rcms")))
             is True
         )
         model = window.model
@@ -3688,7 +3688,7 @@ def test_table_paint_roles_do_not_raise_across_all_cells():
     app, window = launch.start_automation()
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_data", "amino.oma")))
+            window.open(os.path.abspath(os.path.join("sample_data", "amino.rcms")))
             is True
         )
         model = window.tableView.model()
@@ -3717,7 +3717,7 @@ def _cell_text(model, row, column):
 def _assert_sample_data_open_directory(directory):
     directory = os.path.abspath(directory)
     assert os.path.basename(directory) == "sample_data"
-    assert os.path.exists(os.path.join(directory, "amino.oma"))
+    assert os.path.exists(os.path.join(directory, "amino.rcms"))
     assert os.path.normcase(directory) != os.path.normcase(os.getcwd())
 
 

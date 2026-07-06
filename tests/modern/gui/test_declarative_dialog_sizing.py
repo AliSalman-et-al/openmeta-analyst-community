@@ -35,8 +35,8 @@ def test_analysis_dialog_uses_fixed_layout_constraint_without_refit_filter(qapp)
     assert dialog.sizePolicy().verticalPolicy() == QtWidgets.QSizePolicy.Fixed
     assert dialog.isSizeGripEnabled() is False
     assert not hasattr(dialog, "_oma_first_show_refit_filter")
-    assert dialog.property("oma_first_show_refit_options") is None
-    assert dialog.property("oma_stable_fit_size") is None
+    assert dialog.property("RCMS_first_show_refit_options") is None
+    assert dialog.property("RCMS_stable_fit_size") is None
 
 
 def test_combo_policy_caps_closed_control_but_keeps_popup_full_width(qapp):
@@ -44,7 +44,7 @@ def test_combo_policy_caps_closed_control_but_keeps_popup_full_width(qapp):
     layout = QtWidgets.QVBoxLayout(dialog)
     combo = QtWidgets.QComboBox()
     combo.setProperty(
-        "oma_maximum_value_control_width",
+        "RCMS_maximum_value_control_width",
         qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH,
     )
     combo.addItems(
@@ -78,8 +78,8 @@ def test_application_wizard_uses_minimum_layout_constraint_without_refit_filter(
 
         assert wizard.layout().sizeConstraint() == QtWidgets.QLayout.SetMinimumSize
         assert not hasattr(wizard, "_oma_first_show_refit_filter")
-        assert wizard.property("oma_first_show_refit_options") is None
-        assert wizard.property("oma_stable_fit_size") is None
+        assert wizard.property("RCMS_first_show_refit_options") is None
+        assert wizard.property("RCMS_stable_fit_size") is None
     finally:
         wizard.close()
         qapp.processEvents()

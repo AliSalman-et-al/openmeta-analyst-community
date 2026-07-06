@@ -17,9 +17,9 @@ class AnalysisBackendUnavailableError(RuntimeError):
 def install_meta_py_r_backend():
     # The real backend is the in-process rpy2 module (meta_py_r). When R/rpy2
     # is unavailable -- notably in CI and GUI-only tests -- fall back to a pure
-    # Python stub. Set OMA_STUB_BACKEND=1 to force the stub even where R exists;
-    # set OMA_REQUIRE_IN_PROCESS_RPY2=1 to fail loudly instead of falling back.
-    if os.environ.get("OMA_STUB_BACKEND") == "1":
+    # Python stub. Set RCMS_STUB_BACKEND=1 to force the stub even where R exists;
+    # set RCMS_REQUIRE_IN_PROCESS_RPY2=1 to fail loudly instead of falling back.
+    if os.environ.get("RCMS_STUB_BACKEND") == "1":
         return install_stub_meta_py_r()
     if "meta_py_r" in sys.modules:
         return sys.modules["meta_py_r"]
@@ -31,7 +31,7 @@ def install_meta_py_r_backend():
 
         return meta_py_r
     except Exception:
-        if os.environ.get("OMA_REQUIRE_IN_PROCESS_RPY2") == "1":
+        if os.environ.get("RCMS_REQUIRE_IN_PROCESS_RPY2") == "1":
             raise
         return install_stub_meta_py_r()
 
@@ -103,7 +103,7 @@ def install_stub_meta_py_r():
         (),
         {
             "load_metafor": lambda self: None,
-            "load_OpenMetaR": lambda self: None,
+            "load_RCMetaR": lambda self: None,
             "load_igraph": lambda self: None,
             "load_grid": lambda self: None,
             "load_gemtc": lambda self: None,
@@ -113,5 +113,5 @@ def install_stub_meta_py_r():
     return meta_py_r
 
 
-if os.environ.get("OMA_STUB_BACKEND") == "1" and "meta_py_r" not in sys.modules:
+if os.environ.get("RCMS_STUB_BACKEND") == "1" and "meta_py_r" not in sys.modules:
     install_stub_meta_py_r()

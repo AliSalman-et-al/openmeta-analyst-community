@@ -10,7 +10,7 @@ def test_modern_compat_installs_stub_backend(monkeypatch):
     for name in list(sys.modules):
         if name == legacy_qt4_name or name.startswith(legacy_qt4_name + "."):
             del sys.modules[name]
-    monkeypatch.setenv("OMA_STUB_BACKEND", "1")
+    monkeypatch.setenv("RCMS_STUB_BACKEND", "1")
 
     import modern_compat
 

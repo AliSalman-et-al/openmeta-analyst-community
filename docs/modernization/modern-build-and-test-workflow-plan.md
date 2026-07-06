@@ -24,12 +24,12 @@ This plan turns the Modern CI Path optimization decisions into small, reviewable
 
 ## Redundant Work and Bottleneck Audit
 
-- R dependency installation now uses `OMA_CRAN_REPO`, defaulting to `https://cloud.r-project.org`, instead of hard-coding the CRAN origin mirror.
-- Full R Stack Evidence now accepts an R dependency cache root and copies cached dependencies into a clean per-run verification library before building, checking, and installing OpenMetaR.
+- R dependency installation now uses `RCMS_CRAN_REPO`, defaulting to `https://cloud.r-project.org`, instead of hard-coding the CRAN origin mirror.
+- Full R Stack Evidence now accepts an R dependency cache root and copies cached dependencies into a clean per-run verification library before building, checking, and installing rcmetar.
 - Windows and macOS packaging wrappers pass a shared R package cache root into Full R Stack Evidence and package assembly.
 - Smoke/Fast Default R Evidence uses a separate `r-default-library-cache` cache root so the required fast workflow does not restore the larger bundled-R packaging cache.
 - GitHub R dependency caches use exact v2 cache keys without broad `restore-keys`; stale cache directories must not be merged into a new cache archive.
-- R package cache keys now include R version, installer script, dependency manifest, OpenMetaR package metadata, and CRAN repository policy.
+- R package cache keys now include R version, installer script, dependency manifest, RCMetaR package metadata, and CRAN repository policy.
 - Warm local smoke/fast verification now skips `uv sync --locked` unless `-Sync` or `-RecreateVenv` is requested.
 - GitHub smoke/fast verification calls strict R evidence and taxonomy flags explicitly.
 - GitHub smoke/fast verification runs on pull requests and manual dispatch rather than every feature-branch push.
@@ -78,9 +78,9 @@ Deliverables:
 
 Steps:
 
-1. Replace the hard-coded CRAN origin with a configurable repository value, such as `OMA_CRAN_REPO`, defaulting to a documented reliable binary-capable mirror.
+1. Replace the hard-coded CRAN origin with a configurable repository value, such as `RCMS_CRAN_REPO`, defaulting to a documented reliable binary-capable mirror.
 2. Evaluate and document using Posit Package Manager or another reliable CRAN mirror for faster binary/package resolution where appropriate.
-3. Include CRAN repository policy, R version, installer script hash, dependency manifest hash, and `src/R/OpenMetaR/DESCRIPTION` hash in R cache keys.
+3. Include CRAN repository policy, R version, installer script hash, dependency manifest hash, and `src/R/RCMetaR/DESCRIPTION` hash in R cache keys.
 4. Use a persistent local R package cache root for Full R Stack Evidence so local re-runs do not always rebuild from an empty temporary library.
 5. Keep CI cache restoration explicit and visible. Cache dependency libraries; never cache final app directories or ZIPs as trusted outputs. Do not use broad restore prefixes for R library caches because stale cache directories can make each saved cache larger than the active dependency library.
 6. Keep archived `HSROC` pinned to the exact archive URL/version unless a future ADR changes it.

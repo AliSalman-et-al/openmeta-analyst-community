@@ -26,4 +26,4 @@ r_package_cache_root="${r_package_cache_root:-$repo_root/artifacts/r-library-cac
 
 cd "$repo_root"
 uv sync --locked
-uv run python scripts/verify_openmetar_r_stack.py --rscript "$rscript" --r-library-cache-root "$r_package_cache_root"
+uv run python scripts/verify_rcmetar_r_stack.py --rscript "$rscript" --r-library-cache-root "$r_package_cache_root"

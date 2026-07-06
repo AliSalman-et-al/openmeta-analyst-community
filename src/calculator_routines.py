@@ -4,7 +4,7 @@
 #  Byron C. Wallace                                           #
 #                                                             #
 #  CEBM @ Brown                                               #
-#  OpenMeta[analyst]                                          #
+#  RC MetaStudio                                          #
 #  ---                                                        #
 #  Binary data form module; for flexible entry of dichotomous #
 #  outcome data                                               #
@@ -275,11 +275,11 @@ def fit_effect_ci_line_edits_to_contents(line_edits, digits=CALC_NUM_DIGITS):
         policy = line_edit.sizePolicy()
         line_edit.setSizePolicy(QSizePolicy.Fixed, policy.verticalPolicy())
 
-        base_minimum_width = line_edit.property("oma_effect_ci_base_minimum_width")
+        base_minimum_width = line_edit.property("RCMS_effect_ci_base_minimum_width")
         if not isinstance(base_minimum_width, int):
             base_minimum_width = line_edit.minimumWidth()
             line_edit.setProperty(
-                "oma_effect_ci_base_minimum_width", base_minimum_width
+                "RCMS_effect_ci_base_minimum_width", base_minimum_width
             )
 
         text = str(line_edit.text())

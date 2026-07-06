@@ -1,5 +1,5 @@
 options(
-  repos = c(CRAN = Sys.getenv("OMA_CRAN_REPO", "https://cloud.r-project.org")),
+  repos = c(CRAN = Sys.getenv("RCMS_CRAN_REPO", "https://cloud.r-project.org")),
   timeout = 600,
   install.packages.check.source = "no"
 )
@@ -12,11 +12,11 @@ if (!nzchar(lib)) {
 dir.create(lib, recursive = TRUE, showWarnings = FALSE)
 .libPaths(c(lib, .libPaths()))
 
-OpenMetaR_cran_packages <- c(
+RCMetaR_cran_packages <- c(
   "metafor", "lme4", "pdftools", "roxygen2", "testthat"
 )
 
-OpenMetaR_archive_packages <- list(
+RCMetaR_archive_packages <- list(
   HSROC = "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz"
 )
 
@@ -37,7 +37,7 @@ recommended_bundle_packages <- c(
 )
 
 required_packages <- unique(c(
-  OpenMetaR_cran_packages,
+  RCMetaR_cran_packages,
   app_cran_bundle_packages,
   recommended_bundle_packages
 ))
@@ -93,4 +93,4 @@ install_archive_package <- function(package, url, expected_version) {
   }
 }
 
-install_archive_package("HSROC", OpenMetaR_archive_packages$HSROC, "2.1.9")
+install_archive_package("HSROC", RCMetaR_archive_packages$HSROC, "2.1.9")

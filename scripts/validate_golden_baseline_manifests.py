@@ -20,13 +20,13 @@ GOLDEN_MATRIX = MODERNIZATION_DIR / "golden-coverage-matrix.md"
 WORKFLOW_INVENTORY = MODERNIZATION_DIR / "user-facing-workflow-inventory.md"
 
 EXPECTED_MODERN_BASELINE_ENVIRONMENT = {
-    "id": "modern-ci-python3-pyqt5-r4-OpenMetaR",
+    "id": "modern-ci-python3-pyqt5-r4-RCMetaR",
     "os": "Windows",
     "python": "3.11",
     "pyqt": "5.15.11",
     "r": "R version 4.6.0",
     "rpy2": "3.6.7",
-    "package": "OpenMetaR",
+    "package": "RCMetaR",
 }
 
 REQUIRED_CAPTURE_METADATA_FIELDS = {

@@ -1,7 +1,7 @@
 [project]
-name = "openmeta-analyst-community-modern"
-version = "0.0.0"
-description = "Modern Python 3.11 and PyQt5 environment for OpenMeta[Analyst] Community."
+name = "rc-metastudio"
+version = "0.1.0"
+description = "RC MetaStudio open-source desktop software for advanced meta-analysis."
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
@@ -13,8 +13,22 @@ dependencies = [
     "rpy2==3.6.7",
 ]
 
+[project.scripts]
+rc-metastudio = "rc_metastudio.__main__:main"
+
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
 [tool.uv]
-package = false
+package = true
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["rc_metastudio*"]
 
 [tool.pytest.ini_options]
 markers = [

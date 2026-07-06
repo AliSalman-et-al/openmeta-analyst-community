@@ -29,7 +29,7 @@ def test_format_references_preserves_method_order_and_dedupes_exact_matches():
     assert formatted.splitlines() == [
         "1. " + method_reference,
         "2. " + implementation_reference,
-        "3. OpenMetaAnalyst: Wallace, Byron C., Issa J. Dahabreh, Thomas A. "
+        "3. RCMetaStudio: Wallace, Byron C., Issa J. Dahabreh, Thomas A. "
         'Trikalinos, Joseph Lau, Paul Trow, and Christopher H. Schmid. "Closing '
         "the Gap between Methodologists and End-Users: R as a Computational "
         'Back-End." Journal of Statistical Software 49 (2012): 5."',

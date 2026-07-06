@@ -1,0 +1,362 @@
+{
+  "manifest": "RCMetaR-r-dependencies",
+  "schema_version": 1,
+  "target_runtime": {
+    "r": "4.6.0",
+    "rpy2": "3.6.7",
+    "cran_policy": "latest-compatible"
+  },
+  "package_metadata": {
+    "package": "RCMetaR",
+    "description": "src/R/RCMetaR/DESCRIPTION",
+    "dependency_fields": {
+      "runtime": ["Depends", "Imports"],
+      "build": ["LinkingTo"],
+      "test": ["Suggests"],
+      "documentation": ["Suggests"]
+    }
+  },
+  "empty_scope_rationale": {
+    "build": "No compiled RCMetaR code or LinkingTo dependency is present in the current package metadata; roxygen2 is listed because the parent modernization slice requires generated documentation and NAMESPACE output."
+  },
+  "direct_RCMetaR_dependencies": [
+    {
+      "name": "R",
+      "source": "base-runtime",
+      "scope": ["runtime"],
+      "declared_in": ["src/R/RCMetaR/DESCRIPTION"],
+      "evidence": ["src/R/RCMetaR/DESCRIPTION: Depends: R (>= 4.6.0)"],
+      "reason": "RCMetaR is an R package and declares a minimum R runtime.",
+      "installed_version": "4.6.0"
+    },
+    {
+      "name": "grid",
+      "source": "recommended",
+      "scope": ["runtime"],
+      "declared_in": ["src/R/RCMetaR/DESCRIPTION"],
+      "evidence": ["src/R/RCMetaR/R/plotting.r: forest plot rendering calls grid drawing and viewport APIs"],
+      "reason": "Forest plot rendering uses grid viewports, layouts, axes, text, polygons, and line drawing.",
+      "installed_version": "4.6.0"
+    },
+    {
+      "name": "graphics",
+      "source": "base-runtime",
+      "scope": ["runtime"],
+      "declared_in": ["src/R/RCMetaR/DESCRIPTION"],
+      "evidence": ["src/R/RCMetaR/R/RCMetaR-package.r: @import graphics"],
+      "reason": "Diagnostic and plotting code relies on graphics behavior from the base R distribution.",
+      "installed_version": "4.6.0"
+    },
+    {
+      "name": "grDevices",
+      "source": "base-runtime",
+      "scope": ["runtime"],
+      "declared_in": ["src/R/RCMetaR/DESCRIPTION"],
+      "evidence": ["src/R/RCMetaR/R/plotting.r: forest and diagnostic plot functions call png(...), pdf(...), dev.off(...), and graphics.off(...)"],
+      "reason": "RCMetaR writes plot image/PDF devices and closes graphics devices through the base grDevices package.",
+      "installed_version": "4.6.0"
+    },
+    {
+      "name": "metafor",
+      "source": "cran",
+      "scope": ["runtime"],
+      "declared_in": ["src/R/RCMetaR/DESCRIPTION"],
+      "evidence": [
+        "src/R/RCMetaR/R/binary_methods.r: rma.uni(...) and related metafor analysis calls",
+        "src/R/RCMetaR/R/continuous_methods.r: rma.uni(...) and related metafor analysis calls",
+        "src/R/RCMetaR/R/diagnostic_methods.r: rma.uni(...) and related metafor analysis calls",
+        "src/R/RCMetaR/R/meta_reg.r: rma.uni(...) and related metafor analysis calls"
+      ],
+      "reason": "Core binary, continuous, diagnostic, and meta-regression methods call metafor analysis functions.",
+      "installed_version": "5.0-1"
+    },
+    {
+      "name": "HSROC",
+      "source": "cran-archive",
+      "scope": ["runtime"],
+      "declared_in": ["src/R/RCMetaR/DESCRIPTION"],
+      "evidence": [
+        "src/R/RCMetaR/R/diagnostic_methods.r: diagnostic.hsroc delegates to HSROC(...) and HSROCSummary(...)",
+        "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz",
+        "scripts/install-modern-r-deps.R"
+      ],
+      "reason": "Diagnostic HSROC analysis delegates sampling and summaries to the latest available archived HSROC package.",
+      "installed_version": "2.1.9"
+    },
+    {
+      "name": "pdftools",
+      "source": "cran",
+      "scope": ["runtime"],
+      "declared_in": ["src/R/RCMetaR/DESCRIPTION"],
+      "evidence": [
+        "src/R/RCMetaR/R/diagnostic_methods.r: hsroc.rasterize.pdf converts stock HSROC PDF plots into PNG images for the Results window",
+        "scripts/install-modern-r-deps.R"
+      ],
+      "reason": "Stock archived HSROC writes PDF plots; RCMetaR rasterizes them so the PyQt Results window can display HSROC plots as images.",
+      "installed_version": "3.9.0"
+    },
+    {
+      "name": "lme4",
+      "source": "cran",
+      "scope": ["runtime"],
+      "declared_in": ["src/R/RCMetaR/DESCRIPTION"],
+      "evidence": ["src/R/RCMetaR/R/bivariate.r: bivariate.dx.test uses lmer(...) for mixed-model fitting"],
+      "reason": "Bivariate diagnostic model fitting uses lme4 mixed-model functionality.",
+      "installed_version": "2.0-1"
+    },
+    {
+      "name": "methods",
+      "source": "base-runtime",
+      "scope": ["runtime"],
+      "declared_in": ["src/R/RCMetaR/DESCRIPTION"],
+      "evidence": ["src/R/RCMetaR/R/classes.r: setClass(...)"],
+      "reason": "RCMetaR defines S4 data and analysis specification classes with methods::setClass.",
+      "installed_version": "4.6.0"
+    },
+    {
+      "name": "boot",
+      "source": "recommended",
+      "scope": ["runtime"],
+      "declared_in": ["src/R/RCMetaR/DESCRIPTION"],
+      "evidence": [
+        "src/R/RCMetaR/R/diagnostic_methods.r: bivariate diagnostic confidence intervals use boot.ci(...)",
+        "src/R/RCMetaR/R/meta_methods.r: bootstrap analysis uses boot(...)",
+        "src/R/RCMetaR/R/meta_reg.r: boot(...) and boot.ci(...)"
+      ],
+      "reason": "Bootstrap analysis workflows use boot resampling and confidence interval helpers.",
+      "installed_version": "1.3-32"
+    },
+    {
+      "name": "stats",
+      "source": "base-runtime",
+      "scope": ["runtime"],
+      "declared_in": ["src/R/RCMetaR/DESCRIPTION"],
+      "evidence": ["src/R/RCMetaR/R: package-wide statistical helpers call base stats APIs implicitly"],
+      "reason": "RCMetaR relies on standard R statistical functions that are distributed with R.",
+      "installed_version": "4.6.0"
+    },
+    {
+      "name": "utils",
+      "source": "base-runtime",
+      "scope": ["runtime"],
+      "declared_in": ["src/R/RCMetaR/DESCRIPTION"],
+      "evidence": ["src/R/RCMetaR/R: package code calls capture.output(...) and write.csv(...)"],
+      "reason": "RCMetaR captures textual R summaries and writes CSV output through the base utils package.",
+      "installed_version": "4.6.0"
+    },
+    {
+      "name": "roxygen2",
+      "source": "cran",
+      "scope": ["documentation", "build"],
+      "declared_in": [],
+      "evidence": ["docs/adr/0057-convert-RCMetaR-to-roxygen2-in-the-first-r-stack-slice.md"],
+      "reason": "The modernization slice requires roxygen2-generated documentation and NAMESPACE output.",
+      "installed_version": "8.0.0"
+    },
+    {
+      "name": "testthat",
+      "source": "cran",
+      "scope": ["test"],
+      "declared_in": ["src/R/RCMetaR/DESCRIPTION"],
+      "evidence": [
+        "src/R/RCMetaR/DESCRIPTION",
+        "src/R/RCMetaR/tests/testthat.R",
+        "src/R/RCMetaR/tests/testthat"
+      ],
+      "reason": "RCMetaR package-native tests use testthat and run during R CMD check.",
+      "installed_version": "3.3.2"
+    }
+  ],
+  "app_r_bundle_dependencies": [
+    {
+      "name": "Rcpp",
+      "source": "cran",
+      "reason": "Bundled to satisfy compiled CRAN dependency chains used by the modern desktop R library.",
+      "evidence": ["scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "magrittr",
+      "source": "cran",
+      "reason": "Bundled as part of the app-level CRAN dependency closure.",
+      "evidence": ["scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "irlba",
+      "source": "cran",
+      "reason": "Bundled as part of the app-level CRAN dependency closure.",
+      "evidence": ["scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "minqa",
+      "source": "cran",
+      "reason": "Bundled as an optimizer dependency for app-level mixed-model packages.",
+      "evidence": ["scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "nloptr",
+      "source": "cran",
+      "reason": "Bundled as an optimizer dependency for app-level mixed-model packages.",
+      "evidence": ["scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "RcppEigen",
+      "source": "cran",
+      "reason": "Bundled to satisfy compiled dependencies for app-level mixed-model packages.",
+      "evidence": ["scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "SparseM",
+      "source": "cran",
+      "reason": "Bundled as part of the app-level CRAN dependency closure.",
+      "evidence": ["scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "MatrixModels",
+      "source": "cran",
+      "reason": "Bundled as part of the app-level CRAN dependency closure.",
+      "evidence": ["scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "Formula",
+      "source": "cran",
+      "reason": "Bundled as part of the app-level CRAN dependency closure.",
+      "evidence": ["scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "latticeExtra",
+      "source": "cran",
+      "reason": "Bundled as part of the app-level CRAN dependency closure.",
+      "evidence": ["scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "acepack",
+      "source": "cran",
+      "reason": "Bundled as part of the app-level CRAN dependency closure.",
+      "evidence": ["scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "gridExtra",
+      "source": "cran",
+      "reason": "Bundled as part of the app-level CRAN dependency closure.",
+      "evidence": ["scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "data.table",
+      "source": "cran",
+      "reason": "Bundled as part of the app-level CRAN dependency closure.",
+      "evidence": ["scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "htmlTable",
+      "source": "cran",
+      "reason": "Bundled as part of the app-level CRAN dependency closure.",
+      "evidence": ["scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "viridis",
+      "source": "cran",
+      "reason": "Bundled as part of the app-level CRAN dependency closure.",
+      "evidence": ["scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "htmltools",
+      "source": "cran",
+      "reason": "Bundled as part of the app-level CRAN dependency closure.",
+      "evidence": ["scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "MCMCpack",
+      "source": "cran",
+      "reason": "Bundled for app-level R workflows and transitive Bayesian analysis support outside direct RCMetaR metadata.",
+      "evidence": ["scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "igraph",
+      "source": "cran",
+      "reason": "Bundled as an app-level dependency retained outside direct RCMetaR metadata; no direct RCMetaR call site has been identified in this slice.",
+      "evidence": ["src/R/RCMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "quantreg",
+      "source": "cran",
+      "reason": "Bundled as part of the app-level CRAN dependency closure.",
+      "evidence": ["scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "ape",
+      "source": "cran",
+      "reason": "Bundled as an app-level dependency retained outside direct RCMetaR metadata; no direct RCMetaR call site has been identified in this slice.",
+      "evidence": ["src/R/RCMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "Hmisc",
+      "source": "cran",
+      "reason": "Bundled as an app-level dependency retained outside direct RCMetaR metadata; no direct RCMetaR call site has been identified in this slice.",
+      "evidence": ["src/R/RCMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "mice",
+      "source": "cran",
+      "reason": "Bundled as an app-level dependency retained outside direct RCMetaR metadata; no direct RCMetaR call site has been identified in this slice.",
+      "evidence": ["src/R/RCMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "ggplot2",
+      "source": "cran",
+      "reason": "Bundled as an app-level dependency retained outside direct RCMetaR metadata; no direct RCMetaR call site has been identified in this slice.",
+      "evidence": ["src/R/RCMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "RColorBrewer",
+      "source": "cran",
+      "reason": "Bundled as an app-level dependency retained outside direct RCMetaR metadata; no direct RCMetaR call site has been identified in this slice.",
+      "evidence": ["src/R/RCMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "lattice",
+      "source": "recommended",
+      "reason": "Bundled as part of the app-level CRAN dependency closure.",
+      "evidence": ["scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "coda",
+      "source": "cran",
+      "reason": "Bundled as part of the app-level CRAN dependency closure.",
+      "evidence": ["scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "MASS",
+      "source": "recommended",
+      "reason": "Bundled as part of the app-level CRAN dependency closure.",
+      "evidence": ["scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "nlme",
+      "source": "recommended",
+      "reason": "Bundled as an app-level dependency retained outside direct RCMetaR metadata; no direct RCMetaR call site has been identified in this slice.",
+      "evidence": ["src/R/RCMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "splines",
+      "source": "base-runtime",
+      "reason": "Retained outside direct RCMetaR metadata; no direct RCMetaR call site has been identified in this slice.",
+      "evidence": ["src/R/RCMetaR/DESCRIPTION"]
+    },
+    {
+      "name": "survival",
+      "source": "recommended",
+      "reason": "Installed by the app bundle outside direct RCMetaR metadata; no direct RCMetaR call site has been identified in this slice.",
+      "evidence": ["src/R/RCMetaR/DESCRIPTION", "scripts/install-modern-r-deps.R"]
+    },
+    {
+      "name": "mcmc",
+      "source": "cran",
+      "reason": "Installed by the app-level archived dependency bootstrap for Bayesian dependency chains, not direct RCMetaR metadata.",
+      "evidence": ["scripts/install-modern-r-deps.R"]
+    }
+  ],
+  "validation": {
+    "script": "scripts/validate_RCMetaR_r_manifests.py",
+    "installed_version_command": "python scripts/validate_RCMetaR_r_manifests.py --report-installed-versions"
+  }
+}

@@ -2,7 +2,7 @@
 #
 #  Byron C. Wallace
 #  Tufts Medical Center
-#  OpenMeta[analyst]
+#  RC MetaStudio
 #  ---
 #  Proxy interfaces for mediating between the underlying representation (in ma_dataset.py)
 #  and the editing UI.

@@ -4,12 +4,12 @@ set -euo pipefail
 architecture=""
 artifact_name=""
 r_package_cache_root=""
-r_runtime_root="${OMA_R_HOME:-${R_HOME:-}}"
+r_runtime_root="${RCMS_R_HOME:-${R_HOME:-}}"
 recreate_venv=0
 skip_tests=0
 skip_clean=0
 skip_smoke=0
-bundle_identifier="org.openmetaanalyst.community"
+bundle_identifier="org.RCMetaStudio.community"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -73,10 +73,10 @@ fi
 
 case "${architecture:-}" in
   x64)
-    default_artifact="OpenMetaAnalyst-modern-macos-x64"
+    default_artifact="RCMetaStudio-modern-macos-x64"
     ;;
   arm64)
-    default_artifact="OpenMetaAnalyst-modern-macos-arm64"
+    default_artifact="RCMetaStudio-modern-macos-arm64"
     ;;
   "")
     echo "--architecture is required and must be x64 or arm64." >&2
@@ -94,7 +94,7 @@ if [ -z "$r_runtime_root" ]; then
   r_runtime_root="$(R RHOME)"
 fi
 if [ -z "$r_runtime_root" ] || [ ! -d "$r_runtime_root" ]; then
-  echo "No source R runtime was found. Pass --r-runtime-root or set OMA_R_HOME/R_HOME." >&2
+  echo "No source R runtime was found. Pass --r-runtime-root or set RCMS_R_HOME/R_HOME." >&2
   exit 1
 fi
 r_runtime_root="$(cd "$r_runtime_root" && pwd -P)"

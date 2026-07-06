@@ -1,31 +1,31 @@
 # RC MetaStudio Migration Plan
 
-This plan tracks the phased migration from the OpenMeta[Analyst] Community modernization codebase to RC MetaStudio. The migration is intentionally split into reviewable phases so identity, file-format, layout, CI, packaging, and documentation changes remain diagnosable.
+This plan tracks the phased migration from the prior modernization codebase to RC MetaStudio. The migration is intentionally split into reviewable phases so identity, file-format, layout, CI, packaging, and documentation changes remain diagnosable.
 
 ## Ground Rules
 
 - Preserve Analysis Behavior unless a reviewed Statistical Modernization Drift or Compatibility Exception records the change.
-- Do not preserve OpenMeta[Analyst], OpenMetaAnalyst, OpenMetaR, `openmetar.*`, `.oma`, `OMA_*`, `modern`, or generic legacy framing in active surfaces.
+- Do not preserve retired product, executable, R package, R facade, project-file, environment-variable, repository, `modern`, or generic legacy framing in active surfaces.
 - Keep historical ADRs as decision history; use later ADRs as the authority when decisions conflict.
 - Do not redesign deep module interfaces during the mechanical identity and layout migration.
-- Do not ship `.oma` import, conversion, migration, bundled help, network callback, or automatic diagnostic-upload features.
+- Do not ship retired project-file import, conversion, migration, bundled help, network callback, or automatic diagnostic-upload features.
 
 ## Active-Surface Rename Audit
 
 Use this as an audit checklist, not a blind global replacement. Historical ADRs, `NOTICE.md` provenance, scholarly/statistical references, and original copyright notices are exceptions when the old term is historically accurate.
 
-| Old active-surface token | Current target |
+| Retired active-surface identity | Current target |
 | --- | --- |
-| `OpenMeta[Analyst]`, `OpenMetaAnalyst`, `Open Meta-Analyst` | `RC MetaStudio` |
-| `OpenMeta[Analyst] Community` | `RC MetaStudio` |
-| `OpenMetaR` | `RCMetaR` |
-| `openmetar` / `openmetar.*` | `rcmetar` / `rcmetar.*` |
-| `.oma` | `.rcms` |
-| `OMA_*` | `RCMS_*` |
-| `openmeta-analyst-community-modern` | `rc-metastudio` |
+| Retired bracketed, compact, or hyphenated product identity | `RC MetaStudio` |
+| Retired community-fork product wording | `RC MetaStudio` |
+| Retired bundled R package identity | `RCMetaR` |
+| Retired lower-case R facade and private helper prefixes | `rcmetar` / `rcmetar.*` and `.rcmetar.*` |
+| Retired project-file extension | `.rcms` |
+| Retired OMA-prefixed environment namespace | `RCMS_*` |
+| Retired repository/distribution slug | `rc-metastudio` |
 | `modern-*` lane names | evidence-based lane names such as `smoke`, `fast`, `package`, `r-stack`, `analysis-regression`, `verification` |
 | Brown/Tufts/CEBM support links and callbacks | remove, or replace static project links with `https://github.com/AliSalman-et-al/` |
-| generic `legacy` framing | precise terms such as Original OpenMeta[Analyst] Project, Retired Reference Implementation, Retired OMA Compatibility, or RC MetaStudio |
+| generic `legacy` framing | precise terms such as Original Project, Retired Reference Implementation, retired project-file compatibility, or RC MetaStudio |
 
 ## Decision Index
 
@@ -48,8 +48,8 @@ Identity and provenance:
 
 Project files, samples, and settings:
 
-- [ADR 0084](../adr/0084-adopt-rcms-project-files-and-retire-oma-compatibility.md): Adopt `.rcms` files and retire `.oma` compatibility.
-- [ADR 0085](../adr/0085-do-not-ship-oma-migration-tooling.md): Do not ship `.oma` migration tooling.
+- [ADR 0084](../adr/0084-adopt-rcms-project-files-and-retire-oma-compatibility.md): Adopt `.rcms` files and retire removed project-file compatibility.
+- [ADR 0085](../adr/0085-do-not-ship-oma-migration-tooling.md): Do not ship retired project-file migration tooling.
 - [ADR 0101](../adr/0101-commit-rcms-sample-projects-with-a-manifest.md): Commit `.rcms` samples with a manifest.
 - [ADR 0102](../adr/0102-start-rcms-as-the-renamed-project-file-container.md): Start `.rcms` as the renamed project-file container.
 - [ADR 0121](../adr/0121-keep-scientific-sample-project-names.md): Keep scientific sample names.
@@ -74,7 +74,7 @@ Python, R, API, and layout:
 - [ADR 0115](../adr/0115-use-rc-metastudio-as-the-primary-command-name.md): Use `rc-metastudio` as the primary command.
 - [ADR 0118](../adr/0118-use-rc-metastudio-python-distribution-metadata.md): Use RC MetaStudio Python metadata.
 - [ADR 0145](../adr/0145-rename-unclear-legacy-python-module-prefixes.md), [ADR 0155](../adr/0155-rename-product-era-python-classes.md), and [ADR 0156](../adr/0156-retire-the-oma-acronym-from-active-surfaces.md): Rename unclear/product-era Python identifiers and retire `OMA`.
-- [ADR 0152](../adr/0152-commit-rcmetar-roxygen-generated-package-artifacts.md), [ADR 0153](../adr/0153-rename-rcmetar-product-branded-r-files-and-topics.md), [ADR 0154](../adr/0154-rename-private-openmetar-r-helpers.md), and [ADR 0157](../adr/0157-use-rcmetar-r-package-artifact-names.md): Rename and package RCMetaR correctly.
+- [ADR 0152](../adr/0152-commit-rcmetar-roxygen-generated-package-artifacts.md), [ADR 0153](../adr/0153-rename-rcmetar-product-branded-r-files-and-topics.md), [ADR 0154](../adr/0154-rename-private-RCMetaR-r-helpers.md), and [ADR 0157](../adr/0157-use-rcmetar-r-package-artifact-names.md): Rename and package RCMetaR correctly.
 
 UI, resources, help, and callbacks:
 
@@ -143,7 +143,7 @@ Acceptance criteria:
 
 Verification:
 
-- Search active surfaces for OpenMeta[Analyst], OpenMetaAnalyst, OpenMetaR, `openmetar`, and `OMA_*`.
+- Run the identity audit and search active surfaces for retired product, package, facade, project-file, and environment tokens.
 - Run Python and R unit-level checks relevant to renamed interfaces.
 
 ## Phase 3: Project File Identity and Samples
@@ -152,14 +152,14 @@ Acceptance criteria:
 
 - `.rcms` is the only supported project-file extension.
 - Developer documentation makes clear that the initial `.rcms` container preserves the current pickle-based content shape and is transitional pending a later structured format.
-- `.oma` support is removed from active app behavior, tests, docs, file dialogs, packaging, and workflow manifests.
+- Retired project-file support is removed from active app behavior, tests, docs, file dialogs, packaging, and workflow manifests.
 - Existing repository sample projects are converted or renamed to `.rcms`.
 - `sample_projects` contains committed `.rcms` fixtures and a manifest describing provenance, analysis family, workflow coverage, and test usage.
 
 Verification:
 
 - App and tests open `.rcms` sample projects.
-- Search active surfaces for `.oma` except historical/provenance records.
+- Search active surfaces for the retired project-file extension except historical/provenance records.
 
 ## Phase 4: Repository Layout
 
@@ -193,7 +193,7 @@ Target layout:
 Acceptance criteria:
 
 - Loose Python modules move under `src/rc_metastudio`.
-- `src/R/OpenMetaR` moves to `r/RCMetaR`.
+- `src/R/RCMetaR` moves to `r/RCMetaR`.
 - Qt `.ui` files and images move under packaged resources.
 - Generated UI Python is treated as transitional or build output.
 - Import paths, resource paths, and test discovery are updated mechanically.
@@ -230,7 +230,7 @@ Acceptance criteria:
 Verification:
 
 - Build packaging contracts or packaged smoke checks for changed platform paths.
-- Confirm generated artifacts contain no OpenMeta[Analyst], OMA, OpenMetaR, or `modern` names.
+- Confirm generated artifacts contain no retired product, package, project-file, environment, or `modern` names.
 
 ## Phase 7: Remove Bundled Help and Callbacks
 

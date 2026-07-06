@@ -9,7 +9,7 @@ type=text/css rel=stylesheet>
    To run the example, do the following steps:</p>
   <ol>
     <li>Select <b>Open</b> on the <b>File</b> menu.</li>
-    <li>In the Open File dialog, double-click the <b>sample_data</b> directory and open the file lymph.oma.</li>
+    <li>In the Open File dialog, double-click the <b>sample_data</b> directory and open the file lymph.rcms.</li>
     <li>In the <b>Analysis</b> menu,
         select <b>meta-analysis</b>. This opens the Diagnostic Metrics dialog, in which you can select the metrics for the analysis.</p>
        <p><img src="images/diagnostic_metrics_dialog.png"></p>
@@ -19,7 +19,7 @@ type=text/css rel=stylesheet>
       <ol type="a">
           <li>If you select either <b>sensitivity</b> or <b>specificity</b>, the Method & Parameters for Sens./Spec. dialog is displayed, in which you can choose a method and parameters for both the sensitivity and             specificity analyses. In this example, the method is <b>Bivariate (Maximum Likelihood)</b>, which uses a bivariate model for sensitivity and specificity.
                <p><img src="images/method_dialog_sens_spec.png"></p>
-          <p><b>Note:</b> If you select either <b>Diagnostic Fixed-Effect</b> or <b>Diagnostic Random-Effects</b> as the method for sens/spec., OpenMetaAnalyst does not use a bivariate model. Instead, it performs two separate meta-analyses for sensitivity and specificity, using a univariate model in each case.</p>
+          <p><b>Note:</b> If you select either <b>Diagnostic Fixed-Effect</b> or <b>Diagnostic Random-Effects</b> as the method for sens/spec., RCMetaStudio does not use a bivariate model. Instead, it performs two separate meta-analyses for sensitivity and specificity, using a univariate model in each case.</p>
           </li>
           <li> If you select either <b>likelihood ratio</b> or <b>diagnostic odds ration</b>, the Method & Parameters for DOR/LR dialog is displayed, in which you can choose a method and parameters for both the likelihood ratio and diagnostic odds ratio analyses.
                 <p><img src="images/method_dialog_dor-lr.png"></p>
@@ -31,7 +31,7 @@ type=text/css rel=stylesheet>
   <p><img src="images/bivariate_summary.png"></p>
   <p><img src="images/bivariate.png"></p>
   <p>
-  <p>Since the selected method for likelihood ratio is Diagnostic Random-Effects, OpenMetaAnalyst performs separate meta-analyses for positive and negative likelihood ratios and diagnostic odds ratio, and displays forest plots of the results.
+  <p>Since the selected method for likelihood ratio is Diagnostic Random-Effects, RCMetaStudio performs separate meta-analyses for positive and negative likelihood ratios and diagnostic odds ratio, and displays forest plots of the results.
   The negative likelihood ratio forest plost is shown below.</p>
   <p><img src="images/forest_nlr.png"></p>
 

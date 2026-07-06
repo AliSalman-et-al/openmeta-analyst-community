@@ -3,7 +3,7 @@
 #  Byron C. Wallace                  #
 #  George Dietz                      #
 #  CEBM @ Brown                      #
-#  OpenMeta[analyst]                 ##########################
+#  RC MetaStudio                 ##########################
 #  ---                                                        #
 #  Binary data form module; for flexible entry of dichotomous #
 #  outcome data                                               #

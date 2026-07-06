@@ -12,9 +12,9 @@ def test_real_metaform_opens_binary_continuous_and_diagnostic_projects():
     import launch
 
     for name, family, first_study in [
-        ("amino.oma", "binary", "Gonzalez"),
-        ("continuous.oma", "continuous", "Carroll"),
-        ("lymph.oma", "diagnostic", "Kinderman"),
+        ("amino.rcms", "binary", "Gonzalez"),
+        ("continuous.rcms", "continuous", "Carroll"),
+        ("lymph.rcms", "diagnostic", "Kinderman"),
     ]:
         app, window = launch.start_automation()
         try:
@@ -52,7 +52,7 @@ def test_real_metaform_standard_binary_action_opens_specs_dialog(monkeypatch):
     monkeypatch.setattr(meta_form.ma_specs, "MA_Specs", SpecsDialog)
 
     try:
-        assert window.open(os.path.abspath("sample_data/amino.oma")) is True
+        assert window.open(os.path.abspath("sample_data/amino.rcms")) is True
         window.action_go.trigger()
 
         assert calls == [(None, window, window.model.get_global_conf_level(), "binary")]
@@ -67,7 +67,7 @@ def test_real_metaform_preserves_standard_binary_rows():
 
     app, window = launch.start_automation()
     try:
-        assert window.open(os.path.abspath("sample_data/amino.oma")) is True
+        assert window.open(os.path.abspath("sample_data/amino.rcms")) is True
         model = window.tableView.model()
 
         assert window.model.dataset.title == "aminoglycosides"
@@ -89,11 +89,11 @@ def test_representative_projects_round_trip_without_byte_identical_expectations(
     import launch
 
     for name in [
-        "amino.oma",
-        "continuous.oma",
-        "lymph.oma",
-        "BCG.oma",
-        "meantime.oma",
+        "amino.rcms",
+        "continuous.rcms",
+        "lymph.rcms",
+        "BCG.rcms",
+        "meantime.rcms",
     ]:
         app, window = launch.start_automation()
         saved_path = str(tmp_path / name)

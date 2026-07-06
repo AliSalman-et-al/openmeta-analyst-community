@@ -114,9 +114,9 @@ class WelcomePage(QWizardPage, forms.ui_welcome_page.Ui_WizardPage):
 
         self.selected_dataset = QFileDialog.getOpenFileName(
             parent=self,
-            caption="OpenMetaAnalyst - Open File",
+            caption="RCMetaStudio - Open File",
             directory=get_default_open_directory(self.recent_datasets),
-            filter="open meta files (*.oma)",
+            filter="open meta files (*.rcms)",
         )
         if isinstance(self.selected_dataset, tuple):
             self.selected_dataset = self.selected_dataset[0]
@@ -423,7 +423,7 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
     def _select_file(self):
         self.file_path = QFileDialog.getOpenFileName(
             parent=self,
-            caption="OpenMetaAnalyst - Import CSV",
+            caption="RCMetaStudio - Import CSV",
             directory=".",
             filter="csv files (*.csv)",
         )
@@ -484,7 +484,7 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
             QMessageBox.warning(
                 self,
                 "Could not import CSV",
-                "OpenMeta[Analyst] could not preview the selected CSV file.\n\n"
+                "RC MetaStudio could not preview the selected CSV file.\n\n"
                 "Details: %s: %s" % (e.__class__.__name__, e),
             )
             self.imported_data_ok = False
@@ -696,7 +696,7 @@ class MainWizard(QWizard):
 
         if path is None:
             self.setStartId(Page_Welcome)
-            self.setWindowTitle("OpenMetaAnalyst")
+            self.setWindowTitle("RCMetaStudio")
         elif path == "csv_import":
             self.setStartId(Page_DataType)
             self.setWindowTitle("Import a CSV")

@@ -5,7 +5,7 @@ recreate_venv=0
 sync=0
 require_r_evidence=0
 strict_taxonomy=0
-fast_workers="${OMA_FAST_WORKERS:-4}"
+fast_workers="${RCMS_FAST_WORKERS:-4}"
 rscript=""
 r_runtime_root=""
 while [ "$#" -gt 0 ]; do
@@ -99,7 +99,7 @@ fi
 uv run pytest "${fast_pytest_args[@]}"
 
 step "Verifying Default R Evidence"
-r_evidence_args=(scripts/verify_openmetar_r_default.py)
+r_evidence_args=(scripts/verify_rcmetar_r_default.py)
 if [ -n "$rscript" ]; then
   r_evidence_args+=(--rscript "$rscript")
 elif [ -n "$r_runtime_root" ]; then

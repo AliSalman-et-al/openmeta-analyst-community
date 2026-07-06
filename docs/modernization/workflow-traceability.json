@@ -17,9 +17,9 @@
     },
     {
       "id": "oma-open-display-save-save-as",
-      "name": "Existing .oma project open, display, save, and save-as workflows",
+      "name": "Existing .rcms project open, display, save, and save-as workflows",
       "trace_type": "gui_evidence_entry",
-      "trace": "Existing .oma Open Display Save-As Workflow"
+      "trace": "Existing .rcms Open Display Save-As Workflow"
     },
     {
       "id": "recent-files-settings",

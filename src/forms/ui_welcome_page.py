@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'C:\Users\Ali-Salman\Documents\Biostatistics\openmeta-analyst-community\src\forms\welcome_page.ui'
+# Form implementation generated from reading ui file 'C:\Users\Ali-Salman\Documents\Biostatistics\rc-metastudio\src\forms\welcome_page.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -85,12 +85,12 @@ class Ui_WizardPage(object):
         self.verticalLayout_2.addWidget(self.line)
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_2.setObjectName("horizontalLayout_2")
-        self.oma_onlineLabel = QtWidgets.QLabel(WizardPage)
-        self.oma_onlineLabel.setMinimumSize(QtCore.QSize(120, 0))
-        self.oma_onlineLabel.setAlignment(QtCore.Qt.AlignCenter)
-        self.oma_onlineLabel.setOpenExternalLinks(True)
-        self.oma_onlineLabel.setObjectName("oma_onlineLabel")
-        self.horizontalLayout_2.addWidget(self.oma_onlineLabel)
+        self.rcms_onlineLabel = QtWidgets.QLabel(WizardPage)
+        self.rcms_onlineLabel.setMinimumSize(QtCore.QSize(120, 0))
+        self.rcms_onlineLabel.setAlignment(QtCore.Qt.AlignCenter)
+        self.rcms_onlineLabel.setOpenExternalLinks(True)
+        self.rcms_onlineLabel.setObjectName("RCMS_onlineLabel")
+        self.horizontalLayout_2.addWidget(self.rcms_onlineLabel)
         self.line_3 = QtWidgets.QFrame(WizardPage)
         self.line_3.setFrameShape(QtWidgets.QFrame.VLine)
         self.line_3.setFrameShadow(QtWidgets.QFrame.Sunken)
@@ -127,7 +127,7 @@ class Ui_WizardPage(object):
         self.import_csv_btn.setText(_translate("WizardPage", "Import CSV"))
         self.open_recent_btn.setText(_translate("WizardPage", "Open Recent..."))
         self.open_btn.setText(_translate("WizardPage", "Open Existing Dataset"))
-        self.oma_onlineLabel.setText(
+        self.rcms_onlineLabel.setText(
             _translate(
                 "WizardPage",
                 '<html><head/><body><p><a href="http://www.cebm.brown.edu/open_meta"><span style=" text-decoration: underline; color:#0000ff;">OpenMeta Website</span></a></p></body></html>',
