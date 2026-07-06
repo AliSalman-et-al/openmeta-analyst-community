@@ -35,10 +35,6 @@ class WelcomePage(QWizardPage, forms.ui_welcome_page.Ui_WizardPage):
 
         self.recent_datasets = recent_datasets
         self.selected_dataset = None
-        self.setPixmap(
-            QWizard.BackgroundPixmap,
-            QPixmap(":/wizard_images/wizard_images/forest.jpg"),
-        )
         self._setup_connections()
         qt_layout.fit_text_to_contents(self, adjust_root=False)
 
@@ -161,10 +157,6 @@ class DataTypePage(QWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
             app_error_handler.safe_slot(self._button_selected, parent=self)
         )
 
-        self.setPixmap(
-            QWizard.BackgroundPixmap,
-            QPixmap(":/wizard_images/wizard_images/laplace.jpg"),
-        )
         self._normalize_data_type_button_sizes()
         qt_layout.fit_text_to_contents(self, adjust_root=False)
         self._fit_page_to_data_type_contents()
@@ -346,9 +338,6 @@ class ChooseMetricPage(QWizardPage, forms.ui_choose_metric_page.Ui_WizardPage):
             self.metric_cbo_box.blockSignals(False)
             qt_layout.fit_text_to_contents(self, adjust_root=False)
 
-        self.setPixmap(
-            QWizard.BackgroundPixmap, QPixmap(":/wizard_images/wizard_images/airy.jpg")
-        )
         # self.wizard().adjustSize()
 
     def _metric_choice_changed(self, newindex):
@@ -387,11 +376,6 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
             app_error_handler.safe_slot(
                 lambda _state: self._rebuild_display(), parent=self
             )
-        )
-
-        self.setPixmap(
-            QWizard.BackgroundPixmap,
-            QPixmap(":/wizard_images/wizard_images/cochran.jpg"),
         )
 
     def initializePage(self):
@@ -677,11 +661,6 @@ class OutcomeNamePage(QWizardPage, forms.ui_outcome_name_page.Ui_WizardPage):
         super(OutcomeNamePage, self).__init__(parent)
         self.setupUi(self)
 
-        self.setPixmap(
-            QWizard.BackgroundPixmap,
-            QPixmap(":/wizard_images/wizard_images/fisher.jpg"),
-        )
-
         self.registerField("outcomeName*", self.outcome_name_LineEdit)
         qt_layout.fit_text_to_contents(self, adjust_root=False)
 
@@ -724,11 +703,6 @@ class MainWizard(QWizard):
         elif path == "new_dataset":
             self.setStartId(Page_DataType)
             self.setWindowTitle("Create a New Dataset")
-
-        # self.setPixmap(QtWidgets.QWizard.BannerPixmap,
-        #        QtGui.QPixmap(':/misc/meta.png'))
-        # self.setPixmap(QtWidgets.QWizard.BackgroundPixmap,
-        #               QtGui.QPixmap(':/misc/meta.png'))
 
         # make the displayed size of the pages reasonable
         self.currentIdChanged.connect(

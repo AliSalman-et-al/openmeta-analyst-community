@@ -114,3 +114,19 @@ def test_application_wizard_modern_style_renders_sized_nonblank_pages(qapp, tmp_
         finally:
             wizard.close()
             qapp.processEvents()
+
+
+def test_application_wizard_pages_do_not_use_background_pixmaps(qapp):
+    import main_wizard
+
+    wizard = main_wizard.MainWizard()
+    try:
+        for page_id in wizard.pageIds():
+            page = wizard.page(page_id)
+            assert page.pixmap(QtWidgets.QWizard.BackgroundPixmap).isNull()
+            assert page.pixmap(QtWidgets.QWizard.BannerPixmap).isNull()
+        assert wizard.pixmap(QtWidgets.QWizard.BackgroundPixmap).isNull()
+        assert wizard.pixmap(QtWidgets.QWizard.BannerPixmap).isNull()
+    finally:
+        wizard.close()
+        qapp.processEvents()
