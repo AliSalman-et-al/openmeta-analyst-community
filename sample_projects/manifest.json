@@ -15,11 +15,11 @@
         "project open/save round trip coverage"
       ],
       "test_usage": [
-        "tests/modern/fast/test_project_pickle_migration.py",
-        "tests/modern/gui/test_gui_binary_slice.py",
-        "tests/modern/gui/test_metaform_automation_launch.py",
-        "tests/modern/golden/test_modern_golden_compare.py",
-        "tests/modern/packaging_contract/test_windows_distributable_contract.py"
+        "tests/python/fast/test_project_pickle_migration.py",
+        "tests/python/gui/test_gui_binary_slice.py",
+        "tests/python/gui/test_metaform_automation_launch.py",
+        "tests/analysis_regression/golden/test_analysis_regression_compare.py",
+        "tests/packaging/contract/test_windows_distributable_contract.py"
       ]
     },
     {
@@ -33,9 +33,9 @@
         "project open/save round trip coverage"
       ],
       "test_usage": [
-        "tests/modern/fast/test_project_pickle_migration.py",
-        "tests/modern/gui/test_gui_binary_slice.py",
-        "tests/modern/packaging_contract/test_windows_distributable_contract.py"
+        "tests/python/fast/test_project_pickle_migration.py",
+        "tests/python/gui/test_gui_binary_slice.py",
+        "tests/packaging/contract/test_windows_distributable_contract.py"
       ]
     },
     {
@@ -49,10 +49,10 @@
         "project open/save round trip coverage"
       ],
       "test_usage": [
-        "tests/modern/fast/test_project_pickle_migration.py",
-        "tests/modern/gui/test_gui_binary_slice.py",
-        "tests/modern/gui/test_metaform_automation_launch.py",
-        "tests/modern/golden/test_modern_golden_compare.py"
+        "tests/python/fast/test_project_pickle_migration.py",
+        "tests/python/gui/test_gui_binary_slice.py",
+        "tests/python/gui/test_metaform_automation_launch.py",
+        "tests/analysis_regression/golden/test_analysis_regression_compare.py"
       ]
     },
     {
@@ -66,10 +66,10 @@
         "project open/save round trip coverage"
       ],
       "test_usage": [
-        "tests/modern/fast/test_project_pickle_migration.py",
-        "tests/modern/gui/test_gui_binary_slice.py",
-        "tests/modern/gui/test_metaform_automation_launch.py",
-        "tests/modern/golden/test_modern_golden_compare.py"
+        "tests/python/fast/test_project_pickle_migration.py",
+        "tests/python/gui/test_gui_binary_slice.py",
+        "tests/python/gui/test_metaform_automation_launch.py",
+        "tests/analysis_regression/golden/test_analysis_regression_compare.py"
       ]
     },
     {
@@ -83,9 +83,9 @@
         "project open/save round trip coverage"
       ],
       "test_usage": [
-        "tests/modern/fast/test_project_pickle_migration.py",
-        "tests/modern/gui/test_gui_binary_slice.py",
-        "tests/modern/gui/test_metaform_automation_launch.py"
+        "tests/python/fast/test_project_pickle_migration.py",
+        "tests/python/gui/test_gui_binary_slice.py",
+        "tests/python/gui/test_metaform_automation_launch.py"
       ]
     }
   ]

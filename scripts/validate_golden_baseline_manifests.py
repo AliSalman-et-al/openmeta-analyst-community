@@ -8,19 +8,19 @@ import sys
 from pathlib import Path
 
 
-MODERNIZATION_DIR = Path("docs") / "modernization"
-WORKFLOW_TRACEABILITY = MODERNIZATION_DIR / "workflow-traceability.json"
-GOLDEN_COVERAGE = MODERNIZATION_DIR / "golden-coverage-manifest.json"
-GUI_EVIDENCE = MODERNIZATION_DIR / "gui-verification-evidence.md"
-COMPATIBILITY_EXCEPTIONS = MODERNIZATION_DIR / "compatibility-exceptions.json"
-GUI_COMPATIBILITY_EXCEPTIONS = MODERNIZATION_DIR / "gui-compatibility-exceptions.json"
-GOLDEN_SCHEMA = MODERNIZATION_DIR / "golden-baseline.schema.json"
-GOLDEN_BASELINE = MODERNIZATION_DIR / "comprehensive-golden-baseline-manifest.json"
-GOLDEN_MATRIX = MODERNIZATION_DIR / "golden-coverage-matrix.md"
-WORKFLOW_INVENTORY = MODERNIZATION_DIR / "user-facing-workflow-inventory.md"
+VERIFICATION_DIR = Path("docs") / "verification"
+WORKFLOW_TRACEABILITY = VERIFICATION_DIR / "workflow-traceability.json"
+GOLDEN_COVERAGE = VERIFICATION_DIR / "golden-coverage-manifest.json"
+GUI_EVIDENCE = VERIFICATION_DIR / "gui-verification-evidence.md"
+COMPATIBILITY_EXCEPTIONS = VERIFICATION_DIR / "compatibility-exceptions.json"
+GUI_COMPATIBILITY_EXCEPTIONS = VERIFICATION_DIR / "gui-compatibility-exceptions.json"
+GOLDEN_SCHEMA = VERIFICATION_DIR / "golden-baseline.schema.json"
+GOLDEN_BASELINE = VERIFICATION_DIR / "comprehensive-golden-baseline-manifest.json"
+GOLDEN_MATRIX = VERIFICATION_DIR / "golden-coverage-matrix.md"
+WORKFLOW_INVENTORY = VERIFICATION_DIR / "user-facing-workflow-inventory.md"
 
 EXPECTED_MODERN_BASELINE_ENVIRONMENT = {
-    "id": "modern-ci-python3-pyqt5-r4-RCMetaR",
+    "id": "rc-metastudio-python3-pyqt5-r4-RCMetaR",
     "os": "Windows",
     "python": "3.11",
     "pyqt": "5.15.11",
@@ -225,13 +225,13 @@ def validate_capture_metadata(metadata: object) -> None:
         raise ValidationError(
             f"{GOLDEN_BASELINE}:capture_metadata.authority_values must be authoritative and local-debug"
         )
-    if metadata["baseline"] != "modern-behavior":
+    if metadata["baseline"] != "rc-metastudio-behavior":
         raise ValidationError(
-            f"{GOLDEN_BASELINE}:capture_metadata.baseline must be modern-behavior"
+            f"{GOLDEN_BASELINE}:capture_metadata.baseline must be rc-metastudio-behavior"
         )
     if metadata["baseline_environment"] != EXPECTED_MODERN_BASELINE_ENVIRONMENT:
         raise ValidationError(
-            f"{GOLDEN_BASELINE}:capture_metadata.baseline_environment does not match the Modern Behavior Baseline"
+            f"{GOLDEN_BASELINE}:capture_metadata.baseline_environment does not match the RC MetaStudio Behavior Baseline"
         )
     if metadata["authoritative_requires_baseline_environment_match"] is not True:
         raise ValidationError(

@@ -1,4 +1,4 @@
-"""Verify the RCMetaR R Stack Slice for the Modern CI Path."""
+"""Verify RCMetaR as Full R Stack Evidence."""
 
 from __future__ import annotations
 
@@ -14,12 +14,12 @@ from pathlib import Path
 
 
 RCMetaR_PACKAGE = Path("r") / "RCMetaR"
-R_DEP_INSTALLER = Path("scripts") / "install-modern-r-deps.R"
+R_DEP_INSTALLER = Path("scripts") / "install-r-deps.R"
 R_SMOKE_TEST = Path("scripts") / "analysis-smoke-test.R"
 R_MANIFEST_VALIDATOR = Path("scripts") / "validate_rcmetar_r_manifests.py"
 BRIDGE_TESTS = (
-    Path("tests") / "modern" / "r_stack" / "test_inprocess_rpy2_backend.py",
-    Path("tests") / "modern" / "fast" / "test_rcmetar_r_manifest_validation.py",
+    Path("tests") / "r_stack" / "test_inprocess_rpy2_backend.py",
+    Path("tests") / "python" / "fast" / "test_rcmetar_r_manifest_validation.py",
 )
 DEFAULT_CRAN_REPO = "https://cloud.r-project.org"
 
@@ -286,7 +286,7 @@ def dependency_cache_key(
     digest = hashlib.sha256()
     for relative_path in (
         R_DEP_INSTALLER,
-        Path("docs") / "modernization" / "RCMetaR-r-dependencies.json",
+        Path("docs") / "verification" / "RCMetaR-r-dependencies.json",
         RCMetaR_PACKAGE / "DESCRIPTION",
     ):
         digest.update(file_digest(root / relative_path).encode("ascii"))
@@ -383,7 +383,7 @@ def verify_manifest_versions(
         )
     manifest = json.loads(
         (
-            root / Path("docs") / "modernization" / "RCMetaR-r-dependencies.json"
+            root / Path("docs") / "verification" / "RCMetaR-r-dependencies.json"
         ).read_text(encoding="utf-8")
     )
     exact_versions = {

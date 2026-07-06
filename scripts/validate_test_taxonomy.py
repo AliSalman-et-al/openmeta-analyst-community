@@ -1,4 +1,4 @@
-"""Validate the modern pytest taxonomy manifest against collected tests."""
+"""Validate the pytest verification taxonomy manifest against collected tests."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 
-DEFAULT_MANIFEST = Path("docs") / "modernization" / "test-taxonomy.json"
+DEFAULT_MANIFEST = Path("docs") / "verification" / "test-taxonomy.json"
 VALID_SIZES = {"small", "medium", "large"}
 VALID_LANES = {
     "fast",
@@ -102,8 +102,8 @@ def validate_entry(entry: object, index: int) -> str:
 
 
 def taxonomy_nodeids(manifest: dict) -> set[str]:
-    if manifest.get("manifest") != "modern-test-taxonomy":
-        raise TaxonomyError("manifest must be modern-test-taxonomy")
+    if manifest.get("manifest") != "verification-test-taxonomy":
+        raise TaxonomyError("manifest must be verification-test-taxonomy")
     if manifest.get("schema_version") != 1:
         raise TaxonomyError("schema_version must be 1")
     tests = require_list(manifest.get("tests"), "tests")
@@ -159,7 +159,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
-    parser.add_argument("--tests-path", default="tests/modern")
+    parser.add_argument("--tests-path", default="tests")
     parser.add_argument("--strict", action="store_true")
     args = parser.parse_args(argv)
 
@@ -180,7 +180,7 @@ def main(argv: list[str] | None = None) -> int:
         for nodeid in sorted(stale):
             print(f"  {nodeid}")
     if not missing and not stale:
-        print("validated modern test taxonomy")
+        print("validated verification test taxonomy")
     return 0
 
 

@@ -28,7 +28,7 @@ Install the required R packages into a local R library:
 
 ```r
 Sys.setenv(R_LIBS_USER = "path/to/local/r-library")
-source("scripts/install-modern-r-deps.R")
+source("scripts/install-r-deps.R")
 ```
 
 The bundled R package is rcmetar. Prefer the product names and policy in this README, [NOTICE.md](NOTICE.md), and [CHANGELOG.md](CHANGELOG.md) when documentation conflicts with older historical records.
@@ -38,22 +38,22 @@ The bundled R package is rcmetar. Prefer the product names and policy in this RE
 Run the smoke verification lane for the fastest local check:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\verify-modern-smoke.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-smoke.ps1
 ```
 
 Run the fast verification lane for routine local evidence:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\verify-modern-fast.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-fast.ps1
 ```
 
 Run area-specific checks when changing GUI, R Stack, golden analysis, or packaging behavior:
 
 ```powershell
-uv run pytest tests\modern -m gui
-uv run pytest tests\modern -m r_stack
-uv run pytest tests\modern -m golden
-uv run pytest tests\modern -m packaging_contract
+uv run pytest tests -m gui
+uv run pytest tests -m r_stack
+uv run pytest tests -m golden
+uv run pytest tests -m packaging_contract
 ```
 
 ## Packaging Scope

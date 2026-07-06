@@ -1,5 +1,7 @@
 # Split Modern CI verification from packaging
 
+Supersession note: Issue #244 supersedes the active workflow, script, cache, artifact, and local command names in this ADR. Current maintained names use evidence-lane language such as smoke, fast, package, r-stack, analysis-regression, and verification instead of `modern-*` labels.
+
 The Modern CI Path will separate the Fast Verification Lane used on pull requests and pushes from the Packaging Lane that produces full PyInstaller distributables. This keeps ordinary development feedback focused on deterministic source verification while reserving the slower R runtime bundling, packaged smoke checks, ZIP creation, and artifact upload work for manual, release, or packaging-relevant runs.
 
 The Smoke Verification Lane should run before the broader Fast Verification Lane and fail quickly on broken collection, manifest sanity, representative compatibility parsing, project-load compatibility, and Default R Evidence prerequisites. The Fast Verification Lane then proves source correctness through locked Python dependency sync, manifest validation, modern pytest coverage, and OpenMetaR R Stack verification. It does not run PyInstaller, assemble a bundled R runtime, install bundled R libraries into an artifact tree, run packaged smoke checks, create distributable ZIPs, or upload distributable artifacts except when a packaging-relevant change explicitly opts into the Packaging Lane.

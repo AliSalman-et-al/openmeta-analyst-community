@@ -1,0 +1,136 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Comprehensive Golden Baseline Manifest",
+  "type": "object",
+  "required": [
+    "baseline",
+    "captured_at",
+    "coverage_matrix",
+    "coverage_manifest",
+    "schema",
+    "curated_golden_set",
+    "artifact_bundle",
+    "capture_metadata",
+    "bundle_contents"
+  ],
+  "properties": {
+    "baseline": {
+      "const": "comprehensive-golden"
+    },
+    "captured_at": {
+      "type": "string"
+    },
+    "coverage_matrix": {
+      "type": "string"
+    },
+    "coverage_manifest": {
+      "type": "string"
+    },
+    "schema": {
+      "type": "string"
+    },
+    "curated_golden_set": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "artifact_bundle": {
+      "type": "object",
+      "required": [
+        "path",
+        "storage"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "storage": {
+          "const": "ignored-local-or-ci-release-artifact"
+        }
+      }
+    },
+    "capture_metadata": {
+      "type": "object",
+      "required": [
+        "required_fields",
+        "local_default_capture_mode",
+        "authoritative_capture_mode",
+        "authority_values",
+        "baseline",
+        "baseline_environment",
+        "authoritative_requires_baseline_environment_match"
+      ],
+      "properties": {
+        "required_fields": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "python",
+              "os",
+              "r",
+              "rpy2",
+              "pyqt",
+              "package_versions",
+              "commit_sha",
+              "capture_mode",
+              "capture_command",
+              "baseline_environment",
+              "authoritative",
+              "authority"
+            ]
+          },
+          "minItems": 12
+        },
+        "local_default_capture_mode": {
+          "const": "local-debug"
+        },
+        "authoritative_capture_mode": {
+          "const": "authoritative"
+        },
+        "authority_values": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "authoritative",
+              "local-debug"
+            ]
+          },
+          "minItems": 2
+        },
+        "baseline": {
+          "const": "rc-metastudio-behavior"
+        },
+        "baseline_environment": {
+          "type": "object",
+          "required": [
+            "id",
+            "os",
+            "python",
+            "pyqt",
+            "r",
+            "rpy2",
+            "package"
+          ]
+        },
+        "authoritative_requires_baseline_environment_match": {
+          "const": true
+        }
+      }
+    },
+    "bundle_contents": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "capture",
+          "texts",
+          "artifacts",
+          "plot-similarity-metadata",
+          "omissions"
+        ]
+      },
+      "minItems": 1
+    }
+  }
+}

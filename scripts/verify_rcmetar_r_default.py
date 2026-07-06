@@ -249,7 +249,7 @@ def dependency_cache_key(
     digest = hashlib.sha256()
     for relative_path in (
         DEFAULT_R_VERIFIER,
-        Path("docs") / "modernization" / "RCMetaR-r-dependencies.json",
+        Path("docs") / "verification" / "RCMetaR-r-dependencies.json",
         RCMetaR_PACKAGE / "DESCRIPTION",
     ):
         digest.update((root / relative_path).read_bytes())
@@ -262,7 +262,7 @@ def dependency_cache_key(
 def direct_archive_versions(root: Path) -> dict[str, str]:
     manifest = json.loads(
         (
-            root / Path("docs") / "modernization" / "RCMetaR-r-dependencies.json"
+            root / Path("docs") / "verification" / "RCMetaR-r-dependencies.json"
         ).read_text(encoding="utf-8")
     )
     return {
@@ -275,7 +275,7 @@ def direct_archive_versions(root: Path) -> dict[str, str]:
 def direct_dependency_policy(root: Path) -> tuple[list[str], dict[str, str]]:
     manifest = json.loads(
         (
-            root / Path("docs") / "modernization" / "RCMetaR-r-dependencies.json"
+            root / Path("docs") / "verification" / "RCMetaR-r-dependencies.json"
         ).read_text(encoding="utf-8")
     )
     cran_packages = []

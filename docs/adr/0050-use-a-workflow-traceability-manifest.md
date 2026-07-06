@@ -1,5 +1,7 @@
 # Use a Workflow Traceability Manifest
 
+Supersession note: Issue #244 keeps the manifest concept but moves the active manifest out of `docs/modernization`; current workflow traceability lives under `docs/verification`.
+
 The Full Legacy App Port should use a committed `docs/modernization/workflow-traceability.json` file to map every Release Cutover workflow from the User-Facing Workflow Inventory to its compatibility evidence.
 
 Each workflow entry should have a stable ID and trace to one of: a Golden Coverage Matrix row, GUI Verification Evidence entry, documented omission, Compatibility Exception, or GUI Compatibility Exception. Compatibility Exception and GUI Compatibility Exception references should point to committed exception manifests. Pending entries are allowed while the Comprehensive Golden Baseline gate is still open, but the gate is not satisfied until every Release Cutover workflow has a non-pending trace.

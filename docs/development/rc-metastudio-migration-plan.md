@@ -209,7 +209,7 @@ Acceptance criteria:
 
 - Active workflow, script, test, and docs labels use evidence-based names such as `smoke`, `fast`, `package`, `r-stack`, `analysis-baseline`, `analysis-regression`, and `verification`.
 - `modern` and generic `legacy` framing are removed from active surfaces.
-- Tests are organized by runtime and evidence type rather than `tests/modern`.
+- Tests are organized by runtime and evidence type rather than `tests`.
 
 Verification:
 

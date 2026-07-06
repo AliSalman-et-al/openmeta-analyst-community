@@ -43,7 +43,7 @@ RCMetaR_R_PACKAGE = "RCMetaR"
 
 
 MODERN_BASELINE_ENVIRONMENT_EXPECTED = {
-    "id": "modern-ci-python3-pyqt5-r4-RCMetaR",
+    "id": "rc-metastudio-python3-pyqt5-r4-RCMetaR",
     "os": "Windows",
     "python": "3.11",
     "pyqt": "5.15.11",
@@ -193,9 +193,9 @@ def comprehensive_golden_baseline_manifest(root_dir=None, timestamp=None):
     return {
         "baseline": "comprehensive-golden",
         "captured_at": captured_at,
-        "coverage_matrix": "docs/modernization/golden-coverage-matrix.md",
-        "coverage_manifest": "docs/modernization/golden-coverage-manifest.json",
-        "schema": "docs/modernization/golden-baseline.schema.json",
+        "coverage_matrix": "docs/verification/golden-coverage-matrix.md",
+        "coverage_manifest": "docs/verification/golden-coverage-manifest.json",
+        "schema": "docs/verification/golden-baseline.schema.json",
         "curated_golden_set": [
             bundle["id"] for bundle in curated_golden_bundles(root_dir)
         ],
@@ -221,7 +221,7 @@ def comprehensive_golden_baseline_manifest(root_dir=None, timestamp=None):
             "local_default_capture_mode": "local-debug",
             "authoritative_capture_mode": "authoritative",
             "authority_values": ["authoritative", "local-debug"],
-            "baseline": "modern-behavior",
+            "baseline": "rc-metastudio-behavior",
             "baseline_environment": dict(MODERN_BASELINE_ENVIRONMENT_EXPECTED),
             "authoritative_requires_baseline_environment_match": True,
         },

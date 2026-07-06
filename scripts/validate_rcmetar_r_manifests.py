@@ -9,9 +9,9 @@ import sys
 from pathlib import Path
 
 
-MODERNIZATION_DIR = Path("docs") / "modernization"
-DEPENDENCY_MANIFEST = MODERNIZATION_DIR / "RCMetaR-r-dependencies.json"
-DRIFT_MANIFEST = MODERNIZATION_DIR / "RCMetaR-statistical-drift.json"
+VERIFICATION_DIR = Path("docs") / "verification"
+DEPENDENCY_MANIFEST = VERIFICATION_DIR / "RCMetaR-r-dependencies.json"
+DRIFT_MANIFEST = VERIFICATION_DIR / "RCMetaR-statistical-drift.json"
 EXPECTED_R_TARGET = "4.6.0"
 
 DIRECT_DEPENDENCY_REQUIRED_FIELDS = {
@@ -30,7 +30,7 @@ DRIFT_RECORD_REQUIRED_FIELDS = {
     "workflow",
     "result_family",
     "reference_implementation_output",
-    "modern_RCMetaR_output",
+    "rcmetar_output",
     "package_versions",
     "methods_involved",
     "likely_reason",
