@@ -274,7 +274,7 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
             plot.names <- c(plot.names, plot.names.tmp)
             
             # create SROC plot
-            sroc.path <- "./r_tmp/roc.png"
+            sroc.path <- rcmetar.scratch.path("roc.png")
             sroc.plot.data <- create.sroc.plot.data(diagnostic.data, params=params.sens)
             sroc.plot(sroc.plot.data, sroc.path)
             # we use the system time as our unique-enough string to store

@@ -30,6 +30,15 @@ rcmetar.summary.label <- function(value) {
   normalized
 }
 
+rcmetar.scratch.path <- function(...) {
+  scratch.dir <- Sys.getenv(
+    "RCMS_ANALYSIS_SCRATCH_DIR",
+    unset = file.path(tempdir(), "rc-metastudio-analysis")
+  )
+  dir.create(scratch.dir, recursive = TRUE, showWarnings = FALSE)
+  file.path(scratch.dir, ...)
+}
+
 rcmetar.summary.cell.is.numeric <- function(value) {
   normalized <- trimws(as.character(value))
   if (normalized == "") {
@@ -353,11 +362,10 @@ create.summary.disp <- function(om.data, params, res, model.title) {
 
 # @TODO should merge this with save.data below
 save.plot.data <- function(plot.data, out.path=NULL) {
-  # saves plot data to the r_tmp directory
+  # saves plot data to the RC MetaStudio scratch directory
   if (is.null(out.path)){
     # by default, we use thecurrent system time as a 'unique enough' filename
-    out.path <- paste("r_tmp/", 
-                as.character(as.numeric(Sys.time())), sep="")
+    out.path <- rcmetar.scratch.path(as.character(as.numeric(Sys.time())))
   }
   ### save plot data *only*
   save(plot.data, file=paste(out.path, ".plotdata", sep=""))
@@ -366,11 +374,10 @@ save.plot.data <- function(plot.data, out.path=NULL) {
 
 # For OpenMEE phylogenetic forest plot
 save.plot.data.and.params <- function(data, params, res, level, out.path=NULL) {
-  # saves plot data to the r_tmp directory
+  # saves plot data to the RC MetaStudio scratch directory
   if (is.null(out.path)){
     # by default, we use thecurrent system time as a 'unique enough' filename
-    out.path <- paste("r_tmp/", 
-        as.character(as.numeric(Sys.time())), sep="")
+    out.path <- rcmetar.scratch.path(as.character(as.numeric(Sys.time())))
   }
   
   ### save plot data
@@ -397,8 +404,7 @@ save.data <- function(om.data, res, params, plot.data, out.path=NULL) {
   # save the data, result and plot parameters to a tmp file on disk
   if (is.null(out.path)){
     # by default, we use thecurrent system time as a 'unique enough' filename
-    out.path <- paste("r_tmp/", 
-                as.character(as.numeric(Sys.time())), sep="")
+    out.path <- rcmetar.scratch.path(as.character(as.numeric(Sys.time())))
   }
 
   save(om.data, file=paste(out.path, ".data", sep=""))

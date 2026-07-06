@@ -4,6 +4,12 @@ version = "0.1.0"
 description = "RC MetaStudio open-source desktop software for advanced meta-analysis."
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
+authors = [
+    { name = "Ali Salman and RC MetaStudio contributors", email = "alisalman.et.al@gmail.com" },
+]
+maintainers = [
+    { name = "Ali Salman", email = "alisalman.et.al@gmail.com" },
+]
 dependencies = [
     "PyQt5==5.15.11",
     "PyQt5-Qt5==5.15.2",
@@ -15,6 +21,10 @@ dependencies = [
 
 [project.scripts]
 rc-metastudio = "rc_metastudio.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/AliSalman-et-al/rc-metastudio"
+Issues = "https://github.com/AliSalman-et-al/rc-metastudio/issues"
 
 [build-system]
 requires = ["setuptools>=80"]

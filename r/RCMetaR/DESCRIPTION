@@ -1,18 +1,20 @@
 Package: RCMetaR
-Version: 1.0
-Date: 2010-12-02
+Version: 0.1.0
+Date: 2026-07-06
 Type: Package
 Title: R Component for RC MetaStudio
 Authors@R: c(
-    person("Byron", "Wallace", email = "bwallace@tuftsmedicalcenter.org", role = "aut"),
-    person("Paul", "Trow", email = "ptrow@tuftsmedicalcenter.org", role = "cre")
+    person("Ali", "Salman", email = "alisalman.et.al@gmail.com", role = c("aut", "cre")),
+    person("Research Consultancy", role = "cph")
     )
-Author: Byron Wallace [aut],
-    Paul Trow [cre]
-Maintainer: Paul Trow <ptrow@tuftsmedicalcenter.org>
+Author: Ali Salman [aut, cre],
+    Research Consultancy [cph]
+Maintainer: Ali Salman <alisalman.et.al@gmail.com>
 Description: R component for RC MetaStudio, a graphical user interface
     for performing meta-analysis.
 License: GPL (>= 2)
+URL: https://github.com/AliSalman-et-al/rc-metastudio
+BugReports: https://github.com/AliSalman-et-al/rc-metastudio/issues
 Depends:
     R (>= 4.6.0)
 Imports:

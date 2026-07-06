@@ -18,8 +18,8 @@ htmlcov/*
 r_tmp/*
 src/R/rtmp/*
 HSROC_2.0.5.tar.gz
-openmetar_1.0.tar.gz
-openmetar_1.0.zip
+RCMetaR_*.tar.gz
+RCMetaR_*.zip
 
 # IDEs
 .project
@@ -39,8 +39,8 @@ src/build/*
 src/build-debug/*
 src/dist/*
 src/dist-debug/*
-OpenMetaAnalyst*.spec
-src/OpenMetaAnalyst*.spec
+RCMetaStudio*.spec
+src/RCMetaStudio*.spec
 
 # Local agent scratch files
 .codex-tmp/

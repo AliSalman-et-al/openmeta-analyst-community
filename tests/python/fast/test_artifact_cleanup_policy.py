@@ -6,6 +6,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 APP_PACKAGE = ROOT / "src" / "rc_metastudio"
 RETIRED_PRODUCT_SPEC_PATTERN = "OpenMeta" + "Analyst*.spec"
+CURRENT_PRODUCT_SPEC_PATTERNS = (
+    "RCMetaStudio*.spec",
+    "src/RCMetaStudio*.spec",
+)
+RETIRED_ARTIFACT_PATTERNS = (
+    RETIRED_PRODUCT_SPEC_PATTERN,
+    "src/" + RETIRED_PRODUCT_SPEC_PATTERN,
+    "open" + "metar_1.0.tar.gz",
+    "open" + "metar_1.0.zip",
+)
 
 TRACKED_ARTIFACT_PATTERNS = (
     "*.pyc",
@@ -25,10 +35,10 @@ TRACKED_ARTIFACT_PATTERNS = (
     "src/build/*",
     "src/dist/*",
     "*.egg-info/*",
-    RETIRED_PRODUCT_SPEC_PATTERN,
+    *CURRENT_PRODUCT_SPEC_PATTERNS,
     "HSROC_2.0.5.tar.gz",
-    "openmetar_1.0.tar.gz",
-    "openmetar_1.0.zip",
+    "RCMetaR_*.tar.gz",
+    "RCMetaR_*.zip",
 )
 
 REQUIRED_GITIGNORE_PATTERNS = set(TRACKED_ARTIFACT_PATTERNS) | {
@@ -83,7 +93,7 @@ def test_no_tracked_generated_cache_build_or_runtime_artifacts():
         normalized = tracked_path.replace("\\", "/")
         if any(
             fnmatch.fnmatch(normalized, pattern)
-            for pattern in TRACKED_ARTIFACT_PATTERNS
+            for pattern in TRACKED_ARTIFACT_PATTERNS + RETIRED_ARTIFACT_PATTERNS
         ):
             offenders.append(normalized)
 

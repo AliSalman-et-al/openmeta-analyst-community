@@ -369,7 +369,7 @@ def _golden_matrix_omissions():
 
 def curated_golden_bundles(root_dir=None):
     root_dir = root_dir or os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..")
+        os.path.join(os.path.dirname(__file__), "..", "..")
     )
     sample = lambda name: os.path.join(root_dir, "sample_projects", name)
     binary_params = dict(

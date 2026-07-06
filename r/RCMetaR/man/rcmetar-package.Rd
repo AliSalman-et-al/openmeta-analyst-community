@@ -29,11 +29,12 @@ facade.
 \code{\link{RCMetaR-hsroc-helpers}}
 }
 \author{
-\strong{Maintainer}: Paul Trow \email{ptrow@tuftsmedicalcenter.org}
+\strong{Maintainer}: Ali Salman \email{alisalman.et.al@gmail.com}
 
 Authors:
 \itemize{
-  \item Byron Wallace \email{bwallace@tuftsmedicalcenter.org}
+  \item Ali Salman
+  \item Research Consultancy
 }
 
 }

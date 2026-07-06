@@ -2319,7 +2319,7 @@ class DatasetModel(QAbstractTableModel):
         # first check to see that the current outcome is contained in this study
         if not outcome in study.outcomes_to_follow_ups:
             ###
-            # Issue 7 (RESOLVED) http://github.com/bwallace/rc-metastudio-/issues/#issue/7
+            # Historical issue 7 from the original project.
             study.add_outcome(
                 self.dataset.get_outcome_obj(outcome),
                 group_names=self.dataset.get_group_names(),

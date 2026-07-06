@@ -5103,6 +5103,66 @@
     {
       "decision": "keep",
       "evidence": [
+        "packaging_contract",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_release_readiness_contract.py::test_active_rcmetar_package_metadata_uses_current_maintainer_identity",
+      "reason": "Final migration audit guard for active RCMetaR package maintainer metadata.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "packaging_contract",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_release_readiness_contract.py::test_gitignore_uses_current_release_artifact_patterns",
+      "reason": "Final migration audit guard for RCMetaR and RC MetaStudio release artifact ignore patterns.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "packaging_contract",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_release_readiness_contract.py::test_rc_metastudio_and_rcmetar_versions_are_aligned_for_release",
+      "reason": "Final migration audit guard for aligned RC MetaStudio and RCMetaR release versions.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "packaging_contract",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_release_readiness_contract.py::test_release_readiness_text_does_not_invert_current_identity",
+      "reason": "Final migration audit guard for changelog and release-inventory identity wording.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
         "r_stack",
         "analysis_behavior"
       ],

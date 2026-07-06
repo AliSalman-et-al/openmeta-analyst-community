@@ -1074,7 +1074,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         print("trying to display: %s" % previously_displayed_outcome)
         ##
         # RESOLVED previously, if previous outcome was None, this threw up
-        # (see Issue 4: http://github.com/bwallace/rc-metastudio-/issues#issue/4)
+        # Historical issue 4 from the original project.
         self.display_outcome(previously_displayed_outcome)
 
     def _add_new_outcome(self, outcome_name, outcome_type, sub_type=None):

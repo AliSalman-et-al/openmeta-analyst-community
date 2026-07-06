@@ -35,7 +35,7 @@ import textwrap
 import pytest
 
 
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 
 _DRIVER = textwrap.dedent(
@@ -43,6 +43,8 @@ _DRIVER = textwrap.dedent(
     import os, sys
     os.environ["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     sys.path.insert(0, os.path.join(__REPO_ROOT__, "src"))
+    sys.path.insert(0, os.path.join(__REPO_ROOT__, "src", "rc_metastudio"))
+    sys.path.insert(0, os.path.join(__REPO_ROOT__, "tests", "python", "fast"))
 
     import test_backend_compat
     test_backend_compat.install()
@@ -240,6 +242,8 @@ _RCHAR_UTF8_DRIVER = textwrap.dedent(
     os.environ.pop("RCMS_STUB_BACKEND", None)
     os.environ["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     sys.path.insert(0, os.path.join(repo_root, "src"))
+    sys.path.insert(0, os.path.join(repo_root, "src", "rc_metastudio"))
+    sys.path.insert(0, os.path.join(repo_root, "tests", "python", "fast"))
 
     import test_backend_compat
     test_backend_compat.install()
@@ -323,6 +327,8 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
         )
         os.environ.update(env)
         sys.path.insert(0, os.path.join(repo_root, "src"))
+        sys.path.insert(0, os.path.join(repo_root, "src", "rc_metastudio"))
+        sys.path.insert(0, os.path.join(repo_root, "tests", "python", "fast"))
 
         import test_backend_compat
         test_backend_compat.install()
@@ -466,6 +472,8 @@ _HSROC_SUMMARY_DRIVER = textwrap.dedent(
     os.environ.pop("RCMS_STUB_BACKEND", None)
     os.environ["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     sys.path.insert(0, os.path.join(repo_root, "src"))
+    sys.path.insert(0, os.path.join(repo_root, "src", "rc_metastudio"))
+    sys.path.insert(0, os.path.join(repo_root, "tests", "python", "fast"))
 
     import test_backend_compat
     test_backend_compat.install()
@@ -645,6 +653,8 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
         env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
         os.environ.update(env)
         sys.path.insert(0, os.path.join(repo_root, "src"))
+        sys.path.insert(0, os.path.join(repo_root, "src", "rc_metastudio"))
+        sys.path.insert(0, os.path.join(repo_root, "tests", "python", "fast"))
 
         import test_backend_compat
         test_backend_compat.install()

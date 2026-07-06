@@ -334,7 +334,7 @@ def test_comprehensive_golden_baseline_capture_writes_reproducible_bundle(
             golden_analysis,
             "_tool_versions",
             lambda: {
-                "rc_metastudio": "0.005",
+                "rc_metastudio": "0.1.0",
                 "python": "3.11.15",
                 "os": "Windows",
                 "r": "R version 4.6.0",
@@ -406,7 +406,7 @@ def _import_legacy_golden_modules():
             BINARY="binary",
             CONTINUOUS="continuous",
             DIAGNOSTIC="diagnostic",
-            VERSION=0.005,
+            VERSION="0.1.0",
         )
         sys.modules["meta_py_r"] = types.SimpleNamespace(RlibLoader=lambda: None)
         import golden_analysis
