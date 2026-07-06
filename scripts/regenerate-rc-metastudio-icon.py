@@ -9,12 +9,16 @@ from PyQt5 import QtCore, QtGui
 
 
 ROOT = Path(__file__).resolve().parents[1]
-IMAGE_DIR = ROOT / "src" / "images"
-SOURCE_IMAGE = IMAGE_DIR / "rc-metastudio-app-icon-source-whitefill.png"
+IMAGE_DIR = ROOT / "src" / "rc_metastudio" / "images"
+ICON_SOURCE_IMAGE = IMAGE_DIR / "rc-metastudio-app-icon-source.png"
 PNG_TARGET = IMAGE_DIR / "rc-metastudio-app-icon.png"
 ICO_TARGET = IMAGE_DIR / "rc-metastudio-app-icon.ico"
+SPLASH_SOURCE_IMAGE = IMAGE_DIR / "rc-metastudio-splash-source.png"
+SPLASH_TARGET = IMAGE_DIR / "rc-metastudio-splash.png"
 MASTER_SIZE = 1024
 MASTER_MARGIN = 32
+SPLASH_SIZE = QtCore.QSize(600, 480)
+SPLASH_MARGIN = 32
 ICO_SIZES = (16, 24, 32, 48, 64, 128, 256)
 
 
@@ -33,14 +37,16 @@ def _alpha_bounds(image):
                 bottom = max(bottom, y)
 
     if right < left or bottom < top:
-        raise ValueError(f"{SOURCE_IMAGE} has no non-transparent pixels")
+        raise ValueError("source image has no non-transparent pixels")
     return QtCore.QRect(left, top, right - left + 1, bottom - top + 1)
 
 
 def _render_square_master():
-    source = QtGui.QImage(str(SOURCE_IMAGE)).convertToFormat(QtGui.QImage.Format_ARGB32)
+    source = QtGui.QImage(str(ICON_SOURCE_IMAGE)).convertToFormat(
+        QtGui.QImage.Format_ARGB32
+    )
     if source.isNull():
-        raise ValueError(f"Could not load {SOURCE_IMAGE}")
+        raise ValueError(f"Could not load {ICON_SOURCE_IMAGE}")
 
     artwork = source.copy(_alpha_bounds(source))
     target_extent = MASTER_SIZE - (2 * MASTER_MARGIN)
@@ -63,6 +69,36 @@ def _render_square_master():
     )
     painter.end()
     return master
+
+
+def _render_splash():
+    source = QtGui.QImage(str(SPLASH_SOURCE_IMAGE)).convertToFormat(
+        QtGui.QImage.Format_ARGB32
+    )
+    if source.isNull():
+        raise ValueError(f"Could not load {SPLASH_SOURCE_IMAGE}")
+
+    target_width = SPLASH_SIZE.width() - (2 * SPLASH_MARGIN)
+    target_height = SPLASH_SIZE.height() - (2 * SPLASH_MARGIN)
+    scaled = source.scaled(
+        target_width,
+        target_height,
+        QtCore.Qt.KeepAspectRatio,
+        QtCore.Qt.SmoothTransformation,
+    )
+
+    splash = QtGui.QImage(SPLASH_SIZE, QtGui.QImage.Format_ARGB32)
+    splash.fill(QtGui.QColor("white"))
+
+    painter = QtGui.QPainter(splash)
+    painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform, True)
+    painter.drawImage(
+        (SPLASH_SIZE.width() - scaled.width()) // 2,
+        (SPLASH_SIZE.height() - scaled.height()) // 2,
+        scaled,
+    )
+    painter.end()
+    return splash
 
 
 def _png_bytes(image):
@@ -121,9 +157,12 @@ def _write_ico(master):
 def main():
     app = QtGui.QGuiApplication.instance() or QtGui.QGuiApplication([])
     master = _render_square_master()
+    splash = _render_splash()
 
     if not master.save(str(PNG_TARGET), "PNG"):
         raise ValueError(f"Could not write {PNG_TARGET}")
+    if not splash.save(str(SPLASH_TARGET), "PNG"):
+        raise ValueError(f"Could not write {SPLASH_TARGET}")
     _write_ico(master)
 
     icon = QtGui.QIcon(str(ICO_TARGET))

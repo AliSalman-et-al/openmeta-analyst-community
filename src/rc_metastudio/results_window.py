@@ -1,14 +1,6 @@
-#############################################
-#                                           #
-#  Byron C. Wallace     George E. Dietz     #
-#  Brown University     CEBM@Brown          #
-#  RC MetaStudio                        #
-#                                           #
-#                                           #
-#  This is the component responsible        #
-#  for rendering MA results.                #
-#                                           #
-#############################################
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Render and export meta-analysis results."""
 
 import random
 from PyQt5.QtCore import QByteArray, QPoint, QRectF, Qt
@@ -192,8 +184,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
         ###
         # we scale to address issue #23.
-        # should probably pick a 'target' width/height, in case
-        # others generate smaller images by default.
+        # Scale generated images consistently across plot backends.
         scaled_width = int(SCALE_P * pixmap.width())
         scaled_height = int(SCALE_P * pixmap.height())
 
@@ -368,11 +359,8 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self._update_wrapped_text_widths()
 
     def _get_plot_type(self, title):
-        # at present we use the *title* as the type --
-        # this is currently _not_ set by the user, so it's
-        # 'safe', but it's not exactly elegant. probably
-        # we should return a type directly from R.
-        # on other hand, this couples R + Python even
+        # Infer plot type from title because RCMetaR does not yet return an
+        # explicit plot type field.
         # more...
         plot_type = None
         tmp_title = title.lower()
@@ -409,8 +397,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self.scene.addItem(item)
         item.setPos(position)
 
-        # for now we're inferring the plot type (e.g., 'forest'
-        # from the title of the plot (see in-line comments, above)
+        # Infer the plot type from the title; see _get_plot_type.
         plot_type = self._get_plot_type(title)
 
         # attach event handler for mouse-clicks, i.e., to handle

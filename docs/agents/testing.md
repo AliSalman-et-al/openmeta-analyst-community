@@ -80,7 +80,7 @@ delegates:
 
 ## R package setup in focused tests
 
-`DatasetModel` initialization calls OpenMeta R functions such as `set.global.conf.level`. Focused tests that instantiate `DatasetModel` without the full application setup should load only the needed package:
+`DatasetModel` initialization calls RCMetaR functions such as `set.global.conf.level`. Focused tests that instantiate `DatasetModel` without the full application setup should load only the needed package:
 
 ```python
 meta_py_r.RlibLoader().load_RCMetaR()

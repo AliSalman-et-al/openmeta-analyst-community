@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import forms.ui_choose_metric_page
 import forms.ui_csv_import_page
 import forms.ui_data_type_page
@@ -247,7 +250,7 @@ class DataTypePage(QWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
             self.summary["arms"] = "one"
             self.summary["data_type"] = "continuous"
             self.summary["sub_type"] = (
-                "generic_effect"  # TODO: Should disable_two-arm metrics for generic effect
+                "generic_effect"
             )
             self.summary["effect"] = meta_globals.DEFAULT_CONTINUOUS_ONE_ARM
             self.summary["metric_choices"] = meta_globals.CONTINUOUS_ONE_ARM_METRICS
@@ -621,7 +624,7 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
             for row in reader:
                 self.imported_data.append(row)
         self._normalize_imported_rows()
-        self.print_extracted_data()  # just for debugging
+        self.print_extracted_data()
 
     def _normalize_imported_rows(self):
         self.imported_data = tabular_data.normalize_rows(

@@ -1,12 +1,6 @@
-#############################################################
-#  Byron C. Wallace                                         #
-#  George Dietz                                             #
-#  CEBM @ Brown                                             #
-#  OpenMeta(analyst)                                        #
-#                                                           #
-#                                                           #
-# Custom QTableView, implements copy/paste and undo/redo.   #
-#############################################################
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Custom QTableView with copy, paste, undo, and redo support."""
 
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import QRegExp, Qt, pyqtSignal
@@ -95,7 +89,7 @@ class MADataTable(QtWidgets.QTableView):
             app_error_handler.safe_slot(self.row_header_clicked, parent=self)
         )
 
-        ## TODO need to add covariate indices here, as needed
+        # Additional covariate sort columns are registered as they become visible.
         self.reverse_column_sorts = {0: False, 1: False}
         self.setAlternatingRowColors(True)
 
@@ -293,19 +287,9 @@ class MADataTable(QtWidgets.QTableView):
             else:
                 QTableView.keyPressEvent(self, event)
         else:
-            # fix for issue #180
-            # if event.key() == QtCore.Qt.Key_Tab:
-            # check to see if the next cell is
-            # an outcome cell; if it is, treat
-            # this like an enter, instead of a tab.
-
-            ###
             # This is a call to the default keyPressEvent function,
-            # which we are here overwriting, thereby eliminating
-            # many of the annoying properties (no tab navigation; double
-            # click editing only) that have been brought up/reported
-            # as bugs. See issues: #21, #19
-            #
+            # which preserves table navigation behavior for keys we do not
+            # handle explicitly.
             QTableView.keyPressEvent(self, event)
 
     def _is_return_key(self, event):
@@ -386,14 +370,14 @@ class MADataTable(QtWidgets.QTableView):
         if row > len(self.model().dataset) - 1:
             return
 
-        # fix for issue # 184
+        # Prevent row-header signals while the edit dialog mutates row state.
         self.vert_header.blockSignals(True)
 
         try:
             # dispatch on the data type
             form = None
             study_index = row
-            # fix for issue # 183
+            # Snapshot the MA unit so dialog cancellation can restore it.
             ma_unit = copy.deepcopy(
                 self.model().get_current_ma_unit_for_study(study_index)
             )
@@ -553,9 +537,8 @@ class MADataTable(QtWidgets.QTableView):
         # if a covariate column was clicked, it may not yet have an entry in the
         # reverse_column_sorts dictionary; thus we insert one here
         #
-        # @TODO this should *not* use the column number as the key!
-        # rather, it should use the name -- the column number of a given
-        # covariate might change (e.g., if another covariate is deleted)
+        # This uses the visible column number because sort state is owned by the
+        # current table view; rebuild it when covariate columns move or vanish.
         if column not in self.reverse_column_sorts:
             self.reverse_column_sorts[column] = False
         sort_command = CommandSort(
@@ -575,15 +558,13 @@ class MADataTable(QtWidgets.QTableView):
         clipboard = QApplication.clipboard()
         clipboard_text = clipboard.text()
 
-        # fix for issue #169.
-        # excel for mac, insanely, appends \r instead of
-        # \n for new lines (rows).
+        # Some spreadsheet applications use carriage returns between copied
+        # rows; normalize them before parsing.
         clipboard_text = self._normalize_newlines(clipboard_text)
 
         new_content = self._str_to_matrix(clipboard_text)
 
-        # fix for issue #64. excel likes to append a blank row
-        # to copied data -- we drop that here
+        # Drop a trailing blank row commonly included in copied spreadsheet data.
         if self._is_blank_row(new_content[-1]):
             new_content = new_content[:-1]
         new_content = self._normalize_matrix_rows(new_content)
@@ -748,7 +729,7 @@ class MADataTable(QtWidgets.QTableView):
         if (
             len(self.model().dataset) >= 2
             and self._get_number_of_included_studies() >= 2
-        ):  # TODO add condition that there are at least two studies included
+        ):
             self.main_gui.enable_menu_options_that_require_dataset()
         else:
             self.main_gui.disable_menu_options_that_require_dataset()
@@ -857,8 +838,7 @@ class MADataTable(QtWidgets.QTableView):
         # now append a blank study if studies were added.
         if num_to_add > 0:
             new_study = Study(self.model().dataset.max_study_id() + 1)
-            # ah! fix for issue #171. stupidly, I was not previously
-            # excluding 'blank' studies appended here..
+            # Newly appended placeholder studies remain excluded until populated.
             new_study.include = False
             self.model().dataset.add_study(new_study)
             self.model().dataset.study_auto_added = int(new_study.id)
@@ -895,7 +875,6 @@ class CommandCellEdit(QUndoCommand):
         self.added_study = added_study
         self.something_else = added_study
 
-        #### output for debugging
         debug_params = dict(
             first_call=True,
             original_content=original_content,
@@ -908,8 +887,6 @@ class CommandCellEdit(QUndoCommand):
         )
 
         print(("CommandCellEdit created with parameters: %s" % str(debug_params)))
-        #### end debugging output
-
     @DebugHelper
     def redo(self):
         index = self._get_index()
@@ -1088,7 +1065,6 @@ class CommandEditMAUnit(QUndoCommand):
         self.study_index = study_index
         self.ma_data_table_view = table_view
 
-        # for debugging
         print("CommandEditMAunit created")
 
     @DebugHelper

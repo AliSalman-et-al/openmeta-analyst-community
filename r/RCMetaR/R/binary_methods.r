@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 ####################################
 # RC MetaStudio                #
@@ -116,7 +118,7 @@ create.binary.data.array <- function(binary.data, params, res){
     # Extracts data from binary.data and puts it into an array for the the first summary display table.
     tx1.name <- "tx A"
     tx2.name <- "tx B"
-    # TODO: these should be taken from the corresponding column labels in the GUI and passed in via params.
+    # Group labels default here unless the GUI passes display labels in params.
     digits.str <- paste("%.", params$digits, "f", sep="")
     effect.size.name <- pretty.metric.name(as.character(params$measure))
     # Caculate confidence intervals
@@ -308,7 +310,7 @@ binary.fixed.mh <- function(binary.data, params){
     if (length(binary.data@g1O1) == 1 || length(binary.data@y) == 1){
         res <- get.res.for.one.binary.study(binary.data, params)
          # Package res for use by overall method.
-        results <- list("Summary"=res, # shouldn't assume this is any more than a string
+        results <- list("Summary"=res, # Summary is formatted text for display.
                         "res"=res) # actual metafor output
     } else {
         res<-rma.mh(ai=binary.data@g1O1, bi=binary.data@g1O2, 
@@ -703,7 +705,7 @@ binary.random.parameters <- function(){
 }
 
 binary.random.pretty.names <- function() {
-    # sort of redundant to have both this and rm_method_ls but whatever for now...
+    # Keep display names explicit even though rm_method_ls defines the codes.
     rm_method_names <- list(
             HE="Hedges-Olkin",
             DL = "DerSimonian-Laird",

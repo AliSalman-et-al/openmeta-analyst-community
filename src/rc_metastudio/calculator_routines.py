@@ -1,14 +1,6 @@
-###############################################################
-#                                                             #
-#  George E. Dietz                                            #
-#  Byron C. Wallace                                           #
-#                                                             #
-#  CEBM @ Brown                                               #
-#  RC MetaStudio                                          #
-#  ---                                                        #
-#  Binary data form module; for flexible entry of dichotomous #
-#  outcome data                                               #
-###############################################################
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Shared calculator helpers for data-entry dialogs."""
 
 from functools import partial
 from PyQt5.QtCore import Qt

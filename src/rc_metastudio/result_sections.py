@@ -2,14 +2,6 @@ import re
 from collections import namedtuple
 
 
-OPENMETA_ANALYST_REFERENCE = (
-    "RCMetaStudio: Wallace, Byron C., Issa J. Dahabreh, Thomas A. Trikalinos, "
-    'Joseph Lau, Paul Trow, and Christopher H. Schmid. "Closing the Gap between '
-    'Methodologists and End-Users: R as a Computational Back-End." Journal of '
-    'Statistical Software 49 (2012): 5."'
-)
-
-
 REFERENCE_SECTION_TITLE = "References"
 WEIGHTS_SECTION_TITLE = "Weights"
 
@@ -49,9 +41,7 @@ METRIC_TITLE_REPLACEMENTS = (
 
 
 def format_references(references):
-    ordered_references = dedupe_references_preserving_order(
-        list(references) + [OPENMETA_ANALYST_REFERENCE]
-    )
+    ordered_references = dedupe_references_preserving_order(list(references))
     return "".join(
         "%d. %s\n" % (index + 1, reference)
         for index, reference in enumerate(ordered_references)

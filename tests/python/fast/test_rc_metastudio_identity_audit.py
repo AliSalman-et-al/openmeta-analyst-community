@@ -94,7 +94,7 @@ def test_identity_audit_reports_forbidden_tokens_across_active_surfaces(tmp_path
     assert "legacy-r-facade" in result.stdout
 
 
-def test_identity_audit_allows_history_provenance_and_original_headers(tmp_path):
+def test_identity_audit_allows_central_history_provenance(tmp_path):
     write_text(
         tmp_path / "docs" / "adr" / "0001-history.md",
         f"# Historical decision about {legacy_product_name()}\n",
@@ -107,18 +107,28 @@ def test_identity_audit_allows_history_provenance_and_original_headers(tmp_path)
         tmp_path / "docs" / "contexts" / "project-provenance" / "CONTEXT.md",
         f"Original {legacy_bracketed_product_name()} Project: historical provenance term.\n",
     )
+    result = run_audit(tmp_path)
+
+    assert result.returncode == 0, result.stdout
+    assert "identity audit passed" in result.stdout
+
+
+def test_identity_audit_rejects_old_institutional_source_headers(tmp_path):
+    retired_center = "CE" + "BM @ Brown"
+    retired_university = "Brown " + "University"
+    retired_hospital = "Tufts " + "Medical Center"
     write_text(
         tmp_path / "src" / "module.py",
-        f"# Original header: {legacy_bracketed_product_name()}\n"
-        "# CEBM @ Brown\n"
-        "\n"
+        f"# {retired_center}\n"
+        f"# {retired_university}\n"
+        f"# {retired_hospital}\n"
         'PRODUCT_NAME = "RC MetaStudio"\n',
     )
 
     result = run_audit(tmp_path)
 
-    assert result.returncode == 0, result.stdout
-    assert "identity audit passed" in result.stdout
+    assert result.returncode == 1
+    assert "legacy-institution-reference" in result.stdout
 
 
 def test_identity_audit_accepts_current_project_and_rcmetar_boundaries(tmp_path):

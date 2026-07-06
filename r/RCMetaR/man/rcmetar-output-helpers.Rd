@@ -20,13 +20,13 @@
 \alias{write.results.to.file}
 \title{Output, persistence, and formatted summary helpers}
 \description{
-Helpers that format OpenMeta result objects for display, write results to
+Helpers that format RCMetaR result objects for display, write results to
 files, and preserve plot data alongside analysis parameters.
 }
 \section{Display helpers}{
 
 \code{print.summary.display()} and \code{print.summary.data()} provide S3
-print methods for OpenMeta summary objects. \code{create.repeat.string()},
+print methods for RCMetaR summary objects. \code{create.repeat.string()},
 \code{pad.with.spaces()}, \code{round.display()},
 \code{capture.output.and.collapse()}, \code{results.short.list()}, and the
 \code{*.value.info()} helpers format display rows and labels.
@@ -38,4 +38,3 @@ print methods for OpenMeta summary objects. \code{create.repeat.string()},
 \code{save.data()}, and \code{write.results.to.file()} write generated data,
 analysis parameters, and formatted summaries to disk.
 }
-

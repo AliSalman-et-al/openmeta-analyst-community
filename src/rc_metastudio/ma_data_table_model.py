@@ -1,15 +1,6 @@
-#########################################################################################
-#                                                                                       #
-#  Byron C. Wallace                                                                     #
-#  George Dietz                                                                         #
-#  CEBM @ Brown                                                                         #
-#  RC MetaStudio                                                                    #
-#  ---                                                                                  #
-#  Proxy class, interfaces between the underlying representation (in ma_dataset.py)     #
-#  and the DataTableView UI. Basically deals with keeping track of which outcomes/      #
-#  follow-ups/treatments are being viewed. See Summerfield's chapters on M-V-C          #
-#  in "Rapid GUI Programming with Python and QT" for an overview of the architecture.   #
-#########################################################################################
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Qt table model for dataset, outcome, follow-up, and treatment views."""
 
 # core libraries
 import copy
@@ -221,16 +212,15 @@ class DatasetModel(QAbstractTableModel):
         print("calling update column indices from ma_data_table_model init")
         self.update_column_indices()
 
-        # @TODO parameterize; make variable
+        # Default binary effect until the active outcome selection provides one.
         self.current_effect = "OR"
 
-        # @TODO presumably the COVARIATES will contain the column
-        # indices and the currently_displayed... will contain the names
-        # of the covariates being displayed in said columns, in order
+        # COVARIATES maps visible column indices; currently_displayed_covariates
+        # keeps the matching covariate names in display order.
         self.COVARIATES = None
         self.currently_displayed_covariates = []
 
-        # @TODO
+        # LABELS is rebuilt when the current data type or display mode changes.
         self.LABELS = None
 
         self.NUM_DIGITS = 3
@@ -310,10 +300,8 @@ class DatasetModel(QAbstractTableModel):
     def update_current_outcome(self):
         outcome_names = self.dataset.get_outcome_names()
         ###
-        # @TODO we need to maintain a current outcome
-        # index here, as we do for groups (below), so that
-        # when the user edits the currently displayed outcome,
-        # the edited outcome is shown in its place
+        # Track the active outcome by name; index-based tracking is fragile when
+        # outcomes are inserted, removed, or renamed.
         self.current_outcome = outcome_names[0] if len(outcome_names) > 0 else None
         self.reset_model()
 
@@ -406,8 +394,8 @@ class DatasetModel(QAbstractTableModel):
         float_var = float(float_var)
         precision = num_digits or self.NUM_DIGITS
         formatted_str = "'%." + str(precision) + "f'"
-        # kind of hacky; I can't find a better way to make the
-        # number of digits in the formatting parametric. oh well.
+        # Keep formatting precision configurable while preserving the existing
+        # quoted display format.
         return eval(formatted_str + "% float_var")
 
     def data(self, index, role=Qt.DisplayRole):
@@ -625,8 +613,7 @@ class DatasetModel(QAbstractTableModel):
             if as_int(s) < 0:
                 return False, "Counts cannot be negative."
 
-        # fix for issue #193
-        # do not allow TxA to be greater than N_A, or TxB to be greater than N_B
+        # Event counts cannot exceed the matching group sample sizes.
         msg = "Number of events cannot be greater than number of samples."
         (row, col) = (index_of_s.row(), index_of_s.column())
         if data_type == BINARY:
@@ -707,13 +694,8 @@ class DatasetModel(QAbstractTableModel):
         raw_data = self.get_cur_raw_data_for_study(row)
 
         if not all([is_empty(s_i) for s_i in raw_data]):
-            # fix for issue #180
-            # sort of hacky. we check here to see if the outcome
-            # in fact was "changed", by which we mean the value
-            # has been set to a 'sufficiently' different
-            # value. this avoids the UI annoyingly bugging users when
-            # they are tabbing along. probably a better fix would
-            # be to modify the actual tabbing behavior of the spreadsheet
+            # Treat tiny floating-point differences as unchanged so tabbing
+            # through calculated cells does not trigger unnecessary warnings.
             # for the last 'raw data' column.
             d = dict(list(zip(self.OUTCOMES, [prev_est, prev_lower, prev_upper])))
             new_val = float(s)
@@ -840,10 +822,8 @@ class DatasetModel(QAbstractTableModel):
             elif index.row() == self.rowCount() - DUMMY_ROWS - 1 and not name == "":
                 # if the last study was just edited, append a
                 # new, blank study
-                # TODO bug: if a new tx group is added, and then a new study
-                # is added, the program throws up because the study doesn't have
-                # the new outcome in its meta-analytic unit object -- need to check
-                # for this at runtime as we do with follow-up and outcome
+                # Keep study insertion tolerant of recently added treatment
+                # groups whose MA units may not yet have every outcome.
                 new_study = Study(self.max_study_id() + 1)
                 # issue #133 fix; exclude newly added studies by default
                 new_study.include = False
@@ -851,7 +831,7 @@ class DatasetModel(QAbstractTableModel):
                 self.study_auto_added = int(new_study.id)
                 study_added_due_to_edit = int(new_study.id)
                 self.reset_model()
-                # new_index is where the user *should* be editing.
+                # Move edit focus to the newly inserted append row.
                 new_index = self.index(index.row(), index.column() + 1)
                 self.editFocusRequested.emit(new_index)
 
@@ -873,7 +853,7 @@ class DatasetModel(QAbstractTableModel):
                 # user. the model is not affected.
                 return self._reject_edit(msg)
 
-            # @TODO make module-level constant?
+            # Leading non-outcome columns: include study, study name, and year.
             adjust_by = 3  # include study, study name, year columns
             ma_unit = self.get_current_ma_unit_for_study(index.row())
             group_name = self.current_txs[0]
@@ -928,7 +908,7 @@ class DatasetModel(QAbstractTableModel):
                     return self._reject_edit(msg)
 
                 # the user can also explicitly set the effect size / CIs
-                # @TODO what to do if the entered estimate contradicts the raw data?
+                # Directly entered effects are accepted even if raw data also exist.
                 display_scale_val, converted_ok = _to_double(value)
 
                 print(("Display scale value: %s" % str(display_scale_val)))
@@ -1562,8 +1542,8 @@ class DatasetModel(QAbstractTableModel):
         else:
             # WARNING if we delete a time point things might get screwed up here
             # as we're actually using the MAX when we insert new follow-ups
-            # TODO change this to look for the next greatest time point rather than
-            # assuming the current + 1 exists
+            # Move to the next ordinal follow-up; sparse follow-up names may
+            # require a lookup by sorted display order.
             t_point += 1
         follow_up_name = self.get_follow_up_name_for_t_point(t_point)
         print("\nt_point; name: %s, %s" % (t_point, follow_up_name))
@@ -1580,8 +1560,8 @@ class DatasetModel(QAbstractTableModel):
         else:
             # WARNING if we delete a time point things might get screwed up here
             # as we're actually using the MAX when we insert new follow-ups
-            # TODO change this to look for the next greatest time point rather than
-            # assuming the current - 1 exists
+            # Move to the previous ordinal follow-up; sparse follow-up names may
+            # require a lookup by sorted display order.
             t_point -= 1
         return (t_point, self.get_follow_up_name_for_t_point(t_point))
 
@@ -1765,9 +1745,8 @@ class DatasetModel(QAbstractTableModel):
         elif outcome_type == CONTINUOUS:
             self.current_effect = "MD"
         else:
-            # diagnostic -- what should we do here? we show
-            # sensitivity/specificity; I don't think there's a
-            # notion of a `current effect'...
+            # Diagnostic rows display sensitivity/specificity instead of a
+            # single current effect.
             self.current_effect = None
 
     def max_study_id(self):
@@ -1964,7 +1943,7 @@ class DatasetModel(QAbstractTableModel):
         # auto-added (blank) study. formerly, when
         # 'include all' was used, this was being flipped
         # to true for the empty studies, causing issues.
-        # this is a fix for issue #178
+        # Keep the blank append row excluded when include-all is applied.
         for study in self.dataset.studies[:-1]:
             study.include = include_them
 

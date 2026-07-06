@@ -127,6 +127,22 @@ FORBIDDEN_PATTERNS = (
         re.compile(r"\bopenmeta-analyst(?:-community|-error)?\b", re.IGNORECASE),
         "use RC MetaStudio repository, artifact, and output names",
     ),
+    ForbiddenPattern(
+        "legacy-institution-reference",
+        re.compile(
+            r"\b(?:Brown University|Tufts Medical Center|CEBM(?:\s*@\s*Brown|@Brown)?|CEBM/CEBM@Brown)\b",
+            re.IGNORECASE,
+        ),
+        "use RC MetaStudio, Research Consultancy, or centralized provenance text",
+    ),
+    ForbiddenPattern(
+        "legacy-maintainer-reference",
+        re.compile(
+            r"\b(?:Byron C\.?\s+Wallace|Byron Wallace|George E\.?\s+Dietz|George Dietz|Paul Trow)\b",
+            re.IGNORECASE,
+        ),
+        "use Ali Salman and RC MetaStudio contributors for maintained modifications",
+    ),
 )
 
 ALLOWLISTED_PATHS = {
@@ -146,13 +162,6 @@ ALLOWLISTED_PROVENANCE_LINES = (
     re.compile(r"\bOpenMeta\[Analyst\] portions\b"),
 )
 
-HEADER_PROVENANCE_PATTERNS = (
-    re.compile(r"OpenMeta\[?analyst\]?", re.IGNORECASE),
-    re.compile(r"\bOpen\s+Meta-Analyst\b", re.IGNORECASE),
-    re.compile(r"\bBrown\b|\bTufts\b|\bCEBM\b", re.IGNORECASE),
-)
-
-
 def normalized_relative_path(path: Path, root: Path) -> str:
     return path.relative_to(root).as_posix()
 
@@ -167,12 +176,6 @@ def is_allowlisted_line(relative_path: str, line_number: int, line: str) -> bool
     if is_allowlisted_path(relative_path):
         return True
     if any(pattern.search(line) for pattern in ALLOWLISTED_PROVENANCE_LINES):
-        return True
-    stripped = line.lstrip()
-    is_comment = stripped.startswith(("#", "//", "/*", "*", "<!--"))
-    if line_number <= 25 and is_comment and any(
-        pattern.search(line) for pattern in HEADER_PROVENANCE_PATTERNS
-    ):
         return True
     return False
 

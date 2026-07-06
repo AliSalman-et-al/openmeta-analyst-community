@@ -1,12 +1,6 @@
-#######################################################################
-#                                                                     #
-#  George Dietz                                                       #
-#  CEBM @ Brown                                                       #
-#  RC MetaStudio                                                  #
-#                                                                     #
-#  Handle application settings and manage workspace (temp directory)  #
-#                                                                     #
-#######################################################################
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Application settings and managed analysis workspace paths."""
 
 import os
 import sys
@@ -40,8 +34,8 @@ def update_setting(field, value):
     # see if we need to store the value in a special way
     value_type = get_setting_type(field)
     if value_type == list:
-        # Make sure that the written elements are strings (for now...., maybe extend it to scalars (i.e. number or string) in the future)
-        # for now, this is just for reading the most recent files list
+        # QSettings arrays are used for recent-file paths, which are stored as
+        # strings.
         if settings.contains(field):
             settings.remove(field)
         settings.beginGroup(field)
@@ -251,25 +245,26 @@ def get_default_open_directory(recent_files=None):
 ################ END HANDLE SETTINGS ######################
 
 
-###### HANDLE R_TEMP IN USER-AREA DIRECTORY ###################
+###### HANDLE ANALYSIS SCRATCH DIRECTORY ###################
 def setup_directories():
-    """Makes temporary data directory, r_tmp within that
-    Sets python and R working directories to temporary data directory
-    clears r_tmp"""
+    """Create and clear the managed scratch directory for analysis artifacts.
 
-    # make base path and r_tmp
+    Python stays in the application data directory; R is reset to the same base
+    directory and writes analysis artifacts under the managed scratch folder.
+    """
+
+    # Create the application data root and managed analysis scratch folder.
     base_path = make_base_path()
     make_r_tmp()
 
     meta_py_r.reset_Rs_working_dir()  # set working directory on R side
     os.chdir(os.path.normpath(base_path))  # set working directory on python side
 
-    clear_r_tmp()  # clear r_tmp
+    clear_r_tmp()
 
 
 def make_base_path():
-    """Creates the base path if it doesn't exist and returns the path
-    On mac, this is something like: /Users/george/Library/Application Support/RCMetaStudio"""
+    """Create the application data path if needed and return it."""
 
     base_path = get_base_path()
 
@@ -306,7 +301,7 @@ def get_r_tmp_path(normalize=False):
 
 
 def make_r_tmp():
-    """Makes the managed analysis scratch folder and returns the path to it"""
+    """Create the managed analysis scratch folder and return its path."""
     r_tmp_path = get_r_tmp_path()
     success = QDir().mkpath(r_tmp_path)
     if not success:
@@ -324,8 +319,10 @@ def analysis_output_path(filename, normalize=False):
 
 
 def to_posix_path(path):
-    r"""for now, just changes \ to /
-    Assumes there are no escapes in the path, very important!"""
+    r"""Convert native separators to POSIX-style separators for R strings.
+
+    The input must already be a literal path, not an escaped string.
+    """
 
     new_path = path.replace("\\", "/")
     return new_path

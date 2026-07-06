@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import sys, time
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QThread
@@ -17,7 +20,7 @@ meta_py_r_backend.install_meta_py_r_backend()
 import app_error_handler
 import settings
 
-SPLASH_DISPLAY_TIME = 0  # TODO: change to 5 seconds in production version
+SPLASH_DISPLAY_TIME = 0  # Keep startup smoke tests fast; packaged builds may override.
 APPLICATION_ICON_PATH = ":/misc/meta.png"
 
 
@@ -221,7 +224,7 @@ def start_automation_smoke(sample_path):
 
         # Force a real paint pass. Painting queries data()/headerData() for paint
         # roles (e.g. BackgroundColorRole) that offscreen layout never touches, so
-        # this is what catches paint-time porting bugs in the packaged build. A
+        # This catches paint-time model/data regressions in the packaged build. A
         # paint error aborts the process, failing the smoke test with a non-zero
         # exit code rather than shipping a build that crashes on first render.
         _force_table_paint(app, meta)

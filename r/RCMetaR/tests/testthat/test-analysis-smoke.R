@@ -198,7 +198,7 @@ test_that("core facade rejects incompatible methods before dispatch", {
   )
 })
 
-test_that("core method discovery and metadata avoid legacy export scanning", {
+test_that("core method discovery and metadata avoid direct implementation export scanning", {
   fixture <- binary_fixture()
   methods <- rcmetar.available.methods("binary", fixture$data, "OR")
 

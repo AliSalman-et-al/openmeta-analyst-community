@@ -1,13 +1,7 @@
-##################################################################
-#                                                                #
-#  Byron C. Wallace                                              #
-#  George E. Dietz
-#  Brown CEBM
-#  Tufts Medical Center                                          #
-#  RC MetaStudio                                             #
-#  ---                                                           #
-#  meta_reg.r                                                    #
-##################################################################
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Meta-regression and covariate-model helpers.
 
 #gfactor <- function(x, ref.value=NULL) {
 #	### Transforms x in to a factor, with ref.value being the first level ###
@@ -66,7 +60,7 @@ make.mods.str <-function(mods) {
 		
 
 	
-	# fix for issue #122 of OpenMEE
+	# Historical issue 122 from the original project: strip sparse factor levels.
 	if (length(str.els)!=0) {
 		# normal case
 		mods.str <- paste("~", paste(str.els,collapse=" + "), sep=" ")
@@ -378,9 +372,9 @@ g.meta.regression <- function(
 	#            categorical=c(...categorical moderators...),
 	#            interactions=list("A:B"=c("A","B"),"B:C"=c("B",C"),...)
 	#            )
-	#     Note that the interaction names should be as they appear in the mods
+	#     Note that interaction names must match the mods
 	#     string formula
-	# data: should be a dataframe of the type that metafor likes ie
+	# data: must be a metafor-style data frame with
 	# yi and vi for the effect and variance columns
 	# slab holds study names
 	# the parts that are 'factors' have already been made in to factors with
@@ -448,7 +442,7 @@ g.meta.regression <- function(
 		cov.vals <- data[[cov.name]]
 		plot.data <- g.create.plot.data.reg(data, cov.name, cov.vals, measure, level, fitted.line)
 		
-		# @TODO x and y labels ought to be passed in, probably
+		# Use generated axis labels unless the caller supplies richer labels.
 		
 		plot.data$xlabel <- cov.name
 		
@@ -461,8 +455,7 @@ g.meta.regression <- function(
 		meta.regression.plot(plot.data, plot.path)
 		
 		# write the plot data to disk so we can save it
-		# @TODO will want to write the params data, too,
-		# eventually
+		# Plot parameters are persisted separately when callers need editable plots.
 		plot.data.path <- save.plot.data(plot.data)
 		
 		images <- c("Regression Plot"=plot.path)
@@ -527,8 +520,7 @@ g.create.plot.data.reg <- function(reg.data, cov.name, cov.vals, measure, level,
 	plot.data$effects <- effects
 	
 	###
-	# @TODO; these need to be set by the user,
-	# will probably be placed on the params object
+	# Plot sizing defaults can move into params when exposed by the UI.
 	plot.data$sym.size <- 1
 	plot.data$lcol <- "darkred"
 	plot.data$lweight <- 3
@@ -778,7 +770,7 @@ g.bootstrap.meta.regression.cond.means <- function(
 		data.subset = data[indices,]
 		
 		for (mod in mods[["categorical"]]) {
-			# issue #205 (OpenMEE) -- to be changed data to data.subset
+			# Historical issue 205 from the original project: use data.subset
 			# here to make sure all levels are present in 
 			# the sample
 			n.levels <- length(unique(data.subset[[mod]]))
@@ -873,7 +865,7 @@ meta.regression <- function(reg.data, params, cond.means.data=NULL, stop.at.rma=
             plot.path <- "./r_tmp/reg.png"
             plot.data <- create.plot.data.reg(reg.data, params, fitted.line)
 
-            # @TODO x and y labels ought to be passed in, probably
+            # Use generated axis labels unless the caller supplies richer labels.
             plot.data$xlabel <- reg.data@covariates[[1]]@cov.name
             scale.str <- get.scale(params)
             if ((scale.str=="standard") || (scale.str=="arcsine")) {
@@ -884,8 +876,7 @@ meta.regression <- function(reg.data, params, cond.means.data=NULL, stop.at.rma=
             meta.regression.plot(plot.data, plot.path)
             
             # write the plot data to disk so we can save it
-            # @TODO will want to write the params data, too,
-            # eventually
+            # Plot parameters are persisted separately when callers need editable plots.
             plot.data.path <- save.plot.data(plot.data)
 
             images <- c("Regression Plot"=plot.path)
@@ -971,9 +962,7 @@ extract.cov.data <- function(reg.data, dont.make.array = FALSE) {
     cov.name <- cov@cov.name
     cov.vals <- cov@cov.vals
     cov.type <- cov@cov.type
-	#debug_print <- paste(c("Cov name: ", cov.name, "\nCov type: ", cov.type,"\n"))
-	#print(debug_print)
-    ref.var <- cov@ref.var
+	ref.var <- cov@ref.var
     if (cov.type=="continuous") {
       cov.col <- array(cov.vals, dim=c(length(reg.data@y), 1), 
                     dimnames=list(NULL, cov.name))

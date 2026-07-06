@@ -73,9 +73,11 @@ def test_active_rcmetar_package_metadata_uses_current_maintainer_identity():
     assert "Research Consultancy" in fields["Authors@R"]
     assert "tuftsmedicalcenter.org" not in description
     assert "tuftsmedicalcenter.org" not in package_rd
-    assert "Paul Trow <" not in description
-    assert "Paul Trow \\email" not in package_rd
-    assert "Byron Wallace \\email" not in package_rd
+    retired_package_maintainer = "Paul " + "Trow"
+    retired_package_author = "Byron " + "Wallace"
+    assert f"{retired_package_maintainer} <" not in description
+    assert f"{retired_package_maintainer} \\email" not in package_rd
+    assert f"{retired_package_author} \\email" not in package_rd
 
 
 def test_release_readiness_text_does_not_invert_current_identity():

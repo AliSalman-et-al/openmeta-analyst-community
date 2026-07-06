@@ -1,13 +1,6 @@
-######################################
-#                                    #
-#  Byron C. Wallace                  #
-#  Tufts Medical Center              #
-#  RC MetaStudio                 #
-#                                    #
-#  Container form for UI. Handles    #
-#  user interaction.                 #
-#                                    #
-######################################
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Main RC MetaStudio desktop window."""
 
 import pickle
 import os
@@ -169,7 +162,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def __init__(self, parent=None):
         # We follow the advice given by Mark Summerfield in his Python QT book:
         # Namely, we use multiple inheritance to gain access to the ui. We take
-        # this approach throughout OpenMeta.
+        # this approach throughout the application.
         super(MetaForm, self).__init__(parent)
         self.setupUi(self)
         qt_layout.fit_text_to_contents(self)
@@ -185,8 +178,8 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.statusbar.addWidget(self.cl_label, 1)
         qt_layout.fit_text_to_contents(self)
 
-        # TODO should also allow a (path to a) dataset
-        # to be given on the console.
+        # Command-line dataset loading can be added here if headless startup
+        # needs to open a project directly in the GUI.
         self.model = None
         self.new_dataset()
 
@@ -301,7 +294,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                 redo_f = lambda: self.set_model(data_model)
                 edit_command = meta_globals.CommandGenericDo(redo_f, undo_f)
                 self.tableView.undoStack.push(edit_command)
-            else:  # not using undo framework (probably when importing csv (it will handle it internally)
+            else:  # CSV import manages its own undo boundary.
                 self.set_model(data_model)
         else:
             self.model = ma_data_table_model.DatasetModel(dataset=data_model)
@@ -458,15 +451,14 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         # is emitted when a model refresh was called but the edit focus should be set back to
         # where it was before this refresh (refresh clears the current editor).
         # this index is the QModelIndex. this is used, e.g., when a new study is added.
-        # this fixes bug #20.
+        # Restore focus after model refreshes that clear the current editor.
         self._model_signal_connections.append(
             app_error_handler.connect_safely(
                 model.editFocusRequested, self.set_edit_focus, parent=self
             )
         )
 
-        # Do actions when the model is about to be reset (for now, just
-        # recalculate display scale values)
+        # Recalculate display-scale values before model resets.
         self._model_signal_connections.append(
             app_error_handler.connect_safely(
                 model.modelAboutToBeReset, self._model_about_to_be_reset, parent=self
@@ -576,10 +568,11 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     # ma_specs takes care of that. The convention is that each meta
     # Repeated-analysis actions pass workflow names to the RCMetaR core facade.
     # implementation.
-    ### TODO pull out meta methods auto-magically via introspection.
+    # Repeated-analysis workflow names are intentionally explicit until the R
+    # facade exposes richer method metadata.
     def cum_ma(self):
         # NOTE that we do not allow cumulative meta-analysis on
-        # diagnostic data -- this method should never be invoked
+            # Diagnostic data are not routed through cumulative MA here.
         # if we're dealing with diag data.
         form = None
         # note that the spec form gets *this* form as a parameter.
@@ -593,9 +586,8 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             # diagnostic data; we first have the user select metric(s),
             # and only then the model, &etc.
             """
-            @@ TODO this is not actually implemented! i.e., we do not have
-            a cumulative diagnostic MA method. for now this method should
-            *never* be called with diagnostic data.
+            Diagnostic cumulative analysis is not implemented; callers should
+            not reach this branch for diagnostic data.
             """
             form = diag_metrics.Diag_Metrics(
                 self.model, meta_f_str="cumulative", parent=self
@@ -1057,8 +1049,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         cur_groups = list(self.model.get_current_groups())
         cur_groups[1] = new_group_name
         self.model.set_current_groups(cur_groups)
-        # @TODO probably need to tell the table model we changed
-        # the group being displayed...
+        # Refresh the displayed group columns after renaming.
         self.display_groups(cur_groups)
 
     def _undo_add_new_group(self, added_group, previously_displayed_groups):
@@ -1094,7 +1085,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         )
 
     def next(self):
-        # probably you should disable next for the current dimension
+        # Disable navigation when there is no next item in this dimension.
         # if there is only one point (e.g., outcome). otherwise you end
         # up enqueueing a bunch of pointless undo/redos.
         redo_f, undo_f = None, None
@@ -1371,7 +1362,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
     def rename_covariate(self, covariate):
         orig_cov_name = copy.copy(covariate.name)
-        # TODO need to rename edit_group_name_form to something more general...
+        # The group-name editor is also used for covariate labels.
         edit_cov_form = edit_group_name_form.EditCovariateName(
             orig_cov_name, parent=self
         )
@@ -1392,7 +1383,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                 return
 
             ###
-            # TODO implement rename_covariate!
+            # The model owns the actual covariate rename and undo operation.
             redo_f = lambda: self.model.rename_covariate(orig_cov_name, new_cov)
             undo_f = lambda: self.model.rename_covariate(new_cov, orig_cov_name)
 

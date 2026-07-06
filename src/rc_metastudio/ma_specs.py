@@ -1,19 +1,6 @@
-#############################################
-#                                           #
-#  Byron C. Wallace                         #
-#  George Dietz                             #
-#  CEBM @ Brown                             #
-#  This is the code for the ui dialog       #
-#  that handles the method selection        #
-#  and algorithm specifications             #
-#                                           #
-#  RC MetaStudio                        #
-#                                           #
-#  This is also where the calls to run      #
-#  meta-analyses originate, via a callback  #
-#  to the go() routine on meta_form.        #
-#                                           #
-#############################################
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Method-selection dialog and analysis specification builder."""
 
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt
@@ -391,8 +378,8 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         method_names = list(self.available_method_d.keys())
 
         ###
-        # removing bivariate (sens/spec) methods when it makes no sense
-        # @TODO handle this better
+        # Hide bivariate diagnostic methods when sensitivity and specificity
+        # cannot both be estimated from the selected effects.
         if self.data_type == "diagnostic":
             biv_ml_name = "Bivariate (Maximum Likelihood)"
             for biv_method in (biv_ml_name, "HSROC"):
@@ -500,8 +487,8 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         # e.g., in the case of HSROC or other methdos that
         # don't use our forest plotting, we don't show the
         # corresponding tab for forest plot params.
-        # @TODO this is hacky; plus, really we should keep
-        # a list of methods that *DO* take forest plot params
+        # Prefer the explicit no-forest-plot list until method metadata exposes
+        # a positive "accepts forest plot params" capability.
         if self.current_method in METHODS_WITH_NO_FOREST_PLOT:
             self.plot_tab.setEnabled(False)
         else:

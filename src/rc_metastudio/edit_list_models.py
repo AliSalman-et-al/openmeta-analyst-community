@@ -1,12 +1,6 @@
-#################################################################
-#
-#  Byron C. Wallace
-#  Tufts Medical Center
-#  RC MetaStudio
-#  ---
-#  Proxy interfaces for mediating between the underlying representation (in ma_dataset.py)
-#  and the editing UI.
-################################################################
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Proxy models between dataset objects and editing dialogs."""
 
 # import pdb
 

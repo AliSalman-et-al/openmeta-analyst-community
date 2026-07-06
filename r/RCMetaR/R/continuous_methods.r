@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 ####################################
 # RC MetaStudio                #
 # ----                             #
@@ -61,7 +64,7 @@ create.cont.data.array <- function(cont.data, params, res) {
   # Extracts data from cont.data and puts it into an array for the the first summary display table.
   tx1.name <- "tx A"
   tx2.name <- "tx B"
-  # TODO: these should be taken from the corresponding column labels in the GUI and passed in via params.
+  # Group labels default here unless the GUI passes display labels in params.
   digits.str <- paste("%.", params$digits, "f", sep="")
   effect.size.name <- pretty.metric.name(as.character(params$measure))
   # Caculate confidence intervals
@@ -348,7 +351,7 @@ continuous.random.parameters <- function() {
 }
 
 continuous.random.pretty.names <- function() {
-	# sort of redundant to have both this and rm_method_ls but whatever for now...
+	# Keep display names explicit even though rm_method_ls defines the codes.
 	rm_method_names <- list(
     HE = "Hedges-Olkin",
     DL = "DerSimonian-Laird",

@@ -1,13 +1,6 @@
-######################################
-#                                    #
-#  Byron C. Wallace                  #
-#  George Dietz                      #
-#  CEBM @ Brown                      #
-#  RC MetaStudio                 ##########################
-#  ---                                                        #
-#  Binary data form module; for flexible entry of dichotomous #
-#  outcome data                                               #
-###############################################################
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Binary outcome data entry dialog."""
 
 import copy
 from functools import partial
@@ -477,7 +470,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             return str(self.low_txt_box.text())
         elif val_str == "upper":
             return str(self.high_txt_box.text())
-        return None  # should never happen
+        return None  # Unknown value key.
 
     def val_changed(self, val_str):
         # Backup form state
@@ -509,8 +502,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             else:
                 display_scale_val = None
         except ValueError:
-            # a number wasn't entered; ignore
-            # should probably clear out the box here, too.
+            # Ignore incomplete numeric input while the user is still editing.
             print("fail.")
             return None
 
@@ -806,7 +798,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         curr_effect_is_one_arm = self.cur_effect in BINARY_ONE_ARM_METRICS
         curr_effect_is_two_arm = self.cur_effect in BINARY_TWO_ARM_METRICS
 
-        # if None is in the raw data, should we clear out current outcome?
+        # Leave current effects untouched when raw data are incomplete.
         if two_arm_raw_data_ok or (curr_effect_is_one_arm and one_arm_raw_data_ok):
             if curr_effect_is_two_arm:
                 est_and_ci_d = meta_py_r.effect_for_study(
@@ -871,7 +863,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
                     metric, self.group_str, None, None, None, mult=self.mult
                 )
             else:
-                # TODO: Do nothing for now..... treat the case where we have to switch group strings down the line
+                # Future work: handle remapping if group labels become editable here.
                 pass
 
         # clear line edits

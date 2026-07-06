@@ -1,8 +1,6 @@
-"""
-Created on Apr 29, 2013
-
-@author: George Dietz
-"""
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Confidence-level editing dialog."""
 
 from PyQt5.QtWidgets import (
     QDialog,

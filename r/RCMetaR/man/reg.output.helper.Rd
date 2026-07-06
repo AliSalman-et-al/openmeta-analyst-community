@@ -14,5 +14,5 @@ reg.output.helper(theData, rma.results, model.formula, digits)
 A named list of formatted meta-regression output sections.
 }
 \description{
-Builds textual coefficient, omnibus-test, and model-data sections for OpenMeta meta-regression summaries.
+Builds textual coefficient, omnibus-test, and model-data sections for RCMetaR meta-regression summaries.
 }

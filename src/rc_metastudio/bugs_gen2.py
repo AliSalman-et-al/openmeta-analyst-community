@@ -1,18 +1,6 @@
-"""
-MetaAnalyst
-Tufts Medical Center 2008
-bugs_generator.py aka pyBugs
-IronPython (ipy)
-
-*** DO NOT REMOVE OR ALTER THIS FILE ***
-
-This module contains static methods for talking to BRUGs via buffer files. It is a convienent
-glue between MetaAnalyst (.NET) and the BRUGS.dll, and includes methods
-both for generating data input files for BRUGS and for collecting the results back up.
-
-It is called by MetaAnalyst prior to Bayesian analyses to generate the files necessary to talk to BRUGS,
-as well as afterwards to collect and package the results distributed in their respective buffer text files.
-"""
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""BUGS buffer-file helpers retained for Bayesian-analysis workflows."""
 
 import System
 import System.Collections.ArrayList as arraylist
@@ -440,7 +428,7 @@ def generate_data_file_binary(
 # Use generate_all_inits_using_values (getting init values via Chris' method) instead!
 #
 def generate_all_inits_for_binary(outdir, N, num_chains=3):
-    # get bugsy style list for mu and d inits (these need a list of values)
+    # Build BUGS-style lists for mu and d initial values.
     list_chains = generate_inits_for_vars_that_need_list(num_chains, ["mu", "d"], N)
 
     # now generate initial values for variables that only need a scalar

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 #######################################
 # RC MetaStudio                   #
 # ----                                #
@@ -419,7 +422,7 @@ diagnostic.fixed.inv.var <- function(diagnostic.data, params){
         # Write results to csv file
         if ((is.null(params$write.to.file)) || params$write.to.file == TRUE) {
             results.path <- paste("./r_tmp/diag_fixed_inv_var_", params$measure, "_results.csv", sep="")
-            # @TODO Pass in results.path via params
+            # Keep the default path here unless callers pass an override in params.
             write.results.to.file(diagnostic.data, params, res, outpath=results.path) 
         }
         if ((is.null(params$create.plot)) || params$create.plot == TRUE) {
@@ -545,7 +548,7 @@ diagnostic.fixed.mh <- function(diagnostic.data, params){
         # Write results to csv file
         if ((is.null(params$write.to.file)) || params$write.to.file == TRUE) {
             results.path <- paste("./r_tmp/diag_fixed_mh_", params$measure, "_results.csv", sep="")
-            # @TODO Pass in results.path via params
+            # Keep the default path here unless callers pass an override in params.
             write.results.to.file(diagnostic.data, params, res, outpath=results.path) 
         }
         #
@@ -678,8 +681,8 @@ diagnostic.fixed.peto <- function(diagnostic.data, params){
         # Write results and study data to csv files  
         res$study.weights <- (1 / res$vi) / sum(1 / res$vi)
         results.path <- paste("./r_tmp/diagnostic_fixed_peto_results.csv")
-        # @TODO Pass in results.path via params
-        #data.path <- paste("./r_tmp/diagnostic_fixed_peto_study_data.csv")
+        # Keep the default path here unless callers pass an override in params.
+        # Study-data CSV export can be re-enabled beside the results file.
         write.results.to.file(diagnostic.data, params, res, outpath=results.path)
       }
       if (is.null(params$create.plot) || params$create.plot == TRUE) {
@@ -805,7 +808,7 @@ diagnostic.random <- function(diagnostic.data, params){
         # Write results and study data to csv files
         if ((is.null(params$write.to.file)) || params$write.to.file == TRUE) {
             results.path <- paste("./r_tmp/diag_random_", params$measure, "_results.csv", sep="")
-            # @TODO Pass in results.path via params
+            # Keep the default path here unless callers pass an override in params.
             write.results.to.file(diagnostic.data, params, res, outpath=results.path)
         }
         #
@@ -860,7 +863,7 @@ diagnostic.random.parameters <- function(){
 }
 
 diagnostic.random.pretty.names <- function() {
-	# sort of redundant to have both this and rm_method_ls but whatever for now...
+	# Keep display names explicit even though rm_method_ls defines the codes.
 	rm_method_names <- list(
 			HE="Hedges-Olkin",
 			DL = "DerSimonian-Laird",
@@ -1513,7 +1516,7 @@ diagnostic.hsroc <- function(diagnostic.data, params){
     prev.working.dir <- getwd()
     on.exit(setwd(prev.working.dir), add=TRUE)
 
-    # step into r_tmp
+    # Run the sampler from the analysis scratch subdirectory expected by HSROC.
     setwd("r_tmp")
 
     ####
@@ -1648,7 +1651,7 @@ diagnostic.bivariate.ml <- function(diagnostic.data, params){
 
     
     #### 
-    # parse out results -- @TODO make this nicer.
+    # Extract the bivariate summary values from the model output matrix.
     logit_sens = biv.results[1,1]
     logit_spec = biv.results[1,2]
     se_logit_sens = biv.results[1,3]
@@ -1679,7 +1682,7 @@ diagnostic.bivariate.ml <- function(diagnostic.data, params){
 
 
     # generate the plot
-    path.to.roc.plot.base <- "./r_tmp/bivariate" # just hard-coding for now
+    path.to.roc.plot.base <- "./r_tmp/bivariate" # default analysis scratch path
     plot.bivariate(biv.results, adjusted.counts$TP, adjusted.counts$FP, 
                                  adjusted.counts$FN, adjusted.counts$TN,
                                  filepath=path.to.roc.plot.base)
@@ -1755,7 +1758,7 @@ create.sroc.plot.data <- function(diagnostic.data, params){
     plot.options$roc.xlabel <- params$roc_xlabel
     plot.options$roc.ylabel <- params$roc_ylabel
     plot.options$roc.title <- params$roc_title
-    # for future use as options from GUI
+    # Preserve ROC plot options for callers that expose them in the UI.
     plot.data <- list("fitted.line" = fitted.line, "TPR"=TPR, "FPR"=FPR, "std.err"=std.err, "mult"=mult, "inv.var" = inv.var, "s.range" = s.range, "plot.options"=plot.options)
 }
 

@@ -1,14 +1,9 @@
-##################################################
-#
-#  Byron C. Wallace
-#  George Dietz
-#  RC MetaStudio
-#  ---
-#  Continuous data form module; for flexible entry of continuous
-#  outcome data.
-#
-# TODO there is some redundancy here with binary_data_form
-#      should probably refactor
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Continuous outcome data entry dialog."""
+
+# Continuous and binary data forms still share some interaction patterns; keep
+# refactoring opportunities small so imputation behavior stays explicit.
 #
 # Note that we don't make use of the table/custom model
 # design here. Rather, we edit the ma_unit object
@@ -16,9 +11,6 @@
 # straightforward approach, because the table itself displays
 # many fields that do not ultimately belong in the raw_data --
 # it's mostly imputation going on here.
-#
-##################################################
-
 # import pdb
 import sys
 import copy
@@ -332,7 +324,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             return str(self.high_txt_box.text())
         elif val_str == "correlation_pre_post":
             return str(self.correlation_pre_post.text())
-        return None  # should never happen
+        return None  # Unknown value key.
 
     def val_changed(self, val_str):
         # Backup form state
@@ -372,8 +364,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             else:
                 display_scale_val = None
         except ValueError:
-            # a number wasn't entered; ignore
-            # should probably clear out the box here, too.
+            # Ignore incomplete numeric input while the user is still editing.
             print("fail.")
             return None
 
@@ -512,7 +503,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         )
         old_correlation = self._get_correlation_str()
 
-        # Just for simple_table for now
+        # The simple table owns these column headers.
         column_headers = self.get_column_header_strs()
         try:
             warning_msg = self._cell_data_not_valid(
@@ -878,7 +869,8 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
     def float_to_str(self, float_val):
         float_str = ""
         if not is_NaN(float_val):
-            # TODO note the hard-coded number of digits here
+            # Keep this compact in the imputation dialog; analysis output uses
+            # the configured result precision elsewhere.
             float_str = str(round(float_val, 4))
         return float_str
 
@@ -1130,11 +1122,10 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             "mean2": "group 2 mean",
         }
         for key, value in imputed.items():
-            # TODO: (maybe).....: The R code which generates results can
-            # POTENTIALLY yield a maximum of 4 numbers for n1 and n2. However,
-            # empirical testing has shown that this doesn't really happen.
-            # However, for completeness in the future the number of
-            # ChooseBackCalcResultForm options should be generated dynamically
+            # The R imputation code can theoretically yield up to four values
+            # for n1 and n2, but empirical testing shows that path is unused.
+            # ChooseBackCalcResultForm options can be generated dynamically if
+            # multi-value n1/n2 results are later exposed.
 
             if is_list(value):
                 info = (
@@ -1206,7 +1197,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         )
         old_correlation = self._get_correlation_str()
 
-        self.metric_parameter = None  # } these two should go together
+        self.metric_parameter = None
         self.enable_txt_box_input()  # }
 
         calc_fncs.block_signals(self.entry_widgets, True)
@@ -1232,7 +1223,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                     metric, self.group_str, None, None, None, mult=self.mult
                 )
             else:
-                # TODO: Do nothing for now..... treat the case where we have to switch group strings down the line
+                # Future work: handle remapping if group labels become editable here.
                 pass
 
         # clear line edits

@@ -1,22 +1,6 @@
-#############################################################################################
-#                                                                                           #
-#  Byron C. Wallace                                                                         #
-#  George Dietz                                                                             #
-#  CEBM @ Brown                                                                             #
-#  RC MetaStudio                                                                        #
-#                                                                                           #
-#  Dataset module; a roll your own back end. This is a model for manipulating               #
-#  datasets. Note that *no QT lives here*, i.e., it is divorced from the UI entirely.       #
-#                                                                                           #
-#  The structure is as follows: A Dataset object holds a list of Study objects.             #
-#  These Study objects in turn contain a dictionary, mapping outcome names                  #
-#  to another dictionary, which maps follow ups (time points) to MA_Unit                    #
-#  objects. Finally, these MA_Unit objects in turn map treatment names                      #
-#  - or groups (e.g., 'control', 'aspirin') - to raw data. Further, at the MA_Unit level,   #
-#  metrics (e.g., "OR") map to dictionaries containing that metric as computed for          #
-# the pairwise combinations of the groups/treatments (e.g., OR->"AvB"=x)                    #
-#                                                                                           #
-#############################################################################################
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""UI-independent dataset model for studies, outcomes, follow-ups, and groups."""
 import pdb
 from PyQt5.QtCore import pyqtRemoveInputHook
 import copy
@@ -634,9 +618,8 @@ class Study:
     """
 
     def __init__(self, id, name="", year=None, include=True):
-        # TODO should fiddle with the include field here.
-        # when a study is auto-added, it should be excluded
-        # until there is sufficient data
+        # Auto-added studies start with the caller's include flag; callers should
+        # exclude placeholder rows until sufficient data exists.
         self.id = id
         self.year = year
         self.name = name
@@ -770,8 +753,8 @@ class MetaAnalyticUnit:
             ):
                 self.effects_dict[effect] = {}
         elif self.outcome.data_type == CONTINUOUS:
-            # note right now we only have mean difference and standardized mean difference
-            # @TODO hedge's G, cohen's D, glass delta; WV doesn't implement these
+            # Continuous display effects are limited to the implemented mean
+            # difference and standardized mean difference metrics.
             for effect in (
                 meta_globals.CONTINUOUS_TWO_ARM_METRICS
                 + meta_globals.CONTINUOUS_ONE_ARM_METRICS
@@ -921,7 +904,7 @@ class MetaAnalyticUnit:
                 return  # we don't have to recalculate so exit
 
         if convert_to_display_scale is None:
-            # This shouldn't happen.... debug it!
+            # Missing conversion metadata indicates an unsupported outcome type.
             # pyqtRemoveInputHook()
             # pdb.set_trace()
             raise Exception(

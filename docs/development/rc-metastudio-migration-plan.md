@@ -24,7 +24,7 @@ Use this as an audit checklist, not a blind global replacement. Historical ADRs,
 | Retired OMA-prefixed environment namespace | `RCMS_*` |
 | Retired repository/distribution slug | `rc-metastudio` |
 | `modern-*` lane names | evidence-based lane names such as `smoke`, `fast`, `package`, `r-stack`, `analysis-regression`, `verification` |
-| Brown/Tufts/CEBM support links and callbacks | remove, or replace static project links with `https://github.com/AliSalman-et-al/` |
+| Retired institution support links and callbacks | remove, or replace static project links with `https://github.com/AliSalman-et-al/` |
 | generic `legacy` framing | precise terms such as Original Project, Retired Reference Implementation, retired project-file compatibility, or RC MetaStudio |
 
 ## Decision Index
@@ -239,7 +239,7 @@ Acceptance criteria:
 - Bundled legacy HTML help is removed.
 - In-app Help access to legacy docs is removed.
 - About/Legal dialog is rewritten for RC MetaStudio.
-- Brown/CEBM/Tufts callbacks, support links, update checks, and bug-report submission callbacks are removed.
+- Retired institution callbacks, support links, update checks, and bug-report submission callbacks are removed.
 - Static project/issue links point to `https://github.com/AliSalman-et-al/` where needed.
 
 Verification:

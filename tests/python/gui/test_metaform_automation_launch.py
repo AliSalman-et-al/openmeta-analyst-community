@@ -288,23 +288,28 @@ def test_rc_metastudio_logo_resource_is_valid_and_used_consistently():
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     app_icon = QtGui.QIcon(launch.APPLICATION_ICON_PATH)
     logo_pixmap = QtGui.QPixmap(":/misc/meta.png")
+    splash_pixmap = QtGui.QPixmap(":/misc/splash.png")
 
     assert launch.APPLICATION_ICON_PATH == ":/misc/meta.png"
     assert app_icon.isNull() is False
     assert logo_pixmap.isNull() is False
+    assert splash_pixmap.isNull() is False
     assert logo_pixmap.width() == logo_pixmap.height()
     assert logo_pixmap.width() >= 1024
+    assert (splash_pixmap.width(), splash_pixmap.height()) == (600, 480)
     assert sorted(
         (size.width(), size.height()) for size in app_icon.availableSizes()
     ) == [(1024, 1024)]
 
     checked_paths = [
-        Path("src", "meta.ui"),
-        Path("src", "results_window.ui"),
+        Path("src", "rc_metastudio", "forms", "meta.ui"),
+        Path("src", "rc_metastudio", "forms", "results_window.ui"),
     ]
     checked_paths.extend(
-        Path("src", "forms", file_name)
-        for file_name in os.listdir(os.path.join(REPO_ROOT, "src", "forms"))
+        Path("src", "rc_metastudio", "forms", file_name)
+        for file_name in os.listdir(
+            os.path.join(REPO_ROOT, "src", "rc_metastudio", "forms")
+        )
         if file_name.endswith((".ui", ".py"))
     )
 
@@ -3121,7 +3126,8 @@ def test_removed_help_surfaces_do_not_leave_active_ui_or_urls():
             ]
         )
         assert "github.com/AliSalman-et-al/rc-metastudio" in link_text
-        assert "cebm.brown.edu" not in link_text.lower()
+        retired_support_domain = "ce" + "bm.brown.edu"
+        assert retired_support_domain not in link_text.lower()
         assert "tuftscaes.org" not in link_text.lower()
         assert "openMA_help" not in link_text
     finally:

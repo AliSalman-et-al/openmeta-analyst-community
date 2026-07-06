@@ -1,18 +1,20 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 ####################################
 #                                  #
 # RC MetaStudio                #
 # ----                             #
 # classes.r                        # 
-# contains class definitions for   #
-#  OpenMeta.                       #   
+# contains RCMetaR data class      #
+# definitions.                     #
 #                                  #    
 # (note that classes in R are      #
 #   basically structs)             #
 ####################################
 
 #
-# This is the super (parent) class. All Open Meta data objects should inherit from this
-# type.
+# This is the base class for RCMetaR study-data containers.
 setClass("OMData", representation(study.names="character", notes="character", 
          years="integer", covariates="list"))
 
@@ -57,7 +59,7 @@ setClass("AnalysisSpecification",
 setClass("CovariateValues", representation(cov.name="character", cov.vals="vector", cov.type="character", ref.var="character"))
 
 get.subset <- function(omdata, indices, make.unique.names=FALSE) {
-  if (!is(omdata, "OMData")) stop("OpenMeta data expected.")
+  if (!is(omdata, "OMData")) stop("RCMetaR data expected.")
 
   subset.slot <- function(values) {
     if (length(values) == 0) {
@@ -118,5 +120,5 @@ get.subset <- function(omdata, indices, make.unique.names=FALSE) {
     ))))
   }
 
-  stop("Unsupported OpenMeta data class.")
+  stop("Unsupported RCMetaR data class.")
 }

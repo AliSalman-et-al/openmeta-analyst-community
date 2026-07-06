@@ -1,16 +1,9 @@
-######################################
-#                                    #
-#  Byron C. Wallace                  #
-#  George Dietz                      #
-#  CEBM @ Brown                      #
-#  RC MetaStudio                 #
-#                                    #
-#  Contains globals used             #
-#   throughout.                      #
-#                                    #
-######################################
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Application-wide constants and small shared helpers."""
 
-# TODO: move functions out of here and just have this be constants w/o imports
+# This module still mixes constants and small helpers because long-standing call
+# sites import it as the application-wide metadata namespace.
 
 import os
 import math

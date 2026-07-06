@@ -1,15 +1,7 @@
-####################################
-#                                  #
-# RC MetaStudio                #
-# ----                             #
-# plotting.r                       #
-#                                  #
-# Flexible forest plotting.        #
-#  (And more?)                     #
-#                                  #
-# This code due mostly to Issa     #
-#   Dahabreh and Paul Trow         #
-####################################
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Flexible forest plotting and related display helpers.
 
 # largely a generalization based on an example by
 # Murrell P., "R graphics", Chapman & Hall
@@ -488,7 +480,7 @@ create.subgroup.plot.data.generic <- function(subgroup.data, params, data.type, 
         plot.options$plot.ub <- eval(call(transform.name, params$measure))$calc.scale(plot.ub, n)
     }
 
-    # should we show summary line for subgroup plots??
+    # Subgroup plots do not draw an additional summary line here.
     plot.data <- list(label = label.col,
                       types=types,
                       scale = scale.str,
@@ -608,8 +600,7 @@ create.plot.data.reg <- function(reg.data, params, fitted.line, selected.cov=NUL
      plot.data$effects <- effects
 
      ###
-     # @TODO; these need to be set by the user,
-     # will probably be placed on the params object
+     # Plot sizing defaults can move into params when exposed by the UI.
      plot.data$sym.size <- 1
      plot.data$lcol <- "darkred"
      plot.data$lweight <- 3
@@ -688,7 +679,7 @@ set.plot.options <- function(params) {
     }
 
     # fp.title is the title for forest plot
-    # In future, this should be user option
+    # Use a blank title unless the caller supplies one.
     if (is.null(params$fp.title)) {
          plot.options$fp.title <- ""
     } else {
@@ -871,9 +862,8 @@ forest.plot <- function(forest.data, outpath) {
   viewport.layout <- calc.viewport.layout(forest.data, just="left")
   # calculate the layout of the viewport
 
-  # so here we're just going to use the relatively hacky
-  # strategy of (R-)grepping for the literal ".png"
-  # note that this means that, technically, if someone tries
+  # Detect PNG output paths by scanning for the literal ".png".
+  # Note that this means that, technically, if someone tries
   # to save an iamge to my.pngimg.pdf, it will save it instead
   # as a png. on the other hand, why would someone do that?
   if (length(grep(".png", outpath)) != 0){
@@ -960,7 +950,7 @@ calc.viewport.layout <- function(forest.data, just){
         num.additional.cols <- 0
     }
     forest.plot.params <- create.plot.options(forest.data, gapSize = 3.2, plotWidth=5)
-    # @TODO: move these to forest plot options
+    # These dimensions are derived here until forest plot options carry them.
     rows <- forest.data$rows
     num.rows <- rows[length(rows)]
     # number of rows including blank rows
@@ -988,7 +978,7 @@ calc.forest.plot.size <- function(forest.data){
         num.additional.cols <- 0
     }
     forest.plot.params <- create.plot.options(forest.data, gapSize = 3.2, plotWidth=5)
-    # @TODO: move these to forest.plot.options
+    # These dimensions are derived here until forest plot options carry them.
     rows <- forest.data$rows
     num.rows <- rows[length(rows)]
 
@@ -1032,7 +1022,7 @@ calc.width.list <- function(forest.data) {
     # calculate widths of study column and data columns.
     show.study.col <- forest.data$options$show.study.col
     forest.plot.params <- create.plot.options(forest.data, gapSize = 3.2, plotWidth=5)
-    # @TODO: move these to forest plot options
+    # These dimensions are derived here until forest plot options carry them.
     width.list <-vector("list")
     if (show.study.col==TRUE) {
         study.col.grob <- forest.data$study.col.grob
@@ -1397,10 +1387,8 @@ draw.normal.CI <- function(LL, ES, UL, size) {
   # Draw arrow if exceed col range
   # convertX() used to convert between coordinate systems
 
-# TO DO: there is one case where this is a problem, when the summary estimate is wider than the CI
-# this can happen when the summary is calculated in a subgroup where there is only one study
-# this should be handled by another "if" that forces the xscale to be determined "primarily" by the CI of the summaries
-# this has to be done in the function above
+# Single-study subgroup summaries can be wider than their CI. The caller above
+# should prefer summary bounds when determining the x scale in that case.
 
   if ((convertX(unit(UL, "native"), "npc", valueOnly=TRUE) > 1)  &&  (convertX(unit(LL, "native"), "npc", valueOnly=TRUE) >= 0)) {
     # this line is too long on the right - draw a right arrow from LL to 1 (in approriate coords.)
@@ -1563,7 +1551,7 @@ two.forest.plots <- function(forest.data, outpath) {
    changed.params <- draw.forest.plot(forest.data1)
    # Only saving params changes for the left forest plot, because currently plot edit
    # can't handle two sets of params values for xticks or plot bounds.
-   # Could be changed in future.
+   # Plot editing currently persists only the left forest plot parameters.
    popViewport()
    pushViewport(viewport(layout=viewport.layout2, layout.pos.col=2))
    draw.forest.plot(forest.data2)

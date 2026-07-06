@@ -16,7 +16,7 @@
 \alias{CovariateValues-class}
 \alias{get.cov}
 \alias{study.column}
-\title{OpenMeta data classes and study data containers}
+\title{RCMetaR data classes and study data containers}
 \description{
 RCMetaR represents imported study data with S4 classes. These classes carry
 study names, notes, entered covariates, raw study-level measurements, and
@@ -40,4 +40,3 @@ Use \code{get.subset()} to preserve class-specific slots while selecting a
 subset of study rows. Use \code{get.cov()} and \code{study.column()} when
 building grouped analyses and display tables.
 }
-

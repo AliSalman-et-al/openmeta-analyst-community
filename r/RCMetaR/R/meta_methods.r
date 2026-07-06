@@ -1,19 +1,9 @@
-##################################################################
-#                                                                #
-#  Byron C. Wallace                                              #
-#  Tufts Medical Center                                          #
-#  RC MetaStudio                                             #
-#  ---                                                           #
-#  We refer to methods that operate on estimates                 #
-#  of subsets as `meta' methods. These include                   #
-#  cumulative meta-analysis, leave-one-out meta-analysis         #
-#  and all-subsets meta-analysis.                                #
-#                                                                #
-#  Any base meta-analytic                                        #
-#  method can be used as a basis for these methods,              #
-#  so long as the associated *.overall function                  #
-#  is implemented.                                               #
-##################################################################
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Repeated-analysis methods operate on subsets of estimates, including
+# cumulative, leave-one-out, and subgroup meta-analysis. Any base method can be
+# used when its associated *.overall function is implemented.
 
 cum_meta_analysis_ref = 'Cumulative Meta-Analysis: Lau, Joseph, et al. "Cumulative meta-analysis of therapeutic trials for myocardial infarction." New England Journal of Medicine 327.4 (1992): 248-254.'
 subgroup_ma_ref = "Subgroup Meta-Analysis: estimates are recomputed within covariate-defined study groups using the selected base meta-analysis method."
@@ -1428,7 +1418,7 @@ multiple.loo.diagnostic <- function(fnames, params.list, diagnostic.data) {
         two.forest.plots(plot.data, outpath=forest.path)
            
         forest.plot.params.path <- save.data(diagnostic.data.nlr.plr, res.nlr.plr, params=params.tmp, plot.data)
-        # @TODO: If you want to edit the plot, need to also 
+        # Persist plot params so NLR/PLR forest plots can be edited later.
         plot.params.paths.tmp <- c("NLR and PLR Forest Plot"=forest.plot.params.path)
         plot.params.paths <- c(plot.params.paths, plot.params.paths.tmp)
                

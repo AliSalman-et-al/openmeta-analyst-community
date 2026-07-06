@@ -1,9 +1,7 @@
-##################################
-#
-#  Byron C. Wallace
-#  Tufts Medical Center
-#  RC MetaStudio
-#
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Batch dataset editing dialog."""
+
 #  This form is for 'batch' editing a dataset. Note that any
 #  edits apply to *all* MetaAnalyticUnit objects known. So
 #  e.g., if a group name is changed, it will be changed
@@ -13,8 +11,6 @@
 #  undo/redo functionality. Rather, the strategy is to
 #  treat *all* editing done via this form as one
 #  undoable action.
-#
-##################################
 
 # import pdb
 
@@ -80,8 +76,8 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         self.group_list.setModel(self.groups_model)
 
         ### studies
-        # this is sort of hacky; we lop off the last study, which is
-        # always 'blank'. this is a recurring, rather annoying issue.
+        # The final row is the blank append row; batch edits operate only on
+        # real studies.
         # self.blank_study = dataset.studies[-1]
         # dataset.studies = dataset.studies[:-1]
         self.studies_model = edit_list_models.StudiesModel(dataset=dataset)

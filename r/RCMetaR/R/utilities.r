@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 ####################################
 #                                  #
 # RC MetaStudio                #
@@ -360,11 +363,12 @@ create.summary.disp <- function(om.data, params, res, model.title) {
   summary.disp
 }
 
-# @TODO should merge this with save.data below
+# save.plot.data intentionally persists only plot data; save.data stores the
+# broader analysis payload.
 save.plot.data <- function(plot.data, out.path=NULL) {
   # saves plot data to the RC MetaStudio scratch directory
   if (is.null(out.path)){
-    # by default, we use thecurrent system time as a 'unique enough' filename
+    # Use the current system time as a unique-enough default filename.
     out.path <- rcmetar.scratch.path(as.character(as.numeric(Sys.time())))
   }
   ### save plot data *only*
@@ -372,11 +376,11 @@ save.plot.data <- function(plot.data, out.path=NULL) {
   out.path
 }
 
-# For OpenMEE phylogenetic forest plot
+# Save plot data, parameters, and model results for editable forest plots.
 save.plot.data.and.params <- function(data, params, res, level, out.path=NULL) {
   # saves plot data to the RC MetaStudio scratch directory
   if (is.null(out.path)){
-    # by default, we use thecurrent system time as a 'unique enough' filename
+    # Use the current system time as a unique-enough default filename.
     out.path <- rcmetar.scratch.path(as.character(as.numeric(Sys.time())))
   }
   
@@ -703,10 +707,8 @@ create.subgroup.display <- function(res, study.names, params, model.title, data.
     pVal <- format.p.value.display(res[[count]]$pval, params$digits)
     zVal <- g.round.display.zval(res[[count]]$zval, digits=params$digits)
 
-    # very hacky fix to issue where the function would die below. For some
-    # reason when there is only a single study, the num.studies is NULL instead
-    # of one. This isn't really a bug with this function but rather should be
-    # solved elsewhere.....
+    # Single-study subgroup results may omit num.studies; treat that case as
+    # one study for display formatting.
     if (is.null(num.studies))
       num.studies <- 1
      

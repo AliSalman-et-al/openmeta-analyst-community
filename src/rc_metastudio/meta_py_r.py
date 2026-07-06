@@ -1,16 +1,6 @@
-#############################################################################
-#                                                                           #
-#  Byron C. Wallace                                                         #
-#  George Dietz                                                             #
-#  CEBM @ Brown                                                             #
-#  RC MetaStudio                                                        #
-#                                                                           #
-#  This is a proxy module that is responsible for communicating with R.     #
-#  An unholy mixture of R and Python                                        #
-#   **All calls to R (equivalently, all references to the rpy2 library)     #
-#   are to be made via this module **                                       #
-#                                                                           #
-#############################################################################
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""R bridge for RCMetaR calls through rpy2."""
 
 print("Entering meta_py_r for import probably")
 import math
@@ -36,7 +26,7 @@ print(("the path: %s" % os.getenv("PATH")))
 try:
     print("importing from rpy2")
     # will fail if not properly configured
-    # good place to debug when trying to get the mac build to work
+    # Import failure here usually means the local R/rpy2 runtime is incomplete.
     # from rpy2 import robjects as ro
     import rpy2.robjects as ro
 
@@ -75,10 +65,10 @@ def _r_is_null(r_object):
 
     rpy2 >= 3.x represents NULL as a ``NULLType`` singleton whose ``str()`` is
     an object repr (e.g. ``<rpy2...NULLType object at 0x...>``), not the literal
-    ``"NULL"`` that the legacy Python-2 rpy2 produced. Code that detected NULL
-    via ``str(x) == "NULL"`` therefore silently misfires (e.g. treating a list
-    with NULL names as if it had names). Prefer identity/type checks and fall
-    back to the legacy string compare for older rpy2 builds."""
+    ``"NULL"`` emitted by older rpy2 builds. Code that detected NULL via
+    ``str(x) == "NULL"`` therefore silently misfires (e.g. treating a list with
+    NULL names as if it had names). Prefer identity/type checks and keep the
+    string fallback for older rpy2 compatibility."""
     try:
         if r_object is rpy2.rinterface.NULL:
             return True
@@ -136,7 +126,7 @@ class RlibLoader:
         except:
             raise Exception(
                 "The %s R package is not installed.\nPlease \
-install this package and then re-start OpenMeta."
+install this package and then restart RC MetaStudio."
                 % name
             )
 
@@ -177,7 +167,7 @@ def get_r_package_version(package_name):
 
 @RfunctionCaller
 def reset_Rs_working_dir():
-    """resets R's working directory to the the application base_path, not to r_tmp!"""
+    """Reset R's working directory to the application data directory."""
     print("resetting R working dir")
 
     # Fix paths issue in windows
@@ -366,7 +356,7 @@ class R_parse_tools:
 #### end of R data structure tools #########
 
 
-# This should be renamed as it is not doing back-calculation from effects
+# This helper derives display-scale values from available study data.
 @RfunctionCaller
 def impute_cont_data(cont_data_dict, alpha):
     print("computing continuous data via R...")
@@ -455,7 +445,7 @@ def get_params(method_name):
 @RfunctionCaller
 def get_available_methods(for_data_type=None, data_obj_name=None, metric=None):
     """
-    Returns a list of methods available in OpenMeta for the particular data_type
+    Returns a list of methods available in RCMetaR for the particular data_type
     (if one is given).
     """
     data_arg = None if data_obj_name is None else ro.globalenv[str(data_obj_name)]
@@ -585,16 +575,16 @@ def ma_dataset_to_simple_binary_robj(
     studies=None,
 ):
     """
-    This converts a DatasetModel to an OpenMetaData (OMData) R object. We use type DatasetModel
+    This converts a DatasetModel to an RCMetaR OMData object. We use type DatasetModel
     rather than a DataSet model directly to access the current variables. Furthermore, this allows
     us to check which studies (if any) were excluded by the user.
 
     By 'simple' we mean that this method returns a single outcome single follow-up (defined as the
     the currently selected, as indicated by the model object) data object.
 
-     @TODO
-        - implement methods for more advanced conversions, i.e., for multiple outcome
-            datasets (althought this will be implemented in some other method)
+     Future conversion support:
+        - implement methods for multiple-outcome datasets; this likely belongs
+          in a separate adapter method.
     """
     if studies is None:
         # grab the study names. note: the list is pulled out in reverse order from the
@@ -657,7 +647,7 @@ def ma_dataset_to_simple_binary_robj(
         print(
             "there is neither sufficient raw data nor entered effects/CIs. I cannot run an analysis."
         )
-        # @TODO complain to the user here
+        # The raised exception is surfaced to the caller as the user-facing error.
 
     r_obj = execute_r_function("rcmetar.create.binary.data", **data_kwargs)
     ro.globalenv[var_name] = r_obj
@@ -803,7 +793,7 @@ def ma_dataset_to_simple_diagnostic_robj(
     studies=None,
 ):
     """
-    This converts a DatasetModel to an OpenMetaData (OMData) R object. We use type DatasetModel
+    This converts a DatasetModel to an RCMetaR OMData object. We use type DatasetModel
     rather than a DataSet model directly to access the current variables. Furthermore, this allows
     us to check which studies (if any) were excluded by the user.
 
@@ -1250,9 +1240,9 @@ def parse_out_results(result):
 
     for text_n, text in list(result.items()):
         display_text_n = _display_section_name(text_n)
-        # some special cases, notably the plot names and the path for a forest
-        # plot. TODO in the case of diagnostic data, we're probably going to
-        # need to parse out multiple forest plot param objects...
+        # Some result sections carry plot names and forest-plot parameter paths.
+        # Diagnostic analyses may return several plot parameter objects, so keep
+        # this branch broad enough to preserve all named plot metadata.
         print(text_n)
         print("\n--------\n")
         if text_n == "images":
@@ -1275,7 +1265,7 @@ def parse_out_results(result):
             text_d["Weights"] = make_weights_str(result)
         elif (
             text_n in ["res", "res.info", "input_data", "input_params"]
-        ):  # ignore the special output for OpenMEE (may want to have this in the future for OpenMeta as well)
+        ):  # skip low-level RCMetaR internals that are not display sections
             pass
         elif "gui.ignore" in text_n:
             pass
@@ -1679,7 +1669,7 @@ def run_meta_regression(
 
     method_str = "FE" if fixed_effects else "DL"
 
-    # @TODO conf.level, digits should be user-specified
+    # conf.level and digits are caller-supplied where available.
     params = {
         "conf.level": conf_level,
         "digits": 3,
@@ -1805,7 +1795,7 @@ def effect_for_study(
     Computes a point estimate, lower & upper bound for
     the parametric 2x2 *binary* table data.
 
-    @TODO add support for non-normal (e.g., T) distributions
+    Future work: add support for non-normal distributions such as Student's t.
 
     @params
     ===

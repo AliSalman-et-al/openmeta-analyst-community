@@ -9,5 +9,5 @@
 \description{
 Functions for permutation-based meta-analysis and meta-regression workflows.
 They generate permuted results and format permutation distributions for the
-OpenMeta display layer.
+RC MetaStudio display layer.
 }

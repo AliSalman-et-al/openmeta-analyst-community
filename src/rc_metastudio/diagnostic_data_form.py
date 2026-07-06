@@ -1,15 +1,6 @@
-##################################################
-#
-#  Byron C. Wallace
-#  George Dietz
-#  CEBM @ Brown
-#  RC MetaStudio
-#
-#  ---
-#  Diagnostic data form module; for flexible entry of diagnostic
-#  outcome data.
-#
-##################################################
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Diagnostic outcome data entry dialog."""
 
 import copy
 from functools import partial
@@ -454,7 +445,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
                 # here we update the MA unit
                 raw_data_index = DIAG_FIELDS_TO_RAW_INDICES[field]
 
-                # TODO: ENC
+                # Store the imputed raw count in the MA unit, preserving blanks.
                 self.ma_unit.tx_groups[self.group_str].raw_data[raw_data_index] = (
                     None
                     if not is_a_float(imputed_dict[field])
@@ -470,7 +461,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             i = DIAG_FIELDS_TO_RAW_INDICES[field]
             self.ma_unit.tx_groups[self.group_str].raw_data[i] = raw_dict[
                 field
-            ]  # TODO: ENC
+            ]
 
     def get_raw_diag_data(self, convert_None_to_NA_string=False):
         """Returns a dictionary of the raw data in the table (TP,FN,FP,TN),
@@ -531,7 +522,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             return str(self.high_txt_box.text())
         elif val_str == "prevalence":
             return str(self.prevalence_txt_box.text())
-        return None  # should never happen
+        return None  # Unknown value key.
 
     def val_changed(self, val_str):
         # Backup form state
@@ -566,8 +557,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             else:
                 display_scale_val = None
         except ValueError:
-            # a number wasn't entered; ignore
-            # should probably clear out the box here, too.
+            # Ignore incomplete numeric input while the user is still editing.
             print("fail.")
             return None
 
@@ -626,8 +616,8 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         self.two_by_two_table.blockSignals(False)
 
     def _populate_effect_cmbo_box(self):
-        # for now we only back-calculate from sens/spec
-        effects = BACK_CALCULATABLE_DIAGNOSTIC_EFFECTS  # TODO add more metrics
+        # Back-calculation is currently supported for sensitivity/specificity.
+        effects = BACK_CALCULATABLE_DIAGNOSTIC_EFFECTS
         self.effect_cbo_box.blockSignals(True)
         self.effect_cbo_box.addItems(effects)
         self.effect_cbo_box.setCurrentIndex(0)

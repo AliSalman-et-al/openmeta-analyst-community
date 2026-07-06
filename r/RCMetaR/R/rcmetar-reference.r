@@ -1,4 +1,7 @@
-#' OpenMeta data classes and study data containers
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+#' RCMetaR data classes and study data containers
 #'
 #' RCMetaR represents imported study data with S4 classes. These classes carry
 #' study names, notes, entered covariates, raw study-level measurements, and
@@ -322,12 +325,12 @@ NULL
 
 #' Output, persistence, and formatted summary helpers
 #'
-#' Helpers that format OpenMeta result objects for display, write results to
+#' Helpers that format RCMetaR result objects for display, write results to
 #' files, and preserve plot data alongside analysis parameters.
 #'
 #' @section Display helpers:
 #' \code{print.summary.display()} and \code{print.summary.data()} provide S3
-#' print methods for OpenMeta summary objects. \code{create.repeat.string()},
+#' print methods for RCMetaR summary objects. \code{create.repeat.string()},
 #' \code{pad.with.spaces()}, \code{round.display()},
 #' \code{capture.output.and.collapse()}, \code{results.short.list()}, and the
 #' \code{*.value.info()} helpers format display rows and labels.
@@ -345,7 +348,7 @@ NULL
 #'
 #' Functions for permutation-based meta-analysis and meta-regression workflows.
 #' They generate permuted results and format permutation distributions for the
-#' OpenMeta display layer.
+#' RC MetaStudio display layer.
 #'
 #' @aliases permuted.ma permuted.meta.reg permutest.value.info
 #' @name RCMetaR-permutation

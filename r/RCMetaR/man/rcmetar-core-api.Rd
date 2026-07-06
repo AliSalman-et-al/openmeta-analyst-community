@@ -69,7 +69,7 @@ data class, dispatches to the existing statistical implementation, and
 returns the standard RCMetaR result payload.
 }
 \details{
-This facade replaces the legacy exported surface. Long-standing routines such
+This facade replaces broad direct exports. Long-standing routines such
 as \code{binary.random()} and \code{cum.ma.binary()} remain private
 implementation details, while application code calls this core interface so
 that validation, dispatch, and future compatibility changes are centralized

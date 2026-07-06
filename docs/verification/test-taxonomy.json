@@ -1181,7 +1181,21 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/python/fast/test_rc_metastudio_identity_audit.py::test_identity_audit_allows_history_provenance_and_original_headers",
+      "nodeid": "tests/python/fast/test_rc_metastudio_identity_audit.py::test_identity_audit_allows_central_history_provenance",
+      "reason": "Covers RC MetaStudio identity audit behavior required by the verification lane.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_rc_metastudio_identity_audit.py::test_identity_audit_rejects_old_institutional_source_headers",
       "reason": "Covers RC MetaStudio identity audit behavior required by the verification lane.",
       "runtime_class": "subsecond",
       "size": "small"

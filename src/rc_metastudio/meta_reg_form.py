@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from PyQt5.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -106,9 +109,8 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
             fixed_effects = True
 
         if at_least_one_study_does_not_have_vals:
-            # TODO: this run_with_missing stuff needs to be finished i.e.
-            # actually remove the affected studies. Currently just throws an
-            # error
+            # Missing covariate values are rejected here until the analysis
+            # workflow can exclude affected studies consistently.
             run_with_missing = QMessageBox.warning(
                 self,
                 "Missing Covariate Values",
