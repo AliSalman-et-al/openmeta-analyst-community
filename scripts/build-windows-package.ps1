@@ -118,13 +118,23 @@ function Invoke-PackagedAppSmokeTest {
 function Invoke-PackagedWizardLayoutSmokeTest {
     param([string]$Root)
     $exePath = Join-Path $Root "RCMetaStudio.exe"
+    $smokeLogPath = Join-Path $Root "automation-wizard-layout-smoke.log"
+    if (Test-Path $smokeLogPath) { Remove-Item -LiteralPath $smokeLogPath -Force }
     $previousEnv = @{
         QT_QPA_PLATFORM = $env:QT_QPA_PLATFORM
+        RCMS_AUTOMATION_SMOKE_LOG = $env:RCMS_AUTOMATION_SMOKE_LOG
     }
     try {
-        $env:QT_QPA_PLATFORM = "windows"
-        $process = Start-Process -FilePath $exePath -ArgumentList @("--automation-wizard-layout-smoke") -Wait -PassThru -WindowStyle Normal
-        if ($process.ExitCode -ne 0) { throw "Packaged wizard layout smoke test failed with exit code $($process.ExitCode)." }
+        $env:QT_QPA_PLATFORM = "offscreen"
+        $env:RCMS_AUTOMATION_SMOKE_LOG = $smokeLogPath
+        $process = Start-Process -FilePath $exePath -ArgumentList @("--automation-wizard-layout-smoke") -Wait -PassThru -WindowStyle Hidden
+        if ($process.ExitCode -ne 0) {
+            $message = "Packaged wizard layout smoke test failed with exit code $($process.ExitCode)."
+            if (Test-Path $smokeLogPath) {
+                $message = $message + " " + (Get-Content -Raw -LiteralPath $smokeLogPath).Trim()
+            }
+            throw $message
+        }
     }
     finally {
         foreach ($name in $previousEnv.Keys) {

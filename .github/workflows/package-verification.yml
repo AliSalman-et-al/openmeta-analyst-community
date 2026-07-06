@@ -94,6 +94,7 @@ jobs:
           path: |
             build\windows-package\work\RCMetaStudio\warn-RCMetaStudio.txt
             build\windows-package\work\RCMetaStudio\xref-RCMetaStudio.html
+            build\windows-package\dist\RCMetaStudio\automation-wizard-layout-smoke.log
           if-no-files-found: ignore
           retention-days: 14
           compression-level: 0

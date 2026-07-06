@@ -201,7 +201,11 @@ def test_packaged_smoke_launches_visual_wizard_layout_gate():
         'Start-Process -FilePath $exePath -ArgumentList @("--automation-wizard-layout-smoke")'
         in script
     )
-    assert '$env:QT_QPA_PLATFORM = "windows"' in script
+    assert '$env:QT_QPA_PLATFORM = "offscreen"' in script
+    assert "WindowStyle Hidden" in script
+    assert "RCMS_AUTOMATION_SMOKE_LOG = $env:RCMS_AUTOMATION_SMOKE_LOG" in script
+    assert '$env:RCMS_AUTOMATION_SMOKE_LOG = $smokeLogPath' in script
+    assert "automation-wizard-layout-smoke.log" in script
     assert "QT_QPA_PLATFORM = $env:QT_QPA_PLATFORM" in script
 
 
@@ -287,6 +291,10 @@ def test_package_workflow_builds_path_aware_artifacts():
     assert any(
         "RCMetaStudio-macos-arm64" in run
         for run in workflow["text"].splitlines()
+    )
+    assert (
+        "build\\windows-package\\dist\\RCMetaStudio\\automation-wizard-layout-smoke.log"
+        in workflow["text"]
     )
     assert all("RCMS_CRAN_REPO_KEY" in key for key in workflow["cache_keys"])
     assert workflow["restore_keys"] == []

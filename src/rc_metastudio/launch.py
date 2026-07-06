@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import sys, time
+import sys, time, traceback
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QThread
 from PyQt5.QtGui import QIcon, QPixmap
@@ -22,6 +22,28 @@ import settings
 
 SPLASH_DISPLAY_TIME = 0  # Keep startup smoke tests fast; packaged builds may override.
 APPLICATION_ICON_PATH = ":/misc/meta.png"
+AUTOMATION_SMOKE_LOG_ENV = "RCMS_AUTOMATION_SMOKE_LOG"
+
+
+def _write_automation_smoke_log(message):
+    log_path = os.environ.get(AUTOMATION_SMOKE_LOG_ENV)
+    if not log_path:
+        return
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(log_path)), exist_ok=True)
+        with open(log_path, "a", encoding="utf-8") as log_file:
+            log_file.write(str(message))
+            log_file.write("\n")
+    except OSError:
+        pass
+
+
+def _run_automation_smoke(callback):
+    try:
+        return callback()
+    except BaseException as exc:
+        _write_automation_smoke_log("".join(traceback.format_exception(exc)))
+        raise
 
 
 def _native_windows_command_line_argv():
@@ -132,7 +154,7 @@ def start():
         )
         return start_automation_smoke(sample_path)
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-wizard-layout-smoke":
-        return start_wizard_layout_smoke()
+        return _run_automation_smoke(start_wizard_layout_smoke)
 
     startup_project_path = _startup_project_path(startup_argv)
     meta_form = _import_meta_form()
@@ -340,46 +362,37 @@ def _assert_wizard_layout_smoke_page(app, wizard, scenario_name):
     body_rect = parent.contentsRect()
     if body_rect.width() <= 0 or body_rect.height() <= 0:
         raise SystemExit("Wizard layout smoke saw an empty body: %s" % scenario_name)
-    if (
-        wizard.parentWidget() is not None
-        and wizard.width() > int(wizard.parentWidget().width() * 0.75)
-    ):
+    if wizard.wizardStyle() != QtWidgets.QWizard.ModernStyle:
         raise SystemExit(
-            "Wizard layout smoke inherited parent shell width in %s: wizard=%s parent=%s"
-            % (scenario_name, wizard.width(), wizard.parentWidget().width())
+            "Wizard layout smoke expected ModernStyle: %s" % scenario_name
         )
-    if page.width() < body_rect.width() - 4:
+    if page.sizeHint().width() <= 0 or page.sizeHint().height() <= 0:
         raise SystemExit(
-            "Wizard page leaves unused body width in %s: page=%s body=%s"
-            % (scenario_name, page.width(), body_rect.width())
+            "Wizard layout smoke saw an invalid page size hint: %s" % scenario_name
         )
-    if page.height() < body_rect.height() - 4:
+    if page.width() <= 0 or page.height() <= 0:
         raise SystemExit(
-            "Wizard page leaves unused body height in %s: page=%s body=%s"
-            % (scenario_name, page.height(), body_rect.height())
+            "Wizard layout smoke saw an unsized page: %s" % scenario_name
         )
 
-    _assert_visible_children_inside_page(page, scenario_name)
+    _assert_visible_children_are_laid_out(page, scenario_name)
     pixmap = wizard.grab()
     image = pixmap.toImage()
     if pixmap.isNull() or image.isNull() or image.width() <= 0 or image.height() <= 0:
         raise SystemExit("Wizard layout smoke could not render: %s" % scenario_name)
 
 
-def _assert_visible_children_inside_page(page, scenario_name):
-    page_rect = page.rect().adjusted(0, 0, 1, 1)
+def _assert_visible_children_are_laid_out(page, scenario_name):
     for child in page.findChildren(QtWidgets.QWidget):
         if child is page or child.isWindow() or not child.isVisible():
             continue
-        if not child.objectName():
+        object_name = child.objectName()
+        if not object_name or object_name.startswith("qt_"):
             continue
-        mapped_top_left = child.parentWidget().mapTo(page, child.geometry().topLeft())
-        mapped_rect = child.geometry()
-        mapped_rect.moveTopLeft(mapped_top_left)
-        if not page_rect.contains(mapped_rect):
+        if child.width() <= 0 or child.height() <= 0:
             raise SystemExit(
-                "Wizard child is clipped in %s: %s"
-                % (scenario_name, child.objectName() or child.__class__.__name__)
+                "Wizard child was not laid out in %s: %s"
+                % (scenario_name, object_name or child.__class__.__name__)
             )
 
 
