@@ -219,12 +219,12 @@ def add_file_to_recent_files(fpath):
     save_settings()
 
 
-def get_sample_data_path():
+def get_sample_projects_path():
     if getattr(sys, "frozen", False):
         app_root = os.path.dirname(sys.executable)
     else:
         app_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-    return os.path.join(app_root, "sample_data")
+    return os.path.join(app_root, "sample_projects")
 
 
 def get_default_open_directory(recent_files=None):
@@ -236,9 +236,9 @@ def get_default_open_directory(recent_files=None):
         if os.path.isdir(recent_dir):
             return recent_dir
 
-    sample_data_path = get_sample_data_path()
-    if os.path.isdir(sample_data_path):
-        return sample_data_path
+    sample_projects_path = get_sample_projects_path()
+    if os.path.isdir(sample_projects_path):
+        return sample_projects_path
 
     documents_path = get_user_documents_path()
     if documents_path and os.path.isdir(documents_path):

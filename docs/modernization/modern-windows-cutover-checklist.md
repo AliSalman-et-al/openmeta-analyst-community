@@ -17,7 +17,7 @@ The modern Python 3 and Qt 5 path has replaced the legacy release path after sat
 
 - Local verification command: `scripts\verify-modern-fast.ps1` runs the Fast Verification Lane; `scripts\package-modern-windows.ps1` runs the explicit Windows Packaging Lane.
 - Expected artifact: `RCMetaStudio-modern-windows-x64.zip`.
-- Representative project-open samples: `sample_data\BCG.rcms` and `sample_data\amino.rcms`.
+- Representative project-open samples: `sample_projects\BCG.rcms` and `sample_projects\amino.rcms`.
 - Bundled help target: `doc\openMA_help.html`.
 - Modern test and packaging instructions: `docs/agents/testing.md`.
 

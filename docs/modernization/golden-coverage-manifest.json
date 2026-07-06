@@ -63,7 +63,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/amino.rcms",
+      "project_state": "sample_projects/amino.rcms",
       "status": "included",
       "workflow": "standard"
     },
@@ -96,7 +96,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/amino.rcms",
+      "project_state": "sample_projects/amino.rcms",
       "status": "included",
       "workflow": "cumulative"
     },
@@ -129,7 +129,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/amino.rcms",
+      "project_state": "sample_projects/amino.rcms",
       "status": "included",
       "workflow": "leave-one-out"
     },
@@ -155,7 +155,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/amino.rcms",
+      "project_state": "sample_projects/amino.rcms",
       "status": "included",
       "workflow": "standard"
     },
@@ -180,7 +180,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/amino.rcms",
+      "project_state": "sample_projects/amino.rcms",
       "status": "included",
       "workflow": "cumulative"
     },
@@ -205,7 +205,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/amino.rcms",
+      "project_state": "sample_projects/amino.rcms",
       "status": "included",
       "workflow": "leave-one-out"
     },
@@ -238,7 +238,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/amino.rcms",
+      "project_state": "sample_projects/amino.rcms",
       "status": "included",
       "workflow": "standard"
     },
@@ -270,7 +270,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/amino.rcms",
+      "project_state": "sample_projects/amino.rcms",
       "status": "included",
       "workflow": "cumulative"
     },
@@ -302,7 +302,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/amino.rcms",
+      "project_state": "sample_projects/amino.rcms",
       "status": "included",
       "workflow": "leave-one-out"
     },
@@ -328,7 +328,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/amino.rcms",
+      "project_state": "sample_projects/amino.rcms",
       "status": "included",
       "workflow": "standard"
     },
@@ -353,7 +353,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/amino.rcms",
+      "project_state": "sample_projects/amino.rcms",
       "status": "included",
       "workflow": "cumulative"
     },
@@ -378,7 +378,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/amino.rcms",
+      "project_state": "sample_projects/amino.rcms",
       "status": "included",
       "workflow": "leave-one-out"
     },
@@ -404,7 +404,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/amino.rcms",
+      "project_state": "sample_projects/amino.rcms",
       "status": "included",
       "workflow": "standard"
     },
@@ -429,7 +429,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/amino.rcms",
+      "project_state": "sample_projects/amino.rcms",
       "status": "included",
       "workflow": "cumulative"
     },
@@ -454,7 +454,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/amino.rcms",
+      "project_state": "sample_projects/amino.rcms",
       "status": "included",
       "workflow": "leave-one-out"
     },
@@ -480,7 +480,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/amino.rcms",
+      "project_state": "sample_projects/amino.rcms",
       "status": "included",
       "workflow": "standard"
     },
@@ -505,7 +505,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/amino.rcms",
+      "project_state": "sample_projects/amino.rcms",
       "status": "included",
       "workflow": "cumulative"
     },
@@ -530,7 +530,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/amino.rcms",
+      "project_state": "sample_projects/amino.rcms",
       "status": "included",
       "workflow": "leave-one-out"
     },
@@ -562,7 +562,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/continuous.rcms",
+      "project_state": "sample_projects/continuous.rcms",
       "status": "included",
       "workflow": "standard"
     },
@@ -593,7 +593,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/continuous.rcms",
+      "project_state": "sample_projects/continuous.rcms",
       "status": "included",
       "workflow": "cumulative"
     },
@@ -624,7 +624,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/continuous.rcms",
+      "project_state": "sample_projects/continuous.rcms",
       "status": "included",
       "workflow": "leave-one-out"
     },
@@ -656,7 +656,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/continuous.rcms",
+      "project_state": "sample_projects/continuous.rcms",
       "status": "included",
       "workflow": "standard"
     },
@@ -687,7 +687,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/continuous.rcms",
+      "project_state": "sample_projects/continuous.rcms",
       "status": "included",
       "workflow": "cumulative"
     },
@@ -718,7 +718,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/continuous.rcms",
+      "project_state": "sample_projects/continuous.rcms",
       "status": "included",
       "workflow": "leave-one-out"
     },
@@ -754,7 +754,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/lymph.rcms",
+      "project_state": "sample_projects/lymph.rcms",
       "status": "included",
       "workflow": "standard"
     },
@@ -790,7 +790,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/lymph.rcms",
+      "project_state": "sample_projects/lymph.rcms",
       "status": "included",
       "workflow": "standard"
     },
@@ -827,7 +827,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/lymph.rcms",
+      "project_state": "sample_projects/lymph.rcms",
       "status": "included",
       "workflow": "standard"
     },
@@ -864,7 +864,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/lymph.rcms",
+      "project_state": "sample_projects/lymph.rcms",
       "status": "included",
       "workflow": "standard"
     },
@@ -902,7 +902,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/lymph.rcms",
+      "project_state": "sample_projects/lymph.rcms",
       "status": "included",
       "workflow": "standard"
     },
@@ -932,7 +932,7 @@
         "default confidence level",
         "covariate selection"
       ],
-      "project_state": "sample_data/amino.rcms",
+      "project_state": "sample_projects/amino.rcms",
       "status": "included",
       "workflow": "meta-regression"
     },
@@ -962,7 +962,7 @@
         "default confidence level",
         "covariate selection"
       ],
-      "project_state": "sample_data/continuous.rcms",
+      "project_state": "sample_projects/continuous.rcms",
       "status": "included",
       "workflow": "meta-regression"
     },
@@ -993,7 +993,7 @@
         "default plot parameters",
         "covariate selection"
       ],
-      "project_state": "sample_data/amino.rcms",
+      "project_state": "sample_projects/amino.rcms",
       "status": "included",
       "workflow": "subgroup"
     },
@@ -1024,7 +1024,7 @@
         "default plot parameters",
         "covariate selection"
       ],
-      "project_state": "sample_data/continuous.rcms",
+      "project_state": "sample_projects/continuous.rcms",
       "status": "included",
       "workflow": "subgroup"
     },
@@ -1060,7 +1060,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/lymph.rcms",
+      "project_state": "sample_projects/lymph.rcms",
       "status": "included",
       "workflow": "diagnostic-multi-metric"
     },
@@ -1098,7 +1098,7 @@
         "default confidence level",
         "default plot parameters"
       ],
-      "project_state": "sample_data/lymph.rcms",
+      "project_state": "sample_projects/lymph.rcms",
       "status": "included",
       "workflow": "diagnostic-multi-metric"
     },

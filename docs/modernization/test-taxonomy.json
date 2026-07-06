@@ -993,6 +993,34 @@
         "filesystem"
       ],
       "lane": "fast",
+      "nodeid": "tests/modern/fast/test_project_pickle_migration.py::test_sample_project_manifest_documents_committed_rcms_projects",
+      "reason": "Guards the committed RC MetaStudio sample-project manifest required for release packaging and test traceability.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/modern/fast/test_project_pickle_migration.py::test_sample_projects_do_not_reference_retired_project_file_or_module_identity",
+      "reason": "Guards committed sample projects against retired project-file and module identity tokens.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
       "nodeid": "tests/modern/fast/test_pyqt5_ci_path.py::test_modern_ci_uses_pyqt5",
       "reason": "Fast modernization guard suitable for default feedback.",
       "runtime_class": "subsecond",
@@ -2482,6 +2510,22 @@
         "filesystem"
       ],
       "lane": "gui",
+      "nodeid": "tests/modern/gui/test_gui_binary_slice.py::test_project_file_dialogs_use_rc_metastudio_project_filter",
+      "reason": "Protects the real MetaForm open/save dialog boundary for RC MetaStudio Project file labels and retired project extension removal.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
       "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_add_covariate_dialog_fields_and_buttons_fill_fitted_width",
       "reason": "Covers GUI compatibility behavior required by the verification lane.",
       "runtime_class": "seconds",
@@ -3354,7 +3398,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_open_existing_dialog_starts_in_sample_data_even_when_cwd_is_app_data",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_open_existing_dialog_starts_in_sample_projects_even_when_cwd_is_app_data",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
@@ -3765,7 +3809,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_welcome_wizard_open_existing_dialog_starts_in_sample_data_when_no_recent_project",
+      "nodeid": "tests/modern/gui/test_metaform_automation_launch.py::test_welcome_wizard_open_existing_dialog_starts_in_sample_projects_when_no_recent_project",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"

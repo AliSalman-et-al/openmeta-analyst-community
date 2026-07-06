@@ -74,15 +74,15 @@ def _resolve_open_file_path(file_path):
 
     normalized_path = os.path.normpath(file_path).replace("/", os.sep)
     path_parts = [part.lower() for part in normalized_path.split(os.sep)]
-    if "sample_data" not in path_parts:
+    if "sample_projects" not in path_parts:
         return file_path
 
     sample_file = os.path.basename(file_path)
     candidates = [
-        os.path.join(get_sample_data_path(), sample_file),
+        os.path.join(get_sample_projects_path(), sample_file),
         os.path.abspath(
             os.path.join(
-                os.path.dirname(__file__), os.pardir, "sample_data", sample_file
+                os.path.dirname(__file__), os.pardir, "sample_projects", sample_file
             )
         ),
     ]
@@ -321,7 +321,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             )
         else:
             self.dataset_file_lbl.setText(
-                "Open File: <font color='red'>%s</font>" % self.out_path
+                "Open Project: <font color='red'>%s</font>" % self.out_path
             )
         qt_layout.fit_text_to_contents(self)
 
@@ -1265,9 +1265,9 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         if file_path is None:
             file_path = QFileDialog.getOpenFileName(
                 parent=self,
-                caption="RCMetaStudio - Open File",
+                caption="RCMetaStudio - Open Project",
                 directory=get_default_open_directory(),
-                filter="open meta files (*.rcms)",
+                filter="RC MetaStudio Project (*.rcms)",
             )
             file_path = _qt_dialog_path(file_path)
 
@@ -1308,7 +1308,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             self.set_model(data_model, state_dict, check_for_appropriate_metric=True)
             self.model.analysis_source_path = file_path
             self.tableView.undoStack.clear()
-            self.dataset_file_lbl.setText("Open File: %s" % file_path)
+            self.dataset_file_lbl.setText("Open Project: %s" % file_path)
             qt_layout.fit_text_to_contents(self)
         finally:
             self._restore_window_placement(placement)
@@ -1551,9 +1551,9 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
             out_f = QFileDialog.getSaveFileName(
                 parent=self,
-                caption="RCMetaStudio - Save File",
+                caption="RCMetaStudio - Save Project",
                 directory=out_f,
-                filter="open meta files: (.rcms)",
+                filter="RC MetaStudio Project (*.rcms)",
             )
             out_f = _qt_dialog_path(out_f)
             if out_f == "" or out_f == None:
@@ -1563,7 +1563,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
         # add proper file extension
         try:
-            if self.out_path[-4:] != ".rcms":
+            if not self.out_path.lower().endswith(".rcms"):
                 self.out_path += ".rcms"
                 print("added proper file extension")
         except Exception as e:
@@ -1584,7 +1584,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             # add dataset to recent files
             add_file_to_recent_files(self.out_path)
 
-            self.dataset_file_lbl.setText("Open File: %s" % self.out_path)
+            self.dataset_file_lbl.setText("Open Project: %s" % self.out_path)
             qt_layout.fit_text_to_contents(self)
             self.current_data_unsaved = False
             return True

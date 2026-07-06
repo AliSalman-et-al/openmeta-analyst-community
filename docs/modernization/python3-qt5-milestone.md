@@ -54,7 +54,7 @@ This checklist defines the first modernization milestone for RC MetaStudio Commu
 - Use runnable compatibility slices instead of a repository-wide mechanical conversion. See [ADR 0007](../adr/0007-port-by-runnable-compatibility-slices.md).
 - Treat GUI similarity as workflow and recognizable-layout preservation, not pixel-perfect matching. See [ADR 0038](../adr/0038-define-gui-similarity-as-workflow-and-recognizable-layout-preservation.md).
 - Preserve GUI workflows unless a GUI compatibility exception is documented. See [ADR 0039](../adr/0039-preserve-gui-workflows-unless-an-exception-is-documented.md).
-- First GUI slice: open an existing `.rcms` sample dataset, display the data table, run a binary random-effects meta-analysis, and show the result summary plus forest plot. See [ADR 0008](../adr/0008-use-standard-binary-analysis-as-the-first-gui-slice.md).
+- First GUI slice: open an existing `.rcms` sample project, display the data table, run a binary random-effects meta-analysis, and show the result summary plus forest plot. See [ADR 0008](../adr/0008-use-standard-binary-analysis-as-the-first-gui-slice.md).
 - Use automated headless analysis regression as the first hard gate; allow manual or lightweight scripted GUI verification initially. See [ADR 0017](../adr/0017-use-analysis-regression-as-the-first-automated-gate.md).
 
 ## Full Legacy App Port Sequence

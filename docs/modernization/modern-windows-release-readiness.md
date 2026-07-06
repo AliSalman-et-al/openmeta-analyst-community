@@ -8,7 +8,7 @@ This note describes the maintained Python 3 and Qt 5 Windows distributable.
 2. Extract the ZIP to a writable folder.
 3. Run `LaunchRCMetaStudio.bat`.
 
-The launcher starts `RCMetaStudio.exe` and opens the bundled `sample_data\amino.rcms` dataset so the standard binary analysis GUI slice can be checked immediately.
+The launcher starts `RCMetaStudio.exe` and opens the bundled `sample_projects\amino.rcms` project so the standard binary analysis GUI slice can be checked immediately.
 
 ## Compatibility Promises
 

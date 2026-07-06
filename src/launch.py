@@ -125,7 +125,7 @@ def start():
         sample_path = (
             startup_argv[2]
             if len(startup_argv) > 2
-            else os.path.join("sample_data", "amino.rcms")
+            else os.path.join("sample_projects", "amino.rcms")
         )
         return start_automation_smoke(sample_path)
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-wizard-layout-smoke":

@@ -114,9 +114,9 @@ class WelcomePage(QWizardPage, forms.ui_welcome_page.Ui_WizardPage):
 
         self.selected_dataset = QFileDialog.getOpenFileName(
             parent=self,
-            caption="RCMetaStudio - Open File",
+            caption="RCMetaStudio - Open Project",
             directory=get_default_open_directory(self.recent_datasets),
-            filter="open meta files (*.rcms)",
+            filter="RC MetaStudio Project (*.rcms)",
         )
         if isinstance(self.selected_dataset, tuple):
             self.selected_dataset = self.selected_dataset[0]

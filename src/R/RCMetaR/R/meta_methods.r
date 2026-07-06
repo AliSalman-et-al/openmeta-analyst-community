@@ -109,7 +109,7 @@ cum.ma.binary <- function(fname, binary.data, params){
     # (mapping titles to pretty-printed text). In this case we have only one 
     # of each. 
     #    
-    plot.params.paths <- c("Cumulative Forest Plot"=forest.plot.params.path) #hopefully this change (adding 'Cumulative' doesn't break OMA)
+    plot.params.paths <- c("Cumulative Forest Plot"=forest.plot.params.path)
     images <- c("Cumulative Forest Plot"=forest.path)
     plot.names <- c("cumulative forest plot"="cumulative_forest_plot")
 	

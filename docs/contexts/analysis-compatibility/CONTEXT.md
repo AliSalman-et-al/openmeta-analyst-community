@@ -132,9 +132,9 @@ _Avoid_: Full capture, all snapshots
 Golden Analysis Test coverage that samples the major analysis data families before exhaustively covering every method within one family.
 _Avoid_: Broad test coverage, representative tests
 
-**Initial Golden Datasets**:
+**Initial Golden Projects**:
 The first committed project files used to capture and compare Golden Output Bundles: `amino.rcms`, `continuous.rcms`, and `lymph.rcms`.
-_Avoid_: Sample data, fixture set
+_Avoid_: Sample data, fixture set, initial golden datasets
 
 **Initial Golden Methods**:
 The first analysis methods captured for the Curated Golden Set, prioritizing random-effects analyses across the Initial Golden Datasets.
@@ -265,7 +265,7 @@ A machine-readable map from each Release Cutover workflow to its Golden Analysis
 _Avoid_: Manual checklist, prose-only trace, informal audit
 
 **Standard Binary Analysis Workflow**:
-The first GUI Compatibility Slice: open an existing `.rcms` sample dataset, display the data table, run a standard binary random-effects meta-analysis, and show the result summary plus forest plot.
+The first GUI Compatibility Slice: open an existing `.rcms` sample project, display the data table, run a standard binary random-effects meta-analysis, and show the result summary plus forest plot.
 _Avoid_: First GUI test, binary demo
 
 **Project File Read Compatibility**:

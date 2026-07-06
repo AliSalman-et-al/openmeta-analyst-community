@@ -59,8 +59,8 @@ function Assert-AppLayout {
     param([string]$Root)
     Assert-PathExists -Path (Join-Path $Root "RCMetaStudio.exe") -Description "RCMetaStudio executable"
     Assert-PathExists -Path (Join-Path $Root "_internal\PyQt5") -Description "Bundled PyQt5 runtime"
-    Assert-PathExists -Path (Join-Path $Root "sample_data\BCG.rcms") -Description "Bundled sample data"
-    Assert-PathExists -Path (Join-Path $Root "sample_data\amino.rcms") -Description "Bundled GUI slice sample data"
+    Assert-PathExists -Path (Join-Path $Root "sample_projects\BCG.rcms") -Description "Bundled sample project"
+    Assert-PathExists -Path (Join-Path $Root "sample_projects\amino.rcms") -Description "Bundled GUI slice sample project"
     Assert-PathExists -Path (Join-Path $Root "doc\openMA_help.html") -Description "Bundled help"
     Assert-PathExists -Path (Join-Path $Root "R\bin\x64\R.dll") -Description "Bundled R runtime"
     Assert-PathExists -Path (Join-Path $Root "R\library\RCMetaR\DESCRIPTION") -Description "Bundled RCMetaR R package"
@@ -70,7 +70,7 @@ function Assert-AppLayout {
 function Invoke-PackagedAppSmokeTest {
     param([string]$Root)
     $exePath = Join-Path $Root "RCMetaStudio.exe"
-    $samplePath = Join-Path $Root "sample_data\amino.rcms"
+    $samplePath = Join-Path $Root "sample_projects\amino.rcms"
     $previousEnv = @{
         RCMS_REQUIRE_IN_PROCESS_RPY2 = $env:RCMS_REQUIRE_IN_PROCESS_RPY2
         RCMS_STARTUP_PROJECT_SMOKE = $env:RCMS_STARTUP_PROJECT_SMOKE
@@ -137,7 +137,7 @@ function Assert-ZipLayout {
     try {
         $entryNames = @{}
         foreach ($entry in $zip.Entries) { $entryNames[$entry.FullName -replace "/", "\"] = $true }
-        foreach ($requiredEntry in @("RCMetaStudio.exe", "sample_data\BCG.rcms", "sample_data\amino.rcms", "doc\openMA_help.html", "R\bin\x64\R.dll", "R\library\RCMetaR\DESCRIPTION", "LaunchRCMetaStudio.bat")) {
+        foreach ($requiredEntry in @("RCMetaStudio.exe", "sample_projects\BCG.rcms", "sample_projects\amino.rcms", "doc\openMA_help.html", "R\bin\x64\R.dll", "R\library\RCMetaR\DESCRIPTION", "LaunchRCMetaStudio.bat")) {
             if (-not $entryNames.ContainsKey($requiredEntry)) { throw "Created ZIP is missing '$requiredEntry'." }
         }
         $hasPyQt5Runtime = $false
@@ -396,7 +396,7 @@ finally {
     Pop-Location
 }
 
-Copy-DirectoryTree -Source (Join-Path $repoRoot "sample_data") -Destination (Join-Path $appDir "sample_data")
+Copy-DirectoryTree -Source (Join-Path $repoRoot "sample_projects") -Destination (Join-Path $appDir "sample_projects")
 Copy-DirectoryTree -Source (Join-Path $repoRoot "doc") -Destination (Join-Path $appDir "doc")
 Write-Step "Bundling R runtime and packages"
 Copy-RRuntime -Root $resolvedRRuntimeRoot -DestinationRoot $appDir
@@ -406,7 +406,7 @@ Install-BundledRPackages -Root $appDir
 @echo off
 set APP_DIR=%~dp0
 set RPY2_CFFI_MODE=ABI
-start "" "%APP_DIR%RCMetaStudio.exe" "%APP_DIR%sample_data\amino.rcms"
+start "" "%APP_DIR%RCMetaStudio.exe" "%APP_DIR%sample_projects\amino.rcms"
 '@ | Set-Content -Path (Join-Path $appDir "LaunchRCMetaStudio.bat") -Encoding ASCII
 
 Assert-AppLayout -Root $appDir

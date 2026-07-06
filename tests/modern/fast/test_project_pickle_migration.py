@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 
@@ -7,6 +8,16 @@ from PyQt5 import QtCore
 sys.path.insert(0, os.path.abspath("src"))
 
 import project_pickle
+
+
+SAMPLE_PROJECTS_DIR = "sample_projects"
+SAMPLE_PROJECT_NAMES = [
+    "amino.rcms",
+    "BCG.rcms",
+    "continuous.rcms",
+    "lymph.rcms",
+    "meantime.rcms",
+]
 
 
 def _old_qt_module(name):
@@ -78,9 +89,42 @@ def test_project_loader_reports_unsupported_old_qt_values_as_project_format_erro
 
 
 def test_representative_sample_projects_load_with_current_project_loader():
-    for name in ["amino.rcms", "BCG.rcms", "continuous.rcms", "lymph.rcms", "meantime.rcms"]:
+    for name in SAMPLE_PROJECT_NAMES:
         dataset = project_pickle.load_project_pickle(
-            os.path.abspath(os.path.join("sample_data", name))
+            os.path.abspath(os.path.join(SAMPLE_PROJECTS_DIR, name))
         )
 
         assert len(dataset.studies) > 0
+
+
+def test_sample_project_manifest_documents_committed_rcms_projects():
+    manifest_path = os.path.join(SAMPLE_PROJECTS_DIR, "manifest.json")
+    with open(manifest_path, encoding="utf-8") as handle:
+        manifest = json.load(handle)
+
+    projects = manifest["projects"]
+    assert sorted(project["file"] for project in projects) == sorted(
+        SAMPLE_PROJECT_NAMES
+    )
+
+    for project in projects:
+        assert os.path.exists(os.path.join(SAMPLE_PROJECTS_DIR, project["file"]))
+        assert project["file"].endswith(".rcms")
+        assert project["provenance"]
+        assert project["analysis_family"] in {"binary", "continuous", "diagnostic"}
+        assert project["workflow_coverage"]
+        assert project["test_usage"]
+
+
+def test_sample_projects_do_not_reference_retired_project_file_or_module_identity():
+    retired_tokens = [
+        b"." + b"oma",
+        b"Open" + b"MetaAnalyst",
+        b"open" + b"metar",
+        b"Open" + b"MetaR",
+    ]
+
+    for name in SAMPLE_PROJECT_NAMES:
+        data = open(os.path.join(SAMPLE_PROJECTS_DIR, name), "rb").read()
+        for token in retired_tokens:
+            assert token not in data, "%s still contains %r" % (name, token)

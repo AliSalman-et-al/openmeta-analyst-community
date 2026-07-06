@@ -19,7 +19,7 @@ def test_real_metaform_opens_binary_continuous_and_diagnostic_projects():
         app, window = launch.start_automation()
         try:
             assert (
-                window.open(os.path.abspath(os.path.join("sample_data", name))) is True
+                window.open(os.path.abspath(os.path.join("sample_projects", name))) is True
             )
 
             model = window.tableView.model()
@@ -52,7 +52,7 @@ def test_real_metaform_standard_binary_action_opens_specs_dialog(monkeypatch):
     monkeypatch.setattr(meta_form.ma_specs, "MA_Specs", SpecsDialog)
 
     try:
-        assert window.open(os.path.abspath("sample_data/amino.rcms")) is True
+        assert window.open(os.path.abspath("sample_projects/amino.rcms")) is True
         window.action_go.trigger()
 
         assert calls == [(None, window, window.model.get_global_conf_level(), "binary")]
@@ -67,7 +67,7 @@ def test_real_metaform_preserves_standard_binary_rows():
 
     app, window = launch.start_automation()
     try:
-        assert window.open(os.path.abspath("sample_data/amino.rcms")) is True
+        assert window.open(os.path.abspath("sample_projects/amino.rcms")) is True
         model = window.tableView.model()
 
         assert window.model.dataset.title == "aminoglycosides"
@@ -99,7 +99,7 @@ def test_representative_projects_round_trip_without_byte_identical_expectations(
         saved_path = str(tmp_path / name)
         try:
             assert (
-                window.open(os.path.abspath(os.path.join("sample_data", name))) is True
+                window.open(os.path.abspath(os.path.join("sample_projects", name))) is True
             )
             expected = _dataset_summary(window.model.dataset)
             meta_form = sys.modules["meta_form"]
@@ -117,6 +117,40 @@ def test_representative_projects_round_trip_without_byte_identical_expectations(
             window.close()
             app.processEvents()
             os.chdir(REPO_ROOT)
+
+
+def test_project_file_dialogs_use_rc_metastudio_project_filter(monkeypatch):
+    import launch
+
+    app, window = launch.start_automation()
+    calls = []
+
+    def choose_open_project(**kwargs):
+        calls.append(("open", kwargs))
+        return ("", "")
+
+    def choose_save_project(**kwargs):
+        calls.append(("save", kwargs))
+        return ("", "")
+
+    try:
+        meta_form = sys.modules["meta_form"]
+        monkeypatch.setattr(meta_form.QFileDialog, "getOpenFileName", choose_open_project)
+        monkeypatch.setattr(meta_form.QFileDialog, "getSaveFileName", choose_save_project)
+
+        assert window.open() is False
+        assert window.save_as() is None
+
+        assert [kind for kind, _ in calls] == ["open", "save"]
+        retired_extension = "." + "oma"
+        for _, kwargs in calls:
+            assert kwargs["filter"] == "RC MetaStudio Project (*.rcms)"
+            assert retired_extension not in kwargs["filter"].lower()
+            assert "open meta" not in kwargs["filter"].lower()
+    finally:
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
 
 
 def _cell_text(model, row, column):

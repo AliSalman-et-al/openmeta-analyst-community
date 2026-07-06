@@ -551,7 +551,7 @@ def _empty_results():
 
 
 if __name__ == "__main__":
-    # make test results based on results from when meta-analysis run from amino sample data
+    # make test results based on results from when meta-analysis run from amino sample project
     test_results = {}
     test_results["images"] = {"Forest Plot": "./r_tmp/forest.png"}
     test_results["texts"] = {

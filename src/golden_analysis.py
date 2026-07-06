@@ -245,7 +245,7 @@ def write_comprehensive_golden_baseline_manifest(report_path, root_dir=None):
 
 def discover_reference_methods(root_dir, data_family, dataset, metric):
     model = headless_analysis.load_dataset_model(
-        os.path.join(root_dir, "sample_data", dataset)
+        os.path.join(root_dir, "sample_projects", dataset)
     )
     model.set_current_metric(metric)
     if data_family == "binary":
@@ -290,7 +290,7 @@ def _coverage_row(data_family, workflow, dataset, metric, methods, capture_modes
         "capture_modes": capture_modes,
         "artifacts": _workflow_artifacts(workflow),
         "options": _workflow_options(workflow),
-        "project_state": "sample_data/%s" % dataset
+        "project_state": "sample_projects/%s" % dataset
         if dataset.endswith(".rcms")
         else dataset,
         "status": "included",
@@ -365,7 +365,7 @@ def curated_golden_bundles(root_dir=None):
     root_dir = root_dir or os.path.abspath(
         os.path.join(os.path.dirname(__file__), "..")
     )
-    sample = lambda name: os.path.join(root_dir, "sample_data", name)
+    sample = lambda name: os.path.join(root_dir, "sample_projects", name)
     binary_params = dict(
         _common_plot_params("./r_tmp/golden_amino_forest.png"),
         **{

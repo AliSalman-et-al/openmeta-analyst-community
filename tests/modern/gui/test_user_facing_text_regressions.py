@@ -1742,7 +1742,7 @@ def test_issue_173_user_facing_commands_and_headers_use_desktop_casing():
         "Rename Covariate %s",
         "Delete Covariate %s",
         "Create a %s Copy of %s",
-        "Open File: %s",
+        "Open Project: %s",
     ]
     forbidden_strings = [
         '"undo"',

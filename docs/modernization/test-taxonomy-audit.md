@@ -17,7 +17,7 @@ The Fast Verification Lane has a hard Fast Feedback Budget: under ten minutes on
 
 Add a Smoke Verification Lane before the broader Fast Verification Lane. Its target is under thirty seconds locally after dependencies are warm, and it should contain only the highest-signal checks needed to fail early: pytest collection, manifest sanity, one representative Golden Analysis Test parser/comparison check, one project-load compatibility check, and a Default R Evidence prerequisite check.
 
-The Packaging Lane should run on pull requests only when packaging-relevant paths change, and should always remain available for release tags and manual dispatch. Packaging-relevant paths include packaging scripts, packaging workflows, Python lock/configuration files, R package/dependency inputs, launch entry points, bundled sample data, and bundled documentation.
+The Packaging Lane should run on pull requests only when packaging-relevant paths change, and should always remain available for release tags and manual dispatch. Packaging-relevant paths include packaging scripts, packaging workflows, Python lock/configuration files, R package/dependency inputs, launch entry points, bundled sample projects, and bundled documentation.
 
 The next packaging reproducibility target is deterministic process and artifact layout, not byte-identical ZIPs. Acceptance should focus on clean rebuilds, stable inputs, stable artifact contents/layout, explicit cache keys, and documented non-determinism.
 

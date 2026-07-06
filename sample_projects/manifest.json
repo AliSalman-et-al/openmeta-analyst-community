@@ -1,0 +1,92 @@
+{
+  "manifest": "rc-metastudio-sample-projects",
+  "version": 1,
+  "storage_note": "Initial .rcms sample projects preserve the transitional pickle-based project content shape pending a later structured project-file format.",
+  "projects": [
+    {
+      "file": "amino.rcms",
+      "scientific_name": "Aminoglycosides",
+      "analysis_family": "binary",
+      "provenance": "Repository-owned representative project carried forward from the maintained RC MetaStudio sample corpus.",
+      "workflow_coverage": [
+        "standard binary analysis workflow",
+        "binary random-effects golden analysis coverage",
+        "packaged startup project smoke coverage",
+        "project open/save round trip coverage"
+      ],
+      "test_usage": [
+        "tests/modern/fast/test_project_pickle_migration.py",
+        "tests/modern/gui/test_gui_binary_slice.py",
+        "tests/modern/gui/test_metaform_automation_launch.py",
+        "tests/modern/golden/test_modern_golden_compare.py",
+        "tests/modern/packaging_contract/test_windows_distributable_contract.py"
+      ]
+    },
+    {
+      "file": "BCG.rcms",
+      "scientific_name": "BCG vaccine",
+      "analysis_family": "binary",
+      "provenance": "Repository-owned representative project carried forward from the maintained RC MetaStudio sample corpus.",
+      "workflow_coverage": [
+        "binary project-load coverage",
+        "packaged sample-project layout coverage",
+        "project open/save round trip coverage"
+      ],
+      "test_usage": [
+        "tests/modern/fast/test_project_pickle_migration.py",
+        "tests/modern/gui/test_gui_binary_slice.py",
+        "tests/modern/packaging_contract/test_windows_distributable_contract.py"
+      ]
+    },
+    {
+      "file": "continuous.rcms",
+      "scientific_name": "Continuous outcome example",
+      "analysis_family": "continuous",
+      "provenance": "Repository-owned representative project carried forward from the maintained RC MetaStudio sample corpus.",
+      "workflow_coverage": [
+        "continuous analysis workflow",
+        "continuous random-effects golden analysis coverage",
+        "project open/save round trip coverage"
+      ],
+      "test_usage": [
+        "tests/modern/fast/test_project_pickle_migration.py",
+        "tests/modern/gui/test_gui_binary_slice.py",
+        "tests/modern/gui/test_metaform_automation_launch.py",
+        "tests/modern/golden/test_modern_golden_compare.py"
+      ]
+    },
+    {
+      "file": "lymph.rcms",
+      "scientific_name": "Lymph diagnostic accuracy",
+      "analysis_family": "diagnostic",
+      "provenance": "Repository-owned representative project carried forward from the maintained RC MetaStudio sample corpus.",
+      "workflow_coverage": [
+        "diagnostic analysis workflow",
+        "diagnostic golden analysis coverage",
+        "project open/save round trip coverage"
+      ],
+      "test_usage": [
+        "tests/modern/fast/test_project_pickle_migration.py",
+        "tests/modern/gui/test_gui_binary_slice.py",
+        "tests/modern/gui/test_metaform_automation_launch.py",
+        "tests/modern/golden/test_modern_golden_compare.py"
+      ]
+    },
+    {
+      "file": "meantime.rcms",
+      "scientific_name": "Meantime subgroup example",
+      "analysis_family": "continuous",
+      "provenance": "Repository-owned representative project carried forward from the maintained RC MetaStudio sample corpus.",
+      "workflow_coverage": [
+        "factor covariate project-load coverage",
+        "subgroup analysis enablement coverage",
+        "project open/save round trip coverage"
+      ],
+      "test_usage": [
+        "tests/modern/fast/test_project_pickle_migration.py",
+        "tests/modern/gui/test_gui_binary_slice.py",
+        "tests/modern/gui/test_metaform_automation_launch.py"
+      ]
+    }
+  ]
+}

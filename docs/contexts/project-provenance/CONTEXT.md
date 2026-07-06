@@ -33,7 +33,7 @@ The statement that RC MetaStudio is not affiliated with, endorsed by, sponsored 
 _Avoid_: No-endorsement note, casual disclaimer
 
 **RC MetaStudio Project File**:
-The maintained project-file format for RC MetaStudio, using the `.rcms` extension for saved analysis projects and sample data.
+The maintained project-file format for RC MetaStudio, using the `.rcms` extension for saved analysis projects and sample projects.
 _Avoid_: OMA file, `.oma` project file, legacy project file
 
 **RC MetaStudio Project**:

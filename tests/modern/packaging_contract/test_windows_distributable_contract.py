@@ -141,8 +141,8 @@ def test_modern_windows_distributable_contract_is_declared():
     assert {"icons_rc", "rpy2.robjects", "rpy2.rinterface"} <= script["hidden_imports"]
     assert {
         "RCMetaStudio.exe",
-        "sample_data\\BCG.rcms",
-        "sample_data\\amino.rcms",
+        "sample_projects\\BCG.rcms",
+        "sample_projects\\amino.rcms",
         "doc\\openMA_help.html",
         "R\\bin\\x64\\R.dll",
         "R\\library\\RCMetaR\\DESCRIPTION",
@@ -384,7 +384,7 @@ def test_modern_macos_distributable_contract_is_declared():
         "RPY2_CFFI_MODE",
     } <= script["env_names"]
     assert {
-        "sample_data/amino.rcms",
+        "sample_projects/amino.rcms",
         "doc/openMA_help.html",
         "R/library/RCMetaR/DESCRIPTION",
         "LaunchRCMetaStudio.command",
@@ -470,7 +470,7 @@ def test_windows_packager_uses_clean_directory_copies_for_incremental_builds():
     assert relative_order(
         script,
         "function Copy-DirectoryTree",
-        'Copy-DirectoryTree -Source (Join-Path $repoRoot "sample_data")',
+        'Copy-DirectoryTree -Source (Join-Path $repoRoot "sample_projects")',
     )
     assert relative_order(
         script,

@@ -25,7 +25,7 @@ DEFAULT_SCAN_ENTRIES = (
     "scripts",
     "src",
     "tests",
-    "sample_data",
+    "sample_projects",
     "packaging",
 )
 
