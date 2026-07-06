@@ -57,10 +57,6 @@ import network_view
 import conf_level_dialog
 import main_wizard
 
-# for the help
-import webbrowser
-
-
 import forms.ui_running
 
 
@@ -532,7 +528,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             _connect_action(self.action_meta_regression, self.meta_reg)
             _connect_action(self.action_subgroup_ma, self.meta_subgroup_get_cov)
 
-            _connect_action(self.action_open_help, self.show_help)
+            _connect_action(self.action_about_legal, self.show_about_legal)
             _connect_action(self.action_change_conf_level, self._change_global_ci)
             _connect_action(self.action_import_csv, self._import_csv)
 
@@ -633,8 +629,23 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             return
         qt_layout.show_centered(form)
 
-    def show_help(self):
-        webbrowser.open(meta_globals.HELP_URL)
+    def show_about_legal(self):
+        QMessageBox.about(
+            self,
+            "About/Legal",
+            "RC MetaStudio {version}\n\n"
+            "Open-source desktop software for advanced meta-analysis, developed "
+            "and maintained by Research Consultancy (RC).\n\n"
+            "Maintainer: Ali Salman and RC MetaStudio contributors\n"
+            "License: GPL-3.0-or-later\n"
+            "Issues: https://github.com/AliSalman-et-al/rc-metastudio/issues\n\n"
+            "RC MetaStudio is distributed without warranty, including without "
+            "the implied warranty of merchantability or fitness for a particular "
+            "purpose.\n\n"
+            "RC MetaStudio is derived from the Original OpenMeta[Analyst] "
+            "Project and is independently maintained. See NOTICE.md for "
+            "provenance and affiliation details.".format(version=meta_globals.VERSION),
+        )
 
     def meta_subgroup(self, selected_cov):
         form = None

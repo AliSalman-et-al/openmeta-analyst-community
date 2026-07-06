@@ -13,14 +13,13 @@
 # TODO: move functions out of here and just have this be constants w/o imports
 
 import os
-import sys
 import math
 
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QUndoCommand
 
 APPLICATION_NAME = "RCMetaStudio"
-ORGANIZATION_NAME = "CEBM"
+ORGANIZATION_NAME = "Research Consultancy"
 
 # number of digits to display
 NUM_DIGITS = 3
@@ -137,13 +136,6 @@ BASE_PATH = str(os.path.abspath(os.getcwd()))
 
 # this is a useful function sometimes.
 none_to_str = lambda x: "" if x is None else x
-
-_APPLICATION_ROOT = (
-    os.path.dirname(sys.executable)
-    if getattr(sys, "frozen", False)
-    else os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-)
-HELP_URL = os.path.abspath(os.path.join(_APPLICATION_ROOT, "doc", "openMA_help.html"))
 
 # for diagnostic data -- this dictionary maps
 # the mteric names as they appear in the UI/ure

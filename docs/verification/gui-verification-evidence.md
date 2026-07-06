@@ -18,12 +18,12 @@ Record one entry for every Release Cutover workflow that is verified through GUI
 - Verified workflow: open the existing project, display binary study rows, run the random-effects action, and render a result summary plus forest plot path in the PyQt5 window.
 - Command: `uv run pytest -q tests`
 
-## Bundled Help Workflow
+## About/Legal and Static Project Links Workflow
 
-- Issue: #34
+- Issue: #246
 - Dataset: Not applicable.
-- Evidence: `tests/python/gui/test_metaform_automation_launch.py::test_help_action_opens_bundled_help`
-- Verified workflow: trigger the real `MetaForm` help action and open the bundled `doc/openMA_help.html` file.
+- Evidence: `tests/python/gui/test_metaform_automation_launch.py::test_removed_help_surfaces_do_not_leave_active_ui_or_urls`
+- Verified workflow: launch the real `MetaForm`, confirm the retired bundled-help action is absent, keep the About/Legal action available, and expose only current static GitHub project and issue links from the welcome screen.
 - Command: `uv run pytest tests\\python\\gui\\test_metaform_automation_launch.py`
 
 ## Real MetaForm Project Shell Workflow

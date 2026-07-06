@@ -522,7 +522,7 @@
     <property name="title">
      <string>Help</string>
     </property>
-    <addaction name="action_open_help"/>
+    <addaction name="action_about_legal"/>
    </widget>
    <addaction name="menu_file"/>
    <addaction name="menuEdit"/>
@@ -710,9 +710,9 @@
     <string>Save As</string>
    </property>
   </action>
-  <action name="action_open_help">
+  <action name="action_about_legal">
    <property name="text">
-    <string>Open Help</string>
+    <string>About/Legal</string>
    </property>
   </action>
   <action name="action_change_conf_level">

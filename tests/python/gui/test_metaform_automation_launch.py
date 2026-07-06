@@ -3082,23 +3082,51 @@ def test_welcome_wizard_open_existing_dialog_starts_in_sample_projects_when_no_r
         os.chdir(REPO_ROOT)
 
 
-def test_help_action_opens_bundled_help(monkeypatch):
+def test_removed_help_surfaces_do_not_leave_active_ui_or_urls():
     import launch
+    import main_wizard
+    from PyQt5 import QtWidgets
 
-    opened = []
     app, window = launch.start_automation()
-    import meta_globals
-
-    meta_form = sys.modules["meta_form"]
-    monkeypatch.setattr(meta_form.webbrowser, "open", opened.append)
 
     try:
-        window.action_open_help.trigger()
+        assert not hasattr(window, "action_open_help")
+        assert not any(
+            action.text() == "Open Help" for action in window.menuHelp.actions()
+        )
+        assert window.action_about_legal.text() == "About/Legal"
 
-        assert opened == [os.path.join(REPO_ROOT, "doc", "openMA_help.html")]
-        assert meta_globals.HELP_URL == opened[0]
-        assert os.path.exists(opened[0])
+        about_calls = []
+        original_about = QtWidgets.QMessageBox.about
+        QtWidgets.QMessageBox.about = lambda *args: about_calls.append(args)
+        try:
+            window.action_about_legal.trigger()
+        finally:
+            QtWidgets.QMessageBox.about = original_about
+        about_text = about_calls[0][2]
+        assert "RC MetaStudio" in about_text
+        assert "Ali Salman" in about_text
+        assert "GPL-3.0-or-later" in about_text
+        assert "without warranty" in about_text.lower()
+        assert "Original OpenMeta[Analyst] Project" in about_text
+        assert "NOTICE.md" in about_text
+
+        wizard = main_wizard.MainWizard()
+        welcome = wizard.page(main_wizard.Page_Welcome)
+        link_text = " ".join(
+            [
+                welcome.RCMS_onlineLabel.text(),
+                welcome.issue_feedback_label.text(),
+                welcome.how_to_citeLabel.text(),
+            ]
+        )
+        assert "github.com/AliSalman-et-al/rc-metastudio" in link_text
+        assert "cebm.brown.edu" not in link_text.lower()
+        assert "tuftscaes.org" not in link_text.lower()
+        assert "openMA_help" not in link_text
     finally:
+        if "wizard" in locals():
+            wizard.close()
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)

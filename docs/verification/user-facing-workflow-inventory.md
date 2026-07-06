@@ -1,6 +1,6 @@
 # User-Facing Workflow Inventory
 
-This inventory is the authoritative checklist for Functional Indistinguishability during the Full Legacy App Port. It is built from the Reference Implementation GUI actions, bundled user documentation, sample `.rcms` projects, and R-backed analysis paths.
+This inventory is the authoritative checklist for Functional Indistinguishability during the Full Legacy App Port. It is built from the Reference Implementation GUI actions, sample `.rcms` projects, and R-backed analysis paths.
 
 The Full Legacy App Port covers all non-network desktop workflows before Release Cutover. Network Meta-Analysis remains a user-facing legacy workflow, but it belongs to the later Complete User-Facing Legacy Port milestone.
 
@@ -9,7 +9,6 @@ The Full Legacy App Port covers all non-network desktop workflows before Release
 - `src/rc_metastudio/forms/meta.ui` and generated `src/rc_metastudio/ui_meta.py` for main-window menus, toolbar actions, and visible controls.
 - `src/rc_metastudio/meta_form.py` for action handlers, navigation behavior, project open/save, analysis dispatch, and result display.
 - `src/rc_metastudio/main_wizard.py` and `src/rc_metastudio/forms/*.ui` for startup, dataset creation, and CSV import workflows.
-- `doc/*.html` and `doc/images/*` for documented user workflows and expected concepts.
 - `sample_projects/*.rcms` for representative legacy projects.
 - `r/RCMetaR` and related R analysis calls for preserved Analysis Behavior.
 
@@ -29,7 +28,7 @@ The Full Legacy App Port covers all non-network desktop workflows before Release
 - Subgroup Analysis workflows.
 - CSV import workflows.
 - Results-window summary and plot display workflows.
-- Bundled help workflows. Release Cutover preserves the existing bundled HTML help content, changing only local path or launch mechanics needed under Python 3.11 and PyQt5. Installation and compatibility notes belong in release documentation rather than a broad help rewrite.
+- About/Legal and static project-link workflows. RC MetaStudio keeps current provenance, license, warranty, and issue-link surfaces while bundled help content remains removed.
 - Windows distributable launch workflow.
 
 ## Porting Order
@@ -48,7 +47,7 @@ Adopt `uv` for the Python Verification Environment as soon as the dependency fea
 
 Every workflow in Release Cutover Scope needs GUI Verification Evidence in [GUI Verification Evidence](gui-verification-evidence.md) or a documented GUI Compatibility Exception before Release Cutover.
 
-Use scripted verification for workflows that mutate project data, call R-backed Analysis Behavior, save or load `.rcms` files, import CSV data, or affect packaging and launch behavior. Manual GUI Verification Evidence is acceptable for low-risk workflows whose compatibility target is primarily navigational or visual, such as bundled help opening, menu presence, or recognizable dialog layout.
+Use scripted verification for workflows that mutate project data, call R-backed Analysis Behavior, save or load `.rcms` files, import CSV data, or affect packaging and launch behavior. Manual GUI Verification Evidence is acceptable for low-risk workflows whose compatibility target is primarily navigational or visual, such as menu presence or recognizable dialog layout.
 
 Non-analysis GUI workflows should enter the Comprehensive Golden Baseline when they create or mutate analysis-relevant project state. Pure navigation or visual workflows remain GUI Verification Evidence unless they affect analysis inputs or outputs.
 

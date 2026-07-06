@@ -61,7 +61,6 @@ function Assert-AppLayout {
     Assert-PathExists -Path (Join-Path $Root "_internal\PyQt5") -Description "Bundled PyQt5 runtime"
     Assert-PathExists -Path (Join-Path $Root "sample_projects\BCG.rcms") -Description "Bundled sample project"
     Assert-PathExists -Path (Join-Path $Root "sample_projects\amino.rcms") -Description "Bundled GUI slice sample project"
-    Assert-PathExists -Path (Join-Path $Root "doc\openMA_help.html") -Description "Bundled help"
     Assert-PathExists -Path (Join-Path $Root "R\bin\x64\R.dll") -Description "Bundled R runtime"
     Assert-PathExists -Path (Join-Path $Root "R\library\RCMetaR\DESCRIPTION") -Description "Bundled RCMetaR R package"
     Assert-PathExists -Path (Join-Path $Root "LaunchRCMetaStudio.bat") -Description "Windows launcher"
@@ -137,7 +136,7 @@ function Assert-ZipLayout {
     try {
         $entryNames = @{}
         foreach ($entry in $zip.Entries) { $entryNames[$entry.FullName -replace "/", "\"] = $true }
-        foreach ($requiredEntry in @("RCMetaStudio.exe", "sample_projects\BCG.rcms", "sample_projects\amino.rcms", "doc\openMA_help.html", "R\bin\x64\R.dll", "R\library\RCMetaR\DESCRIPTION", "LaunchRCMetaStudio.bat")) {
+        foreach ($requiredEntry in @("RCMetaStudio.exe", "sample_projects\BCG.rcms", "sample_projects\amino.rcms", "R\bin\x64\R.dll", "R\library\RCMetaR\DESCRIPTION", "LaunchRCMetaStudio.bat")) {
             if (-not $entryNames.ContainsKey($requiredEntry)) { throw "Created ZIP is missing '$requiredEntry'." }
         }
         $hasPyQt5Runtime = $false
@@ -398,7 +397,6 @@ finally {
 }
 
 Copy-DirectoryTree -Source (Join-Path $repoRoot "sample_projects") -Destination (Join-Path $appDir "sample_projects")
-Copy-DirectoryTree -Source (Join-Path $repoRoot "doc") -Destination (Join-Path $appDir "doc")
 Write-Step "Bundling R runtime and packages"
 Copy-RRuntime -Root $resolvedRRuntimeRoot -DestinationRoot $appDir
 Install-BundledRPackages -Root $appDir

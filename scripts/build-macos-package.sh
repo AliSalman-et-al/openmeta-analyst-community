@@ -247,9 +247,8 @@ if [ ! -x "$app_root/RCMetaStudio" ]; then
   exit 1
 fi
 
-step "Bundling sample projects, help, and R runtime"
+step "Bundling sample projects and R runtime"
 copy_tree "$repo_root/sample_projects" "$app_root/sample_projects"
-copy_tree "$repo_root/doc" "$app_root/doc"
 copy_tree "$r_runtime_root" "$app_root/R"
 
 r_home="$app_root/R"
@@ -366,7 +365,6 @@ for required_path in \
   "$app_root/RCMetaStudio" \
   "$app_root/sample_projects/BCG.rcms" \
   "$app_root/sample_projects/amino.rcms" \
-  "$app_root/doc/openMA_help.html" \
   "$app_root/R/bin/Rscript" \
   "$app_root/R/library/RCMetaR/DESCRIPTION" \
   "$app_root/LaunchRCMetaStudio.command"
@@ -400,7 +398,6 @@ required = [
     "RCMetaStudio.app/Contents/MacOS/RCMetaStudio",
     "RCMetaStudio.app/Contents/MacOS/sample_projects/BCG.rcms",
     "RCMetaStudio.app/Contents/MacOS/sample_projects/amino.rcms",
-    "RCMetaStudio.app/Contents/MacOS/doc/openMA_help.html",
     "RCMetaStudio.app/Contents/MacOS/R/bin/Rscript",
     "RCMetaStudio.app/Contents/MacOS/R/library/RCMetaR/DESCRIPTION",
     "RCMetaStudio.app/Contents/MacOS/LaunchRCMetaStudio.command",

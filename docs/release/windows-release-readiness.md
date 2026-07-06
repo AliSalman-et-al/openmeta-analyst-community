@@ -17,7 +17,7 @@ The launcher starts `RCMetaStudio.exe` and opens the bundled `sample_projects\am
 - R behavior: Release Cutover preserves Reference Implementation R-backed statistical behavior; broad R modernization is post-cutover unless required for the bridge or packaging.
 - GUI: milestone 1 preserves required workflows and recognizable layouts, not pixel-perfect Qt 4 rendering.
 - `.rcms`: representative existing `.rcms` files must open without user-visible migration steps, and selected project files must round-trip successfully before release.
-- Help: RC MetaStudio opens the bundled `doc\openMA_help.html` content rather than relying on legacy network-hosted help.
+- Help and legal: RC MetaStudio does not bundle the retired help system; provenance, license, warranty, and issue feedback surfaces are available through About/Legal and static GitHub links.
 
 ## Out of Scope
 

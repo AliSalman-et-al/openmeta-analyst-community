@@ -3149,8 +3149,8 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_help_action_opens_bundled_help",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_removed_help_surfaces_do_not_leave_active_ui_or_urls",
+      "reason": "Protects the removed-help and static About/Legal GUI contract from regressing into bundled help or obsolete support links.",
       "runtime_class": "minutes",
       "size": "large"
     },

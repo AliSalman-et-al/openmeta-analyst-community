@@ -144,7 +144,7 @@
         </size>
        </property>
        <property name="text">
-        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;a href=&quot;http://www.cebm.brown.edu/open_meta&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;OpenMeta Website&lt;/span&gt;&lt;/a&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        <string>&lt;a href=&quot;https://github.com/AliSalman-et-al/rc-metastudio&quot;&gt;Project Site&lt;/a&gt;</string>
        </property>
        <property name="alignment">
         <set>Qt::AlignCenter</set>
@@ -191,7 +191,7 @@
       </widget>
      </item>
      <item>
-      <widget class="QLabel" name="helpLabel">
+      <widget class="QLabel" name="issue_feedback_label">
        <property name="minimumSize">
         <size>
          <width>70</width>
@@ -199,7 +199,7 @@
         </size>
        </property>
        <property name="text">
-        <string>&lt;a href=&quot;http://tuftscaes.org/open_meta/help/openMA_help.html&quot;&gt;Help&lt;/a&gt;</string>
+        <string>&lt;a href=&quot;https://github.com/AliSalman-et-al/rc-metastudio/issues&quot;&gt;Issues&lt;/a&gt;</string>
        </property>
        <property name="alignment">
         <set>Qt::AlignCenter</set>

@@ -1310,16 +1310,12 @@ class DatasetModel(QAbstractTableModel):
                         else:
                             return "# True Negatives" + sort_msg
                 elif section in self.OUTCOMES:
-                    help_msg = "For information about how the confidence interval was obtained,\n"
-                    help_msg += "please consult the the help at {0}".format(HELP_URL)
                     lower_msg = "Lower bound of {0:.1%} confidence interval".format(
                         self.conf_level / 100.0
                     )
-                    lower_msg += "\n" + help_msg
                     upper_msg = "Upper bound of {0:.1%} confidence interval\n".format(
                         self.conf_level / 100.0
                     )
-                    upper_msg += "\n" + help_msg
                     se_msg = "Standard Error"
 
                     if outcome_type == BINARY:

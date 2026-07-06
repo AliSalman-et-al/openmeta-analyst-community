@@ -112,10 +112,10 @@
       "trace": "Results Window Summary Plot Display Workflow"
     },
     {
-      "id": "bundled-help",
-      "name": "Bundled help workflows",
+      "id": "about-legal-static-links",
+      "name": "About/Legal and static project-link workflows",
       "trace_type": "gui_evidence_entry",
-      "trace": "Bundled Help Workflow"
+      "trace": "About/Legal and Static Project Links Workflow"
     },
     {
       "id": "windows-distributable-launch",

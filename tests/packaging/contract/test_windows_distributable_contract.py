@@ -144,7 +144,6 @@ def test_windows_distributable_contract_is_declared():
         "RCMetaStudio.exe",
         "sample_projects\\BCG.rcms",
         "sample_projects\\amino.rcms",
-        "doc\\openMA_help.html",
         "R\\bin\\x64\\R.dll",
         "R\\library\\RCMetaR\\DESCRIPTION",
         "LaunchRCMetaStudio.bat",
@@ -152,6 +151,8 @@ def test_windows_distributable_contract_is_declared():
         "docs\\verification\\RCMetaR-r-dependencies.json",
         "r\\RCMetaR\\DESCRIPTION",
     } <= script["paths"]
+    assert "doc\\openMA_help.html" not in script["paths"]
+    assert "Bundled help" not in script["text"]
     assert "src\\rc_metastudio\\__main__.py" in script["paths"]
     assert "src/rc_metastudio/__main__.py" in spec
     assert "src\\rc_metastudio\\launch.py" not in script["text"]
@@ -389,10 +390,11 @@ def test_macos_distributable_contract_is_declared():
     } <= script["env_names"]
     assert {
         "sample_projects/amino.rcms",
-        "doc/openMA_help.html",
         "R/library/RCMetaR/DESCRIPTION",
         "LaunchRCMetaStudio.command",
     } <= script["app_paths"]
+    assert "doc/openMA_help.html" not in script["app_paths"]
+    assert "Bundling sample projects, help, and R runtime" not in script["text"]
     assert "scripts/install-r-deps.R" in script["text"]
     assert "src/rc_metastudio/__main__.py" in script["text"]
     assert "src/rc_metastudio/launch.py" not in script["text"]
