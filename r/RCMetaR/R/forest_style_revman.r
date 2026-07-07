@@ -164,6 +164,22 @@ rcmetar.revman.direction.labels <- function(bundle) {
     list(left=left, right=right, axis="")
 }
 
+rcmetar.revman.wrap.header <- function(label, width=18) {
+    label <- as.character(label)
+    wrapped <- strwrap(label, width=width)
+    if (length(wrapped) <= 1) {
+        return(label)
+    }
+    paste(wrapped, collapse="\n")
+}
+
+rcmetar.revman.wrap.direction <- function(label) {
+    if (is.null(label) || !nzchar(label)) {
+        return("")
+    }
+    rcmetar.revman.wrap.header(label, width=22)
+}
+
 rcmetar.revman.p.value.label <- function(p.value) {
     if (display.value.is.missing(p.value)) {
         return("P = NA")
@@ -306,7 +322,7 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
         vi=effect$vi,
         ci.lb=effect$ci.lb,
         ci.ub=effect$ci.ub,
-        slab=bundle$slab,
+        slab=rep("", length(bundle$slab)),
         atransf=rcmetar.metafor.atransf(bundle),
         at=rcmetar.revman.axis.ticks(bundle, layout$alim),
         xlim=layout$xlim,
@@ -323,7 +339,7 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
         cex=size$cex,
         cex.lab=size$cex,
         cex.axis=size$cex,
-        header=if (show.headers) c(rcmetar.metafor.study.header(bundle), paste0(method, ", ", bundle$params$conf.level, "% CI")) else FALSE,
+        header=FALSE,
         pch=15,
         psize=summary$psize,
         col=rcmetar.forest.accent.color(bundle$params),
@@ -341,7 +357,7 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
         graphics::text(layout$ilab.xpos, k + 2, ilab$headers)
     }
     if (show.headers && length(layout$group.xpos) > 0) {
-        graphics::text(layout$group.xpos, k + 3, names(layout$group.xpos))
+        graphics::text(layout$group.xpos, k + 3, vapply(names(layout$group.xpos), rcmetar.revman.wrap.header, character(1)))
     }
     if (show.headers) {
         graphics::text(layout$annotation.header.xpos, k + 3, metric)
@@ -356,6 +372,7 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
     rcmetar.draw.revman.axis(bundle, layout, plot.info$cex)
 
     graphics::par(cex=plot.info$cex, font=1)
+    graphics::text(layout$xlim[[1]], k:1, bundle$slab, pos=4, cex=plot.info$cex, col="black")
     rcmetar.draw.revman.study.effect.labels(bundle, effect, layout, k:1, plot.info$cex)
     rcmetar.draw.revman.bottom.blocks(bundle, layout$xlim[1], plot.info$cex, layout)
 
@@ -383,13 +400,14 @@ rcmetar.draw.revman.sequential.forest <- function(bundle, outpath) {
     k <- length(bundle$slab)
     rows <- seq(from=k, to=1)
     alim <- rcmetar.metafor.alim(bundle)
+    layout <- rcmetar.metafor.layout(bundle, size, alim)
     plot.info <- suppressWarnings(metafor::forest.default(
         x=bundle$effect$yi,
         sei=bundle$effect$sei,
         ci.lb=bundle$effect$ci.lb,
         ci.ub=bundle$effect$ci.ub,
-        slab=bundle$slab,
-        xlim=c(alim[[1]] - 0.55 * diff(alim), alim[[2]] + 0.35 * diff(alim)),
+        slab=rep("", length(bundle$slab)),
+        xlim=layout$xlim,
         alim=alim,
         at=rcmetar.metafor.axis.ticks(bundle, alim),
         atransf=rcmetar.metafor.atransf(bundle),
@@ -398,14 +416,10 @@ rcmetar.draw.revman.sequential.forest <- function(bundle, outpath) {
         cex=size$cex,
         cex.lab=size$cex,
         cex.axis=size$cex,
-        header=if (rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)) {
-            c(rcmetar.metafor.study.header(bundle), rcmetar.metafor.effect.header(bundle))
-        } else {
-            FALSE
-        },
+        header=FALSE,
         rows=rows,
         ylim=c(-1.5, k + 3),
-        annotate=rcmetar.param.is.true(bundle$params, "fp_show_annotation", TRUE),
+        annotate=FALSE,
         col=rcmetar.forest.accent.color(bundle$params),
         pch=15,
         psize=rcmetar.metafor.psize(bundle),
@@ -413,7 +427,8 @@ rcmetar.draw.revman.sequential.forest <- function(bundle, outpath) {
         efac=1.0,
         digits=as.integer(bundle$params$digits)
     ))
-    graphics::segments(plot.info$xlim[[1]], k + 1, plot.info$xlim[[2]], k + 1, lwd=0.8)
+    rcmetar.draw.metafor.single.study.accent(bundle, rows, alim, rcmetar.forest.accent.color(bundle$params))
+    rcmetar.draw.metafor.sequential.text(bundle, rows, layout, k, size$cex)
     invisible(bundle$changed.params)
 }
 
@@ -438,6 +453,7 @@ rcmetar.revman.layout <- function(bundle) {
     } else {
         alim <- rcmetar.metafor.alim(bundle)
     }
+    label.extra <- max(0, max(nchar(as.character(bundle$slab)), 0) - 34)
     if (identical(bundle$data_type, "binary") && length(bundle$ilab$columns) == 5) {
         ilab.xpos <- c(-20.6, -18.6, -16.1, -14.1, -10.8)
         column.groups <- vapply(bundle$ilab$columns, function(column) column$group, character(1))
@@ -446,7 +462,7 @@ rcmetar.revman.layout <- function(bundle) {
             stats::setNames(mean(ilab.xpos[column.groups == bundle$ilab$groups[[2]]]), bundle$ilab$groups[[2]])
         )
         return(list(
-            xlim=c(-30, 5.6),
+            xlim=c(-30 - label.extra * 0.42, 5.6),
             alim=alim,
             ilab.xpos=ilab.xpos,
             group.xpos=group.xpos,
@@ -466,7 +482,7 @@ rcmetar.revman.layout <- function(bundle) {
         numeric(0)
     }
     list(
-        xlim=c(alim[1] - 5.15 * span, alim[2] + 0.25 * span),
+        xlim=c(alim[1] - (5.15 + label.extra * 0.055) * span, alim[2] + 0.25 * span),
         alim=alim,
         ilab.xpos=ilab.xpos,
         group.xpos=group.xpos,
@@ -608,11 +624,25 @@ rcmetar.measure.revman.forest.device <- function(bundle) {
     k <- length(bundle$slab)
     label.width <- max(nchar(as.character(bundle$slab)), 0)
     column.count <- max(ncol(bundle$ilab$matrix), 0)
+    header.width <- max(
+        nchar(c(
+            bundle$ilab$headers,
+            bundle$ilab$groups,
+            rcmetar.revman.metric.label(bundle),
+            rcmetar.revman.method.label(bundle)
+        )),
+        0
+    )
     width <- 11.25 +
         max(0, label.width - 24) * 0.095 +
-        max(0, column.count - 5) * 0.22
+        max(0, column.count - 5) * 0.22 +
+        max(0, header.width - 16) * 0.045
     height <- max(4.25, 3.05 + 0.25 * k)
-    list(width=min(width, 18), height=min(height, 18), cex=0.90, bg="white")
+    cex <- 0.90 -
+        max(0, k - 8) * 0.012 -
+        max(0, label.width - 48) * 0.004 -
+        max(0, header.width - 28) * 0.003
+    list(width=min(width, 18), height=min(height, 18), cex=max(0.64, cex), bg="white")
 }
 
 rcmetar.draw.revman.bottom.blocks <- function(bundle, x, cex, layout=NULL) {
@@ -638,11 +668,11 @@ rcmetar.draw.revman.bottom.blocks <- function(bundle, x, cex, layout=NULL) {
     }
     if (nzchar(bundle$style_blocks$favours_left)) {
         left.x <- if (metric.is.log.scale(as.character(bundle$params$measure))) log(0.05) else graphics::par("usr")[1] + diff(graphics::par("usr")[1:2]) * 0.62
-        graphics::text(left.x, -3.45, bundle$style_blocks$favours_left, cex=cex)
+        graphics::text(left.x, -3.45, rcmetar.revman.wrap.direction(bundle$style_blocks$favours_left), cex=cex)
     }
     if (nzchar(bundle$style_blocks$favours_right)) {
         right.x <- if (metric.is.log.scale(as.character(bundle$params$measure))) log(12) else graphics::par("usr")[1] + diff(graphics::par("usr")[1:2]) * 0.78
-        graphics::text(right.x, -3.45, bundle$style_blocks$favours_right, cex=cex)
+        graphics::text(right.x, -3.45, rcmetar.revman.wrap.direction(bundle$style_blocks$favours_right), cex=cex)
     }
     invisible(NULL)
 }

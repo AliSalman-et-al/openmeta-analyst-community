@@ -62,3 +62,8 @@ markers = [
     "gui_compatibility: evidence for GUI compatibility or workflow preservation.",
     "release_readiness: evidence for release, packaging, or cutover readiness.",
 ]
+
+[dependency-groups]
+dev = [
+    "pillow>=12.3.0",
+]

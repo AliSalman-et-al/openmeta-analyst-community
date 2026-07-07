@@ -773,6 +773,8 @@ rcmetar.draw.default.metafor.forest <- function(bundle, outpath) {
     rows <- seq(from=k, to=1)
     alim <- rcmetar.metafor.alim(bundle)
     layout <- rcmetar.metafor.layout(bundle, size, alim)
+    manual.sequential.labels <- isTRUE(bundle$single_study) &&
+        (identical(bundle$forest_variant, "cumulative") || identical(bundle$forest_variant, "leave-one-out"))
     top <- if (rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)) k + 3 else k + 2.7
     ylim <- c(-1.5, top)
     if (identical(bundle$forest_variant, "subgroup")) {
@@ -782,9 +784,9 @@ rcmetar.draw.default.metafor.forest <- function(bundle, outpath) {
     }
 
     accent.color <- rcmetar.forest.accent.color(bundle$params)
-    forest.color <- if (isTRUE(bundle$single_study)) "black" else accent.color
+    forest.color <- if (isTRUE(bundle$single_study) && !manual.sequential.labels) "black" else accent.color
     forest.args <- list(
-        slab = bundle$slab,
+        slab = if (manual.sequential.labels) rep("", length(bundle$slab)) else bundle$slab,
         ilab = if (ncol(bundle$ilab$matrix) > 0) bundle$ilab$matrix else NULL,
         ilab.lab = if (ncol(bundle$ilab$matrix) > 0 && rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)) bundle$ilab$headers else NULL,
         ilab.xpos = if (ncol(bundle$ilab$matrix) > 0) layout$ilab.xpos else NULL,
@@ -797,10 +799,10 @@ rcmetar.draw.default.metafor.forest <- function(bundle, outpath) {
         cex = size$cex,
         cex.lab = size$cex,
         cex.axis = size$cex,
-        header = if (rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)) c(rcmetar.metafor.study.header(bundle), rcmetar.metafor.effect.header(bundle)) else FALSE,
+        header = if (manual.sequential.labels) FALSE else if (rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)) c(rcmetar.metafor.study.header(bundle), rcmetar.metafor.effect.header(bundle)) else FALSE,
         rows = rows,
         ylim = ylim,
-        annotate = rcmetar.param.is.true(bundle$params, "fp_show_annotation", TRUE),
+        annotate = if (manual.sequential.labels) FALSE else rcmetar.param.is.true(bundle$params, "fp_show_annotation", TRUE),
         col = forest.color,
         colshade = "#eeeeee",
         shade = "zebra",
@@ -822,7 +824,12 @@ rcmetar.draw.default.metafor.forest <- function(bundle, outpath) {
             ),
             forest.args
         ))
-        rcmetar.draw.metafor.single.study.accent(bundle, rows, alim, accent.color)
+        if (manual.sequential.labels) {
+            rcmetar.draw.metafor.single.study.accent(bundle, rows, alim, accent.color)
+            rcmetar.draw.metafor.sequential.text(bundle, rows, layout, k, size$cex)
+        } else {
+            rcmetar.draw.metafor.single.study.accent(bundle, rows, alim, accent.color)
+        }
     } else {
         plot.info <- do.call(metafor::forest.rma, c(list(x = bundle$res), c(forest.args, list(mlab="", border=accent.color, colout="black"))))
     }
@@ -846,6 +853,21 @@ rcmetar.draw.default.metafor.forest <- function(bundle, outpath) {
     invisible(bundle$changed.params)
 }
 
+rcmetar.draw.metafor.sequential.text <- function(bundle, rows, layout, k, cex) {
+    graphics::par(xpd=NA)
+    graphics::text(layout$xlim[[1]], rows, bundle$slab, pos=4, cex=cex, col="black")
+    if (rcmetar.param.is.true(bundle$params, "fp_show_annotation", TRUE)) {
+        labels <- rcmetar.metafor.effect.labels(bundle)
+        graphics::text(layout$xlim[[2]], rows, labels, pos=2, cex=cex, col="black")
+    }
+    if (rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)) {
+        graphics::text(layout$xlim[[1]], k + 2, rcmetar.metafor.study.header(bundle), pos=4, font=2, cex=cex, col="black")
+        graphics::text(layout$xlim[[2]], k + 2, rcmetar.metafor.effect.header(bundle), pos=2, font=2, cex=cex, col="black")
+        graphics::segments(layout$xlim[[1]], k + 1, layout$xlim[[2]], k + 1, lwd=0.8)
+    }
+    invisible(NULL)
+}
+
 rcmetar.draw.metafor.single.study.accent <- function(bundle, rows, alim, color) {
     if (identical(color, "black") || length(rows) != length(bundle$effect$yi)) {
         return(invisible(NULL))
@@ -860,6 +882,7 @@ rcmetar.draw.metafor.single.study.accent <- function(bundle, rows, alim, color) 
     left <- pmax(ci.lb[finite], alim[[1]])
     right <- pmin(ci.ub[finite], alim[[2]])
     graphics::segments(left, rows[finite], right, rows[finite], col=color, lwd=1.35)
+    rcmetar.draw.metafor.single.study.interval.ends(ci.lb[finite], ci.ub[finite], rows[finite], alim, color)
     inside <- yi[finite] >= alim[[1]] & yi[finite] <= alim[[2]]
     if (any(inside)) {
         graphics::points(
@@ -870,6 +893,62 @@ rcmetar.draw.metafor.single.study.accent <- function(bundle, rows, alim, color) 
             cex=rcmetar.metafor.psize(bundle)[finite][inside]
         )
     }
+    invisible(NULL)
+}
+
+rcmetar.draw.metafor.single.study.interval.ends <- function(ci.lb, ci.ub, rows, alim, color) {
+    span <- max(diff(alim), 1)
+    arrow.length <- span * 0.018
+    cap.height <- 0.065
+
+    left.clipped <- ci.lb < alim[[1]]
+    if (any(left.clipped)) {
+        for (row in rows[left.clipped]) {
+            graphics::polygon(
+                x=c(alim[[1]], alim[[1]] + arrow.length, alim[[1]] + arrow.length),
+                y=c(row, row + cap.height * 1.35, row - cap.height * 1.35),
+                col=color,
+                border=color
+            )
+        }
+    }
+
+    right.clipped <- ci.ub > alim[[2]]
+    if (any(right.clipped)) {
+        for (row in rows[right.clipped]) {
+            graphics::polygon(
+                x=c(alim[[2]], alim[[2]] - arrow.length, alim[[2]] - arrow.length),
+                y=c(row, row + cap.height * 1.35, row - cap.height * 1.35),
+                col=color,
+                border=color
+            )
+        }
+    }
+
+    left.cap <- !left.clipped & is.finite(ci.lb)
+    if (any(left.cap)) {
+        graphics::segments(
+            ci.lb[left.cap],
+            rows[left.cap] - cap.height,
+            ci.lb[left.cap],
+            rows[left.cap] + cap.height,
+            col=color,
+            lwd=1.35
+        )
+    }
+
+    right.cap <- !right.clipped & is.finite(ci.ub)
+    if (any(right.cap)) {
+        graphics::segments(
+            ci.ub[right.cap],
+            rows[right.cap] - cap.height,
+            ci.ub[right.cap],
+            rows[right.cap] + cap.height,
+            col=color,
+            lwd=1.35
+        )
+    }
+
     invisible(NULL)
 }
 
