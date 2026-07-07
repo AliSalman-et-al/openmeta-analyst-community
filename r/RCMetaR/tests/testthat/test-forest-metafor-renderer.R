@@ -492,6 +492,65 @@ test_that("diagnostic RevMan Forest Style uses DTA columns and a plain metric ax
   expect_gt(file.info(png_path)$size, 5000)
 })
 
+test_that("BMJ Forest Style builds faithful family columns and renders smoke cases", {
+  fixtures <- list(
+    binary = list(
+      fixture = metafor_binary_fixture(),
+      expected_headers = c("Events", "Total", "Events", "Total", "Weight"),
+      expected_groups = c("Experimental", "Control"),
+      axis_label = "",
+      favours_left = "Favours Experimental",
+      favours_right = "Favours Control"
+    ),
+    continuous = list(
+      fixture = metafor_continuous_fixture(),
+      expected_headers = c("Mean", "SD", "Total", "Mean", "SD", "Total", "Weight"),
+      expected_groups = c("Treatment", "Control"),
+      axis_label = "",
+      favours_left = "Favours Treatment",
+      favours_right = "Favours Control"
+    ),
+    diagnostic = list(
+      fixture = metafor_diagnostic_fixture(measure = "Sens"),
+      expected_headers = c("TP", "FP", "FN", "TN", "Weight"),
+      expected_groups = "DTA",
+      axis_label = "Sensitivity",
+      favours_left = "",
+      favours_right = ""
+    )
+  )
+
+  for (case in fixtures) {
+    fixture <- case$fixture
+    fixture$params$fp_style <- "bmj"
+    res <- rma.uni(
+      yi = fixture$data@y,
+      sei = fixture$data@SE,
+      slab = fixture$data@study.names,
+      method = fixture$params$rm.method,
+      level = fixture$params$conf.level,
+      digits = fixture$params$digits
+    )
+
+    bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+
+    expect_equal(bundle$fp_style, "bmj")
+    expect_equal(bundle$ilab$headers, case$expected_headers)
+    expect_equal(bundle$ilab$groups, case$expected_groups)
+    expect_equal(bundle$style_blocks$favours_left, case$favours_left)
+    expect_equal(bundle$style_blocks$favours_right, case$favours_right)
+    expect_equal(bundle$style_blocks$axis_label, case$axis_label)
+    expect_match(bundle$style_blocks$heterogeneity, "Heterogeneity: Tau")
+    expect_match(bundle$style_blocks$test_overall, "Test for overall effect: Z =")
+    expect_equal(rcmetar.forest.accent.color(bundle$params), "#6b58a6")
+
+    png_path <- tempfile(fileext = ".png")
+    rcmetar.draw.forest.plot(bundle, png_path)
+    expect_true(file.exists(png_path))
+    expect_gt(file.info(png_path)$size, 5000)
+  }
+})
+
 test_that("older forest plot params default to Default style and visible controls", {
   fixture <- metafor_binary_fixture()
   fixture$params$fp_style <- NULL
@@ -1014,6 +1073,35 @@ test_that("subgroup workflow saves and renders RevMan subtotal diamonds", {
   expect_true(inherits(bundle$subgroups$overall, "rma"))
   expect_match(bundle$style_blocks$heterogeneity, "Heterogeneity: Tau²")
   expect_match(bundle$style_blocks$test_overall, "Test for overall effect: Z =")
+  expect_true(file.exists(unname(result$images[[1]])))
+  expect_gt(file.info(unname(result$images[[1]]))$size, 5000)
+})
+
+test_that("subgroup workflow saves and renders BMJ subtotal diamonds", {
+  fixture <- metafor_binary_fixture()
+  fixture$params$fp_style <- "bmj"
+  fixture$params$fp_outpath <- tempfile(fileext = ".png")
+  fixture$params$cov_name <- "Era"
+  fixture$data@covariates <- list(new(
+    "CovariateValues",
+    cov.name = "Era",
+    cov.vals = c("Early", "Early", "Early", "Late", "Late", "Late"),
+    cov.type = "factor",
+    ref.var = "Early"
+  ))
+
+  result <- subgroup.ma.binary("binary.random", fixture$data, fixture$params)
+  bundle <- load_saved_plot_data(unname(result$plot_params_paths[[1]]))
+
+  expect_equal(bundle$render_engine, "metafor")
+  expect_equal(bundle$forest_variant, "subgroup")
+  expect_equal(bundle$fp_style, "bmj")
+  expect_equal(bundle$ilab$headers, c("Events", "Total", "Events", "Total", "Weight"))
+  expect_length(bundle$subgroups$polygon_rows, 2)
+  expect_true(inherits(bundle$subgroups$overall, "rma"))
+  expect_match(bundle$style_blocks$heterogeneity, "Heterogeneity: Tau")
+  expect_match(bundle$style_blocks$test_overall, "Test for overall effect: Z =")
+  expect_equal(rcmetar.forest.accent.color(bundle$params), "#6b58a6")
   expect_true(file.exists(unname(result$images[[1]])))
   expect_gt(file.info(unname(result$images[[1]]))$size, 5000)
 })
