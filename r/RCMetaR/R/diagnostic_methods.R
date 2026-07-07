@@ -4,7 +4,7 @@
 #######################################
 # RC MetaStudio                   #
 # ----                                #
-# diagnostic_methods.r                # 
+# diagnostic_methods.R                #
 # Facade module; wraps methods        #
 # that perform analysis on diagnostic #
 # data in a coherent interface.       # 

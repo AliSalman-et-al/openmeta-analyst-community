@@ -34,7 +34,7 @@
       "source": "recommended",
       "scope": ["runtime"],
       "declared_in": ["r/RCMetaR/DESCRIPTION"],
-      "evidence": ["r/RCMetaR/R/plotting.r: forest plot rendering calls grid drawing and viewport APIs"],
+      "evidence": ["r/RCMetaR/R/plotting.R: forest plot rendering calls grid drawing and viewport APIs"],
       "reason": "Forest plot rendering uses grid viewports, layouts, axes, text, polygons, and line drawing.",
       "installed_version": "4.6.0"
     },
@@ -43,7 +43,7 @@
       "source": "base-runtime",
       "scope": ["runtime"],
       "declared_in": ["r/RCMetaR/DESCRIPTION"],
-      "evidence": ["r/RCMetaR/R/RCMetaR-package.r: @import graphics"],
+      "evidence": ["r/RCMetaR/R/rcmetar-package.R: @import graphics"],
       "reason": "Diagnostic and plotting code relies on graphics behavior from the base R distribution.",
       "installed_version": "4.6.0"
     },
@@ -52,7 +52,7 @@
       "source": "base-runtime",
       "scope": ["runtime"],
       "declared_in": ["r/RCMetaR/DESCRIPTION"],
-      "evidence": ["r/RCMetaR/R/plotting.r: forest and diagnostic plot functions call png(...), pdf(...), dev.off(...), and graphics.off(...)"],
+      "evidence": ["r/RCMetaR/R/plotting.R: forest and diagnostic plot functions call png(...), pdf(...), dev.off(...), and graphics.off(...)"],
       "reason": "RCMetaR writes plot image/PDF devices and closes graphics devices through the base grDevices package.",
       "installed_version": "4.6.0"
     },
@@ -62,10 +62,10 @@
       "scope": ["runtime"],
       "declared_in": ["r/RCMetaR/DESCRIPTION"],
       "evidence": [
-        "r/RCMetaR/R/binary_methods.r: rma.uni(...) and related metafor analysis calls",
-        "r/RCMetaR/R/continuous_methods.r: rma.uni(...) and related metafor analysis calls",
-        "r/RCMetaR/R/diagnostic_methods.r: rma.uni(...) and related metafor analysis calls",
-        "r/RCMetaR/R/meta_reg.r: rma.uni(...) and related metafor analysis calls"
+        "r/RCMetaR/R/binary_methods.R: rma.uni(...) and related metafor analysis calls",
+        "r/RCMetaR/R/continuous_methods.R: rma.uni(...) and related metafor analysis calls",
+        "r/RCMetaR/R/diagnostic_methods.R: rma.uni(...) and related metafor analysis calls",
+        "r/RCMetaR/R/meta_reg.R: rma.uni(...) and related metafor analysis calls"
       ],
       "reason": "Core binary, continuous, diagnostic, and meta-regression methods call metafor analysis functions.",
       "installed_version": "5.0-1"
@@ -76,7 +76,7 @@
       "scope": ["runtime"],
       "declared_in": ["r/RCMetaR/DESCRIPTION"],
       "evidence": [
-        "r/RCMetaR/R/diagnostic_methods.r: diagnostic.hsroc delegates to HSROC(...) and HSROCSummary(...)",
+        "r/RCMetaR/R/diagnostic_methods.R: diagnostic.hsroc delegates to HSROC(...) and HSROCSummary(...)",
         "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz",
         "scripts/install-r-deps.R"
       ],
@@ -89,7 +89,7 @@
       "scope": ["runtime"],
       "declared_in": ["r/RCMetaR/DESCRIPTION"],
       "evidence": [
-        "r/RCMetaR/R/diagnostic_methods.r: hsroc.rasterize.pdf converts stock HSROC PDF plots into PNG images for the Results window",
+        "r/RCMetaR/R/diagnostic_methods.R: hsroc.rasterize.pdf converts stock HSROC PDF plots into PNG images for the Results window",
         "scripts/install-r-deps.R"
       ],
       "reason": "Stock archived HSROC writes PDF plots; RCMetaR rasterizes them so the PyQt Results window can display HSROC plots as images.",
@@ -101,7 +101,7 @@
       "scope": ["runtime"],
       "declared_in": ["r/RCMetaR/DESCRIPTION"],
       "evidence": [
-        "r/RCMetaR/R/plot_devices.r: rcmetar.open.svg_device renders canonical forest plot SVG files with svglite::svglite(...)"
+        "r/RCMetaR/R/plot_devices.R: rcmetar.open.svg_device renders canonical forest plot SVG files with svglite::svglite(...)"
       ],
       "reason": "Forest plot exports use svglite as the canonical vector rendering device so all output formats share one source artifact.",
       "installed_version": "2.2.2"
@@ -112,7 +112,7 @@
       "scope": ["runtime"],
       "declared_in": ["r/RCMetaR/DESCRIPTION"],
       "evidence": [
-        "r/RCMetaR/R/plot_devices.r: rcmetar.export.svg_render converts canonical SVG files to PNG, PDF, and bitmap exports with rsvg"
+        "r/RCMetaR/R/plot_devices.R: rcmetar.export.svg_render converts canonical SVG files to PNG, PDF, and bitmap exports with rsvg"
       ],
       "reason": "Forest plot PNG, PDF, and TIFF exports are derived from canonical SVG output through librsvg-backed conversion.",
       "installed_version": "2.7.0"
@@ -123,7 +123,7 @@
       "scope": ["runtime"],
       "declared_in": ["r/RCMetaR/DESCRIPTION"],
       "evidence": [
-        "r/RCMetaR/R/plot_devices.r: rcmetar.export.svg_render writes LZW-compressed TIFF files with tiff::writeTIFF(...)"
+        "r/RCMetaR/R/plot_devices.R: rcmetar.export.svg_render writes LZW-compressed TIFF files with tiff::writeTIFF(...)"
       ],
       "reason": "Journal-oriented TIFF forest plot exports are written from the canonical SVG rasterization bitmap with LZW compression.",
       "installed_version": "0.1-12"
@@ -133,7 +133,7 @@
       "source": "cran",
       "scope": ["runtime"],
       "declared_in": ["r/RCMetaR/DESCRIPTION"],
-      "evidence": ["r/RCMetaR/R/bivariate.r: bivariate.dx.test uses lmer(...) for mixed-model fitting"],
+      "evidence": ["r/RCMetaR/R/bivariate.R: bivariate.dx.test uses lmer(...) for mixed-model fitting"],
       "reason": "Bivariate diagnostic model fitting uses lme4 mixed-model functionality.",
       "installed_version": "2.0-1"
     },
@@ -142,7 +142,7 @@
       "source": "base-runtime",
       "scope": ["runtime"],
       "declared_in": ["r/RCMetaR/DESCRIPTION"],
-      "evidence": ["r/RCMetaR/R/classes.r: setClass(...)"],
+      "evidence": ["r/RCMetaR/R/classes.R: setClass(...)"],
       "reason": "RCMetaR defines S4 data and analysis specification classes with methods::setClass.",
       "installed_version": "4.6.0"
     },
@@ -152,9 +152,9 @@
       "scope": ["runtime"],
       "declared_in": ["r/RCMetaR/DESCRIPTION"],
       "evidence": [
-        "r/RCMetaR/R/diagnostic_methods.r: bivariate diagnostic confidence intervals use boot.ci(...)",
-        "r/RCMetaR/R/meta_methods.r: bootstrap analysis uses boot(...)",
-        "r/RCMetaR/R/meta_reg.r: boot(...) and boot.ci(...)"
+        "r/RCMetaR/R/diagnostic_methods.R: bivariate diagnostic confidence intervals use boot.ci(...)",
+        "r/RCMetaR/R/meta_methods.R: bootstrap analysis uses boot(...)",
+        "r/RCMetaR/R/meta_reg.R: boot(...) and boot.ci(...)"
       ],
       "reason": "Bootstrap analysis workflows use boot resampling and confidence interval helpers.",
       "installed_version": "1.3-32"

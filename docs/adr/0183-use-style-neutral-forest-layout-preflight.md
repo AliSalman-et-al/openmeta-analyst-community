@@ -7,7 +7,7 @@ The metafor Forest Renderer should use a style-neutral Forest Layout Preflight b
 ## Consequences
 
 - The renderer remains Metafor-first: Forest Layout Preflight plans arguments and surrounding annotations for `metafor::forest()` rather than drawing custom forest marks.
-- Shared layout logic belongs in a dedicated forest preflight module instead of being scattered through `forest_metafor.r` and style files.
+- Shared layout logic belongs in `forest_layout_preflight.R` instead of being scattered through `forest_metafor.R` and style files; Default-specific rendering belongs in `forest_style_default.R`.
 - Style modules remain shallow templates over shared primitives; they should not each implement independent device sizing, row spacing, axis-footer, or text-scale algorithms.
 - Responsiveness means fit-to-content first, not arbitrarily shrinking text: preflight should grow device width/height and wrap eligible text before reducing `cex`, and any shrinkage should stay within a journal-readable range with explicit warnings when the floor is reached.
 - Device growth is bounded: preflight should cap exported dimensions at documented practical maxima, keep content visible within those caps, and attach explicit layout warnings when a cap or text-size floor affects the result instead of silently clipping.

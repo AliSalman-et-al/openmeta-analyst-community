@@ -573,7 +573,7 @@ _HSROC_SUMMARY_DRIVER = textwrap.dedent(
     assert parsed_direct["texts"]["Other Summary"] == "Lower bound Upper bound", parsed_direct
     assert parsed_direct["texts"]["Raw Text Summary"] == "Lower bound Upper bound", parsed_direct
 
-    classes_path = os.path.join(repo_root, "r", "RCMetaR", "R", "classes.r")
+    classes_path = os.path.join(repo_root, "r", "RCMetaR", "R", "classes.R")
     ro.r("source(%r)" % classes_path.replace(os.sep, "/"))
     context_summary = ro.r(
         '''

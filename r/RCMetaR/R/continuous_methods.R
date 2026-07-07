@@ -4,7 +4,7 @@
 ####################################
 # RC MetaStudio                #
 # ----                             #
-# continuous_methods.r             # 
+# continuous_methods.R             #
 # Facade module; wraps methods     #
 # that perform analyses on         # 
 # continuous data in a coherent    #

@@ -5,7 +5,7 @@
 #                                  #
 # RC MetaStudio                #
 # ----                             #
-# utilities.r                      #
+# utilities.R                      #
 #                                  #
 # Utilities for pretty-printing    #
 # results.                         #

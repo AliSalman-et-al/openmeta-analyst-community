@@ -22,11 +22,13 @@ The renderer computes PNG/PDF device dimensions with a **measure-then-render two
 ## Module layout
 
 The renderer is added as **style-split** private R files behind the stable `rcmetar.draw.forest.plot` facade (the package uses roxygen2 with no `Collate`, so files source alphabetically and only exported functions need `#' @export`):
-- `r/RCMetaR/R/forest_metafor.r` — style dispatcher, the builder that emits the precomputed render spec (ADR 0179), device-sizing helpers, universal appearance helpers, and the thin Default templates.
-- `r/RCMetaR/R/forest_style_revman.r` — the RevMan faithful templates.
-- `r/RCMetaR/R/forest_style_bmj.r` — the BMJ faithful templates.
+- `r/RCMetaR/R/forest_metafor.R` — Metafor-backed forest renderer entrypoint, support checks, bundle construction, shared data/appearance primitives, and style dispatch.
+- `r/RCMetaR/R/forest_layout_preflight.R` — shared measurement and layout planning for Metafor-backed forest styles.
+- `r/RCMetaR/R/forest_style_default.R` — the Default/plain Metafor style templates and renderer.
+- `r/RCMetaR/R/forest_style_revman.R` — the RevMan faithful templates.
+- `r/RCMetaR/R/forest_style_bmj.R` — the BMJ faithful templates.
 
-The legacy custom engine, SROC, meta-regression scatter, and the legacy `two.forest.plots` stay in `plotting.r` until the ADR 0179 phases retire them.
+The legacy custom engine, SROC, meta-regression scatter, and the legacy `two.forest.plots` stay in `plotting.R` until the ADR 0179 phases retire them.
 
 ## Consequences
 

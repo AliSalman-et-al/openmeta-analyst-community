@@ -128,7 +128,7 @@ rcmetar.revman.ilab.for.data <- function(om.data, params, res=NULL) {
     if ("DiagnosticData" %in% class(om.data)) {
         return(rcmetar.revman.diagnostic.ilab(om.data, params, res))
     }
-    rcmetar.empty.default.ilab(length(om.data@study.names))
+    rcmetar.empty.forest.ilab(length(om.data@study.names))
 }
 
 rcmetar.revman.test.overall.label <- function(bundle) {

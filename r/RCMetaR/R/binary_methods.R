@@ -4,7 +4,7 @@
 ####################################
 # RC MetaStudio                #
 # ----                             #
-# binary_methods.r                 # 
+# binary_methods.R                 #
 # Facade module; wraps methods     #
 # that perform analysis on binary  #
 # data in a coherent interface.    # 

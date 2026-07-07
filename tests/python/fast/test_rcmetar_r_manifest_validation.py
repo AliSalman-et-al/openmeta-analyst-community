@@ -395,7 +395,7 @@ def parse_packages(field_value):
 
 def legacy_exported_functions_from_source():
     names = set()
-    for path in RCMetaR_R_DIR.glob("*.r"):
+    for path in RCMetaR_R_DIR.glob("*.R"):
         text = path.read_text(encoding="utf-8")
         names.update(LEGACY_EXPORT_PATTERN.findall(text))
         names.update(match.group(1) for match in LEGACY_ALIAS_PATTERN.finditer(text))
@@ -404,7 +404,7 @@ def legacy_exported_functions_from_source():
 
 def s4_classes_from_source():
     names = set()
-    for path in RCMetaR_R_DIR.glob("*.r"):
+    for path in RCMetaR_R_DIR.glob("*.R"):
         names.update(S4_CLASS_PATTERN.findall(path.read_text(encoding="utf-8")))
     return names
 
@@ -449,7 +449,7 @@ def test_RCMetaR_source_uses_namespace_imports_instead_of_attach_calls():
     package_attach_pattern = re.compile(r"\b(?:library|require)\s*\(")
 
     offenders = []
-    for path in RCMetaR_R_DIR.glob("*.r"):
+    for path in RCMetaR_R_DIR.glob("*.R"):
         if package_attach_pattern.search(path.read_text(encoding="utf-8")):
             offenders.append(path.relative_to(REPO_ROOT).as_posix())
 

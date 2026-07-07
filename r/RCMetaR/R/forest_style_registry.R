@@ -88,7 +88,7 @@ rcmetar.is.metafor.forest.bundle <- function(plot.data) {
 
 rcmetar.ilab.for.data <- function(om.data, params, res=NULL) {
     style <- rcmetar.forest.style(params)
-    helper <- if (!identical(style, "default")) rcmetar.metafor.style.helper(style, "ilab.for.data") else NULL
+    helper <- rcmetar.metafor.style.helper(style, "ilab.for.data")
     if (!is.null(helper)) {
         return(helper(om.data, params, res))
     }
@@ -96,7 +96,7 @@ rcmetar.ilab.for.data <- function(om.data, params, res=NULL) {
 }
 
 rcmetar.decorate.metafor.bundle <- function(bundle) {
-    helper <- if (!identical(bundle$fp_style, "default")) rcmetar.metafor.style.helper(bundle$fp_style, "decorate.bundle") else NULL
+    helper <- rcmetar.metafor.style.helper(bundle$fp_style, "decorate.bundle")
     if (!is.null(helper)) {
         return(helper(bundle))
     }

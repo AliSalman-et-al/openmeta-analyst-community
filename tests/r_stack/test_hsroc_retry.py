@@ -6,15 +6,15 @@ import textwrap
 import pytest
 
 
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 
 _HSROC_RETRY_DRIVER = textwrap.dedent(
     r"""
     repo <- normalizePath(__REPO_ROOT__, winslash = "/")
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/classes.r")))
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/utilities.r")))
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/diagnostic_methods.r")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/classes.R")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/utilities.R")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/diagnostic_methods.R")))
 
     work <- tempfile("hsroc_retry_")
     dir.create(work)
@@ -276,9 +276,9 @@ _HSROC_NAMESPACE_DRIVER = textwrap.dedent(
 _HSROC_HEADER_DRIVER = textwrap.dedent(
     r"""
     repo <- normalizePath(__REPO_ROOT__, winslash = "/")
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/classes.r")))
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/utilities.r")))
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/diagnostic_methods.r")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/classes.R")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/utilities.R")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/diagnostic_methods.R")))
 
     between.study <- matrix(
       c(0.624, 1.110, 0.817, 1.907, 1.493, 1.356),
@@ -341,9 +341,9 @@ _HSROC_HEADER_DRIVER = textwrap.dedent(
 _HSROC_CLINICAL_SUMMARY_DRIVER = textwrap.dedent(
     r"""
     repo <- normalizePath(__REPO_ROOT__, winslash = "/")
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/classes.r")))
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/utilities.r")))
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/diagnostic_methods.r")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/classes.R")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/utilities.R")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/diagnostic_methods.R")))
 
     between.study <- matrix(
       c(
@@ -442,9 +442,9 @@ _HSROC_CLINICAL_SUMMARY_DRIVER = textwrap.dedent(
 _HSROC_SUMMARY_WIDTH_DRIVER = textwrap.dedent(
     r"""
     repo <- normalizePath(__REPO_ROOT__, winslash = "/")
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/classes.r")))
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/utilities.r")))
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/diagnostic_methods.r")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/classes.R")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/utilities.R")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/diagnostic_methods.R")))
 
     with.width.80 <- function(expr) {
       old.options <- options(width=80)

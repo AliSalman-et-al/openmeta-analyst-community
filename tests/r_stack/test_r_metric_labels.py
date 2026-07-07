@@ -6,13 +6,13 @@ import textwrap
 import pytest
 
 
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 
 _METRIC_LABEL_DRIVER = textwrap.dedent(
     r"""
     repo <- normalizePath(__REPO_ROOT__, winslash = "/")
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/plotting.r")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/plotting.R")))
 
     expected <- list(
       OR = "Odds Ratio",
