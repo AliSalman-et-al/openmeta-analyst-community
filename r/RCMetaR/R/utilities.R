@@ -221,9 +221,12 @@ create.repeat.string <- function(symbol, num.repeats) {
  
 round.display <- function(x, digits) {
   digits.str <- paste("%.", digits, "f", sep="")
-  x.disp <- c()
-  x.disp[x < 10^(-digits)] <- paste("< ", 10^(-digits), sep="")
-  x.disp[x >= 10^(-digits)] <- sprintf(digits.str, x[x>=10^(-digits)])
+  x.disp <- rep("", length(x))
+  finite <- is.finite(x)
+  small.nonnegative <- finite & x >= 0 & x < 10^(-digits)
+  x.disp[small.nonnegative] <- paste("< ", 10^(-digits), sep="")
+  x.disp[finite & !small.nonnegative] <- sprintf(digits.str, x[finite & !small.nonnegative])
+  x.disp[!finite & is.na(x)] <- NA_character_
   x.disp
 }
 

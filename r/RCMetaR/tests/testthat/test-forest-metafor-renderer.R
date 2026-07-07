@@ -379,6 +379,19 @@ test_that("Forest Layout Preflight records sparse and compact RevMan templates w
   expect_equal(compact.plan$style$template, "compact")
   expect_true(compact.plan$rows$manual_sequential_labels)
   expect_equal(compact.plan$rows$study_rows, 2:1)
+  expect_lt(compact.plan$rows$top - max(compact.plan$rows$study_rows), 2)
+  expect_true(compact.plan$rows$ylim[[1]] >= -2.5)
+  expect_lt(compact.plan$device$height, 5)
+
+  sequential.bundle$params$fp_style <- "bmj"
+  sequential.bundle$fp_style <- "bmj"
+  bmj.compact.plan <- rcmetar.forest.layout.preflight(sequential.bundle, style = "bmj")
+
+  expect_equal(bmj.compact.plan$style$name, "bmj")
+  expect_equal(bmj.compact.plan$style$template, "compact")
+  expect_true(bmj.compact.plan$rows$manual_sequential_labels)
+  expect_lt(bmj.compact.plan$rows$top - max(bmj.compact.plan$rows$study_rows), 2)
+  expect_lt(bmj.compact.plan$device$height, 5)
 })
 
 test_that("RevMan study heading uses reference default and respects custom labels", {

@@ -225,7 +225,6 @@ rcmetar.draw.default.forest <- function(bundle, outpath) {
 
     op <- graphics::par(no.readonly=TRUE)
     on.exit(graphics::par(op), add=TRUE)
-    graphics::par(bg="white", mar=c(4.8, 1.0, 1.4, 1.0), fg="black", col.axis="black", col.lab="black")
 
     k <- plan$rows$k
     rows <- plan$rows$study_rows
@@ -233,6 +232,8 @@ rcmetar.draw.default.forest <- function(bundle, outpath) {
     layout <- plan$layout
     group.headers <- plan$headers$group
     manual.sequential.labels <- plan$rows$manual_sequential_labels
+    plot.margin <- if (manual.sequential.labels) c(3.6, 1.0, 1.0, 1.0) else c(4.8, 1.0, 1.4, 1.0)
+    graphics::par(bg="white", mar=plot.margin, fg="black", col.axis="black", col.lab="black")
     top <- plan$rows$top
     ylim <- plan$rows$ylim
 

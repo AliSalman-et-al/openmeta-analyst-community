@@ -593,14 +593,17 @@ rcmetar.draw.metafor.sequential.text <- function(bundle, rows, layout, k, cex) {
         graphics::text(layout$xlim[[2]], rows, labels, pos=2, cex=cex, col="black")
     }
     if (rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)) {
-        graphics::text(layout$xlim[[1]], k + 2, rcmetar.metafor.study.header(bundle), pos=4, font=2, cex=cex, col="black")
-        graphics::text(layout$xlim[[2]], k + 2, rcmetar.metafor.effect.header(bundle), pos=2, font=2, cex=cex, col="black")
-        graphics::segments(layout$xlim[[1]], k + 1, layout$xlim[[2]], k + 1, lwd=0.8)
+        first.row <- max(rows, na.rm=TRUE)
+        header.y <- first.row + 1.25
+        rule.y <- first.row + 0.70
+        graphics::text(layout$xlim[[1]], header.y, rcmetar.metafor.study.header(bundle), pos=4, font=2, cex=cex, col="black")
+        graphics::text(layout$xlim[[2]], header.y, rcmetar.metafor.effect.header(bundle), pos=2, font=2, cex=cex, col="black")
+        graphics::segments(layout$xlim[[1]], rule.y, layout$xlim[[2]], rule.y, lwd=0.8)
     }
     invisible(NULL)
 }
 
-rcmetar.draw.metafor.single.study.accent <- function(bundle, rows, alim, color) {
+rcmetar.draw.metafor.single.study.accent <- function(bundle, rows, alim, color, pch=15) {
     if (identical(color, "black")) {
         return(invisible(NULL))
     }
@@ -609,11 +612,12 @@ rcmetar.draw.metafor.single.study.accent <- function(bundle, rows, alim, color) 
         rows=rows,
         alim=alim,
         color=color,
-        psize=rcmetar.metafor.psize(bundle)
+        psize=rcmetar.metafor.psize(bundle),
+        pch=pch
     )
 }
 
-rcmetar.draw.metafor.effect.accent <- function(effect, rows, alim, color, psize, lwd=1.35) {
+rcmetar.draw.metafor.effect.accent <- function(effect, rows, alim, color, psize, lwd=1.35, pch=15) {
     if (length(rows) != length(effect$yi)) {
         return(invisible(NULL))
     }
@@ -633,7 +637,7 @@ rcmetar.draw.metafor.effect.accent <- function(effect, rows, alim, color, psize,
         graphics::points(
             yi[finite][inside],
             rows[finite][inside],
-            pch=15,
+            pch=pch,
             col=color,
             cex=psize[finite][inside]
         )

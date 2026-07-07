@@ -419,16 +419,18 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
 }
 
 rcmetar.draw.revman.sequential.forest <- function(bundle, outpath) {
-    plan <- rcmetar.forest.layout.preflight(bundle, style="revman")
+    style <- if (identical(bundle$fp_style, "bmj")) "bmj" else "revman"
+    plan <- rcmetar.forest.layout.preflight(bundle, style=style)
     size <- plan$device
     size$bg <- "white"
     rcmetar.render.plot_file(outpath, size, function() {
 
     op <- graphics::par(no.readonly=TRUE)
     on.exit(graphics::par(op), add=TRUE)
+    bottom.margin <- if (nzchar(plan$x$xlab)) 3.1 else 2.15
     graphics::par(
         bg="white",
-        mar=c(3.1, 0.8, 1.2, 0.8),
+        mar=c(bottom.margin, 0.8, 0.9, 0.8),
         fg="black",
         col.axis="black",
         col.lab="black",
@@ -440,6 +442,8 @@ rcmetar.draw.revman.sequential.forest <- function(bundle, outpath) {
     rows <- plan$rows$study_rows
     alim <- plan$x$alim
     layout <- plan$layout
+    compact.pch <- if (identical(style, "bmj")) 18 else 15
+    compact.lwd <- if (identical(style, "bmj")) 1.25 else 1.15
     plot.info <- suppressWarnings(metafor::forest.default(
         x=bundle$effect$yi,
         sei=bundle$effect$sei,
@@ -460,13 +464,19 @@ rcmetar.draw.revman.sequential.forest <- function(bundle, outpath) {
         ylim=plan$rows$ylim,
         annotate=FALSE,
         col=rcmetar.forest.accent.color(bundle$params),
-        pch=15,
+        pch=compact.pch,
         psize=rcmetar.metafor.psize(bundle),
-        lwd=1.15,
+        lwd=compact.lwd,
         efac=0,
         digits=as.integer(bundle$params$digits)
     ))
-    rcmetar.draw.metafor.single.study.accent(bundle, rows, alim, rcmetar.forest.accent.color(bundle$params))
+    rcmetar.draw.metafor.single.study.accent(
+        bundle,
+        rows,
+        alim,
+        rcmetar.forest.accent.color(bundle$params),
+        pch=compact.pch
+    )
     rcmetar.draw.metafor.sequential.text(bundle, rows, layout, k, plan$typography$cex)
     invisible(bundle$changed.params)
     })

@@ -107,6 +107,12 @@ rcmetar.forest.display.row.count <- function(bundle) {
     nrow(bundle$ilab$matrix)
 }
 
+rcmetar.forest.is.sequential.variant <- function(bundle) {
+    isTRUE(bundle$single_study) &&
+        (identical(bundle$forest_variant, "cumulative") ||
+            identical(bundle$forest_variant, "leave-one-out"))
+}
+
 rcmetar.forest.default.device.metrics <- function(bundle) {
     rcmetar.forest.with.measurement.device({
         display.rows <- rcmetar.forest.display.row.count(bundle)
@@ -163,10 +169,13 @@ rcmetar.forest.default.device.metrics <- function(bundle) {
             0
         }
         left.width <- max(study.width + block.gap + ilab.width, heterogeneity.width + block.gap)
-        vertical.margin <- 3.1
+        sequential <- rcmetar.forest.is.sequential.variant(bundle)
+        vertical.margin <- if (sequential) 1.70 else 3.1
+        row.height <- if (sequential) 0.34 else 0.48
+        min.height <- if (sequential) 3.90 else 5.0
         list(
             width=max(9.5, min(18, left.width + plot.width + annotation.width + 1.5)),
-            height=max(5.0, min(18, vertical.margin + 0.48 * display.rows)),
+            height=max(min.height, min(18, vertical.margin + row.height * display.rows)),
             cex=cex,
             bg="white",
             study_width=study.width,
@@ -210,6 +219,18 @@ rcmetar.forest.default.layout.coordinates <- function(bundle, size, alim) {
     )
 }
 
+rcmetar.forest.sequential.rows <- function(k, headers=TRUE) {
+    top <- if (isTRUE(headers)) k + 1.7 else k + 0.95
+    list(
+        k=k,
+        study_rows=seq(from=k, to=1),
+        ylim=c(-1.05, top),
+        top=top,
+        manual_sequential_labels=TRUE,
+        max_group_header_lines=1
+    )
+}
+
 rcmetar.forest.default.rows <- function(bundle) {
     k <- nrow(bundle$ilab$matrix)
     rows <- seq(from=k, to=1)
@@ -219,9 +240,13 @@ rcmetar.forest.default.rows <- function(bundle) {
     } else {
         1
     }
-    manual.sequential.labels <- isTRUE(bundle$single_study) &&
-        (identical(bundle$forest_variant, "cumulative") ||
-            identical(bundle$forest_variant, "leave-one-out"))
+    manual.sequential.labels <- rcmetar.forest.is.sequential.variant(bundle)
+    if (manual.sequential.labels) {
+        return(rcmetar.forest.sequential.rows(
+            k,
+            rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)
+        ))
+    }
     header.extra <- if (rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)) {
         max(0, max.group.header.lines - 1) * 0.55
     } else {
@@ -254,7 +279,7 @@ rcmetar.forest.default.layout.preflight <- function(bundle, style="default", siz
     header.offset <- if (rows$max_group_header_lines > 1) 0.35 else 0.2
     rcmetar.forest.layout.plan(
         style=style,
-        template=if (identical(style, "revman")) "compact" else "default",
+        template=if (rows$manual_sequential_labels) "compact" else if (identical(style, "revman")) "compact" else "default",
         device=size,
         typography=list(cex=size$cex, cex.axis=size$cex, cex.lab=size$cex),
         rows=rows,

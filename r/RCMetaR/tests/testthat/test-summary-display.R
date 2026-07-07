@@ -141,6 +141,10 @@ expect_values_inside_header_columns <- function(header, values, labels) {
   }
 }
 
+test_that("round.display preserves signed negative estimates", {
+  expect_equal(round.display(c(-0.809, -0.0004, 0.0004, 0.809), 3), c("-0.809", "-0.000", "< 0.001", "0.809"))
+})
+
 test_that("summary display uses readable labels and aligned columns", {
   rendered <- capture.output(print(summary_display_fixture()))
   text <- paste(rendered, collapse = "\n")
