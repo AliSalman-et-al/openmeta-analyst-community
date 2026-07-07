@@ -539,6 +539,49 @@ test_that("Default Forest Style sizing reserves space for long group headers", {
   expect_gt(file.info(png_path)$size, 5000)
 })
 
+test_that("RevMan raw-column layouts reserve space for long study labels", {
+  short.fixture <- metafor_continuous_fixture()
+  short.fixture$params$fp_style <- "revman"
+  short.res <- rma.uni(
+    yi = short.fixture$data@y,
+    sei = short.fixture$data@SE,
+    slab = short.fixture$data@study.names,
+    method = short.fixture$params$rm.method,
+    level = short.fixture$params$conf.level,
+    digits = short.fixture$params$digits
+  )
+  short.bundle <- rcmetar.regenerate.plot.data(short.fixture$data, short.res, short.fixture$params)
+  short.layout <- rcmetar.revman.layout(short.bundle)
+
+  long.fixture <- metafor_continuous_fixture()
+  long.fixture$data@study.names <- paste(
+    "International multicenter trial with protocol-defined responder analysis",
+    seq_along(long.fixture$data@study.names)
+  )
+  long.fixture$params$fp_style <- "revman"
+  long.res <- rma.uni(
+    yi = long.fixture$data@y,
+    sei = long.fixture$data@SE,
+    slab = long.fixture$data@study.names,
+    method = long.fixture$params$rm.method,
+    level = long.fixture$params$conf.level,
+    digits = long.fixture$params$digits
+  )
+  long.bundle <- rcmetar.regenerate.plot.data(long.fixture$data, long.res, long.fixture$params)
+  long.layout <- rcmetar.revman.layout(long.bundle)
+
+  short.gap <- as.numeric(short.layout$ilab.xpos[[1]]) - short.layout$xlim[[1]]
+  long.gap <- as.numeric(long.layout$ilab.xpos[[1]]) - long.layout$xlim[[1]]
+  span <- max(diff(long.layout$alim), 1)
+
+  expect_gt(long.gap, short.gap + 1.5 * span)
+
+  png_path <- tempfile(fileext = ".png")
+  rcmetar.draw.forest.plot(long.bundle, png_path)
+  expect_true(file.exists(png_path))
+  expect_gt(file.info(png_path)$size, 5000)
+})
+
 test_that("single-study binary Default Forest Style uses normalized vectors", {
   fixture <- metafor_binary_fixture(studies = 1)
   res <- get.res.for.one.binary.study(fixture$data, fixture$params)

@@ -527,7 +527,7 @@ rcmetar.revman.layout <- function(bundle) {
         numeric(0)
     }
     list(
-        xlim=c(alim[1] - (5.15 + label.extra * 0.020) * span, alim[2] + 0.25 * span),
+        xlim=c(alim[1] - (5.15 + label.extra * 0.095) * span, alim[2] + 0.25 * span),
         alim=alim,
         ilab.xpos=ilab.xpos,
         group.xpos=group.xpos,
