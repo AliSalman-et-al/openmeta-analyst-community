@@ -255,6 +255,7 @@ test_that("binary RevMan Forest Style builds faithful count, weight, and block s
   expect_match(bundle$style_blocks$test_overall, "Test for overall effect: Z =")
   expect_equal(bundle$style_blocks$favours_left, "Favours Experimental")
   expect_equal(bundle$style_blocks$favours_right, "Favours Control")
+  expect_equal(rcmetar.revman.study.header(bundle), "Study or Subgroup")
   expect_false(any(grepl("bias|rob", c(names(bundle$style_blocks), unlist(bundle$style_blocks)), ignore.case = TRUE)))
   expect_equal(rcmetar.forest.accent.color(bundle$params), "#000000")
 
@@ -262,6 +263,30 @@ test_that("binary RevMan Forest Style builds faithful count, weight, and block s
   rcmetar.draw.forest.plot(bundle, png_path)
   expect_true(file.exists(png_path))
   expect_gt(file.info(png_path)$size, 5000)
+})
+
+test_that("RevMan study heading uses reference default and respects custom labels", {
+  fixture <- metafor_binary_fixture()
+  fixture$params$fp_style <- "revman"
+  res <- rma.uni(
+    yi = fixture$data@y,
+    sei = fixture$data@SE,
+    slab = fixture$data@study.names,
+    method = fixture$params$rm.method,
+    level = fixture$params$conf.level,
+    digits = fixture$params$digits
+  )
+
+  bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+  expect_equal(rcmetar.revman.study.header(bundle), "Study or Subgroup")
+
+  fixture$params$fp_col1_str <- "Trial"
+  custom.bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+  expect_equal(rcmetar.revman.study.header(custom.bundle), "Trial")
+
+  fixture$params$fp_show_col1 <- FALSE
+  hidden.bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+  expect_equal(rcmetar.revman.study.header(hidden.bundle), "")
 })
 
 test_that("continuous RevMan Forest Style builds mean SD total columns", {

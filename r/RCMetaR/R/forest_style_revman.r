@@ -296,6 +296,18 @@ rcmetar.revman.metric.label <- function(bundle) {
     label
 }
 
+rcmetar.revman.study.header <- function(bundle) {
+    if (!rcmetar.param.is.true(bundle$params, "fp_show_col1", TRUE)) {
+        return("")
+    }
+    header <- bundle$params$fp_col1_str
+    if (is.null(header) || length(header) == 0 ||
+            as.character(header) %in% c("[default]", "Studies", "Author(s) and Year")) {
+        return("Study or Subgroup")
+    }
+    as.character(header)
+}
+
 rcmetar.draw.revman.forest <- function(bundle, outpath) {
     if (!inherits(bundle$res, "rma") && isTRUE(bundle$single_study)) {
         return(rcmetar.draw.revman.sequential.forest(bundle, outpath))
@@ -351,7 +363,7 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
         refline=NA,
         ilab=ilab$matrix,
         ilab.xpos=layout$ilab.xpos,
-        ilab.pos=2,
+        ilab.pos=NULL,
         cex=size$cex,
         cex.lab=size$cex,
         cex.axis=size$cex,
@@ -373,11 +385,12 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
         psize=summary$psize,
         lwd=1.15
     )
-    graphics::segments(plot.info$xlim[1] + 0.5, k + 1, plot.info$xlim[2], k + 1, lwd=0.8)
+    graphics::segments(plot.info$xlim[1], k + 1, plot.info$xlim[2], k + 1, lwd=0.8)
     graphics::segments(0, -2, 0, k + 1, lwd=0.8)
 
     graphics::par(cex=plot.info$cex, font=2)
     if (show.headers) {
+        graphics::text(layout$xlim[[1]], k + 2, rcmetar.revman.study.header(bundle), pos=4)
         graphics::text(layout$ilab.xpos, k + 2, ilab$headers)
     }
     if (show.headers && length(layout$group.xpos) > 0) {
