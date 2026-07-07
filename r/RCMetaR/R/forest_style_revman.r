@@ -680,7 +680,7 @@ rcmetar.revman.axis.footer.layout <- function(bundle, layout) {
         split.x <- mean(alim)
     }
     direction.width <- if (!is.null(layout) && ncol(bundle$ilab$matrix) <= 1) 18 else 22
-    direction.y <- if (direction.width <= 18) -3.82 else -3.45
+    direction.y <- if (direction.width <= 18) -4.05 else -3.68
     list(
         left.x=mean(c(alim[[1]], split.x)),
         right.x=mean(c(split.x, alim[[2]])),
