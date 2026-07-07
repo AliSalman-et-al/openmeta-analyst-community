@@ -433,7 +433,9 @@ def test_RCMetaR_description_declares_only_direct_package_dependencies():
         "methods",
         "metafor",
         "pdftools",
+        "ragg",
         "stats",
+        "svglite",
         "utils",
     }
     assert parse_packages(fields["Suggests"]) == {"coda", "roxygen2", "testthat"}

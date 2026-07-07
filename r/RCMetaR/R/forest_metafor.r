@@ -806,42 +806,8 @@ rcmetar.metafor.layout <- function(bundle, size, alim) {
     )
 }
 
-rcmetar.plot.file.extension <- function(outpath) {
-    path <- tolower(as.character(outpath))
-    if (grepl("[.]svg[.]gz$", path)) {
-        return("svgz")
-    }
-    ext <- tools::file_ext(path)
-    if (!nzchar(ext)) {
-        return("pdf")
-    }
-    ext
-}
-
 rcmetar.open.metafor_device <- function(outpath, size) {
-    bg <- if (!is.null(size$bg)) size$bg else "white"
-    ext <- rcmetar.plot.file.extension(outpath)
-    if (identical(ext, "png")) {
-        if (requireNamespace("ragg", quietly=TRUE)) {
-            ragg::agg_png(filename=outpath, width=size$width, height=size$height, units="in", res=144, background=bg)
-        } else {
-            grDevices::png(filename=outpath, width=size$width, height=size$height, units="in", res=144, bg=bg)
-        }
-        return(invisible(ext))
-    }
-    if (identical(ext, "svg") || identical(ext, "svgz")) {
-        if (requireNamespace("svglite", quietly=TRUE)) {
-            svglite::svglite(filename=outpath, width=size$width, height=size$height, bg=bg, standalone=TRUE, fix_text_size=TRUE)
-        } else {
-            if (identical(ext, "svgz")) {
-                stop("Compressed SVG forest plot export requires the optional svglite package; use a .svg path or install svglite.", call.=FALSE)
-            }
-            grDevices::svg(filename=outpath, width=size$width, height=size$height, bg=bg)
-        }
-        return(invisible(ext))
-    }
-    grDevices::pdf(file=outpath, width=size$width, height=size$height, bg=bg)
-    invisible(ext)
+    rcmetar.open.plot_device(outpath, size)
 }
 
 rcmetar.draw.metafor.forest <- function(bundle, outpath) {
