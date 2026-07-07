@@ -793,6 +793,36 @@ rcmetar.bmj.display.ilab <- function(bundle, weights) {
     ilab
 }
 
+rcmetar.bmj.group.header.rules <- function(bundle, layout, ilab) {
+    if (length(layout$group.xpos) == 0 || length(ilab$columns) == 0 || length(layout$ilab.xpos) == 0) {
+        return(data.frame(group=character(0), left=numeric(0), right=numeric(0)))
+    }
+    column.groups <- vapply(ilab$columns, function(column) column$group, character(1))
+    rules <- lapply(names(layout$group.xpos), function(group) {
+        indexes <- which(column.groups == group)
+        indexes <- indexes[indexes <= length(layout$ilab.xpos)]
+        indexes <- indexes[is.finite(layout$ilab.xpos[indexes])]
+        if (length(indexes) < 2) {
+            return(NULL)
+        }
+        xpos <- as.numeric(layout$ilab.xpos[indexes])
+        sorted <- sort(unique(xpos))
+        spacing <- if (length(sorted) >= 2) min(diff(sorted)) else diff(layout$alim) * 0.05
+        pad <- max(spacing * 0.35, diff(layout$alim) * 0.008)
+        data.frame(
+            group=group,
+            left=min(xpos) - pad,
+            right=max(xpos) + pad,
+            stringsAsFactors=FALSE
+        )
+    })
+    rules <- Filter(Negate(is.null), rules)
+    if (length(rules) == 0) {
+        return(data.frame(group=character(0), left=numeric(0), right=numeric(0)))
+    }
+    do.call(rbind, rules)
+}
+
 rcmetar.draw.bmj.effects <- function(effect, rows, alim, color, psize) {
     yi <- as.numeric(effect$yi)
     ci.lb <- as.numeric(effect$ci.lb)
@@ -832,7 +862,12 @@ rcmetar.draw.bmj.headers <- function(bundle, layout, ilab, k, metric, method, sh
     } else {
         graphics::text(layout$ilab.xpos, k + 2.2, ilab$headers)
         if (length(layout$group.xpos) > 0) {
-            graphics::text(layout$group.xpos, k + 3.0, vapply(names(layout$group.xpos), rcmetar.bmj.wrap.header, character(1)))
+            group.labels <- vapply(names(layout$group.xpos), rcmetar.bmj.wrap.header, character(1))
+            graphics::text(layout$group.xpos, k + 3.0, group.labels)
+            rules <- rcmetar.bmj.group.header.rules(bundle, layout, ilab)
+            if (nrow(rules) > 0) {
+                graphics::segments(rules$left, k + 2.65, rules$right, k + 2.65, lwd=0.8, col="#111111")
+            }
         }
     }
     header <- paste0(metric, ", IV,\n", sub("^IV, ", "", method), " (", bundle$params$conf.level, "% CI)")

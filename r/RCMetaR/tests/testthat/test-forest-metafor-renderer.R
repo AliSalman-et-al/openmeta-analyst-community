@@ -614,6 +614,12 @@ test_that("BMJ raw-column layouts measure long labels and wrapped headers", {
   long.bundle <- make_bundle(long.fixture)
   long.plan <- rcmetar.forest.layout.preflight(long.bundle)
 
+  continuous.fixture <- metafor_continuous_fixture()
+  continuous.fixture$params$fp_style <- "bmj"
+  continuous.bundle <- make_bundle(continuous.fixture)
+  continuous.plan <- rcmetar.forest.layout.preflight(continuous.bundle)
+  continuous.rules <- rcmetar.bmj.group.header.rules(continuous.bundle, continuous.plan$layout, continuous.bundle$ilab)
+
   expect_equal(long.plan$style$name, "bmj")
   expect_equal(long.plan$style$template, "standard")
   expect_gt(long.plan$device$width, short.plan$device$width)
@@ -627,6 +633,11 @@ test_that("BMJ raw-column layouts measure long labels and wrapped headers", {
   expect_match(rcmetar.bmj.wrap.header(long.bundle$ilab$groups[[1]]), "\n", fixed = TRUE)
   expect_match(rcmetar.bmj.wrap.direction(long.bundle$style_blocks$favours_right), "\n", fixed = TRUE)
   expect_false("layout_plan" %in% names(long.bundle))
+  expect_equal(continuous.rules$group, c("Treatment", "Control"))
+  expect_lt(continuous.rules$left[[1]], min(continuous.plan$layout$ilab.xpos[1:3]))
+  expect_gt(continuous.rules$right[[1]], max(continuous.plan$layout$ilab.xpos[1:3]))
+  expect_lt(continuous.rules$left[[2]], min(continuous.plan$layout$ilab.xpos[4:6]))
+  expect_gt(continuous.rules$right[[2]], max(continuous.plan$layout$ilab.xpos[4:6]))
 })
 
 test_that("older forest plot params default to Default style and visible controls", {
