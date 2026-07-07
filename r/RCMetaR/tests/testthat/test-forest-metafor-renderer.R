@@ -552,9 +552,15 @@ test_that("BMJ Forest Style builds faithful family columns and renders smoke cas
     expect_equal(bundle$style_blocks$favours_left, case$favours_left)
     expect_equal(bundle$style_blocks$favours_right, case$favours_right)
     expect_equal(bundle$style_blocks$axis_label, case$axis_label)
-    expect_match(bundle$style_blocks$heterogeneity, "Heterogeneity: Tau")
-    expect_match(bundle$style_blocks$test_overall, "Test for overall effect: Z =")
+    expect_match(bundle$style_blocks$heterogeneity, "Heterogeneity: Tau²=")
+    expect_match(bundle$style_blocks$heterogeneity, ", df=")
+    expect_match(bundle$style_blocks$test_overall, "Test for overall effect: Z=")
     expect_equal(rcmetar.forest.accent.color(bundle$params), "#6b58a6")
+    if (identical(bundle$data_type, "binary")) {
+      summary <- rcmetar.bmj.summary.effect(bundle)
+      expect_gte(min(summary$psize, na.rm = TRUE), 1.2)
+      expect_gte(max(summary$psize, na.rm = TRUE), 2.0)
+    }
 
     png_path <- tempfile(fileext = ".png")
     rcmetar.draw.forest.plot(bundle, png_path)
@@ -1155,8 +1161,8 @@ test_that("subgroup workflow saves and renders BMJ subtotal diamonds", {
   expect_equal(bundle$ilab$headers, c("", "", "Weight"))
   expect_length(bundle$subgroups$polygon_rows, 2)
   expect_true(inherits(bundle$subgroups$overall, "rma"))
-  expect_match(bundle$style_blocks$heterogeneity, "Heterogeneity: Tau")
-  expect_match(bundle$style_blocks$test_overall, "Test for overall effect: Z =")
+  expect_match(bundle$style_blocks$heterogeneity, "Heterogeneity: Tau²=")
+  expect_match(bundle$style_blocks$test_overall, "Test for overall effect: Z=")
   expect_equal(rcmetar.forest.accent.color(bundle$params), "#6b58a6")
   expect_true(file.exists(unname(result$images[[1]])))
   expect_gt(file.info(unname(result$images[[1]]))$size, 5000)

@@ -239,8 +239,8 @@ rcmetar.bmj.axis.footer.layout <- function(bundle, layout) {
         left.max.width=(split.x - alim[[1]]) * 0.92,
         right.max.width=(alim[[2]] - split.x) * 0.92,
         direction.width=22,
-        direction.y=-3.55,
-        axis.label.y=-3.55
+        direction.y=-2.82,
+        axis.label.y=-2.82
     )
 }
 
@@ -249,13 +249,47 @@ rcmetar.bmj.summary.result <- function(bundle) {
 }
 
 rcmetar.bmj.heterogeneity.label <- function(bundle) {
-    rcmetar.revman.heterogeneity.label(bundle)
+    label <- rcmetar.revman.heterogeneity.label(bundle)
+    label <- gsub("Tau² = ", "Tau²=", label, fixed=TRUE)
+    label <- gsub("Chi² = ", "Chi²=", label, fixed=TRUE)
+    label <- gsub(", df = ", ", df=", label, fixed=TRUE)
+    label <- gsub(" (P ", ", P ", label, fixed=TRUE)
+    label <- gsub("); I² = ", "; I²=", label, fixed=TRUE)
+    label <- gsub("P = ", "P=", label, fixed=TRUE)
+    label <- gsub("P < ", "P<", label, fixed=TRUE)
+    label
 }
 
 rcmetar.bmj.test.overall.label <- function(bundle) {
     label <- rcmetar.revman.test.overall.label(bundle)
     label <- sub(" \\((P [^)]+)\\)$", ", \\1", label)
-    gsub("P = ", "P=", label, fixed=TRUE)
+    label <- gsub("Z = ", "Z=", label, fixed=TRUE)
+    label <- gsub("P = ", "P=", label, fixed=TRUE)
+    gsub("P < ", "P<", label, fixed=TRUE)
+}
+
+rcmetar.bmj.heterogeneity.display.label <- function(label) {
+    sub("^Heterogeneity:", "Test for heterogeneity:", label)
+}
+
+rcmetar.bmj.compact.p.value.label <- function(p.value, digits=2) {
+    label <- rcmetar.revman.p.value.label(p.value)
+    label <- gsub("P = ", "P=", label, fixed=TRUE)
+    gsub("P < ", "P<", label, fixed=TRUE)
+}
+
+rcmetar.bmj.heterogeneity.expression <- function(res) {
+    if (is.null(res) || is.null(res$QE)) {
+        return(NULL)
+    }
+    as.expression(bquote(paste(
+        "Test for heterogeneity: ",
+        tau^2, "=", .(round.display(res$tau2, 2)), "; ",
+        chi^2, "=", .(round.display(res$QE, 2)),
+        ", df=", .(res$k - res$p), ", ",
+        .(rcmetar.bmj.compact.p.value.label(res$QEp, 2)), "; ",
+        I^2, "=", .(round.display(res$I2, 0)), "%"
+    )))
 }
 
 rcmetar.measure.bmj.forest.device <- function(bundle) {
@@ -568,7 +602,7 @@ rcmetar.forest.bmj.layout.preflight <- function(bundle, size.policy="export") {
     layout <- rcmetar.forest.bmj.layout.coordinates.from_size(bundle, size)
     k <- length(bundle$slab)
     top.padding <- if (size$header_lines > 2) 3.75 else 3.2
-    bottom.padding <- if (size$direction_lines > 2) 5.15 else 4.6
+    bottom.padding <- if (size$direction_lines > 2) 4.65 else 3.95
     rows <- list(
         k=k,
         study_rows=k:1,
@@ -684,20 +718,20 @@ rcmetar.draw.bmj.forest <- function(bundle, outpath) {
     graphics::par(xpd=NA)
     rcmetar.draw.bmj.effects(effect, rows, layout$alim, accent, summary$psize)
     graphics::segments(plot.info$xlim[1], k + 1.55, plot.info$xlim[2], k + 1.55, lwd=0.9, col="#a9a9a9")
-    graphics::segments(0, -1.1, 0, k + 1.55, lwd=0.85, col="#a9a9a9")
-    graphics::segments(summary$yi, -0.05, summary$yi, k + 0.45, lwd=0.9, lty=2, col=accent)
+    graphics::segments(0, -1.0, 0, k + 1.55, lwd=0.85, col="#a9a9a9")
+    graphics::segments(summary$yi, 0, summary$yi, k, lwd=0.9, lty=2, col=accent)
 
     graphics::par(cex=plot.info$cex, font=2, col="#111111")
     rcmetar.draw.bmj.headers(bundle, layout, ilab, k, metric, method, plan$headers$show)
 
-    graphics::text(layout$annotation.xpos, -0.2, summary$label, pos=4, font=2)
-    rcmetar.draw.revman.summary.diamond(summary, -1, accent)
+    graphics::text(layout$annotation.xpos, 0, summary$label, pos=4, font=1)
+    rcmetar.draw.revman.summary.diamond(summary, 0, accent)
     rcmetar.draw.bmj.axis(bundle, layout, plot.info$cex)
 
     graphics::par(cex=plot.info$cex, font=1, col="#111111")
     graphics::text(layout$xlim[[1]], rows, bundle$slab, pos=4, cex=plot.info$cex, col="#111111")
     rcmetar.draw.bmj.study.effect.labels(bundle, effect, layout, rows, plot.info$cex)
-    rcmetar.draw.bmj.bottom.blocks(bundle, layout$xlim[1], plot.info$cex, layout)
+    rcmetar.draw.bmj.bottom.blocks(bundle, layout$xlim[1], plot.info$cex, layout, summary$res)
 
     invisible(bundle$changed.params)
     })
@@ -708,8 +742,16 @@ rcmetar.bmj.summary.effect <- function(bundle) {
     transform <- rcmetar.bundle.transform(bundle)
     pred <- c(transform$display.scale(summary$yi), transform$display.scale(summary$ci.lb), transform$display.scale(summary$ci.ub))
     summary$label <- rcmetar.bmj.effect.label(pred[[1]], pred[[2]], pred[[3]], bundle$params$digits)
-    if (length(summary$psize) > 0) {
-        summary$psize <- pmax(0.95, summary$psize * 0.95)
+    finite.weights <- is.finite(summary$weights)
+    if (any(finite.weights)) {
+        scaled <- rep(NA_real_, length(summary$weights))
+        weight.range <- range(summary$weights[finite.weights])
+        if (diff(weight.range) > 0) {
+            scaled[finite.weights] <- 1.2 + (summary$weights[finite.weights] - weight.range[[1]]) / diff(weight.range)
+        } else {
+            scaled[finite.weights] <- 1.45
+        }
+        summary$psize <- scaled
     }
     summary
 }
@@ -731,9 +773,10 @@ rcmetar.draw.bmj.effects <- function(effect, rows, alim, color, psize) {
     if (!any(finite)) {
         return(invisible(NULL))
     }
-    graphics::segments(pmax(ci.lb[finite], alim[[1]]), rows[finite], pmin(ci.ub[finite], alim[[2]]), rows[finite], col=color, lwd=1.25)
+    graphics::segments(pmax(ci.lb[finite], alim[[1]]), rows[finite], pmin(ci.ub[finite], alim[[2]]), rows[finite], col=color, lwd=1.5)
     inside <- yi[finite] >= alim[[1]] & yi[finite] <= alim[[2]]
     if (any(inside)) {
+        graphics::points(yi[finite][inside], rows[finite][inside], pch=18, col="white", cex=psize[finite][inside] * 1.15)
         graphics::points(yi[finite][inside], rows[finite][inside], pch=18, col=color, cex=psize[finite][inside])
     }
     invisible(NULL)
@@ -816,27 +859,31 @@ rcmetar.draw.bmj.default_like.forest <- function(bundle, outpath) {
 rcmetar.draw.bmj.axis <- function(bundle, layout, cex) {
     ticks <- rcmetar.bmj.axis.ticks(bundle, layout$alim)
     labels <- rcmetar.bmj.axis.labels(bundle, ticks)
-    y.axis <- -2.02
-    y.tick <- -1.90
-    y.label <- -2.48
+    y.axis <- -1.72
+    y.tick <- -1.56
+    y.label <- -2.18
     span <- max(diff(layout$alim), 1)
-    graphics::rect(layout$alim[[1]] - 0.04 * span, -5.4, layout$alim[[2]] + 0.04 * span, -1.82, col="white", border=NA)
+    graphics::rect(layout$alim[[1]] - 0.04 * span, -5.4, layout$alim[[2]] + 0.04 * span, -1.46, col="white", border=NA)
     graphics::segments(layout$alim[[1]], y.axis, layout$alim[[2]], y.axis, lwd=0.9, col="#a9a9a9")
     graphics::segments(ticks, y.axis, ticks, y.tick, lwd=0.8, col="#a9a9a9")
     graphics::text(ticks, y.label, labels, cex=cex, col="#111111")
     invisible(NULL)
 }
 
-rcmetar.draw.bmj.bottom.blocks <- function(bundle, x, cex, layout=NULL) {
+rcmetar.draw.bmj.bottom.blocks <- function(bundle, x, cex, layout=NULL, summary.res=NULL) {
     graphics::par(xpd=NA)
     if (!is.null(layout)) {
         rcmetar.draw.bmj.total.row(bundle, x, layout, cex)
     }
     if (nzchar(bundle$style_blocks$heterogeneity)) {
-        graphics::text(x, -1.55, sub("^Heterogeneity:", "Test for heterogeneity:", bundle$style_blocks$heterogeneity), pos=4, cex=cex)
+        heterogeneity.label <- rcmetar.bmj.heterogeneity.expression(summary.res)
+        if (is.null(heterogeneity.label)) {
+            heterogeneity.label <- rcmetar.bmj.heterogeneity.display.label(bundle$style_blocks$heterogeneity)
+        }
+        graphics::text(x, -1, heterogeneity.label, pos=4, cex=cex)
     }
     if (nzchar(bundle$style_blocks$test_overall)) {
-        graphics::text(x, -2.55, bundle$style_blocks$test_overall, pos=4, cex=cex)
+        graphics::text(x, -2, bundle$style_blocks$test_overall, pos=4, cex=cex)
     }
     axis.footer <- rcmetar.bmj.axis.footer.layout(bundle, layout)
     left.label <- ""
@@ -884,11 +931,11 @@ rcmetar.draw.bmj.bottom.blocks <- function(bundle, x, cex, layout=NULL) {
 }
 
 rcmetar.draw.bmj.total.row <- function(bundle, x, layout, cex) {
-    graphics::text(x, -0.2, paste0("Total (", bundle$params$conf.level, "% CI)"), pos=4, font=2, cex=cex)
+    graphics::text(x, 0, paste0("Total (", bundle$params$conf.level, "% CI)"), pos=4, font=1, cex=cex)
     for (key in names(bundle$style_blocks$totals)) {
         index <- rcmetar.bmj.column.index(bundle, key)
         if (length(index) == 1) {
-            graphics::text(layout$ilab.xpos[[index]], -0.2, bundle$style_blocks$totals[[key]], font=2, cex=cex)
+            graphics::text(layout$ilab.xpos[[index]], 0, bundle$style_blocks$totals[[key]], font=1, cex=cex)
         }
     }
     invisible(NULL)
