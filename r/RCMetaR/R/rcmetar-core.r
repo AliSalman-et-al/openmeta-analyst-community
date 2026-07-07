@@ -340,6 +340,9 @@ rcmetar.draw.forest.plot <- function(plot.data, outpath, side.by.side=FALSE) {
     if (isTRUE(side.by.side)) {
         return(two.forest.plots(plot.data, outpath))
     }
+    if (rcmetar.is.metafor.forest.bundle(plot.data)) {
+        return(rcmetar.draw.metafor.forest(plot.data, outpath))
+    }
     forest.plot(plot.data, outpath)
 }
 

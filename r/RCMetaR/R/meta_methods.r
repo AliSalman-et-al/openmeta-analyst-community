@@ -24,7 +24,9 @@ cum.ma.binary <- function(fname, binary.data, params){
     res <- eval(call(fname, binary.data, params.tmp))
     res.overall <- eval(call(paste(fname, ".overall", sep=""), res))
     # parse out the overall estimate
-    plot.data <- create.plot.data.binary(binary.data, params, res.overall)
+    params.legacy <- params
+    params.legacy$fp_legacy_renderer <- TRUE
+    plot.data <- create.plot.data.binary(binary.data, params.legacy, res.overall)
     # data for standard forest plot
     
     # iterate over the binaryData elements, adding one study at a time

@@ -186,6 +186,10 @@ create.plot.data.binary <- function(binary.data, params, res, selected.cov = NUL
          plot.data$col4 <- list(nums = binary.data@g2O1, denoms = binary.data@g2O1 + binary.data@g2O2)
     }
 
+    if (rcmetar.metafor.binary.default.supported(binary.data, params, selected.cov=selected.cov)) {
+        plot.data <- rcmetar.build.binary.metafor.bundle(binary.data, params, res, plot.data)
+    }
+
     plot.data
 }
 
@@ -804,6 +808,10 @@ pretty.metric.name <- function(metric) {
 #            forest plot              #
 #######################################
 forest.plot <- function(forest.data, outpath) {
+  if (rcmetar.is.metafor.forest.bundle(forest.data)) {
+      return(rcmetar.draw.metafor.forest(forest.data, outpath))
+  }
+
   png(filename=rcmetar.scratch.path("INTER")) # to fix windows popping out at you issue
 
   # calculates plot sizes and layout, and then calls draw.forest.plot.
