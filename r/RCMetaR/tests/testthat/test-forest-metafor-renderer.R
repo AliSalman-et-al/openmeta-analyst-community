@@ -289,6 +289,49 @@ test_that("RevMan study heading uses reference default and respects custom label
   expect_equal(rcmetar.revman.study.header(hidden.bundle), "")
 })
 
+test_that("RevMan X-axis footer labels align to the plotted effect axis", {
+  fixture <- metafor_binary_fixture()
+  fixture$params$fp_style <- "revman"
+  res <- rma.uni(
+    yi = fixture$data@y,
+    sei = fixture$data@SE,
+    slab = fixture$data@study.names,
+    method = fixture$params$rm.method,
+    level = fixture$params$conf.level,
+    digits = fixture$params$digits
+  )
+  bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+  layout <- rcmetar.revman.layout(bundle)
+  footer <- rcmetar.revman.axis.footer.layout(bundle, layout)
+
+  expect_equal(footer$left.x, mean(c(layout$alim[[1]], 0)), tolerance = 1e-8)
+  expect_equal(footer$right.x, mean(c(0, layout$alim[[2]])), tolerance = 1e-8)
+  expect_equal(footer$axis.x, mean(layout$alim), tolerance = 1e-8)
+  expect_gt(footer$left.max.width, 0)
+  expect_gt(footer$right.max.width, 0)
+  expect_equal(bundle$style_blocks$favours_left, "Favours Experimental")
+  expect_equal(bundle$style_blocks$favours_right, "Favours Control")
+
+  diagnostic.fixture <- metafor_diagnostic_fixture(measure = "Sens")
+  diagnostic.fixture$params$fp_style <- "revman"
+  diagnostic.res <- rma.uni(
+    yi = diagnostic.fixture$data@y,
+    sei = diagnostic.fixture$data@SE,
+    slab = diagnostic.fixture$data@study.names,
+    method = diagnostic.fixture$params$rm.method,
+    level = diagnostic.fixture$params$conf.level,
+    digits = diagnostic.fixture$params$digits
+  )
+  diagnostic.bundle <- rcmetar.regenerate.plot.data(diagnostic.fixture$data, diagnostic.res, diagnostic.fixture$params)
+  diagnostic.layout <- rcmetar.revman.layout(diagnostic.bundle)
+  diagnostic.footer <- rcmetar.revman.axis.footer.layout(diagnostic.bundle, diagnostic.layout)
+
+  expect_equal(diagnostic.footer$axis.x, mean(diagnostic.layout$alim), tolerance = 1e-8)
+  expect_equal(diagnostic.bundle$style_blocks$axis_label, "Sensitivity")
+  expect_equal(diagnostic.bundle$style_blocks$favours_left, "")
+  expect_equal(diagnostic.bundle$style_blocks$favours_right, "")
+})
+
 test_that("continuous RevMan Forest Style builds mean SD total columns", {
   fixture <- metafor_continuous_fixture()
   fixture$params$fp_style <- "revman"

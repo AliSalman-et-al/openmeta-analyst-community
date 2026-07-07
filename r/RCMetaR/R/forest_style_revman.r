@@ -665,6 +665,49 @@ rcmetar.revman.axis.labels <- function(bundle, ticks) {
     rcmetar.revman.format.effect.number(values, digits)
 }
 
+rcmetar.revman.axis.footer.layout <- function(bundle, layout) {
+    if (is.null(layout) || is.null(layout$alim)) {
+        layout <- list(alim=graphics::par("usr")[1:2])
+    }
+    alim <- as.numeric(layout$alim)
+    split.x <- 0
+    if (!is.finite(split.x) || split.x <= alim[[1]] || split.x >= alim[[2]]) {
+        split.x <- mean(alim)
+    }
+    direction.width <- if (!is.null(layout) && ncol(bundle$ilab$matrix) <= 1) 12 else 22
+    direction.y <- if (direction.width <= 12) -3.92 else -3.45
+    list(
+        left.x=mean(c(alim[[1]], split.x)),
+        right.x=mean(c(split.x, alim[[2]])),
+        axis.x=mean(alim),
+        left.max.width=(split.x - alim[[1]]) * 0.92,
+        right.max.width=(alim[[2]] - split.x) * 0.92,
+        direction.y=direction.y,
+        axis.label.y=direction.y,
+        direction.width=direction.width
+    )
+}
+
+rcmetar.revman.constrained.direction.label <- function(label, cex, max.width, preferred.width) {
+    widths <- unique(pmax(8, c(preferred.width, 18, 14, 12, 10, 8)))
+    for (width in widths) {
+        wrapped <- rcmetar.revman.wrap.direction(label, width)
+        lines <- unlist(strsplit(wrapped, "\n", fixed=TRUE), use.names=FALSE)
+        if (length(lines) == 0 ||
+                max(graphics::strwidth(lines, units="user", cex=cex), na.rm=TRUE) <= max.width) {
+            return(wrapped)
+        }
+    }
+    rcmetar.revman.wrap.direction(label, min(widths))
+}
+
+rcmetar.revman.line.count <- function(label) {
+    if (is.null(label) || !nzchar(label)) {
+        return(0)
+    }
+    length(strsplit(label, "\n", fixed=TRUE)[[1]])
+}
+
 rcmetar.measure.revman.forest.device <- function(bundle) {
     k <- length(bundle$slab)
     label.width <- max(nchar(as.character(bundle$slab)), 0)
@@ -711,15 +754,45 @@ rcmetar.draw.revman.bottom.blocks <- function(bundle, x, cex, layout=NULL) {
     if (nzchar(bundle$style_blocks$test_overall)) {
         graphics::text(x, -4, bundle$style_blocks$test_overall, pos=4, cex=cex)
     }
-    direction.width <- if (!is.null(layout) && ncol(bundle$ilab$matrix) <= 1) 12 else 22
-    direction.y <- if (direction.width <= 12) -3.92 else -3.45
+    axis.footer <- rcmetar.revman.axis.footer.layout(bundle, layout)
+    left.label <- ""
+    right.label <- ""
     if (nzchar(bundle$style_blocks$favours_left)) {
-        left.x <- if (metric.is.log.scale(as.character(bundle$params$measure))) log(0.04) else graphics::par("usr")[1] + diff(graphics::par("usr")[1:2]) * 0.60
-        graphics::text(left.x, direction.y, rcmetar.revman.wrap.direction(bundle$style_blocks$favours_left, direction.width), cex=cex)
+        left.label <- rcmetar.revman.constrained.direction.label(
+            bundle$style_blocks$favours_left,
+            cex,
+            axis.footer$left.max.width,
+            axis.footer$direction.width
+        )
     }
     if (nzchar(bundle$style_blocks$favours_right)) {
-        right.x <- if (metric.is.log.scale(as.character(bundle$params$measure))) log(25) else graphics::par("usr")[1] + diff(graphics::par("usr")[1:2]) * 0.82
-        graphics::text(right.x, direction.y, rcmetar.revman.wrap.direction(bundle$style_blocks$favours_right, direction.width), cex=cex)
+        right.label <- rcmetar.revman.constrained.direction.label(
+            bundle$style_blocks$favours_right,
+            cex,
+            axis.footer$right.max.width,
+            axis.footer$direction.width
+        )
+    }
+    direction.y <- axis.footer$direction.y -
+        max(0, max(rcmetar.revman.line.count(left.label), rcmetar.revman.line.count(right.label)) - 2) * 0.36
+    if (nzchar(bundle$style_blocks$favours_left)) {
+        graphics::text(
+            axis.footer$left.x,
+            direction.y,
+            left.label,
+            cex=cex
+        )
+    }
+    if (nzchar(bundle$style_blocks$favours_right)) {
+        graphics::text(
+            axis.footer$right.x,
+            direction.y,
+            right.label,
+            cex=cex
+        )
+    }
+    if (nzchar(bundle$style_blocks$axis_label)) {
+        graphics::text(axis.footer$axis.x, axis.footer$axis.label.y, bundle$style_blocks$axis_label, cex=cex)
     }
     invisible(NULL)
 }
