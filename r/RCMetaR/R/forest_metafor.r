@@ -1,72 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# metafor-backed forest renderer for the Default Forest Style.
-
-rcmetar.forest.style.default <- function(params) {
-    style <- params$fp_style
-    if (is.null(style) || length(style) == 0 || is.na(style) || style == "[default]") {
-        return("default")
-    }
-    style <- tolower(trimws(as.character(style[1])))
-    switch(
-        style,
-        "default" = "default",
-        "default (metafor)" = "default",
-        "default forest style" = "default",
-        "revman" = "revman",
-        "revman forest style" = "revman",
-        "bmj" = "bmj",
-        "bmj forest style" = "bmj",
-        style
-    )
-}
-
-rcmetar.forest.style <- function(params) {
-    style <- rcmetar.forest.style.default(params)
-    if (style %in% c("default", "revman", "bmj")) {
-        return(style)
-    }
-    "default"
-}
-
-rcmetar.param.is.true <- function(params, name, default=TRUE) {
-    value <- params[[name]]
-    if (is.null(value) || length(value) == 0 || is.na(value[1])) {
-        return(default)
-    }
-    if (is.logical(value)) {
-        return(isTRUE(value[1]))
-    }
-    tolower(as.character(value[1])) %in% c("true", "t", "1", "yes")
-}
-
-rcmetar.forest.accent.color <- function(params) {
-    color <- params$fp_accent_color
-    if (!is.null(color) && length(color) > 0 && !is.na(color[1]) && nzchar(as.character(color[1]))) {
-        return(as.character(color[1]))
-    }
-    switch(
-        rcmetar.forest.style(params),
-        revman="#000000",
-        bmj="#6b58a6",
-        "#2f5597"
-    )
-}
-
-rcmetar.point.size.multiplier <- function(params) {
-    value <- suppressWarnings(as.numeric(params$fp_point_size_multiplier))
-    if (length(value) == 0 || !is.finite(value[1]) || value[1] <= 0) {
-        return(1.0)
-    }
-    value[1]
-}
-
-rcmetar.is.metafor.forest.bundle <- function(plot.data) {
-    is.list(plot.data) &&
-        identical(plot.data$render_engine, "metafor") &&
-        !is.null(plot.data$fp_style)
-}
+# Default metafor-backed forest renderer and shared bundle builders.
 
 rcmetar.metafor.binary.default.supported <- function(binary.data, params, selected.cov=NULL) {
     is.null(selected.cov) &&
@@ -360,12 +295,12 @@ rcmetar.build.subgroup.metafor.bundle <- function(om.data, params, subgroup.data
     flat.ci.lb <- flat.yi - mult * flat.sei
     flat.ci.ub <- flat.yi + mult * flat.sei
     flat.slab <- unlist(lapply(study.data, rcmetar.study.labels), use.names=FALSE)
-    flat.ilab <- lapply(study.data, rcmetar.default.ilab.for.data, params=params)
+    flat.ilab <- lapply(study.data, rcmetar.ilab.for.data, params=params, res=NULL)
     ilab.matrix <- do.call(rbind, lapply(flat.ilab, function(ilab) ilab$matrix))
     if (is.null(ilab.matrix)) {
         ilab.matrix <- matrix(character(0), nrow=length(flat.slab), ncol=0)
     }
-    ilab.template <- rcmetar.default.ilab.for.data(om.data, params)
+    ilab.template <- rcmetar.ilab.for.data(om.data, params, subgroup.results[[length(subgroup.list) + 1]])
     colnames(ilab.matrix) <- ilab.template$headers
 
     study.rows <- list()
@@ -380,7 +315,7 @@ rcmetar.build.subgroup.metafor.bundle <- function(om.data, params, subgroup.data
         cursor <- polygon.rows[[i]] - 2.2
     }
 
-    list(
+    bundle <- list(
         render_engine = "metafor",
         data_type = .rcmetar.data.type(om.data),
         forest_variant = "subgroup",
@@ -413,6 +348,7 @@ rcmetar.build.subgroup.metafor.bundle <- function(om.data, params, subgroup.data
             ylim = c(min(polygon.rows) - 4, max(header.rows) + 2.5)
         )
     )
+    rcmetar.decorate.metafor.bundle(bundle)
 }
 
 rcmetar.metafor.subgroup.difference.test <- function(yi, sei, subgroup.values, params) {
@@ -454,14 +390,14 @@ rcmetar.build.binary.metafor.bundle <- function(binary.data, params, res, legacy
         )
     }
 
-    list(
+    bundle <- list(
         render_engine = "metafor",
         data_type = "binary",
         fp_style = rcmetar.forest.style(params),
         res = res,
         effect = effect,
         single_study = single.study,
-        ilab = rcmetar.binary.default.ilab(binary.data, params),
+        ilab = rcmetar.ilab.for.data(binary.data, params, res),
         slab = rcmetar.study.labels(binary.data),
         weights = rcmetar.metafor.weights(res),
         params = params,
@@ -470,6 +406,7 @@ rcmetar.build.binary.metafor.bundle <- function(binary.data, params, res, legacy
         changed.params = legacy.plot.data$changed.params,
         legacy_plot_data = legacy.plot.data
     )
+    rcmetar.decorate.metafor.bundle(bundle)
 }
 
 rcmetar.build.continuous.metafor.bundle <- function(cont.data, params, res, legacy.plot.data=NULL) {
@@ -489,14 +426,14 @@ rcmetar.build.continuous.metafor.bundle <- function(cont.data, params, res, lega
         )
     }
 
-    list(
+    bundle <- list(
         render_engine = "metafor",
         data_type = "continuous",
         fp_style = rcmetar.forest.style(params),
         res = res,
         effect = effect,
         single_study = single.study,
-        ilab = rcmetar.continuous.default.ilab(cont.data, params),
+        ilab = rcmetar.ilab.for.data(cont.data, params, res),
         slab = rcmetar.study.labels(cont.data),
         weights = rcmetar.metafor.weights(res),
         params = params,
@@ -505,6 +442,7 @@ rcmetar.build.continuous.metafor.bundle <- function(cont.data, params, res, lega
         changed.params = legacy.plot.data$changed.params,
         legacy_plot_data = legacy.plot.data
     )
+    rcmetar.decorate.metafor.bundle(bundle)
 }
 
 rcmetar.build.diagnostic.metafor.bundle <- function(diagnostic.data, params, res, legacy.plot.data=NULL) {
@@ -524,14 +462,14 @@ rcmetar.build.diagnostic.metafor.bundle <- function(diagnostic.data, params, res
         )
     }
 
-    list(
+    bundle <- list(
         render_engine = "metafor",
         data_type = "diagnostic",
         fp_style = rcmetar.forest.style(params),
         res = res,
         effect = effect,
         single_study = single.study,
-        ilab = rcmetar.diagnostic.default.ilab(diagnostic.data, params),
+        ilab = rcmetar.ilab.for.data(diagnostic.data, params, res),
         slab = rcmetar.study.labels(diagnostic.data),
         weights = rcmetar.metafor.weights(res),
         params = params,
@@ -540,6 +478,7 @@ rcmetar.build.diagnostic.metafor.bundle <- function(diagnostic.data, params, res
         changed.params = legacy.plot.data$changed.params,
         legacy_plot_data = legacy.plot.data
     )
+    rcmetar.decorate.metafor.bundle(bundle)
 }
 
 rcmetar.metafor.atransf <- function(bundle) {
@@ -554,6 +493,9 @@ rcmetar.metafor.atransf <- function(bundle) {
 }
 
 rcmetar.metafor.refline <- function(bundle) {
+    if (identical(bundle$forest_variant, "cumulative") || identical(bundle$forest_variant, "leave-one-out")) {
+        return(NA)
+    }
     if (metric.is.log.scale(as.character(bundle$params$measure))) {
         return(0)
     }
@@ -587,6 +529,10 @@ rcmetar.metafor.axis.ticks <- function(bundle, alim) {
 }
 
 rcmetar.metafor.xlab <- function(bundle) {
+    helper <- rcmetar.metafor.style.helper(bundle$fp_style, "xlab")
+    if (!is.null(helper)) {
+        return(helper(bundle))
+    }
     params <- bundle$params
     if (!is.null(params$fp_xlabel) && params$fp_xlabel != "[default]") {
         return(as.character(params$fp_xlabel))
@@ -798,7 +744,7 @@ rcmetar.metafor.layout <- function(bundle, size, alim) {
 }
 
 rcmetar.open.metafor_device <- function(outpath, size) {
-    bg <- "white"
+    bg <- if (!is.null(size$bg)) size$bg else "white"
     if (length(grep(".png", outpath)) != 0) {
         grDevices::png(filename=outpath, width=size$width, height=size$height, units="in", res=144, bg=bg)
     } else {
@@ -807,6 +753,14 @@ rcmetar.open.metafor_device <- function(outpath, size) {
 }
 
 rcmetar.draw.metafor.forest <- function(bundle, outpath) {
+    renderer <- rcmetar.metafor.style.renderer(bundle$fp_style)
+    if (!identical(bundle$fp_style, "default") && !is.null(renderer)) {
+        return(renderer(bundle, outpath))
+    }
+    rcmetar.draw.default.metafor.forest(bundle, outpath)
+}
+
+rcmetar.draw.default.metafor.forest <- function(bundle, outpath) {
     size <- rcmetar.measure.metafor.forest.device(bundle)
     rcmetar.open.metafor_device(outpath, size)
     on.exit(grDevices::dev.off(), add=TRUE)
@@ -828,6 +782,7 @@ rcmetar.draw.metafor.forest <- function(bundle, outpath) {
     }
 
     accent.color <- rcmetar.forest.accent.color(bundle$params)
+    forest.color <- if (isTRUE(bundle$single_study)) "black" else accent.color
     forest.args <- list(
         slab = bundle$slab,
         ilab = if (ncol(bundle$ilab$matrix) > 0) bundle$ilab$matrix else NULL,
@@ -846,7 +801,7 @@ rcmetar.draw.metafor.forest <- function(bundle, outpath) {
         rows = rows,
         ylim = ylim,
         annotate = rcmetar.param.is.true(bundle$params, "fp_show_annotation", TRUE),
-        col = accent.color,
+        col = forest.color,
         colshade = "#eeeeee",
         shade = "zebra",
         pch = 15,
@@ -867,8 +822,9 @@ rcmetar.draw.metafor.forest <- function(bundle, outpath) {
             ),
             forest.args
         ))
+        rcmetar.draw.metafor.single.study.accent(bundle, rows, alim, accent.color)
     } else {
-        plot.info <- do.call(metafor::forest.rma, c(list(x = bundle$res), c(forest.args, list(mlab="", border=accent.color, colout=accent.color))))
+        plot.info <- do.call(metafor::forest.rma, c(list(x = bundle$res), c(forest.args, list(mlab="", border=accent.color, colout="black"))))
     }
 
     if (identical(bundle$forest_variant, "subgroup")) {
@@ -888,6 +844,33 @@ rcmetar.draw.metafor.forest <- function(bundle, outpath) {
     rcmetar.draw.metafor.heterogeneity(bundle, layout$xlim[1], cex=size$cex)
 
     invisible(bundle$changed.params)
+}
+
+rcmetar.draw.metafor.single.study.accent <- function(bundle, rows, alim, color) {
+    if (identical(color, "black") || length(rows) != length(bundle$effect$yi)) {
+        return(invisible(NULL))
+    }
+    yi <- as.numeric(bundle$effect$yi)
+    ci.lb <- as.numeric(bundle$effect$ci.lb)
+    ci.ub <- as.numeric(bundle$effect$ci.ub)
+    finite <- is.finite(yi) & is.finite(ci.lb) & is.finite(ci.ub)
+    if (!any(finite)) {
+        return(invisible(NULL))
+    }
+    left <- pmax(ci.lb[finite], alim[[1]])
+    right <- pmin(ci.ub[finite], alim[[2]])
+    graphics::segments(left, rows[finite], right, rows[finite], col=color, lwd=1.35)
+    inside <- yi[finite] >= alim[[1]] & yi[finite] <= alim[[2]]
+    if (any(inside)) {
+        graphics::points(
+            yi[finite][inside],
+            rows[finite][inside],
+            pch=15,
+            col=color,
+            cex=rcmetar.metafor.psize(bundle)[finite][inside]
+        )
+    }
+    invisible(NULL)
 }
 
 rcmetar.draw.metafor.subgroups <- function(bundle, x, cex) {

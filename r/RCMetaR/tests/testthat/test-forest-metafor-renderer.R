@@ -190,6 +190,97 @@ test_that("forest style and universal appearance params persist in metafor bundl
   expect_gt(file.info(png_path)$size, 5000)
 })
 
+test_that("binary RevMan Forest Style builds faithful count, weight, and block spec", {
+  fixture <- metafor_binary_fixture()
+  fixture$params$fp_style <- "revman"
+  res <- rma.uni(
+    yi = fixture$data@y,
+    sei = fixture$data@SE,
+    slab = fixture$data@study.names,
+    method = fixture$params$rm.method,
+    level = fixture$params$conf.level,
+    digits = fixture$params$digits,
+    add = c(fixture$params$adjust, fixture$params$adjust),
+    to = as.character(fixture$params$to)
+  )
+
+  bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+
+  expect_equal(bundle$fp_style, "revman")
+  expect_equal(bundle$ilab$headers, c("Events", "Total", "Events", "Total", "Weight"))
+  expect_equal(bundle$ilab$groups, c("Experimental", "Control"))
+  expect_equal(unname(bundle$ilab$matrix[1, ]), c("4", "123", "11", "139", paste0(round.display(weights(res)[[1]], 1), "%")))
+  expect_match(bundle$style_blocks$heterogeneity, "Heterogeneity: Tau²")
+  expect_match(bundle$style_blocks$heterogeneity, "Chi²")
+  expect_match(bundle$style_blocks$heterogeneity, "I²")
+  expect_match(bundle$style_blocks$test_overall, "Test for overall effect: Z =")
+  expect_equal(bundle$style_blocks$favours_left, "Favours Experimental")
+  expect_equal(bundle$style_blocks$favours_right, "Favours Control")
+  expect_false(any(grepl("bias|rob", c(names(bundle$style_blocks), unlist(bundle$style_blocks)), ignore.case = TRUE)))
+  expect_equal(rcmetar.forest.accent.color(bundle$params), "#000000")
+
+  png_path <- tempfile(fileext = ".png")
+  rcmetar.draw.forest.plot(bundle, png_path)
+  expect_true(file.exists(png_path))
+  expect_gt(file.info(png_path)$size, 5000)
+})
+
+test_that("continuous RevMan Forest Style builds mean SD total columns", {
+  fixture <- metafor_continuous_fixture()
+  fixture$params$fp_style <- "revman"
+  res <- rma.uni(
+    yi = fixture$data@y,
+    sei = fixture$data@SE,
+    slab = fixture$data@study.names,
+    method = fixture$params$rm.method,
+    level = fixture$params$conf.level,
+    digits = fixture$params$digits
+  )
+
+  bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+
+  expect_equal(bundle$fp_style, "revman")
+  expect_equal(bundle$ilab$headers, c("Mean", "SD", "Total", "Mean", "SD", "Total", "Weight"))
+  expect_equal(bundle$ilab$groups, c("Treatment", "Control"))
+  expect_equal(bundle$style_blocks$favours_left, "Favours Treatment")
+  expect_equal(bundle$style_blocks$favours_right, "Favours Control")
+  expect_match(bundle$style_blocks$test_overall, "Test for overall effect: Z =")
+
+  png_path <- tempfile(fileext = ".png")
+  rcmetar.draw.forest.plot(bundle, png_path)
+  expect_true(file.exists(png_path))
+  expect_gt(file.info(png_path)$size, 5000)
+})
+
+test_that("diagnostic RevMan Forest Style uses DTA columns and a plain metric axis", {
+  fixture <- metafor_diagnostic_fixture(measure = "Sens")
+  fixture$params$fp_style <- "revman"
+  res <- rma.uni(
+    yi = fixture$data@y,
+    sei = fixture$data@SE,
+    slab = fixture$data@study.names,
+    method = fixture$params$rm.method,
+    level = fixture$params$conf.level,
+    digits = fixture$params$digits
+  )
+
+  bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+
+  expect_equal(bundle$fp_style, "revman")
+  expect_equal(bundle$ilab$headers, c("TP", "FP", "FN", "TN", "Weight"))
+  expect_equal(bundle$ilab$groups, "DTA")
+  expect_equal(bundle$style_blocks$favours_left, "")
+  expect_equal(bundle$style_blocks$favours_right, "")
+  expect_equal(bundle$style_blocks$axis_label, "Sensitivity")
+  expect_equal(rcmetar.metafor.xlab(bundle), "Sensitivity")
+  expect_match(bundle$style_blocks$heterogeneity, "Heterogeneity: Tau²")
+
+  png_path <- tempfile(fileext = ".png")
+  rcmetar.draw.forest.plot(bundle, png_path)
+  expect_true(file.exists(png_path))
+  expect_gt(file.info(png_path)$size, 5000)
+})
+
 test_that("older forest plot params default to Default style and visible controls", {
   fixture <- metafor_binary_fixture()
   fixture$params$fp_style <- NULL
@@ -412,6 +503,22 @@ test_that("cumulative workflow saves and renders a Default metafor bundle", {
   expect_gt(file.info(unname(result$images[[1]]))$size, 5000)
 })
 
+test_that("cumulative workflow saves and renders a RevMan metafor bundle", {
+  fixture <- metafor_binary_fixture()
+  fixture$params$fp_style <- "revman"
+  fixture$params$fp_outpath <- tempfile(fileext = ".png")
+
+  result <- cum.ma.binary("binary.random", fixture$data, fixture$params)
+  bundle <- load_saved_plot_data(unname(result$plot_params_paths[[1]]))
+
+  expect_equal(bundle$render_engine, "metafor")
+  expect_equal(bundle$forest_variant, "cumulative")
+  expect_equal(bundle$fp_style, "revman")
+  expect_equal(rcmetar.forest.accent.color(bundle$params), "#000000")
+  expect_true(file.exists(unname(result$images[[1]])))
+  expect_gt(file.info(unname(result$images[[1]]))$size, 5000)
+})
+
 test_that("leave-one-out workflow saves and renders a Default metafor bundle", {
   fixture <- metafor_continuous_fixture()
   fixture$params$fp_outpath <- tempfile(fileext = ".png")
@@ -424,6 +531,22 @@ test_that("leave-one-out workflow saves and renders a Default metafor bundle", {
   expect_equal(bundle$fp_style, "default")
   expect_equal(bundle$slab[[1]], "Overall")
   expect_true(all(grepl("^- ", bundle$slab[-1])))
+  expect_true(file.exists(unname(result$images[[1]])))
+  expect_gt(file.info(unname(result$images[[1]]))$size, 5000)
+})
+
+test_that("leave-one-out workflow saves and renders a RevMan metafor bundle", {
+  fixture <- metafor_continuous_fixture()
+  fixture$params$fp_style <- "revman"
+  fixture$params$fp_outpath <- tempfile(fileext = ".png")
+
+  result <- loo.ma.continuous("continuous.random", fixture$data, fixture$params)
+  bundle <- load_saved_plot_data(unname(result$plot_params_paths[[1]]))
+
+  expect_equal(bundle$render_engine, "metafor")
+  expect_equal(bundle$forest_variant, "leave-one-out")
+  expect_equal(bundle$fp_style, "revman")
+  expect_equal(bundle$slab[[1]], "Overall")
   expect_true(file.exists(unname(result$images[[1]])))
   expect_gt(file.info(unname(result$images[[1]]))$size, 5000)
 })
@@ -453,6 +576,34 @@ test_that("subgroup workflow saves and renders Default metafor subtotal diamonds
   expect_true(is.finite(bundle$subgroups$difference_test$QM))
   expect_equal(bundle$subgroups$difference_test$df, 1)
   expect_true(inherits(bundle$subgroups$overall, "rma"))
+  expect_true(file.exists(unname(result$images[[1]])))
+  expect_gt(file.info(unname(result$images[[1]]))$size, 5000)
+})
+
+test_that("subgroup workflow saves and renders RevMan subtotal diamonds", {
+  fixture <- metafor_binary_fixture()
+  fixture$params$fp_style <- "revman"
+  fixture$params$fp_outpath <- tempfile(fileext = ".png")
+  fixture$params$cov_name <- "Era"
+  fixture$data@covariates <- list(new(
+    "CovariateValues",
+    cov.name = "Era",
+    cov.vals = c("Early", "Early", "Early", "Late", "Late", "Late"),
+    cov.type = "factor",
+    ref.var = "Early"
+  ))
+
+  result <- subgroup.ma.binary("binary.random", fixture$data, fixture$params)
+  bundle <- load_saved_plot_data(unname(result$plot_params_paths[[1]]))
+
+  expect_equal(bundle$render_engine, "metafor")
+  expect_equal(bundle$forest_variant, "subgroup")
+  expect_equal(bundle$fp_style, "revman")
+  expect_equal(bundle$ilab$headers, c("Events", "Total", "Events", "Total", "Weight"))
+  expect_length(bundle$subgroups$polygon_rows, 2)
+  expect_true(inherits(bundle$subgroups$overall, "rma"))
+  expect_match(bundle$style_blocks$heterogeneity, "Heterogeneity: Tau²")
+  expect_match(bundle$style_blocks$test_overall, "Test for overall effect: Z =")
   expect_true(file.exists(unname(result$images[[1]])))
   expect_gt(file.info(unname(result$images[[1]]))$size, 5000)
 })
