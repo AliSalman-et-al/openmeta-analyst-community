@@ -10,6 +10,11 @@ rcmetar.forest.layout.preflight <- function(bundle, style=bundle$fp_style, size.
             !identical(bundle$forest_variant, "subgroup")) {
         return(rcmetar.forest.revman.layout.preflight(bundle, size.policy=size.policy))
     }
+    if (identical(style, "bmj") &&
+            inherits(bundle$res, "rma") &&
+            !identical(bundle$forest_variant, "subgroup")) {
+        return(rcmetar.forest.bmj.layout.preflight(bundle, size.policy=size.policy))
+    }
     rcmetar.forest.default.layout.preflight(bundle, style=style, size.policy=size.policy)
 }
 

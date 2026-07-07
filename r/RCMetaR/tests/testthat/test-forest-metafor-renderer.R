@@ -327,6 +327,18 @@ test_that("Forest Layout Preflight produces deterministic layout plans for Defau
   expect_equal(revman.plan$rows$study_rows, length(revman.bundle$slab):1)
   expect_equal(revman.plan$x$at, rcmetar.revman.axis.ticks(revman.bundle, revman.plan$x$alim))
   expect_equal(revman.plan$footer$axis$axis.x, mean(revman.plan$x$alim), tolerance = 1e-8)
+
+  fixture$params$fp_style <- "bmj"
+  bmj.bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+  bmj.plan <- rcmetar.forest.layout.preflight(bmj.bundle)
+
+  expect_s3_class(bmj.plan, "rcmetar_forest_layout_plan")
+  expect_equal(bmj.plan$style$name, "bmj")
+  expect_equal(bmj.plan$style$template, "standard")
+  expect_equal(bmj.plan$headers$study, "Study or Subgroup")
+  expect_equal(bmj.plan$headers$effect, "Odds ratio")
+  expect_equal(bmj.plan$rows$study_rows, length(bmj.bundle$slab):1)
+  expect_equal(bmj.plan$footer$axis$axis.x, mean(bmj.plan$x$alim), tolerance = 1e-8)
 })
 
 test_that("Forest Layout Preflight records sparse and compact RevMan templates without persisting plans", {
@@ -549,6 +561,50 @@ test_that("BMJ Forest Style builds faithful family columns and renders smoke cas
     expect_true(file.exists(png_path))
     expect_gt(file.info(png_path)$size, 5000)
   }
+})
+
+test_that("BMJ raw-column layouts measure long labels and wrapped headers", {
+  make_bundle <- function(fixture) {
+    res <- rma.uni(
+      yi = fixture$data@y,
+      sei = fixture$data@SE,
+      slab = fixture$data@study.names,
+      method = fixture$params$rm.method,
+      level = fixture$params$conf.level,
+      digits = fixture$params$digits
+    )
+    rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+  }
+
+  short.fixture <- metafor_binary_fixture()
+  short.fixture$params$fp_style <- "bmj"
+  short.bundle <- make_bundle(short.fixture)
+  short.plan <- rcmetar.forest.layout.preflight(short.bundle)
+
+  long.fixture <- metafor_binary_fixture()
+  long.fixture$params$fp_style <- "bmj"
+  long.fixture$params$fp_col3_str <- "Experimental intervention with long header"
+  long.fixture$params$fp_col4_str <- "Control condition with long header"
+  long.fixture$data@study.names <- paste(
+    long.fixture$data@study.names,
+    "International protocol-defined multicentre trial with extended label"
+  )
+  long.bundle <- make_bundle(long.fixture)
+  long.plan <- rcmetar.forest.layout.preflight(long.bundle)
+
+  expect_equal(long.plan$style$name, "bmj")
+  expect_equal(long.plan$style$template, "standard")
+  expect_gt(long.plan$device$width, short.plan$device$width)
+  expect_gt(long.plan$device$height, short.plan$device$height)
+  expect_gte(long.plan$device$header_lines, 3)
+  expect_gte(long.plan$device$direction_lines, 3)
+  expect_lt(max(as.numeric(long.plan$columns$ilab.xpos[1:2])), long.plan$x$alim[[1]])
+  expect_gt(long.plan$columns$annotation.xpos, long.plan$x$alim[[2]])
+  expect_gt(long.plan$footer$axis$left.max.width, 0)
+  expect_gt(long.plan$footer$axis$right.max.width, 0)
+  expect_match(rcmetar.bmj.wrap.header(long.bundle$ilab$groups[[1]]), "\n", fixed = TRUE)
+  expect_match(rcmetar.bmj.wrap.direction(long.bundle$style_blocks$favours_right), "\n", fixed = TRUE)
+  expect_false("layout_plan" %in% names(long.bundle))
 })
 
 test_that("older forest plot params default to Default style and visible controls", {
