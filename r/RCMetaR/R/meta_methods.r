@@ -619,7 +619,9 @@ cum.ma.continuous <- function(fname, cont.data, params){
     res <- eval(call(fname, cont.data, params.tmp))
     res.overall <- eval(call(paste(fname, ".overall", sep=""), res))
     # parse out the overall estimate
-    plot.data <- create.plot.data.continuous(cont.data, params, res=res.overall)
+    params.legacy <- params
+    params.legacy$fp_legacy_renderer <- TRUE
+    plot.data <- create.plot.data.continuous(cont.data, params.legacy, res=res.overall)
     # data for standard forest plot
     
     params$fp_show_col3 <- FALSE
@@ -736,7 +738,9 @@ cum.ma.diagnostic <- function(fname, diagnostic.data, params){
 	res <- eval(call(fname, diagnostic.data, params.tmp))
 	res.overall <- eval(call(paste(fname, ".overall", sep=""), res))
 	# parse out the overall estimate
-	plot.data <- create.plot.data.diagnostic(diagnostic.data, params, res.overall)
+	params.legacy <- params
+	params.legacy$fp_legacy_renderer <- TRUE
+	plot.data <- create.plot.data.diagnostic(diagnostic.data, params.legacy, res.overall)
 	# data for standard forest plot
 	
 	####

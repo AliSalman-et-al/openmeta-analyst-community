@@ -230,6 +230,9 @@ create.plot.data.diagnostic <- function(diagnostic.data, params, res, selected.c
         changed.params$fp_col3_str <- label
         plot.data$changed.params <- changed.params
     }
+    if (rcmetar.metafor.diagnostic.default.supported(diagnostic.data, params, selected.cov=selected.cov)) {
+        plot.data <- rcmetar.build.diagnostic.metafor.bundle(diagnostic.data, params, res, plot.data)
+    }
     plot.data
 }
 
@@ -237,6 +240,9 @@ create.plot.data.continuous <- function(cont.data, params, res, selected.cov = N
     # Creates a data structure that can be passed to forest.plot
     # res is the output of a call to the Metafor function rma
     plot.data <- create.plot.data.generic(cont.data, params, res, selected.cov=selected.cov)
+    if (rcmetar.metafor.continuous.default.supported(cont.data, params, selected.cov=selected.cov)) {
+        plot.data <- rcmetar.build.continuous.metafor.bundle(cont.data, params, res, plot.data)
+    }
     plot.data
 }
 

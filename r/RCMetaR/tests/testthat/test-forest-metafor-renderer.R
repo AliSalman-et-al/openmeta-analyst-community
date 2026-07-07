@@ -45,6 +45,56 @@ metafor_binary_fixture <- function(studies = 6) {
   list(data = data, params = params)
 }
 
+metafor_continuous_params <- function(outpath) {
+  params <- metafor_binary_params(outpath)
+  params$measure <- "MD"
+  params$fp_col3_str <- "Treatment"
+  params$fp_col4_str <- "Control"
+  params$create.plot <- TRUE
+  params
+}
+
+metafor_continuous_fixture <- function(studies = 5) {
+  data <- new(
+    "ContinuousData",
+    N1 = c(22, 35, 18, 41, 29)[seq_len(studies)],
+    mean1 = c(8.2, 7.6, 9.1, 6.8, 7.4)[seq_len(studies)],
+    sd1 = c(1.5, 1.8, 1.2, 2.1, 1.7)[seq_len(studies)],
+    N2 = c(20, 32, 21, 38, 31)[seq_len(studies)],
+    mean2 = c(9.0, 8.5, 9.7, 7.9, 8.1)[seq_len(studies)],
+    sd2 = c(1.6, 1.7, 1.4, 2.0, 1.5)[seq_len(studies)],
+    study.names = c("Allen", "Baker", "Cole", "Diaz", "Evans")[seq_len(studies)],
+    years = as.integer(2001:(2000 + studies))
+  )
+  params <- metafor_continuous_params(file.path("r_tmp", paste0("forest_metafor_cont_", studies, ".png")))
+  effects <- compute.for.one.cont.study(data, params)
+  data@y <- effects$yi
+  data@SE <- sqrt(effects$vi)
+  list(data = data, params = params)
+}
+
+metafor_diagnostic_params <- function(outpath, measure = "Sens") {
+  params <- metafor_binary_params(outpath)
+  params$measure <- measure
+  params$create.plot <- TRUE
+  params
+}
+
+metafor_diagnostic_fixture <- function(studies = 5, measure = "Sens") {
+  data <- new(
+    "DiagnosticData",
+    TP = c(42, 51, 37, 66, 49)[seq_len(studies)],
+    FN = c(8, 11, 13, 9, 15)[seq_len(studies)],
+    TN = c(88, 73, 96, 81, 77)[seq_len(studies)],
+    FP = c(12, 16, 10, 14, 18)[seq_len(studies)],
+    study.names = c("Ibrahim", "Jones", "Khan", "Lopez", "Miller")[seq_len(studies)],
+    years = as.integer(2011:(2010 + studies))
+  )
+  params <- metafor_diagnostic_params(file.path("r_tmp", paste0("forest_metafor_diag_", measure, "_", studies, ".png")), measure)
+  data <- compute.diag.point.estimates(data, params)
+  list(data = data, params = params)
+}
+
 read_png_dimensions <- function(path) {
   con <- file(path, "rb")
   on.exit(close(con))
@@ -115,6 +165,105 @@ test_that("single-study binary Default Forest Style uses normalized vectors", {
   expect_equal(unname(bundle$effect$yi), unname(as.numeric(fixture$data@y)))
   expect_equal(unname(bundle$effect$sei), unname(as.numeric(fixture$data@SE)))
   expect_equal(bundle$ilab$headers, c("Events", "Total", "Events", "Total"))
+
+  png_path <- tempfile(fileext = ".png")
+  rcmetar.draw.forest.plot(bundle, png_path)
+
+  expect_true(file.exists(png_path))
+  expect_gt(file.info(png_path)$size, 3000)
+})
+
+test_that("continuous Default Forest Style builds and renders mean SD N columns", {
+  fixture <- metafor_continuous_fixture()
+  res <- rma.uni(
+    yi = fixture$data@y,
+    sei = fixture$data@SE,
+    slab = fixture$data@study.names,
+    method = fixture$params$rm.method,
+    level = fixture$params$conf.level,
+    digits = fixture$params$digits
+  )
+
+  bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+
+  expect_equal(bundle$render_engine, "metafor")
+  expect_equal(bundle$data_type, "continuous")
+  expect_equal(bundle$ilab$headers, c("Mean", "SD", "N", "Mean", "SD", "N"))
+  expect_equal(bundle$ilab$groups, c("Treatment", "Control"))
+  expect_equal(nrow(bundle$ilab$matrix), length(fixture$data@study.names))
+  expect_true(inherits(bundle$res, "rma"))
+
+  png_path <- tempfile(fileext = ".png")
+  rcmetar.draw.forest.plot(bundle, png_path)
+
+  expect_true(file.exists(png_path))
+  expect_gt(file.info(png_path)$size, 5000)
+  png_size <- read_png_dimensions(png_path)
+  expect_gte(png_size[["width"]], 900)
+  expect_gte(png_size[["height"]], 500)
+})
+
+test_that("diagnostic Default Forest Style builds and renders count columns on transformed axes", {
+  fixture <- metafor_diagnostic_fixture(measure = "Sens")
+  res <- rma.uni(
+    yi = fixture$data@y,
+    sei = fixture$data@SE,
+    slab = fixture$data@study.names,
+    method = fixture$params$rm.method,
+    level = fixture$params$conf.level,
+    digits = fixture$params$digits
+  )
+
+  bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+
+  expect_equal(bundle$render_engine, "metafor")
+  expect_equal(bundle$data_type, "diagnostic")
+  expect_equal(bundle$ilab$headers, c("TP", "FP", "FN", "TN"))
+  expect_equal(bundle$ilab$groups, "Counts")
+  expect_identical(rcmetar.metafor.atransf(bundle), invlogit)
+  expect_true(inherits(bundle$res, "rma"))
+
+  log_fixture <- metafor_diagnostic_fixture(measure = "PLR")
+  log_res <- rma.uni(
+    yi = log_fixture$data@y,
+    sei = log_fixture$data@SE,
+    slab = log_fixture$data@study.names,
+    method = log_fixture$params$rm.method,
+    level = log_fixture$params$conf.level,
+    digits = log_fixture$params$digits
+  )
+  log_bundle <- rcmetar.regenerate.plot.data(log_fixture$data, log_res, log_fixture$params)
+  expect_identical(rcmetar.metafor.atransf(log_bundle), exp)
+
+  png_path <- tempfile(fileext = ".png")
+  rcmetar.draw.forest.plot(bundle, png_path)
+
+  expect_true(file.exists(png_path))
+  expect_gt(file.info(png_path)$size, 5000)
+  png_size <- read_png_dimensions(png_path)
+  expect_gte(png_size[["width"]], 900)
+  expect_gte(png_size[["height"]], 500)
+})
+
+test_that("single-study entered diagnostic Default Forest Style omits count ilab and uses normalized vectors", {
+  data <- new(
+    "DiagnosticData",
+    y = logit(0.81),
+    SE = 0.18,
+    study.names = "Entered",
+    years = 0L
+  )
+  params <- metafor_diagnostic_params(tempfile(fileext = ".png"), "Sens")
+  res <- get.res.for.one.diag.study(data, params)
+
+  bundle <- rcmetar.regenerate.plot.data(data, res, params)
+
+  expect_equal(bundle$render_engine, "metafor")
+  expect_equal(bundle$data_type, "diagnostic")
+  expect_true(bundle$single_study)
+  expect_equal(ncol(bundle$ilab$matrix), 0)
+  expect_equal(unname(bundle$effect$yi), unname(as.numeric(data@y)))
+  expect_equal(unname(bundle$effect$sei), unname(as.numeric(data@SE)))
 
   png_path <- tempfile(fileext = ".png")
   rcmetar.draw.forest.plot(bundle, png_path)
