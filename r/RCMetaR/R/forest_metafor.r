@@ -14,8 +14,52 @@ rcmetar.forest.style.default <- function(params) {
         "default" = "default",
         "default (metafor)" = "default",
         "default forest style" = "default",
+        "revman" = "revman",
+        "revman forest style" = "revman",
+        "bmj" = "bmj",
+        "bmj forest style" = "bmj",
         style
     )
+}
+
+rcmetar.forest.style <- function(params) {
+    style <- rcmetar.forest.style.default(params)
+    if (style %in% c("default", "revman", "bmj")) {
+        return(style)
+    }
+    "default"
+}
+
+rcmetar.param.is.true <- function(params, name, default=TRUE) {
+    value <- params[[name]]
+    if (is.null(value) || length(value) == 0 || is.na(value[1])) {
+        return(default)
+    }
+    if (is.logical(value)) {
+        return(isTRUE(value[1]))
+    }
+    tolower(as.character(value[1])) %in% c("true", "t", "1", "yes")
+}
+
+rcmetar.forest.accent.color <- function(params) {
+    color <- params$fp_accent_color
+    if (!is.null(color) && length(color) > 0 && !is.na(color[1]) && nzchar(as.character(color[1]))) {
+        return(as.character(color[1]))
+    }
+    switch(
+        rcmetar.forest.style(params),
+        revman="#000000",
+        bmj="#6b58a6",
+        "#2f5597"
+    )
+}
+
+rcmetar.point.size.multiplier <- function(params) {
+    value <- suppressWarnings(as.numeric(params$fp_point_size_multiplier))
+    if (length(value) == 0 || !is.finite(value[1]) || value[1] <= 0) {
+        return(1.0)
+    }
+    value[1]
 }
 
 rcmetar.is.metafor.forest.bundle <- function(plot.data) {
@@ -28,7 +72,7 @@ rcmetar.metafor.binary.default.supported <- function(binary.data, params, select
     is.null(selected.cov) &&
         !isTRUE(params$fp_legacy_renderer) &&
         "BinaryData" %in% class(binary.data) &&
-        rcmetar.forest.style.default(params) == "default" &&
+        rcmetar.forest.style(params) %in% c("default", "revman", "bmj") &&
         as.character(params$measure) %in% binary.two.arm.metrics &&
         length(binary.data@g1O1) > 0 &&
         length(binary.data@g1O1) == length(binary.data@g1O2) &&
@@ -41,7 +85,7 @@ rcmetar.metafor.continuous.default.supported <- function(cont.data, params, sele
         !isTRUE(params$fp_legacy_renderer) &&
         !identical(params$create.plot, FALSE) &&
         "ContinuousData" %in% class(cont.data) &&
-        rcmetar.forest.style.default(params) == "default" &&
+        rcmetar.forest.style(params) %in% c("default", "revman", "bmj") &&
         as.character(params$measure) %in% c(continuous.two.arm.metrics, continuous.one.arm.metrics) &&
         length(cont.data@study.names) > 0
 }
@@ -57,19 +101,31 @@ rcmetar.metafor.diagnostic.default.supported <- function(diagnostic.data, params
         !isTRUE(params$fp_legacy_renderer) &&
         !identical(params$create.plot, FALSE) &&
         "DiagnosticData" %in% class(diagnostic.data) &&
-        rcmetar.forest.style.default(params) == "default" &&
+        rcmetar.forest.style(params) %in% c("default", "revman", "bmj") &&
         as.character(params$measure) %in% c(diagnostic.logit.metrics, diagnostic.log.metrics) &&
         length(diagnostic.data@study.names) > 0 &&
         (has.counts || has.entered.effects)
 }
 
 rcmetar.binary.default.ilab <- function(binary.data, params) {
+    if (!rcmetar.param.is.true(params, "fp_show_raw_counts", TRUE)) {
+        return(rcmetar.empty.default.ilab(length(binary.data@study.names)))
+    }
     columns <- list(
         list(key="experimental_events", group="Experimental", header="Events", values=binary.data@g1O1),
         list(key="experimental_nonevents", group="Experimental", header="Non-events", values=binary.data@g1O2),
         list(key="control_events", group="Control", header="Events", values=binary.data@g2O1),
         list(key="control_nonevents", group="Control", header="Non-events", values=binary.data@g2O2)
     )
+    if (!rcmetar.param.is.true(params, "fp_show_col3", TRUE)) {
+        columns <- columns[!vapply(columns, function(column) column$group == "Experimental", logical(1))]
+    }
+    if (!rcmetar.param.is.true(params, "fp_show_col4", TRUE)) {
+        columns <- columns[!vapply(columns, function(column) column$group == "Control", logical(1))]
+    }
+    if (length(columns) == 0) {
+        return(rcmetar.empty.default.ilab(length(binary.data@study.names)))
+    }
     groups <- c("Experimental", "Control")
     if (!is.null(params$fp_col3_str) && params$fp_col3_str != "[default]") {
         groups[1] <- as.character(params$fp_col3_str)
@@ -104,6 +160,9 @@ rcmetar.format.metafor.numeric <- function(values, digits) {
 }
 
 rcmetar.continuous.default.ilab <- function(cont.data, params) {
+    if (!rcmetar.param.is.true(params, "fp_show_raw_counts", TRUE)) {
+        return(rcmetar.empty.default.ilab(length(cont.data@study.names)))
+    }
     digits <- as.integer(params$digits)
     groups <- c("Experimental", "Control")
     if (!is.null(params$fp_col3_str) && params$fp_col3_str != "[default]") {
@@ -122,12 +181,21 @@ rcmetar.continuous.default.ilab <- function(cont.data, params) {
         list(key="experimental_sd", group=groups[1], header="SD", values=rcmetar.format.metafor.numeric(cont.data@sd1, digits)),
         list(key="experimental_n", group=groups[1], header="N", values=as.character(cont.data@N1))
     )
+    if (!rcmetar.param.is.true(params, "fp_show_col3", TRUE)) {
+        columns <- list()
+    }
     if (as.character(params$measure) %in% continuous.two.arm.metrics) {
-        columns <- c(columns, list(
+        control.columns <- list(
             list(key="control_mean", group=groups[2], header="Mean", values=rcmetar.format.metafor.numeric(cont.data@mean2, digits)),
             list(key="control_sd", group=groups[2], header="SD", values=rcmetar.format.metafor.numeric(cont.data@sd2, digits)),
             list(key="control_n", group=groups[2], header="N", values=as.character(cont.data@N2))
-        ))
+        )
+        if (rcmetar.param.is.true(params, "fp_show_col4", TRUE)) {
+            columns <- c(columns, control.columns)
+        }
+    }
+    if (length(columns) == 0) {
+        return(rcmetar.empty.default.ilab(length(cont.data@study.names)))
     }
 
     matrix <- do.call(cbind, lapply(columns, function(column) column$values))
@@ -149,7 +217,7 @@ rcmetar.empty.default.ilab <- function(n) {
 }
 
 rcmetar.diagnostic.default.ilab <- function(diagnostic.data, params) {
-    if (length(diagnostic.data@TP) == 0) {
+    if (length(diagnostic.data@TP) == 0 || !rcmetar.param.is.true(params, "fp_show_raw_counts", TRUE)) {
         return(rcmetar.empty.default.ilab(length(diagnostic.data@study.names)))
     }
 
@@ -194,7 +262,7 @@ rcmetar.metafor.weights <- function(res) {
 
 rcmetar.metafor.default.supported <- function(params) {
     !isTRUE(params$fp_legacy_renderer) &&
-        rcmetar.forest.style.default(params) == "default"
+        rcmetar.forest.style(params) %in% c("default", "revman", "bmj")
 }
 
 rcmetar.bundle.transform <- function(bundle) {
@@ -235,7 +303,7 @@ rcmetar.build.sequential.metafor.bundle <- function(om.data, params, results, va
         render_engine = "metafor",
         data_type = .rcmetar.data.type(om.data),
         forest_variant = variant,
-        fp_style = "default",
+        fp_style = rcmetar.forest.style(params),
         res = results,
         effect = list(
             yi = yi,
@@ -316,7 +384,7 @@ rcmetar.build.subgroup.metafor.bundle <- function(om.data, params, subgroup.data
         render_engine = "metafor",
         data_type = .rcmetar.data.type(om.data),
         forest_variant = "subgroup",
-        fp_style = "default",
+        fp_style = rcmetar.forest.style(params),
         res = subgroup.results[[length(subgroup.list) + 1]],
         effect = list(yi=flat.yi, sei=flat.sei, ci.lb=flat.ci.lb, ci.ub=flat.ci.ub, slab=flat.slab),
         single_study = TRUE,
@@ -389,7 +457,7 @@ rcmetar.build.binary.metafor.bundle <- function(binary.data, params, res, legacy
     list(
         render_engine = "metafor",
         data_type = "binary",
-        fp_style = "default",
+        fp_style = rcmetar.forest.style(params),
         res = res,
         effect = effect,
         single_study = single.study,
@@ -424,7 +492,7 @@ rcmetar.build.continuous.metafor.bundle <- function(cont.data, params, res, lega
     list(
         render_engine = "metafor",
         data_type = "continuous",
-        fp_style = "default",
+        fp_style = rcmetar.forest.style(params),
         res = res,
         effect = effect,
         single_study = single.study,
@@ -459,7 +527,7 @@ rcmetar.build.diagnostic.metafor.bundle <- function(diagnostic.data, params, res
     list(
         render_engine = "metafor",
         data_type = "diagnostic",
-        fp_style = "default",
+        fp_style = rcmetar.forest.style(params),
         res = res,
         effect = effect,
         single_study = single.study,
@@ -534,6 +602,9 @@ rcmetar.metafor.xlab <- function(bundle) {
 }
 
 rcmetar.metafor.study.header <- function(bundle) {
+    if (!rcmetar.param.is.true(bundle$params, "fp_show_col1", TRUE)) {
+        return("")
+    }
     header <- bundle$params$fp_col1_str
     if (is.null(header) || length(header) == 0 || header == "[default]") {
         return("Author(s) and Year")
@@ -542,6 +613,9 @@ rcmetar.metafor.study.header <- function(bundle) {
 }
 
 rcmetar.metafor.effect.header <- function(bundle) {
+    if (!rcmetar.param.is.true(bundle$params, "fp_show_annotation", TRUE)) {
+        return("")
+    }
     paste0(pretty.metric.name(as.character(bundle$params$measure)), " [", bundle$params$conf.level, "% CI]")
 }
 
@@ -553,12 +627,13 @@ rcmetar.metafor.psize <- function(bundle) {
         return(NULL)
     }
     sei <- as.numeric(bundle$effect$sei)
+    multiplier <- rcmetar.point.size.multiplier(bundle$params)
     if (length(sei) == 0 || any(!is.finite(sei)) || length(unique(round(sei, 10))) == 1) {
-        return(rep(1, length(sei)))
+        return(rep(1, length(sei)) * multiplier)
     }
     precision <- 1 / (sei^2)
     precision <- precision / max(precision, na.rm=TRUE)
-    0.65 + 0.9 * sqrt(precision)
+    (0.65 + 0.9 * sqrt(precision)) * multiplier
 }
 
 rcmetar.metafor.alim <- function(bundle) {
@@ -612,6 +687,20 @@ rcmetar.metafor.effect.labels <- function(bundle) {
     )
 }
 
+rcmetar.metafor.heterogeneity.measure.label <- function(bundle) {
+    if (isTRUE(bundle$single_study) || is.null(bundle$res$QE)) {
+        return("")
+    }
+    res <- bundle$res
+    paste0(
+        "RE Model (Q = ", round.display(res$QE, 2),
+        ", df = ", res$k - res$p, ", ",
+        rcmetar.metafor.p.value.label(res$QEp), "; I^2 = ",
+        round.display(res$I2, 1), "%, tau^2 = ",
+        round.display(res$tau2, 2), ")"
+    )
+}
+
 rcmetar.measure.metafor.forest.device <- function(bundle) {
     scratch <- rcmetar.scratch.path("INTER")
     grDevices::png(filename=scratch, width=1200, height=800, res=144)
@@ -624,29 +713,50 @@ rcmetar.measure.metafor.forest.device <- function(bundle) {
     }
     cex <- max(0.70, min(1.10, 1.08 - max(display.rows - 10, 0) * 0.018))
     study.width <- max(strwidth(c(bundle$slab, rcmetar.metafor.study.header(bundle)), units="inches", cex=cex), na.rm=TRUE)
+    column.gap <- 0.34
+    block.gap <- 0.78
+    plot.width <- 3.5
+    heterogeneity.width <- max(strwidth(rcmetar.metafor.heterogeneity.measure.label(bundle), units="inches", cex=cex), na.rm=TRUE)
     if (ncol(bundle$ilab$matrix) > 0) {
         column.widths <- apply(bundle$ilab$matrix, 2, function(col) {
             max(strwidth(c(col, bundle$ilab$headers), units="inches", cex=cex), na.rm=TRUE)
         })
         group.widths <- vapply(bundle$ilab$groups, function(group) strwidth(group, units="inches", cex=cex), numeric(1))
+        column.groups <- vapply(bundle$ilab$columns, function(column) column$group, character(1))
+        for (group in bundle$ilab$groups) {
+            group.columns <- which(column.groups == group)
+            if (length(group.columns) == 0) {
+                next
+            }
+            current.width <- sum(column.widths[group.columns]) + column.gap * max(length(group.columns) - 1, 0)
+            required.width <- group.widths[[group]]
+            if (is.finite(required.width) && required.width > current.width) {
+                column.widths[group.columns] <- column.widths[group.columns] +
+                    ((required.width - current.width) / length(group.columns))
+            }
+        }
     } else {
         column.widths <- numeric(0)
         group.widths <- numeric(0)
     }
-    annotation.width <- max(strwidth(c(rcmetar.metafor.effect.header(bundle), rcmetar.metafor.effect.labels(bundle)), units="inches", cex=cex), na.rm=TRUE)
-    column.gap <- 0.34
-    block.gap <- 0.78
-    plot.width <- 3.5
+    annotation.values <- if (rcmetar.param.is.true(bundle$params, "fp_show_annotation", TRUE)) {
+        c(rcmetar.metafor.effect.header(bundle), rcmetar.metafor.effect.labels(bundle))
+    } else {
+        ""
+    }
+    annotation.width <- max(strwidth(annotation.values, units="inches", cex=cex), na.rm=TRUE)
     ilab.width <- if (length(column.widths) > 0) {
         sum(pmax(column.widths, 0.45)) + column.gap * (length(column.widths) - 1) + block.gap
     } else {
         0
     }
-    left.width <- study.width + block.gap + ilab.width
+    left.width <- max(study.width + block.gap + ilab.width, heterogeneity.width + block.gap)
+
+    vertical.margin <- 3.1
 
     list(
         width = max(9.5, min(18, left.width + plot.width + annotation.width + 1.5)),
-        height = max(5.8, min(20, 3.1 + 0.48 * display.rows)),
+        height = max(5.0, min(20, vertical.margin + 0.48 * display.rows)),
         cex = cex,
         study_width = study.width,
         column_widths = pmax(column.widths, 0.45),
@@ -709,7 +819,7 @@ rcmetar.draw.metafor.forest <- function(bundle, outpath) {
     rows <- seq(from=k, to=1)
     alim <- rcmetar.metafor.alim(bundle)
     layout <- rcmetar.metafor.layout(bundle, size, alim)
-    top <- k + 3
+    top <- if (rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)) k + 3 else k + 2.7
     ylim <- c(-1.5, top)
     if (identical(bundle$forest_variant, "subgroup")) {
         rows <- bundle$subgroups$study_rows
@@ -717,10 +827,11 @@ rcmetar.draw.metafor.forest <- function(bundle, outpath) {
         top <- ylim[2]
     }
 
+    accent.color <- rcmetar.forest.accent.color(bundle$params)
     forest.args <- list(
         slab = bundle$slab,
         ilab = if (ncol(bundle$ilab$matrix) > 0) bundle$ilab$matrix else NULL,
-        ilab.lab = if (ncol(bundle$ilab$matrix) > 0) bundle$ilab$headers else NULL,
+        ilab.lab = if (ncol(bundle$ilab$matrix) > 0 && rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)) bundle$ilab$headers else NULL,
         ilab.xpos = if (ncol(bundle$ilab$matrix) > 0) layout$ilab.xpos else NULL,
         xlim = layout$xlim,
         alim = alim,
@@ -731,11 +842,11 @@ rcmetar.draw.metafor.forest <- function(bundle, outpath) {
         cex = size$cex,
         cex.lab = size$cex,
         cex.axis = size$cex,
-        header = c(rcmetar.metafor.study.header(bundle), rcmetar.metafor.effect.header(bundle)),
+        header = if (rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)) c(rcmetar.metafor.study.header(bundle), rcmetar.metafor.effect.header(bundle)) else FALSE,
         rows = rows,
         ylim = ylim,
-        annotate = TRUE,
-        col = "black",
+        annotate = rcmetar.param.is.true(bundle$params, "fp_show_annotation", TRUE),
+        col = accent.color,
         colshade = "#eeeeee",
         shade = "zebra",
         pch = 15,
@@ -757,7 +868,7 @@ rcmetar.draw.metafor.forest <- function(bundle, outpath) {
             forest.args
         ))
     } else {
-        plot.info <- do.call(metafor::forest.rma, c(list(x = bundle$res), c(forest.args, list(mlab="", border="black"))))
+        plot.info <- do.call(metafor::forest.rma, c(list(x = bundle$res), c(forest.args, list(mlab="", border=accent.color, colout=accent.color))))
     }
 
     if (identical(bundle$forest_variant, "subgroup")) {
@@ -765,7 +876,7 @@ rcmetar.draw.metafor.forest <- function(bundle, outpath) {
     }
 
     text.y <- if (!is.null(plot.info$ylim)) plot.info$ylim[2] - 0.2 else top - 0.2
-    if (length(bundle$ilab$groups) > 0) {
+    if (length(bundle$ilab$groups) > 0 && rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)) {
         graphics::text(
             layout$group.xpos,
             text.y,

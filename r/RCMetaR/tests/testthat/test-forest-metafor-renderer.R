@@ -161,6 +161,124 @@ test_that("binary Default Forest Style builds a self-contained metafor render bu
   expect_gt(file.info(redrawn_path)$size, 5000)
 })
 
+test_that("forest style and universal appearance params persist in metafor bundles", {
+  fixture <- metafor_binary_fixture()
+  fixture$params$fp_style <- "bmj"
+  fixture$params$fp_accent_color <- "#6b58a6"
+  fixture$params$fp_point_size_multiplier <- 1.8
+  res <- rma.uni(
+    yi = fixture$data@y,
+    sei = fixture$data@SE,
+    slab = fixture$data@study.names,
+    method = fixture$params$rm.method,
+    level = fixture$params$conf.level,
+    digits = fixture$params$digits,
+    add = c(fixture$params$adjust, fixture$params$adjust),
+    to = as.character(fixture$params$to)
+  )
+
+  bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+
+  expect_equal(bundle$render_engine, "metafor")
+  expect_equal(bundle$fp_style, "bmj")
+  expect_equal(rcmetar.forest.accent.color(bundle$params), "#6b58a6")
+  expect_equal(rcmetar.point.size.multiplier(bundle$params), 1.8)
+
+  png_path <- tempfile(fileext = ".png")
+  rcmetar.draw.forest.plot(bundle, png_path)
+  expect_true(file.exists(png_path))
+  expect_gt(file.info(png_path)$size, 5000)
+})
+
+test_that("older forest plot params default to Default style and visible controls", {
+  fixture <- metafor_binary_fixture()
+  fixture$params$fp_style <- NULL
+  fixture$params$fp_accent_color <- NULL
+  fixture$params$fp_point_size_multiplier <- NULL
+  fixture$params$fp_show_raw_counts <- NULL
+  fixture$params$fp_show_headers <- NULL
+  fixture$params$fp_show_annotation <- NULL
+  res <- rma.uni(
+    yi = fixture$data@y,
+    sei = fixture$data@SE,
+    slab = fixture$data@study.names,
+    method = fixture$params$rm.method,
+    level = fixture$params$conf.level,
+    digits = fixture$params$digits,
+    add = c(fixture$params$adjust, fixture$params$adjust),
+    to = as.character(fixture$params$to)
+  )
+
+  bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+
+  expect_equal(bundle$fp_style, "default")
+  expect_equal(bundle$ilab$headers, c("Events", "Non-events", "Events", "Non-events"))
+  expect_equal(rcmetar.forest.accent.color(bundle$params), "#2f5597")
+  expect_true(rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE))
+  expect_true(rcmetar.param.is.true(bundle$params, "fp_show_annotation", TRUE))
+})
+
+test_that("Default Forest Style panel toggles raw counts headers and annotation", {
+  fixture <- metafor_binary_fixture()
+  fixture$params$fp_show_raw_counts <- FALSE
+  fixture$params$fp_show_headers <- FALSE
+  fixture$params$fp_show_annotation <- FALSE
+  res <- rma.uni(
+    yi = fixture$data@y,
+    sei = fixture$data@SE,
+    slab = fixture$data@study.names,
+    method = fixture$params$rm.method,
+    level = fixture$params$conf.level,
+    digits = fixture$params$digits,
+    add = c(fixture$params$adjust, fixture$params$adjust),
+    to = as.character(fixture$params$to)
+  )
+
+  bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+
+  expect_equal(ncol(bundle$ilab$matrix), 0)
+  expect_equal(rcmetar.metafor.effect.header(bundle), "")
+  size <- rcmetar.measure.metafor.forest.device(bundle)
+  expect_gt(size$left_width, size$study_width + size$block_gap)
+
+  png_path <- tempfile(fileext = ".png")
+  rcmetar.draw.forest.plot(bundle, png_path)
+  expect_true(file.exists(png_path))
+  expect_gt(file.info(png_path)$size, 5000)
+})
+
+test_that("Default Forest Style sizing reserves space for long group headers", {
+  fixture <- metafor_binary_fixture()
+  fixture$data@study.names <- paste(fixture$data@study.names, "Collaborative Trial With Long Label")
+  fixture$params$fp_col1_str <- "Long Study Label"
+  fixture$params$fp_col3_str <- "Intervention With Long Header"
+  fixture$params$fp_col4_str <- "Comparator With Long Header"
+  res <- rma.uni(
+    yi = fixture$data@y,
+    sei = fixture$data@SE,
+    slab = fixture$data@study.names,
+    method = fixture$params$rm.method,
+    level = fixture$params$conf.level,
+    digits = fixture$params$digits,
+    add = c(fixture$params$adjust, fixture$params$adjust),
+    to = as.character(fixture$params$to)
+  )
+
+  bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+  size <- rcmetar.measure.metafor.forest.device(bundle)
+  experimental.columns <- vapply(bundle$ilab$columns, function(column) column$group, character(1)) ==
+    "Intervention With Long Header"
+  experimental.width <- sum(size$column_widths[experimental.columns]) +
+    size$column_gap * (sum(experimental.columns) - 1)
+
+  expect_gte(experimental.width, unname(size$group_widths[["Intervention With Long Header"]]))
+
+  png_path <- tempfile(fileext = ".png")
+  rcmetar.draw.forest.plot(bundle, png_path)
+  expect_true(file.exists(png_path))
+  expect_gt(file.info(png_path)$size, 5000)
+})
+
 test_that("single-study binary Default Forest Style uses normalized vectors", {
   fixture <- metafor_binary_fixture(studies = 1)
   res <- get.res.for.one.binary.study(fixture$data, fixture$params)

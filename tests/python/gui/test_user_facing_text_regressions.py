@@ -1679,6 +1679,7 @@ def test_issue_76_to_105_corrected_user_facing_strings_are_present():
         '_translate("DataTypePage", "Proportion")',
         'QAction("Rename Group %s"',
         'QAction("Rename Covariate %s"',
+        'QAction("Edit Forest Plot"',
         'QAction("Save PDF Image As"',
         'QAction("Save PNG Image As"',
     ]

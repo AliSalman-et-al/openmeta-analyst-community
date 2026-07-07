@@ -1165,16 +1165,16 @@ def update_plot_params(
     # R-palatable
     params_df = ro.r["data.frame"](**plot_params)
     ro.globalenv["tmp.params"] = params_df
+    plot_params_symbol = _r_symbol(plot_params_name)
 
     for param_name in plot_params:
         param_name = _r_symbol(param_name)
-        plot_params_name = _r_symbol(plot_params_name)
         execute_r_string(
-            "%s$%s <- tmp.params$%s" % (plot_params_name, param_name, param_name)
+            "%s$%s <- tmp.params$%s" % (plot_params_symbol, param_name, param_name)
         )
 
     if write_them_out:
-        execute_r_function("save", **{"list": "tmp.params", "file": str(outpath)})
+        execute_r_function("save", **{"list": plot_params_symbol, "file": str(outpath)})
 
 
 @RfunctionCaller

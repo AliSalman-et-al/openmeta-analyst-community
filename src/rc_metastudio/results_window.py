@@ -4,11 +4,21 @@
 
 import random
 from PyQt5.QtCore import QByteArray, QPoint, QRectF, Qt
-from PyQt5.QtGui import QFont, QFontMetricsF, QImage, QPixmap, QTextOption, QTransform
+from PyQt5.QtGui import (
+    QColor,
+    QFont,
+    QFontMetricsF,
+    QImage,
+    QPixmap,
+    QTextOption,
+    QTransform,
+)
 from PyQt5.QtGui import QTextCursor
 from PyQt5.QtWidgets import (
     QAction,
     QApplication,
+    QColorDialog,
+    QDialog,
     QFileDialog,
     QGraphicsItem,
     QGraphicsPixmapItem,
@@ -22,8 +32,10 @@ import os
 import sys
 import ui_results_window
 import app_error_handler
+import forms.ui_edit_forest_plot
 import meta_py_r
 import qt_layout
+import qt_text
 import result_sections
 # import shutil
 
@@ -39,6 +51,17 @@ SIDE_BY_SIDE_FOREST_PLOTS = (
     "Sensitivity and Specificity",
     "Cumulative Forest Plot",
 )
+FOREST_STYLE_LABELS = {
+    "default": "Default (metafor)",
+    "revman": "RevMan",
+    "bmj": "BMJ",
+}
+FOREST_STYLE_VALUES = {label: value for value, label in FOREST_STYLE_LABELS.items()}
+FOREST_STYLE_DEFAULT_COLORS = {
+    "default": "#2f5597",
+    "revman": "#000000",
+    "bmj": "#6b58a6",
+}
 NO_RESULTS_MESSAGE = "No results could be computed for this analysis."
 ROW_HEIGHT = 15  # by trial-and-error; seems to work very well
 SECTION_SPACING = ROW_HEIGHT
@@ -59,6 +82,139 @@ class SelectableResultsTextItem(QGraphicsTextItem):
                 type(e), e, e.__traceback__, parent=self._results_window
             )
             event.accept()
+
+
+class EditForestPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg):
+    def __init__(self, plot_params, image_path, parent=None):
+        super(EditForestPlotDialog, self).__init__(parent)
+        self.setupUi(self)
+        self._loading_style = False
+        self._params = dict(plot_params or {})
+
+        self.color_btn.clicked.connect(
+            app_error_handler.safe_slot(self._choose_color, parent=self)
+        )
+        self.style_cbo.currentIndexChanged[str].connect(
+            app_error_handler.safe_slot(self._style_changed, parent=self)
+        )
+
+        self._load_params(image_path)
+        qt_layout.fit_application_dialog_to_contents(self)
+
+    def _load_params(self, image_path):
+        self._loading_style = True
+        try:
+            style = self._normalized_style(self._params.get("fp_style", "default"))
+            self.style_cbo.setCurrentText(FOREST_STYLE_LABELS[style])
+            self._set_text(
+                self.col1_str_edit, self._params.get("fp_col1_str", "Studies")
+            )
+            self._set_text(
+                self.col2_str_edit, self._params.get("fp_col2_str", "[default]")
+            )
+            self._set_text(
+                self.col3_str_edit, self._params.get("fp_col3_str", "Experimental")
+            )
+            self._set_text(
+                self.col4_str_edit, self._params.get("fp_col4_str", "Control")
+            )
+            self.show_1.setChecked(self._bool_param("fp_show_col1", True))
+            self.show_2.setChecked(self._bool_param("fp_show_col2", True))
+            self.show_3.setChecked(self._bool_param("fp_show_col3", True))
+            self.show_4.setChecked(self._bool_param("fp_show_col4", True))
+            self.show_raw_counts.setChecked(
+                self._bool_param("fp_show_raw_counts", True)
+            )
+            self.show_headers.setChecked(self._bool_param("fp_show_headers", True))
+            self.show_annotation.setChecked(
+                self._bool_param("fp_show_annotation", True)
+            )
+            self._set_text(self.x_lbl_le, self._params.get("fp_xlabel", "[default]"))
+            self._set_text(self.plot_lb_le, self._params.get("fp_plot_lb", "[default]"))
+            self._set_text(self.plot_ub_le, self._params.get("fp_plot_ub", "[default]"))
+            self._set_text(self.x_ticks_le, self._params.get("fp_xticks", "[default]"))
+            self.show_summary_line.setChecked(
+                self._bool_param("fp_show_summary_line", True)
+            )
+            self._set_text(
+                self.image_path, image_path or self._params.get("fp_outpath", "")
+            )
+            color = (
+                self._params.get("fp_accent_color")
+                or FOREST_STYLE_DEFAULT_COLORS[style]
+            )
+            self._set_accent_color(color)
+            self.point_size_multiplier.setValue(
+                self._float_param("fp_point_size_multiplier", 1.0)
+            )
+        finally:
+            self._loading_style = False
+
+    def _style_changed(self, label):
+        if self._loading_style:
+            return
+        style = FOREST_STYLE_VALUES.get(str(label), "default")
+        self._set_accent_color(FOREST_STYLE_DEFAULT_COLORS[style])
+
+    def _choose_color(self):
+        current = QColor(self.accent_color.text())
+        color = QColorDialog.getColor(current, self, "Forest Plot Accent Color")
+        if color.isValid():
+            self._set_accent_color(color.name())
+
+    def _set_accent_color(self, color):
+        text = str(color or FOREST_STYLE_DEFAULT_COLORS["default"])
+        self.accent_color.setText(text)
+        self.color_btn.setStyleSheet("background-color: %s;" % text)
+
+    def _set_text(self, widget, value):
+        widget.setText(str(self._scalar(value)))
+
+    def _scalar(self, value):
+        if isinstance(value, (list, tuple)) and value:
+            return value[0]
+        return value
+
+    def _bool_param(self, name, default):
+        value = self._scalar(self._params.get(name, default))
+        if isinstance(value, str):
+            return value.lower() in ("true", "t", "1", "yes")
+        return bool(value)
+
+    def _float_param(self, name, default):
+        try:
+            return float(self._scalar(self._params.get(name, default)))
+        except (TypeError, ValueError):
+            return default
+
+    def _normalized_style(self, style):
+        style = str(self._scalar(style) or "default").strip().lower()
+        return style if style in FOREST_STYLE_LABELS else "default"
+
+    def plot_params(self):
+        style = FOREST_STYLE_VALUES.get(str(self.style_cbo.currentText()), "default")
+        return {
+            "fp_style": style,
+            "fp_show_col1": self.show_1.isChecked(),
+            "fp_col1_str": qt_text.to_native_text(self.col1_str_edit.text()),
+            "fp_show_col2": self.show_2.isChecked(),
+            "fp_col2_str": qt_text.to_native_text(self.col2_str_edit.text()),
+            "fp_show_col3": self.show_3.isChecked(),
+            "fp_col3_str": qt_text.to_native_text(self.col3_str_edit.text()),
+            "fp_show_col4": self.show_4.isChecked(),
+            "fp_col4_str": qt_text.to_native_text(self.col4_str_edit.text()),
+            "fp_show_raw_counts": self.show_raw_counts.isChecked(),
+            "fp_show_headers": self.show_headers.isChecked(),
+            "fp_show_annotation": self.show_annotation.isChecked(),
+            "fp_accent_color": qt_text.to_native_text(self.accent_color.text()),
+            "fp_point_size_multiplier": self.point_size_multiplier.value(),
+            "fp_xlabel": qt_text.to_native_text(self.x_lbl_le.text()),
+            "fp_plot_lb": qt_text.to_native_text(self.plot_lb_le.text()),
+            "fp_plot_ub": qt_text.to_native_text(self.plot_ub_le.text()),
+            "fp_xticks": qt_text.to_native_text(self.x_ticks_le.text()),
+            "fp_show_summary_line": self.show_summary_line.isChecked(),
+            "fp_outpath": qt_text.to_native_text(self.image_path.text()),
+        }
 
 
 class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
@@ -444,6 +600,17 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
             context_menu = QMenu(self)
             if params_path:
+                if plot_type == "forest" and not self._is_side_by_side_fp(title):
+                    action = QAction("Edit Forest Plot", self)
+                    action.triggered.connect(
+                        app_error_handler.safe_slot(
+                            lambda _checked=False: self.edit_forest_plot(
+                                params_path, png_path, qpixmap_item
+                            ),
+                            parent=self,
+                        )
+                    )
+                    context_menu.addAction(action)
                 add_save_as_pdf_menu_action(context_menu)
                 add_save_as_png_menu_action(context_menu)
             else:  # no params path given, just give them the png
@@ -454,6 +621,29 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             )
 
         return _graphics_item_context_menu
+
+    def edit_forest_plot(self, params_path, png_path, qpixmap_item):
+        plot_params = meta_py_r.load_vars_for_plot(params_path, return_params_dict=True)
+        if plot_params is False:
+            return
+
+        dialog = EditForestPlotDialog(plot_params, png_path, parent=self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+
+        updated_params = dialog.plot_params()
+        outpath = updated_params["fp_outpath"] or png_path
+        meta_py_r.update_plot_params(
+            updated_params, write_them_out=True, outpath="%s.params" % params_path
+        )
+        meta_py_r.regenerate_plot_data()
+        meta_py_r.generate_forest_plot(outpath)
+        meta_py_r.write_out_plot_data(params_path)
+
+        if qpixmap_item is not None:
+            pixmap = self.generate_pixmap(outpath)
+            if not pixmap.isNull():
+                qpixmap_item.setPixmap(pixmap)
 
     def _is_side_by_side_fp(self, title):
         return any(

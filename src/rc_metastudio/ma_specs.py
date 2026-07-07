@@ -962,6 +962,7 @@ def _is_integer_analysis_param(name):
 
 
 def add_plot_params(specs_form):
+    specs_form.current_param_vals["fp_style"] = "default"
     specs_form.current_param_vals["fp_show_col1"] = specs_form.show_1.isChecked()
     specs_form.current_param_vals["fp_col1_str"] = _text_value(specs_form.col1_str_edit)
     specs_form.current_param_vals["fp_show_col2"] = specs_form.show_2.isChecked()
@@ -991,6 +992,11 @@ def add_plot_params(specs_form):
     specs_form.current_param_vals["fp_show_summary_line"] = (
         specs_form.show_summary_line.isChecked()
     )
+    specs_form.current_param_vals.setdefault("fp_show_raw_counts", True)
+    specs_form.current_param_vals.setdefault("fp_show_headers", True)
+    specs_form.current_param_vals.setdefault("fp_show_annotation", True)
+    specs_form.current_param_vals.setdefault("fp_accent_color", "#2f5597")
+    specs_form.current_param_vals.setdefault("fp_point_size_multiplier", 1.0)
 
 
 def _diagnostic_analysis_requests(specs_form):

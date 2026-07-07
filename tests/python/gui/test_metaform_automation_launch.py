@@ -2203,7 +2203,9 @@ def test_results_window_text_context_menu_is_reentrant_safe(monkeypatch):
         app.processEvents()
 
 
-def test_results_window_figure_context_menus_only_offer_save_actions(monkeypatch):
+def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_plots(
+    monkeypatch,
+):
     import launch
     import test_backend_compat
 
@@ -2284,7 +2286,7 @@ def test_results_window_figure_context_menus_only_offer_save_actions(monkeypatch
         assert popups == [
             (
                 results_window.QPoint(10, 20),
-                ["Save PDF Image As", "Save PNG Image As"],
+                ["Edit Forest Plot", "Save PDF Image As", "Save PNG Image As"],
             ),
             (
                 results_window.QPoint(10, 20),
@@ -2298,6 +2300,60 @@ def test_results_window_figure_context_menus_only_offer_save_actions(monkeypatch
         ]
     finally:
         window.close()
+        app.processEvents()
+
+
+def test_edit_forest_plot_dialog_round_trips_style_and_appearance_params(monkeypatch):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    dialog = results_window.EditForestPlotDialog(
+        {
+            "fp_style": "default",
+            "fp_col1_str": "Studies",
+            "fp_col2_str": "[default]",
+            "fp_col3_str": "Treatment",
+            "fp_col4_str": "Control",
+            "fp_show_col1": True,
+            "fp_show_col2": True,
+            "fp_show_col3": True,
+            "fp_show_col4": True,
+            "fp_show_raw_counts": True,
+            "fp_show_headers": True,
+            "fp_show_annotation": True,
+            "fp_accent_color": "#2f5597",
+            "fp_point_size_multiplier": 1.0,
+            "fp_xlabel": "[default]",
+            "fp_plot_lb": "[default]",
+            "fp_plot_ub": "[default]",
+            "fp_xticks": "[default]",
+            "fp_show_summary_line": True,
+        },
+        "forest.png",
+    )
+
+    try:
+        assert dialog.style_cbo.currentText() == "Default (metafor)"
+        dialog.style_cbo.setCurrentText("BMJ")
+        dialog.show_raw_counts.setChecked(False)
+        dialog.show_headers.setChecked(False)
+        dialog.show_annotation.setChecked(False)
+        dialog.point_size_multiplier.setValue(1.75)
+
+        params = dialog.plot_params()
+
+        assert params["fp_style"] == "bmj"
+        assert params["fp_accent_color"] == "#6b58a6"
+        assert params["fp_show_raw_counts"] is False
+        assert params["fp_show_headers"] is False
+        assert params["fp_show_annotation"] is False
+        assert params["fp_point_size_multiplier"] == 1.75
+    finally:
+        dialog.close()
         app.processEvents()
 
 
