@@ -1580,7 +1580,7 @@ loo.ma.diagnostic <- function(fname, diagnostic.data, params){
 			diagnostic.random = paste("Diagnostic Random-Effects Model\n\nMetric: ", metric.name, sep=""))
     loo.disp <- create.overall.display(res=loo.results, study.names, params, model.title, data.type="diagnostic")
         
-    if (is.null(params$create.plot)) {
+    if (!identical(params$create.plot, FALSE)) {
         plot.data <- create.plot.data.loo(diagnostic.data, params, res=loo.results)
         forest.path <- paste(params$fp_outpath, sep="")
         changed.params <- plot.data$changed.params

@@ -4,33 +4,34 @@
 # Default metafor-backed forest renderer and shared bundle builders.
 
 rcmetar.metafor.binary.default.supported <- function(binary.data, params, selected.cov=NULL) {
+    n <- length(binary.data@study.names)
+    has.raw <- rcmetar.has.binary.raw.columns(binary.data, n)
+    has.entered.effects <- rcmetar.has.entered.effects(binary.data, n)
     is.null(selected.cov) &&
         !isTRUE(params$fp_legacy_renderer) &&
         "BinaryData" %in% class(binary.data) &&
         rcmetar.forest.style(params) %in% c("default", "revman", "bmj") &&
         as.character(params$measure) %in% binary.two.arm.metrics &&
-        length(binary.data@g1O1) > 0 &&
-        length(binary.data@g1O1) == length(binary.data@g1O2) &&
-        length(binary.data@g1O2) == length(binary.data@g2O1) &&
-        length(binary.data@g2O1) == length(binary.data@g2O2)
+        n > 0 &&
+        (has.raw || has.entered.effects)
 }
 
 rcmetar.metafor.continuous.default.supported <- function(cont.data, params, selected.cov=NULL) {
+    n <- length(cont.data@study.names)
     is.null(selected.cov) &&
         !isTRUE(params$fp_legacy_renderer) &&
         !identical(params$create.plot, FALSE) &&
         "ContinuousData" %in% class(cont.data) &&
         rcmetar.forest.style(params) %in% c("default", "revman", "bmj") &&
         as.character(params$measure) %in% c(continuous.two.arm.metrics, continuous.one.arm.metrics) &&
-        length(cont.data@study.names) > 0
+        n > 0 &&
+        (rcmetar.has.continuous.raw.columns(cont.data, n, params) || rcmetar.has.entered.effects(cont.data, n))
 }
 
 rcmetar.metafor.diagnostic.default.supported <- function(diagnostic.data, params, selected.cov=NULL) {
-    has.counts <- length(diagnostic.data@TP) > 0 &&
-        length(diagnostic.data@TP) == length(diagnostic.data@FP) &&
-        length(diagnostic.data@FP) == length(diagnostic.data@FN) &&
-        length(diagnostic.data@FN) == length(diagnostic.data@TN)
-    has.entered.effects <- length(diagnostic.data@y) > 0 && length(diagnostic.data@SE) > 0
+    n <- length(diagnostic.data@study.names)
+    has.counts <- rcmetar.has.diagnostic.raw.columns(diagnostic.data, n)
+    has.entered.effects <- rcmetar.has.entered.effects(diagnostic.data, n)
 
     is.null(selected.cov) &&
         !isTRUE(params$fp_legacy_renderer) &&
@@ -38,19 +39,69 @@ rcmetar.metafor.diagnostic.default.supported <- function(diagnostic.data, params
         "DiagnosticData" %in% class(diagnostic.data) &&
         rcmetar.forest.style(params) %in% c("default", "revman", "bmj") &&
         as.character(params$measure) %in% c(diagnostic.logit.metrics, diagnostic.log.metrics) &&
-        length(diagnostic.data@study.names) > 0 &&
+        n > 0 &&
         (has.counts || has.entered.effects)
 }
 
+rcmetar.has.entered.effects <- function(om.data, n=length(om.data@study.names)) {
+    length(om.data@y) == n && length(om.data@SE) == n
+}
+
+rcmetar.has.binary.raw.columns <- function(binary.data, n=length(binary.data@study.names)) {
+    n > 0 &&
+        length(binary.data@g1O1) == n &&
+        length(binary.data@g1O2) == n &&
+        length(binary.data@g2O1) == n &&
+        length(binary.data@g2O2) == n
+}
+
+rcmetar.has.continuous.raw.columns <- function(cont.data, n=length(cont.data@study.names), params=NULL) {
+    n > 0 &&
+        length(cont.data@N1) == n &&
+        length(cont.data@mean1) == n &&
+        length(cont.data@sd1) == n &&
+        (
+            is.null(params) ||
+                !(as.character(params$measure) %in% continuous.two.arm.metrics) ||
+                (
+                    length(cont.data@N2) == n &&
+                        length(cont.data@mean2) == n &&
+                        length(cont.data@sd2) == n
+                )
+        )
+}
+
+rcmetar.has.diagnostic.raw.columns <- function(diagnostic.data, n=length(diagnostic.data@study.names)) {
+    n > 0 &&
+        length(diagnostic.data@TP) == n &&
+        length(diagnostic.data@FP) == n &&
+        length(diagnostic.data@FN) == n &&
+        length(diagnostic.data@TN) == n
+}
+
+rcmetar.raw.values.complete <- function(values) {
+    values <- suppressWarnings(as.numeric(values))
+    length(values) > 0 && all(is.finite(values))
+}
+
+rcmetar.format.metafor.raw <- function(values) {
+    values <- as.numeric(values)
+    labels <- as.character(values)
+    labels[!is.finite(values)] <- ""
+    labels
+}
+
 rcmetar.binary.default.ilab <- function(binary.data, params) {
-    if (!rcmetar.param.is.true(params, "fp_show_raw_counts", TRUE)) {
+    n <- length(binary.data@study.names)
+    if (!rcmetar.param.is.true(params, "fp_show_raw_counts", TRUE) ||
+            !rcmetar.has.binary.raw.columns(binary.data, n)) {
         return(rcmetar.empty.default.ilab(length(binary.data@study.names)))
     }
     columns <- list(
-        list(key="experimental_events", group="Experimental", header="Events", values=binary.data@g1O1),
-        list(key="experimental_nonevents", group="Experimental", header="Non-events", values=binary.data@g1O2),
-        list(key="control_events", group="Control", header="Events", values=binary.data@g2O1),
-        list(key="control_nonevents", group="Control", header="Non-events", values=binary.data@g2O2)
+        list(key="experimental_events", group="Experimental", header="Events", values=rcmetar.format.metafor.raw(binary.data@g1O1)),
+        list(key="experimental_nonevents", group="Experimental", header="Non-events", values=rcmetar.format.metafor.raw(binary.data@g1O2)),
+        list(key="control_events", group="Control", header="Events", values=rcmetar.format.metafor.raw(binary.data@g2O1)),
+        list(key="control_nonevents", group="Control", header="Non-events", values=rcmetar.format.metafor.raw(binary.data@g2O2))
     )
     if (!rcmetar.param.is.true(params, "fp_show_col3", TRUE)) {
         columns <- columns[!vapply(columns, function(column) column$group == "Experimental", logical(1))]
@@ -95,7 +146,9 @@ rcmetar.format.metafor.numeric <- function(values, digits) {
 }
 
 rcmetar.continuous.default.ilab <- function(cont.data, params) {
-    if (!rcmetar.param.is.true(params, "fp_show_raw_counts", TRUE)) {
+    n <- length(cont.data@study.names)
+    if (!rcmetar.param.is.true(params, "fp_show_raw_counts", TRUE) ||
+            !rcmetar.has.continuous.raw.columns(cont.data, n, params)) {
         return(rcmetar.empty.default.ilab(length(cont.data@study.names)))
     }
     digits <- as.integer(params$digits)
@@ -114,7 +167,7 @@ rcmetar.continuous.default.ilab <- function(cont.data, params) {
     columns <- list(
         list(key="experimental_mean", group=groups[1], header="Mean", values=rcmetar.format.metafor.numeric(cont.data@mean1, digits)),
         list(key="experimental_sd", group=groups[1], header="SD", values=rcmetar.format.metafor.numeric(cont.data@sd1, digits)),
-        list(key="experimental_n", group=groups[1], header="N", values=as.character(cont.data@N1))
+        list(key="experimental_n", group=groups[1], header="N", values=rcmetar.format.metafor.raw(cont.data@N1))
     )
     if (!rcmetar.param.is.true(params, "fp_show_col3", TRUE)) {
         columns <- list()
@@ -123,7 +176,7 @@ rcmetar.continuous.default.ilab <- function(cont.data, params) {
         control.columns <- list(
             list(key="control_mean", group=groups[2], header="Mean", values=rcmetar.format.metafor.numeric(cont.data@mean2, digits)),
             list(key="control_sd", group=groups[2], header="SD", values=rcmetar.format.metafor.numeric(cont.data@sd2, digits)),
-            list(key="control_n", group=groups[2], header="N", values=as.character(cont.data@N2))
+            list(key="control_n", group=groups[2], header="N", values=rcmetar.format.metafor.raw(cont.data@N2))
         )
         if (rcmetar.param.is.true(params, "fp_show_col4", TRUE)) {
             columns <- c(columns, control.columns)
@@ -152,15 +205,17 @@ rcmetar.empty.default.ilab <- function(n) {
 }
 
 rcmetar.diagnostic.default.ilab <- function(diagnostic.data, params) {
-    if (length(diagnostic.data@TP) == 0 || !rcmetar.param.is.true(params, "fp_show_raw_counts", TRUE)) {
+    n <- length(diagnostic.data@study.names)
+    if (!rcmetar.has.diagnostic.raw.columns(diagnostic.data, n) ||
+            !rcmetar.param.is.true(params, "fp_show_raw_counts", TRUE)) {
         return(rcmetar.empty.default.ilab(length(diagnostic.data@study.names)))
     }
 
     columns <- list(
-        list(key="true_positive", group="Counts", header="TP", values=diagnostic.data@TP),
-        list(key="false_positive", group="Counts", header="FP", values=diagnostic.data@FP),
-        list(key="false_negative", group="Counts", header="FN", values=diagnostic.data@FN),
-        list(key="true_negative", group="Counts", header="TN", values=diagnostic.data@TN)
+        list(key="true_positive", group="Counts", header="TP", values=rcmetar.format.metafor.raw(diagnostic.data@TP)),
+        list(key="false_positive", group="Counts", header="FP", values=rcmetar.format.metafor.raw(diagnostic.data@FP)),
+        list(key="false_negative", group="Counts", header="FN", values=rcmetar.format.metafor.raw(diagnostic.data@FN)),
+        list(key="true_negative", group="Counts", header="TN", values=rcmetar.format.metafor.raw(diagnostic.data@TN))
     )
     matrix <- do.call(cbind, lapply(columns, function(column) column$values))
     mode(matrix) <- "character"

@@ -47,15 +47,20 @@ rcmetar.revman.ilab <- function(columns, n) {
 rcmetar.revman.binary.ilab <- function(binary.data, params, res=NULL) {
     n <- length(binary.data@study.names)
     groups <- rcmetar.revman.arm.labels(params)
-    experimental.total <- as.numeric(binary.data@g1O1) + as.numeric(binary.data@g1O2)
-    control.total <- as.numeric(binary.data@g2O1) + as.numeric(binary.data@g2O2)
-    columns <- list(
-        list(key="experimental_events", group=groups[[1]], header="Events", values=binary.data@g1O1),
-        list(key="experimental_total", group=groups[[1]], header="Total", values=experimental.total),
-        list(key="control_events", group=groups[[2]], header="Events", values=binary.data@g2O1),
-        list(key="control_total", group=groups[[2]], header="Total", values=control.total),
+    columns <- list()
+    if (rcmetar.has.binary.raw.columns(binary.data, n)) {
+        experimental.total <- as.numeric(binary.data@g1O1) + as.numeric(binary.data@g1O2)
+        control.total <- as.numeric(binary.data@g2O1) + as.numeric(binary.data@g2O2)
+        columns <- list(
+            list(key="experimental_events", group=groups[[1]], header="Events", values=rcmetar.format.metafor.raw(binary.data@g1O1)),
+            list(key="experimental_total", group=groups[[1]], header="Total", values=rcmetar.format.metafor.raw(experimental.total)),
+            list(key="control_events", group=groups[[2]], header="Events", values=rcmetar.format.metafor.raw(binary.data@g2O1)),
+            list(key="control_total", group=groups[[2]], header="Total", values=rcmetar.format.metafor.raw(control.total))
+        )
+    }
+    columns <- c(columns, list(
         list(key="weight", group="", header="Weight", values=rcmetar.revman.format.weight(rcmetar.metafor.weights(res), n))
-    )
+    ))
     rcmetar.revman.ilab(columns, n)
 }
 
@@ -63,30 +68,41 @@ rcmetar.revman.continuous.ilab <- function(cont.data, params, res=NULL) {
     n <- length(cont.data@study.names)
     digits <- as.integer(params$digits)
     groups <- rcmetar.revman.arm.labels(params)
-    columns <- list(
-        list(key="experimental_mean", group=groups[[1]], header="Mean", values=rcmetar.revman.format.number(cont.data@mean1, digits)),
-        list(key="experimental_sd", group=groups[[1]], header="SD", values=rcmetar.revman.format.number(cont.data@sd1, digits)),
-        list(key="experimental_total", group=groups[[1]], header="Total", values=cont.data@N1),
-        list(key="control_mean", group=groups[[2]], header="Mean", values=rcmetar.revman.format.number(cont.data@mean2, digits)),
-        list(key="control_sd", group=groups[[2]], header="SD", values=rcmetar.revman.format.number(cont.data@sd2, digits)),
-        list(key="control_total", group=groups[[2]], header="Total", values=cont.data@N2),
+    columns <- list()
+    if (rcmetar.has.continuous.raw.columns(cont.data, n, params)) {
+        columns <- list(
+            list(key="experimental_mean", group=groups[[1]], header="Mean", values=rcmetar.revman.format.number(cont.data@mean1, digits)),
+            list(key="experimental_sd", group=groups[[1]], header="SD", values=rcmetar.revman.format.number(cont.data@sd1, digits)),
+            list(key="experimental_total", group=groups[[1]], header="Total", values=rcmetar.format.metafor.raw(cont.data@N1))
+        )
+        if (as.character(params$measure) %in% continuous.two.arm.metrics) {
+            columns <- c(columns, list(
+                list(key="control_mean", group=groups[[2]], header="Mean", values=rcmetar.revman.format.number(cont.data@mean2, digits)),
+                list(key="control_sd", group=groups[[2]], header="SD", values=rcmetar.revman.format.number(cont.data@sd2, digits)),
+                list(key="control_total", group=groups[[2]], header="Total", values=rcmetar.format.metafor.raw(cont.data@N2))
+            ))
+        }
+    }
+    columns <- c(columns, list(
         list(key="weight", group="", header="Weight", values=rcmetar.revman.format.weight(rcmetar.metafor.weights(res), n))
-    )
+    ))
     rcmetar.revman.ilab(columns, n)
 }
 
 rcmetar.revman.diagnostic.ilab <- function(diagnostic.data, params, res=NULL) {
     n <- length(diagnostic.data@study.names)
-    if (length(diagnostic.data@TP) == 0) {
-        return(rcmetar.empty.default.ilab(n))
+    columns <- list()
+    if (rcmetar.has.diagnostic.raw.columns(diagnostic.data, n)) {
+        columns <- list(
+            list(key="true_positive", group="DTA", header="TP", values=rcmetar.format.metafor.raw(diagnostic.data@TP)),
+            list(key="false_positive", group="DTA", header="FP", values=rcmetar.format.metafor.raw(diagnostic.data@FP)),
+            list(key="false_negative", group="DTA", header="FN", values=rcmetar.format.metafor.raw(diagnostic.data@FN)),
+            list(key="true_negative", group="DTA", header="TN", values=rcmetar.format.metafor.raw(diagnostic.data@TN))
+        )
     }
-    columns <- list(
-        list(key="true_positive", group="DTA", header="TP", values=diagnostic.data@TP),
-        list(key="false_positive", group="DTA", header="FP", values=diagnostic.data@FP),
-        list(key="false_negative", group="DTA", header="FN", values=diagnostic.data@FN),
-        list(key="true_negative", group="DTA", header="TN", values=diagnostic.data@TN),
+    columns <- c(columns, list(
         list(key="weight", group="", header="Weight", values=rcmetar.revman.format.weight(rcmetar.metafor.weights(res), n))
-    )
+    ))
     rcmetar.revman.ilab(columns, n)
 }
 
@@ -173,11 +189,11 @@ rcmetar.revman.wrap.header <- function(label, width=18) {
     paste(wrapped, collapse="\n")
 }
 
-rcmetar.revman.wrap.direction <- function(label) {
+rcmetar.revman.wrap.direction <- function(label, width=22) {
     if (is.null(label) || !nzchar(label)) {
         return("")
     }
-    rcmetar.revman.wrap.header(label, width=22)
+    rcmetar.revman.wrap.header(label, width=width)
 }
 
 rcmetar.revman.p.value.label <- function(p.value) {
@@ -223,8 +239,8 @@ rcmetar.revman.total.values <- function(bundle) {
     totals <- list()
     for (key in c("experimental_total", "control_total")) {
         index <- rcmetar.revman.column.index(bundle, key)
-        if (length(index) == 1) {
-            totals[[key]] <- sum(suppressWarnings(as.numeric(bundle$ilab$matrix[, index])), na.rm=TRUE)
+        if (length(index) == 1 && rcmetar.raw.values.complete(bundle$ilab$matrix[, index])) {
+            totals[[key]] <- sum(suppressWarnings(as.numeric(bundle$ilab$matrix[, index])))
         }
     }
     weight.index <- rcmetar.revman.column.index(bundle, "weight")
@@ -241,8 +257,8 @@ rcmetar.revman.total.events <- function(bundle) {
     events <- list()
     for (key in c("experimental_events", "control_events")) {
         index <- rcmetar.revman.column.index(bundle, key)
-        if (length(index) == 1) {
-            events[[key]] <- sum(suppressWarnings(as.numeric(bundle$ilab$matrix[, index])), na.rm=TRUE)
+        if (length(index) == 1 && rcmetar.raw.values.complete(bundle$ilab$matrix[, index])) {
+            events[[key]] <- sum(suppressWarnings(as.numeric(bundle$ilab$matrix[, index])))
         }
     }
     events
@@ -480,6 +496,19 @@ rcmetar.revman.layout <- function(bundle) {
         ))
     }
     span <- max(diff(alim), 1)
+    if (ncol(bundle$ilab$matrix) == 1) {
+        ilab.xpos <- alim[1] - 2.35 * span
+        group.xpos <- numeric(0)
+        return(list(
+            xlim=c(alim[1] - (5.15 + label.extra * 0.030) * span, alim[2] + 0.25 * span),
+            alim=alim,
+            ilab.xpos=ilab.xpos,
+            group.xpos=group.xpos,
+            annotation.xpos=alim[1] - 0.36 * span,
+            annotation.header.xpos=alim[1] - 0.78 * span,
+            plot.header.xpos=mean(alim)
+        ))
+    }
     ilab.xpos <- seq(alim[1] - 3.8 * span, alim[1] - 1.55 * span, length.out=max(ncol(bundle$ilab$matrix), 1))
     column.groups <- vapply(bundle$ilab$columns, function(column) column$group, character(1))
     group.xpos <- if (length(column.groups) > 0) {
@@ -495,7 +524,7 @@ rcmetar.revman.layout <- function(bundle) {
         ilab.xpos=ilab.xpos,
         group.xpos=group.xpos,
         annotation.xpos=alim[1] - 0.36 * span,
-        annotation.header.xpos=alim[1] - 0.36 * span,
+        annotation.header.xpos=alim[1] - 0.78 * span,
         plot.header.xpos=mean(alim)
     )
 }
@@ -674,13 +703,15 @@ rcmetar.draw.revman.bottom.blocks <- function(bundle, x, cex, layout=NULL) {
     if (nzchar(bundle$style_blocks$test_overall)) {
         graphics::text(x, -4, bundle$style_blocks$test_overall, pos=4, cex=cex)
     }
+    direction.width <- if (!is.null(layout) && ncol(bundle$ilab$matrix) <= 1) 12 else 22
+    direction.y <- if (direction.width <= 12) -3.92 else -3.45
     if (nzchar(bundle$style_blocks$favours_left)) {
-        left.x <- if (metric.is.log.scale(as.character(bundle$params$measure))) log(0.05) else graphics::par("usr")[1] + diff(graphics::par("usr")[1:2]) * 0.62
-        graphics::text(left.x, -3.45, rcmetar.revman.wrap.direction(bundle$style_blocks$favours_left), cex=cex)
+        left.x <- if (metric.is.log.scale(as.character(bundle$params$measure))) log(0.04) else graphics::par("usr")[1] + diff(graphics::par("usr")[1:2]) * 0.60
+        graphics::text(left.x, direction.y, rcmetar.revman.wrap.direction(bundle$style_blocks$favours_left, direction.width), cex=cex)
     }
     if (nzchar(bundle$style_blocks$favours_right)) {
-        right.x <- if (metric.is.log.scale(as.character(bundle$params$measure))) log(12) else graphics::par("usr")[1] + diff(graphics::par("usr")[1:2]) * 0.78
-        graphics::text(right.x, -3.45, rcmetar.revman.wrap.direction(bundle$style_blocks$favours_right), cex=cex)
+        right.x <- if (metric.is.log.scale(as.character(bundle$params$measure))) log(25) else graphics::par("usr")[1] + diff(graphics::par("usr")[1:2]) * 0.82
+        graphics::text(right.x, direction.y, rcmetar.revman.wrap.direction(bundle$style_blocks$favours_right, direction.width), cex=cex)
     }
     invisible(NULL)
 }
