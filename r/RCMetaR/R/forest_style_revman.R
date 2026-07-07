@@ -48,15 +48,24 @@ rcmetar.revman.binary.ilab <- function(binary.data, params, res=NULL) {
     n <- length(binary.data@study.names)
     groups <- rcmetar.revman.arm.labels(params)
     columns <- list()
-    if (rcmetar.has.binary.raw.columns(binary.data, n)) {
+    if (rcmetar.param.is.true(params, "fp_show_raw_counts", TRUE) &&
+            rcmetar.has.binary.raw.columns(binary.data, n)) {
         experimental.total <- as.numeric(binary.data@g1O1) + as.numeric(binary.data@g1O2)
         control.total <- as.numeric(binary.data@g2O1) + as.numeric(binary.data@g2O2)
-        columns <- list(
+        experimental.columns <- list(
             list(key="experimental_events", group=groups[[1]], header="Events", values=rcmetar.format.metafor.raw(binary.data@g1O1)),
-            list(key="experimental_total", group=groups[[1]], header="Total", values=rcmetar.format.metafor.raw(experimental.total)),
+            list(key="experimental_total", group=groups[[1]], header="Total", values=rcmetar.format.metafor.raw(experimental.total))
+        )
+        control.columns <- list(
             list(key="control_events", group=groups[[2]], header="Events", values=rcmetar.format.metafor.raw(binary.data@g2O1)),
             list(key="control_total", group=groups[[2]], header="Total", values=rcmetar.format.metafor.raw(control.total))
         )
+        if (rcmetar.param.is.true(params, "fp_show_col3", TRUE)) {
+            columns <- c(columns, experimental.columns)
+        }
+        if (rcmetar.param.is.true(params, "fp_show_col4", TRUE)) {
+            columns <- c(columns, control.columns)
+        }
     }
     columns <- c(columns, list(
         list(key="weight", group="", header="Weight", values=rcmetar.revman.format.weight(rcmetar.metafor.weights(res), n))
@@ -69,13 +78,17 @@ rcmetar.revman.continuous.ilab <- function(cont.data, params, res=NULL) {
     digits <- as.integer(params$digits)
     groups <- rcmetar.revman.arm.labels(params)
     columns <- list()
-    if (rcmetar.has.continuous.raw.columns(cont.data, n, params)) {
-        columns <- list(
-            list(key="experimental_mean", group=groups[[1]], header="Mean", values=rcmetar.revman.format.number(cont.data@mean1, digits)),
-            list(key="experimental_sd", group=groups[[1]], header="SD", values=rcmetar.revman.format.number(cont.data@sd1, digits)),
-            list(key="experimental_total", group=groups[[1]], header="Total", values=rcmetar.format.metafor.raw(cont.data@N1))
-        )
-        if (as.character(params$measure) %in% continuous.two.arm.metrics) {
+    if (rcmetar.param.is.true(params, "fp_show_raw_counts", TRUE) &&
+            rcmetar.has.continuous.raw.columns(cont.data, n, params)) {
+        if (rcmetar.param.is.true(params, "fp_show_col3", TRUE)) {
+            columns <- list(
+                list(key="experimental_mean", group=groups[[1]], header="Mean", values=rcmetar.revman.format.number(cont.data@mean1, digits)),
+                list(key="experimental_sd", group=groups[[1]], header="SD", values=rcmetar.revman.format.number(cont.data@sd1, digits)),
+                list(key="experimental_total", group=groups[[1]], header="Total", values=rcmetar.format.metafor.raw(cont.data@N1))
+            )
+        }
+        if (as.character(params$measure) %in% continuous.two.arm.metrics &&
+                rcmetar.param.is.true(params, "fp_show_col4", TRUE)) {
             columns <- c(columns, list(
                 list(key="control_mean", group=groups[[2]], header="Mean", values=rcmetar.revman.format.number(cont.data@mean2, digits)),
                 list(key="control_sd", group=groups[[2]], header="SD", values=rcmetar.revman.format.number(cont.data@sd2, digits)),
@@ -92,7 +105,8 @@ rcmetar.revman.continuous.ilab <- function(cont.data, params, res=NULL) {
 rcmetar.revman.diagnostic.ilab <- function(diagnostic.data, params, res=NULL) {
     n <- length(diagnostic.data@study.names)
     columns <- list()
-    if (rcmetar.has.diagnostic.raw.columns(diagnostic.data, n)) {
+    if (rcmetar.param.is.true(params, "fp_show_raw_counts", TRUE) &&
+            rcmetar.has.diagnostic.raw.columns(diagnostic.data, n)) {
         columns <- list(
             list(key="true_positive", group="DTA", header="TP", values=rcmetar.format.metafor.raw(diagnostic.data@TP)),
             list(key="false_positive", group="DTA", header="FP", values=rcmetar.format.metafor.raw(diagnostic.data@FP)),

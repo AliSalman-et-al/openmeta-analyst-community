@@ -771,6 +771,44 @@ test_that("entered-effect-only RevMan plots degrade to weight columns", {
   }
 })
 
+test_that("RevMan and BMJ styles honor hidden raw count columns", {
+  styles <- c("revman", "bmj")
+  fixtures <- list(
+    binary = metafor_binary_fixture(),
+    continuous = metafor_continuous_fixture(),
+    diagnostic = metafor_diagnostic_fixture()
+  )
+
+  for (style in styles) {
+    for (fixture in fixtures) {
+      fixture$params$fp_style <- style
+      fixture$params$fp_show_raw_counts <- FALSE
+      res <- rma.uni(
+        yi = fixture$data@y,
+        sei = fixture$data@SE,
+        slab = fixture$data@study.names,
+        method = fixture$params$rm.method,
+        level = fixture$params$conf.level,
+        digits = fixture$params$digits
+      )
+
+      bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+
+      expect_equal(bundle$render_engine, "metafor")
+      expect_equal(bundle$fp_style, style)
+      expect_equal(bundle$ilab$headers, "Weight")
+      expect_equal(bundle$ilab$groups, character(0))
+      expected.weight <- if (identical(style, "bmj")) "100.0" else "100.0%"
+      expect_equal(bundle$style_blocks$totals$weight, expected.weight)
+
+      png_path <- tempfile(fileext = ".png")
+      rcmetar.draw.forest.plot(bundle, png_path)
+      expect_true(file.exists(png_path))
+      expect_gt(file.info(png_path)$size, 5000)
+    }
+  }
+})
+
 test_that("mixed raw and entered-effect rows render blanks for unavailable raw data", {
   fixture <- metafor_mixed_binary_fixture()
   res <- rma.uni(
