@@ -292,6 +292,83 @@ test_that("binary RevMan Forest Style builds faithful count, weight, and block s
   expect_gt(file.info(png_path)$size, 5000)
 })
 
+test_that("Forest Layout Preflight produces deterministic layout plans for Default and RevMan styles", {
+  fixture <- metafor_binary_fixture()
+  res <- rma.uni(
+    yi = fixture$data@y,
+    sei = fixture$data@SE,
+    slab = fixture$data@study.names,
+    method = fixture$params$rm.method,
+    level = fixture$params$conf.level,
+    digits = fixture$params$digits
+  )
+
+  default.bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+  default.plan <- rcmetar.forest.layout.preflight(default.bundle)
+
+  expect_s3_class(default.plan, "rcmetar_forest_layout_plan")
+  expect_equal(default.plan$style$name, "default")
+  expect_equal(default.plan$style$template, "default")
+  expect_gt(default.plan$device$width, 0)
+  expect_gt(default.plan$device$height, 0)
+  expect_gte(default.plan$typography$cex, 0.78)
+  expect_equal(default.plan$rows$study_rows, nrow(default.bundle$ilab$matrix):1)
+  expect_equal(default.plan$x$alim, rcmetar.metafor.alim(default.bundle))
+  expect_equal(default.plan$columns$ilab.xpos, rcmetar.metafor.layout(default.bundle, default.plan$device, default.plan$x$alim)$ilab.xpos)
+
+  fixture$params$fp_style <- "revman"
+  revman.bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+  revman.plan <- rcmetar.forest.layout.preflight(revman.bundle)
+
+  expect_s3_class(revman.plan, "rcmetar_forest_layout_plan")
+  expect_equal(revman.plan$style$name, "revman")
+  expect_equal(revman.plan$style$template, "standard")
+  expect_equal(revman.plan$headers$study, "Study or Subgroup")
+  expect_equal(revman.plan$rows$study_rows, length(revman.bundle$slab):1)
+  expect_equal(revman.plan$x$at, rcmetar.revman.axis.ticks(revman.bundle, revman.plan$x$alim))
+  expect_equal(revman.plan$footer$axis$axis.x, mean(revman.plan$x$alim), tolerance = 1e-8)
+})
+
+test_that("Forest Layout Preflight records sparse and compact RevMan templates without persisting plans", {
+  fixture <- metafor_entered_binary_fixture()
+  fixture$params$fp_style <- "revman"
+  res <- rma.uni(
+    yi = fixture$data@y,
+    sei = fixture$data@SE,
+    slab = fixture$data@study.names,
+    method = fixture$params$rm.method,
+    level = fixture$params$conf.level,
+    digits = fixture$params$digits
+  )
+
+  sparse.bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+  sparse.plan <- rcmetar.forest.layout.preflight(sparse.bundle)
+
+  expect_equal(sparse.plan$style$name, "revman")
+  expect_equal(sparse.plan$style$template, "sparse")
+  expect_equal(sparse.bundle$ilab$headers, "Weight")
+  expect_equal(length(sparse.plan$columns$ilab.xpos), 1)
+  expect_false("layout_plan" %in% names(sparse.bundle))
+
+  sequential.bundle <- rcmetar.build.sequential.metafor.bundle(
+    fixture$data,
+    fixture$params,
+    list(
+      list(b = fixture$data@y[[1]], ci.lb = fixture$data@y[[1]] - fixture$data@SE[[1]], ci.ub = fixture$data@y[[1]] + fixture$data@SE[[1]], se = fixture$data@SE[[1]]),
+      list(b = fixture$data@y[[2]], ci.lb = fixture$data@y[[2]] - fixture$data@SE[[2]], ci.ub = fixture$data@y[[2]] + fixture$data@SE[[2]], se = fixture$data@SE[[2]])
+    ),
+    "cumulative",
+    labels = c("Entered Binary 1", "+ Entered Binary 2"),
+    legacy.plot.data = list(plot.range = NULL, changed.params = fixture$params)
+  )
+  compact.plan <- rcmetar.forest.layout.preflight(sequential.bundle, style = "revman")
+
+  expect_equal(compact.plan$style$name, "revman")
+  expect_equal(compact.plan$style$template, "compact")
+  expect_true(compact.plan$rows$manual_sequential_labels)
+  expect_equal(compact.plan$rows$study_rows, 2:1)
+})
+
 test_that("RevMan study heading uses reference default and respects custom labels", {
   fixture <- metafor_binary_fixture()
   fixture$params$fp_style <- "revman"

@@ -37,7 +37,8 @@ qa_scenario_settings <- function() {
     base = list(n = 7, stress = FALSE, sparse = FALSE, accent = NA_character_, headers = TRUE, annotation = TRUE, point = 1.0, digits = 2),
     stress = list(n = 16, stress = TRUE, sparse = FALSE, accent = "#008a5e", headers = TRUE, annotation = TRUE, point = 1.18, digits = 2),
     compact = list(n = 4, stress = FALSE, sparse = FALSE, accent = "#7c3f98", headers = FALSE, annotation = TRUE, point = 0.85, digits = 3),
-    sparse = list(n = 6, stress = FALSE, sparse = TRUE, accent = "#2f5597", headers = TRUE, annotation = TRUE, point = 1.0, digits = 2)
+    sparse = list(n = 6, stress = FALSE, sparse = TRUE, direct = FALSE, accent = "#2f5597", headers = TRUE, annotation = TRUE, point = 1.0, digits = 2),
+    direct = list(n = 6, stress = FALSE, sparse = TRUE, direct = TRUE, accent = "#2f5597", headers = TRUE, annotation = TRUE, point = 1.0, digits = 2)
   )
 }
 
@@ -147,6 +148,35 @@ qa_make_diagnostic <- function(n, stress) {
   compute.diag.point.estimates(data, params)
 }
 
+qa_make_entered_binary <- function(n, stress) {
+  yi <- log(seq(0.68, 1.18, length.out = n))
+  sei <- seq(0.16, 0.28, length.out = n)
+  rcmetar.create.binary.data(
+    y = yi,
+    SE = sei,
+    study.names = qa_long_labels("Entered Binary", n, stress),
+    years = as.integer(2000 + seq_len(n))
+  )
+}
+
+qa_make_entered_continuous <- function(n, stress) {
+  rcmetar.create.continuous.data(
+    y = seq(-0.45, 0.35, length.out = n),
+    SE = seq(0.18, 0.30, length.out = n),
+    study.names = qa_long_labels("Entered Continuous", n, stress),
+    years = as.integer(2010 + seq_len(n))
+  )
+}
+
+qa_make_entered_diagnostic <- function(n, stress) {
+  rcmetar.create.diagnostic.data(
+    y = logit(seq(0.70, 0.82, length.out = n)),
+    SE = seq(0.16, 0.26, length.out = n),
+    study.names = qa_long_labels("Entered Diagnostic", n, stress),
+    years = as.integer(2020 + seq_len(n))
+  )
+}
+
 qa_method_for <- function(kind) {
   switch(kind, binary = "binary.random", continuous = "continuous.random", diagnostic = "diagnostic.random")
 }
@@ -155,7 +185,15 @@ qa_measure_for <- function(kind) {
   switch(kind, binary = "OR", continuous = "MD", diagnostic = "Sens")
 }
 
-qa_fixture_for <- function(kind, n, stress) {
+qa_fixture_for <- function(kind, n, stress, direct = FALSE) {
+  if (isTRUE(direct)) {
+    return(switch(
+      kind,
+      binary = qa_make_entered_binary(n, stress),
+      continuous = qa_make_entered_continuous(n, stress),
+      diagnostic = qa_make_entered_diagnostic(n, stress)
+    ))
+  }
   switch(
     kind,
     binary = qa_make_binary(n, stress),
@@ -166,7 +204,7 @@ qa_fixture_for <- function(kind, n, stress) {
 
 qa_render_case <- function(kind, workflow, style, scenario.name, scenarios, output.root, format) {
   scenario <- scenarios[[scenario.name]]
-  data <- qa_fixture_for(kind, scenario$n, scenario$stress)
+  data <- qa_fixture_for(kind, scenario$n, scenario$stress, isTRUE(scenario$direct))
   case.name <- paste(kind, workflow, style, scenario.name, sep = "__")
   out <- file.path(output.root, paste0(case.name, ".", format))
   params <- qa_base_params(qa_measure_for(kind), out, style, scenario)

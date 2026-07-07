@@ -711,75 +711,7 @@ rcmetar.metafor.heterogeneity.measure.label <- function(bundle) {
 }
 
 rcmetar.measure.metafor.forest.device <- function(bundle) {
-    scratch <- rcmetar.scratch.path("INTER")
-    grDevices::png(filename=scratch, width=1200, height=800, res=144)
-    on.exit(grDevices::dev.off(), add=TRUE)
-
-    k <- nrow(bundle$ilab$matrix)
-    display.rows <- k
-    if (identical(bundle$forest_variant, "subgroup")) {
-        display.rows <- length(bundle$subgroups$study_rows) + length(bundle$subgroups$header_rows) + length(bundle$subgroups$polygon_rows) + 2
-    }
-    cex <- max(0.70, min(1.10, 1.08 - max(display.rows - 10, 0) * 0.018))
-    study.width <- max(strwidth(c(bundle$slab, rcmetar.metafor.study.header(bundle)), units="inches", cex=cex), na.rm=TRUE)
-    column.gap <- 0.34
-    block.gap <- 0.78
-    plot.width <- 3.5
-    heterogeneity.width <- max(strwidth(rcmetar.metafor.heterogeneity.measure.label(bundle), units="inches", cex=cex), na.rm=TRUE)
-    if (ncol(bundle$ilab$matrix) > 0) {
-        column.widths <- apply(bundle$ilab$matrix, 2, function(col) {
-            max(strwidth(c(col, bundle$ilab$headers), units="inches", cex=cex), na.rm=TRUE)
-        })
-        group.headers <- rcmetar.metafor.group.headers(bundle)
-        group.widths <- vapply(group.headers, function(group) {
-            lines <- unlist(strsplit(group, "\n", fixed=TRUE), use.names=FALSE)
-            max(strwidth(lines, units="inches", cex=cex), na.rm=TRUE)
-        }, numeric(1))
-        column.groups <- vapply(bundle$ilab$columns, function(column) column$group, character(1))
-        for (group in bundle$ilab$groups) {
-            group.columns <- which(column.groups == group)
-            if (length(group.columns) == 0) {
-                next
-            }
-            current.width <- sum(column.widths[group.columns]) + column.gap * max(length(group.columns) - 1, 0)
-            required.width <- group.widths[[group]]
-            if (is.finite(required.width) && required.width > current.width) {
-                column.widths[group.columns] <- column.widths[group.columns] +
-                    ((required.width - current.width) / length(group.columns))
-            }
-        }
-    } else {
-        column.widths <- numeric(0)
-        group.widths <- numeric(0)
-    }
-    annotation.values <- if (rcmetar.param.is.true(bundle$params, "fp_show_annotation", TRUE)) {
-        c(rcmetar.metafor.effect.header(bundle), rcmetar.metafor.effect.labels(bundle))
-    } else {
-        ""
-    }
-    annotation.width <- max(strwidth(annotation.values, units="inches", cex=cex), na.rm=TRUE)
-    ilab.width <- if (length(column.widths) > 0) {
-        sum(pmax(column.widths, 0.45)) + column.gap * (length(column.widths) - 1) + block.gap
-    } else {
-        0
-    }
-    left.width <- max(study.width + block.gap + ilab.width, heterogeneity.width + block.gap)
-
-    vertical.margin <- 3.1
-
-    list(
-        width = max(9.5, min(18, left.width + plot.width + annotation.width + 1.5)),
-        height = max(5.0, min(20, vertical.margin + 0.48 * display.rows)),
-        cex = cex,
-        study_width = study.width,
-        column_widths = pmax(column.widths, 0.45),
-        group_widths = group.widths,
-        column_gap = column.gap,
-        block_gap = block.gap,
-        left_width = left.width,
-        plot_width = plot.width,
-        annotation_width = annotation.width + 0.35
-    )
+    rcmetar.forest.default.device.metrics(bundle)
 }
 
 rcmetar.metafor.wrap.header <- function(label, width=18) {
@@ -801,31 +733,7 @@ rcmetar.metafor.group.headers <- function(bundle) {
 }
 
 rcmetar.metafor.layout <- function(bundle, size, alim) {
-    span <- max(diff(alim), 1)
-    user.per.inch <- span / size$plot_width
-    xlim <- c(
-        alim[1] - size$left_width * user.per.inch,
-        alim[2] + size$annotation_width * user.per.inch
-    )
-    column.lefts <- size$study_width + size$block_gap +
-        c(0, head(cumsum(size$column_widths + size$column_gap), -1))
-    column.centers <- column.lefts + size$column_widths / 2
-    ilab.xpos <- xlim[1] + column.centers * user.per.inch
-
-    if (length(bundle$ilab$columns) > 0) {
-        column.groups <- vapply(bundle$ilab$columns, function(column) column$group, character(1))
-        group.xpos <- vapply(bundle$ilab$groups, function(group) {
-            mean(ilab.xpos[column.groups == group])
-        }, numeric(1))
-    } else {
-        group.xpos <- numeric(0)
-    }
-
-    list(
-        xlim = xlim,
-        ilab.xpos = ilab.xpos,
-        group.xpos = group.xpos
-    )
+    rcmetar.forest.default.layout.coordinates(bundle, size, alim)
 }
 
 rcmetar.open.metafor_device <- function(outpath, size) {
@@ -841,37 +749,23 @@ rcmetar.draw.metafor.forest <- function(bundle, outpath) {
 }
 
 rcmetar.draw.default.metafor.forest <- function(bundle, outpath) {
-    size <- rcmetar.measure.metafor.forest.device(bundle)
+    plan <- rcmetar.forest.layout.preflight(bundle, style="default")
+    size <- plan$device
     rcmetar.render.plot_file(outpath, size, function() {
 
     op <- graphics::par(no.readonly=TRUE)
     on.exit(graphics::par(op), add=TRUE)
     graphics::par(bg="white", mar=c(4.8, 1.0, 1.4, 1.0), fg="black", col.axis="black", col.lab="black")
 
-    k <- nrow(bundle$ilab$matrix)
-    rows <- seq(from=k, to=1)
-    alim <- rcmetar.metafor.alim(bundle)
-    layout <- rcmetar.metafor.layout(bundle, size, alim)
-    group.headers <- rcmetar.metafor.group.headers(bundle)
-    max.group.header.lines <- if (length(group.headers) > 0) {
-        max(vapply(strsplit(group.headers, "\n", fixed=TRUE), length, integer(1)))
-    } else {
-        1
-    }
-    manual.sequential.labels <- isTRUE(bundle$single_study) &&
-        (identical(bundle$forest_variant, "cumulative") || identical(bundle$forest_variant, "leave-one-out"))
-    header.extra <- if (rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)) {
-        max(0, max.group.header.lines - 1) * 0.55
-    } else {
-        0
-    }
-    top <- if (rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)) k + 3 + header.extra else k + 2.7
-    ylim <- c(-1.5, top)
-    if (identical(bundle$forest_variant, "subgroup")) {
-        rows <- bundle$subgroups$study_rows
-        ylim <- bundle$subgroups$ylim
-        top <- ylim[2]
-    }
+    k <- plan$rows$k
+    rows <- plan$rows$study_rows
+    alim <- plan$x$alim
+    layout <- plan$layout
+    group.headers <- plan$headers$group
+    max.group.header.lines <- plan$rows$max_group_header_lines
+    manual.sequential.labels <- plan$rows$manual_sequential_labels
+    top <- plan$rows$top
+    ylim <- plan$rows$ylim
 
     accent.color <- rcmetar.forest.accent.color(bundle$params)
     forest.color <- if (!isTRUE(bundle$single_study) || (isTRUE(bundle$single_study) && !manual.sequential.labels)) "black" else accent.color
@@ -880,16 +774,16 @@ rcmetar.draw.default.metafor.forest <- function(bundle, outpath) {
         ilab = if (ncol(bundle$ilab$matrix) > 0) bundle$ilab$matrix else NULL,
         ilab.lab = if (ncol(bundle$ilab$matrix) > 0 && rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)) bundle$ilab$headers else NULL,
         ilab.xpos = if (ncol(bundle$ilab$matrix) > 0) layout$ilab.xpos else NULL,
-        xlim = layout$xlim,
-        alim = alim,
-        at = rcmetar.metafor.axis.ticks(bundle, alim),
+        xlim = plan$x$xlim,
+        alim = plan$x$alim,
+        at = plan$x$at,
         atransf = rcmetar.metafor.atransf(bundle),
-        refline = rcmetar.metafor.refline(bundle, alim),
-        xlab = rcmetar.metafor.xlab(bundle),
-        cex = size$cex,
-        cex.lab = size$cex,
-        cex.axis = size$cex,
-        header = if (manual.sequential.labels) FALSE else if (rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)) c(rcmetar.metafor.study.header(bundle), rcmetar.metafor.effect.header(bundle)) else FALSE,
+        refline = plan$x$refline,
+        xlab = plan$x$xlab,
+        cex = plan$typography$cex,
+        cex.lab = plan$typography$cex.lab,
+        cex.axis = plan$typography$cex.axis,
+        header = if (manual.sequential.labels) FALSE else if (plan$headers$show) c(plan$headers$study, plan$headers$effect) else FALSE,
         rows = rows,
         ylim = ylim,
         annotate = if (manual.sequential.labels) FALSE else rcmetar.param.is.true(bundle$params, "fp_show_annotation", TRUE),
@@ -931,7 +825,7 @@ rcmetar.draw.default.metafor.forest <- function(bundle, outpath) {
         rcmetar.draw.metafor.subgroups(bundle, layout$xlim[1], size$cex)
     }
 
-    header.offset <- if (max.group.header.lines > 1) 0.35 else 0.2
+    header.offset <- plan$headers$offset
     text.y <- if (!is.null(plot.info$ylim)) plot.info$ylim[2] - header.offset else top - header.offset
     if (length(bundle$ilab$groups) > 0 && rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)) {
         graphics::text(

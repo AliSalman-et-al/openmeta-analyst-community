@@ -352,6 +352,14 @@ _Avoid_: PyQt4 bootstrap, fake Qt module installer
 The post-cutover forest-plot renderer that draws plots with `metafor::forest()` and `addpoly()` from the `rma` result, replacing the retired custom grid-graphics engine. It reuses the existing `metafor` dependency and changes presentation only, not Analysis Behavior.
 _Avoid_: New plotting library, custom grid engine
 
+**Forest Layout Preflight**:
+The measurement and planning pass that runs before the metafor Forest Renderer draws, choosing device size, text scale, row positions, plot limits, annotation positions, header/footer reserves, and style-specific spacing from a Forest Render Bundle. It does not compute statistics and does not draw plot marks.
+_Avoid_: Sizing helper, renderer, custom plot engine
+
+**Forest Layout Plan**:
+The computed, per-render output of Forest Layout Preflight: device dimensions, typography, row positions, plot limits, annotation positions, column positions, headers, footer reserves, and style constraints consumed by the metafor Forest Renderer. It is ephemeral, regenerated for each render/export target, and should not contain statistical results beyond layout-ready values copied from the Forest Render Bundle.
+_Avoid_: Plot data, render bundle, style config
+
 **Forest Render Bundle**:
 The self-contained render spec persisted for a forest plot (the redefined `.plotdata` object): the `rma` result or normalized effect/CI/`slab` vectors, a precomputed ilab spec (ilab column matrix, headers, weights, effect/CI values, subgroup structure) for the chosen style, params, data-type, side-by-side flag, and Forest Plot Style. A builder (`rcmetar.regenerate.plot.data`) emits it from `(om.data, res, params, style)`; the renderer (`rcmetar.draw.forest.plot`) is a pure placer over `metafor::forest()`. It keeps the edit, save-as, and regenerate round-trip stable without reloading `om.data`.
 _Avoid_: Legacy plot.data, pickled plot
@@ -367,6 +375,14 @@ _Avoid_: Basic plot, no style
 **RevMan Forest Style**:
 A full faithful reproduction of the Cochrane Review Manager forest layout on the metafor Forest Renderer, with per-data-family column templates and weight, effect/CI, subtotal, and heterogeneity blocks. Implemented without risk-of-bias columns, symbols, or legend.
 _Avoid_: Cochrane theme, RevMan clone with risk of bias
+
+**Sparse RevMan Template**:
+The RevMan Forest Style layout used when raw arm-level columns are unavailable or only partially available. It preserves RevMan's header, rule, weight/effect columns, summary, footer, and axis conventions while omitting absent raw-data column groups instead of falling back to Default Forest Style.
+_Avoid_: Default fallback, broken RevMan, empty RevMan columns
+
+**RevMan Compact Template**:
+The RevMan Forest Style layout used for forest plot variants whose rows are not ordinary study-arm comparisons, such as cumulative and leave-one-out plots. It preserves RevMan's typography, rule, effect/CI annotation, summary, and axis conventions without inventing Experimental/Control arm columns.
+_Avoid_: Full RevMan table for cumulative plots, Default cumulative fallback
 
 **BMJ Forest Style**:
 A full faithful reproduction of the BMJ house forest layout on the metafor Forest Renderer, using the BMJ accent color and house column arrangement. Brand fonts are approximated with a clean default family rather than shipped.

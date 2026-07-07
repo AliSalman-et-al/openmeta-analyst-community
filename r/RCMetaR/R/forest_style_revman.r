@@ -316,7 +316,8 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
         return(rcmetar.draw.default.metafor.forest(within(bundle, fp_style <- "default"), outpath))
     }
 
-    size <- rcmetar.measure.revman.forest.device(bundle)
+    plan <- rcmetar.forest.layout.preflight(bundle, style="revman")
+    size <- plan$device
     rcmetar.render.plot_file(outpath, size, function() {
 
     op <- graphics::par(no.readonly=TRUE)
@@ -333,7 +334,7 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
         col.lab="black"
     )
 
-    layout <- rcmetar.revman.layout(bundle)
+    layout <- plan$layout
     effect <- rcmetar.revman.study.effects(bundle)
     summary <- rcmetar.revman.summary.effect(bundle)
     bundle$style_blocks$heterogeneity <- rcmetar.revman.heterogeneity.label(within(bundle, res <- summary$res))
@@ -341,8 +342,9 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
     ilab <- rcmetar.revman.display.ilab(bundle, summary$weights)
     method <- rcmetar.revman.method.label(bundle)
     metric <- rcmetar.revman.metric.label(bundle)
-    k <- length(bundle$slab)
-    show.headers <- rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)
+    k <- plan$rows$k
+    rows <- plan$rows$study_rows
+    show.headers <- plan$headers$show
 
     plot.info <- suppressWarnings(metafor::forest.default(
         x=effect$yi,
@@ -351,9 +353,9 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
         ci.ub=effect$ci.ub,
         slab=rep("", length(bundle$slab)),
         atransf=rcmetar.metafor.atransf(bundle),
-        at=rcmetar.revman.axis.ticks(bundle, layout$alim),
-        xlim=layout$xlim,
-        alim=layout$alim,
+        at=plan$x$at,
+        xlim=plan$x$xlim,
+        alim=plan$x$alim,
         xlab="",
         xaxt="n",
         efac=0,
@@ -363,22 +365,22 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
         ilab=ilab$matrix,
         ilab.xpos=layout$ilab.xpos,
         ilab.pos=NULL,
-        cex=size$cex,
-        cex.lab=size$cex,
-        cex.axis=size$cex,
+        cex=plan$typography$cex,
+        cex.lab=plan$typography$cex.lab,
+        cex.axis=plan$typography$cex.axis,
         header=FALSE,
         pch=15,
         psize=summary$psize,
         col=rcmetar.forest.accent.color(bundle$params),
         annotate=FALSE,
-        ylim=c(-5.8, k + 3),
-        rows=k:1
+        ylim=plan$rows$ylim,
+        rows=rows
     ))
 
     graphics::par(xpd=NA)
     rcmetar.draw.metafor.effect.accent(
         effect=effect,
-        rows=k:1,
+        rows=rows,
         alim=layout$alim,
         color=rcmetar.forest.accent.color(bundle$params),
         psize=summary$psize,
@@ -408,8 +410,8 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
     rcmetar.draw.revman.axis(bundle, layout, plot.info$cex)
 
     graphics::par(cex=plot.info$cex, font=1)
-    graphics::text(layout$xlim[[1]], k:1, bundle$slab, pos=4, cex=plot.info$cex, col="black")
-    rcmetar.draw.revman.study.effect.labels(bundle, effect, layout, k:1, plot.info$cex)
+    graphics::text(layout$xlim[[1]], rows, bundle$slab, pos=4, cex=plot.info$cex, col="black")
+    rcmetar.draw.revman.study.effect.labels(bundle, effect, layout, rows, plot.info$cex)
     rcmetar.draw.revman.bottom.blocks(bundle, layout$xlim[1], plot.info$cex, layout)
 
     invisible(bundle$changed.params)
@@ -417,7 +419,8 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
 }
 
 rcmetar.draw.revman.sequential.forest <- function(bundle, outpath) {
-    size <- rcmetar.measure.metafor.forest.device(bundle)
+    plan <- rcmetar.forest.layout.preflight(bundle, style="revman")
+    size <- plan$device
     size$bg <- "white"
     rcmetar.render.plot_file(outpath, size, function() {
 
@@ -433,28 +436,28 @@ rcmetar.draw.revman.sequential.forest <- function(bundle, outpath) {
         tcl=-0.25
     )
 
-    k <- length(bundle$slab)
-    rows <- seq(from=k, to=1)
-    alim <- rcmetar.metafor.alim(bundle)
-    layout <- rcmetar.metafor.layout(bundle, size, alim)
+    k <- plan$rows$k
+    rows <- plan$rows$study_rows
+    alim <- plan$x$alim
+    layout <- plan$layout
     plot.info <- suppressWarnings(metafor::forest.default(
         x=bundle$effect$yi,
         sei=bundle$effect$sei,
         ci.lb=bundle$effect$ci.lb,
         ci.ub=bundle$effect$ci.ub,
         slab=rep("", length(bundle$slab)),
-        xlim=layout$xlim,
-        alim=alim,
-        at=rcmetar.metafor.axis.ticks(bundle, alim),
+        xlim=plan$x$xlim,
+        alim=plan$x$alim,
+        at=plan$x$at,
         atransf=rcmetar.metafor.atransf(bundle),
-        refline=NA,
-        xlab=rcmetar.metafor.xlab(bundle),
-        cex=size$cex,
-        cex.lab=size$cex,
-        cex.axis=size$cex,
+        refline=plan$x$refline,
+        xlab=plan$x$xlab,
+        cex=plan$typography$cex,
+        cex.lab=plan$typography$cex.lab,
+        cex.axis=plan$typography$cex.axis,
         header=FALSE,
         rows=rows,
-        ylim=c(-1.5, k + 3),
+        ylim=plan$rows$ylim,
         annotate=FALSE,
         col=rcmetar.forest.accent.color(bundle$params),
         pch=15,
@@ -464,7 +467,7 @@ rcmetar.draw.revman.sequential.forest <- function(bundle, outpath) {
         digits=as.integer(bundle$params$digits)
     ))
     rcmetar.draw.metafor.single.study.accent(bundle, rows, alim, rcmetar.forest.accent.color(bundle$params))
-    rcmetar.draw.metafor.sequential.text(bundle, rows, layout, k, size$cex)
+    rcmetar.draw.metafor.sequential.text(bundle, rows, layout, k, plan$typography$cex)
     invisible(bundle$changed.params)
     })
 }
@@ -485,61 +488,7 @@ rcmetar.revman.axis.ticks <- function(bundle, alim) {
 }
 
 rcmetar.revman.layout <- function(bundle) {
-    if (metric.is.log.scale(as.character(bundle$params$measure))) {
-        alim <- log(c(0.01, 100))
-    } else {
-        alim <- rcmetar.metafor.alim(bundle)
-    }
-    label.extra <- max(0, max(nchar(as.character(bundle$slab)), 0) - 44)
-    if (identical(bundle$data_type, "binary") && length(bundle$ilab$columns) == 5) {
-        ilab.xpos <- c(-20.6, -18.6, -16.1, -14.1, -10.8)
-        column.groups <- vapply(bundle$ilab$columns, function(column) column$group, character(1))
-        group.xpos <- c(
-            stats::setNames(mean(ilab.xpos[column.groups == bundle$ilab$groups[[1]]]), bundle$ilab$groups[[1]]),
-            stats::setNames(mean(ilab.xpos[column.groups == bundle$ilab$groups[[2]]]), bundle$ilab$groups[[2]])
-        )
-        return(list(
-            xlim=c(-30 - label.extra * 0.16, 5.6),
-            alim=alim,
-            ilab.xpos=ilab.xpos,
-            group.xpos=group.xpos,
-            annotation.xpos=-4.7,
-            annotation.header.xpos=-6.6,
-            plot.header.xpos=mean(alim)
-        ))
-    }
-    span <- max(diff(alim), 1)
-    if (ncol(bundle$ilab$matrix) == 1) {
-        ilab.xpos <- alim[1] - 2.35 * span
-        group.xpos <- numeric(0)
-        return(list(
-            xlim=c(alim[1] - (5.15 + label.extra * 0.030) * span, alim[2] + 0.25 * span),
-            alim=alim,
-            ilab.xpos=ilab.xpos,
-            group.xpos=group.xpos,
-            annotation.xpos=alim[1] - 0.36 * span,
-            annotation.header.xpos=alim[1] - 0.78 * span,
-            plot.header.xpos=mean(alim)
-        ))
-    }
-    ilab.xpos <- seq(alim[1] - 3.8 * span, alim[1] - 1.55 * span, length.out=max(ncol(bundle$ilab$matrix), 1))
-    column.groups <- vapply(bundle$ilab$columns, function(column) column$group, character(1))
-    group.xpos <- if (length(column.groups) > 0) {
-        vapply(bundle$ilab$groups, function(group) {
-            mean(ilab.xpos[column.groups == group])
-        }, numeric(1))
-    } else {
-        numeric(0)
-    }
-    list(
-        xlim=c(alim[1] - (5.15 + label.extra * 0.095) * span, alim[2] + 0.25 * span),
-        alim=alim,
-        ilab.xpos=ilab.xpos,
-        group.xpos=group.xpos,
-        annotation.xpos=alim[1] - 0.36 * span,
-        annotation.header.xpos=alim[1] - 0.78 * span,
-        plot.header.xpos=mean(alim)
-    )
+    rcmetar.forest.revman.layout.coordinates(bundle)
 }
 
 rcmetar.revman.study.effects <- function(bundle) {
@@ -671,28 +620,7 @@ rcmetar.revman.axis.labels <- function(bundle, ticks) {
 }
 
 rcmetar.revman.axis.footer.layout <- function(bundle, layout) {
-    if (is.null(layout) || is.null(layout$alim)) {
-        layout <- list(alim=graphics::par("usr")[1:2])
-    }
-    alim <- as.numeric(layout$alim)
-    split.x <- 0
-    if (!is.finite(split.x) || split.x <= alim[[1]] || split.x >= alim[[2]]) {
-        split.x <- mean(alim)
-    }
-    direction.width <- if (!is.null(layout) && ncol(bundle$ilab$matrix) <= 1) 18 else 22
-    direction.y <- if (direction.width <= 18) -4.05 else -3.68
-    list(
-        left.x=mean(c(alim[[1]], split.x)),
-        right.x=mean(c(split.x, alim[[2]])),
-        split.x=split.x,
-        span=diff(alim),
-        axis.x=mean(alim),
-        left.max.width=(split.x - alim[[1]]) * 0.92,
-        right.max.width=(alim[[2]] - split.x) * 0.92,
-        direction.y=direction.y,
-        axis.label.y=direction.y,
-        direction.width=direction.width
-    )
+    rcmetar.forest.revman.axis.footer(bundle, layout)
 }
 
 rcmetar.revman.constrained.direction.label <- function(label, cex, max.width, preferred.width) {
@@ -716,28 +644,7 @@ rcmetar.revman.line.count <- function(label) {
 }
 
 rcmetar.measure.revman.forest.device <- function(bundle) {
-    k <- length(bundle$slab)
-    label.width <- max(nchar(as.character(bundle$slab)), 0)
-    column.count <- max(ncol(bundle$ilab$matrix), 0)
-    header.width <- max(
-        nchar(c(
-            bundle$ilab$headers,
-            bundle$ilab$groups,
-            rcmetar.revman.metric.label(bundle),
-            rcmetar.revman.method.label(bundle)
-        )),
-        0
-    )
-    width <- 11.25 +
-        max(0, label.width - 24) * 0.095 +
-        max(0, column.count - 5) * 0.22 +
-        max(0, header.width - 16) * 0.045
-    height <- max(4.25, 3.05 + 0.25 * k)
-    cex <- 0.98 -
-        max(0, k - 8) * 0.008 -
-        max(0, label.width - 48) * 0.0025 -
-        max(0, header.width - 28) * 0.0015
-    list(width=min(width, 18), height=min(height, 18), cex=max(0.78, cex), bg="white")
+    rcmetar.forest.revman.device.metrics(bundle)
 }
 
 rcmetar.draw.revman.bottom.blocks <- function(bundle, x, cex, layout=NULL) {

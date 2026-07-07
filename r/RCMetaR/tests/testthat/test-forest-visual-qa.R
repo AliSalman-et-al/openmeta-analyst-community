@@ -24,7 +24,7 @@ test_that("optional forest visual QA matrix renders", {
   source(script, local = TRUE)
   manifest <- qa_render_matrix(output.root)
 
-  expect_equal(nrow(manifest), 72)
+  expect_equal(nrow(manifest), 90)
   expect_false(any(is.na(manifest$image)))
   expect_true(all(file.exists(manifest$image)))
   expect_true(all(manifest$bytes > 1000))
