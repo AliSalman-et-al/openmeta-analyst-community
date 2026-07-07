@@ -107,7 +107,7 @@ class EditForestPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plo
             style = self._normalized_style(self._params.get("fp_style", "default"))
             self.style_cbo.setCurrentText(FOREST_STYLE_LABELS[style])
             self._set_text(
-                self.col1_str_edit, self._params.get("fp_col1_str", "Studies")
+                self.col1_str_edit, self._params.get("fp_col1_str", "Study or Subgroup")
             )
             self._set_text(
                 self.col2_str_edit, self._params.get("fp_col2_str", "[default]")

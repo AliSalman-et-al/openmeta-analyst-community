@@ -1295,7 +1295,7 @@ update.plot.data.multiple <- function(binary.data, params, results) {
         plot.options$show.summary.line <- TRUE
     }
     # plot options passed in via params
-    plot.data <- list(label = c(paste(params$fp_col1_str, sep = ""), binary.data@study.names, "Overall"),
+    plot.data <- list(label = c(rcmetar.forest.study.header.label(params$fp_col1_str), binary.data@study.names, "Overall"),
                     types = c(3, rep(0, length(binary.data@study.names)), 2),
                     scale = scale.str,
                     data.type = data.type,

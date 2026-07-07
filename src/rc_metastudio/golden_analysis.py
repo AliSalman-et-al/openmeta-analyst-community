@@ -57,7 +57,7 @@ def _common_plot_params(path):
     return {
         "conf.level": 95.0,
         "digits": 3.0,
-        "fp_col1_str": "Studies",
+        "fp_col1_str": "Study or Subgroup",
         "fp_col2_str": "[default]",
         "fp_col3_str": "Ev/Trt",
         "fp_col4_str": "Ev/Ctrl",

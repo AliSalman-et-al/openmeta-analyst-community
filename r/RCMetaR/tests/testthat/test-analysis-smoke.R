@@ -18,7 +18,7 @@ base_plot_params <- function(measure) {
     rm.method = "DL",
     adjust = 0.5,
     fp_plot_ub = "[default]",
-    fp_col1_str = "Studies",
+    fp_col1_str = "Study or Subgroup",
     measure = measure,
     fp_xlabel = "[default]",
     fp_show_summary_line = TRUE,

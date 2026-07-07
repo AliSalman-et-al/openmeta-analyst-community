@@ -420,7 +420,7 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
             )
             params <- data.frame(
               conf.level=95, digits=3, measure="OR", rm.method="DL", to="only0", adjust=0.5,
-              fp_col1_str="Studies", fp_col2_str="[default]", fp_col3_str="Ev/Trt", fp_col4_str="Ev/Ctrl",
+              fp_col1_str="Study or Subgroup", fp_col2_str="[default]", fp_col3_str="Ev/Trt", fp_col4_str="Ev/Ctrl",
               fp_xlabel="[default]", fp_outpath="./r_tmp/meta_regression_names_forest.png",
               fp_plot_lb="[default]", fp_plot_ub="[default]", fp_show_col1=TRUE,
               fp_show_col2=TRUE, fp_show_col3=TRUE, fp_show_col4=TRUE,
@@ -688,7 +688,7 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
             )
             params <- data.frame(
               conf.level=95, digits=3, measure="OR", rm.method="DL", to="only0", adjust=0.5,
-              fp_col1_str="Studies", fp_col2_str="[default]", fp_col3_str="Ev/Trt", fp_col4_str="Ev/Ctrl",
+              fp_col1_str="Study or Subgroup", fp_col2_str="[default]", fp_col3_str="Ev/Trt", fp_col4_str="Ev/Ctrl",
               fp_xlabel="[default]", fp_outpath="./r_tmp/issue113_forest.png",
               fp_plot_lb="[default]", fp_plot_ub="[default]", fp_show_col1=TRUE,
               fp_show_col2=TRUE, fp_show_col3=TRUE, fp_show_col4=TRUE,

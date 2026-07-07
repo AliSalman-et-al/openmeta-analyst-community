@@ -18,7 +18,7 @@ metafor_binary_params <- function(outpath) {
     rm.method = "DL",
     adjust = 0.5,
     fp_plot_ub = "[default]",
-    fp_col1_str = "Studies",
+    fp_col1_str = "Study or Subgroup",
     measure = "OR",
     fp_xlabel = "[default]",
     fp_show_summary_line = TRUE,
@@ -369,8 +369,16 @@ test_that("older forest plot params default to Default style and visible control
   expect_equal(bundle$fp_style, "default")
   expect_equal(bundle$ilab$headers, c("Events", "Non-events", "Events", "Non-events"))
   expect_equal(rcmetar.forest.accent.color(bundle$params), "#2f5597")
+  expect_equal(rcmetar.metafor.study.header(bundle), "Study or Subgroup")
   expect_true(rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE))
   expect_true(rcmetar.param.is.true(bundle$params, "fp_show_annotation", TRUE))
+
+  bundle$params$fp_col1_str <- "Studies"
+  expect_equal(rcmetar.metafor.study.header(bundle), "Study or Subgroup")
+  bundle$params$fp_col1_str <- "Author(s) and Year"
+  expect_equal(rcmetar.metafor.study.header(bundle), "Study or Subgroup")
+  bundle$params$fp_col1_str <- "Trial"
+  expect_equal(rcmetar.metafor.study.header(bundle), "Trial")
 })
 
 test_that("Default Forest Style panel toggles raw counts headers and annotation", {

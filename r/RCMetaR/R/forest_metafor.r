@@ -3,6 +3,14 @@
 
 # Default metafor-backed forest renderer and shared bundle builders.
 
+rcmetar.forest.study.header.label <- function(header) {
+    if (is.null(header) || length(header) == 0 ||
+            as.character(header) %in% c("[default]", "Studies", "Author(s) and Year")) {
+        return("Study or Subgroup")
+    }
+    as.character(header)
+}
+
 rcmetar.metafor.binary.default.supported <- function(binary.data, params, selected.cov=NULL) {
     n <- length(binary.data@study.names)
     has.raw <- rcmetar.has.binary.raw.columns(binary.data, n)
@@ -610,11 +618,7 @@ rcmetar.metafor.study.header <- function(bundle) {
     if (!rcmetar.param.is.true(bundle$params, "fp_show_col1", TRUE)) {
         return("")
     }
-    header <- bundle$params$fp_col1_str
-    if (is.null(header) || length(header) == 0 || header == "[default]") {
-        return("Author(s) and Year")
-    }
-    as.character(header)
+    rcmetar.forest.study.header.label(bundle$params$fp_col1_str)
 }
 
 rcmetar.metafor.effect.header <- function(bundle) {

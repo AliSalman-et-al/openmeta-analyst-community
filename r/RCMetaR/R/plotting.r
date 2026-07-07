@@ -88,7 +88,7 @@ create.plot.data.generic <- function(om.data, params, res, selected.cov=NULL){
     study.names <- om.data@study.names
     years <- om.data@years
     study.names[years != 0] <- paste(study.names[years != 0], years[years != 0], sep=" ")
-    plot.data <- list(label = c(paste(params$fp_col1_str, sep = ""), study.names, overall),
+    plot.data <- list(label = c(rcmetar.forest.study.header.label(params$fp_col1_str), study.names, overall),
                       types = c(3, rep(0, length(om.data@study.names)), 2),
                       scale = scale.str,
                       options = plot.options)
@@ -374,7 +374,7 @@ create.plot.data.cum <- function(om.data, params, res) {
     # type 4 does not get plotted! Generates empty row in plot.
     study.names <- c(study.names, "")
     # extra blank name to align rows with standard plot
-    plot.data$label <- c(as.character(params$fp_col1_str), study.names)
+    plot.data$label <- c(rcmetar.forest.study.header.label(params$fp_col1_str), study.names)
     plot.data
 }
 
@@ -384,7 +384,7 @@ create.plot.data.loo <- function(om.data, params, res) {
     # First entry of res contains overall summary
     study.names <- c("Overall", paste("- ", om.data@study.names, sep=""))
     plot.data <- create.plot.data.overall(om.data, params, res, res.overall)
-    plot.data$label <- c(as.character(params$fp_col1_str), study.names)
+    plot.data$label <- c(rcmetar.forest.study.header.label(params$fp_col1_str), study.names)
     plot.data$types <- c(3, 5, rep(0, length(om.data@study.names)))
     plot.data
 }
@@ -475,7 +475,7 @@ create.subgroup.plot.data.generic <- function(subgroup.data, params, data.type, 
     }
     QEp <- forest.plot.p.value.label(cur.res$QEp, params$digits)
     overall <- forest.plot.heterogeneity.suffix(I2, QEp)
-    label.col <- c(as.character(params$fp_col1_str), label.col, paste("Overall", overall, sep=""))
+    label.col <- c(rcmetar.forest.study.header.label(params$fp_col1_str), label.col, paste("Overall", overall, sep=""))
     plot.options <- set.plot.options(params)
     if (params$fp_plot_lb == "[default]") {
         plot.options$plot.lb <- params$fp_plot_lb
@@ -643,7 +643,7 @@ set.plot.options <- function(params) {
     } else {
       plot.options$show.study.col <- FALSE
     }
-    plot.options$col1.str <- as.character(params$fp_col1_str)
+    plot.options$col1.str <- rcmetar.forest.study.header.label(params$fp_col1_str)
 
     if (params$fp_show_col2=='TRUE') {
       plot.options$show.col2 <- TRUE

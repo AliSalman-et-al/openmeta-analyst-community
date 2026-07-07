@@ -219,7 +219,7 @@ class Ui_edit_forest_plot_dlg(object):
         )
         self.groupBox.setTitle(_translate("edit_forest_plot_dlg", "Column Labels"))
         self.label_2.setText(_translate("edit_forest_plot_dlg", "Column 1 label:"))
-        self.col1_str_edit.setText(_translate("edit_forest_plot_dlg", "Studies"))
+        self.col1_str_edit.setText(_translate("edit_forest_plot_dlg", "Study or Subgroup"))
         self.show_1.setText(_translate("edit_forest_plot_dlg", "Show"))
         self.label_4.setText(_translate("edit_forest_plot_dlg", "Column 2 label:"))
         self.col2_str_edit.setText(

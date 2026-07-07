@@ -300,12 +300,7 @@ rcmetar.revman.study.header <- function(bundle) {
     if (!rcmetar.param.is.true(bundle$params, "fp_show_col1", TRUE)) {
         return("")
     }
-    header <- bundle$params$fp_col1_str
-    if (is.null(header) || length(header) == 0 ||
-            as.character(header) %in% c("[default]", "Studies", "Author(s) and Year")) {
-        return("Study or Subgroup")
-    }
-    as.character(header)
+    rcmetar.forest.study.header.label(bundle$params$fp_col1_str)
 }
 
 rcmetar.draw.revman.forest <- function(bundle, outpath) {

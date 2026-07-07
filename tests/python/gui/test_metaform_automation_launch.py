@@ -2314,7 +2314,7 @@ def test_edit_forest_plot_dialog_round_trips_style_and_appearance_params(monkeyp
     dialog = results_window.EditForestPlotDialog(
         {
             "fp_style": "default",
-            "fp_col1_str": "Studies",
+            "fp_col1_str": "Study or Subgroup",
             "fp_col2_str": "[default]",
             "fp_col3_str": "Treatment",
             "fp_col4_str": "Control",

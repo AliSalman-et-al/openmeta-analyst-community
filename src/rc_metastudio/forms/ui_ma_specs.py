@@ -191,7 +191,7 @@ class Ui_Dialog(object):
             _translate("Dialog", "Text for column title that appears on forest plot")
         )
         self.label_2.setText(_translate("Dialog", "Column 1 label:"))
-        self.col1_str_edit.setText(_translate("Dialog", "Studies"))
+        self.col1_str_edit.setText(_translate("Dialog", "Study or Subgroup"))
         self.show_1.setText(_translate("Dialog", "Show"))
         self.label_4.setToolTip(
             _translate("Dialog", "Text for column title that appears on forest plot")
