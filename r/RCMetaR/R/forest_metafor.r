@@ -66,9 +66,9 @@ rcmetar.metafor.diagnostic.default.supported <- function(diagnostic.data, params
 rcmetar.binary.default.ilab <- function(binary.data, params) {
     columns <- list(
         list(key="experimental_events", group="Experimental", header="Events", values=binary.data@g1O1),
-        list(key="experimental_total", group="Experimental", header="Total", values=binary.data@g1O1 + binary.data@g1O2),
+        list(key="experimental_nonevents", group="Experimental", header="Non-events", values=binary.data@g1O2),
         list(key="control_events", group="Control", header="Events", values=binary.data@g2O1),
-        list(key="control_total", group="Control", header="Total", values=binary.data@g2O1 + binary.data@g2O2)
+        list(key="control_nonevents", group="Control", header="Non-events", values=binary.data@g2O2)
     )
     groups <- c("Experimental", "Control")
     if (!is.null(params$fp_col3_str) && params$fp_col3_str != "[default]") {
@@ -192,6 +192,11 @@ rcmetar.metafor.weights <- function(res) {
     NULL
 }
 
+rcmetar.metafor.default.supported <- function(params) {
+    !isTRUE(params$fp_legacy_renderer) &&
+        rcmetar.forest.style.default(params) == "default"
+}
+
 rcmetar.bundle.transform <- function(bundle) {
     switch(
         bundle$data_type,
@@ -200,6 +205,168 @@ rcmetar.bundle.transform <- function(bundle) {
         diagnostic=diagnostic.transform.f(as.character(bundle$params$measure)),
         binary.transform.f(as.character(bundle$params$measure))
     )
+}
+
+rcmetar.result.vector <- function(results, field) {
+    vapply(results, function(result) as.numeric(result[[field]][1]), numeric(1))
+}
+
+rcmetar.build.sequential.metafor.bundle <- function(om.data, params, results, variant, labels, legacy.plot.data=NULL) {
+    if (is.null(legacy.plot.data)) {
+        legacy.plot.data <- switch(
+            variant,
+            cumulative=create.plot.data.cum(om.data, params, results),
+            "leave-one-out"=create.plot.data.loo(om.data, params, results),
+            NULL
+        )
+    }
+
+    yi <- rcmetar.result.vector(results, "b")
+    ci.lb <- rcmetar.result.vector(results, "ci.lb")
+    ci.ub <- rcmetar.result.vector(results, "ci.ub")
+    sei <- rcmetar.result.vector(results, "se")
+    missing.se <- !is.finite(sei)
+    if (any(missing.se)) {
+        mult <- get.mult.from.conf.level(params$conf.level)
+        sei[missing.se] <- (ci.ub[missing.se] - ci.lb[missing.se]) / (2 * mult)
+    }
+
+    list(
+        render_engine = "metafor",
+        data_type = .rcmetar.data.type(om.data),
+        forest_variant = variant,
+        fp_style = "default",
+        res = results,
+        effect = list(
+            yi = yi,
+            sei = sei,
+            ci.lb = ci.lb,
+            ci.ub = ci.ub,
+            slab = as.character(labels)
+        ),
+        single_study = TRUE,
+        ilab = rcmetar.empty.default.ilab(length(labels)),
+        slab = as.character(labels),
+        weights = NULL,
+        params = params,
+        side_by_side = FALSE,
+        plot_range = legacy.plot.data$plot.range,
+        changed.params = legacy.plot.data$changed.params,
+        legacy_plot_data = legacy.plot.data
+    )
+}
+
+rcmetar.default.ilab.for.data <- function(om.data, params) {
+    if ("BinaryData" %in% class(om.data)) {
+        return(rcmetar.binary.default.ilab(om.data, params))
+    }
+    if ("ContinuousData" %in% class(om.data)) {
+        return(rcmetar.continuous.default.ilab(om.data, params))
+    }
+    if ("DiagnosticData" %in% class(om.data)) {
+        return(rcmetar.diagnostic.default.ilab(om.data, params))
+    }
+    rcmetar.empty.default.ilab(length(om.data@study.names))
+}
+
+rcmetar.build.subgroup.metafor.bundle <- function(om.data, params, subgroup.data, legacy.plot.data=NULL) {
+    if (is.null(legacy.plot.data)) {
+        legacy.plot.data <- switch(
+            .rcmetar.data.type(om.data),
+            binary=create.subgroup.plot.data.binary(subgroup.data, params),
+            continuous=create.subgroup.plot.data.cont(subgroup.data, params),
+            diagnostic=create.subgroup.plot.data.diagnostic(subgroup.data, params)
+        )
+    }
+
+    subgroup.list <- as.character(subgroup.data$subgroup.list)
+    grouped.data <- subgroup.data$grouped.data
+    subgroup.results <- subgroup.data$results
+    study.data <- grouped.data[seq_along(subgroup.list)]
+    flat.yi <- unlist(lapply(study.data, function(data) as.numeric(data@y)), use.names=FALSE)
+    flat.sei <- unlist(lapply(study.data, function(data) as.numeric(data@SE)), use.names=FALSE)
+    subgroup.values <- unlist(Map(function(group, data) {
+        rep(group, length(data@study.names))
+    }, subgroup.list, study.data), use.names=FALSE)
+    mult <- get.mult.from.conf.level(params$conf.level)
+    flat.ci.lb <- flat.yi - mult * flat.sei
+    flat.ci.ub <- flat.yi + mult * flat.sei
+    flat.slab <- unlist(lapply(study.data, rcmetar.study.labels), use.names=FALSE)
+    flat.ilab <- lapply(study.data, rcmetar.default.ilab.for.data, params=params)
+    ilab.matrix <- do.call(rbind, lapply(flat.ilab, function(ilab) ilab$matrix))
+    if (is.null(ilab.matrix)) {
+        ilab.matrix <- matrix(character(0), nrow=length(flat.slab), ncol=0)
+    }
+    ilab.template <- rcmetar.default.ilab.for.data(om.data, params)
+    colnames(ilab.matrix) <- ilab.template$headers
+
+    study.rows <- list()
+    header.rows <- numeric(length(subgroup.list))
+    polygon.rows <- numeric(length(subgroup.list))
+    cursor <- length(flat.slab) + length(subgroup.list) * 2
+    for (i in seq_along(subgroup.list)) {
+        n <- length(study.data[[i]]@study.names)
+        header.rows[[i]] <- cursor
+        study.rows[[i]] <- seq(from=cursor - 1.0, length.out=n, by=-1)
+        polygon.rows[[i]] <- min(study.rows[[i]]) - 1
+        cursor <- polygon.rows[[i]] - 2.2
+    }
+
+    list(
+        render_engine = "metafor",
+        data_type = .rcmetar.data.type(om.data),
+        forest_variant = "subgroup",
+        fp_style = "default",
+        res = subgroup.results[[length(subgroup.list) + 1]],
+        effect = list(yi=flat.yi, sei=flat.sei, ci.lb=flat.ci.lb, ci.ub=flat.ci.ub, slab=flat.slab),
+        single_study = TRUE,
+        ilab = list(
+            matrix = ilab.matrix,
+            columns = ilab.template$columns,
+            headers = ilab.template$headers,
+            groups = ilab.template$groups
+        ),
+        slab = flat.slab,
+        weights = NULL,
+        params = params,
+        side_by_side = FALSE,
+        plot_range = legacy.plot.data$plot.range,
+        changed.params = legacy.plot.data$changed.params,
+        legacy_plot_data = legacy.plot.data,
+        subgroups = list(
+            names = subgroup.list,
+            results = subgroup.results[seq_along(subgroup.list)],
+            overall = subgroup.results[[length(subgroup.list) + 1]],
+            study_rows = unlist(study.rows, use.names=FALSE),
+            header_rows = header.rows,
+            polygon_rows = polygon.rows,
+            overall_row = min(polygon.rows) - 2,
+            difference_test = rcmetar.metafor.subgroup.difference.test(flat.yi, flat.sei, subgroup.values, params),
+            ylim = c(min(polygon.rows) - 4, max(header.rows) + 2.5)
+        )
+    )
+}
+
+rcmetar.metafor.subgroup.difference.test <- function(yi, sei, subgroup.values, params) {
+    if (length(unique(subgroup.values)) < 2 || length(yi) != length(subgroup.values)) {
+        return(NULL)
+    }
+    subgroup.factor <- stats::relevel(factor(subgroup.values), ref=as.character(subgroup.values[[1]]))
+    res <- tryCatch(
+        metafor::rma.uni(
+            yi=yi,
+            sei=sei,
+            mods=~ subgroup.factor,
+            method=params$rm.method,
+            level=params$conf.level,
+            digits=params$digits
+        ),
+        error=function(e) NULL
+    )
+    if (is.null(res) || is.null(res$QM) || display.value.is.missing(res$QM)) {
+        return(NULL)
+    }
+    list(QM=res$QM, QMp=res$QMp, df=res$p - 1)
 }
 
 rcmetar.build.binary.metafor.bundle <- function(binary.data, params, res, legacy.plot.data=NULL) {
@@ -378,6 +545,22 @@ rcmetar.metafor.effect.header <- function(bundle) {
     paste0(pretty.metric.name(as.character(bundle$params$measure)), " [", bundle$params$conf.level, "% CI]")
 }
 
+rcmetar.metafor.psize <- function(bundle) {
+    if (identical(bundle$forest_variant, "subgroup")) {
+        return(rep(1, length(bundle$effect$yi)))
+    }
+    if (inherits(bundle$res, "rma") && is.null(bundle$forest_variant)) {
+        return(NULL)
+    }
+    sei <- as.numeric(bundle$effect$sei)
+    if (length(sei) == 0 || any(!is.finite(sei)) || length(unique(round(sei, 10))) == 1) {
+        return(rep(1, length(sei)))
+    }
+    precision <- 1 / (sei^2)
+    precision <- precision / max(precision, na.rm=TRUE)
+    0.65 + 0.9 * sqrt(precision)
+}
+
 rcmetar.metafor.alim <- function(bundle) {
     if (!is.null(bundle$plot_range) && length(bundle$plot_range) == 2 && all(is.finite(bundle$plot_range))) {
         if (metric.is.logit.scale(as.character(bundle$params$measure))) {
@@ -385,7 +568,10 @@ rcmetar.metafor.alim <- function(bundle) {
         }
         return(as.numeric(bundle$plot_range))
     }
-    values <- c(bundle$res$yi, bundle$res$ci.lb, bundle$res$ci.ub, bundle$effect$yi, bundle$effect$ci.lb, bundle$effect$ci.ub)
+    values <- c(bundle$effect$yi, bundle$effect$ci.lb, bundle$effect$ci.ub)
+    if (inherits(bundle$res, "rma")) {
+        values <- c(values, bundle$res$yi, bundle$res$ci.lb, bundle$res$ci.ub)
+    }
     values <- values[is.finite(values)]
     if (length(values) == 0) {
         return(c(-1, 1))
@@ -396,7 +582,12 @@ rcmetar.metafor.alim <- function(bundle) {
 rcmetar.metafor.effect.labels <- function(bundle) {
     legacy <- bundle$legacy_plot_data
     digits <- as.integer(bundle$params$digits)
-    if (!is.null(legacy$effects.disp)) {
+    if (!is.null(bundle$forest_variant) && !identical(bundle$forest_variant, "standard")) {
+        transform <- rcmetar.bundle.transform(bundle)
+        y <- transform$display.scale(bundle$effect$yi)
+        lb <- transform$display.scale(bundle$effect$ci.lb)
+        ub <- transform$display.scale(bundle$effect$ci.ub)
+    } else if (!is.null(legacy$effects.disp)) {
         y <- legacy$effects.disp$y.disp
         lb <- legacy$effects.disp$lb.disp
         ub <- legacy$effects.disp$ub.disp
@@ -427,7 +618,11 @@ rcmetar.measure.metafor.forest.device <- function(bundle) {
     on.exit(grDevices::dev.off(), add=TRUE)
 
     k <- nrow(bundle$ilab$matrix)
-    cex <- max(0.62, min(1.05, 1.08 - max(k - 8, 0) * 0.025))
+    display.rows <- k
+    if (identical(bundle$forest_variant, "subgroup")) {
+        display.rows <- length(bundle$subgroups$study_rows) + length(bundle$subgroups$header_rows) + length(bundle$subgroups$polygon_rows) + 2
+    }
+    cex <- max(0.70, min(1.10, 1.08 - max(display.rows - 10, 0) * 0.018))
     study.width <- max(strwidth(c(bundle$slab, rcmetar.metafor.study.header(bundle)), units="inches", cex=cex), na.rm=TRUE)
     if (ncol(bundle$ilab$matrix) > 0) {
         column.widths <- apply(bundle$ilab$matrix, 2, function(col) {
@@ -439,9 +634,9 @@ rcmetar.measure.metafor.forest.device <- function(bundle) {
         group.widths <- numeric(0)
     }
     annotation.width <- max(strwidth(c(rcmetar.metafor.effect.header(bundle), rcmetar.metafor.effect.labels(bundle)), units="inches", cex=cex), na.rm=TRUE)
-    column.gap <- 0.32
-    block.gap <- 0.7
-    plot.width <- 3.2
+    column.gap <- 0.34
+    block.gap <- 0.78
+    plot.width <- 3.5
     ilab.width <- if (length(column.widths) > 0) {
         sum(pmax(column.widths, 0.45)) + column.gap * (length(column.widths) - 1) + block.gap
     } else {
@@ -450,8 +645,8 @@ rcmetar.measure.metafor.forest.device <- function(bundle) {
     left.width <- study.width + block.gap + ilab.width
 
     list(
-        width = max(8.5, min(14, left.width + plot.width + annotation.width + 1.4)),
-        height = max(5.2, min(18, 3.0 + 0.52 * k)),
+        width = max(9.5, min(18, left.width + plot.width + annotation.width + 1.5)),
+        height = max(5.8, min(20, 3.1 + 0.48 * display.rows)),
         cex = cex,
         study_width = study.width,
         column_widths = pmax(column.widths, 0.45),
@@ -508,13 +703,19 @@ rcmetar.draw.metafor.forest <- function(bundle, outpath) {
 
     op <- graphics::par(no.readonly=TRUE)
     on.exit(graphics::par(op), add=TRUE)
-    graphics::par(bg="white", mar=c(4.8, 1.0, 1.6, 1.0), fg="black", col.axis="black", col.lab="black")
+    graphics::par(bg="white", mar=c(4.8, 1.0, 1.4, 1.0), fg="black", col.axis="black", col.lab="black")
 
     k <- nrow(bundle$ilab$matrix)
     rows <- seq(from=k, to=1)
     alim <- rcmetar.metafor.alim(bundle)
     layout <- rcmetar.metafor.layout(bundle, size, alim)
     top <- k + 3
+    ylim <- c(-1.5, top)
+    if (identical(bundle$forest_variant, "subgroup")) {
+        rows <- bundle$subgroups$study_rows
+        ylim <- bundle$subgroups$ylim
+        top <- ylim[2]
+    }
 
     forest.args <- list(
         slab = bundle$slab,
@@ -532,10 +733,15 @@ rcmetar.draw.metafor.forest <- function(bundle, outpath) {
         cex.axis = size$cex,
         header = c(rcmetar.metafor.study.header(bundle), rcmetar.metafor.effect.header(bundle)),
         rows = rows,
-        ylim = c(-1.5, top),
+        ylim = ylim,
         annotate = TRUE,
         col = "black",
-        colshade = "#f2f2f2",
+        colshade = "#eeeeee",
+        shade = "zebra",
+        pch = 15,
+        psize = rcmetar.metafor.psize(bundle),
+        lwd = 1.35,
+        efac = 1.15,
         digits = as.integer(bundle$params$digits)
     )
     forest.args <- forest.args[!vapply(forest.args, is.null, logical(1))]
@@ -551,7 +757,11 @@ rcmetar.draw.metafor.forest <- function(bundle, outpath) {
             forest.args
         ))
     } else {
-        plot.info <- do.call(metafor::forest.rma, c(list(x = bundle$res), c(forest.args, list(mlab="", shade="zebra", border="black"))))
+        plot.info <- do.call(metafor::forest.rma, c(list(x = bundle$res), c(forest.args, list(mlab="", border="black"))))
+    }
+
+    if (identical(bundle$forest_variant, "subgroup")) {
+        rcmetar.draw.metafor.subgroups(bundle, layout$xlim[1], size$cex)
     }
 
     text.y <- if (!is.null(plot.info$ylim)) plot.info$ylim[2] - 0.2 else top - 0.2
@@ -567,6 +777,71 @@ rcmetar.draw.metafor.forest <- function(bundle, outpath) {
     rcmetar.draw.metafor.heterogeneity(bundle, layout$xlim[1], cex=size$cex)
 
     invisible(bundle$changed.params)
+}
+
+rcmetar.draw.metafor.subgroups <- function(bundle, x, cex) {
+    for (i in seq_along(bundle$subgroups$names)) {
+        label <- bundle$subgroups$names[[i]]
+        label.y <- bundle$subgroups$header_rows[[i]]
+        graphics::text(
+            x,
+            label.y,
+            label,
+            pos=4,
+            font=4,
+            cex=cex
+        )
+        metafor::addpoly.rma(
+            bundle$subgroups$results[[i]],
+            row=bundle$subgroups$polygon_rows[[i]],
+            mlab=rcmetar.metafor.model.label("RE Model for Subgroup", bundle$subgroups$results[[i]]),
+            cex=cex
+        )
+    }
+    graphics::segments(
+        x,
+        bundle$subgroups$overall_row + 1,
+        par("usr")[2],
+        bundle$subgroups$overall_row + 1,
+        lwd=1.15
+    )
+    metafor::addpoly.rma(
+        bundle$subgroups$overall,
+        row=bundle$subgroups$overall_row,
+        mlab=rcmetar.metafor.model.label("RE Model for All Studies", bundle$subgroups$overall),
+        cex=cex
+    )
+    if (!is.null(bundle$subgroups$difference_test)) {
+        graphics::text(
+            x,
+            bundle$subgroups$overall_row - 0.75,
+            rcmetar.metafor.subgroup.difference.label(bundle$subgroups$difference_test),
+            pos=4,
+            cex=cex
+        )
+    }
+    invisible(NULL)
+}
+
+rcmetar.metafor.model.label <- function(prefix, res) {
+    if (is.null(res$QE)) {
+        return(prefix)
+    }
+    as.expression(bquote(paste(
+        .(prefix), " (Q = ", .(round.display(res$QE, 2)),
+        ", df = ", .(res$k - res$p), ", ",
+        .(rcmetar.metafor.p.value.label(res$QEp)), "; ",
+        I^2, " = ", .(round.display(res$I2, 1)), "%, ",
+        tau^2, " = ", .(round.display(res$tau2, 2)), ")"
+    )))
+}
+
+rcmetar.metafor.subgroup.difference.label <- function(test) {
+    as.expression(bquote(paste(
+        "Test for Subgroup Differences: ", Q[M], " = ",
+        .(round.display(test$QM, 2)), ", df = ", .(test$df), ", ",
+        .(rcmetar.metafor.p.value.label(test$QMp))
+    )))
 }
 
 rcmetar.draw.metafor.heterogeneity <- function(bundle, x, cex) {

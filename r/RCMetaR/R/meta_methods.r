@@ -83,18 +83,25 @@ cum.ma.binary <- function(fname, binary.data, params){
     params.cum$fp_col2_str <- "Cumulative Estimate"
     # column labels for the cumulative (right-hand) plot
     plot.data.cum <- create.plot.data.cum(om.data=binary.data, params.cum, res=cum.results)
-    two.plot.data <- list("left"=plot.data, "right"=plot.data.cum)
-    changed.params <- plot.data$changed.params
-    # List of changed params values for standard (left) plot - not cumulative plot!
-    # Currently plot edit can't handle two sets of params values for xticks or plot bounds.
-    # Could be changed in future.
-    params.changed.in.forest.plot <- two.forest.plots(two.plot.data, outpath=forest.path)
-    changed.params <- c(changed.params, params.changed.in.forest.plot)
+    if (rcmetar.metafor.default.supported(params.cum)) {
+        plot.data <- rcmetar.build.sequential.metafor.bundle(binary.data, params.cum, cum.results, "cumulative", study.names, plot.data.cum)
+        changed.params <- plot.data$changed.params
+        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+    } else {
+        two.plot.data <- list("left"=plot.data, "right"=plot.data.cum)
+        changed.params <- plot.data$changed.params
+        # List of changed params values for standard (left) plot - not cumulative plot!
+        # Currently plot edit can't handle two sets of params values for xticks or plot bounds.
+        # Could be changed in future.
+        params.changed.in.forest.plot <- two.forest.plots(two.plot.data, outpath=forest.path)
+        changed.params <- c(changed.params, params.changed.in.forest.plot)
+        plot.data <- two.plot.data
+    }
     # Update params changed in two.forest.plots
     params <- update.changed.plot.params(params, changed.params)
     # we use the system time as our unique-enough string to store
     # the params object
-    forest.plot.params.path <- save.data(binary.data, res, params, two.plot.data)
+    forest.plot.params.path <- save.data(binary.data, res, params, plot.data)
     # Now we package the results in a dictionary (technically, a named 
     # vector). In particular, there are two fields that must be returned; 
     # a dictionary of images (mapping titles to image paths) and a list of texts
@@ -572,7 +579,13 @@ loo.ma.binary <- function(fname, binary.data, params){
     plot.data <- create.plot.data.loo(binary.data, params, res=loo.results)
     changed.params <- plot.data$changed.params
     # list of changed params values
-    params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+    if (rcmetar.metafor.default.supported(params)) {
+        plot.data <- rcmetar.build.sequential.metafor.bundle(binary.data, params, loo.results, "leave-one-out", study.names, plot.data)
+        changed.params <- plot.data$changed.params
+        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+    } else {
+        params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+    }
     changed.params <- c(changed.params, params.changed.in.forest.plot)
     params <- update.changed.plot.params(params, changed.params)
     # update params values
@@ -688,18 +701,25 @@ cum.ma.continuous <- function(fname, cont.data, params){
     params.cum$fp_col1_str <- "Cumulative Studies"
     params.cum$fp_col2_str <- "Cumulative Estimate"
     plot.data.cum <- create.plot.data.cum(om.data=cont.data, params.cum, res=cum.results)
-    two.plot.data <- list("left"=plot.data, "right"=plot.data.cum)
-    changed.params <- plot.data$changed.params
-    # List of changed params values for standard (left) plot - not cumulative plot!
-    # Currently plot edit can't handle two sets of params values for xticks or plot bounds.
-    # Could be changed in future.
-    params.changed.in.forest.plot <- two.forest.plots(two.plot.data, outpath=forest.path)
-    changed.params <- c(changed.params, params.changed.in.forest.plot)
+    if (rcmetar.metafor.default.supported(params.cum)) {
+        plot.data <- rcmetar.build.sequential.metafor.bundle(cont.data, params.cum, cum.results, "cumulative", study.names, plot.data.cum)
+        changed.params <- plot.data$changed.params
+        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+    } else {
+        two.plot.data <- list("left"=plot.data, "right"=plot.data.cum)
+        changed.params <- plot.data$changed.params
+        # List of changed params values for standard (left) plot - not cumulative plot!
+        # Currently plot edit can't handle two sets of params values for xticks or plot bounds.
+        # Could be changed in future.
+        params.changed.in.forest.plot <- two.forest.plots(two.plot.data, outpath=forest.path)
+        changed.params <- c(changed.params, params.changed.in.forest.plot)
+        plot.data <- two.plot.data
+    }
     # Update params changed in two.forest.plots
     params <- update.changed.plot.params(params, changed.params)
     # we use the system time as our unique-enough string to store
     # the params object
-    forest.plot.params.path <- save.data(cont.data, res=cum.results, params, two.plot.data)
+    forest.plot.params.path <- save.data(cont.data, res=cum.results, params, plot.data)
     #
     # Now we package the results in a dictionary (technically, a named 
     # vector). In particular, there are two fields that must be returned; 
@@ -799,18 +819,25 @@ cum.ma.diagnostic <- function(fname, diagnostic.data, params){
 	params.cum$fp_col2_str <- "Cumulative Estimate"
 	# column labels for the cumulative (right-hand) plot
 	plot.data.cum <- create.plot.data.cum(om.data=diagnostic.data, params.cum, res=cum.results)
-	two.plot.data <- list("left"=plot.data, "right"=plot.data.cum)
-	changed.params <- plot.data$changed.params
-	# List of changed params values for standard (left) plot - not cumulative plot!
-	# Currently plot edit can't handle two sets of params values for xticks or plot bounds.
-	# Could be changed in future.
-	params.changed.in.forest.plot <- two.forest.plots(two.plot.data, outpath=forest.path)
-	changed.params <- c(changed.params, params.changed.in.forest.plot)
+	if (rcmetar.metafor.default.supported(params.cum)) {
+		plot.data <- rcmetar.build.sequential.metafor.bundle(diagnostic.data, params.cum, cum.results, "cumulative", study.names, plot.data.cum)
+		changed.params <- plot.data$changed.params
+		params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+	} else {
+		two.plot.data <- list("left"=plot.data, "right"=plot.data.cum)
+		changed.params <- plot.data$changed.params
+		# List of changed params values for standard (left) plot - not cumulative plot!
+		# Currently plot edit can't handle two sets of params values for xticks or plot bounds.
+		# Could be changed in future.
+		params.changed.in.forest.plot <- two.forest.plots(two.plot.data, outpath=forest.path)
+		changed.params <- c(changed.params, params.changed.in.forest.plot)
+		plot.data <- two.plot.data
+	}
 	# Update params changed in two.forest.plots
 	params <- update.changed.plot.params(params, changed.params)
 	# we use the system time as our unique-enough string to store
 	# the params object
-	forest.plot.params.path <- save.data(diagnostic.data, res, params, two.plot.data)
+	forest.plot.params.path <- save.data(diagnostic.data, res, params, plot.data)
 	# Now we package the results in a dictionary (technically, a named 
 	# vector). In particular, there are two fields that must be returned; 
 	# a dictionary of images (mapping titles to image paths) and a list of texts
@@ -962,7 +989,13 @@ loo.ma.continuous <- function(fname, cont.data, params){
     plot.data <- create.plot.data.loo(cont.data, params, res=loo.results)
     changed.params <- plot.data$changed.params
     # list of changed params values
-    params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+    if (rcmetar.metafor.default.supported(params)) {
+        plot.data <- rcmetar.build.sequential.metafor.bundle(cont.data, params, loo.results, "leave-one-out", study.names, plot.data)
+        changed.params <- plot.data$changed.params
+        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+    } else {
+        params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+    }
     changed.params <- c(changed.params, params.changed.in.forest.plot)
     params <- update.changed.plot.params(params, changed.params)
     # update params values
@@ -1055,7 +1088,13 @@ subgroup.ma.binary <- function(fname, binary.data, params){
     plot.data <- create.subgroup.plot.data.binary(subgroup.data, params)
     changed.params <- plot.data$changed.params
     # list of changed params values
-    params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+    if (rcmetar.metafor.default.supported(params)) {
+        plot.data <- rcmetar.build.subgroup.metafor.bundle(binary.data, params, subgroup.data, plot.data)
+        changed.params <- plot.data$changed.params
+        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+    } else {
+        params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+    }
     changed.params <- c(changed.params, params.changed.in.forest.plot)
     params <- update.changed.plot.params(params, changed.params)
     # update params values
@@ -1089,6 +1128,7 @@ get.subgroup.data.binary <- function(binary.data, cov.val, cov.vals) {
   y.tmp <- binary.data@y[cov.vals == cov.val]
   SE.tmp <- binary.data@SE[cov.vals == cov.val]
   names.tmp <- binary.data@study.names[cov.vals == cov.val]
+  years.tmp <- binary.data@years[cov.vals == cov.val]
   if (length(binary.data@g1O1) > 0){
     g1O1.tmp <- binary.data@g1O1[cov.vals == cov.val]
     g1O2.tmp <- binary.data@g1O2[cov.vals == cov.val]
@@ -1096,9 +1136,11 @@ get.subgroup.data.binary <- function(binary.data, cov.val, cov.vals) {
     g2O2.tmp <- binary.data@g2O2[cov.vals == cov.val]
     subgroup.data <- new('BinaryData', g1O1=g1O1.tmp, 
                           g1O2=g1O2.tmp, g2O1=g2O1.tmp, 
-                          g2O2=g2O2.tmp, y=y.tmp, SE=SE.tmp, study.names=names.tmp)
+                          g2O2=g2O2.tmp, y=y.tmp, SE=SE.tmp, study.names=names.tmp,
+                          years=years.tmp, g1.name=binary.data@g1.name, g2.name=binary.data@g2.name)
   } else {
-    subgroup.data <- new('BinaryData', y=y.tmp, SE=SE.tmp, study.names=names.tmp)
+    subgroup.data <- new('BinaryData', y=y.tmp, SE=SE.tmp, study.names=names.tmp,
+                         years=years.tmp, g1.name=binary.data@g1.name, g2.name=binary.data@g2.name)
   }
   subgroup.data
 }
@@ -1154,7 +1196,13 @@ subgroup.ma.continuous <- function(fname, cont.data, params){
     plot.data <- create.subgroup.plot.data.cont(subgroup.data, params)
     changed.params <- plot.data$changed.params
     # list of changed params values
-    params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+    if (rcmetar.metafor.default.supported(params)) {
+        plot.data <- rcmetar.build.subgroup.metafor.bundle(cont.data, params, subgroup.data, plot.data)
+        changed.params <- plot.data$changed.params
+        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+    } else {
+        params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+    }
     changed.params <- c(changed.params, params.changed.in.forest.plot)
     params <- update.changed.plot.params(params, changed.params)
     # update params values
@@ -1190,6 +1238,7 @@ get.subgroup.data.cont <- function(cont.data, cov.val, cov.vals) {
       y.tmp <- cont.data@y[cov.vals == cov.val]
       SE.tmp <- cont.data@SE[cov.vals == cov.val]
       names.tmp <- cont.data@study.names[cov.vals == cov.val]
+      years.tmp <- cont.data@years[cov.vals == cov.val]
   if (length(cont.data@N1) > 0){
       N1.tmp <- cont.data@N1[cov.vals == cov.val]
       mean1.tmp <- cont.data@mean1[cov.vals == cov.val]
@@ -1201,11 +1250,13 @@ get.subgroup.data.cont <- function(cont.data, cov.val, cov.vals) {
                           N1=N1.tmp, mean1=mean1.tmp , sd1=sd1.tmp, 
                           N2=N2.tmp, mean2=mean2.tmp, sd2=sd2.tmp,
                           y=y.tmp, SE=SE.tmp, 
-                          study.names=names.tmp)
+                          study.names=names.tmp, years=years.tmp,
+                          g1.name=cont.data@g1.name, g2.name=cont.data@g2.name)
     } else {
     subgroup.data <- new('ContinuousData', 
                           y=y.tmp, SE=SE.tmp, 
-                          study.names=names.tmp)
+                          study.names=names.tmp, years=years.tmp,
+                          g1.name=cont.data@g1.name, g2.name=cont.data@g2.name)
     }
     subgroup.data
 }
@@ -1534,7 +1585,13 @@ loo.ma.diagnostic <- function(fname, diagnostic.data, params){
         forest.path <- paste(params$fp_outpath, sep="")
         changed.params <- plot.data$changed.params
         # list of changed params values
-        params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+        if (rcmetar.metafor.default.supported(params)) {
+            plot.data <- rcmetar.build.sequential.metafor.bundle(diagnostic.data, params, loo.results, "leave-one-out", study.names, plot.data)
+            changed.params <- plot.data$changed.params
+            params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+        } else {
+            params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+        }
         changed.params <- c(changed.params, params.changed.in.forest.plot)
         params <- update.changed.plot.params(params, changed.params)
         # update params values
@@ -1827,7 +1884,13 @@ subgroup.ma.diagnostic <- function(fname, diagnostic.data, params, selected.cov)
         plot.data <- create.subgroup.plot.data.diagnostic(subgroup.data, params)
         changed.params <- plot.data$changed.params
         # list of changed params values
-        params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+        if (rcmetar.metafor.default.supported(params)) {
+            plot.data <- rcmetar.build.subgroup.metafor.bundle(diagnostic.data, params, subgroup.data, plot.data)
+            changed.params <- plot.data$changed.params
+            params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+        } else {
+            params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+        }
         changed.params <- c(changed.params, params.changed.in.forest.plot)
         params <- update.changed.plot.params(params, changed.params)
         # update params values
@@ -1863,6 +1926,7 @@ get.subgroup.data.diagnostic <- function(diagnostic.data, cov.val, cov.vals) {
   y.tmp <- diagnostic.data@y[cov.vals == cov.val]
   SE.tmp <- diagnostic.data@SE[cov.vals == cov.val]
   names.tmp <- diagnostic.data@study.names[cov.vals == cov.val]
+  years.tmp <- diagnostic.data@years[cov.vals == cov.val]
   if (length(diagnostic.data@TP) > 0){
     TP.tmp <- diagnostic.data@TP[cov.vals==cov.val]
     FN.tmp <- diagnostic.data@FN[cov.vals==cov.val]
@@ -1870,9 +1934,11 @@ get.subgroup.data.diagnostic <- function(diagnostic.data, cov.val, cov.vals) {
     FP.tmp <- diagnostic.data@FP[cov.vals==cov.val]
     subgroup.data <- new('DiagnosticData', TP=TP.tmp, 
                           FN=FN.tmp , TN=TN.tmp, 
-                          FP=FP.tmp, y=y.tmp, SE=SE.tmp, study.names=names.tmp)
+                          FP=FP.tmp, y=y.tmp, SE=SE.tmp, study.names=names.tmp,
+                          years=years.tmp)
   } else {
-    subgroup.data <- new('DiagnosticData', y=y.tmp, SE=SE.tmp, study.names=names.tmp)
+    subgroup.data <- new('DiagnosticData', y=y.tmp, SE=SE.tmp, study.names=names.tmp,
+                         years=years.tmp)
   }
   subgroup.data
 }

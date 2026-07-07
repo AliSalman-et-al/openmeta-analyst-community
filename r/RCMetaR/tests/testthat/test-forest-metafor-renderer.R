@@ -105,6 +105,12 @@ read_png_dimensions <- function(path) {
   )
 }
 
+load_saved_plot_data <- function(path) {
+  env <- new.env(parent = emptyenv())
+  load(paste0(path, ".plotdata"), envir = env)
+  env$plot.data
+}
+
 test_that("binary Default Forest Style builds a self-contained metafor render bundle", {
   fixture <- metafor_binary_fixture()
   res <- rma.uni(
@@ -123,7 +129,8 @@ test_that("binary Default Forest Style builds a self-contained metafor render bu
   expect_equal(bundle$render_engine, "metafor")
   expect_equal(bundle$data_type, "binary")
   expect_equal(bundle$fp_style, "default")
-  expect_equal(bundle$ilab$headers, c("Events", "Total", "Events", "Total"))
+  expect_equal(bundle$ilab$headers, c("Events", "Non-events", "Events", "Non-events"))
+  expect_equal(unname(bundle$ilab$matrix[1, ]), c("4", "119", "11", "128"))
   expect_equal(bundle$ilab$groups, c("Experimental", "Control"))
   expect_equal(nrow(bundle$ilab$matrix), length(fixture$data@study.names))
   expect_true(inherits(bundle$res, "rma"))
@@ -164,7 +171,7 @@ test_that("single-study binary Default Forest Style uses normalized vectors", {
   expect_true(bundle$single_study)
   expect_equal(unname(bundle$effect$yi), unname(as.numeric(fixture$data@y)))
   expect_equal(unname(bundle$effect$sei), unname(as.numeric(fixture$data@SE)))
-  expect_equal(bundle$ilab$headers, c("Events", "Total", "Events", "Total"))
+  expect_equal(bundle$ilab$headers, c("Events", "Non-events", "Events", "Non-events"))
 
   png_path <- tempfile(fileext = ".png")
   rcmetar.draw.forest.plot(bundle, png_path)
@@ -270,4 +277,64 @@ test_that("single-study entered diagnostic Default Forest Style omits count ilab
 
   expect_true(file.exists(png_path))
   expect_gt(file.info(png_path)$size, 3000)
+})
+
+test_that("cumulative workflow saves and renders a Default metafor bundle", {
+  fixture <- metafor_binary_fixture()
+  fixture$params$fp_outpath <- tempfile(fileext = ".png")
+
+  result <- cum.ma.binary("binary.random", fixture$data, fixture$params)
+  bundle <- load_saved_plot_data(unname(result$plot_params_paths[[1]]))
+
+  expect_equal(bundle$render_engine, "metafor")
+  expect_equal(bundle$forest_variant, "cumulative")
+  expect_equal(bundle$fp_style, "default")
+  expect_equal(bundle$slab, c("Aaronson", "+ Ferguson", "+ Rosenthal", "+ Hart", "+ Frimodt-Moller", "+ Stein"))
+  expect_true(file.exists(unname(result$images[[1]])))
+  expect_gt(file.info(unname(result$images[[1]]))$size, 5000)
+})
+
+test_that("leave-one-out workflow saves and renders a Default metafor bundle", {
+  fixture <- metafor_continuous_fixture()
+  fixture$params$fp_outpath <- tempfile(fileext = ".png")
+
+  result <- loo.ma.continuous("continuous.random", fixture$data, fixture$params)
+  bundle <- load_saved_plot_data(unname(result$plot_params_paths[[1]]))
+
+  expect_equal(bundle$render_engine, "metafor")
+  expect_equal(bundle$forest_variant, "leave-one-out")
+  expect_equal(bundle$fp_style, "default")
+  expect_equal(bundle$slab[[1]], "Overall")
+  expect_true(all(grepl("^- ", bundle$slab[-1])))
+  expect_true(file.exists(unname(result$images[[1]])))
+  expect_gt(file.info(unname(result$images[[1]]))$size, 5000)
+})
+
+test_that("subgroup workflow saves and renders Default metafor subtotal diamonds", {
+  fixture <- metafor_binary_fixture()
+  fixture$params$fp_outpath <- tempfile(fileext = ".png")
+  fixture$params$cov_name <- "Era"
+  fixture$data@covariates <- list(new(
+    "CovariateValues",
+    cov.name = "Era",
+    cov.vals = c("Early", "Early", "Early", "Late", "Late", "Late"),
+    cov.type = "factor",
+    ref.var = "Early"
+  ))
+
+  result <- subgroup.ma.binary("binary.random", fixture$data, fixture$params)
+  bundle <- load_saved_plot_data(unname(result$plot_params_paths[[1]]))
+
+  expect_equal(bundle$render_engine, "metafor")
+  expect_equal(bundle$forest_variant, "subgroup")
+  expect_equal(bundle$fp_style, "default")
+  expect_equal(bundle$slab[[1]], "Aaronson, 1991")
+  expect_equal(bundle$subgroups$names, c("Early", "Late"))
+  expect_length(bundle$subgroups$polygon_rows, 2)
+  expect_false(is.null(bundle$subgroups$difference_test))
+  expect_true(is.finite(bundle$subgroups$difference_test$QM))
+  expect_equal(bundle$subgroups$difference_test$df, 1)
+  expect_true(inherits(bundle$subgroups$overall, "rma"))
+  expect_true(file.exists(unname(result$images[[1]])))
+  expect_gt(file.info(unname(result$images[[1]]))$size, 5000)
 })
