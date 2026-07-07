@@ -807,7 +807,7 @@ rcmetar.metafor.layout <- function(bundle, size, alim) {
 }
 
 rcmetar.open.metafor_device <- function(outpath, size) {
-    rcmetar.open.plot_device(outpath, size)
+    rcmetar.open.svg_device(outpath, size)
 }
 
 rcmetar.draw.metafor.forest <- function(bundle, outpath) {
@@ -820,8 +820,7 @@ rcmetar.draw.metafor.forest <- function(bundle, outpath) {
 
 rcmetar.draw.default.metafor.forest <- function(bundle, outpath) {
     size <- rcmetar.measure.metafor.forest.device(bundle)
-    rcmetar.open.metafor_device(outpath, size)
-    on.exit(grDevices::dev.off(), add=TRUE)
+    rcmetar.render.plot_file(outpath, size, function() {
 
     op <- graphics::par(no.readonly=TRUE)
     on.exit(graphics::par(op), add=TRUE)
@@ -912,6 +911,7 @@ rcmetar.draw.default.metafor.forest <- function(bundle, outpath) {
     rcmetar.draw.metafor.heterogeneity(bundle, layout$xlim[1], cex=size$cex)
 
     invisible(bundle$changed.params)
+    })
 }
 
 rcmetar.draw.metafor.sequential.text <- function(bundle, rows, layout, k, cex) {

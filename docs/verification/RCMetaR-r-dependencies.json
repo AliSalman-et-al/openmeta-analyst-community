@@ -96,6 +96,39 @@
       "installed_version": "3.9.0"
     },
     {
+      "name": "svglite",
+      "source": "cran",
+      "scope": ["runtime"],
+      "declared_in": ["r/RCMetaR/DESCRIPTION"],
+      "evidence": [
+        "r/RCMetaR/R/plot_devices.r: rcmetar.open.svg_device renders canonical forest plot SVG files with svglite::svglite(...)"
+      ],
+      "reason": "Forest plot exports use svglite as the canonical vector rendering device so all output formats share one source artifact.",
+      "installed_version": "2.2.2"
+    },
+    {
+      "name": "rsvg",
+      "source": "cran",
+      "scope": ["runtime"],
+      "declared_in": ["r/RCMetaR/DESCRIPTION"],
+      "evidence": [
+        "r/RCMetaR/R/plot_devices.r: rcmetar.export.svg_render converts canonical SVG files to PNG, PDF, and bitmap exports with rsvg"
+      ],
+      "reason": "Forest plot PNG, PDF, and TIFF exports are derived from canonical SVG output through librsvg-backed conversion.",
+      "installed_version": "2.7.0"
+    },
+    {
+      "name": "tiff",
+      "source": "cran",
+      "scope": ["runtime"],
+      "declared_in": ["r/RCMetaR/DESCRIPTION"],
+      "evidence": [
+        "r/RCMetaR/R/plot_devices.r: rcmetar.export.svg_render writes LZW-compressed TIFF files with tiff::writeTIFF(...)"
+      ],
+      "reason": "Journal-oriented TIFF forest plot exports are written from the canonical SVG rasterization bitmap with LZW compression.",
+      "installed_version": "0.1-12"
+    },
+    {
       "name": "lme4",
       "source": "cran",
       "scope": ["runtime"],

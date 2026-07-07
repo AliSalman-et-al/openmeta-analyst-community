@@ -312,8 +312,7 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
     }
 
     size <- rcmetar.measure.revman.forest.device(bundle)
-    rcmetar.open.metafor_device(outpath, size)
-    on.exit(grDevices::dev.off(), add=TRUE)
+    rcmetar.render.plot_file(outpath, size, function() {
 
     op <- graphics::par(no.readonly=TRUE)
     on.exit(graphics::par(op), add=TRUE)
@@ -409,13 +408,13 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
     rcmetar.draw.revman.bottom.blocks(bundle, layout$xlim[1], plot.info$cex, layout)
 
     invisible(bundle$changed.params)
+    })
 }
 
 rcmetar.draw.revman.sequential.forest <- function(bundle, outpath) {
     size <- rcmetar.measure.metafor.forest.device(bundle)
     size$bg <- "white"
-    rcmetar.open.metafor_device(outpath, size)
-    on.exit(grDevices::dev.off(), add=TRUE)
+    rcmetar.render.plot_file(outpath, size, function() {
 
     op <- graphics::par(no.readonly=TRUE)
     on.exit(graphics::par(op), add=TRUE)
@@ -462,6 +461,7 @@ rcmetar.draw.revman.sequential.forest <- function(bundle, outpath) {
     rcmetar.draw.metafor.single.study.accent(bundle, rows, alim, rcmetar.forest.accent.color(bundle$params))
     rcmetar.draw.metafor.sequential.text(bundle, rows, layout, k, size$cex)
     invisible(bundle$changed.params)
+    })
 }
 
 rcmetar.revman.method.label <- function(bundle) {

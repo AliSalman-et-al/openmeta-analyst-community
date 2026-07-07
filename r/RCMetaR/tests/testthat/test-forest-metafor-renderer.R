@@ -177,12 +177,14 @@ test_that("binary Default Forest Style builds a self-contained metafor render bu
   png_path <- tempfile(fileext = ".png")
   pdf_path <- tempfile(fileext = ".pdf")
   svg_path <- tempfile(fileext = ".svg")
+  svgz_path <- tempfile(fileext = ".svgz")
   tiff_path <- tempfile(fileext = ".tiff")
   contains_png_pdf_path <- tempfile(pattern = "contains_png_", fileext = ".pdf")
 
   rcmetar.draw.forest.plot(bundle, png_path)
   rcmetar.draw.forest.plot(bundle, pdf_path)
   rcmetar.draw.forest.plot(bundle, svg_path)
+  rcmetar.draw.forest.plot(bundle, svgz_path)
   rcmetar.draw.forest.plot(bundle, tiff_path)
   rcmetar.draw.forest.plot(bundle, contains_png_pdf_path)
 
@@ -200,9 +202,14 @@ test_that("binary Default Forest Style builds a self-contained metafor render bu
   expect_gt(file.info(svg_path)$size, 1000)
   expect_match(readLines(svg_path, n = 1), "xml|svg")
 
+  expect_true(file.exists(svgz_path))
+  expect_gt(file.info(svgz_path)$size, 1000)
+  expect_match(readLines(gzfile(svgz_path), n = 1), "xml|svg")
+
   expect_true(file.exists(tiff_path))
   expect_gt(file.info(tiff_path)$size, 1000)
   expect_equal(rcmetar.plot.file.extension(tiff_path), "tiff")
+  expect_length(dim(tiff::readTIFF(tiff_path)), 3)
 
   expect_equal(rcmetar.plot.file.extension(contains_png_pdf_path), "pdf")
   expect_equal(rcmetar.plot.file.extension("journal-forest.svg.gz"), "svgz")
