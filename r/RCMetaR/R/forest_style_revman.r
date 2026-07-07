@@ -368,7 +368,7 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
 
     graphics::rect(layout$annotation.xpos, -1.5, layout$ilab.xpos[[length(layout$ilab.xpos)]], -0.5, col="white", border=NA)
     graphics::text(layout$annotation.xpos, -1, summary$label, pos=2)
-    rcmetar.draw.revman.summary.diamond(summary, -1)
+    rcmetar.draw.revman.summary.diamond(summary, -1, rcmetar.forest.accent.color(bundle$params))
     rcmetar.draw.revman.axis(bundle, layout, plot.info$cex)
 
     graphics::par(cex=plot.info$cex, font=1)
@@ -453,7 +453,7 @@ rcmetar.revman.layout <- function(bundle) {
     } else {
         alim <- rcmetar.metafor.alim(bundle)
     }
-    label.extra <- max(0, max(nchar(as.character(bundle$slab)), 0) - 34)
+    label.extra <- max(0, max(nchar(as.character(bundle$slab)), 0) - 44)
     if (identical(bundle$data_type, "binary") && length(bundle$ilab$columns) == 5) {
         ilab.xpos <- c(-20.6, -18.6, -16.1, -14.1, -10.8)
         column.groups <- vapply(bundle$ilab$columns, function(column) column$group, character(1))
@@ -462,7 +462,7 @@ rcmetar.revman.layout <- function(bundle) {
             stats::setNames(mean(ilab.xpos[column.groups == bundle$ilab$groups[[2]]]), bundle$ilab$groups[[2]])
         )
         return(list(
-            xlim=c(-30 - label.extra * 0.42, 5.6),
+            xlim=c(-30 - label.extra * 0.16, 5.6),
             alim=alim,
             ilab.xpos=ilab.xpos,
             group.xpos=group.xpos,
@@ -482,7 +482,7 @@ rcmetar.revman.layout <- function(bundle) {
         numeric(0)
     }
     list(
-        xlim=c(alim[1] - (5.15 + label.extra * 0.055) * span, alim[2] + 0.25 * span),
+        xlim=c(alim[1] - (5.15 + label.extra * 0.020) * span, alim[2] + 0.25 * span),
         alim=alim,
         ilab.xpos=ilab.xpos,
         group.xpos=group.xpos,
@@ -587,12 +587,12 @@ rcmetar.draw.revman.study.effect.labels <- function(bundle, effect, layout, rows
     graphics::text(layout$annotation.xpos, rows, labels, pos=2, cex=cex)
 }
 
-rcmetar.draw.revman.summary.diamond <- function(summary, row) {
+rcmetar.draw.revman.summary.diamond <- function(summary, row, color="black") {
     graphics::polygon(
         x=c(summary$ci.lb, summary$yi, summary$ci.ub, summary$yi),
         y=c(row, row + 0.32, row, row - 0.32),
-        col="black",
-        border="black"
+        col=color,
+        border=color
     )
 }
 
