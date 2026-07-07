@@ -176,9 +176,13 @@ test_that("binary Default Forest Style builds a self-contained metafor render bu
 
   png_path <- tempfile(fileext = ".png")
   pdf_path <- tempfile(fileext = ".pdf")
+  svg_path <- tempfile(fileext = ".svg")
+  contains_png_pdf_path <- tempfile(pattern = "contains_png_", fileext = ".pdf")
 
   rcmetar.draw.forest.plot(bundle, png_path)
   rcmetar.draw.forest.plot(bundle, pdf_path)
+  rcmetar.draw.forest.plot(bundle, svg_path)
+  rcmetar.draw.forest.plot(bundle, contains_png_pdf_path)
 
   expect_true(file.exists(png_path))
   expect_gt(file.info(png_path)$size, 5000)
@@ -189,6 +193,23 @@ test_that("binary Default Forest Style builds a self-contained metafor render bu
   expect_true(file.exists(pdf_path))
   expect_gt(file.info(pdf_path)$size, 1000)
   expect_equal(pdftools::pdf_info(pdf_path)$pages, 1)
+
+  expect_true(file.exists(svg_path))
+  expect_gt(file.info(svg_path)$size, 1000)
+  expect_match(readLines(svg_path, n = 1), "xml|svg")
+
+  expect_equal(rcmetar.plot.file.extension(contains_png_pdf_path), "pdf")
+  expect_equal(rcmetar.plot.file.extension("journal-forest.svg.gz"), "svgz")
+  expect_true(file.exists(contains_png_pdf_path))
+  expect_gt(file.info(contains_png_pdf_path)$size, 1000)
+  expect_equal(pdftools::pdf_info(contains_png_pdf_path)$pages, 1)
+
+  if (!requireNamespace("svglite", quietly = TRUE)) {
+    expect_error(
+      rcmetar.open.metafor_device(tempfile(fileext = ".svgz"), list(width = 4, height = 3, bg = "white")),
+      "requires the optional svglite package"
+    )
+  }
 
   saved_path <- tempfile()
   rcmetar.save.plot.data(bundle, saved_path)
