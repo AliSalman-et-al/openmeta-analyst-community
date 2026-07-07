@@ -492,14 +492,18 @@ rcmetar.metafor.atransf <- function(bundle) {
     NULL
 }
 
-rcmetar.metafor.refline <- function(bundle) {
+rcmetar.metafor.refline <- function(bundle, alim=NULL) {
     if (identical(bundle$forest_variant, "cumulative") || identical(bundle$forest_variant, "leave-one-out")) {
         return(NA)
     }
+    refline <- 0
     if (metric.is.log.scale(as.character(bundle$params$measure))) {
-        return(0)
+        refline <- 0
     }
-    0
+    if (!is.null(alim) && is.finite(refline) && (refline < alim[[1]] || refline > alim[[2]])) {
+        return(NA)
+    }
+    refline
 }
 
 rcmetar.metafor.axis.ticks <- function(bundle, alim) {
@@ -641,8 +645,8 @@ rcmetar.metafor.heterogeneity.measure.label <- function(bundle) {
     paste0(
         "RE Model (Q = ", round.display(res$QE, 2),
         ", df = ", res$k - res$p, ", ",
-        rcmetar.metafor.p.value.label(res$QEp), "; I^2 = ",
-        round.display(res$I2, 1), "%, tau^2 = ",
+        rcmetar.metafor.p.value.label(res$QEp), "; I² = ",
+        round.display(res$I2, 1), "%, tau² = ",
         round.display(res$tau2, 2), ")"
     )
 }
@@ -784,7 +788,7 @@ rcmetar.draw.default.metafor.forest <- function(bundle, outpath) {
     }
 
     accent.color <- rcmetar.forest.accent.color(bundle$params)
-    forest.color <- if (isTRUE(bundle$single_study) && !manual.sequential.labels) "black" else accent.color
+    forest.color <- if (!isTRUE(bundle$single_study) || (isTRUE(bundle$single_study) && !manual.sequential.labels)) "black" else accent.color
     forest.args <- list(
         slab = if (manual.sequential.labels) rep("", length(bundle$slab)) else bundle$slab,
         ilab = if (ncol(bundle$ilab$matrix) > 0) bundle$ilab$matrix else NULL,
@@ -794,7 +798,7 @@ rcmetar.draw.default.metafor.forest <- function(bundle, outpath) {
         alim = alim,
         at = rcmetar.metafor.axis.ticks(bundle, alim),
         atransf = rcmetar.metafor.atransf(bundle),
-        refline = rcmetar.metafor.refline(bundle),
+        refline = rcmetar.metafor.refline(bundle, alim),
         xlab = rcmetar.metafor.xlab(bundle),
         cex = size$cex,
         cex.lab = size$cex,
@@ -809,7 +813,7 @@ rcmetar.draw.default.metafor.forest <- function(bundle, outpath) {
         pch = 15,
         psize = rcmetar.metafor.psize(bundle),
         lwd = 1.35,
-        efac = 1.15,
+        efac = if (manual.sequential.labels) 0 else 1.15,
         digits = as.integer(bundle$params$digits)
     )
     forest.args <- forest.args[!vapply(forest.args, is.null, logical(1))]
@@ -831,7 +835,10 @@ rcmetar.draw.default.metafor.forest <- function(bundle, outpath) {
             rcmetar.draw.metafor.single.study.accent(bundle, rows, alim, accent.color)
         }
     } else {
-        plot.info <- do.call(metafor::forest.rma, c(list(x = bundle$res), c(forest.args, list(mlab="", border=accent.color, colout="black"))))
+        plot.info <- do.call(metafor::forest.rma, c(list(x = bundle$res), c(forest.args, list(mlab="", border=accent.color, colout=accent.color))))
+        if (!identical(bundle$forest_variant, "subgroup")) {
+            rcmetar.draw.metafor.summary.diamond(bundle$res, -1, accent.color)
+        }
     }
 
     if (identical(bundle$forest_variant, "subgroup")) {
@@ -869,20 +876,59 @@ rcmetar.draw.metafor.sequential.text <- function(bundle, rows, layout, k, cex) {
 }
 
 rcmetar.draw.metafor.single.study.accent <- function(bundle, rows, alim, color) {
-    if (identical(color, "black") || length(rows) != length(bundle$effect$yi)) {
+    if (identical(color, "black")) {
         return(invisible(NULL))
     }
-    yi <- as.numeric(bundle$effect$yi)
-    ci.lb <- as.numeric(bundle$effect$ci.lb)
-    ci.ub <- as.numeric(bundle$effect$ci.ub)
+    rcmetar.draw.metafor.effect.accent(
+        effect=bundle$effect,
+        rows=rows,
+        alim=alim,
+        color=color,
+        psize=rcmetar.metafor.psize(bundle)
+    )
+}
+
+rcmetar.draw.metafor.summary.diamond <- function(res, row, color) {
+    if (identical(color, "black") ||
+            is.null(res$b) || is.null(res$ci.lb) || is.null(res$ci.ub)) {
+        return(invisible(NULL))
+    }
+    center <- as.numeric(res$b)
+    lower <- as.numeric(res$ci.lb)
+    upper <- as.numeric(res$ci.ub)
+    if (!all(is.finite(c(center, lower, upper)))) {
+        return(invisible(NULL))
+    }
+    graphics::polygon(
+        x=c(lower, center, upper, center),
+        y=c(row, row + 0.36, row, row - 0.36),
+        col="white",
+        border="white"
+    )
+    graphics::polygon(
+        x=c(lower, center, upper, center),
+        y=c(row, row + 0.28, row, row - 0.28),
+        col=color,
+        border=color
+    )
+    invisible(NULL)
+}
+
+rcmetar.draw.metafor.effect.accent <- function(effect, rows, alim, color, psize, lwd=1.35) {
+    if (length(rows) != length(effect$yi)) {
+        return(invisible(NULL))
+    }
+    yi <- as.numeric(effect$yi)
+    ci.lb <- as.numeric(effect$ci.lb)
+    ci.ub <- as.numeric(effect$ci.ub)
     finite <- is.finite(yi) & is.finite(ci.lb) & is.finite(ci.ub)
     if (!any(finite)) {
         return(invisible(NULL))
     }
     left <- pmax(ci.lb[finite], alim[[1]])
     right <- pmin(ci.ub[finite], alim[[2]])
-    graphics::segments(left, rows[finite], right, rows[finite], col=color, lwd=1.35)
-    rcmetar.draw.metafor.single.study.interval.ends(ci.lb[finite], ci.ub[finite], rows[finite], alim, color)
+    graphics::segments(left, rows[finite], right, rows[finite], col=color, lwd=lwd)
+    rcmetar.draw.metafor.single.study.interval.ends(ci.lb[finite], ci.ub[finite], rows[finite], alim, color, lwd=lwd)
     inside <- yi[finite] >= alim[[1]] & yi[finite] <= alim[[2]]
     if (any(inside)) {
         graphics::points(
@@ -890,16 +936,19 @@ rcmetar.draw.metafor.single.study.accent <- function(bundle, rows, alim, color) 
             rows[finite][inside],
             pch=15,
             col=color,
-            cex=rcmetar.metafor.psize(bundle)[finite][inside]
+            cex=psize[finite][inside]
         )
     }
     invisible(NULL)
 }
 
-rcmetar.draw.metafor.single.study.interval.ends <- function(ci.lb, ci.ub, rows, alim, color) {
-    span <- max(diff(alim), 1)
-    arrow.length <- span * 0.018
-    cap.height <- 0.065
+rcmetar.draw.metafor.single.study.interval.ends <- function(ci.lb, ci.ub, rows, alim, color, lwd=1.35) {
+    span <- diff(alim)
+    if (!is.finite(span) || span <= 0) {
+        span <- 1
+    }
+    arrow.length <- span * 0.026
+    cap.height <- 0.055
 
     left.clipped <- ci.lb < alim[[1]]
     if (any(left.clipped)) {
@@ -933,7 +982,7 @@ rcmetar.draw.metafor.single.study.interval.ends <- function(ci.lb, ci.ub, rows, 
             ci.lb[left.cap],
             rows[left.cap] + cap.height,
             col=color,
-            lwd=1.35
+            lwd=lwd
         )
     }
 
@@ -945,7 +994,7 @@ rcmetar.draw.metafor.single.study.interval.ends <- function(ci.lb, ci.ub, rows, 
             ci.ub[right.cap],
             rows[right.cap] + cap.height,
             col=color,
-            lwd=1.35
+            lwd=lwd
         )
     }
 

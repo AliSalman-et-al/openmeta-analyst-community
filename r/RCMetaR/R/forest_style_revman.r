@@ -329,7 +329,7 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
         alim=layout$alim,
         xlab="",
         xaxt="n",
-        efac=c(0, 4),
+        efac=0,
         textpos=c(layout$xlim[1], layout$annotation.xpos),
         lty=c(1, 1, 0),
         refline=NA,
@@ -349,6 +349,14 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
     ))
 
     graphics::par(xpd=NA)
+    rcmetar.draw.metafor.effect.accent(
+        effect=effect,
+        rows=k:1,
+        alim=layout$alim,
+        color=rcmetar.forest.accent.color(bundle$params),
+        psize=summary$psize,
+        lwd=1.15
+    )
     graphics::segments(plot.info$xlim[1] + 0.5, k + 1, plot.info$xlim[2], k + 1, lwd=0.8)
     graphics::segments(0, -2, 0, k + 1, lwd=0.8)
 
@@ -424,7 +432,7 @@ rcmetar.draw.revman.sequential.forest <- function(bundle, outpath) {
         pch=15,
         psize=rcmetar.metafor.psize(bundle),
         lwd=1.15,
-        efac=1.0,
+        efac=0,
         digits=as.integer(bundle$params$digits)
     ))
     rcmetar.draw.metafor.single.study.accent(bundle, rows, alim, rcmetar.forest.accent.color(bundle$params))
@@ -638,11 +646,11 @@ rcmetar.measure.revman.forest.device <- function(bundle) {
         max(0, column.count - 5) * 0.22 +
         max(0, header.width - 16) * 0.045
     height <- max(4.25, 3.05 + 0.25 * k)
-    cex <- 0.90 -
-        max(0, k - 8) * 0.012 -
-        max(0, label.width - 48) * 0.004 -
-        max(0, header.width - 28) * 0.003
-    list(width=min(width, 18), height=min(height, 18), cex=max(0.64, cex), bg="white")
+    cex <- 0.98 -
+        max(0, k - 8) * 0.008 -
+        max(0, label.width - 48) * 0.0025 -
+        max(0, header.width - 28) * 0.0015
+    list(width=min(width, 18), height=min(height, 18), cex=max(0.78, cex), bg="white")
 }
 
 rcmetar.draw.revman.bottom.blocks <- function(bundle, x, cex, layout=NULL) {
