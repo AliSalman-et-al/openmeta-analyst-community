@@ -466,6 +466,7 @@ rcmetar.draw.revman.sequential.forest <- function(bundle, outpath) {
         col=rcmetar.forest.accent.color(bundle$params),
         pch=compact.pch,
         psize=rcmetar.metafor.psize(bundle),
+        lty=rcmetar.metafor.forest.line.types(plan),
         lwd=compact.lwd,
         efac=0,
         digits=as.integer(bundle$params$digits)

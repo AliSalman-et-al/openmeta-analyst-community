@@ -427,6 +427,13 @@ rcmetar.metafor.refline <- function(bundle, alim=NULL) {
     refline
 }
 
+rcmetar.metafor.forest.line.types <- function(plan) {
+    if (isTRUE(plan$rows$manual_sequential_labels)) {
+        return(c("solid", "blank"))
+    }
+    c("solid", "solid")
+}
+
 rcmetar.metafor.axis.ticks <- function(bundle, alim) {
     params <- bundle$params
     if (!is.null(params$fp_xticks) && !identical(params$fp_xticks[1], "[default]") && !all(is.na(params$fp_xticks))) {

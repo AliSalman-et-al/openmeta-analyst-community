@@ -382,6 +382,7 @@ test_that("Forest Layout Preflight records sparse and compact RevMan templates w
   expect_lt(compact.plan$rows$top - max(compact.plan$rows$study_rows), 2)
   expect_true(compact.plan$rows$ylim[[1]] >= -2.5)
   expect_lt(compact.plan$device$height, 5)
+  expect_equal(rcmetar.metafor.forest.line.types(compact.plan), c("solid", "blank"))
 
   sequential.bundle$params$fp_style <- "bmj"
   sequential.bundle$fp_style <- "bmj"

@@ -260,6 +260,7 @@ rcmetar.draw.default.forest <- function(bundle, outpath) {
         col = forest.color,
         colshade = "#eeeeee",
         shade = "zebra",
+        lty = rcmetar.metafor.forest.line.types(plan),
         pch = 15,
         psize = rcmetar.metafor.psize(bundle),
         lwd = 1.35,
