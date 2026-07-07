@@ -529,7 +529,7 @@ test_that("BMJ Forest Style builds faithful family columns and renders smoke cas
     ),
     continuous = list(
       fixture = metafor_continuous_fixture(),
-      expected_headers = c("Mean", "SD", "Total", "Mean", "SD", "Total", "Weight"),
+      expected_headers = c("Total", "Mean", "SD", "Total", "Mean", "SD", "Weight"),
       expected_groups = c("Treatment", "Control"),
       axis_label = "",
       favours_left = "Favors control",
@@ -573,6 +573,9 @@ test_that("BMJ Forest Style builds faithful family columns and renders smoke cas
       summary <- rcmetar.bmj.summary.effect(bundle)
       expect_gte(min(summary$psize, na.rm = TRUE), 1.2)
       expect_gte(max(summary$psize, na.rm = TRUE), 2.0)
+    }
+    if (identical(bundle$data_type, "continuous")) {
+      expect_equal(unname(bundle$ilab$matrix[1, 1:6]), c("22", "8.200", "1.500", "20", "9.000", "1.600"))
     }
 
     png_path <- tempfile(fileext = ".png")

@@ -66,9 +66,37 @@ rcmetar.bmj.binary.ilab <- function(binary.data, params, res=NULL) {
     rcmetar.bmj.ilab(columns, n)
 }
 
+rcmetar.bmj.continuous.ilab <- function(cont.data, params, res=NULL) {
+    n <- length(cont.data@study.names)
+    digits <- as.integer(params$digits)
+    groups <- rcmetar.revman.arm.labels(params)
+    columns <- list()
+    if (rcmetar.has.continuous.raw.columns(cont.data, n, params)) {
+        columns <- list(
+            list(key="experimental_total", group=groups[[1]], header="Total", values=rcmetar.format.metafor.raw(cont.data@N1)),
+            list(key="experimental_mean", group=groups[[1]], header="Mean", values=rcmetar.revman.format.number(cont.data@mean1, digits)),
+            list(key="experimental_sd", group=groups[[1]], header="SD", values=rcmetar.revman.format.number(cont.data@sd1, digits))
+        )
+        if (as.character(params$measure) %in% continuous.two.arm.metrics) {
+            columns <- c(columns, list(
+                list(key="control_total", group=groups[[2]], header="Total", values=rcmetar.format.metafor.raw(cont.data@N2)),
+                list(key="control_mean", group=groups[[2]], header="Mean", values=rcmetar.revman.format.number(cont.data@mean2, digits)),
+                list(key="control_sd", group=groups[[2]], header="SD", values=rcmetar.revman.format.number(cont.data@sd2, digits))
+            ))
+        }
+    }
+    columns <- c(columns, list(
+        list(key="weight", group="", header="Weight", values=rcmetar.bmj.format.weight(rcmetar.metafor.weights(res), n))
+    ))
+    rcmetar.bmj.ilab(columns, n)
+}
+
 rcmetar.bmj.ilab.for.data <- function(om.data, params, res=NULL) {
     if ("BinaryData" %in% class(om.data)) {
         return(rcmetar.bmj.binary.ilab(om.data, params, res))
+    }
+    if ("ContinuousData" %in% class(om.data)) {
+        return(rcmetar.bmj.continuous.ilab(om.data, params, res))
     }
     ilab <- rcmetar.revman.ilab.for.data(om.data, params, res)
     weight.index <- which(vapply(ilab$columns, function(column) column$key, character(1)) == "weight")
