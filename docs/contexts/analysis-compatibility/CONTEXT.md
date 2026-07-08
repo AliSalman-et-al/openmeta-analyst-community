@@ -148,6 +148,14 @@ _Avoid_: Network feature, optional analysis
 An analysis feature that models study-level covariates as predictors of effect estimates and must remain compatible before the first modernization milestone is releasable.
 _Avoid_: Regression feature, covariate analysis
 
+**Meta-Regression Bubble Plot**:
+The generated plot for a single-continuous-covariate Meta-Regression, showing study effect estimates as precision-weighted bubbles against the moderator with the fitted regression line and optional interval bands.
+_Avoid_: Regression scatter, covariate chart
+
+**Bubble Plot Style**:
+The publication presentation template for a Meta-Regression Bubble Plot, using the same Default, RevMan, and BMJ style vocabulary as Forest Plot Style while remaining a separate plot contract.
+_Avoid_: Bubble theme, regression skin
+
 **Subgroup Analysis**:
 An analysis feature that compares effect estimates across study groups or categorical covariates and must remain compatible before the first modernization milestone is releasable.
 _Avoid_: Group analysis, subgroup feature

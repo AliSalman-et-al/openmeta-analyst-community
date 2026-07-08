@@ -592,7 +592,17 @@ create.subgroup.plot.data.cont <- function(subgroup.data, params) {
 }
 
 # create regression plot data
-create.plot.data.reg <- function(reg.data, params, fitted.line, selected.cov=NULL) {
+create.plot.data.reg <- function(reg.data, params, fitted.line, selected.cov=NULL, res=NULL) {
+     if (inherits(res, "rma")) {
+         return(rcmetar.create.metafor.bubble.bundle(
+             reg.data=reg.data,
+             params=params,
+             res=res,
+             cov.name=reg.data@covariates[[1]]@cov.name,
+             cov.values=reg.data@covariates[[1]]@cov.vals,
+             fitted.line=fitted.line
+         ))
+     }
      scale.str <- get.scale(params)
      cov.name <- reg.data@covariates[[1]]@cov.name
      cov.vals <- reg.data@covariates[[1]]@cov.vals
@@ -814,6 +824,10 @@ pretty.metric.name <- function(metric) {
 #       meta-regression scatter       #
 #######################################
 meta.regression.plot <- function(plot.data, outpath, ...) {
+    if (rcmetar.is.metafor.bubble.bundle(plot.data)) {
+        return(rcmetar.draw.metafor.bubble(plot.data, outpath))
+    }
+
 	png(filename=rcmetar.scratch.path("INTER")) # to fix windows popping out at you issue
 
     lweight = 1

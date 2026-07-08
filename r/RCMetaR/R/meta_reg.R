@@ -440,7 +440,7 @@ g.meta.regression <- function(
 		plot.path <- "./r_tmp/reg.png"
 	    cov.name <- mods[['numeric']][[1]]
 		cov.vals <- data[[cov.name]]
-		plot.data <- g.create.plot.data.reg(data, cov.name, cov.vals, measure, level, fitted.line)
+		plot.data <- g.create.plot.data.reg(data, cov.name, cov.vals, measure, level, fitted.line, res=res, digits=digits)
 		
 		# Use generated axis labels unless the caller supplies richer labels.
 		
@@ -504,7 +504,23 @@ is.single.numeric.covariate <- function(mods) {
 }
 
 # create regression plot data for g.meta.regression function
-g.create.plot.data.reg <- function(reg.data, cov.name, cov.vals, measure, level, fitted.line) {
+g.create.plot.data.reg <- function(reg.data, cov.name, cov.vals, measure, level, fitted.line, res=NULL, digits=3) {
+	if (inherits(res, "rma")) {
+		params <- list(
+			measure=measure,
+			conf.level=level,
+			digits=digits,
+			fp_style="default"
+		)
+		return(rcmetar.create.metafor.bubble.bundle(
+			reg.data=reg.data,
+			params=params,
+			res=res,
+			cov.name=cov.name,
+			cov.values=cov.vals,
+			fitted.line=fitted.line
+		))
+	}
 	scale.str <- g.get.scale(measure)
 	plot.data <- list("fitted.line" = fitted.line,
 			types = c(rep(0, length(reg.data$slab))),
@@ -863,7 +879,7 @@ meta.regression <- function(reg.data, params, cond.means.data=NULL, stop.at.rma=
             betas <- res$b
             fitted.line <- list(intercept=betas[1], slope=betas[2])
             plot.path <- "./r_tmp/reg.png"
-            plot.data <- create.plot.data.reg(reg.data, params, fitted.line)
+            plot.data <- create.plot.data.reg(reg.data, params, fitted.line, res=res)
 
             # Use generated axis labels unless the caller supplies richer labels.
             plot.data$xlabel <- reg.data@covariates[[1]]@cov.name
