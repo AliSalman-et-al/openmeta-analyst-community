@@ -113,6 +113,27 @@ qa_make_binary <- function(n, stress) {
   data
 }
 
+qa_make_binary_one_arm <- function(n, stress) {
+  set.seed(if (stress) 154 else 151)
+  events <- pmax(0, round(seq(2, 72, length.out = n) + rnorm(n, 0, 3)))
+  nonevents <- round(seq(38, 720, length.out = n) + runif(n, 10, 90))
+  if (stress && n >= 4) {
+    events[3] <- 0
+  }
+  data <- new(
+    "BinaryData",
+    g1O1 = events,
+    g1O2 = nonevents,
+    study.names = qa_long_labels("One-arm Binary", n, stress),
+    years = as.integer(2000 + seq_len(n))
+  )
+  params <- qa_base_params("PLO", tempfile(fileext = ".png"), "default", qa_scenario_settings()$base)
+  effect <- compute.for.one.bin.study(data, params)
+  data@y <- effect$yi
+  data@SE <- sqrt(effect$vi)
+  data
+}
+
 qa_make_continuous <- function(n, stress) {
   set.seed(if (stress) 204 else 201)
   data <- new(
@@ -127,6 +148,23 @@ qa_make_continuous <- function(n, stress) {
     years = as.integer(2010 + seq_len(n))
   )
   params <- qa_base_params("MD", tempfile(fileext = ".png"), "default", qa_scenario_settings()$base)
+  effect <- compute.for.one.cont.study(data, params)
+  data@y <- effect$yi
+  data@SE <- sqrt(effect$vi)
+  data
+}
+
+qa_make_continuous_one_arm <- function(n, stress) {
+  set.seed(if (stress) 254 else 251)
+  data <- new(
+    "ContinuousData",
+    N1 = round(seq(18, 260, length.out = n)),
+    mean1 = round(seq(8.2, 16.4, length.out = n) + rnorm(n, 0, .9), 2),
+    sd1 = round(runif(n, 1.1, 4.4), 2),
+    study.names = qa_long_labels("One-arm Continuous", n, stress),
+    years = as.integer(2010 + seq_len(n))
+  )
+  params <- qa_base_params("TXMean", tempfile(fileext = ".png"), "default", qa_scenario_settings()$base)
   effect <- compute.for.one.cont.study(data, params)
   data@y <- effect$yi
   data@SE <- sqrt(effect$vi)
@@ -159,11 +197,31 @@ qa_make_entered_binary <- function(n, stress) {
   )
 }
 
+qa_make_entered_binary_one_arm <- function(n, stress) {
+  yi <- logit(seq(0.06, 0.22, length.out = n))
+  sei <- seq(0.14, 0.26, length.out = n)
+  rcmetar.create.binary.data(
+    y = yi,
+    SE = sei,
+    study.names = qa_long_labels("Entered One-arm Binary", n, stress),
+    years = as.integer(2000 + seq_len(n))
+  )
+}
+
 qa_make_entered_continuous <- function(n, stress) {
   rcmetar.create.continuous.data(
     y = seq(-0.45, 0.35, length.out = n),
     SE = seq(0.18, 0.30, length.out = n),
     study.names = qa_long_labels("Entered Continuous", n, stress),
+    years = as.integer(2010 + seq_len(n))
+  )
+}
+
+qa_make_entered_continuous_one_arm <- function(n, stress) {
+  rcmetar.create.continuous.data(
+    y = seq(7.5, 13.5, length.out = n),
+    SE = seq(0.18, 0.32, length.out = n),
+    study.names = qa_long_labels("Entered One-arm Continuous", n, stress),
     years = as.integer(2010 + seq_len(n))
   )
 }
@@ -178,26 +236,44 @@ qa_make_entered_diagnostic <- function(n, stress) {
 }
 
 qa_method_for <- function(kind) {
-  switch(kind, binary = "binary.random", continuous = "continuous.random", diagnostic = "diagnostic.random")
+  switch(
+    kind,
+    binary_two_arm = "binary.random",
+    binary_one_arm = "binary.random",
+    continuous_two_arm = "continuous.random",
+    continuous_one_arm = "continuous.random",
+    diagnostic = "diagnostic.random"
+  )
 }
 
 qa_measure_for <- function(kind) {
-  switch(kind, binary = "OR", continuous = "MD", diagnostic = "Sens")
+  switch(
+    kind,
+    binary_two_arm = "OR",
+    binary_one_arm = "PLO",
+    continuous_two_arm = "MD",
+    continuous_one_arm = "TXMean",
+    diagnostic = "Sens"
+  )
 }
 
 qa_fixture_for <- function(kind, n, stress, direct = FALSE) {
   if (isTRUE(direct)) {
     return(switch(
       kind,
-      binary = qa_make_entered_binary(n, stress),
-      continuous = qa_make_entered_continuous(n, stress),
+      binary_two_arm = qa_make_entered_binary(n, stress),
+      binary_one_arm = qa_make_entered_binary_one_arm(n, stress),
+      continuous_two_arm = qa_make_entered_continuous(n, stress),
+      continuous_one_arm = qa_make_entered_continuous_one_arm(n, stress),
       diagnostic = qa_make_entered_diagnostic(n, stress)
     ))
   }
   switch(
     kind,
-    binary = qa_make_binary(n, stress),
-    continuous = qa_make_continuous(n, stress),
+    binary_two_arm = qa_make_binary(n, stress),
+    binary_one_arm = qa_make_binary_one_arm(n, stress),
+    continuous_two_arm = qa_make_continuous(n, stress),
+    continuous_one_arm = qa_make_continuous_one_arm(n, stress),
     diagnostic = qa_make_diagnostic(n, stress)
   )
 }
@@ -232,7 +308,7 @@ qa_render_matrix <- function(output.root = qa_root(qa_find_repo_root()), format 
   output.root <- normalizePath(output.root, winslash = "/", mustWork = TRUE)
   scenarios <- qa_scenario_settings()
   cases <- expand.grid(
-    kind = c("binary", "continuous", "diagnostic"),
+    kind = c("binary_two_arm", "binary_one_arm", "continuous_two_arm", "continuous_one_arm", "diagnostic"),
     workflow = c("standard", "cumulative", "leave-one-out"),
     style = c("default", "revman", "bmj"),
     scenario = names(scenarios),
