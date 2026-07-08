@@ -21,7 +21,17 @@ binary.one.arm.metrics <- c("PR", "PLN", "PLO", "PAS", "PFT")
 
 
 compute.for.one.bin.study <- function(binary.data, params){
-    res <- escalc(params$measure, ai=binary.data@g1O1, bi=binary.data@g1O2, 
+    if (params$measure %in% binary.one.arm.metrics) {
+        res <- escalc(
+            params$measure,
+            xi=binary.data@g1O1,
+            ni=binary.data@g1O1 + binary.data@g1O2,
+            add=params$adjust,
+            to=params$to
+        )
+        return(res)
+    }
+    res <- escalc(params$measure, ai=binary.data@g1O1, bi=binary.data@g1O2,
                                     ci=binary.data@g2O1, di=binary.data@g2O2,
                                     add=params$adjust, to=params$to)
     res             
@@ -73,9 +83,7 @@ binary.transform.f <- function(metric.str){
             arcsine.sqrt(x) 
         } else if (metric.str %in% binary.freeman_tukey.metrics){
             ni <- extra.args[['ni']]
-          if (length(x)==1) {
              transf.pft(x, ni)
-          }
         } else {
             # identity function
             x

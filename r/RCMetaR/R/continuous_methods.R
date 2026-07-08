@@ -21,6 +21,9 @@ compute.for.one.cont.study <- function(cont.data, params) {
   m2i <- cont.data@mean2
   sd1i <- cont.data@sd1
   sd2i <- cont.data@sd2
+  if (params$measure %in% continuous.one.arm.metrics) {
+    return(data.frame(yi=m1i, vi=(sd1i^2) / n1i))
+  }
   res <- escalc(params$measure, n1i=n1i, n2i=n2i, m1i=m1i, m2i=m2i, sd1i=sd1i, sd2i=sd2i)
   res
 }

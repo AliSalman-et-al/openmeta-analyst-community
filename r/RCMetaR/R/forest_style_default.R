@@ -10,8 +10,31 @@ rcmetar.empty.default.ilab <- function(n) {
 rcmetar.binary.default.ilab <- function(binary.data, params) {
     n <- length(binary.data@study.names)
     if (!rcmetar.param.is.true(params, "fp_show_raw_counts", TRUE) ||
-            !rcmetar.has.binary.raw.columns(binary.data, n)) {
+            !rcmetar.has.binary.raw.columns(binary.data, n, params)) {
         return(rcmetar.empty.default.ilab(length(binary.data@study.names)))
+    }
+    if (as.character(params$measure) %in% binary.one.arm.metrics) {
+        group <- "Experimental"
+        if (!is.null(params$fp_col3_str) && params$fp_col3_str != "[default]") {
+            group <- as.character(params$fp_col3_str)
+        }
+        if (!rcmetar.param.is.true(params, "fp_show_col3", TRUE)) {
+            return(rcmetar.empty.default.ilab(length(binary.data@study.names)))
+        }
+        columns <- list(
+            list(key="experimental_events", group=group, header="Events", values=rcmetar.format.metafor.raw(binary.data@g1O1)),
+            list(key="experimental_nonevents", group=group, header="Non-events", values=rcmetar.format.metafor.raw(binary.data@g1O2))
+        )
+        matrix <- do.call(cbind, lapply(columns, function(column) column$values))
+        mode(matrix) <- "character"
+        headers <- vapply(columns, function(column) column$header, character(1))
+        colnames(matrix) <- headers
+        return(list(
+            matrix = matrix,
+            columns = columns,
+            headers = headers,
+            groups = group
+        ))
     }
     columns <- list(
         list(key="experimental_events", group="Experimental", header="Events", values=rcmetar.format.metafor.raw(binary.data@g1O1)),

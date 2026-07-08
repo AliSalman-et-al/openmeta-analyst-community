@@ -13,12 +13,13 @@ rcmetar.forest.study.header.label <- function(header) {
 
 rcmetar.metafor.binary.default.supported <- function(binary.data, params, selected.cov=NULL) {
     n <- length(binary.data@study.names)
-    has.raw <- rcmetar.has.binary.raw.columns(binary.data, n)
+    measure <- as.character(params$measure)
+    has.raw <- rcmetar.has.binary.raw.columns(binary.data, n, params)
     has.entered.effects <- rcmetar.has.entered.effects(binary.data, n)
     is.null(selected.cov) &&
         "BinaryData" %in% class(binary.data) &&
         rcmetar.forest.style(params) %in% c("default", "revman", "bmj") &&
-        as.character(params$measure) %in% binary.two.arm.metrics &&
+        measure %in% c(binary.two.arm.metrics, binary.one.arm.metrics) &&
         n > 0 &&
         (has.raw || has.entered.effects)
 }
@@ -26,7 +27,6 @@ rcmetar.metafor.binary.default.supported <- function(binary.data, params, select
 rcmetar.metafor.continuous.default.supported <- function(cont.data, params, selected.cov=NULL) {
     n <- length(cont.data@study.names)
     is.null(selected.cov) &&
-        !identical(params$create.plot, FALSE) &&
         "ContinuousData" %in% class(cont.data) &&
         rcmetar.forest.style(params) %in% c("default", "revman", "bmj") &&
         as.character(params$measure) %in% c(continuous.two.arm.metrics, continuous.one.arm.metrics) &&
@@ -52,12 +52,33 @@ rcmetar.has.entered.effects <- function(om.data, n=length(om.data@study.names)) 
     length(om.data@y) == n && length(om.data@SE) == n
 }
 
-rcmetar.has.binary.raw.columns <- function(binary.data, n=length(binary.data@study.names)) {
-    n > 0 &&
+rcmetar.has.binary.raw.columns <- function(binary.data, n=length(binary.data@study.names), params=NULL) {
+    has.one.arm <- n > 0 &&
         length(binary.data@g1O1) == n &&
-        length(binary.data@g1O2) == n &&
-        length(binary.data@g2O1) == n &&
-        length(binary.data@g2O2) == n
+        length(binary.data@g1O2) == n
+    if (!has.one.arm) {
+        return(FALSE)
+    }
+    if (!is.null(params) && as.character(params$measure) %in% binary.one.arm.metrics) {
+        return(TRUE)
+    }
+    length(binary.data@g2O1) == n && length(binary.data@g2O2) == n
+}
+
+rcmetar.binary.one.arm.raw.total <- function(binary.data, n=length(binary.data@study.names)) {
+    if (n == 0 || length(binary.data@g1O1) != n || length(binary.data@g1O2) != n) {
+        return(NULL)
+    }
+    as.numeric(binary.data@g1O1) + as.numeric(binary.data@g1O2)
+}
+
+rcmetar.forest.harmonic.mean <- function(values) {
+    values <- as.numeric(values)
+    values <- values[is.finite(values) & values > 0]
+    if (length(values) == 0) {
+        return(NA_real_)
+    }
+    length(values) / sum(1 / values)
 }
 
 rcmetar.has.continuous.raw.columns <- function(cont.data, n=length(cont.data@study.names), params=NULL) {
@@ -164,6 +185,11 @@ rcmetar.build.sequential.metafor.bundle <- function(om.data, params, results, va
         sei[missing.se] <- (ci.ub[missing.se] - ci.lb[missing.se]) / (2 * mult)
     }
 
+    sample.sizes <- NULL
+    if ("BinaryData" %in% class(om.data) && as.character(params$measure) %in% binary.one.arm.metrics) {
+        sample.sizes <- rcmetar.binary.one.arm.raw.total(om.data)
+    }
+
     list(
         render_engine = "metafor",
         data_type = .rcmetar.data.type(om.data),
@@ -181,6 +207,7 @@ rcmetar.build.sequential.metafor.bundle <- function(om.data, params, results, va
         ilab = rcmetar.empty.forest.ilab(length(labels)),
         slab = as.character(labels),
         weights = NULL,
+        sample_sizes = sample.sizes,
         params = params,
         side_by_side = FALSE,
         plot_range = legacy.plot.data$plot.range,
@@ -212,6 +239,10 @@ rcmetar.build.subgroup.metafor.bundle <- function(om.data, params, subgroup.data
     flat.ci.lb <- flat.yi - mult * flat.sei
     flat.ci.ub <- flat.yi + mult * flat.sei
     flat.slab <- unlist(lapply(study.data, rcmetar.study.labels), use.names=FALSE)
+    sample.sizes <- NULL
+    if ("BinaryData" %in% class(om.data) && as.character(params$measure) %in% binary.one.arm.metrics) {
+        sample.sizes <- unlist(lapply(study.data, rcmetar.binary.one.arm.raw.total), use.names=FALSE)
+    }
     flat.ilab <- lapply(study.data, rcmetar.ilab.for.data, params=params, res=NULL)
     ilab.matrix <- do.call(rbind, lapply(flat.ilab, function(ilab) ilab$matrix))
     if (is.null(ilab.matrix)) {
@@ -248,6 +279,7 @@ rcmetar.build.subgroup.metafor.bundle <- function(om.data, params, subgroup.data
         ),
         slab = flat.slab,
         weights = NULL,
+        sample_sizes = sample.sizes,
         params = params,
         side_by_side = FALSE,
         plot_range = legacy.plot.data$plot.range,
@@ -317,6 +349,7 @@ rcmetar.build.binary.metafor.bundle <- function(binary.data, params, res, legacy
         ilab = rcmetar.ilab.for.data(binary.data, params, res),
         slab = rcmetar.study.labels(binary.data),
         weights = rcmetar.metafor.weights(res),
+        sample_sizes = if (as.character(params$measure) %in% binary.one.arm.metrics) rcmetar.binary.one.arm.raw.total(binary.data) else NULL,
         params = params,
         side_by_side = FALSE,
         plot_range = legacy.plot.data$plot.range,
@@ -405,6 +438,15 @@ rcmetar.metafor.atransf <- function(bundle) {
     }
     if (metric.is.logit.scale(measure)) {
         return(invlogit)
+    }
+    if (metric.is.arcsine.scale(measure)) {
+        return(invarcsine.sqrt)
+    }
+    if (metric.is.freeman_tukey.scale(measure)) {
+        sample.sizes <- bundle$sample_sizes
+        return(function(x) {
+            binary.transform.f(measure)$display.scale(x, ni=sample.sizes)
+        })
     }
     NULL
 }
@@ -501,6 +543,13 @@ rcmetar.metafor.alim <- function(bundle) {
     if (!is.null(bundle$plot_range) && length(bundle$plot_range) == 2 && all(is.finite(bundle$plot_range))) {
         if (metric.is.logit.scale(as.character(bundle$params$measure))) {
             return(logit(pmin(pmax(as.numeric(bundle$plot_range), .Machine$double.eps), 1 - .Machine$double.eps)))
+        }
+        if (metric.is.arcsine.scale(as.character(bundle$params$measure))) {
+            return(arcsine.sqrt(as.numeric(bundle$plot_range)))
+        }
+        if (metric.is.freeman_tukey.scale(as.character(bundle$params$measure))) {
+            sample.size <- rcmetar.forest.harmonic.mean(bundle$sample_sizes)
+            return(binary.transform.f(as.character(bundle$params$measure))$calc.scale(as.numeric(bundle$plot_range), ni=sample.size))
         }
         return(as.numeric(bundle$plot_range))
     }

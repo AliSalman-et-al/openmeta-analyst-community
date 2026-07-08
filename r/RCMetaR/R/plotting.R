@@ -42,7 +42,7 @@ create.plot.data.generic <- function(om.data, params, res, selected.cov=NULL){
     transform.name <- get.transform.name(om.data)
     plot.options <- set.plot.options(params)
     # Set n, the number of studies, for PFT metric.
-    if (params$measure=="PFT" && length(om.data@g1O1) > 1 && length(om.data@g1O2)) {
+    if (params$measure=="PFT" && length(om.data@g1O1) > 0 && length(om.data@g1O2) > 0) {
         n <- om.data@g1O1 + om.data@g1O2  # Number of subjects
     }
 	else {

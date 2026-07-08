@@ -45,6 +45,24 @@ metafor_binary_fixture <- function(studies = 6) {
   list(data = data, params = params)
 }
 
+metafor_binary_one_arm_fixture <- function(studies = 5, measure = "PLO") {
+  data <- new(
+    "BinaryData",
+    g1O1 = c(4, 8, 10, 15, 18, 22)[seq_len(studies)],
+    g1O2 = c(96, 92, 90, 85, 82, 78)[seq_len(studies)],
+    study.names = c("Ames", "Benton", "Cruz", "Dover", "Elia", "Frost")[seq_len(studies)],
+    years = as.integer(2001:(2000 + studies))
+  )
+  params <- metafor_binary_params(file.path("r_tmp", paste0("forest_one_arm_binary_", measure, "_", studies, ".png")))
+  params$measure <- measure
+  params$fp_col3_str <- "Cohort"
+  params$create.plot <- TRUE
+  effects <- compute.for.one.bin.study(data, params)
+  data@y <- effects$yi
+  data@SE <- sqrt(effects$vi)
+  list(data = data, params = params)
+}
+
 metafor_continuous_params <- function(outpath) {
   params <- metafor_binary_params(outpath)
   params$measure <- "MD"
@@ -67,6 +85,25 @@ metafor_continuous_fixture <- function(studies = 5) {
     years = as.integer(2001:(2000 + studies))
   )
   params <- metafor_continuous_params(file.path("r_tmp", paste0("forest_metafor_cont_", studies, ".png")))
+  effects <- compute.for.one.cont.study(data, params)
+  data@y <- effects$yi
+  data@SE <- sqrt(effects$vi)
+  list(data = data, params = params)
+}
+
+metafor_continuous_one_arm_fixture <- function(studies = 5) {
+  data <- new(
+    "ContinuousData",
+    N1 = c(22, 35, 18, 41, 29, 33)[seq_len(studies)],
+    mean1 = c(8.2, 7.6, 9.1, 6.8, 7.4, 8.7)[seq_len(studies)],
+    sd1 = c(1.5, 1.8, 1.2, 2.1, 1.7, 1.4)[seq_len(studies)],
+    study.names = c("Allen", "Baker", "Cole", "Diaz", "Evans", "Fong")[seq_len(studies)],
+    years = as.integer(2001:(2000 + studies))
+  )
+  params <- metafor_continuous_params(file.path("r_tmp", paste0("forest_one_arm_cont_", studies, ".png")))
+  params$measure <- "TXMean"
+  params$fp_col3_str <- "Cohort"
+  params$fp_col4_str <- "[default]"
   effects <- compute.for.one.cont.study(data, params)
   data@y <- effects$yi
   data@SE <- sqrt(effects$vi)
@@ -962,6 +999,85 @@ test_that("single-study binary Default Forest Style uses normalized vectors", {
   expect_gt(file.info(png_path)$size, 3000)
 })
 
+test_that("single-arm binary metrics build and render Default metafor bundles", {
+  metrics <- c("PR", "PLN", "PLO", "PAS", "PFT")
+
+  for (metric in metrics) {
+    fixture <- metafor_binary_one_arm_fixture(measure = metric)
+    res <- rma.uni(
+      yi = fixture$data@y,
+      sei = fixture$data@SE,
+      slab = fixture$data@study.names,
+      method = fixture$params$rm.method,
+      level = fixture$params$conf.level,
+      digits = fixture$params$digits
+    )
+
+    bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+
+    expect_equal(bundle$render_engine, "metafor")
+    expect_equal(bundle$data_type, "binary")
+    expect_equal(bundle$ilab$headers, c("Events", "Non-events"))
+    expect_equal(bundle$ilab$groups, "Cohort")
+    expect_equal(unname(bundle$ilab$matrix[1, ]), c("4", "96"))
+    expect_equal(bundle$sample_sizes, fixture$data@g1O1 + fixture$data@g1O2)
+    expect_true(inherits(bundle$res, "rma"))
+    expect_equal(rcmetar.metafor.effect.header(bundle), paste0(pretty.metric.name(metric), " [95% CI]"))
+    expect_true(all(is.finite(rcmetar.metafor.alim(bundle))))
+
+    png_path <- tempfile(fileext = ".png")
+    rcmetar.draw.forest.plot(bundle, png_path)
+
+    expect_true(file.exists(png_path))
+    expect_gt(file.info(png_path)$size, 5000)
+  }
+})
+
+test_that("single-arm binary RevMan and BMJ styles use one-arm count columns and plain metric axes", {
+  fixture <- metafor_binary_one_arm_fixture(measure = "PLO")
+  res <- rma.uni(
+    yi = fixture$data@y,
+    sei = fixture$data@SE,
+    slab = fixture$data@study.names,
+    method = fixture$params$rm.method,
+    level = fixture$params$conf.level,
+    digits = fixture$params$digits
+  )
+
+  fixture$params$fp_style <- "revman"
+  revman.bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+
+  expect_equal(revman.bundle$ilab$headers, c("Events", "Total", "Weight"))
+  expect_equal(revman.bundle$ilab$groups, "Cohort")
+  expect_equal(unname(revman.bundle$ilab$matrix[1, 1:2]), c("4", "100"))
+  expect_equal(revman.bundle$style_blocks$favours_left, "")
+  expect_equal(revman.bundle$style_blocks$favours_right, "")
+  expect_equal(revman.bundle$style_blocks$axis_label, pretty.metric.name("PLO"))
+  expect_equal(revman.bundle$style_blocks$totals$experimental_total, 500)
+  expect_equal(revman.bundle$style_blocks$total_events$experimental_events, 55)
+
+  png_path <- tempfile(fileext = ".png")
+  rcmetar.draw.forest.plot(revman.bundle, png_path)
+  expect_true(file.exists(png_path))
+  expect_gt(file.info(png_path)$size, 5000)
+
+  fixture$params$fp_style <- "bmj"
+  bmj.bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+
+  expect_equal(bmj.bundle$ilab$headers, c("", "Weight"))
+  expect_equal(bmj.bundle$ilab$groups, "Cohort")
+  expect_equal(unname(bmj.bundle$ilab$matrix[1, 1]), "4 / 100")
+  expect_equal(bmj.bundle$style_blocks$favours_left, "")
+  expect_equal(bmj.bundle$style_blocks$favours_right, "")
+  expect_equal(bmj.bundle$style_blocks$axis_label, pretty.metric.name("PLO"))
+  expect_equal(bmj.bundle$style_blocks$totals$experimental_events_total, "55 / 500")
+
+  png_path <- tempfile(fileext = ".png")
+  rcmetar.draw.forest.plot(bmj.bundle, png_path)
+  expect_true(file.exists(png_path))
+  expect_gt(file.info(png_path)$size, 5000)
+})
+
 test_that("continuous Default Forest Style builds and renders mean SD N columns", {
   fixture <- metafor_continuous_fixture()
   res <- rma.uni(
@@ -990,6 +1106,59 @@ test_that("continuous Default Forest Style builds and renders mean SD N columns"
   png_size <- read_png_dimensions(png_path)
   expect_gte(png_size[["width"]], 900)
   expect_gte(png_size[["height"]], 500)
+})
+
+test_that("single-arm continuous styles use one-arm mean SD N columns and plain metric axes", {
+  fixture <- metafor_continuous_one_arm_fixture()
+  res <- rma.uni(
+    yi = fixture$data@y,
+    sei = fixture$data@SE,
+    slab = fixture$data@study.names,
+    method = fixture$params$rm.method,
+    level = fixture$params$conf.level,
+    digits = fixture$params$digits
+  )
+
+  default.bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+
+  expect_equal(default.bundle$render_engine, "metafor")
+  expect_equal(default.bundle$data_type, "continuous")
+  expect_equal(default.bundle$ilab$headers, c("Mean", "SD", "N"))
+  expect_equal(default.bundle$ilab$groups, "Cohort")
+  expect_equal(unname(default.bundle$ilab$matrix[1, ]), c("8.200", "1.500", "22"))
+
+  png_path <- tempfile(fileext = ".png")
+  rcmetar.draw.forest.plot(default.bundle, png_path)
+  expect_true(file.exists(png_path))
+  expect_gt(file.info(png_path)$size, 5000)
+
+  fixture$params$fp_style <- "revman"
+  revman.bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+
+  expect_equal(revman.bundle$ilab$headers, c("Mean", "SD", "Total", "Weight"))
+  expect_equal(revman.bundle$ilab$groups, "Cohort")
+  expect_equal(revman.bundle$style_blocks$favours_left, "")
+  expect_equal(revman.bundle$style_blocks$favours_right, "")
+  expect_equal(revman.bundle$style_blocks$axis_label, pretty.metric.name("TXMean"))
+
+  png_path <- tempfile(fileext = ".png")
+  rcmetar.draw.forest.plot(revman.bundle, png_path)
+  expect_true(file.exists(png_path))
+  expect_gt(file.info(png_path)$size, 5000)
+
+  fixture$params$fp_style <- "bmj"
+  bmj.bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+
+  expect_equal(bmj.bundle$ilab$headers, c("Total", "Mean", "SD", "Weight"))
+  expect_equal(bmj.bundle$ilab$groups, "Cohort")
+  expect_equal(bmj.bundle$style_blocks$favours_left, "")
+  expect_equal(bmj.bundle$style_blocks$favours_right, "")
+  expect_equal(bmj.bundle$style_blocks$axis_label, pretty.metric.name("TXMean"))
+
+  png_path <- tempfile(fileext = ".png")
+  rcmetar.draw.forest.plot(bmj.bundle, png_path)
+  expect_true(file.exists(png_path))
+  expect_gt(file.info(png_path)$size, 5000)
 })
 
 test_that("diagnostic Default Forest Style builds and renders count columns on transformed axes", {

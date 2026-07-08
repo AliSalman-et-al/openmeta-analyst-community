@@ -49,21 +49,22 @@ rcmetar.revman.binary.ilab <- function(binary.data, params, res=NULL) {
     groups <- rcmetar.revman.arm.labels(params)
     columns <- list()
     if (rcmetar.param.is.true(params, "fp_show_raw_counts", TRUE) &&
-            rcmetar.has.binary.raw.columns(binary.data, n)) {
+            rcmetar.has.binary.raw.columns(binary.data, n, params)) {
         experimental.total <- as.numeric(binary.data@g1O1) + as.numeric(binary.data@g1O2)
-        control.total <- as.numeric(binary.data@g2O1) + as.numeric(binary.data@g2O2)
         experimental.columns <- list(
             list(key="experimental_events", group=groups[[1]], header="Events", values=rcmetar.format.metafor.raw(binary.data@g1O1)),
             list(key="experimental_total", group=groups[[1]], header="Total", values=rcmetar.format.metafor.raw(experimental.total))
         )
-        control.columns <- list(
-            list(key="control_events", group=groups[[2]], header="Events", values=rcmetar.format.metafor.raw(binary.data@g2O1)),
-            list(key="control_total", group=groups[[2]], header="Total", values=rcmetar.format.metafor.raw(control.total))
-        )
         if (rcmetar.param.is.true(params, "fp_show_col3", TRUE)) {
             columns <- c(columns, experimental.columns)
         }
-        if (rcmetar.param.is.true(params, "fp_show_col4", TRUE)) {
+        if (as.character(params$measure) %in% binary.two.arm.metrics &&
+                rcmetar.param.is.true(params, "fp_show_col4", TRUE)) {
+            control.total <- as.numeric(binary.data@g2O1) + as.numeric(binary.data@g2O2)
+            control.columns <- list(
+                list(key="control_events", group=groups[[2]], header="Events", values=rcmetar.format.metafor.raw(binary.data@g2O1)),
+                list(key="control_total", group=groups[[2]], header="Total", values=rcmetar.format.metafor.raw(control.total))
+            )
             columns <- c(columns, control.columns)
         }
     }
@@ -180,7 +181,9 @@ rcmetar.revman.heterogeneity.label <- function(bundle) {
 }
 
 rcmetar.revman.direction.labels <- function(bundle) {
-    if (identical(bundle$data_type, "diagnostic")) {
+    measure <- as.character(bundle$params$measure)
+    if (identical(bundle$data_type, "diagnostic") ||
+            measure %in% c(binary.one.arm.metrics, continuous.one.arm.metrics)) {
         return(list(left="", right="", axis=pretty.metric.name(as.character(bundle$params$measure))))
     }
     left <- "Favours Experimental"
