@@ -265,7 +265,7 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
             res <- list("left"=res.sens, "right"=res.spec)
             plot.data <- create.side.by.side.plot.data(diagnostic.data.all, params=params.tmp, res=res)
             forest.path <- paste(params.sens$fp_outpath, sep="")
-            two.forest.plots(plot.data, outpath=forest.path)
+            rcmetar.draw.forest.plot(plot.data, outpath=forest.path, side.by.side=TRUE)
                
             forest.plot.params.path <- save.data(om.data=diagnostic.data.all, res, params=params.tmp, plot.data)
             plot.params.paths.tmp <- c("Sensitivity and Specificity Forest Plot"=forest.plot.params.path)
@@ -323,7 +323,7 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
         plot.data <- create.side.by.side.plot.data(diagnostic.data.all, res=res, params.tmp)
         
         forest.path <- paste(params.nlr$fp_outpath, sep="")
-        two.forest.plots(plot.data, outpath=forest.path)
+        rcmetar.draw.forest.plot(plot.data, outpath=forest.path, side.by.side=TRUE)
            
         forest.plot.params.path <- save.data(diagnostic.data, res, params=params.tmp, plot.data)
         plot.params.paths.tmp <- c("NLR and PLR Forest Plot"=forest.plot.params.path)
@@ -338,7 +338,6 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
         
         remove.indices <- c(remove.indices, nlr.index, plr.index)
 		
-		cat("end of plr/nlr stuff")
     }
 
     # remove fnames and params for side-by-side plots
@@ -1777,6 +1776,9 @@ create.side.by.side.plot.data <- function(diagnostic.data, params, res) {
     res.right <- res$right    
     diagnostic.data.left <- diagnostic.data$left
     diagnostic.data.right <- diagnostic.data$right
+
+    params.left$create.plot <- TRUE
+    params.right$create.plot <- TRUE
     
     plot.data.left <- create.plot.data.diagnostic(diagnostic.data.left, params.left, res.left)
     plot.data.left$options$fp.title <- pretty.metric.name(as.character(params.left$measure))

@@ -592,6 +592,127 @@ rcmetar.draw.metafor.forest <- function(bundle, outpath) {
     rcmetar.draw.default.forest(bundle, outpath)
 }
 
+rcmetar.is.metafor.twin.forest <- function(plot.data) {
+    is.list(plot.data) &&
+        rcmetar.is.metafor.forest.bundle(plot.data$left) &&
+        rcmetar.is.metafor.forest.bundle(plot.data$right) &&
+        identical(plot.data$left$fp_style, "default") &&
+        identical(plot.data$right$fp_style, "default")
+}
+
+rcmetar.twin.forest.shared.rows <- function(left.plan, right.plan) {
+    k <- max(left.plan$rows$k, right.plan$rows$k)
+    rows <- seq(from=k, to=1)
+    ylim <- c(
+        min(left.plan$rows$ylim[[1]], right.plan$rows$ylim[[1]]),
+        max(left.plan$rows$ylim[[2]], right.plan$rows$ylim[[2]])
+    )
+    list(k=k, study_rows=rows, ylim=ylim, top=ylim[[2]], manual_sequential_labels=FALSE)
+}
+
+rcmetar.with.shared.twin.rows <- function(plan, shared.rows) {
+    plan$rows$k <- shared.rows$k
+    plan$rows$study_rows <- shared.rows$study_rows
+    plan$rows$ylim <- shared.rows$ylim
+    plan$rows$top <- shared.rows$top
+    plan$rows$manual_sequential_labels <- FALSE
+    plan
+}
+
+rcmetar.draw.metafor.twin.forest <- function(plot.data, outpath) {
+    left.bundle <- plot.data$left
+    right.bundle <- plot.data$right
+    left.plan <- rcmetar.forest.layout.preflight(left.bundle, style="default")
+    right.plan <- rcmetar.forest.layout.preflight(right.bundle, style="default")
+    shared.rows <- rcmetar.twin.forest.shared.rows(left.plan, right.plan)
+    left.plan <- rcmetar.with.shared.twin.rows(left.plan, shared.rows)
+    right.plan <- rcmetar.with.shared.twin.rows(right.plan, shared.rows)
+    size <- list(
+        width=left.plan$device$width + right.plan$device$width,
+        height=max(left.plan$device$height, right.plan$device$height),
+        bg="white"
+    )
+
+    rcmetar.render.plot_file(outpath, size, function() {
+        op <- graphics::par(no.readonly=TRUE)
+        on.exit(graphics::par(op), add=TRUE)
+        graphics::layout(matrix(c(1, 2), nrow=1), widths=c(left.plan$device$width, right.plan$device$width))
+        rcmetar.draw.metafor.twin.default.panel(left.bundle, left.plan)
+        rcmetar.draw.metafor.twin.default.panel(right.bundle, right.plan)
+        invisible(left.bundle$changed.params)
+    })
+}
+
+rcmetar.draw.metafor.twin.default.panel <- function(bundle, plan) {
+    k <- plan$rows$k
+    rows <- plan$rows$study_rows
+    alim <- plan$x$alim
+    layout <- plan$layout
+    group.headers <- plan$headers$group
+    graphics::par(bg="white", mar=c(4.8, 1.0, 1.4, 1.0), fg="black", col.axis="black", col.lab="black")
+
+    accent.color <- rcmetar.forest.accent.color(bundle$params)
+    forest.args <- list(
+        slab = bundle$slab,
+        ilab = if (ncol(bundle$ilab$matrix) > 0) bundle$ilab$matrix else NULL,
+        ilab.lab = if (ncol(bundle$ilab$matrix) > 0 && rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)) bundle$ilab$headers else NULL,
+        ilab.xpos = if (ncol(bundle$ilab$matrix) > 0) layout$ilab.xpos else NULL,
+        xlim = plan$x$xlim,
+        alim = plan$x$alim,
+        at = plan$x$at,
+        atransf = rcmetar.metafor.atransf(bundle),
+        refline = plan$x$refline,
+        xlab = plan$x$xlab,
+        cex = plan$typography$cex,
+        cex.lab = plan$typography$cex.lab,
+        cex.axis = plan$typography$cex.axis,
+        header = if (plan$headers$show) c(plan$headers$study, plan$headers$effect) else FALSE,
+        rows = rows,
+        ylim = plan$rows$ylim,
+        annotate = rcmetar.param.is.true(bundle$params, "fp_show_annotation", TRUE),
+        col = "black",
+        colshade = "#eeeeee",
+        shade = "zebra",
+        lty = rcmetar.metafor.forest.line.types(plan),
+        pch = 15,
+        psize = rcmetar.metafor.psize(bundle),
+        lwd = 1.35,
+        efac = 1.15,
+        digits = as.integer(bundle$params$digits)
+    )
+    forest.args <- forest.args[!vapply(forest.args, is.null, logical(1))]
+
+    if (isTRUE(bundle$single_study)) {
+        plot.info <- do.call(metafor::forest.default, c(
+            list(
+                x = bundle$effect$yi,
+                sei = bundle$effect$sei,
+                ci.lb = bundle$effect$ci.lb,
+                ci.ub = bundle$effect$ci.ub
+            ),
+            forest.args
+        ))
+        rcmetar.draw.metafor.single.study.accent(bundle, rows, alim, accent.color)
+    } else {
+        plot.info <- do.call(metafor::forest.rma, c(list(x = bundle$res), c(forest.args, list(mlab="", border=accent.color, colout=accent.color))))
+        rcmetar.draw.default.summary.diamond(bundle$res, -1, accent.color)
+    }
+
+    header.offset <- plan$headers$offset
+    text.y <- if (!is.null(plot.info$ylim)) plot.info$ylim[2] - header.offset else plan$rows$top - header.offset
+    if (length(bundle$ilab$groups) > 0 && rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)) {
+        graphics::text(
+            layout$group.xpos,
+            text.y,
+            group.headers,
+            font=2,
+            cex=plan$device$cex
+        )
+    }
+    rcmetar.draw.default.heterogeneity(bundle, layout$xlim[1], cex=plan$device$cex)
+    invisible(bundle$changed.params)
+}
+
 rcmetar.draw.metafor.sequential.text <- function(bundle, rows, layout, k, cex) {
     graphics::par(xpd=NA)
     graphics::text(layout$xlim[[1]], rows, bundle$slab, pos=4, cex=cex, col="black")

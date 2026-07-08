@@ -1007,6 +1007,79 @@ test_that("diagnostic Default Forest Style builds and renders count columns on t
   expect_gte(png_size[["height"]], 500)
 })
 
+test_that("diagnostic twin-panel Default Forest Style renders aligned metafor panels", {
+  left_fixture <- metafor_diagnostic_fixture(measure = "Sens")
+  right_fixture <- metafor_diagnostic_fixture(measure = "Spec")
+  outpath <- tempfile(fileext = ".png")
+  left_fixture$params$fp_outpath <- outpath
+  right_fixture$params$fp_outpath <- outpath
+  left_fixture$params$create.plot <- FALSE
+  right_fixture$params$create.plot <- FALSE
+
+  left_res <- rma.uni(
+    yi = left_fixture$data@y,
+    sei = left_fixture$data@SE,
+    slab = left_fixture$data@study.names,
+    method = left_fixture$params$rm.method,
+    level = left_fixture$params$conf.level,
+    digits = left_fixture$params$digits
+  )
+  right_res <- rma.uni(
+    yi = right_fixture$data@y,
+    sei = right_fixture$data@SE,
+    slab = right_fixture$data@study.names,
+    method = right_fixture$params$rm.method,
+    level = right_fixture$params$conf.level,
+    digits = right_fixture$params$digits
+  )
+  plot_data <- create.side.by.side.plot.data(
+    list(left = left_fixture$data, right = right_fixture$data),
+    params = list(left = left_fixture$params, right = right_fixture$params),
+    res = list(left = left_res, right = right_res)
+  )
+
+  expect_true(rcmetar.is.metafor.forest.bundle(plot_data$left))
+  expect_true(rcmetar.is.metafor.forest.bundle(plot_data$right))
+
+  rcmetar.draw.forest.plot(plot_data, outpath, side.by.side = TRUE)
+
+  expect_true(file.exists(outpath))
+  expect_gt(file.info(outpath)$size, 5000)
+  png_size <- read_png_dimensions(outpath)
+  expect_gte(png_size[["width"]], 1800)
+  expect_gte(png_size[["height"]], 500)
+})
+
+test_that("diagnostic multi-metric workflows save and render metafor twin-panel plots", {
+  fixture <- metafor_diagnostic_fixture(measure = "Sens")
+  run_pair <- function(left_measure, right_measure, expected_name) {
+    left_params <- metafor_diagnostic_params(tempfile(fileext = ".png"), left_measure)
+    right_params <- metafor_diagnostic_params(left_params$fp_outpath, right_measure)
+
+    result <- rcmetar.run.diagnostic.analyses(
+      fixture$data,
+      c("diagnostic.random", "diagnostic.random"),
+      list(left_params, right_params)
+    )
+    image_path <- unname(result$images[[expected_name]])
+    plot_data <- load_saved_plot_data(unname(result$plot_params_paths[[expected_name]]))
+
+    expect_true(rcmetar.is.metafor.twin.forest(plot_data))
+    expect_equal(plot_data$left$render_engine, "metafor")
+    expect_equal(plot_data$right$render_engine, "metafor")
+    expect_equal(plot_data$left$params$measure, left_measure)
+    expect_equal(plot_data$right$params$measure, right_measure)
+    expect_true(file.exists(image_path))
+    expect_gt(file.info(image_path)$size, 5000)
+    png_size <- read_png_dimensions(image_path)
+    expect_gte(png_size[["width"]], 1800)
+    expect_gte(png_size[["height"]], 500)
+  }
+
+  run_pair("Sens", "Spec", "Sensitivity and Specificity Forest Plot")
+  run_pair("NLR", "PLR", "NLR and PLR Forest Plot")
+})
+
 test_that("single-study entered diagnostic Default Forest Style omits count ilab and uses normalized vectors", {
   data <- new(
     "DiagnosticData",

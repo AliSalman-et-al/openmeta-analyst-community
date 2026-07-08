@@ -1513,6 +1513,10 @@ create.plot.options <- function(forest.data, gapSize, plotWidth) {
 #######################################
 
 two.forest.plots <- function(forest.data, outpath) {
+   if (rcmetar.is.metafor.twin.forest(forest.data)) {
+      return(rcmetar.draw.metafor.twin.forest(forest.data, outpath))
+   }
+
    png(filename=rcmetar.scratch.path("INTER")) # to fix windows popping out at you issue
 
    # draw two forest plots side by side.
