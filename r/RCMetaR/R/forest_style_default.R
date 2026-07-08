@@ -244,6 +244,7 @@ rcmetar.draw.default.forest <- function(bundle, outpath) {
         ilab = if (ncol(bundle$ilab$matrix) > 0) bundle$ilab$matrix else NULL,
         ilab.lab = if (ncol(bundle$ilab$matrix) > 0 && rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)) bundle$ilab$headers else NULL,
         ilab.xpos = if (ncol(bundle$ilab$matrix) > 0) layout$ilab.xpos else NULL,
+        textpos = c(rcmetar.forest.study.x(layout), rcmetar.forest.annotation.x(layout)),
         xlim = plan$x$xlim,
         alim = plan$x$alim,
         at = plan$x$at,
@@ -293,7 +294,7 @@ rcmetar.draw.default.forest <- function(bundle, outpath) {
     }
 
     if (identical(bundle$forest_variant, "subgroup")) {
-        rcmetar.draw.default.subgroups(bundle, layout$xlim[1], size$cex)
+        rcmetar.draw.default.subgroups(bundle, rcmetar.forest.study.x(layout), size$cex)
     }
 
     header.offset <- plan$headers$offset
@@ -307,7 +308,7 @@ rcmetar.draw.default.forest <- function(bundle, outpath) {
             cex=size$cex
         )
     }
-    rcmetar.draw.default.heterogeneity(bundle, layout$xlim[1], cex=size$cex)
+    rcmetar.draw.default.heterogeneity(bundle, rcmetar.forest.study.x(layout), cex=size$cex)
 
     invisible(bundle$changed.params)
     })

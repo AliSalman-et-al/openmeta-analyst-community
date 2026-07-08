@@ -119,6 +119,13 @@ def main() -> int:
             f"Forest plot visual QA: {scenario}",
             (args.thumb_width, args.thumb_height),
         )
+    overview = sorted(rows, key=lambda row: (row["scenario"], row["kind"], row["workflow"], row["style"]))
+    contact_sheet(
+        overview,
+        out_dir / "contact_all.png",
+        "Forest plot visual QA: all scenarios",
+        (args.thumb_width, args.thumb_height),
+    )
     return 0
 
 

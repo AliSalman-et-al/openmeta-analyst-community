@@ -1138,7 +1138,7 @@ test_that("cumulative workflow saves and renders a RevMan metafor bundle", {
   expect_gt(file.info(unname(result$images[[1]]))$size, 5000)
 })
 
-test_that("cumulative workflow handles entered-effect-only data in Default and RevMan styles", {
+test_that("cumulative workflow handles entered-effect-only data in Default, RevMan, and BMJ styles", {
   fixtures <- list(
     binary = list(fixture_fn = metafor_entered_binary_fixture, method = "binary.random", runner = cum.ma.binary),
     continuous = list(fixture_fn = metafor_entered_continuous_fixture, method = "continuous.random", runner = cum.ma.continuous),
@@ -1146,7 +1146,7 @@ test_that("cumulative workflow handles entered-effect-only data in Default and R
   )
 
   for (entry in fixtures) {
-    for (style in c("default", "revman")) {
+    for (style in c("default", "revman", "bmj")) {
       fixture <- entry$fixture_fn()
       fixture$params$fp_style <- style
       fixture$params$fp_outpath <- tempfile(fileext = ".png")
@@ -1179,7 +1179,7 @@ test_that("leave-one-out workflow saves and renders a Default metafor bundle", {
   expect_gt(file.info(unname(result$images[[1]]))$size, 5000)
 })
 
-test_that("leave-one-out workflow handles entered-effect-only data in Default and RevMan styles", {
+test_that("leave-one-out workflow handles entered-effect-only data in Default, RevMan, and BMJ styles", {
   fixtures <- list(
     binary = list(fixture_fn = metafor_entered_binary_fixture, method = "binary.random", runner = loo.ma.binary),
     continuous = list(fixture_fn = metafor_entered_continuous_fixture, method = "continuous.random", runner = loo.ma.continuous),
@@ -1187,7 +1187,7 @@ test_that("leave-one-out workflow handles entered-effect-only data in Default an
   )
 
   for (entry in fixtures) {
-    for (style in c("default", "revman")) {
+    for (style in c("default", "revman", "bmj")) {
       fixture <- entry$fixture_fn()
       fixture$params$fp_style <- style
       fixture$params$fp_outpath <- tempfile(fileext = ".png")

@@ -657,6 +657,7 @@ rcmetar.draw.metafor.twin.default.panel <- function(bundle, plan) {
         ilab = if (ncol(bundle$ilab$matrix) > 0) bundle$ilab$matrix else NULL,
         ilab.lab = if (ncol(bundle$ilab$matrix) > 0 && rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)) bundle$ilab$headers else NULL,
         ilab.xpos = if (ncol(bundle$ilab$matrix) > 0) layout$ilab.xpos else NULL,
+        textpos = c(rcmetar.forest.study.x(layout), rcmetar.forest.annotation.x(layout)),
         xlim = plan$x$xlim,
         alim = plan$x$alim,
         at = plan$x$at,
@@ -709,24 +710,26 @@ rcmetar.draw.metafor.twin.default.panel <- function(bundle, plan) {
             cex=plan$device$cex
         )
     }
-    rcmetar.draw.default.heterogeneity(bundle, layout$xlim[1], cex=plan$device$cex)
+    rcmetar.draw.default.heterogeneity(bundle, rcmetar.forest.study.x(layout), cex=plan$device$cex)
     invisible(bundle$changed.params)
 }
 
 rcmetar.draw.metafor.sequential.text <- function(bundle, rows, layout, k, cex) {
     graphics::par(xpd=NA)
-    graphics::text(layout$xlim[[1]], rows, bundle$slab, pos=4, cex=cex, col="black")
+    study.x <- rcmetar.forest.study.x(layout)
+    annotation.x <- rcmetar.forest.annotation.x(layout)
+    graphics::text(study.x, rows, bundle$slab, pos=4, cex=cex, col="black")
     if (rcmetar.param.is.true(bundle$params, "fp_show_annotation", TRUE)) {
         labels <- rcmetar.metafor.effect.labels(bundle)
-        graphics::text(layout$xlim[[2]], rows, labels, pos=2, cex=cex, col="black")
+        graphics::text(annotation.x, rows, labels, pos=2, cex=cex, col="black")
     }
     if (rcmetar.param.is.true(bundle$params, "fp_show_headers", TRUE)) {
         first.row <- max(rows, na.rm=TRUE)
         header.y <- first.row + 1.25
         rule.y <- first.row + 0.70
-        graphics::text(layout$xlim[[1]], header.y, rcmetar.metafor.study.header(bundle), pos=4, font=2, cex=cex, col="black")
-        graphics::text(layout$xlim[[2]], header.y, rcmetar.metafor.effect.header(bundle), pos=2, font=2, cex=cex, col="black")
-        graphics::segments(layout$xlim[[1]], rule.y, layout$xlim[[2]], rule.y, lwd=0.8)
+        graphics::text(study.x, header.y, rcmetar.metafor.study.header(bundle), pos=4, font=2, cex=cex, col="black")
+        graphics::text(annotation.x, header.y, rcmetar.metafor.effect.header(bundle), pos=2, font=2, cex=cex, col="black")
+        graphics::segments(study.x, rule.y, annotation.x, rule.y, lwd=0.8)
     }
     invisible(NULL)
 }

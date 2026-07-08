@@ -67,7 +67,8 @@ rcmetar.forest.layout.warning <- function(severity, code, message) {
 
 rcmetar.forest.layout.cap.warnings <- function(size, min.cex=0.78, max.width=18, max.height=18) {
     warnings <- list()
-    if (!is.null(size$cex) && is.finite(size$cex) && size$cex <= min.cex + 1e-8) {
+    text.floor <- if (!is.null(size$text_floor) && is.finite(size$text_floor)) size$text_floor else min.cex
+    if (!is.null(size$cex) && is.finite(size$cex) && size$cex <= text.floor + 1e-8) {
         warnings[[length(warnings) + 1]] <- rcmetar.forest.layout.warning(
             "warning",
             "text-scale-floor",
@@ -113,10 +114,25 @@ rcmetar.forest.is.sequential.variant <- function(bundle) {
             identical(bundle$forest_variant, "leave-one-out"))
 }
 
+rcmetar.forest.study.x <- function(layout) {
+    if (!is.null(layout$study.xpos) && is.finite(layout$study.xpos)) {
+        return(layout$study.xpos)
+    }
+    layout$xlim[[1]]
+}
+
+rcmetar.forest.annotation.x <- function(layout) {
+    if (!is.null(layout$annotation.xpos) && is.finite(layout$annotation.xpos)) {
+        return(layout$annotation.xpos)
+    }
+    layout$xlim[[2]]
+}
+
 rcmetar.forest.default.device.metrics <- function(bundle) {
     rcmetar.forest.with.measurement.device({
         display.rows <- rcmetar.forest.display.row.count(bundle)
-        cex <- max(0.78, min(1.10, 1.08 - max(display.rows - 10, 0) * 0.018))
+        text.floor <- 0.78
+        cex <- max(text.floor, min(1.10, 1.08 - max(display.rows - 10, 0) * 0.018))
         study.width <- max(strwidth(
             c(bundle$slab, rcmetar.metafor.study.header(bundle)),
             units="inches",
@@ -177,6 +193,7 @@ rcmetar.forest.default.device.metrics <- function(bundle) {
             width=max(9.5, min(18, left.width + plot.width + annotation.width + 1.5)),
             height=max(min.height, min(18, vertical.margin + row.height * display.rows)),
             cex=cex,
+            text_floor=text.floor,
             bg="white",
             study_width=study.width,
             column_widths=pmax(column.widths, 0.45),
@@ -194,14 +211,16 @@ rcmetar.forest.default.device.metrics <- function(bundle) {
 rcmetar.forest.default.layout.coordinates <- function(bundle, size, alim) {
     span <- max(diff(alim), 1)
     user.per.inch <- span / size$plot_width
-    xlim <- c(
+    edge.pad <- 0.18 * span
+    base.xlim <- c(
         alim[1] - size$left_width * user.per.inch,
         alim[2] + size$annotation_width * user.per.inch
     )
+    xlim <- c(base.xlim[[1]] - edge.pad, base.xlim[[2]] + edge.pad)
     column.lefts <- size$study_width + size$block_gap +
         c(0, head(cumsum(size$column_widths + size$column_gap), -1))
     column.centers <- column.lefts + size$column_widths / 2
-    ilab.xpos <- xlim[1] + column.centers * user.per.inch
+    ilab.xpos <- base.xlim[1] + column.centers * user.per.inch
 
     if (length(bundle$ilab$columns) > 0) {
         column.groups <- vapply(bundle$ilab$columns, function(column) column$group, character(1))
@@ -214,6 +233,8 @@ rcmetar.forest.default.layout.coordinates <- function(bundle, size, alim) {
 
     list(
         xlim=xlim,
+        study.xpos=base.xlim[[1]],
+        annotation.xpos=base.xlim[[2]],
         ilab.xpos=ilab.xpos,
         group.xpos=group.xpos
     )
@@ -293,7 +314,7 @@ rcmetar.forest.default.layout.preflight <- function(bundle, style="default", siz
         columns=list(
             ilab.xpos=layout$ilab.xpos,
             group.xpos=layout$group.xpos,
-            annotation.xpos=layout$xlim[[2]]
+            annotation.xpos=rcmetar.forest.annotation.x(layout)
         ),
         headers=list(
             group=group.headers,
@@ -321,6 +342,7 @@ rcmetar.forest.revman.device.metrics <- function(bundle) {
         )),
         0
     )
+    text.floor <- 0.68
     width <- 11.25 +
         max(0, label.width - 24) * 0.095 +
         max(0, column.count - 5) * 0.22 +
@@ -330,10 +352,14 @@ rcmetar.forest.revman.device.metrics <- function(bundle) {
         max(0, k - 8) * 0.008 -
         max(0, label.width - 48) * 0.0025 -
         max(0, header.width - 28) * 0.0015
+    if (width > 18) {
+        cex <- cex * (18 / width)
+    }
     list(
         width=min(width, 18),
         height=min(height, 18),
-        cex=max(0.78, cex),
+        cex=max(text.floor, cex),
+        text_floor=text.floor,
         bg="white",
         display_rows=k,
         label_width=label.width,
@@ -349,6 +375,7 @@ rcmetar.forest.revman.layout.coordinates <- function(bundle) {
         alim <- rcmetar.metafor.alim(bundle)
     }
     label.extra <- max(0, max(nchar(as.character(bundle$slab)), 0) - 44)
+    span <- max(diff(alim), 1)
     if (identical(bundle$data_type, "binary") && length(bundle$ilab$columns) == 5) {
         ilab.xpos <- c(-20.6, -18.6, -16.1, -14.1, -10.8)
         column.groups <- vapply(bundle$ilab$columns, function(column) column$group, character(1))
@@ -356,8 +383,11 @@ rcmetar.forest.revman.layout.coordinates <- function(bundle) {
             stats::setNames(mean(ilab.xpos[column.groups == bundle$ilab$groups[[1]]]), bundle$ilab$groups[[1]]),
             stats::setNames(mean(ilab.xpos[column.groups == bundle$ilab$groups[[2]]]), bundle$ilab$groups[[2]])
         )
+        base.xlim <- c(-30 - label.extra * 0.16, 5.6)
+        edge.pad <- 0.20 * span
         return(list(
-            xlim=c(-30 - label.extra * 0.16, 5.6),
+            xlim=c(base.xlim[[1]] - edge.pad, base.xlim[[2]] + edge.pad),
+            study.xpos=base.xlim[[1]],
             alim=alim,
             ilab.xpos=ilab.xpos,
             group.xpos=group.xpos,
@@ -366,12 +396,14 @@ rcmetar.forest.revman.layout.coordinates <- function(bundle) {
             plot.header.xpos=mean(alim)
         ))
     }
-    span <- max(diff(alim), 1)
     if (ncol(bundle$ilab$matrix) == 1) {
         ilab.xpos <- alim[1] - 1.95 * span
         group.xpos <- numeric(0)
+        base.xlim <- c(alim[1] - (3.80 + label.extra * 0.030) * span, alim[2] + 0.25 * span)
+        edge.pad <- 0.16 * span
         return(list(
-            xlim=c(alim[1] - (3.80 + label.extra * 0.030) * span, alim[2] + 0.25 * span),
+            xlim=c(base.xlim[[1]] - edge.pad, base.xlim[[2]] + edge.pad),
+            study.xpos=base.xlim[[1]],
             alim=alim,
             ilab.xpos=ilab.xpos,
             group.xpos=group.xpos,
@@ -389,8 +421,11 @@ rcmetar.forest.revman.layout.coordinates <- function(bundle) {
     } else {
         numeric(0)
     }
+    base.xlim <- c(alim[1] - (5.15 + label.extra * 0.095) * span, alim[2] + 0.25 * span)
+    edge.pad <- 0.16 * span
     list(
-        xlim=c(alim[1] - (5.15 + label.extra * 0.095) * span, alim[2] + 0.25 * span),
+        xlim=c(base.xlim[[1]] - edge.pad, base.xlim[[2]] + edge.pad),
+        study.xpos=base.xlim[[1]],
         alim=alim,
         ilab.xpos=ilab.xpos,
         group.xpos=group.xpos,

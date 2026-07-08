@@ -373,7 +373,7 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
         xlab="",
         xaxt="n",
         efac=0,
-        textpos=c(layout$xlim[1], layout$annotation.xpos),
+        textpos=c(rcmetar.forest.study.x(layout), layout$annotation.xpos),
         lty=c(1, 1, 0),
         refline=NA,
         ilab=ilab$matrix,
@@ -405,7 +405,7 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
 
     graphics::par(cex=plot.info$cex, font=2)
     if (show.headers) {
-        graphics::text(layout$xlim[[1]], k + 2, rcmetar.revman.study.header(bundle), pos=4)
+        graphics::text(rcmetar.forest.study.x(layout), k + 2, rcmetar.revman.study.header(bundle), pos=4)
         graphics::text(layout$ilab.xpos, k + 2, ilab$headers)
     }
     if (show.headers && length(layout$group.xpos) > 0) {
@@ -424,9 +424,9 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
     rcmetar.draw.revman.axis(bundle, layout, plot.info$cex)
 
     graphics::par(cex=plot.info$cex, font=1)
-    graphics::text(layout$xlim[[1]], rows, bundle$slab, pos=4, cex=plot.info$cex, col="black")
+    graphics::text(rcmetar.forest.study.x(layout), rows, bundle$slab, pos=4, cex=plot.info$cex, col="black")
     rcmetar.draw.revman.study.effect.labels(bundle, effect, layout, rows, plot.info$cex)
-    rcmetar.draw.revman.bottom.blocks(bundle, layout$xlim[1], plot.info$cex, layout)
+    rcmetar.draw.revman.bottom.blocks(bundle, rcmetar.forest.study.x(layout), plot.info$cex, layout)
 
     invisible(bundle$changed.params)
     })

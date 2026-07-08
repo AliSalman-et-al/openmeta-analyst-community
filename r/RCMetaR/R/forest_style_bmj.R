@@ -458,7 +458,8 @@ rcmetar.bmj.text.width <- function(values, cex, minimum=0) {
 rcmetar.forest.bmj.device.metrics <- function(bundle) {
     rcmetar.forest.with.measurement.device({
         display.rows <- rcmetar.forest.display.row.count(bundle)
-        cex <- max(0.76, min(1.02, 1.02 - max(display.rows - 10, 0) * 0.014))
+        text.floor <- 0.68
+        cex <- max(text.floor, min(1.02, 1.02 - max(display.rows - 10, 0) * 0.014))
         header.lines <- max(c(1, vapply(bundle$ilab$groups, function(group) {
             length(rcmetar.bmj.header.lines(group))
         }, integer(1))))
@@ -511,19 +512,27 @@ rcmetar.forest.bmj.device.metrics <- function(bundle) {
         left.plot.gap <- 0.58
         right.plot.gap <- 0.45
         weight.effect.gap <- 0.48
-        right.margin <- 0.25
+        right.margin <- 0.35
         left.width <- max(study.width + study.gap + left.table.width + left.plot.gap, footer.width + 0.25)
         right.width <- right.plot.gap + weight.width + weight.effect.gap + effect.width + right.margin
         width <- max(10.8, left.width + plot.width + right.width)
         if (width > 18) {
             shrink <- 18 / width
-            cex <- max(0.76, cex * shrink)
+            cex <- max(text.floor, cex * shrink)
             column.widths <- rcmetar.bmj.column.widths(bundle, cex)
             weight.width <- if (length(weight.index) == 1) column.widths[[weight.index]] else 0
             left.table.width <- if (length(left.indexes) > 0) {
                 sum(column.widths[left.indexes]) + column.gap * max(length(left.indexes) - 1, 0)
             } else {
                 0
+            }
+            group.header.width <- rcmetar.bmj.text.width(
+                c(bundle$ilab$groups, "No of events / total"),
+                cex,
+                minimum=left.table.width
+            )
+            if (length(left.indexes) > 0 && group.header.width > left.table.width) {
+                left.table.width <- group.header.width
             }
             study.width <- rcmetar.bmj.text.width(
                 c(bundle$slab, "Study or\nsubgroup", rcmetar.bmj.study.header(bundle)),
@@ -549,6 +558,7 @@ rcmetar.forest.bmj.device.metrics <- function(bundle) {
             width=min(width, 18),
             height=max(5.0, min(18, 3.15 + 0.32 * display.rows + height.extra)),
             cex=cex,
+            text_floor=text.floor,
             bg="white",
             display_rows=display.rows,
             header_lines=header.lines,
@@ -598,10 +608,12 @@ rcmetar.forest.bmj.layout.coordinates.from_size <- function(bundle, size) {
     alim <- rcmetar.forest.bmj.alim(bundle)
     span <- max(diff(alim), 1)
     user.per.inch <- span / size$plot_width
-    xlim <- c(
+    base.xlim <- c(
         alim[[1]] - size$left_width * user.per.inch,
         alim[[2]] + size$right_width * user.per.inch
     )
+    edge.pad <- 0.16 * span
+    xlim <- c(base.xlim[[1]] - edge.pad, base.xlim[[2]] + edge.pad)
     plot.start <- size$left_width
     plot.end <- plot.start + size$plot_width
     ilab.inches <- numeric(length(size$column_widths))
@@ -616,7 +628,7 @@ rcmetar.forest.bmj.layout.coordinates.from_size <- function(bundle, size) {
     if (length(size$weight_index) == 1) {
         ilab.inches[size$weight_index] <- plot.end + size$right_plot_gap + size$weight_width / 2
     }
-    ilab.xpos <- xlim[[1]] + ilab.inches * user.per.inch
+    ilab.xpos <- base.xlim[[1]] + ilab.inches * user.per.inch
     column.groups <- vapply(bundle$ilab$columns, function(column) column$group, character(1))
     group.xpos <- if (length(column.groups) > 0) {
         vapply(bundle$ilab$groups, function(group) {
@@ -628,11 +640,12 @@ rcmetar.forest.bmj.layout.coordinates.from_size <- function(bundle, size) {
     annotation.left <- plot.end + size$right_plot_gap + size$weight_width + size$weight_effect_gap
     list(
         xlim=xlim,
+        study.xpos=base.xlim[[1]],
         alim=alim,
         ilab.xpos=ilab.xpos,
         group.xpos=group.xpos,
-        annotation.xpos=xlim[[1]] + annotation.left * user.per.inch,
-        annotation.header.xpos=xlim[[1]] + (annotation.left + size$effect_width / 2) * user.per.inch,
+        annotation.xpos=base.xlim[[1]] + annotation.left * user.per.inch,
+        annotation.header.xpos=base.xlim[[1]] + (annotation.left + size$effect_width / 2) * user.per.inch,
         plot.header.xpos=mean(alim)
     )
 }
@@ -738,7 +751,7 @@ rcmetar.draw.bmj.forest <- function(bundle, outpath) {
         xlab="",
         xaxt="n",
         efac=0,
-        textpos=c(layout$xlim[1], layout$annotation.xpos),
+        textpos=c(rcmetar.forest.study.x(layout), layout$annotation.xpos),
         lty=c(0, 0, 0),
         refline=NA,
         ilab=ilab$matrix,
@@ -770,9 +783,9 @@ rcmetar.draw.bmj.forest <- function(bundle, outpath) {
     rcmetar.draw.bmj.axis(bundle, layout, plot.info$cex)
 
     graphics::par(cex=plot.info$cex, font=1, col="#111111")
-    graphics::text(layout$xlim[[1]], rows, bundle$slab, pos=4, cex=plot.info$cex, col="#111111")
+    graphics::text(rcmetar.forest.study.x(layout), rows, bundle$slab, pos=4, cex=plot.info$cex, col="#111111")
     rcmetar.draw.bmj.study.effect.labels(bundle, effect, layout, rows, plot.info$cex)
-    rcmetar.draw.bmj.bottom.blocks(bundle, layout$xlim[1], plot.info$cex, layout, summary$res)
+    rcmetar.draw.bmj.bottom.blocks(bundle, rcmetar.forest.study.x(layout), plot.info$cex, layout, summary$res)
 
     invisible(bundle$changed.params)
     })
@@ -857,7 +870,7 @@ rcmetar.draw.bmj.headers <- function(bundle, layout, ilab, k, metric, method, sh
     if (!show.headers) {
         return(invisible(NULL))
     }
-    graphics::text(layout$xlim[[1]], k + 2.35, "Study or\nsubgroup", pos=4)
+    graphics::text(rcmetar.forest.study.x(layout), k + 2.35, "Study or\nsubgroup", pos=4)
     if (identical(bundle$data_type, "binary") && length(bundle$ilab$groups) >= 2 && ncol(ilab$matrix) == 3) {
         group.labels <- vapply(names(layout$group.xpos)[1:2], rcmetar.bmj.wrap.header, character(1))
         group.lines <- max(vapply(group.labels, rcmetar.bmj.line.count, integer(1)), 1)

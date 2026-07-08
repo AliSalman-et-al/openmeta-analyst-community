@@ -234,7 +234,7 @@ qa_render_matrix <- function(output.root = qa_root(qa_find_repo_root()), format 
   cases <- expand.grid(
     kind = c("binary", "continuous", "diagnostic"),
     workflow = c("standard", "cumulative", "leave-one-out"),
-    style = c("default", "revman"),
+    style = c("default", "revman", "bmj"),
     scenario = names(scenarios),
     stringsAsFactors = FALSE
   )
