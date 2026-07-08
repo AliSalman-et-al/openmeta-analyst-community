@@ -1140,6 +1140,10 @@ test_that("single-arm continuous styles use one-arm mean SD N columns and plain 
   expect_equal(revman.bundle$style_blocks$favours_left, "")
   expect_equal(revman.bundle$style_blocks$favours_right, "")
   expect_equal(revman.bundle$style_blocks$axis_label, pretty.metric.name("TXMean"))
+  revman.layout <- rcmetar.revman.layout(revman.bundle)
+  revman.span <- max(diff(revman.layout$alim), 1)
+  expect_lte(revman.layout$annotation.xpos, revman.layout$alim[[1]] - 0.70 * revman.span)
+  expect_gte(revman.layout$annotation.xpos - max(revman.layout$ilab.xpos), 1.00 * revman.span)
 
   png_path <- tempfile(fileext = ".png")
   rcmetar.draw.forest.plot(revman.bundle, png_path)

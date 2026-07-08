@@ -415,10 +415,11 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
         graphics::text(layout$group.xpos, k + 3, vapply(names(layout$group.xpos), rcmetar.revman.wrap.header, character(1)))
     }
     if (show.headers) {
-        graphics::text(layout$annotation.header.xpos, k + 3, metric)
-        graphics::text(layout$annotation.header.xpos, k + 2, paste0(method, ", ", bundle$params$conf.level, "% CI"))
+        method.header <- paste0(method, ",\n", bundle$params$conf.level, "% CI")
+        graphics::text(layout$annotation.xpos, k + 3, metric, pos=2)
+        graphics::text(layout$annotation.xpos, k + 2, method.header, pos=2)
         graphics::text(layout$plot.header.xpos, k + 3, metric)
-        graphics::text(layout$plot.header.xpos, k + 2, paste0(method, ", ", bundle$params$conf.level, "% CI"))
+        graphics::text(layout$plot.header.xpos, k + 2, method.header)
     }
 
     graphics::rect(layout$annotation.xpos, -1.5, layout$ilab.xpos[[length(layout$ilab.xpos)]], -0.5, col="white", border=NA)

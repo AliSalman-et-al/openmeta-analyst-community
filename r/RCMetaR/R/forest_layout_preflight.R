@@ -412,7 +412,10 @@ rcmetar.forest.revman.layout.coordinates <- function(bundle) {
             plot.header.xpos=mean(alim)
         ))
     }
-    ilab.xpos <- seq(alim[1] - 3.8 * span, alim[1] - 1.55 * span, length.out=max(ncol(bundle$ilab$matrix), 1))
+    column.count <- max(ncol(bundle$ilab$matrix), 1)
+    ilab.left.gap <- if (column.count >= 4) 4.05 else 3.8
+    ilab.right.gap <- if (column.count >= 4) 1.80 else 1.55
+    ilab.xpos <- seq(alim[1] - ilab.left.gap * span, alim[1] - ilab.right.gap * span, length.out=column.count)
     column.groups <- vapply(bundle$ilab$columns, function(column) column$group, character(1))
     group.xpos <- if (length(column.groups) > 0) {
         vapply(bundle$ilab$groups, function(group) {
@@ -421,6 +424,8 @@ rcmetar.forest.revman.layout.coordinates <- function(bundle) {
     } else {
         numeric(0)
     }
+    annotation.gap <- if (column.count >= 4) 0.72 else 0.36
+    annotation.header.gap <- if (column.count >= 4) 1.02 else 0.78
     base.xlim <- c(alim[1] - (5.15 + label.extra * 0.095) * span, alim[2] + 0.25 * span)
     edge.pad <- 0.16 * span
     list(
@@ -429,8 +434,8 @@ rcmetar.forest.revman.layout.coordinates <- function(bundle) {
         alim=alim,
         ilab.xpos=ilab.xpos,
         group.xpos=group.xpos,
-        annotation.xpos=alim[1] - 0.36 * span,
-        annotation.header.xpos=alim[1] - 0.78 * span,
+        annotation.xpos=alim[1] - annotation.gap * span,
+        annotation.header.xpos=alim[1] - annotation.header.gap * span,
         plot.header.xpos=mean(alim)
     )
 }
