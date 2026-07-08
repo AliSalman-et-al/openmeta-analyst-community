@@ -342,7 +342,7 @@ rcmetar.forest.revman.device.metrics <- function(bundle) {
         )),
         0
     )
-    text.floor <- 0.68
+    text.floor <- if (k <= 16) 0.78 else 0.68
     width <- 11.25 +
         max(0, label.width - 24) * 0.095 +
         max(0, column.count - 5) * 0.22 +

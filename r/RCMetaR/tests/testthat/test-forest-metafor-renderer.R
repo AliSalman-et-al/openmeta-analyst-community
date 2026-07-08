@@ -395,6 +395,33 @@ test_that("Forest Layout Preflight records sparse and compact RevMan templates w
   expect_lt(bmj.compact.plan$device$height, 5)
 })
 
+test_that("Forest Layout Preflight keeps hidden-header CI lines and readable moderate-row text", {
+  fixture <- metafor_binary_fixture()
+  fixture$params$fp_show_headers <- FALSE
+  res <- rma.uni(
+    yi = fixture$data@y,
+    sei = fixture$data@SE,
+    slab = fixture$data@study.names,
+    method = fixture$params$rm.method,
+    level = fixture$params$conf.level,
+    digits = fixture$params$digits
+  )
+
+  default.bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+  default.plan <- rcmetar.forest.layout.preflight(default.bundle)
+  expect_equal(rcmetar.metafor.forest.line.types(default.plan), c("solid", "solid"))
+
+  fixture$params$fp_style <- "revman"
+  revman.bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+  revman.plan <- rcmetar.forest.layout.preflight(revman.bundle)
+  expect_gte(revman.plan$metrics$text_floor, 0.78)
+
+  fixture$params$fp_style <- "bmj"
+  bmj.bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+  bmj.plan <- rcmetar.forest.layout.preflight(bmj.bundle)
+  expect_gte(bmj.plan$metrics$text_floor, 0.82)
+})
+
 test_that("RevMan study heading uses reference default and respects custom labels", {
   fixture <- metafor_binary_fixture()
   fixture$params$fp_style <- "revman"

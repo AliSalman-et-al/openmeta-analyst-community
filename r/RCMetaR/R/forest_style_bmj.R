@@ -458,7 +458,7 @@ rcmetar.bmj.text.width <- function(values, cex, minimum=0) {
 rcmetar.forest.bmj.device.metrics <- function(bundle) {
     rcmetar.forest.with.measurement.device({
         display.rows <- rcmetar.forest.display.row.count(bundle)
-        text.floor <- 0.68
+        text.floor <- if (display.rows <= 16) 0.82 else if (display.rows <= 28) 0.76 else 0.70
         cex <- max(text.floor, min(1.02, 1.02 - max(display.rows - 10, 0) * 0.014))
         header.lines <- max(c(1, vapply(bundle$ilab$groups, function(group) {
             length(rcmetar.bmj.header.lines(group))
@@ -556,7 +556,7 @@ rcmetar.forest.bmj.device.metrics <- function(bundle) {
         height.extra <- max(0, header.lines - 2) * 0.28 + max(0, direction.lines - 2) * 0.20
         list(
             width=min(width, 18),
-            height=max(5.0, min(18, 3.15 + 0.32 * display.rows + height.extra)),
+            height=max(5.0, min(18, 3.35 + 0.35 * display.rows + height.extra)),
             cex=cex,
             text_floor=text.floor,
             bg="white",
