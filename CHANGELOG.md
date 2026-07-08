@@ -4,7 +4,24 @@ All notable RC MetaStudio changes will be recorded in this file.
 
 RC MetaStudio starts a fresh maintained-product changelog. Historical release history for the Original OpenMeta[Analyst] Project is not reconstructed here; see [NOTICE.md](NOTICE.md) for provenance.
 
-## 0.1.0 - Unreleased
+## 0.1.1 - Unreleased
+
+### Added
+
+- Added metafor-backed forest plot rendering for default, RevMan, and BMJ styles, including entered-effect and one-arm analysis families.
+- Added journal-ready SVG-first plot export devices with PNG, PDF, and TIFF conversion support.
+- Added side-by-side diagnostic forest plot composition and visual QA contact-sheet tooling.
+- Added metafor-backed bubble plot rendering for meta-regression outputs.
+- Added focused R renderer tests and visual QA coverage for forest and bubble plot behavior.
+
+### Changed
+
+- Replaced the legacy custom forest plot renderer with the metafor-backed renderer.
+- Replaced the legacy bubble plot renderer with the metafor-backed renderer.
+- Improved forest plot layout preflight, spacing, axis labels, headers, gutters, text scaling, and raw-column visibility across supported styles.
+- Renamed RCMetaR R source files to canonical `.R` casing and refreshed generated package documentation.
+
+## 0.1.0 - 2026-07-06
 
 ### Added
 

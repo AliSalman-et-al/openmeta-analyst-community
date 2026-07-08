@@ -135,6 +135,7 @@ def test_windows_distributable_contract_is_declared():
         "Assert-AppLayout",
         "Invoke-PackagedAppSmokeTest",
         "Invoke-PackagedWizardLayoutSmokeTest",
+        "Get-ProjectVersion",
         "Get-RPackageCacheKey",
         "Test-BundledRPackages",
         "Copy-RLibraryPackages",
@@ -166,8 +167,9 @@ def test_windows_distributable_contract_is_declared():
     assert "src/rc_metastudio/__main__.py" in spec
     assert "src\\rc_metastudio\\launch.py" not in script["text"]
     assert "src/rc_metastudio/launch.py" not in spec
+    assert "tomllib.loads" in script["text"]
     assert (
-        "if ($ArchiveRootName) { $ArchiveRootName } else { $ArtifactName }"
+        'if ($ArchiveRootName) { $ArchiveRootName } else { "RCMetaStudio-$projectVersion-windows-x64" }'
         in script["text"]
     )
     assert "ArchiveRootName must be a single portable directory name" in script["text"]
@@ -328,16 +330,18 @@ def test_package_workflow_builds_path_aware_artifacts():
     )
     assert "-RRuntimeRoot" in workflow["text"]
     assert "--r-runtime-root" in workflow["text"]
+    assert workflow["text"].count("Resolve RC MetaStudio version") == 3
+    assert "tomllib.loads" in workflow["text"]
     assert (
-        "-ArchiveRootName \"RCMetaStudio-${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}-windows-x64\""
+        "-ArchiveRootName \"RCMetaStudio-${{ steps.package-version.outputs.version }}-windows-x64\""
         in workflow["text"]
     )
     assert (
-        "--archive-root-name \"RCMetaStudio-${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}-macos-x64\""
+        "--archive-root-name \"RCMetaStudio-${{ steps.package-version.outputs.version }}-macos-x64\""
         in workflow["text"]
     )
     assert (
-        '--archive-root-name "RCMetaStudio-${{ inputs.release_tag }}-macos-arm64"'
+        '--archive-root-name "RCMetaStudio-${{ steps.package-version.outputs.version }}-macos-arm64"'
         in workflow["text"]
     )
     assert (
@@ -445,6 +449,7 @@ def test_macos_distributable_contract_is_declared():
         "require_free_space_gb",
         "repo_path",
         "resolve_existing_dir",
+        "project_version",
         "copy_tree",
         "sha256_file",
         "sha256_stdin_12",
@@ -474,7 +479,8 @@ def test_macos_distributable_contract_is_declared():
     assert (
         "--archive-root-name must be a single portable directory name" in script["text"]
     )
-    assert 'archive_root_name="${archive_root_name:-$artifact_name}"' in script["text"]
+    assert "tomllib.loads" in script["text"]
+    assert 'archive_root_name="${archive_root_name:-RCMetaStudio-$resolved_project_version-macos-$architecture}"' in script["text"]
     assert 'archive_staging_root="$work_root/zip-staging"' in script["text"]
     assert (
         'copy_tree "$app_bundle" "$archive_root_dir/RCMetaStudio.app"' in script["text"]
@@ -513,6 +519,7 @@ def test_local_macos_package_script_uses_shared_build_script():
         "uv sync --locked",
         "uv run pytest tests/python/fast/test_pyqt5_verification_path.py tests/python/fast/test_pyqt5_generated_ui_imports.py tests/python/fast/test_project_pickle_migration.py tests/python/fast/test_qt_text_boundaries.py",
         '--r-runtime-root "$r_runtime_root"',
+        'build_args+=(--archive-root-name "$archive_root_name")',
         'bash "$repo_root/scripts/build-macos-package.sh"',
     )
 

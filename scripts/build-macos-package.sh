@@ -103,6 +103,16 @@ repo_path() {
   esac
 }
 
+project_version() {
+  "$python_exe" - "$repo_root/pyproject.toml" <<'PY'
+import pathlib
+import sys
+import tomllib
+
+print(tomllib.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))["project"]["version"])
+PY
+}
+
 resolve_existing_dir() {
   local path="$1"
   local description="$2"
@@ -177,13 +187,7 @@ dist_root="$repo_root/build/macos-package/$architecture/dist"
 work_root="$repo_root/build/macos-package/$architecture/work"
 app_bundle="$dist_root/RCMetaStudio.app"
 app_root="$app_bundle/Contents/MacOS"
-archive_root_name="${archive_root_name:-$artifact_name}"
-if [[ -z "$archive_root_name" || "$archive_root_name" == *"/"* || "$archive_root_name" == *"\\"* ]]; then
-  echo "--archive-root-name must be a single portable directory name." >&2
-  exit 2
-fi
 archive_staging_root="$work_root/zip-staging"
-archive_root_dir="$archive_staging_root/$archive_root_name"
 zip_path="$artifact_dir/$artifact_name.zip"
 tmp_zip_path="$zip_path.tmp"
 r_package_cache_root="${r_package_cache_root:-$artifact_dir/r-library-cache}"
@@ -200,6 +204,14 @@ if [ ! -x "$python_exe" ]; then
   echo "Python executable was not found or is not executable: $python_exe" >&2
   exit 1
 fi
+
+resolved_project_version="$(project_version)"
+archive_root_name="${archive_root_name:-RCMetaStudio-$resolved_project_version-macos-$architecture}"
+if [[ -z "$archive_root_name" || "$archive_root_name" == *"/"* || "$archive_root_name" == *"\\"* ]]; then
+  echo "--archive-root-name must be a single portable directory name." >&2
+  exit 2
+fi
+archive_root_dir="$archive_staging_root/$archive_root_name"
 
 "$python_exe" - <<'PY'
 import PyInstaller

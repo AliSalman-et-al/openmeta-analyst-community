@@ -17,12 +17,7 @@ $artifactDir = Join-Path $repoRoot "artifacts"
 $distRoot = Join-Path $repoRoot "build\windows-package\dist"
 $workRoot = Join-Path $repoRoot "build\windows-package\work"
 $appDir = Join-Path $distRoot "RCMetaStudio"
-$archiveRootName = if ($ArchiveRootName) { $ArchiveRootName } else { $ArtifactName }
-if ($archiveRootName -match '[\\/:*?"<>|]') {
-    throw "ArchiveRootName must be a single portable directory name, not '$archiveRootName'."
-}
 $archiveStagingRoot = Join-Path $workRoot "zip-staging"
-$archiveRootDir = Join-Path $archiveStagingRoot $archiveRootName
 $zipPath = Join-Path $artifactDir "$ArtifactName.zip"
 $tmpZipPath = "$zipPath.tmp"
 if (-not $RPackageCacheRoot) {
@@ -44,6 +39,14 @@ function Resolve-CommandOrRepoPath {
     }
     $command = Get-Command $Path -ErrorAction Stop
     return $command.Source
+}
+
+function Get-ProjectVersion {
+    param([string]$PythonExe)
+    $pyprojectPath = Join-Path $repoRoot "pyproject.toml"
+    $version = & $PythonExe -c "import pathlib, sys, tomllib; print(tomllib.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))['project']['version'])" $pyprojectPath
+    if ($LASTEXITCODE -ne 0 -or -not $version) { throw "Could not resolve RC MetaStudio version from pyproject.toml." }
+    return $version.Trim()
 }
 
 function Assert-PathExists {
@@ -392,6 +395,13 @@ $PythonExe = Resolve-CommandOrRepoPath -Path $PythonExe
 
 & $PythonExe -c "import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 11) else 1)"
 if ($LASTEXITCODE -ne 0) { throw "Windows packaging requires Python 3.11 to match the CI runtime and PyQt5 wheel support." }
+
+$projectVersion = Get-ProjectVersion -PythonExe $PythonExe
+$archiveRootName = if ($ArchiveRootName) { $ArchiveRootName } else { "RCMetaStudio-$projectVersion-windows-x64" }
+if ($archiveRootName -match '[\\/:*?"<>|]') {
+    throw "ArchiveRootName must be a single portable directory name, not '$archiveRootName'."
+}
+$archiveRootDir = Join-Path $archiveStagingRoot $archiveRootName
 
 $requiredPyInstallerVersion = "6.21.0"
 $installedPyInstallerVersion = & $PythonExe -c "import PyInstaller; print(PyInstaller.__version__)" 2>$null

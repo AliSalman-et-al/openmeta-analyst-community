@@ -1,4 +1,5 @@
 import importlib.util
+import shutil
 import sys
 import tomllib
 from pathlib import Path
@@ -56,10 +57,53 @@ def test_rc_metastudio_and_rcmetar_versions_are_aligned_for_release():
     )
     rcmetar_fields = read_description_fields(RCMetaR_DESCRIPTION)
 
-    assert project_version == "0.1.0"
     assert package.__version__ == project_version
     assert str(meta_globals.VERSION) == project_version
     assert rcmetar_fields["Version"] == project_version
+
+
+def test_version_bump_script_updates_all_release_version_surfaces(tmp_path):
+    paths_to_copy = [
+        "pyproject.toml",
+        "uv.lock",
+        "CHANGELOG.md",
+        "src/rc_metastudio/__init__.py",
+        "src/rc_metastudio/meta_globals.py",
+        "r/RCMetaR/DESCRIPTION",
+    ]
+    for relative_path in paths_to_copy:
+        source = ROOT / relative_path
+        target = tmp_path / relative_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
+
+    bump_version = load_module(
+        "bump_version_for_release_contract", ROOT / "scripts" / "bump_version.py"
+    )
+    result = bump_version.main(
+        ["0.2.0", "--root", str(tmp_path), "--date", "2026-08-09"]
+    )
+
+    assert result == 0
+    pyproject = tomllib.loads((tmp_path / "pyproject.toml").read_text("utf-8"))
+    package = load_module(
+        "rc_metastudio_after_bump", tmp_path / "src" / "rc_metastudio" / "__init__.py"
+    )
+    meta_globals = load_module(
+        "meta_globals_after_bump",
+        tmp_path / "src" / "rc_metastudio" / "meta_globals.py",
+    )
+    rcmetar_fields = read_description_fields(tmp_path / "r" / "RCMetaR" / "DESCRIPTION")
+    lockfile = (tmp_path / "uv.lock").read_text("utf-8")
+    changelog = (tmp_path / "CHANGELOG.md").read_text("utf-8")
+
+    assert pyproject["project"]["version"] == "0.2.0"
+    assert package.__version__ == "0.2.0"
+    assert meta_globals.VERSION == "0.2.0"
+    assert rcmetar_fields["Version"] == "0.2.0"
+    assert rcmetar_fields["Date"] == "2026-08-09"
+    assert 'name = "rc-metastudio"\nversion = "0.2.0"' in lockfile
+    assert "## 0.2.0 - Unreleased" in changelog
 
 
 def test_active_rcmetar_package_metadata_uses_current_maintainer_identity():

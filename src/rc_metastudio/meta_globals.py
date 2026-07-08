@@ -23,7 +23,7 @@ NUM_DIGITS = 3
 #   levels of granularity).
 CALC_NUM_DIGITS = 4
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 
 DISABLE_NETWORK_STUFF = True  # disable this until we can package jags, rjags, getmc
 DEFAULT_DATASET_NAME = "untitled_dataset"

@@ -1,6 +1,6 @@
 Package: RCMetaR
-Version: 0.1.0
-Date: 2026-07-06
+Version: 0.1.1
+Date: 2026-07-08
 Type: Package
 Title: R Component for RC MetaStudio
 Authors@R: c(

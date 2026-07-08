@@ -60,6 +60,14 @@ uv run pytest tests -m packaging_contract
 
 Windows is the active packaged release target. macOS package jobs are available for release-candidate validation but remain opt-in.
 
+To bump the aligned RC MetaStudio and bundled RCMetaR version surfaces, run:
+
+```powershell
+uv run python scripts\bump_version.py 0.1.2 --date 2026-08-09
+```
+
+The script updates `pyproject.toml`, `uv.lock`, application version constants, `r/RCMetaR/DESCRIPTION`, and creates a changelog section when one does not already exist. Edit `CHANGELOG.md` afterward so the release notes describe user-visible changes rather than commit logs.
+
 Before release packaging, bundled third-party components and assets must be inventoried and their license notices preserved separately from RC MetaStudio copyright and provenance. See [docs/release/third-party-inventory.md](docs/release/third-party-inventory.md).
 
 ## Feedback And Contributions
