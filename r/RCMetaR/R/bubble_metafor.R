@@ -47,8 +47,7 @@ rcmetar.create.metafor.bubble.bundle <- function(
         fitted.line=fitted.line,
         scale=scale.str,
         xlabel=as.character(cov.name),
-        ylabel=rcmetar.bubble.default.ylabel(params),
-        legacy_plot_data=NULL
+        ylabel=rcmetar.bubble.default.ylabel(params)
     )
 }
 

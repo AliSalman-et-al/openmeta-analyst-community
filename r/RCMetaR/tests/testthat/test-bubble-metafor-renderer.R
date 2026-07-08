@@ -85,6 +85,27 @@ test_that("meta-regression stores a self-contained metafor bubble plot bundle", 
   expect_equal(bundle$slab, fixture$data@study.names)
 })
 
+test_that("meta-regression bubble plot redraws reject legacy non-metafor payloads", {
+  fixture <- bubble_binary_fixture("default")
+  legacy.plot.data <- list(
+    fitted.line = list(intercept = 0, slope = 1),
+    types = rep(0, length(fixture$data@study.names)),
+    effects = list(ES = fixture$data@y, se = fixture$data@SE),
+    covariate = list(varname = "latitude", values = fixture$data@covariates[[1]]@cov.vals),
+    xlabel = "latitude",
+    ylabel = "Odds Ratio"
+  )
+
+  expect_error(
+    create.plot.data.reg(fixture$data, fixture$params, list(intercept = 0, slope = 1)),
+    "metafor rma result"
+  )
+  expect_error(
+    rcmetar.draw.regression.plot(legacy.plot.data, tempfile(fileext = ".png")),
+    "metafor-backed plot bundle"
+  )
+})
+
 test_that("metafor bubble plot renderer supports Default, RevMan, and BMJ styles", {
   for (style in c("default", "revman", "bmj")) {
     fixture <- bubble_binary_fixture(style, long.labels = TRUE)

@@ -593,43 +593,26 @@ create.subgroup.plot.data.cont <- function(subgroup.data, params) {
 
 # create regression plot data
 create.plot.data.reg <- function(reg.data, params, fitted.line, selected.cov=NULL, res=NULL) {
-     if (inherits(res, "rma")) {
-         return(rcmetar.create.metafor.bubble.bundle(
-             reg.data=reg.data,
-             params=params,
-             res=res,
-             cov.name=reg.data@covariates[[1]]@cov.name,
-             cov.values=reg.data@covariates[[1]]@cov.vals,
-             fitted.line=fitted.line
-         ))
+     if (!inherits(res, "rma")) {
+         stop("Meta-regression bubble plots require a metafor rma result.", call.=FALSE)
      }
-     scale.str <- get.scale(params)
-     cov.name <- reg.data@covariates[[1]]@cov.name
-     cov.vals <- reg.data@covariates[[1]]@cov.vals
-     plot.data <- list("fitted.line" = fitted.line,
-                      types = c(rep(0, length(reg.data@study.names))),
-                      scale = scale.str,
-                      covariate = list(varname = cov.name, values = cov.vals))
-     mult <- get.mult.from.conf.level(params$conf.level)
-
-
-     y <- reg.data@y
-     se <- reg.data@SE
-     effects <- list(ES = y,
-                    se = se)
-     plot.data$effects <- effects
-
-     ###
-     # Plot sizing defaults can move into params when exposed by the UI.
-     plot.data$sym.size <- 1
-     plot.data$lcol <- "darkred"
-     plot.data$lweight <- 3
-     plot.data$lpattern <- "dotted"
-     plot.data$plotregion <- "n"
-     plot.data$mcolor <- "darkgreen"
-     plot.data$regline <- TRUE
-
-     plot.data
+     cov.index <- 1
+     if (!is.null(selected.cov)) {
+         cov.names <- vapply(reg.data@covariates, function(covariate) covariate@cov.name, character(1))
+         match.index <- match(as.character(selected.cov), cov.names)
+         if (!is.na(match.index)) {
+             cov.index <- match.index
+         }
+     }
+     covariate <- reg.data@covariates[[cov.index]]
+     rcmetar.create.metafor.bubble.bundle(
+         reg.data=reg.data,
+         params=params,
+         res=res,
+         cov.name=covariate@cov.name,
+         cov.values=covariate@cov.vals,
+         fitted.line=fitted.line
+     )
 }
 
 
@@ -821,61 +804,13 @@ pretty.metric.name <- function(metric) {
 ###################################
 
 #######################################
-#       meta-regression scatter       #
+#       meta-regression bubble facade #
 #######################################
 meta.regression.plot <- function(plot.data, outpath, ...) {
-    if (rcmetar.is.metafor.bubble.bundle(plot.data)) {
-        return(rcmetar.draw.metafor.bubble(plot.data, outpath))
+    if (!rcmetar.is.metafor.bubble.bundle(plot.data)) {
+        stop("Meta-regression bubble plots require a metafor-backed plot bundle.", call.=FALSE)
     }
-
-	png(filename=rcmetar.scratch.path("INTER")) # to fix windows popping out at you issue
-
-    lweight = 1
-    lpattern = "solid"
-    lcol = "blue"
-    ES <- plot.data$effects$ES
-    se <- plot.data$effects$se
-    # make the data data.frame
-    data.reg <- data.frame(plot.data$effects, types=plot.data$types)
-    # data for plot (only keep the studies - not the summaries)
-    data.reg <- subset(data.reg, types==0)
-    cov.name <- plot.data$covariate$varname
-    cov.values <- plot.data$covariate$values
-    x.range.min <- min(cov.values)
-    x.range.max <- max(cov.values)
-    x.range <- x.range.max - x.range.min
-    x.min <- x.range.min - (x.range / 5)
-    x.max <- x.range.max + (x.range / 5)
-    y.range.min <- min(ES)
-    y.range.max <- max(ES)
-    y.range <- y.range.max - y.range.min
-    y.min <- y.range.min - (y.range / 5)
-    y.max <- y.range.max + (y.range / 5)
-
-    if (length(grep(".png", outpath)) != 0){
-        png(filename=outpath, width=10 , height=5, units="in", res=144)
-    } else {
-        pdf(file=outpath, width=10 , height=5)
-    }
-
-    plot(y = data.reg$ES, x=cov.values,
-                          xlim=c(x.min, x.max),
-                          ylim=c(y.min, y.max),
-                          xlab=plot.data$xlabel,
-                          ylab=plot.data$ylabel, type='n')
-    symbols(y = data.reg$ES, x=cov.values,
-                circles = 1 / data.reg$se,
-                inches=.3,
-                bty=plot.data$plotregion, add=TRUE)
-    if (plot.data$regline)  {
-       x<-c(x.range.min, x.range.max)
-       y<-c (plot.data$fitted.line$intercept +
-                x.range.min*plot.data$fitted.line$slope, plot.data$fitted.line$intercept +
-                x.range.max*plot.data$fitted.line$slope)
-       lines(x, y, col=lcol, lwd=lweight, lty=lpattern)
-    }
-    # write the plot data out to disk
-    graphics.off()
+    rcmetar.draw.metafor.bubble(plot.data, outpath)
 }
 
 ######################################

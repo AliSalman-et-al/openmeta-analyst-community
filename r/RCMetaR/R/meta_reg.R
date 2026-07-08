@@ -505,47 +505,23 @@ is.single.numeric.covariate <- function(mods) {
 
 # create regression plot data for g.meta.regression function
 g.create.plot.data.reg <- function(reg.data, cov.name, cov.vals, measure, level, fitted.line, res=NULL, digits=3) {
-	if (inherits(res, "rma")) {
-		params <- list(
-			measure=measure,
-			conf.level=level,
-			digits=digits,
-			fp_style="default"
-		)
-		return(rcmetar.create.metafor.bubble.bundle(
-			reg.data=reg.data,
-			params=params,
-			res=res,
-			cov.name=cov.name,
-			cov.values=cov.vals,
-			fitted.line=fitted.line
-		))
+	if (!inherits(res, "rma")) {
+		stop("Meta-regression bubble plots require a metafor rma result.", call.=FALSE)
 	}
-	scale.str <- g.get.scale(measure)
-	plot.data <- list("fitted.line" = fitted.line,
-			types = c(rep(0, length(reg.data$slab))),
-			scale = scale.str,
-			covariate = list(varname = cov.name, values = cov.vals))
-	mult <- get.mult.from.conf.level(level)
-	
-	
-	y <- reg.data$yi
-	se <- sqrt(reg.data$vi)
-	effects <- list(ES = y,
-			se = se)
-	plot.data$effects <- effects
-	
-	###
-	# Plot sizing defaults can move into params when exposed by the UI.
-	plot.data$sym.size <- 1
-	plot.data$lcol <- "darkred"
-	plot.data$lweight <- 3
-	plot.data$lpattern <- "dotted"
-	plot.data$plotregion <- "n"
-	plot.data$mcolor <- "darkgreen"
-	plot.data$regline <- TRUE
-	
-	plot.data
+	params <- list(
+		measure=measure,
+		conf.level=level,
+		digits=digits,
+		fp_style="default"
+	)
+	rcmetar.create.metafor.bubble.bundle(
+		reg.data=reg.data,
+		params=params,
+		res=res,
+		cov.name=cov.name,
+		cov.values=cov.vals,
+		fitted.line=fitted.line
+	)
 }
 
 # get scale for g.meta.regression function and derivatives
@@ -1044,16 +1020,8 @@ binary.fixed.meta.regression <- function(reg.data, params){
         betas <- res$b
         fitted.line <- list(intercept=betas[1], slope=betas[2])
         plot.path <- "./r_tmp/reg.png"
-        plot.data <- create.plot.data.reg(reg.data, params, fitted.line, selected.cov=cov.name)
-        meta.regression.plot(plot.data, outpath=plot.path, symSize=1,
-                                  lcol = "darkred",
-                                  y.axis.label = "Effect size",
-                                  xlabel= cov.name,
-                                  lweight = 3,
-                                  lpatern = "dotted",
-                                  plotregion = "n",
-                                  mcolor = "darkgreen",
-                                  regline = TRUE)   
+        plot.data <- create.plot.data.reg(reg.data, params, fitted.line, selected.cov=cov.name, res=res)
+        meta.regression.plot(plot.data, outpath=plot.path)
         images <- c("Regression Plot"=plot.path)
         plot.names <- c("forest plot"="reg.plot")
         results <- list("images"=images, "Summary"=capture.output.and.collapse(reg.disp), "plot_names"=plot.names)
@@ -1081,16 +1049,8 @@ random.meta.regression <- function(reg.data, params, cov.name){
     else {
         plot.path <- params$rp_outpath
     }
-    plot.data <- create.plot.data.reg(reg.data, params, fitted.line, selected.cov=cov.name)
-    meta.regression.plot(plot.data, outpath=plot.path, symSize=1,
-                                  lcol = "darkred",
-                                  y.axis.label = "Effect size",
-                                  xlabel= cov.name,
-                                  lweight = 3,
-                                  lpatern = "solid",
-                                  plotregion = "n",
-                                  mcolor = "black",
-                                  regline = TRUE)   
+    plot.data <- create.plot.data.reg(reg.data, params, fitted.line, selected.cov=cov.name, res=res)
+    meta.regression.plot(plot.data, outpath=plot.path)
     images <- c("Regression Plot"=plot.path)
     plot.names <- c("forest plot"="reg.plot")
     results <- list("images"=images, "Summary"=capture.output.and.collapse(reg.disp), "plot_names"=plot.names)
