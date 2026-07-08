@@ -431,7 +431,7 @@ diagnostic.fixed.inv.var <- function(diagnostic.data, params){
             plot.data <- create.plot.data.diagnostic(diagnostic.data, params, res)
             changed.params <- plot.data$changed.params
             # list of changed params values
-            params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+            params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
             changed.params <- c(changed.params, params.changed.in.forest.plot)
             params <- update.changed.plot.params(params, changed.params)
             # dump the forest plot params to disk; return path to
@@ -562,7 +562,7 @@ diagnostic.fixed.mh <- function(diagnostic.data, params){
             plot.data <- create.plot.data.diagnostic(diagnostic.data, params, res)
             changed.params <- plot.data$changed.params
             # list of changed params values
-            params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+            params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
             changed.params <- c(changed.params, params.changed.in.forest.plot)
             params <- update.changed.plot.params(params, changed.params)
             # dump the forest plot params to disk; return path to
@@ -697,7 +697,7 @@ diagnostic.fixed.peto <- function(diagnostic.data, params){
         plot.data <- create.plot.data.diagnostic(diagnostic.data, params, res)
         changed.params <- plot.data$changed.params
         # list of changed params values
-        params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
         changed.params <- c(changed.params, params.changed.in.forest.plot)
         params <- update.changed.plot.params(params, changed.params)
         # dump the forest plot params to disk; return path to
@@ -818,7 +818,7 @@ diagnostic.random <- function(diagnostic.data, params){
             plot.data <- create.plot.data.diagnostic(diagnostic.data, params, res)
             changed.params <- plot.data$changed.params
             # list of changed params values
-            params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+            params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
             changed.params <- c(changed.params, params.changed.in.forest.plot)
             params <- update.changed.plot.params(params, changed.params)
             # update params values

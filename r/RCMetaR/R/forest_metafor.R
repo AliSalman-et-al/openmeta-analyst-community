@@ -16,7 +16,6 @@ rcmetar.metafor.binary.default.supported <- function(binary.data, params, select
     has.raw <- rcmetar.has.binary.raw.columns(binary.data, n)
     has.entered.effects <- rcmetar.has.entered.effects(binary.data, n)
     is.null(selected.cov) &&
-        !isTRUE(params$fp_legacy_renderer) &&
         "BinaryData" %in% class(binary.data) &&
         rcmetar.forest.style(params) %in% c("default", "revman", "bmj") &&
         as.character(params$measure) %in% binary.two.arm.metrics &&
@@ -27,7 +26,6 @@ rcmetar.metafor.binary.default.supported <- function(binary.data, params, select
 rcmetar.metafor.continuous.default.supported <- function(cont.data, params, selected.cov=NULL) {
     n <- length(cont.data@study.names)
     is.null(selected.cov) &&
-        !isTRUE(params$fp_legacy_renderer) &&
         !identical(params$create.plot, FALSE) &&
         "ContinuousData" %in% class(cont.data) &&
         rcmetar.forest.style(params) %in% c("default", "revman", "bmj") &&
@@ -42,7 +40,6 @@ rcmetar.metafor.diagnostic.default.supported <- function(diagnostic.data, params
     has.entered.effects <- rcmetar.has.entered.effects(diagnostic.data, n)
 
     is.null(selected.cov) &&
-        !isTRUE(params$fp_legacy_renderer) &&
         !identical(params$create.plot, FALSE) &&
         "DiagnosticData" %in% class(diagnostic.data) &&
         rcmetar.forest.style(params) %in% c("default", "revman", "bmj") &&
@@ -130,8 +127,7 @@ rcmetar.metafor.weights <- function(res) {
 }
 
 rcmetar.metafor.default.supported <- function(params) {
-    !isTRUE(params$fp_legacy_renderer) &&
-        rcmetar.forest.style(params) %in% c("default", "revman", "bmj")
+    rcmetar.forest.style(params) %in% c("default", "revman", "bmj")
 }
 
 rcmetar.bundle.transform <- function(bundle) {

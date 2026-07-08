@@ -427,7 +427,6 @@ def test_RCMetaR_description_declares_only_direct_package_dependencies():
         "boot",
         "grDevices",
         "graphics",
-        "grid",
         "HSROC",
         "lme4",
         "methods",
@@ -443,6 +442,30 @@ def test_RCMetaR_description_declares_only_direct_package_dependencies():
     assert "igraph" not in fields["Imports"]
     assert "Hmisc" not in fields["Imports"]
     assert "exportPattern" not in RCMetaR_NAMESPACE.read_text(encoding="utf-8")
+
+
+def test_custom_grid_forest_engine_is_retired():
+    source_text = "\n".join(
+        path.read_text(encoding="utf-8") for path in RCMetaR_R_DIR.glob("*.R")
+    )
+
+    retired_function_defs = {
+        "forest.plot",
+        "draw.forest.plot",
+        "draw.data.col",
+        "two.forest.plots",
+        "create.grobs",
+        "calc.viewport.layout",
+        "calc.forest.plot.size",
+        "draw.normal.CI",
+        "draw.summary.CI",
+        "draw.summary.CI.no.scaled.diamond",
+    }
+    defined_functions = set(LEGACY_EXPORT_PATTERN.findall(source_text))
+
+    assert defined_functions.isdisjoint(retired_function_defs)
+    assert "fp_legacy_renderer" not in source_text
+    assert re.search(r"\b(?:grid\.|grid[A-Z_a-z])", source_text) is None
 
 
 def test_RCMetaR_source_uses_namespace_imports_instead_of_attach_calls():

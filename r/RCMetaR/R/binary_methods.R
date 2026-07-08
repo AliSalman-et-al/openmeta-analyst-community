@@ -221,7 +221,7 @@ binary.fixed.inv.var <- function(binary.data, params){
 		
 		forest.plot.params.path <- ""
 		if (is.null(params$supress.output) || !params$supress.output) {
-            params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+            params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
             changed.params <- c(changed.params, params.changed.in.forest.plot)
             params <- update.changed.plot.params(params, changed.params)
             # update params values
@@ -338,7 +338,7 @@ binary.fixed.mh <- function(binary.data, params){
 		forest.plot.params.path <- ""
 		if (is.null(params$supress.output) || !params$supress.output) {
 	        # list of changed params values
-	        params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+	        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
 	        changed.params <- c(changed.params, params.changed.in.forest.plot)
 	        params <- update.changed.plot.params(params, changed.params)
 	        # dump the forest plot params to disk; return path to
@@ -498,7 +498,7 @@ binary.fixed.peto <- function(binary.data, params) {
 		forest.plot.params.path <- ""
 		if (is.null(params$supress.output) || !params$supress.output) {
 	        # list of changed params values
-	        params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+	        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
 	        changed.params <- c(changed.params, params.changed.in.forest.plot)
 	        params <- update.changed.plot.params(params, changed.params)
 	        # dump the forest plot params to disk; return path to
@@ -646,7 +646,7 @@ binary.random <- function(binary.data, params) {
 		forest.plot.params.path <- ""
 		if (is.null(params$supress.output) || !params$supress.output) {
 	        # list of changed params values
-	        params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+	        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
 	        changed.params <- c(changed.params, params.changed.in.forest.plot)
 	        params <- update.changed.plot.params(params, changed.params)
 	        # dump the forest plot params to disk; return path to

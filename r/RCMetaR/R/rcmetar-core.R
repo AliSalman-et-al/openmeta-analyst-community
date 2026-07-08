@@ -341,12 +341,12 @@ rcmetar.draw.forest.plot <- function(plot.data, outpath, side.by.side=FALSE) {
         if (rcmetar.is.metafor.twin.forest(plot.data)) {
             return(rcmetar.draw.metafor.twin.forest(plot.data, outpath))
         }
-        return(two.forest.plots(plot.data, outpath))
+        stop("Forest plot data must be a metafor twin-panel render bundle.", call.=FALSE)
     }
     if (rcmetar.is.metafor.forest.bundle(plot.data)) {
         return(rcmetar.draw.metafor.forest(plot.data, outpath))
     }
-    forest.plot(plot.data, outpath)
+    stop("Forest plot data must be a metafor render bundle.", call.=FALSE)
 }
 
 rcmetar.draw.regression.plot <- function(plot.data, outpath) {

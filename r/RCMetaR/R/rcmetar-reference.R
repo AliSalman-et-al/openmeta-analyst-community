@@ -259,10 +259,10 @@ NULL
 #' @name RCMetaR-meta-regression
 NULL
 
-#' Forest plot and display data builders
+#' Forest render bundle and display data builders
 #'
 #' Functions that turn analysis results into rc-metastudio plot data,
-#' forest-plot grobs, formatted labels, tick marks, and result tables.
+#' metafor Forest Render Bundles, formatted labels, and result tables.
 #'
 #' @section Plot data:
 #' \code{create.plot.data.generic()}, \code{create.plot.data.binary()},
@@ -273,25 +273,19 @@ NULL
 #' \code{create.subgroup.plot.data.binary()},
 #' \code{create.subgroup.plot.data.cont()}, and
 #' \code{create.subgroup.plot.data.diagnostic()} build data structures consumed
-#' by plotting functions.
+#' by plotting functions and the metafor forest renderer.
 #'
 #' @section Forest plot drawing:
-#' \code{forest.plot()}, \code{draw.forest.plot()}, \code{create.grobs()},
-#' \code{draw.data.col()}, \code{draw.label.col()}, \code{draw.normal.CI()},
-#' \code{draw.summary.CI()}, \code{draw.summary.CI.no.scaled.diamond()},
-#' \code{two.forest.plots()}, and \code{sroc.plot()} draw analysis figures.
+#' \code{rcmetar.draw.forest.plot()} and \code{sroc.plot()} draw analysis figures.
 #'
 #' @section Layout and labels:
-#' \code{calc.box.sizes()}, \code{calc.forest.plot.size()},
-#' \code{calc.plot.range()}, \code{calc.tick.marks()},
-#' \code{calc.viewport.layout()}, \code{calc.width.list()},
-#' \code{calculate.radii()}, \code{check.label()},
+#' \code{calc.plot.range()}, \code{calculate.radii()}, \code{check.label()},
 #' \code{create.effect.size.label()}, \code{format.data.cols()},
 #' \code{format.effect.sizes()}, \code{format.raw.data.col()},
-#' \code{create.plot.options()}, \code{set.plot.options()}, and
+#' \code{set.plot.options()}, and
 #' \code{update.changed.plot.params()} control display formatting.
 #'
-#' @aliases additional.columns assign.rows calc.box.sizes calc.forest.plot.size calc.plot.range calc.tick.marks calc.viewport.layout calc.width.list calculate.radii check.label create.effect.size.label create.grobs create.plot.data.binary create.plot.data.continuous create.plot.data.cum create.plot.data.diagnostic create.plot.data.generic create.plot.data.loo create.plot.data.overall create.plot.data.reg create.plot.options create.subgroup.plot.data.binary create.subgroup.plot.data.cont create.subgroup.plot.data.diagnostic create.subgroup.plot.data.generic draw.data.col draw.forest.plot draw.label.col draw.normal.CI draw.summary.CI draw.summary.CI.no.scaled.diamond forest.plot format.data.cols format.effect.sizes format.raw.data.col create.overall.display create.subgroup.display create.summary.disp pretty.metric.name set.plot.options sroc.plot two.forest.plots update.changed.plot.params
+#' @aliases calc.plot.range calculate.radii check.label create.effect.size.label create.plot.data.binary create.plot.data.continuous create.plot.data.cum create.plot.data.diagnostic create.plot.data.generic create.plot.data.loo create.plot.data.overall create.plot.data.reg create.subgroup.plot.data.binary create.subgroup.plot.data.cont create.subgroup.plot.data.diagnostic create.subgroup.plot.data.generic format.data.cols format.effect.sizes format.raw.data.col create.overall.display create.subgroup.display create.summary.disp pretty.metric.name set.plot.options sroc.plot update.changed.plot.params
 #' @name RCMetaR-plotting
 NULL
 
