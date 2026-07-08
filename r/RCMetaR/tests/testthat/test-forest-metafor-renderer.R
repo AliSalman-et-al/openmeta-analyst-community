@@ -1041,12 +1041,20 @@ test_that("diagnostic twin-panel Default Forest Style renders aligned metafor pa
   expect_true(rcmetar.is.metafor.forest.bundle(plot_data$left))
   expect_true(rcmetar.is.metafor.forest.bundle(plot_data$right))
 
+  left_plan <- rcmetar.forest.layout.preflight(plot_data$left, style = "default")
+  right_plan <- rcmetar.forest.layout.preflight(plot_data$right, style = "default")
+  gutter_width <- rcmetar.twin.forest.gutter.width(left_plan, right_plan)
+  expect_gt(gutter_width, 0.5)
+
   rcmetar.draw.forest.plot(plot_data, outpath, side.by.side = TRUE)
 
   expect_true(file.exists(outpath))
   expect_gt(file.info(outpath)$size, 5000)
   png_size <- read_png_dimensions(outpath)
-  expect_gte(png_size[["width"]], 1800)
+  expect_gte(
+    png_size[["width"]],
+    ceiling((left_plan$device$width + gutter_width + right_plan$device$width) * 300)
+  )
   expect_gte(png_size[["height"]], 500)
 })
 

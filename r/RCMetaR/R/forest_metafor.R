@@ -619,6 +619,10 @@ rcmetar.with.shared.twin.rows <- function(plan, shared.rows) {
     plan
 }
 
+rcmetar.twin.forest.gutter.width <- function(left.plan, right.plan) {
+    max(0.55, min(0.85, 0.045 * (left.plan$device$width + right.plan$device$width)))
+}
+
 rcmetar.draw.metafor.twin.forest <- function(plot.data, outpath) {
     left.bundle <- plot.data$left
     right.bundle <- plot.data$right
@@ -627,8 +631,9 @@ rcmetar.draw.metafor.twin.forest <- function(plot.data, outpath) {
     shared.rows <- rcmetar.twin.forest.shared.rows(left.plan, right.plan)
     left.plan <- rcmetar.with.shared.twin.rows(left.plan, shared.rows)
     right.plan <- rcmetar.with.shared.twin.rows(right.plan, shared.rows)
+    gutter.width <- rcmetar.twin.forest.gutter.width(left.plan, right.plan)
     size <- list(
-        width=left.plan$device$width + right.plan$device$width,
+        width=left.plan$device$width + gutter.width + right.plan$device$width,
         height=max(left.plan$device$height, right.plan$device$height),
         bg="white"
     )
@@ -636,7 +641,10 @@ rcmetar.draw.metafor.twin.forest <- function(plot.data, outpath) {
     rcmetar.render.plot_file(outpath, size, function() {
         op <- graphics::par(no.readonly=TRUE)
         on.exit(graphics::par(op), add=TRUE)
-        graphics::layout(matrix(c(1, 2), nrow=1), widths=c(left.plan$device$width, right.plan$device$width))
+        graphics::layout(
+            matrix(c(1, 0, 2), nrow=1),
+            widths=c(left.plan$device$width, gutter.width, right.plan$device$width)
+        )
         rcmetar.draw.metafor.twin.default.panel(left.bundle, left.plan)
         rcmetar.draw.metafor.twin.default.panel(right.bundle, right.plan)
         invisible(left.bundle$changed.params)
