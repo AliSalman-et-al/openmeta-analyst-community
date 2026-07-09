@@ -2249,6 +2249,7 @@ def test_results_window_text_context_menu_is_reentrant_safe(monkeypatch):
         FakeMenu.current.aboutToHide.emit()
         text_items[0].contextMenuEvent(FakeEvent())
         assert len(popups) == 2
+        FakeMenu.current.aboutToHide.emit()
     finally:
         window.close()
         app.processEvents()
@@ -2424,6 +2425,65 @@ def test_results_window_save_handler_accepts_backend_export_formats(
         assert calls == [
             ("load", "%s.plotdata" % artifact.params_path),
             ("forest", str(tmp_path / ("saved.%s" % extension)), False),
+        ]
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_results_window_save_handler_preserves_requested_format_when_extension_is_omitted(
+    tmp_path, monkeypatch
+):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    calls = []
+    window = results_window.ResultsWindow(
+        {
+            "texts": {},
+            "images": {},
+            "image_var_names": {},
+            "image_params_paths": {},
+            "image_order": [],
+        }
+    )
+    artifact = results_window.PlotArtifact(
+        "Forest Plot",
+        str(tmp_path / "forest.png"),
+        params_path=str(tmp_path / "forest_params"),
+        plot_type="forest",
+    )
+
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "load_in_R",
+        lambda path: calls.append(("load", path)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "generate_forest_plot",
+        lambda path, side_by_side=False: calls.append(
+            ("forest", path, side_by_side)
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.QFileDialog,
+        "getSaveFileName",
+        lambda *args, **kwargs: (str(tmp_path / "saved"), ""),
+    )
+
+    try:
+        window.save_image_as(artifact, format="svg")
+
+        assert calls == [
+            ("load", "%s.plotdata" % artifact.params_path),
+            ("forest", str(tmp_path / "saved.svg"), False),
         ]
     finally:
         window.close()
