@@ -14,6 +14,20 @@ rcmetar.plot.file.extension <- function(outpath) {
     ext
 }
 
+rcmetar.plot.canonical_svg_path <- function(outpath) {
+    path <- as.character(outpath)
+    ext <- rcmetar.plot.file.extension(path)
+    if (identical(ext, "svg") || identical(ext, "svgz")) {
+        return(path)
+    }
+
+    filename <- basename(path)
+    if (!grepl("[.]", filename)) {
+        return(paste(path, ".svg", sep=""))
+    }
+    sub("[.][^.]*$", ".svg", path)
+}
+
 rcmetar.plot.export.dpi <- function(size) {
     if (!is.null(size$dpi) && is.finite(size$dpi) && size$dpi > 0) {
         return(size$dpi)
@@ -81,8 +95,7 @@ rcmetar.render.plot_file <- function(outpath, size, draw) {
         return(rcmetar.render.plot_svg(outpath, size, draw))
     }
 
-    svg.path <- tempfile(fileext=".svg")
-    on.exit(unlink(svg.path), add=TRUE)
+    svg.path <- rcmetar.plot.canonical_svg_path(outpath)
     result <- rcmetar.render.plot_svg(svg.path, size, draw)
     rcmetar.export.svg_render(svg.path, outpath, size)
     invisible(result)
