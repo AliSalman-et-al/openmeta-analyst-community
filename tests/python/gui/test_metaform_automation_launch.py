@@ -2544,6 +2544,116 @@ def test_edit_forest_plot_dialog_round_trips_style_and_appearance_params(monkeyp
         app.processEvents()
 
 
+def test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog(
+    tmp_path, monkeypatch
+):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    calls = []
+    params_path = str(tmp_path / "forest_params")
+    png_path = str(tmp_path / "forest.png")
+    out_path = str(tmp_path / "edited.png")
+
+    class FakeSignal(object):
+        def __init__(self):
+            self._callbacks = []
+
+        def connect(self, callback):
+            self._callbacks.append(callback)
+
+        def emit(self):
+            for callback in self._callbacks:
+                callback()
+
+    class FakeEditForestPlotDialog(object):
+        def __init__(self, plot_params, image_path, parent=None):
+            self.applied = FakeSignal()
+            self._params = {
+                "fp_col1_str": "EDIT TEST HEADING",
+                "fp_outpath": out_path,
+            }
+            calls.append(("dialog", plot_params, image_path, parent is not None))
+
+        def exec(self):
+            self.applied.emit()
+            return results_window.QDialog.Rejected
+
+        def plot_params(self):
+            return dict(self._params)
+
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "load_vars_for_plot",
+        lambda path, return_params_dict=False: {"fp_col1_str": "Study"},
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "update_plot_params",
+        lambda updated_params, write_them_out=False, outpath=None: calls.append(
+            ("update", updated_params, write_them_out, outpath)
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "regenerate_plot_data",
+        lambda: calls.append(("regenerate",)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "generate_forest_plot",
+        lambda outpath: calls.append(("generate", outpath)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "write_out_plot_data",
+        lambda path: calls.append(("write", path)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window,
+        "EditForestPlotDialog",
+        FakeEditForestPlotDialog,
+    )
+
+    window = results_window.ResultsWindow(
+        {
+            "texts": {},
+            "images": {},
+            "image_var_names": {},
+            "image_params_paths": {},
+            "image_order": [],
+        }
+    )
+
+    try:
+        window.edit_forest_plot(params_path, png_path, plot_item=None)
+
+        assert calls == [
+            ("dialog", {"fp_col1_str": "Study"}, png_path, True),
+            (
+                "update",
+                {"fp_col1_str": "EDIT TEST HEADING", "fp_outpath": out_path},
+                True,
+                "%s.params" % params_path,
+            ),
+            ("regenerate",),
+            ("generate", out_path),
+            ("write", params_path),
+        ]
+    finally:
+        window.close()
+        app.processEvents()
+
+
 def test_results_window_ignores_missing_image_order_entries():
     import launch
     import test_backend_compat

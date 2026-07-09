@@ -4,7 +4,7 @@
 
 import random
 from collections import namedtuple
-from PyQt5.QtCore import QByteArray, QPoint, QRectF, Qt
+from PyQt5.QtCore import QByteArray, QPoint, QRectF, Qt, pyqtSignal
 from PyQt5.QtGui import (
     QColor,
     QFont,
@@ -20,6 +20,7 @@ from PyQt5.QtWidgets import (
     QApplication,
     QColorDialog,
     QDialog,
+    QDialogButtonBox,
     QFileDialog,
     QGraphicsItem,
     QGraphicsPixmapItem,
@@ -153,6 +154,8 @@ class SelectableResultsTextItem(QGraphicsTextItem):
 
 
 class EditForestPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg):
+    applied = pyqtSignal()
+
     def __init__(self, plot_params, image_path, parent=None):
         super(EditForestPlotDialog, self).__init__(parent)
         self.setupUi(self)
@@ -165,6 +168,9 @@ class EditForestPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plo
         self.style_cbo.currentIndexChanged[str].connect(
             app_error_handler.safe_slot(self._style_changed, parent=self)
         )
+        apply_button = self.buttonBox.button(QDialogButtonBox.Apply)
+        if apply_button is not None:
+            apply_button.clicked.connect(self.applied.emit)
 
         self._load_params(image_path)
         qt_layout.fit_application_dialog_to_contents(self)
@@ -748,9 +754,17 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             return
 
         dialog = EditForestPlotDialog(plot_params, png_path, parent=self)
-        if dialog.exec() != QDialog.Accepted:
-            return
+        dialog.applied.connect(
+            app_error_handler.safe_slot(
+                lambda: self._apply_forest_plot_edits(
+                    dialog, params_path, png_path, plot_item
+                ),
+                parent=self,
+            )
+        )
+        dialog.exec()
 
+    def _apply_forest_plot_edits(self, dialog, params_path, png_path, plot_item):
         updated_params = dialog.plot_params()
         outpath = updated_params["fp_outpath"] or png_path
         meta_py_r.update_plot_params(

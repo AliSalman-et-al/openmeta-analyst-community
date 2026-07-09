@@ -3547,10 +3547,138 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_figure_context_menus_only_offer_save_actions",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_displays_canonical_svg_plot_artifact",
+      "reason": "Covers canonical SVG plot display behavior in the Results window.",
       "runtime_class": "seconds",
       "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_plots",
+      "reason": "Guards the Results window context menu contract for regenerable Forest Render Bundles.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_save_handler_accepts_backend_export_formats[pdf]",
+      "reason": "Guards Results window forest-plot regeneration for supported export formats.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_save_handler_accepts_backend_export_formats[png]",
+      "reason": "Guards Results window forest-plot regeneration for supported export formats.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_save_handler_accepts_backend_export_formats[svg]",
+      "reason": "Guards Results window forest-plot regeneration for supported export formats.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_save_handler_accepts_backend_export_formats[tiff]",
+      "reason": "Guards Results window forest-plot regeneration for supported export formats.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_save_handler_preserves_requested_format_when_extension_is_omitted",
+      "reason": "Guards Results window forest-plot regeneration when users omit an export extension.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_edit_forest_plot_dialog_round_trips_style_and_appearance_params",
+      "reason": "Guards Edit Forest Plot dialog parameter round-tripping across Forest Plot Styles.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog",
+      "reason": "Guards issue #268: Apply-only forest plot edits regenerate the Forest Render Bundle without closing the dialog.",
+      "runtime_class": "subsecond",
+      "size": "small"
     },
     {
       "decision": "keep",
