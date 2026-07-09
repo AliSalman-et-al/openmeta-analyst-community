@@ -16,9 +16,7 @@ class Ui_edit_forest_plot_dlg(object):
         edit_forest_plot_dlg.setObjectName("edit_forest_plot_dlg")
         edit_forest_plot_dlg.resize(560, 620)
         icon = QtGui.QIcon()
-        icon.addPixmap(
-            QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
-        )
+        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         edit_forest_plot_dlg.setWindowIcon(icon)
         self.verticalLayout = QtWidgets.QVBoxLayout(edit_forest_plot_dlg)
         self.verticalLayout.setObjectName("verticalLayout")
@@ -56,7 +54,7 @@ class Ui_edit_forest_plot_dlg(object):
         self.point_size_multiplier = QtWidgets.QDoubleSpinBox(self.appearance_group)
         self.point_size_multiplier.setDecimals(2)
         self.point_size_multiplier.setMinimum(0.25)
-        self.point_size_multiplier.setMaximum(3.00)
+        self.point_size_multiplier.setMaximum(3.0)
         self.point_size_multiplier.setSingleStep(0.05)
         self.point_size_multiplier.setProperty("value", 1.0)
         self.point_size_multiplier.setObjectName("point_size_multiplier")
@@ -178,6 +176,7 @@ class Ui_edit_forest_plot_dlg(object):
         self.label_3.setObjectName("label_3")
         self.horizontalLayout_4.addWidget(self.label_3)
         self.image_path = QtWidgets.QLineEdit(edit_forest_plot_dlg)
+        self.image_path.setText("")
         self.image_path.setObjectName("image_path")
         self.horizontalLayout_4.addWidget(self.image_path)
         self.save_btn = QtWidgets.QPushButton(edit_forest_plot_dlg)
@@ -192,39 +191,29 @@ class Ui_edit_forest_plot_dlg(object):
         self.verticalLayout.addWidget(self.buttonBox)
 
         self.retranslateUi(edit_forest_plot_dlg)
-        self.buttonBox.accepted.connect(edit_forest_plot_dlg.accept)  # type: ignore
-        self.buttonBox.rejected.connect(edit_forest_plot_dlg.reject)  # type: ignore
+        self.buttonBox.accepted.connect(edit_forest_plot_dlg.accept) # type: ignore
+        self.buttonBox.rejected.connect(edit_forest_plot_dlg.reject) # type: ignore
         QtCore.QMetaObject.connectSlotsByName(edit_forest_plot_dlg)
 
     def retranslateUi(self, edit_forest_plot_dlg):
         _translate = QtCore.QCoreApplication.translate
-        edit_forest_plot_dlg.setWindowTitle(
-            _translate("edit_forest_plot_dlg", "Edit Forest Plot")
-        )
-        self.style_group.setTitle(
-            _translate("edit_forest_plot_dlg", "Forest Plot Style")
-        )
+        edit_forest_plot_dlg.setWindowTitle(_translate("edit_forest_plot_dlg", "Edit Plot"))
+        self.style_group.setTitle(_translate("edit_forest_plot_dlg", "Plot Style"))
         self.style_label.setText(_translate("edit_forest_plot_dlg", "Style:"))
-        self.style_cbo.setItemText(
-            0, _translate("edit_forest_plot_dlg", "Default (metafor)")
-        )
+        self.style_cbo.setItemText(0, _translate("edit_forest_plot_dlg", "Default (metafor)"))
         self.style_cbo.setItemText(1, _translate("edit_forest_plot_dlg", "RevMan"))
         self.style_cbo.setItemText(2, _translate("edit_forest_plot_dlg", "BMJ"))
         self.appearance_group.setTitle(_translate("edit_forest_plot_dlg", "Appearance"))
         self.accent_label.setText(_translate("edit_forest_plot_dlg", "Accent color:"))
         self.accent_color.setText(_translate("edit_forest_plot_dlg", "#2f5597"))
         self.color_btn.setText(_translate("edit_forest_plot_dlg", "..."))
-        self.point_size_label.setText(
-            _translate("edit_forest_plot_dlg", "Point size multiplier:")
-        )
+        self.point_size_label.setText(_translate("edit_forest_plot_dlg", "Point size multiplier:"))
         self.groupBox.setTitle(_translate("edit_forest_plot_dlg", "Column Labels"))
         self.label_2.setText(_translate("edit_forest_plot_dlg", "Column 1 label:"))
         self.col1_str_edit.setText(_translate("edit_forest_plot_dlg", "Study or Subgroup"))
         self.show_1.setText(_translate("edit_forest_plot_dlg", "Show"))
         self.label_4.setText(_translate("edit_forest_plot_dlg", "Column 2 label:"))
-        self.col2_str_edit.setText(
-            _translate("edit_forest_plot_dlg", "Estimate (Conf. Int.)")
-        )
+        self.col2_str_edit.setText(_translate("edit_forest_plot_dlg", "Estimate (Conf. Int.)"))
         self.show_2.setText(_translate("edit_forest_plot_dlg", "Show"))
         self.label_5.setText(_translate("edit_forest_plot_dlg", "Column 3 label:"))
         self.col3_str_edit.setText(_translate("edit_forest_plot_dlg", "Ev/Trt"))
@@ -232,18 +221,12 @@ class Ui_edit_forest_plot_dlg(object):
         self.label_6.setText(_translate("edit_forest_plot_dlg", "Column 4 label:"))
         self.col4_str_edit.setText(_translate("edit_forest_plot_dlg", "Ev/Ctrl"))
         self.show_4.setText(_translate("edit_forest_plot_dlg", "Show"))
-        self.default_panel.setTitle(
-            _translate("edit_forest_plot_dlg", "Default Style Options")
-        )
-        self.raw_counts_label.setText(
-            _translate("edit_forest_plot_dlg", "Show raw-count columns:")
-        )
+        self.default_panel.setTitle(_translate("edit_forest_plot_dlg", "Default Style Options"))
+        self.raw_counts_label.setText(_translate("edit_forest_plot_dlg", "Show raw-count columns:"))
         self.show_raw_counts.setText(_translate("edit_forest_plot_dlg", "Show"))
         self.headers_label.setText(_translate("edit_forest_plot_dlg", "Show headers:"))
         self.show_headers.setText(_translate("edit_forest_plot_dlg", "Show"))
-        self.annotation_label.setText(
-            _translate("edit_forest_plot_dlg", "Show annotation:")
-        )
+        self.annotation_label.setText(_translate("edit_forest_plot_dlg", "Show annotation:"))
         self.show_annotation.setText(_translate("edit_forest_plot_dlg", "Show"))
         self.label_12.setText(_translate("edit_forest_plot_dlg", "X-axis label:"))
         self.label_13.setText(_translate("edit_forest_plot_dlg", "X-axis ticks:"))
@@ -255,8 +238,5 @@ class Ui_edit_forest_plot_dlg(object):
         self.label_16.setText(_translate("edit_forest_plot_dlg", "Show summary line:"))
         self.x_lbl_le.setText(_translate("edit_forest_plot_dlg", "[default]"))
         self.label_3.setText(_translate("edit_forest_plot_dlg", "Save image to:"))
-        self.image_path.setText("")
         self.save_btn.setText(_translate("edit_forest_plot_dlg", "..."))
-
-
 import icons_rc

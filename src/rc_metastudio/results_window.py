@@ -232,7 +232,7 @@ class EditForestPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plo
 
     def _choose_color(self):
         current = QColor(self.accent_color.text())
-        color = QColorDialog.getColor(current, self, "Forest Plot Accent Color")
+        color = QColorDialog.getColor(current, self, "Plot Accent Color")
         if color.isValid():
             self._set_accent_color(color.name())
 
@@ -729,7 +729,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                 if artifact.plot_type == "forest" and not self._is_side_by_side_fp(
                     artifact.title
                 ):
-                    action = QAction("Edit Forest Plot", self)
+                    action = QAction("Edit Plot", self)
                     action.triggered.connect(
                         app_error_handler.safe_slot(
                             lambda _checked=False: self.edit_forest_plot(

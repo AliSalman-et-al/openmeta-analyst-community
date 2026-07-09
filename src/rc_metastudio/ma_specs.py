@@ -4,6 +4,7 @@
 
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import (
     QComboBox,
     QDialog,
@@ -40,6 +41,18 @@ import diagnostic_explain
 
 _fromUtf8 = lambda s: s
 
+PLOT_STYLE_LABELS = {
+    "default": "Default (metafor)",
+    "revman": "RevMan",
+    "bmj": "BMJ",
+}
+PLOT_STYLE_VALUES = {label: value for value, label in PLOT_STYLE_LABELS.items()}
+PLOT_STYLE_DEFAULT_COLORS = {
+    "default": "#2f5597",
+    "revman": "#000000",
+    "bmj": "#6b58a6",
+}
+
 COUNT_BASED_DIAGNOSTIC_METHODS = set(
     [
         "diagnostic.bivariate.ml",
@@ -70,6 +83,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         self.current_param_vals = external_params or {}
         self.model = model
+        self._loading_plot_style = False
+        self._setup_plot_controls()
+        self._load_plot_params()
 
         if conf_level is None:
             raise ValueError("CONFIDENCE LEVEL MUST BE SPECIFIED")
@@ -170,6 +186,63 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             return None
         else:
             self.image_path.setText(out_f)
+
+    def _setup_plot_controls(self):
+        self.color_btn.clicked.connect(
+            app_error_handler.safe_slot(self._choose_plot_color, parent=self)
+        )
+        self.style_cbo.currentIndexChanged[str].connect(
+            app_error_handler.safe_slot(self._plot_style_changed, parent=self)
+        )
+
+    def _load_plot_params(self):
+        self._loading_plot_style = True
+        try:
+            style = _normalized_plot_style(
+                self.current_param_vals.get("fp_style", "default")
+            )
+            self.style_cbo.setCurrentText(PLOT_STYLE_LABELS[style])
+            self._set_plot_accent_color(
+                self.current_param_vals.get("fp_accent_color")
+                or PLOT_STYLE_DEFAULT_COLORS[style]
+            )
+            self.point_size_multiplier.setValue(
+                _float_plot_param(
+                    self.current_param_vals.get("fp_point_size_multiplier"), 1.0
+                )
+            )
+            self.show_raw_counts.setChecked(
+                _bool_plot_param(
+                    self.current_param_vals.get("fp_show_raw_counts"), True
+                )
+            )
+            self.show_headers.setChecked(
+                _bool_plot_param(self.current_param_vals.get("fp_show_headers"), True)
+            )
+            self.show_annotation.setChecked(
+                _bool_plot_param(
+                    self.current_param_vals.get("fp_show_annotation"), True
+                )
+            )
+        finally:
+            self._loading_plot_style = False
+
+    def _plot_style_changed(self, label):
+        if self._loading_plot_style:
+            return
+        style = PLOT_STYLE_VALUES.get(str(label), "default")
+        self._set_plot_accent_color(PLOT_STYLE_DEFAULT_COLORS[style])
+
+    def _choose_plot_color(self):
+        current = QColor(self.accent_color.text())
+        color = QtWidgets.QColorDialog.getColor(current, self, "Plot Accent Color")
+        if color.isValid():
+            self._set_plot_accent_color(color.name())
+
+    def _set_plot_accent_color(self, color):
+        text = str(color or PLOT_STYLE_DEFAULT_COLORS["default"])
+        self.accent_color.setText(text)
+        self.color_btn.setStyleSheet("background-color: %s;" % text)
 
     def run_network_analysis(self):
         # first, let's fire up a progress bar
@@ -962,7 +1035,9 @@ def _is_integer_analysis_param(name):
 
 
 def add_plot_params(specs_form):
-    specs_form.current_param_vals["fp_style"] = "default"
+    specs_form.current_param_vals["fp_style"] = PLOT_STYLE_VALUES.get(
+        str(specs_form.style_cbo.currentText()), "default"
+    )
     specs_form.current_param_vals["fp_show_col1"] = specs_form.show_1.isChecked()
     specs_form.current_param_vals["fp_col1_str"] = _text_value(specs_form.col1_str_edit)
     specs_form.current_param_vals["fp_show_col2"] = specs_form.show_2.isChecked()
@@ -992,11 +1067,44 @@ def add_plot_params(specs_form):
     specs_form.current_param_vals["fp_show_summary_line"] = (
         specs_form.show_summary_line.isChecked()
     )
-    specs_form.current_param_vals.setdefault("fp_show_raw_counts", True)
-    specs_form.current_param_vals.setdefault("fp_show_headers", True)
-    specs_form.current_param_vals.setdefault("fp_show_annotation", True)
-    specs_form.current_param_vals.setdefault("fp_accent_color", "#2f5597")
-    specs_form.current_param_vals.setdefault("fp_point_size_multiplier", 1.0)
+    specs_form.current_param_vals["fp_show_raw_counts"] = (
+        specs_form.show_raw_counts.isChecked()
+    )
+    specs_form.current_param_vals["fp_show_headers"] = specs_form.show_headers.isChecked()
+    specs_form.current_param_vals["fp_show_annotation"] = (
+        specs_form.show_annotation.isChecked()
+    )
+    specs_form.current_param_vals["fp_accent_color"] = _text_value(
+        specs_form.accent_color
+    )
+    specs_form.current_param_vals["fp_point_size_multiplier"] = (
+        specs_form.point_size_multiplier.value()
+    )
+
+
+def _normalized_plot_style(style):
+    style = str(_scalar_plot_param(style) or "default").strip().lower()
+    return style if style in PLOT_STYLE_LABELS else "default"
+
+
+def _scalar_plot_param(value):
+    if isinstance(value, (list, tuple)) and value:
+        return value[0]
+    return value
+
+
+def _bool_plot_param(value, default):
+    value = _scalar_plot_param(default if value is None else value)
+    if isinstance(value, str):
+        return value.lower() in ("true", "t", "1", "yes")
+    return bool(value)
+
+
+def _float_plot_param(value, default):
+    try:
+        return float(_scalar_plot_param(default if value is None else value))
+    except (TypeError, ValueError):
+        return default
 
 
 def _diagnostic_analysis_requests(specs_form):

@@ -2339,7 +2339,7 @@ def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_p
             (
                 results_window.QPoint(10, 20),
                 [
-                    "Edit Forest Plot",
+                    "Edit Plot",
                     "Save PDF Image As",
                     "Save PNG Image As",
                     "Save TIFF Image As",
@@ -2542,6 +2542,65 @@ def test_edit_forest_plot_dialog_round_trips_style_and_appearance_params(monkeyp
     finally:
         dialog.close()
         app.processEvents()
+
+
+def test_pre_run_plots_tab_exports_style_and_appearance_params(monkeypatch):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import ma_specs
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+
+    class PlotDefaultsForm(object):
+        pass
+
+    form = PlotDefaultsForm()
+    form.current_param_vals = {}
+    form.style_cbo = QtWidgets.QComboBox()
+    form.style_cbo.addItems(["Default (metafor)", "RevMan", "BMJ"])
+    form.style_cbo.setCurrentText("RevMan")
+    form.show_1 = QtWidgets.QCheckBox()
+    form.show_1.setChecked(True)
+    form.col1_str_edit = QtWidgets.QLineEdit("Study or Subgroup")
+    form.show_2 = QtWidgets.QCheckBox()
+    form.show_2.setChecked(False)
+    form.col2_str_edit = QtWidgets.QLineEdit("[default]")
+    form.show_3 = QtWidgets.QCheckBox()
+    form.show_3.setChecked(True)
+    form.col3_str_edit = QtWidgets.QLineEdit("Treatment")
+    form.show_4 = QtWidgets.QCheckBox()
+    form.show_4.setChecked(True)
+    form.col4_str_edit = QtWidgets.QLineEdit("Control")
+    form.x_lbl_le = QtWidgets.QLineEdit("Odds Ratio")
+    form.image_path = QtWidgets.QLineEdit("forest.png")
+    form.plot_lb_le = QtWidgets.QLineEdit("[default]")
+    form.plot_ub_le = QtWidgets.QLineEdit("[default]")
+    form.x_ticks_le = QtWidgets.QLineEdit("[default]")
+    form.show_summary_line = QtWidgets.QCheckBox()
+    form.show_summary_line.setChecked(True)
+    form.show_raw_counts = QtWidgets.QCheckBox()
+    form.show_raw_counts.setChecked(False)
+    form.show_headers = QtWidgets.QCheckBox()
+    form.show_headers.setChecked(False)
+    form.show_annotation = QtWidgets.QCheckBox()
+    form.show_annotation.setChecked(False)
+    form.accent_color = QtWidgets.QLineEdit("#123456")
+    form.point_size_multiplier = QtWidgets.QDoubleSpinBox()
+    form.point_size_multiplier.setValue(1.5)
+
+    ma_specs.add_plot_params(form)
+
+    assert form.current_param_vals["fp_style"] == "revman"
+    assert form.current_param_vals["fp_accent_color"] == "#123456"
+    assert form.current_param_vals["fp_point_size_multiplier"] == 1.5
+    assert form.current_param_vals["fp_show_raw_counts"] is False
+    assert form.current_param_vals["fp_show_headers"] is False
+    assert form.current_param_vals["fp_show_annotation"] is False
+    assert form.current_param_vals["fp_col3_str"] == "Treatment"
+    assert form.current_param_vals["fp_col4_str"] == "Control"
+    app.processEvents()
 
 
 def test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog(
