@@ -204,6 +204,10 @@ _Avoid_: Exact match, string equality
 Compatibility where generated plots preserve the same analysis content, labels, grouping, ordering, and recognizable presentation as the Reference Implementation without requiring pixel-perfect image equality.
 _Avoid_: Pixel-perfect plot diff, unchecked plot artifact, cosmetic clone
 
+**Plot Artifact**:
+The durable generated figure for an analysis result, represented canonically as SVG and exported or previewed in other formats from that same figure content. It is distinct from the Forest Render Bundle, which is the persisted render spec used to regenerate the figure.
+_Avoid_: Temporary preview image, format-specific plot copy, plot title string
+
 **Compatibility Exception**:
 An explicitly documented, reviewed difference from Reference Implementation Analysis Behavior that is accepted despite failing normal golden-test equivalence.
 _Avoid_: Known failure, acceptable drift

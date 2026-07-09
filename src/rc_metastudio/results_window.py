@@ -3,6 +3,7 @@
 """Render and export meta-analysis results."""
 
 import random
+from collections import namedtuple
 from PyQt5.QtCore import QByteArray, QPoint, QRectF, Qt
 from PyQt5.QtGui import (
     QColor,
@@ -42,7 +43,16 @@ import result_sections
 PageSize = (612, 792)
 padding = 25
 horizontal_padding = 75
-SCALE_P = 0.5  # percent images are to be scaled
+PlotExportFormat = namedtuple("PlotExportFormat", ["extension", "label", "qt_format"])
+PLOT_EXPORT_FORMATS = (
+    PlotExportFormat("pdf", "PDF", None),
+    PlotExportFormat("png", "PNG", "PNG"),
+    PlotExportFormat("tiff", "TIFF", None),
+    PlotExportFormat("svg", "SVG", None),
+)
+PLOT_EXPORT_FORMATS_BY_EXTENSION = {
+    export_format.extension: export_format for export_format in PLOT_EXPORT_FORMATS
+}
 
 # these are special forest plots, in that multiple parameters objects are
 # require to re-generate them (and we invoke a different method!)
@@ -65,6 +75,51 @@ FOREST_STYLE_DEFAULT_COLORS = {
 NO_RESULTS_MESSAGE = "No results could be computed for this analysis."
 ROW_HEIGHT = 15  # by trial-and-error; seems to work very well
 SECTION_SPACING = ROW_HEIGHT
+QGraphicsSvgItem = None
+
+
+def _svg_item_class():
+    global QGraphicsSvgItem
+    if QGraphicsSvgItem is None:
+        from PyQt5.QtSvg import QGraphicsSvgItem as _QGraphicsSvgItem
+
+        QGraphicsSvgItem = _QGraphicsSvgItem
+    return QGraphicsSvgItem
+
+
+def _canonical_svg_path(image_path):
+    root, ext = os.path.splitext(str(image_path))
+    if ext.lower() in (".svg", ".svgz"):
+        return str(image_path)
+    return "%s.svg" % root
+
+
+class PlotArtifact(object):
+    def __init__(self, title, image_path, params_path=None, plot_type=None):
+        self.title = title
+        self.image_path = str(image_path)
+        self.params_path = params_path
+        self.plot_type = plot_type
+        self.canonical_svg_path = _canonical_svg_path(self.image_path)
+
+    def display_path(self):
+        if os.path.exists(self.canonical_svg_path):
+            return self.canonical_svg_path
+        return self.image_path
+
+    def has_vector_display(self):
+        return self.display_path().lower().endswith((".svg", ".svgz"))
+
+    def can_display(self):
+        if self.has_vector_display():
+            item = _svg_item_class()(self.display_path())
+            return item.renderer().isValid()
+        return not QPixmap(self.image_path).isNull()
+
+    def export_formats(self):
+        if self.params_path:
+            return PLOT_EXPORT_FORMATS
+        return (PLOT_EXPORT_FORMATS_BY_EXTENSION["png"],)
 
 
 class SelectableResultsTextItem(QGraphicsTextItem):
@@ -297,26 +352,29 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         print("title: %s; image: %s" % (title, image))
         cur_y = max(0, self.y_coord)
         print("cur_y: %s" % cur_y)
-        pixmap = self.generate_pixmap(image)
-        if pixmap.isNull():
-            print("Skipping image that Qt could not load: %s" % image)
-            return
-        # first add the title
-        qt_item = self.add_title(display_title)
-
-        # if there is a parameters object associated with this object
-        # (i.e., it is a forest plot of some variety), we pass it along
-        # to the create_pixmap_item method to for the context_menu
-        # construction
         params_path = None
         if self.params_paths is not None and title in self.params_paths:
             params_path = self.params_paths[title]
 
-        img_shape, pos, pixmap_item = self.create_pixmap_item(
-            pixmap, self.position(), title, image, params_path=params_path
+        artifact = self.create_plot_artifact(title, image, params_path=params_path)
+        if not artifact.can_display():
+            print("Skipping image that Qt could not load: %s" % image)
+            return
+
+        qt_item = self.add_title(display_title)
+        img_shape, pos, plot_item = self.create_plot_item(
+            artifact, self.position()
         )
 
         self.items_to_coords[id(qt_item)] = pos
+
+    def create_plot_artifact(self, title, image_path, params_path=None):
+        return PlotArtifact(
+            title,
+            image_path,
+            params_path=params_path,
+            plot_type=self._get_plot_type(title),
+        )
 
     def add_text_section(self, title, display_title, text):
         try:
@@ -338,11 +396,9 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         if pixmap.isNull():
             return pixmap
 
-        ###
-        # we scale to address issue #23.
-        # Scale generated images consistently across plot backends.
-        scaled_width = int(SCALE_P * pixmap.width())
-        scaled_height = int(SCALE_P * pixmap.height())
+        scaled_width, scaled_height = self._fit_size_to_viewport(
+            pixmap.width(), pixmap.height()
+        )
 
         if scaled_width > self.scene.width():
             self.scene.setSceneRect(
@@ -354,6 +410,22 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         )
 
         return pixmap
+
+    def _fit_size_to_viewport(self, width, height):
+        if width <= 0 or height <= 0:
+            return (width, height)
+
+        viewport_width = self._plot_viewport_width()
+        scale = min(1.0, float(viewport_width) / float(width))
+        return (max(1, int(width * scale)), max(1, int(height * scale)))
+
+    def _plot_viewport_width(self):
+        viewport_width = max(
+            self.graphics_view.viewport().width(), self.graphics_view.width()
+        )
+        if viewport_width <= horizontal_padding:
+            viewport_width = max(self.results_nav_splitter.width(), self.width())
+        return max(300, viewport_width - self.x_coord - padding)
 
     def add_references(self):
         if self.references_text is None:
@@ -529,6 +601,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
     def create_pixmap_item(
         self, pixmap, position, title, image_path, params_path=None, matrix=QTransform()
     ):
+        artifact = self.create_plot_artifact(title, image_path, params_path=params_path)
         item = QGraphicsPixmapItem(pixmap)
         item.setToolTip(
             'To save the image:\nright-click on the image and choose "save image as".'
@@ -553,68 +626,102 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self.scene.addItem(item)
         item.setPos(position)
 
-        # Infer the plot type from the title; see _get_plot_type.
-        plot_type = self._get_plot_type(title)
-
         # attach event handler for mouse-clicks, i.e., to handle
         # user right-clicks
-        item.contextMenuEvent = self._make_context_menu(
-            params_path, title, image_path, item, plot_type=plot_type
-        )
+        item.contextMenuEvent = self._make_context_menu(artifact, item)
 
         return (item.boundingRect().size(), position, item)
 
-    def _make_context_menu(
-        self, params_path, title, png_path, qpixmap_item, plot_type="forest"
-    ):
-        plot_img = QImage(png_path)
+    def create_plot_item(self, artifact, position):
+        if artifact.has_vector_display():
+            svg_item = self.create_svg_item(artifact, position)
+            if svg_item is not None:
+                return svg_item
+
+        pixmap = self.generate_pixmap(artifact.image_path)
+        return self.create_pixmap_item(
+            pixmap,
+            position,
+            artifact.title,
+            artifact.image_path,
+            params_path=artifact.params_path,
+        )
+
+    def create_svg_item(self, artifact, position):
+        item = _svg_item_class()(artifact.display_path())
+        if not item.renderer().isValid():
+            return None
+
+        item.setToolTip(
+            'To save the image:\nright-click on the image and choose "save image as".'
+        )
+        item.setFlags(QGraphicsItem.ItemIsSelectable)
+
+        item_width = item.boundingRect().width()
+        item_height = item.boundingRect().height()
+        scaled_width, scaled_height = self._fit_size_to_viewport(
+            item_width, item_height
+        )
+        if item_width > 0:
+            item.setScale(float(scaled_width) / float(item_width))
+
+        self.y_coord += scaled_height + SECTION_SPACING
+        self.scene.setSceneRect(
+            0,
+            0,
+            max(self.scene.width(), scaled_width),
+            self.y_coord + scaled_height + padding,
+        )
+
+        print("creating item @:%s" % position)
+        self.scene.clearSelection()
+        self.scene.addItem(item)
+        item.setPos(position)
+        item.contextMenuEvent = self._make_context_menu(artifact, item)
+
+        return (item.boundingRect().size(), position, item)
+
+    def _make_context_menu(self, artifact, plot_item):
+        plot_img = QImage(artifact.image_path)
 
         def _graphics_item_context_menu(event):
-            def add_save_as_pdf_menu_action(menu):
-                action = QAction("Save PDF Image As", self)
-                action.triggered.connect(
-                    app_error_handler.safe_slot(
-                        lambda _checked=False: self.save_image_as(
-                            params_path, title, plot_type=plot_type, format="pdf"
-                        ),
-                        parent=self,
-                    )
-                )
-                menu.addAction(action)
+            def add_save_as_menu_action(menu, export_format):
+                action = QAction("Save %s Image As" % export_format.label, self)
 
-            def add_save_as_png_menu_action(menu):
-                action = QAction("Save PNG Image As", self)
-                action.triggered.connect(
-                    app_error_handler.safe_slot(
-                        lambda _checked=False: self.save_image_as(
-                            params_path,
-                            title,
-                            plot_type=plot_type,
-                            unscaled_image=plot_img,
-                            format="png",
+                def save_action(_checked=False, selected_format=export_format):
+                    self.save_image_as(
+                        artifact,
+                        unscaled_image=(
+                            plot_img
+                            if selected_format.qt_format is not None
+                            and not artifact.params_path
+                            else None
                         ),
-                        parent=self,
+                        format=selected_format.extension,
                     )
+
+                action.triggered.connect(
+                    app_error_handler.safe_slot(save_action, parent=self)
                 )
                 menu.addAction(action)
 
             context_menu = QMenu(self)
-            if params_path:
-                if plot_type == "forest" and not self._is_side_by_side_fp(title):
+            if artifact.params_path:
+                if artifact.plot_type == "forest" and not self._is_side_by_side_fp(
+                    artifact.title
+                ):
                     action = QAction("Edit Forest Plot", self)
                     action.triggered.connect(
                         app_error_handler.safe_slot(
                             lambda _checked=False: self.edit_forest_plot(
-                                params_path, png_path, qpixmap_item
+                                artifact.params_path, artifact.image_path, plot_item
                             ),
                             parent=self,
                         )
                     )
                     context_menu.addAction(action)
-                add_save_as_pdf_menu_action(context_menu)
-                add_save_as_png_menu_action(context_menu)
-            else:  # no params path given, just give them the png
-                add_save_as_png_menu_action(context_menu)
+            for export_format in artifact.export_formats():
+                add_save_as_menu_action(context_menu, export_format)
 
             app_error_handler.popup_context_menu(
                 context_menu, event.screenPos(), parent=self, event=event
@@ -622,7 +729,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
         return _graphics_item_context_menu
 
-    def edit_forest_plot(self, params_path, png_path, qpixmap_item):
+    def edit_forest_plot(self, params_path, png_path, plot_item):
         plot_params = meta_py_r.load_vars_for_plot(params_path, return_params_dict=True)
         if plot_params is False:
             return
@@ -640,33 +747,48 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         meta_py_r.generate_forest_plot(outpath)
         meta_py_r.write_out_plot_data(params_path)
 
-        if qpixmap_item is not None:
-            pixmap = self.generate_pixmap(outpath)
-            if not pixmap.isNull():
-                qpixmap_item.setPixmap(pixmap)
+        if plot_item is not None:
+            artifact = self.create_plot_artifact(
+                "Forest Plot", outpath, params_path=params_path
+            )
+            if isinstance(plot_item, _svg_item_class()) and os.path.exists(
+                artifact.canonical_svg_path
+            ):
+                plot_item.renderer().load(artifact.canonical_svg_path)
+                self.scene.update()
+            elif isinstance(plot_item, QGraphicsPixmapItem):
+                pixmap = self.generate_pixmap(outpath)
+                if not pixmap.isNull():
+                    plot_item.setPixmap(pixmap)
 
     def _is_side_by_side_fp(self, title):
         return any(
             [side_by_side in title for side_by_side in SIDE_BY_SIDE_FOREST_PLOTS]
         )
 
-    def save_image_as(
-        self, params_path, title, plot_type="forest", unscaled_image=None, format=None
-    ):
+    def save_image_as(self, artifact, unscaled_image=None, format=None):
+        if not isinstance(artifact, PlotArtifact):
+            artifact = self.create_plot_artifact(
+                "", artifact, params_path=None
+            )
 
-        if format not in ["pdf", "png"]:
-            raise Exception("Invalid format, needs to be either pdf or png!")
+        if format not in PLOT_EXPORT_FORMATS_BY_EXTENSION:
+            valid_formats = ", ".join(PLOT_EXPORT_FORMATS_BY_EXTENSION.keys())
+            raise Exception("Invalid format, needs to be one of: %s!" % valid_formats)
+
+        export_format = PLOT_EXPORT_FORMATS_BY_EXTENSION[format]
 
         if not unscaled_image:
             # note that the params object will, by convention,
             # have the (generic) name 'plot.data' -- after this
             # call, this object will be in the namespace
-            meta_py_r.load_in_R("%s.plotdata" % params_path)
+            meta_py_r.load_in_R("%s.plotdata" % artifact.params_path)
 
             default_path = {
-                "forest": "forest_plot.pdf",
-                "regression": "regression.pdf",
-            }[plot_type]
+                "forest": "forest_plot",
+                "regression": "regression",
+            }[artifact.plot_type]
+            default_path = "%s.%s" % (default_path, export_format.extension)
 
             # where to save the graphic?
             file_path, _selected_filter = QFileDialog.getSaveFileName(
@@ -677,23 +799,27 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
             # now we re-generate it, unless they canceled, of course
             if file_path != "":
-                if plot_type == "forest":
-                    if self._is_side_by_side_fp(title):
+                if artifact.plot_type == "forest":
+                    if self._is_side_by_side_fp(artifact.title):
                         meta_py_r.generate_forest_plot(file_path, side_by_side=True)
                     else:
                         meta_py_r.generate_forest_plot(file_path)
-                elif plot_type == "regression":
+                elif artifact.plot_type == "regression":
                     meta_py_r.generate_reg_plot(file_path)
                 else:
-                    print("sorry -- I don't know how to draw %s plots!" % plot_type)
+                    print(
+                        "sorry -- I don't know how to draw %s plots!"
+                        % artifact.plot_type
+                    )
         else:  # case where we just have the png and can't regenerate the pdf from plot data
-            default_path = ".".join([title.replace(" ", "_"), "png"])
+            default_path = ".".join([artifact.title.replace(" ", "_"), "png"])
             file_path, _selected_filter = QFileDialog.getSaveFileName(
                 self,
                 "RC MetaStudio -- save plot as",
                 default_path,
             )
-            unscaled_image.save(file_path, "PNG")
+            if file_path != "":
+                unscaled_image.save(file_path, export_format.qt_format)
 
     def position(self):
         point = QPoint(int(self.x_coord), int(self.y_coord))

@@ -2014,6 +2014,57 @@ def test_results_window_renders_summary_text_and_plot_navigation(tmp_path):
         app.processEvents()
 
 
+def test_results_window_displays_canonical_svg_plot_artifact(tmp_path):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    plot_path = tmp_path / "forest.png"
+    svg_path = tmp_path / "forest.svg"
+    image = results_window.QImage(1600, 800, results_window.QImage.Format_RGB32)
+    image.fill(results_window.Qt.white)
+    assert image.save(str(plot_path), "PNG")
+    svg_path.write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="800">'
+        '<rect width="1600" height="800" fill="white"/>'
+        '<text x="20" y="60">Forest Plot</text>'
+        "</svg>",
+        encoding="utf-8",
+    )
+
+    window = results_window.ResultsWindow(
+        {
+            "texts": {},
+            "images": {"Forest Plot": str(plot_path)},
+            "image_var_names": {"Forest Plot": "forest_plot"},
+            "image_params_paths": {"Forest Plot": str(tmp_path / "forest_params")},
+            "image_order": ["Forest Plot"],
+        }
+    )
+
+    try:
+        svg_items = [
+            item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsSvgItem)
+        ]
+        pixmap_items = [
+            item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsPixmapItem)
+        ]
+
+        assert len(svg_items) == 1
+        assert pixmap_items == []
+        assert svg_items[0].scale() < 1.0
+    finally:
+        window.close()
+        app.processEvents()
+
+
 def test_results_window_places_references_after_images_and_wraps_them(tmp_path):
     import launch
     import test_backend_compat
@@ -2272,13 +2323,13 @@ def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_p
 
         for params_path, title, plot_type in menu_cases:
             event = FakeEvent()
-            handler = window._make_context_menu(
-                params_path,
+            artifact = results_window.PlotArtifact(
                 title,
                 "missing.png",
-                qpixmap_item=None,
+                params_path=params_path,
                 plot_type=plot_type,
             )
+            handler = window._make_context_menu(artifact, plot_item=None)
             handler(event)
             assert event.accepted is True
             FakeMenu.current.aboutToHide.emit()
@@ -2286,17 +2337,93 @@ def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_p
         assert popups == [
             (
                 results_window.QPoint(10, 20),
-                ["Edit Forest Plot", "Save PDF Image As", "Save PNG Image As"],
+                [
+                    "Edit Forest Plot",
+                    "Save PDF Image As",
+                    "Save PNG Image As",
+                    "Save TIFF Image As",
+                    "Save SVG Image As",
+                ],
             ),
             (
                 results_window.QPoint(10, 20),
-                ["Save PDF Image As", "Save PNG Image As"],
+                [
+                    "Save PDF Image As",
+                    "Save PNG Image As",
+                    "Save TIFF Image As",
+                    "Save SVG Image As",
+                ],
             ),
             (
                 results_window.QPoint(10, 20),
-                ["Save PDF Image As", "Save PNG Image As"],
+                [
+                    "Save PDF Image As",
+                    "Save PNG Image As",
+                    "Save TIFF Image As",
+                    "Save SVG Image As",
+                ],
             ),
             (results_window.QPoint(10, 20), ["Save PNG Image As"]),
+        ]
+    finally:
+        window.close()
+        app.processEvents()
+
+
+@pytest.mark.parametrize("extension", ["pdf", "png", "tiff", "svg"])
+def test_results_window_save_handler_accepts_backend_export_formats(
+    tmp_path, monkeypatch, extension
+):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    calls = []
+    window = results_window.ResultsWindow(
+        {
+            "texts": {},
+            "images": {},
+            "image_var_names": {},
+            "image_params_paths": {},
+            "image_order": [],
+        }
+    )
+    artifact = results_window.PlotArtifact(
+        "Forest Plot",
+        str(tmp_path / "forest.png"),
+        params_path=str(tmp_path / "forest_params"),
+        plot_type="forest",
+    )
+
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "load_in_R",
+        lambda path: calls.append(("load", path)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "generate_forest_plot",
+        lambda path, side_by_side=False: calls.append(
+            ("forest", path, side_by_side)
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.QFileDialog,
+        "getSaveFileName",
+        lambda *args, **kwargs: (str(tmp_path / ("saved.%s" % extension)), ""),
+    )
+
+    try:
+        window.save_image_as(artifact, format=extension)
+
+        assert calls == [
+            ("load", "%s.plotdata" % artifact.params_path),
+            ("forest", str(tmp_path / ("saved.%s" % extension)), False),
         ]
     finally:
         window.close()
