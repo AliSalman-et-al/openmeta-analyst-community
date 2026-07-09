@@ -66,7 +66,6 @@ PLOT_EXPORT_EXTENSION_ALIASES = {
 SIDE_BY_SIDE_FOREST_PLOTS = (
     "NLR and PLR Forest Plot",
     "Sensitivity and Specificity",
-    "Cumulative Forest Plot",
 )
 FOREST_STYLE_LABELS = {
     "default": "Default (metafor)",

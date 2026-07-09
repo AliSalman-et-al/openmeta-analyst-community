@@ -2317,6 +2317,7 @@ def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_p
     try:
         menu_cases = [
             ("plot.data", "Forest Plot", "forest"),
+            ("plot.data", "Cumulative Forest Plot", "forest"),
             ("plot.data", "Sensitivity and Specificity", "forest"),
             ("plot.data", "Regression Plot", "regression"),
             (None, "Forest Plot", "forest"),
@@ -2349,6 +2350,16 @@ def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_p
             (
                 results_window.QPoint(10, 20),
                 [
+                    "Edit Plot",
+                    "Save PDF Image As",
+                    "Save PNG Image As",
+                    "Save TIFF Image As",
+                    "Save SVG Image As",
+                ],
+            ),
+            (
+                results_window.QPoint(10, 20),
+                [
                     "Save PDF Image As",
                     "Save PNG Image As",
                     "Save TIFF Image As",
@@ -2365,6 +2376,65 @@ def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_p
                 ],
             ),
             (results_window.QPoint(10, 20), ["Save PNG Image As"]),
+        ]
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_results_window_save_handler_regenerates_cumulative_forest_as_single_panel(
+    tmp_path, monkeypatch
+):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    calls = []
+    window = results_window.ResultsWindow(
+        {
+            "texts": {},
+            "images": {},
+            "image_var_names": {},
+            "image_params_paths": {},
+            "image_order": [],
+        }
+    )
+    artifact = results_window.PlotArtifact(
+        "Cumulative Forest Plot",
+        str(tmp_path / "forest.png"),
+        params_path=str(tmp_path / "forest_params"),
+        plot_type="forest",
+    )
+
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "load_in_R",
+        lambda path: calls.append(("load", path)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "generate_forest_plot",
+        lambda path, side_by_side=False: calls.append(
+            ("forest", path, side_by_side)
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.QFileDialog,
+        "getSaveFileName",
+        lambda *args, **kwargs: (str(tmp_path / "saved.pdf"), ""),
+    )
+
+    try:
+        window.save_image_as(artifact, format="pdf")
+
+        assert calls == [
+            ("load", "%s.plotdata" % artifact.params_path),
+            ("forest", str(tmp_path / "saved.pdf"), False),
         ]
     finally:
         window.close()
