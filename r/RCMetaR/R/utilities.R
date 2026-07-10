@@ -415,6 +415,12 @@ save.data <- function(om.data, res, params, plot.data, out.path=NULL) {
   }
 
   save(om.data, file=paste(out.path, ".data", sep=""))
+  if (inherits(plot.data$regeneration_state, "rcmetar_forest_regeneration_state")) {
+    res <- plot.data$regeneration_state
+    for (param.name in names(res$param_overrides)) {
+      params[[param.name]] <- res$param_overrides[[param.name]]
+    }
+  }
   save(res, file=paste(out.path, ".res", sep=""))
   
   save(plot.data, file=paste(out.path, ".plotdata", sep=""))

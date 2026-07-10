@@ -1342,6 +1342,74 @@ test_that("cumulative workflow saves and renders a Default metafor bundle", {
   expect_gt(file.info(unname(result$images[[1]]))$size, 5000)
 })
 
+test_that("workflow forest artifacts regenerate through their saved public contract", {
+  cases <- list(
+    cumulative = function() {
+      fixture <- metafor_binary_fixture()
+      fixture$params$fp_outpath <- tempfile(fileext = ".png")
+      list(fixture = fixture, result = cum.ma.binary("binary.random", fixture$data, fixture$params))
+    },
+    `leave-one-out` = function() {
+      fixture <- metafor_continuous_fixture()
+      fixture$params$fp_outpath <- tempfile(fileext = ".png")
+      list(fixture = fixture, result = loo.ma.continuous("continuous.random", fixture$data, fixture$params))
+    },
+    subgroup = function() {
+      fixture <- metafor_binary_fixture()
+      fixture$params$fp_outpath <- tempfile(fileext = ".png")
+      fixture$params$cov_name <- "Era"
+      fixture$data@covariates <- list(new(
+        "CovariateValues",
+        cov.name = "Era",
+        cov.vals = c("Early", "Early", "Early", "Late", "Late", "Late"),
+        cov.type = "factor",
+        ref.var = "Early"
+      ))
+      list(fixture = fixture, result = subgroup.ma.binary("binary.random", fixture$data, fixture$params))
+    }
+  )
+
+  for (variant in names(cases)) {
+    case <- cases[[variant]]()
+    params.path <- unname(case$result$plot_params_paths[[1]])
+    load(paste0(params.path, ".data"))
+    load(paste0(params.path, ".params"))
+    load(paste0(params.path, ".res"))
+    if (identical(variant, "cumulative")) {
+      expect_equal(params$fp_col1_str, "Cumulative Studies")
+      expect_equal(params$fp_col2_str, "Cumulative Estimate")
+    }
+    expect_false(identical(params$fp_plot_lb, "[default]"))
+    expect_false(identical(params$fp_plot_ub, "[default]"))
+    params$fp_style <- "bmj"
+
+    regenerated <- rcmetar.regenerate.plot.data(om.data, res, params)
+    regenerated.path <- tempfile(fileext = ".svg")
+    rcmetar.draw.forest.plot(regenerated, regenerated.path)
+
+    expect_equal(regenerated$forest_variant, variant)
+    expect_equal(regenerated$fp_style, "bmj")
+    if (identical(variant, "cumulative")) {
+      expect_equal(regenerated$params$fp_col1_str, "Cumulative Studies")
+      expect_equal(regenerated$params$fp_col2_str, "Cumulative Estimate")
+    }
+    expect_true(rcmetar.is.metafor.forest.bundle(regenerated))
+    expect_true(file.exists(regenerated.path))
+    expect_gt(file.info(regenerated.path)$size, 3000)
+  }
+})
+
+test_that("forest regeneration state rejects unsupported parameter overrides", {
+  expect_error(
+    rcmetar.forest.regeneration.state(
+      "subgroup",
+      subgroup.data = list(subgroup.list=list(), grouped.data=list(), results=list()),
+      param.overrides = list(fp_col1_str="Unexpected")
+    ),
+    "does not support parameter overrides"
+  )
+})
+
 test_that("cumulative workflow saves and renders a RevMan metafor bundle", {
   fixture <- metafor_binary_fixture()
   fixture$params$fp_style <- "revman"

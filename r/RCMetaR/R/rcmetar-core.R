@@ -354,6 +354,20 @@ rcmetar.diagnostic.study.effects <- function(tp, fn, fp, tn, metrics=c("Spec", "
 }
 
 rcmetar.regenerate.plot.data <- function(om.data, res, params) {
+    if (inherits(res, "rcmetar_forest_regeneration_state")) {
+        res <- rcmetar.validate.forest.regeneration.state(res)
+        variant <- as.character(res$variant)
+        if (identical(variant, "cumulative") || identical(variant, "leave-one-out")) {
+            return(rcmetar.build.sequential.metafor.bundle(
+                om.data, params, res$results, variant, res$labels
+            ))
+        }
+        if (identical(variant, "subgroup")) {
+            return(rcmetar.build.subgroup.metafor.bundle(
+                om.data, params, res$subgroup_data
+            ))
+        }
+    }
     data.type <- .rcmetar.data.type(om.data)
     switch(
         data.type,

@@ -2830,8 +2830,16 @@ def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_p
         app.processEvents()
 
 
-def test_results_window_applies_diagnostic_forest_edits_to_selected_plot_artifact(
-    tmp_path, monkeypatch
+@pytest.mark.parametrize(
+    ("title", "plot_kind"),
+    (
+        ("Cumulative Forest Plot", "cumulative_forest"),
+        ("Leave-one-out Forest Plot", "leave_one_out_forest"),
+        ("Subgroup Forest Plot", "subgroup_forest"),
+    ),
+)
+def test_results_window_applies_forest_edits_to_selected_variant_artifact(
+    tmp_path, monkeypatch, title, plot_kind
 ):
     import launch
     import test_backend_compat
@@ -2840,9 +2848,8 @@ def test_results_window_applies_diagnostic_forest_edits_to_selected_plot_artifac
     import results_window
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-    title = "Positive Likelihood Ratio Forest Plot"
-    params_path = str(tmp_path / "positive_likelihood_ratio_forest")
-    image_path = tmp_path / "positive_likelihood_ratio_forest.svg"
+    params_path = str(tmp_path / plot_kind)
+    image_path = tmp_path / (plot_kind + ".svg")
     image_path.write_text(
         '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200">'
         '<rect width="400" height="200" fill="white"/>'
@@ -2878,7 +2885,9 @@ def test_results_window_applies_diagnostic_forest_edits_to_selected_plot_artifac
             "images": {title: str(image_path)},
             "image_params_paths": {title: params_path},
             "image_order": [title],
-            "plot_capabilities": {title: _plot_capability()},
+            "plot_capabilities": {
+                title: _plot_capability(plot_kind=plot_kind)
+            },
         }
     )
     monkeypatch.setattr(

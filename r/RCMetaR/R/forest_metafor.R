@@ -165,6 +165,62 @@ rcmetar.result.vector <- function(results, field) {
     vapply(results, function(result) as.numeric(result[[field]][1]), numeric(1))
 }
 
+rcmetar.forest.regeneration.state <- function(variant, results=NULL, labels=NULL, subgroup.data=NULL,
+                                                param.overrides=list()) {
+    variant <- as.character(variant)
+    if (!(variant %in% c("cumulative", "leave-one-out", "subgroup"))) {
+        stop(sprintf("Unknown forest regeneration variant '%s'.", variant), call.=FALSE)
+    }
+    if (is.null(param.overrides)) {
+        param.overrides <- list()
+    }
+    if (!is.list(param.overrides) ||
+        (length(param.overrides) > 0 &&
+            (is.null(names(param.overrides)) || any(!nzchar(names(param.overrides)))))) {
+        stop("Forest regeneration parameter overrides must be a named list.", call.=FALSE)
+    }
+    allowed.overrides <- if (identical(variant, "cumulative")) {
+        c("fp_col1_str", "fp_col2_str")
+    } else {
+        character()
+    }
+    unsupported.overrides <- setdiff(names(param.overrides), allowed.overrides)
+    if (length(unsupported.overrides) > 0) {
+        stop(sprintf(
+            "Forest regeneration variant '%s' does not support parameter overrides: %s.",
+            variant, paste(unsupported.overrides, collapse=", ")
+        ), call.=FALSE)
+    }
+    if (variant %in% c("cumulative", "leave-one-out")) {
+        if (!is.list(results) || length(results) == 0 || length(labels) != length(results)) {
+            stop(sprintf("Forest regeneration variant '%s' requires matching results and labels.", variant), call.=FALSE)
+        }
+        state <- list(
+            variant=variant,
+            results=results,
+            labels=as.character(labels),
+            param_overrides=param.overrides
+        )
+    } else {
+        required <- c("subgroup.list", "grouped.data", "results")
+        if (!is.list(subgroup.data) || !all(required %in% names(subgroup.data))) {
+            stop("Subgroup forest regeneration requires complete subgroup data.", call.=FALSE)
+        }
+        state <- list(variant=variant, subgroup_data=subgroup.data)
+    }
+    structure(state, class="rcmetar_forest_regeneration_state")
+}
+
+rcmetar.validate.forest.regeneration.state <- function(state) {
+    if (!inherits(state, "rcmetar_forest_regeneration_state")) {
+        stop("A forest regeneration state object is required.", call.=FALSE)
+    }
+    rcmetar.forest.regeneration.state(
+        state$variant, state$results, state$labels, state$subgroup_data,
+        state$param_overrides
+    )
+}
+
 rcmetar.build.sequential.metafor.bundle <- function(om.data, params, results, variant, labels, legacy.plot.data=NULL) {
     if (is.null(legacy.plot.data)) {
         legacy.plot.data <- switch(
@@ -190,7 +246,7 @@ rcmetar.build.sequential.metafor.bundle <- function(om.data, params, results, va
         sample.sizes <- rcmetar.binary.one.arm.raw.total(om.data)
     }
 
-    list(
+    bundle <- list(
         render_engine = "metafor",
         data_type = .rcmetar.data.type(om.data),
         forest_variant = variant,
@@ -213,6 +269,15 @@ rcmetar.build.sequential.metafor.bundle <- function(om.data, params, results, va
         changed.params = legacy.plot.data$changed.params,
         legacy_plot_data = legacy.plot.data
     )
+    param.overrides <- if (identical(variant, "cumulative")) {
+        list(fp_col1_str=params$fp_col1_str, fp_col2_str=params$fp_col2_str)
+    } else {
+        list()
+    }
+    bundle$regeneration_state <- rcmetar.forest.regeneration.state(
+        variant, results=results, labels=labels, param.overrides=param.overrides
+    )
+    bundle
 }
 
 rcmetar.build.subgroup.metafor.bundle <- function(om.data, params, subgroup.data, legacy.plot.data=NULL) {
@@ -294,6 +359,9 @@ rcmetar.build.subgroup.metafor.bundle <- function(om.data, params, subgroup.data
             difference_test = rcmetar.metafor.subgroup.difference.test(flat.yi, flat.sei, subgroup.values, params),
             ylim = c(min(polygon.rows) - 4, max(header.rows) + 2.5)
         )
+    )
+    bundle$regeneration_state <- rcmetar.forest.regeneration.state(
+        "subgroup", subgroup.data=subgroup.data
     )
     rcmetar.decorate.metafor.bundle(bundle)
 }

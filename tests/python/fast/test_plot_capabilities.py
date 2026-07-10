@@ -87,3 +87,18 @@ def test_regenerator_is_resolved_from_a_safe_registry():
     assert plot_capabilities.regenerator_name("forest") == "generate_forest_plot"
     assert plot_capabilities.regenerator_name("regression") == "generate_reg_plot"
     assert plot_capabilities.regenerator_name("none") is None
+
+
+def test_editable_plot_kind_requires_a_compatible_regenerator():
+    with pytest.raises(ValueError, match="does not support plot kind"):
+        plot_capabilities.validate_result(
+            {
+                "images": {"Regression Plot": "regression.svg"},
+                "image_params_paths": {"Regression Plot": "regression-data"},
+                "plot_capabilities": {
+                    "Regression Plot": descriptor(
+                        plot_kind="regression", regenerator="forest"
+                    )
+                },
+            }
+        )

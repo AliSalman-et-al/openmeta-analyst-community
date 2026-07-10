@@ -162,6 +162,20 @@
       ],
       "external_dependencies": [],
       "lane": "fast",
+      "nodeid": "tests/python/fast/test_plot_capabilities.py::test_editable_plot_kind_requires_a_compatible_regenerator",
+      "reason": "Prevents editable plot metadata from selecting a regenerator that does not implement its plot kind.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [],
+      "lane": "fast",
       "nodeid": "tests/python/fast/test_plot_capabilities.py::test_option_groups_are_keyed_by_explicit_plot_kind",
       "reason": "Guards the shared plot-kind option registry used by both plot configuration entry points.",
       "runtime_class": "subsecond",
@@ -234,6 +248,57 @@
       "lane": "fast",
       "nodeid": "tests/python/fast/test_plot_capabilities.py::test_validate_result_returns_normalized_descriptors",
       "reason": "Guards normalized descriptor values consumed by the Results window.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem",
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_applies_forest_edits_to_selected_variant_artifact[Cumulative Forest Plot-cumulative_forest]",
+      "reason": "Exercises Edit Plot Apply through the Results Window for cumulative forest artifacts.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem",
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_applies_forest_edits_to_selected_variant_artifact[Leave-one-out Forest Plot-leave_one_out_forest]",
+      "reason": "Exercises Edit Plot Apply through the Results Window for leave-one-out forest artifacts.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem",
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_applies_forest_edits_to_selected_variant_artifact[Subgroup Forest Plot-subgroup_forest]",
+      "reason": "Exercises Edit Plot Apply through the Results Window for subgroup forest artifacts.",
       "runtime_class": "subsecond",
       "size": "small"
     },

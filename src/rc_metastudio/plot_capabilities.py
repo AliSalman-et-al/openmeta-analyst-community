@@ -29,10 +29,21 @@ PLOT_OPTION_GROUPS = {
     "other": frozenset(),
 }
 
-REGENERATOR_NAMES = {
-    "forest": "generate_forest_plot",
-    "regression": "generate_reg_plot",
-    "none": None,
+REGENERATORS = {
+    "forest": {
+        "function": "generate_forest_plot",
+        "plot_kinds": frozenset(
+            ("forest", "cumulative_forest", "leave_one_out_forest", "subgroup_forest")
+        ),
+    },
+    "regression": {
+        "function": "generate_reg_plot",
+        "plot_kinds": frozenset(("regression",)),
+    },
+    "none": {
+        "function": None,
+        "plot_kinds": frozenset(("roc", "sroc", "other")),
+    },
 }
 
 COMPOSITIONS = frozenset(("single",))
@@ -44,7 +55,7 @@ def option_groups(plot_kind):
 
 def regenerator_name(regenerator):
     try:
-        return REGENERATOR_NAMES[regenerator]
+        return REGENERATORS[regenerator]["function"]
     except KeyError:
         raise ValueError("Unknown plot regenerator: %s" % regenerator)
 
@@ -112,6 +123,11 @@ def _validate_descriptor(title, descriptor):
     normalized["regenerator"] = regenerator
     if normalized["editable"] and regenerator == "none":
         raise ValueError("Editable plot %s requires a regenerator" % title)
+    if normalized["editable"] and plot_kind not in REGENERATORS[regenerator]["plot_kinds"]:
+        raise ValueError(
+            "Plot regenerator %s does not support plot kind %s for %s"
+            % (regenerator, plot_kind, title)
+        )
     if normalized["styleable"] and not option_groups(plot_kind):
         raise ValueError("Styleable plot %s requires option groups" % title)
     return normalized
