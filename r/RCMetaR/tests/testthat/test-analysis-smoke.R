@@ -127,7 +127,89 @@ test_that("plot capability metadata distinguishes workflow-specific forest kinds
       function(descriptor) identical(descriptor$plot_kind, unname(expected_kinds[[workflow]])),
       logical(1)
     )))
+    expect_true(all(vapply(
+      result$plot_capabilities,
+      function(descriptor) isTRUE(descriptor$editable),
+      logical(1)
+    )))
   }
+})
+
+test_that("plot kind capabilities derive editability from support and artifact data", {
+  expected <- list(
+    forest = list(styleable = TRUE, regenerator = "forest", editable = TRUE),
+    cumulative_forest = list(styleable = TRUE, regenerator = "forest", editable = TRUE),
+    leave_one_out_forest = list(styleable = TRUE, regenerator = "forest", editable = TRUE),
+    subgroup_forest = list(styleable = TRUE, regenerator = "forest", editable = TRUE),
+    regression = list(styleable = TRUE, regenerator = "regression", editable = TRUE),
+    roc = list(styleable = FALSE, regenerator = "none", editable = FALSE),
+    sroc = list(styleable = FALSE, regenerator = "none", editable = FALSE),
+    other = list(styleable = FALSE, regenerator = "none", editable = FALSE)
+  )
+
+  for (plot.kind in names(expected)) {
+    with.data <- .rcmetar.plot.descriptor.for.kind(plot.kind, has.params = TRUE)
+    without.data <- .rcmetar.plot.descriptor.for.kind(plot.kind, has.params = FALSE)
+    expect_identical(with.data$styleable, expected[[plot.kind]]$styleable)
+    expect_identical(with.data$regenerator, expected[[plot.kind]]$regenerator)
+    expect_identical(with.data$editable, expected[[plot.kind]]$editable)
+    expect_false(without.data$editable)
+  }
+})
+
+test_that("analysis plot capability query maps workflows through the kind registry", {
+  cases <- list(
+    list("binary", "binary.random", "standard", "forest"),
+    list("binary", "binary.random", "cumulative", "cumulative_forest"),
+    list("binary", "binary.random", "leave-one-out", "leave_one_out_forest"),
+    list("binary", "binary.random", "subgroup", "subgroup_forest"),
+    list("binary", "binary.random", "bootstrap", "other"),
+    list("binary", "meta.regression", "meta-regression", "regression")
+  )
+
+  for (case in cases) {
+    descriptor <- rcmetar.analysis.plot.capabilities(
+      case[[1]], case[[2]], case[[3]]
+    )[[1]]
+    expect_identical(descriptor$plot_kind, case[[4]])
+    expect_identical(
+      descriptor$editable,
+      descriptor$regenerator != "none"
+    )
+  }
+
+  hsroc <- rcmetar.analysis.plot.capabilities(
+    "diagnostic", "diagnostic.hsroc", "standard"
+  )
+  bivariate <- rcmetar.analysis.plot.capabilities(
+    "diagnostic", "diagnostic.bivariate.ml", "standard"
+  )
+  expect_identical(vapply(hsroc, `[[`, character(1), "plot_kind"), c("sroc", "forest"))
+  expect_identical(vapply(bivariate, `[[`, character(1), "plot_kind"), c("roc", "forest"))
+})
+
+test_that("plot data availability is matched to each plot artifact", {
+  result <- list(
+    images = c(
+      "First Plot" = "first.svg",
+      "Second Plot" = "second.svg",
+      "Third Plot" = "third.svg",
+      "Fourth Plot" = "fourth.svg"
+    ),
+    plot_params_paths = c(
+      "First Plot" = "first.plotdata",
+      "Second Plot" = "",
+      "Third Plot" = NA_character_
+    )
+  )
+  request <- list(workflow = "standard", method = "binary.random")
+
+  attached <- .rcmetar.attach.plot.capabilities(result, request)
+
+  expect_true(attached$plot_capabilities[["First Plot"]]$editable)
+  expect_false(attached$plot_capabilities[["Second Plot"]]$editable)
+  expect_false(attached$plot_capabilities[["Third Plot"]]$editable)
+  expect_false(attached$plot_capabilities[["Fourth Plot"]]$editable)
 })
 
 test_that("representative binary analysis paths execute", {

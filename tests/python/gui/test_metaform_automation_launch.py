@@ -2722,10 +2722,10 @@ def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_p
     try:
         menu_cases = [
             ("plot.data", "Forest Plot", "forest", True, "forest"),
-            ("plot.data", "Cumulative Forest Plot", "cumulative_forest", False, "forest"),
-            ("plot.data", "Leave-one-out Forest plot", "leave_one_out_forest", False, "forest"),
-            ("plot.data", "Subgroup Forest Plot", "subgroup_forest", False, "forest"),
-            ("plot.data", "Subgroups Forest Plot", "subgroup_forest", False, "forest"),
+            ("plot.data", "Cumulative Forest Plot", "cumulative_forest", True, "forest"),
+            ("plot.data", "Leave-one-out Forest plot", "leave_one_out_forest", True, "forest"),
+            ("plot.data", "Subgroup Forest Plot", "subgroup_forest", True, "forest"),
+            ("plot.data", "Subgroups Forest Plot", "subgroup_forest", True, "forest"),
             ("plot.data", "Sensitivity Forest Plot", "forest", True, "forest"),
             ("plot.data", "Specificity Forest Plot", "forest", True, "forest"),
             ("plot.data", "Negative Likelihood Ratio Forest Plot", "forest", True, "forest"),

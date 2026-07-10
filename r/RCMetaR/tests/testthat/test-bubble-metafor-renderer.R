@@ -77,6 +77,7 @@ test_that("meta-regression stores a self-contained metafor bubble plot bundle", 
   plot.path <- unname(result$plot_params_paths[["Regression Plot"]])
   bundle <- bubble_load_saved_plot_data(plot.path)
 
+  expect_true(result$plot_capabilities[["Regression Plot"]]$editable)
   expect_equal(bundle$render_engine, "metafor")
   expect_equal(bundle$plot_type, "meta_regression_bubble")
   expect_equal(bundle$bp_style, "default")

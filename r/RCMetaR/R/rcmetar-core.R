@@ -147,25 +147,27 @@ rcmetar.analysis.plot.capabilities <- function(data.type, method, workflow="stan
         stop(sprintf("Method '%s' is not available for %s %s analysis.", method, data.type, workflow), call.=FALSE)
     }
 
-    descriptor <- .rcmetar.plot.descriptor
-    if (workflow == "cumulative") return(list(descriptor("cumulative_forest", FALSE, TRUE, "forest")))
-    if (workflow == "leave-one-out") return(list(descriptor("leave_one_out_forest", FALSE, TRUE, "forest")))
-    if (workflow == "subgroup") return(list(descriptor("subgroup_forest", FALSE, TRUE, "forest")))
-    if (workflow == "bootstrap") return(list(descriptor("other", FALSE, FALSE, "none")))
-    if (workflow == "meta-regression") return(list(descriptor("regression", TRUE, TRUE, "regression")))
+    descriptor <- function(plot.kind) {
+        .rcmetar.plot.descriptor.for.kind(plot.kind, has.params=TRUE)
+    }
+    if (workflow == "cumulative") return(list(descriptor("cumulative_forest")))
+    if (workflow == "leave-one-out") return(list(descriptor("leave_one_out_forest")))
+    if (workflow == "subgroup") return(list(descriptor("subgroup_forest")))
+    if (workflow == "bootstrap") return(list(descriptor("other")))
+    if (workflow == "meta-regression") return(list(descriptor("regression")))
     if (method == "diagnostic.hsroc") {
         return(list(
-            descriptor("sroc", FALSE, FALSE, "none"),
-            descriptor("forest", TRUE, TRUE, "forest")
+            descriptor("sroc"),
+            descriptor("forest")
         ))
     }
     if (method == "diagnostic.bivariate.ml") {
         return(list(
-            descriptor("roc", FALSE, FALSE, "none"),
-            descriptor("forest", TRUE, TRUE, "forest")
+            descriptor("roc"),
+            descriptor("forest")
         ))
     }
-    list(descriptor("forest", TRUE, TRUE, "forest"))
+    list(descriptor("forest"))
 }
 
 rcmetar.set.global.conf.level <- function(conf.level) {
@@ -698,9 +700,11 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
         stop("Every RCMetaR plot artifact must have a non-empty title.", call.=FALSE)
     }
     if (is.null(result$plot_capabilities)) {
-        descriptor <- .rcmetar.homogeneous.plot.capability(result, request)
         result$plot_capabilities <- setNames(
-            lapply(image.names, function(title) descriptor),
+            lapply(
+                image.names,
+                function(title) .rcmetar.homogeneous.plot.capability(result, request, title)
+            ),
             image.names
         )
     }
@@ -710,7 +714,7 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
     result
 }
 
-.rcmetar.homogeneous.plot.capability <- function(result, request) {
+.rcmetar.homogeneous.plot.capability <- function(result, request, title) {
     workflow <- as.character(request$workflow[[1]])
     methods <- if (!is.null(request$methods)) request$methods else request$method
     methods <- as.character(methods)
@@ -730,20 +734,47 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
         },
         stop(sprintf("No plot capability contract for workflow '%s'.", workflow), call.=FALSE)
     )
-    forest.kinds <- c("forest", "cumulative_forest", "leave_one_out_forest", "subgroup_forest")
-    styleable <- plot.kind %in% c(forest.kinds, "regression")
     params.paths <- result$plot_params_paths
-    has.params <- !is.null(params.paths) && length(params.paths) > 0
-    editable <- workflow == "standard" && has.params && plot.kind %in% c("forest", "regression")
-    regenerator <- if (plot.kind %in% forest.kinds) {
-        "forest"
-    } else if (plot.kind == "regression") {
-        "regression"
-    } else {
-        "none"
-    }
+    params.path <- if (
+        !is.null(params.paths) &&
+        !is.null(names(params.paths)) &&
+        title %in% names(params.paths)
+    ) params.paths[[title]] else NULL
+    has.params <- length(params.path) == 1 &&
+        !is.na(params.path) &&
+        nzchar(as.character(params.path))
+    .rcmetar.plot.descriptor.for.kind(plot.kind, has.params)
+}
 
-    .rcmetar.plot.descriptor(plot.kind, editable, styleable, regenerator)
+.rcmetar.plot.kind.capability <- function(plot.kind) {
+    capabilities <- list(
+        forest=list(styleable=TRUE, regenerator="forest", option.groups=TRUE),
+        cumulative_forest=list(styleable=TRUE, regenerator="forest", option.groups=TRUE),
+        leave_one_out_forest=list(styleable=TRUE, regenerator="forest", option.groups=TRUE),
+        subgroup_forest=list(styleable=TRUE, regenerator="forest", option.groups=TRUE),
+        regression=list(styleable=TRUE, regenerator="regression", option.groups=TRUE),
+        roc=list(styleable=FALSE, regenerator="none", option.groups=FALSE),
+        sroc=list(styleable=FALSE, regenerator="none", option.groups=FALSE),
+        other=list(styleable=FALSE, regenerator="none", option.groups=FALSE)
+    )
+    capability <- capabilities[[plot.kind]]
+    if (is.null(capability)) {
+        stop(sprintf("No plot capability contract for plot kind '%s'.", plot.kind), call.=FALSE)
+    }
+    capability
+}
+
+.rcmetar.plot.descriptor.for.kind <- function(plot.kind, has.params) {
+    capability <- .rcmetar.plot.kind.capability(plot.kind)
+    editable <- isTRUE(has.params) &&
+        capability$regenerator != "none" &&
+        isTRUE(capability$option.groups)
+    .rcmetar.plot.descriptor(
+        plot.kind,
+        editable,
+        capability$styleable,
+        capability$regenerator
+    )
 }
 
 .rcmetar.plot.descriptor <- function(plot.kind, editable, styleable, regenerator) {
