@@ -68,6 +68,12 @@ SIDE_BY_SIDE_FOREST_PLOTS = (
     "NLR and PLR Forest Plot",
     "Sensitivity and Specificity",
 )
+NON_EDITABLE_FOREST_PLOTS = (
+    "Cumulative Forest Plot",
+    "Leave-One-Out Forest Plot",
+    "Subgroup Forest Plot",
+    "Subgroups Forest Plot",
+)
 FOREST_STYLE_LABELS = {
     "default": "Default (metafor)",
     "revman": "RevMan",
@@ -854,8 +860,9 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             context_menu = QMenu(self)
             if artifact.params_path:
                 editable = bool(plot_options.option_groups(artifact.plot_type))
-                if artifact.plot_type == "forest" and self._is_side_by_side_fp(
-                    artifact.title
+                if artifact.plot_type == "forest" and (
+                    self._is_side_by_side_fp(artifact.title)
+                    or self._is_non_editable_fp(artifact.title)
                 ):
                     editable = False
                 if editable:
@@ -970,6 +977,15 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
     def _is_side_by_side_fp(self, title):
         return any(
             [side_by_side in title for side_by_side in SIDE_BY_SIDE_FOREST_PLOTS]
+        )
+
+    def _is_non_editable_fp(self, title):
+        normalized_title = title.casefold()
+        return any(
+            [
+                non_editable.casefold() in normalized_title
+                for non_editable in NON_EDITABLE_FOREST_PLOTS
+            ]
         )
 
     def save_image_as(self, artifact, unscaled_image=None, format=None):

@@ -2418,14 +2418,17 @@ def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_p
 
     try:
         menu_cases = [
-            ("plot.data", "Forest Plot", "forest"),
-            ("plot.data", "Cumulative Forest Plot", "forest"),
-            ("plot.data", "Sensitivity and Specificity", "forest"),
-            ("plot.data", "Regression Plot", "regression"),
-            (None, "Forest Plot", "forest"),
+            ("plot.data", "Forest Plot", "forest", True),
+            ("plot.data", "Cumulative Forest Plot", "forest", False),
+            ("plot.data", "Leave-one-out Forest plot", "forest", False),
+            ("plot.data", "Subgroup Forest Plot", "forest", False),
+            ("plot.data", "Subgroups Forest Plot", "forest", False),
+            ("plot.data", "Sensitivity and Specificity", "forest", False),
+            ("plot.data", "Regression Plot", "regression", True),
+            (None, "Forest Plot", "forest", False),
         ]
 
-        for params_path, title, plot_type in menu_cases:
+        for params_path, title, plot_type, editable in menu_cases:
             event = FakeEvent()
             artifact = results_window.PlotArtifact(
                 title,
@@ -2437,49 +2440,17 @@ def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_p
             handler(event)
             assert event.accepted is True
             FakeMenu.current.aboutToHide.emit()
-
-        assert popups == [
-            (
-                results_window.QPoint(10, 20),
-                [
-                    "Edit Plot",
-                    "Save PDF Image As",
-                    "Save PNG Image As",
-                    "Save TIFF Image As",
-                    "Save SVG Image As",
-                ],
-            ),
-            (
-                results_window.QPoint(10, 20),
-                [
-                    "Edit Plot",
-                    "Save PDF Image As",
-                    "Save PNG Image As",
-                    "Save TIFF Image As",
-                    "Save SVG Image As",
-                ],
-            ),
-            (
-                results_window.QPoint(10, 20),
-                [
-                    "Save PDF Image As",
-                    "Save PNG Image As",
-                    "Save TIFF Image As",
-                    "Save SVG Image As",
-                ],
-            ),
-            (
-                results_window.QPoint(10, 20),
-                [
-                    "Edit Plot",
-                    "Save PDF Image As",
-                    "Save PNG Image As",
-                    "Save TIFF Image As",
-                    "Save SVG Image As",
-                ],
-            ),
-            (results_window.QPoint(10, 20), ["Save PNG Image As"]),
-        ]
+            expected_actions = [
+                "Save PDF Image As",
+                "Save PNG Image As",
+                "Save TIFF Image As",
+                "Save SVG Image As",
+            ]
+            if editable:
+                expected_actions.insert(0, "Edit Plot")
+            if params_path is None:
+                expected_actions = ["Save PNG Image As"]
+            assert popups[-1] == (results_window.QPoint(10, 20), expected_actions)
     finally:
         window.close()
         app.processEvents()
