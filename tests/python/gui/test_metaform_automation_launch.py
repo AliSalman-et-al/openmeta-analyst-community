@@ -990,8 +990,8 @@ def test_standard_meta_analysis_opens_specs_and_runs_through_backend(monkeypatch
             def __init__(self, result, parent=None):
                 shown.append((result, parent))
 
-            def show(self):
-                shown.append("shown")
+            def showMaximized(self):
+                shown.append("maximized")
 
         def run(method, params, _method=method_name):
             calls.append(method)
@@ -1049,7 +1049,7 @@ def test_standard_meta_analysis_opens_specs_and_runs_through_backend(monkeypatch
                     {"texts": {"Summary": "%s model" % method_name}, "images": {}},
                     window,
                 ),
-                "shown",
+                "maximized",
             ]
         finally:
             window.close()
@@ -1865,8 +1865,8 @@ def test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe(monke
         def __init__(self, result, parent=None):
             shown.append((result, parent))
 
-        def show(self):
-            shown.append("shown")
+        def showMaximized(self):
+            shown.append("maximized")
 
     def run_meta_regression(dataset, studies, covariates, metric, **kwargs):
         shown.append(
@@ -1930,7 +1930,7 @@ def test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe(monke
                 },
                 window,
             ),
-            "shown",
+            "maximized",
         ]
 
         factor_column = window.model.columnCount() - 1
@@ -2002,16 +2002,61 @@ def test_sequential_analysis_results_use_results_window(monkeypatch):
         def __init__(self, result, parent=None):
             shown.append((result, parent))
 
-        def show(self):
-            shown.append("shown")
+        def showMaximized(self):
+            shown.append("maximized")
 
     monkeypatch.setattr(meta_form.results_window, "ResultsWindow", ResultDialog)
 
     try:
         window.analysis(results)
 
-        assert shown == [(results, window), "shown"]
+        assert shown == [(results, window), "maximized"]
     finally:
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
+def test_analysis_opens_results_window_maximized_and_fits_svg_plot(tmp_path):
+    import launch
+    import results_window
+
+    plot_path = tmp_path / "forest.svg"
+    plot_path.write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="800">'
+        '<rect width="1600" height="800" fill="white"/>'
+        "</svg>",
+        encoding="utf-8",
+    )
+    app, window = launch.start_automation()
+    try:
+        window.analysis(
+            {
+                "texts": {},
+                "images": {"Forest Plot": str(plot_path)},
+                "plot_capabilities": {
+                    "Forest Plot": _plot_capability(editable=False),
+                },
+            }
+        )
+        app.processEvents()
+
+        result_windows = window.findChildren(results_window.ResultsWindow)
+        assert len(result_windows) == 1
+        result_window = result_windows[0]
+        assert result_window.isVisible()
+        assert result_window.isMaximized()
+        plot_item = next(
+            item
+            for item in result_window.scene.items()
+            if isinstance(item, results_window.QGraphicsSvgItem)
+        )
+        viewport_width = result_window.graphics_view.viewport().width()
+        assert plot_item.sceneBoundingRect().width() >= viewport_width * 0.9
+        assert plot_item.sceneBoundingRect().width() <= viewport_width
+    finally:
+        for result_window in window.findChildren(results_window.ResultsWindow):
+            result_window.close()
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -2221,6 +2266,75 @@ def test_results_window_refits_svg_plots_and_reflows_sections_on_resize(tmp_path
         assert svg_items[0].scale() == pytest.approx(4.0)
         assert svg_items[0].sceneBoundingRect().width() == pytest.approx(1600)
         assert_sections_are_separated()
+
+        splitter_width = window.results_nav_splitter.width()
+        window.results_nav_splitter.setSizes([splitter_width - 100, 100])
+        window.results_nav_splitter.splitterMoved.emit(0, 0)
+        app.processEvents()
+
+        narrow_viewport_width = window.graphics_view.viewport().width()
+        assert svg_items[0].sceneBoundingRect().width() <= narrow_viewport_width
+        assert_sections_are_separated()
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_results_window_refits_svg_plot_after_in_place_regenerate(tmp_path):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    plot_path = tmp_path / "forest.svg"
+
+    def write_svg(width, height):
+        plot_path.write_text(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d">'
+            '<rect width="%d" height="%d" fill="white"/>'
+            "</svg>" % (width, height, width, height),
+            encoding="utf-8",
+        )
+
+    write_svg(400, 200)
+    window = results_window.ResultsWindow(
+        {
+            "texts": {},
+            "images": {"Forest Plot": str(plot_path)},
+            "plot_capabilities": {
+                "Forest Plot": _plot_capability(editable=False),
+            },
+        }
+    )
+
+    try:
+        window.resize(1200, 800)
+        window.show()
+        app.processEvents()
+        plot_item = next(
+            item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsSvgItem)
+        )
+        initial_width = plot_item.sceneBoundingRect().width()
+        viewport_width = window.graphics_view.viewport().width()
+        assert initial_width >= viewport_width * 0.9
+        assert initial_width <= viewport_width
+
+        write_svg(800, 400)
+        window._refresh_plot_item(
+            plot_item, "Forest Plot", str(plot_path), params_path=None
+        )
+        app.processEvents()
+
+        refreshed_width = plot_item.sceneBoundingRect().width()
+        refreshed_height = plot_item.sceneBoundingRect().height()
+        refreshed_viewport_width = window.graphics_view.viewport().width()
+        assert refreshed_width >= refreshed_viewport_width * 0.9
+        assert refreshed_width <= refreshed_viewport_width
+        assert refreshed_width / refreshed_height == pytest.approx(2.0)
     finally:
         window.close()
         app.processEvents()

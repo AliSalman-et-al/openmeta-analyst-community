@@ -328,6 +328,10 @@ _Avoid_: Exact GUI, identical GUI
 GUI compatibility where users can identify the same menus, dialogs, tables, controls, and result views even if Qt5 changes spacing, fonts, or widget rendering.
 _Avoid_: Pixel match, visual clone
 
+**Results Window**:
+The maximized reader view that presents an analysis summary, its Plot Artifacts, and supporting references after an analysis completes.
+_Avoid_: Analysis popup, plot window
+
 **Qt Binding Target**:
 The Python Qt binding chosen for the first GUI migration milestone.
 _Avoid_: Qt wrapper, GUI framework choice

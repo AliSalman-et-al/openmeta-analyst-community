@@ -1931,6 +1931,22 @@
     {
       "decision": "keep",
       "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_analysis_opens_results_window_maximized_and_fits_svg_plot",
+      "reason": "Guards Issue #282's maximized Results Window launch and initial SVG viewport fit.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
         "golden",
         "analysis_behavior"
       ],
@@ -3841,6 +3857,22 @@
       "lane": "gui",
       "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_displays_canonical_svg_plot_artifact",
       "reason": "Covers canonical SVG plot display behavior in the Results window.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_refits_svg_plot_after_in_place_regenerate",
+      "reason": "Guards Issue #282's shared SVG fit contract after in-place regeneration.",
       "runtime_class": "seconds",
       "size": "medium"
     },

@@ -502,13 +502,30 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         scale = min(max_scale, float(viewport_width) / float(width))
         return (max(1, int(width * scale)), max(1, int(height * scale)))
 
-    def _plot_viewport_width(self):
-        viewport_width = max(
-            self.graphics_view.viewport().width(), self.graphics_view.width()
+    def _fit_vector_plot_to_viewport(self, svg_item):
+        """Fit one SVG item to the current viewport while preserving its ratio."""
+        item_width = svg_item.boundingRect().width()
+        item_height = svg_item.boundingRect().height()
+        scaled_width, scaled_height = self._fit_size_to_viewport(
+            item_width,
+            item_height,
+            max_scale=MAX_VECTOR_PLOT_SCALE,
         )
+        if item_width <= 0:
+            return scaled_width, scaled_height
+
+        target_scale = float(scaled_width) / float(item_width)
+        if abs(target_scale - svg_item.scale()) >= 0.001:
+            svg_item.setScale(target_scale)
+        return scaled_width, scaled_height
+
+    def _plot_viewport_width(self):
+        viewport_width = self.graphics_view.viewport().width()
+        if viewport_width <= horizontal_padding:
+            viewport_width = self.graphics_view.width()
         if viewport_width <= horizontal_padding:
             viewport_width = max(self.results_nav_splitter.width(), self.width())
-        return max(300, viewport_width - self.x_coord - padding)
+        return max(1, viewport_width - self.x_coord - padding)
 
     def add_references(self):
         if self.references_text is None:
@@ -676,22 +693,14 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                 self._svg_plot_items, key=lambda plot_item: plot_item.scenePos().y()
             ):
                 item_width = item.boundingRect().width()
-                item_height = item.boundingRect().height()
-                scaled_width, _scaled_height = self._fit_size_to_viewport(
-                    item_width,
-                    item_height,
-                    max_scale=MAX_VECTOR_PLOT_SCALE,
-                )
                 if item_width <= 0:
                     continue
 
                 old_height = previous_heights.get(
                     id(item), item.sceneBoundingRect().height()
                 )
-                new_scale = float(scaled_width) / float(item_width)
                 plot_y = item.scenePos().y()
-                if abs(new_scale - item.scale()) >= 0.001:
-                    item.setScale(new_scale)
+                self._fit_vector_plot_to_viewport(item)
                 height_delta = item.sceneBoundingRect().height() - old_height
                 if abs(height_delta) < 0.001:
                     continue
@@ -786,13 +795,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         )
         item.setFlags(QGraphicsItem.ItemIsSelectable)
 
-        item_width = item.boundingRect().width()
-        item_height = item.boundingRect().height()
-        scaled_width, scaled_height = self._fit_size_to_viewport(
-            item_width, item_height, max_scale=MAX_VECTOR_PLOT_SCALE
-        )
-        if item_width > 0:
-            item.setScale(float(scaled_width) / float(item_width))
+        scaled_width, scaled_height = self._fit_vector_plot_to_viewport(item)
 
         self.y_coord += scaled_height + SECTION_SPACING
         self.scene.setSceneRect(

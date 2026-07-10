@@ -904,7 +904,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                 "the results.\n\nDetails: %s: %s" % (e.__class__.__name__, e),
             )
             return
-        form.show()
+        form.showMaximized()
 
     def edit_group_name(self, cur_group_name):
         orig_group_name = copy.copy(cur_group_name)
