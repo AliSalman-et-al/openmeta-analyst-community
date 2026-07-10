@@ -358,6 +358,8 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         super(ResultsWindow, self).__init__(parent)
         self._svg_plot_items = []
         self._refitting_svg_plots = False
+        self._layout_items = []
+        self._nav_items_to_sections = {}
         self.setupUi(self)
         qt_layout.configure_resizable_window(self)
         self.copied_item = QByteArray()
@@ -411,6 +413,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
         self.add_result_sections()
         self.add_references()
+        self._relayout_sections()
 
         # reset the scene
         self.graphics_view.setScene(self.scene)
@@ -450,6 +453,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         )
 
         self.items_to_coords[id(qt_item)] = pos
+        self._nav_items_to_sections[id(qt_item)] = plot_item
 
     def create_plot_artifact(self, title, image_path, params_path=None):
         return PlotArtifact(
@@ -470,6 +474,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             # now the text
             text_item_rect, pos = self.create_text_item(str(text), self.position())
             self.items_to_coords[id(qt_item)] = pos
+            self._nav_items_to_sections[id(qt_item)] = self._layout_items[-1]
         except:
             pass
 
@@ -536,6 +541,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             str(self.references_text), self.position(), wrap=True
         )
         self.items_to_coords[id(qt_item)] = pos
+        self._nav_items_to_sections[id(qt_item)] = self._layout_items[-1]
 
     def add_title(self, title):
         print("Adding title")
@@ -549,6 +555,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         # text.setPos(self.position())
         print("  title at: %s" % self.y_coord)
         self.scene.addItem(text)
+        self._layout_items.append(text)
         qt_item = QTreeWidgetItem(self.nav_tree, [title])
         self.scene.setSceneRect(
             0,
@@ -594,6 +601,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard
         )
         self.scene.addItem(txt_item)
+        self._layout_items.append(txt_item)
         # fix for issue #149; was formerly txt_item.boundingRect().size().height()
 
         # self.y_coord += txt_item.boundingRect.height()  #ROW_HEIGHT*text.count("\n")
@@ -681,52 +689,49 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
     def _refit_viewport_items(self):
         self._update_wrapped_text_widths()
         self._refit_svg_plot_items()
+        self._relayout_sections()
 
-    def _refit_svg_plot_items(self, previous_heights=None):
-        if self._refitting_svg_plots or not self._svg_plot_items:
+    def _refit_svg_plot_items(self):
+        if self._refitting_svg_plots:
             return
 
-        previous_heights = previous_heights or {}
         self._refitting_svg_plots = True
         try:
-            for item in sorted(
-                self._svg_plot_items, key=lambda plot_item: plot_item.scenePos().y()
-            ):
+            for item in self._svg_plot_items:
                 item_width = item.boundingRect().width()
                 if item_width <= 0:
                     continue
 
-                old_height = previous_heights.get(
-                    id(item), item.sceneBoundingRect().height()
-                )
-                plot_y = item.scenePos().y()
                 self._fit_vector_plot_to_viewport(item)
-                height_delta = item.sceneBoundingRect().height() - old_height
-                if abs(height_delta) < 0.001:
-                    continue
-
-                for later_item in self.scene.items():
-                    if later_item is item or later_item.scenePos().y() <= plot_y:
-                        continue
-                    later_item.moveBy(0, height_delta)
-
-                for position in self.items_to_coords.values():
-                    if position.y() > plot_y:
-                        position.setY(position.y() + height_delta)
-                self.y_coord += height_delta
-
-            scene_bounds = self.scene.itemsBoundingRect()
-            self.scene.setSceneRect(
-                0,
-                0,
-                max(
-                    self.graphics_view.viewport().width(),
-                    scene_bounds.right() + padding,
-                ),
-                max(1, scene_bounds.bottom() + padding),
-            )
         finally:
             self._refitting_svg_plots = False
+
+    def _relayout_sections(self):
+        """Place every result item from its current measured size and stored order."""
+        next_y = float(self.add_offset)
+        for item in self._layout_items:
+            item.setPos(self.x_coord, next_y)
+            if isinstance(item, SelectableResultsTextItem):
+                item_height = self._advance_past_text_item(item, item.toPlainText())
+            else:
+                item_height = item.sceneBoundingRect().height()
+            next_y += item_height
+            if not isinstance(item, QGraphicsTextItem) or isinstance(
+                item, SelectableResultsTextItem
+            ):
+                next_y += SECTION_SPACING
+
+        self.y_coord = next_y
+        for nav_item_id, section_item in self._nav_items_to_sections.items():
+            self.items_to_coords[nav_item_id] = section_item.scenePos()
+
+        scene_bounds = self.scene.itemsBoundingRect()
+        self.scene.setSceneRect(
+            0,
+            0,
+            max(self.graphics_view.viewport().width(), scene_bounds.right() + padding),
+            max(1, scene_bounds.bottom() + padding),
+        )
 
     def showEvent(self, event):
         super(ResultsWindow, self).showEvent(event)
@@ -762,6 +767,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         # item.setMatrix(matrix)
         self.scene.clearSelection()
         self.scene.addItem(item)
+        self._layout_items.append(item)
         item.setPos(position)
 
         # attach event handler for mouse-clicks, i.e., to handle
@@ -809,6 +815,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self.scene.clearSelection()
         self.scene.addItem(item)
         self._svg_plot_items.append(item)
+        self._layout_items.append(item)
         item.setPos(position)
         item.contextMenuEvent = self._make_context_menu(artifact, item)
 
@@ -937,18 +944,16 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             if isinstance(plot_item, _svg_item_class()) and os.path.exists(
                 artifact.canonical_svg_path
             ):
-                previous_height = plot_item.sceneBoundingRect().height()
                 renderer = _svg_renderer_class()(artifact.canonical_svg_path, self)
                 if renderer.isValid():
                     plot_item.setSharedRenderer(renderer)
-                    self._refit_svg_plot_items(
-                        previous_heights={id(plot_item): previous_height}
-                    )
+                    self._refit_viewport_items()
                     self.scene.update()
             elif isinstance(plot_item, QGraphicsPixmapItem):
                 pixmap = self.generate_pixmap(outpath)
                 if not pixmap.isNull():
                     plot_item.setPixmap(pixmap)
+                    self._relayout_sections()
 
     def save_image_as(self, artifact, unscaled_image=None, format=None):
         if not isinstance(artifact, PlotArtifact):

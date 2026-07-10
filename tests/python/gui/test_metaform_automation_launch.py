@@ -2301,7 +2301,10 @@ def test_results_window_refits_svg_plot_after_in_place_regenerate(tmp_path):
     write_svg(400, 200)
     window = results_window.ResultsWindow(
         {
-            "texts": {},
+            "texts": {
+                "Summary": "Meta-analysis summary.",
+                "Weights": "Study weights remain readable after the plot.",
+            },
             "images": {"Forest Plot": str(plot_path)},
             "plot_capabilities": {
                 "Forest Plot": _plot_capability(editable=False),
@@ -2319,6 +2322,13 @@ def test_results_window_refits_svg_plot_after_in_place_regenerate(tmp_path):
             if isinstance(item, results_window.QGraphicsSvgItem)
         )
         initial_width = plot_item.sceneBoundingRect().width()
+        weights_title = next(
+            item
+            for item in window.scene.items()
+            if isinstance(item, QtWidgets.QGraphicsTextItem)
+            and "Weights" in item.toPlainText()
+        )
+        initial_weights_y = weights_title.scenePos().y()
         viewport_width = window.graphics_view.viewport().width()
         assert initial_width >= viewport_width * 0.9
         assert initial_width <= viewport_width
@@ -2335,6 +2345,125 @@ def test_results_window_refits_svg_plot_after_in_place_regenerate(tmp_path):
         assert refreshed_width >= refreshed_viewport_width * 0.9
         assert refreshed_width <= refreshed_viewport_width
         assert refreshed_width / refreshed_height == pytest.approx(2.0)
+        assert (
+            weights_title.sceneBoundingRect().top()
+            >= plot_item.sceneBoundingRect().bottom()
+        )
+
+        write_svg(400, 800)
+        window._refresh_plot_item(
+            plot_item, "Forest Plot", str(plot_path), params_path=None
+        )
+        app.processEvents()
+
+        assert (
+            weights_title.sceneBoundingRect().top()
+            >= plot_item.sceneBoundingRect().bottom()
+        )
+
+        write_svg(400, 100)
+        window._refresh_plot_item(
+            plot_item, "Forest Plot", str(plot_path), params_path=None
+        )
+        app.processEvents()
+
+        assert (
+            weights_title.sceneBoundingRect().top()
+            >= plot_item.sceneBoundingRect().bottom()
+        )
+        assert weights_title.scenePos().y() < initial_weights_y
+
+        fresh_window = results_window.ResultsWindow(
+            {
+                "texts": {
+                    "Summary": "Meta-analysis summary.",
+                    "Weights": "Study weights remain readable after the plot.",
+                },
+                "images": {"Forest Plot": str(plot_path)},
+                "plot_capabilities": {
+                    "Forest Plot": _plot_capability(editable=False),
+                },
+            }
+        )
+        try:
+            fresh_window.resize(1200, 800)
+            fresh_window.show()
+            app.processEvents()
+            fresh_weights_title = next(
+                item
+                for item in fresh_window.scene.items()
+                if isinstance(item, QtWidgets.QGraphicsTextItem)
+                and item.toPlainText() == "Weights"
+            )
+            assert weights_title.scenePos().y() == pytest.approx(
+                fresh_weights_title.scenePos().y()
+            )
+        finally:
+            fresh_window.close()
+            app.processEvents()
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_results_window_reflows_sections_after_raster_plot_regenerate(tmp_path):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    plot_path = tmp_path / "forest.png"
+
+    def write_plot(width, height):
+        image = results_window.QImage(
+            width, height, results_window.QImage.Format_ARGB32
+        )
+        image.fill(0xFFFFFFFF)
+        assert image.save(str(plot_path))
+
+    write_plot(400, 200)
+    window = results_window.ResultsWindow(
+        {
+            "texts": {
+                "Summary": "Meta-analysis summary.",
+                "Weights": "Study weights remain readable after the plot.",
+            },
+            "images": {"Forest Plot": str(plot_path)},
+            "plot_capabilities": {
+                "Forest Plot": _plot_capability(editable=False),
+            },
+        }
+    )
+
+    try:
+        window.resize(1200, 800)
+        window.show()
+        app.processEvents()
+        plot_item = next(
+            item
+            for item in window.scene.items()
+            if isinstance(item, QtWidgets.QGraphicsPixmapItem)
+        )
+        weights_title = next(
+            item
+            for item in window.scene.items()
+            if isinstance(item, QtWidgets.QGraphicsTextItem)
+            and item.toPlainText() == "Weights"
+        )
+
+        write_plot(400, 800)
+        window._refresh_plot_item(
+            plot_item, "Forest Plot", str(plot_path), params_path=None
+        )
+        app.processEvents()
+
+        assert (
+            weights_title.sceneBoundingRect().top()
+            - plot_item.sceneBoundingRect().bottom()
+            >= results_window.SECTION_SPACING
+        )
     finally:
         window.close()
         app.processEvents()
