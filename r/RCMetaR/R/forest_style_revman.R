@@ -513,8 +513,14 @@ rcmetar.revman.method.label <- function(bundle) {
 }
 
 rcmetar.revman.axis.ticks <- function(bundle, alim) {
+    params <- bundle$params
+    if (!is.null(params$fp_xticks) &&
+            !identical(params$fp_xticks[1], "[default]") &&
+            !all(is.na(params$fp_xticks))) {
+        return(rcmetar.metafor.axis.ticks(bundle, alim))
+    }
     if (metric.is.log.scale(as.character(bundle$params$measure))) {
-        return(log(c(0.01, 0.1, 1, 10, 100)))
+        return(rcmetar.forest.journal.ratio.ticks(alim))
     }
     ticks <- pretty(alim, n=4)
     ticks[ticks >= alim[1] & ticks <= alim[2]]
@@ -645,7 +651,7 @@ rcmetar.draw.revman.axis <- function(bundle, layout, cex) {
 rcmetar.revman.axis.labels <- function(bundle, ticks) {
     measure <- as.character(bundle$params$measure)
     if (metric.is.log.scale(measure)) {
-        return(c("0.01", "0.1", "1", "10", "100"))
+        return(formatC(exp(ticks), digits=3, format="fg"))
     }
     values <- rcmetar.bundle.transform(bundle)$display.scale(ticks)
     digits <- if (metric.is.logit.scale(measure)) 2 else max(0, min(2, as.integer(bundle$params$digits)))
@@ -727,7 +733,7 @@ rcmetar.draw.revman.bottom.blocks <- function(bundle, x, cex, layout=NULL) {
     right.x <- axis.footer$right.x
     left.adj <- 0.5
     right.adj <- 0.5
-    if (label.wraps.deeply) {
+    if (label.wraps.deeply || (nzchar(left.label) && nzchar(right.label))) {
         label.gap <- max(axis.footer$span * 0.035, 0.08)
         left.x <- axis.footer$split.x - label.gap
         right.x <- axis.footer$split.x + label.gap

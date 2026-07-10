@@ -293,7 +293,7 @@ rcmetar.forest.default.rows <- function(bundle) {
 rcmetar.forest.default.layout.preflight <- function(bundle, style="default", size.policy="export") {
     size <- rcmetar.forest.default.device.metrics(bundle)
     size$size_policy <- size.policy
-    alim <- rcmetar.metafor.alim(bundle)
+    alim <- rcmetar.forest.journal.alim(bundle)
     layout <- rcmetar.forest.default.layout.coordinates(bundle, size, alim)
     rows <- rcmetar.forest.default.rows(bundle)
     group.headers <- rcmetar.metafor.group.headers(bundle)
@@ -343,7 +343,10 @@ rcmetar.forest.revman.device.metrics <- function(bundle) {
         0
     )
     text.floor <- if (k <= 16) 0.78 else 0.68
-    width <- 11.25 +
+    ratio.axis.reserve <- if (
+        metric.is.log.scale(as.character(bundle$params$measure))
+    ) 2.75 else 0
+    width <- 11.25 + ratio.axis.reserve +
         max(0, label.width - 24) * 0.095 +
         max(0, column.count - 5) * 0.22 +
         max(0, header.width - 16) * 0.045
@@ -368,11 +371,97 @@ rcmetar.forest.revman.device.metrics <- function(bundle) {
     )
 }
 
+rcmetar.forest.has.explicit.axis.bounds <- function(bundle) {
+    !is.null(bundle$params$fp_plot_lb) &&
+        !is.null(bundle$params$fp_plot_ub) &&
+        !identical(bundle$params$fp_plot_lb[[1]], "[default]") &&
+        !identical(bundle$params$fp_plot_ub[[1]], "[default]")
+}
+
+rcmetar.forest.journal.effect.intervals <- function(bundle) {
+    yi <- as.numeric(bundle$effect$yi)
+    ci.lb <- as.numeric(bundle$effect$ci.lb)
+    ci.ub <- as.numeric(bundle$effect$ci.ub)
+    if (inherits(bundle$res, "rma")) {
+        yi <- as.numeric(bundle$res$yi)
+        vi <- as.numeric(bundle$res$vi)
+        if (length(yi) == length(vi)) {
+            z <- stats::qnorm(
+                1 - (1 - as.numeric(bundle$params$conf.level) / 100) / 2
+            )
+            se <- sqrt(vi)
+            ci.lb <- yi - z * se
+            ci.ub <- yi + z * se
+        }
+    }
+    list(yi=yi, ci.lb=ci.lb, ci.ub=ci.ub)
+}
+
+rcmetar.forest.journal.alim <- function(bundle) {
+    if (rcmetar.forest.has.explicit.axis.bounds(bundle)) {
+        return(rcmetar.metafor.alim(bundle))
+    }
+    effect <- rcmetar.forest.journal.effect.intervals(bundle)
+    yi <- effect$yi[is.finite(effect$yi)]
+    lower <- effect$ci.lb[is.finite(effect$ci.lb)]
+    upper <- effect$ci.ub[is.finite(effect$ci.ub)]
+    summary.bounds <- numeric(0)
+    if (inherits(bundle$res, "rma")) {
+        summary.bounds <- c(bundle$res$ci.lb, bundle$res$ci.ub)
+        summary.bounds <- summary.bounds[is.finite(summary.bounds)]
+    }
+    central.bounds <- if (length(lower) >= 5 && length(upper) >= 5) {
+        trim.count <- max(1, floor(min(length(lower), length(upper)) * 0.10))
+        c(
+            sort(lower)[[trim.count + 1]],
+            sort(upper, decreasing=TRUE)[[trim.count + 1]]
+        )
+    } else {
+        c(lower, upper)
+    }
+    values <- c(yi, central.bounds, summary.bounds)
+    values <- values[is.finite(values)]
+    if (length(values) < 2 || diff(range(values)) <= 0) {
+        return(rcmetar.metafor.alim(bundle))
+    }
+    range(values)
+}
+
+rcmetar.forest.journal.ratio.alim <- function(bundle) {
+    base <- rcmetar.forest.journal.alim(bundle)
+    if (rcmetar.forest.has.explicit.axis.bounds(bundle)) {
+        return(base)
+    }
+    observed <- range(c(base, 0), finite=TRUE)
+    displayed <- exp(observed)
+    candidates <- sort(as.vector(outer(c(1, 2, 5), 10^(-8:8))))
+    lower <- max(candidates[candidates <= displayed[[1]]], na.rm=TRUE)
+    upper <- min(candidates[candidates >= displayed[[2]]], na.rm=TRUE)
+    if (!is.finite(lower) || !is.finite(upper) || lower >= upper) {
+        return(observed)
+    }
+    log(c(lower, upper))
+}
+
+rcmetar.forest.journal.ratio.ticks <- function(alim) {
+    candidates <- log(sort(as.vector(outer(c(1, 2, 5), 10^(-8:8)))))
+    ticks <- candidates[candidates >= alim[[1]] & candidates <= alim[[2]]]
+    major <- ticks[abs((ticks / log(10)) - round(ticks / log(10))) < 1e-8]
+    if (length(major) >= 3 && length(major) <= 5) {
+        return(major)
+    }
+    if (length(ticks) > 5) {
+        indexes <- unique(round(seq(1, length(ticks), length.out=4)))
+        ticks <- sort(unique(c(ticks[indexes], 0)))
+    }
+    ticks
+}
+
 rcmetar.forest.revman.layout.coordinates <- function(bundle) {
     if (metric.is.log.scale(as.character(bundle$params$measure))) {
-        alim <- log(c(0.01, 100))
+        alim <- rcmetar.forest.journal.ratio.alim(bundle)
     } else {
-        alim <- rcmetar.metafor.alim(bundle)
+        alim <- rcmetar.forest.journal.alim(bundle)
     }
     label.extra <- max(0, max(nchar(as.character(bundle$slab)), 0) - 44)
     span <- max(diff(alim), 1)

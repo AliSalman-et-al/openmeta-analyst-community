@@ -179,7 +179,18 @@ qa_render_matrix <- function(output.root = qa_root()) {
     }, error = function(e) {
       err <<- conditionMessage(e)
     })
-    rows[[i]] <- data.frame(case, image = image, bytes = bytes, error = err, stringsAsFactors = FALSE)
+    rows[[i]] <- data.frame(
+      case = id,
+      family = "regression",
+      kind = case$kind,
+      workflow = case$workflow,
+      style = case$style,
+      scenario = case$scenario,
+      image = image,
+      bytes = bytes,
+      error = err,
+      stringsAsFactors = FALSE
+    )
   }
   manifest <- do.call(rbind, rows)
   utils::write.csv(manifest, file.path(output.root, "manifest.csv"), row.names = FALSE)

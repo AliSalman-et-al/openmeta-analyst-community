@@ -170,3 +170,21 @@ test_that("editable bubble options survive bundle regeneration", {
   expect_equal(rcmetar.bubble.x.ticks(bundle), c(10, 30, 50))
   expect_false(rcmetar.bubble.param.is.true(bundle, "bp_show_confidence_band", TRUE))
 })
+
+test_that("Bubble Plot moderator ticks adapt to observed values and honor overrides", {
+  fixture <- bubble_binary_fixture("default")
+  result <- rcmetar.run.analysis(
+    fixture$data,
+    list(method = "meta.regression", params = fixture$params, workflow = "meta-regression")
+  )
+  bundle <- rcmetar.regenerate.regression.plot.data(fixture$data, result$res, fixture$params)
+  limits <- rcmetar.bubble.xlim(bundle)
+  ticks <- rcmetar.bubble.x.ticks(bundle)
+
+  expect_gte(length(ticks), 3)
+  expect_lte(length(ticks), 7)
+  expect_true(all(ticks >= limits[[1]] & ticks <= limits[[2]]))
+
+  bundle$params$bp_xticks <- c(12, 24, 48)
+  expect_equal(rcmetar.bubble.x.ticks(bundle), c(12, 24, 48))
+})

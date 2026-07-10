@@ -545,8 +545,7 @@ rcmetar.metafor.axis.ticks <- function(bundle, alim) {
         return(ticks)
     }
     if (metric.is.log.scale(as.character(params$measure))) {
-        candidates <- log(c(0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 4, 10, 20, 100))
-        ticks <- candidates[candidates >= alim[1] & candidates <= alim[2]]
+        ticks <- rcmetar.forest.journal.ratio.ticks(alim)
         if (length(ticks) >= 2) {
             return(ticks)
         }
@@ -618,7 +617,24 @@ rcmetar.metafor.alim <- function(bundle) {
     }
     values <- c(bundle$effect$yi, bundle$effect$ci.lb, bundle$effect$ci.ub)
     if (inherits(bundle$res, "rma")) {
-        values <- c(values, bundle$res$yi, bundle$res$ci.lb, bundle$res$ci.ub)
+        study.yi <- as.numeric(bundle$res$yi)
+        study.vi <- as.numeric(bundle$res$vi)
+        if (length(study.yi) == length(study.vi)) {
+            z <- stats::qnorm(
+                1 - (1 - as.numeric(bundle$params$conf.level) / 100) / 2
+            )
+            study.se <- sqrt(study.vi)
+            values <- c(
+                values,
+                study.yi,
+                study.yi - z * study.se,
+                study.yi + z * study.se,
+                bundle$res$ci.lb,
+                bundle$res$ci.ub
+            )
+        } else {
+            values <- c(values, study.yi, bundle$res$ci.lb, bundle$res$ci.ub)
+        }
     }
     values <- values[is.finite(values)]
     if (length(values) == 0) {

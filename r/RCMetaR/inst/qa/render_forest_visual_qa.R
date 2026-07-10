@@ -266,8 +266,9 @@ qa_fixture_for <- function(kind, n, stress, direct = FALSE) {
       continuous_two_arm = qa_make_entered_continuous(n, stress),
       continuous_one_arm = qa_make_entered_continuous_one_arm(n, stress),
       diagnostic = qa_make_entered_diagnostic(n, stress)
-    ))
-  }
+  ))
+}
+
   switch(
     kind,
     binary_two_arm = qa_make_binary(n, stress),
@@ -278,13 +279,40 @@ qa_fixture_for <- function(kind, n, stress, direct = FALSE) {
   )
 }
 
+qa_add_subgroup_covariate <- function(data) {
+  values <- rep(c("Group A", "Group B"), length.out = length(data@study.names))
+  covariate <- rcmetar.create.covariate.values(
+    "QA subgroup",
+    values,
+    "factor",
+    "Group A"
+  )
+  data@covariates <- c(data@covariates, list(covariate))
+  list(data = data, covariate = covariate)
+}
+
 qa_render_case <- function(kind, workflow, style, scenario.name, scenarios, output.root, format) {
   scenario <- scenarios[[scenario.name]]
   data <- qa_fixture_for(kind, scenario$n, scenario$stress, isTRUE(scenario$direct))
   case.name <- paste(kind, workflow, style, scenario.name, sep = "__")
   out <- file.path(output.root, paste0(case.name, ".", format))
   params <- qa_base_params(qa_measure_for(kind), out, style, scenario)
-  result <- rcmetar.run.analysis(data, list(method = qa_method_for(kind), params = params, workflow = workflow))
+  selected.cov <- NULL
+  if (identical(workflow, "subgroup")) {
+    subgroup.fixture <- qa_add_subgroup_covariate(data)
+    data <- subgroup.fixture$data
+    selected.cov <- subgroup.fixture$covariate
+    params$cov_name <- selected.cov@cov.name
+  }
+  result <- rcmetar.run.analysis(
+    data,
+    list(
+      method = qa_method_for(kind),
+      params = params,
+      workflow = workflow,
+      selected.cov = selected.cov
+    )
+  )
   image.path <- unname(result$images[[1]])
   if (is.null(image.path) || !file.exists(image.path)) {
     stop("Missing image for ", case.name, call. = FALSE)
@@ -293,6 +321,7 @@ qa_render_case <- function(kind, workflow, style, scenario.name, scenarios, outp
   cat(case.name, "|", image.path, "|", info$size, "bytes\n")
   data.frame(
     case = case.name,
+    family = paste0(gsub("-", "_", workflow), "_forest"),
     kind = kind,
     workflow = workflow,
     style = style,
@@ -309,7 +338,7 @@ qa_render_matrix <- function(output.root = qa_root(qa_find_repo_root()), format 
   scenarios <- qa_scenario_settings()
   cases <- expand.grid(
     kind = c("binary_two_arm", "binary_one_arm", "continuous_two_arm", "continuous_one_arm", "diagnostic"),
-    workflow = c("standard", "cumulative", "leave-one-out"),
+    workflow = c("standard", "cumulative", "leave-one-out", "subgroup"),
     style = c("default", "revman", "bmj"),
     scenario = names(scenarios),
     stringsAsFactors = FALSE

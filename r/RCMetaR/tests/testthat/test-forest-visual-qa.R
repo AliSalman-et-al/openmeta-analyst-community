@@ -24,12 +24,12 @@ test_that("optional forest visual QA matrix renders", {
   source(script, local = TRUE)
   manifest <- qa_render_matrix(output.root)
 
-  expect_equal(nrow(manifest), 225)
+  expect_equal(nrow(manifest), 300)
   expect_setequal(
     unique(manifest$kind),
     c("binary_two_arm", "binary_one_arm", "continuous_two_arm", "continuous_one_arm", "diagnostic")
   )
-  expect_setequal(unique(manifest$workflow), c("standard", "cumulative", "leave-one-out"))
+  expect_setequal(unique(manifest$workflow), c("standard", "cumulative", "leave-one-out", "subgroup"))
   expect_setequal(unique(manifest$style), c("default", "revman", "bmj"))
   expect_false(any(is.na(manifest$image)))
   expect_true(all(file.exists(manifest$image)))

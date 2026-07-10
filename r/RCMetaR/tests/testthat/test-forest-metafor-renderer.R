@@ -353,7 +353,7 @@ test_that("Forest Layout Preflight produces deterministic layout plans for Defau
   expect_gt(default.plan$device$height, 0)
   expect_gte(default.plan$typography$cex, 0.78)
   expect_equal(default.plan$rows$study_rows, nrow(default.bundle$ilab$matrix):1)
-  expect_equal(default.plan$x$alim, rcmetar.metafor.alim(default.bundle))
+  expect_equal(default.plan$x$alim, rcmetar.forest.journal.alim(default.bundle))
   expect_equal(default.plan$columns$ilab.xpos, rcmetar.metafor.layout(default.bundle, default.plan$device, default.plan$x$alim)$ilab.xpos)
 
   fixture$params$fp_style <- "revman"
@@ -379,6 +379,75 @@ test_that("Forest Layout Preflight produces deterministic layout plans for Defau
   expect_equal(bmj.plan$headers$effect, "Odds ratio")
   expect_equal(bmj.plan$rows$study_rows, length(bmj.bundle$slab):1)
   expect_equal(bmj.plan$footer$axis$axis.x, mean(bmj.plan$x$alim), tolerance = 1e-8)
+})
+
+test_that("journal ratio axes adapt to observed effects across Forest Plot Styles", {
+  fixture <- metafor_binary_fixture()
+  res <- rma.uni(
+    yi = fixture$data@y,
+    sei = fixture$data@SE,
+    slab = fixture$data@study.names,
+    method = fixture$params$rm.method,
+    level = fixture$params$conf.level,
+    digits = fixture$params$digits
+  )
+
+  z <- stats::qnorm(0.975)
+  for (style in c("default", "revman", "bmj")) {
+    fixture$params$fp_style <- style
+    bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+    plan <- rcmetar.forest.layout.preflight(bundle)
+    interval.fractions <- (2 * z * fixture$data@SE) / diff(plan$x$alim)
+
+    expect_lte(plan$x$alim[[1]], 0)
+    expect_gte(plan$x$alim[[2]], 0)
+    expect_gte(stats::median(interval.fractions, na.rm = TRUE), 0.08)
+    expect_lt(diff(plan$x$alim), diff(log(c(0.01, 100))))
+    expect_gte(length(plan$x$at), 3)
+    expect_lte(length(plan$x$at), 5)
+    expect_true(all(plan$x$at >= plan$x$alim[[1]] & plan$x$at <= plan$x$alim[[2]]))
+  }
+})
+
+test_that("explicit Forest Plot axis ticks override adaptive defaults for every style", {
+  fixture <- metafor_binary_fixture()
+  fixture$params$fp_xticks <- c(0.1, 0.5, 1, 2)
+  fixture$params$fp_plot_lb <- "0.25"
+  fixture$params$fp_plot_ub <- "4"
+  res <- rma.uni(yi=fixture$data@y, sei=fixture$data@SE, method="DL")
+
+  for (style in c("default", "revman", "bmj")) {
+    fixture$params$fp_style <- style
+    bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+    plan <- rcmetar.forest.layout.preflight(bundle)
+    expect_equal(plan$x$at, log(c(0.1, 0.5, 1, 2)))
+    expect_equal(plan$x$alim, rcmetar.metafor.alim(bundle))
+  }
+})
+
+test_that("one extreme study interval does not squeeze the remaining forest", {
+  fixture <- metafor_entered_binary_fixture(6)
+  fixture$data@SE[[1]] <- 1.8
+  res <- rma.uni(
+    yi=fixture$data@y,
+    sei=fixture$data@SE,
+    method="DL",
+    level=fixture$params$conf.level
+  )
+  z <- stats::qnorm(0.975)
+  full.lower <- res$yi - z * sqrt(res$vi)
+  full.upper <- res$yi + z * sqrt(res$vi)
+
+  for (style in c("default", "revman", "bmj")) {
+    fixture$params$fp_style <- style
+    bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+    plan <- rcmetar.forest.layout.preflight(bundle)
+
+    expect_gt(plan$x$alim[[1]], min(full.lower))
+    expect_lt(plan$x$alim[[2]], max(full.upper))
+    expect_true(all(res$yi >= plan$x$alim[[1]] & res$yi <= plan$x$alim[[2]]))
+    expect_true(res$ci.lb >= plan$x$alim[[1]] && res$ci.ub <= plan$x$alim[[2]])
+  }
 })
 
 test_that("Forest Layout Preflight records sparse and compact RevMan templates without persisting plans", {

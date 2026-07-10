@@ -592,12 +592,12 @@ rcmetar.forest.bmj.device.metrics <- function(bundle) {
 rcmetar.forest.bmj.alim <- function(bundle) {
     measure <- as.character(bundle$params$measure)
     if (metric.is.log.scale(measure)) {
-        return(log(c(0.01, 100)))
+        return(rcmetar.forest.journal.ratio.alim(bundle))
     }
     if (identical(measure, "RD")) {
         return(c(-1, 1))
     }
-    alim <- rcmetar.metafor.alim(bundle)
+    alim <- rcmetar.forest.journal.alim(bundle)
     alim <- range(c(alim, 0), finite=TRUE)
     padding <- max(diff(alim) * 0.12, 0.1)
     c(alim[[1]] - padding, alim[[2]] + padding)

@@ -18,6 +18,8 @@ The metafor Forest Renderer should use a style-neutral Forest Layout Preflight b
 - GUI preview, file export, and QA rendering use the same preflight engine with different explicit size policies (`preview`, `export`, `qa`) rather than separate renderers.
 - The migration to Forest Layout Preflight is a refactor-first, QA-guided architectural change delivered as one cohesive commit. Plot output is not frozen during the refactor; visual changes are accepted when the forest visual QA matrix shows improved journal-ready layout without clipping, overlap, bad whitespace, or unreadable text.
 - The first architectural commit covers every current forest plot variant — standard, cumulative, and leave-one-out across binary, continuous, and diagnostic data — for both Default and RevMan styles, including sparse/direct-effect and stress visual QA cases.
+- Forest effect axes use a shared journal-axis policy across styles. Automatic bounds retain every study point estimate and the pooled interval, fit the central distribution of study intervals, and use clipping arrows for isolated extreme intervals so a single imprecise study does not collapse the readable scale. Ratio axes round those bounds to conventional 1-2-5 values and show a bounded number of ticks. Explicit user bounds and ticks remain authoritative.
+- Comprehensive visual QA maintains an explicit Plot Artifact family inventory. Families marked covered must produce manifest rows; intentional exclusions require a durable reason and evidence reference so a successful run cannot silently omit a user-visible plot family.
 - The preflight style-constraint interface should be ready for BMJ and future metafor-based styles, but BMJ rendering remains deferred unless a maintained BMJ renderer already exists.
 - Preflight measurement stays base-graphics-native: use controlled graphics devices, `strwidth`/`strheight`, and explicit base coordinate conversions so measurement matches the `metafor::forest()` drawing path. Do not introduce `grid`, `gridGraphics`, or `ggplotify` as layout dependencies for this layer.
 
@@ -27,6 +29,6 @@ The metafor Forest Renderer should use a style-neutral Forest Layout Preflight b
 - Shared sizing, row, column, axis, and footer calculations move out of scattered style-specific helpers where practical.
 - No `gridGraphics` or `ggplotify` dependency is added for layout.
 - Plan-level tests cover invariants for dimensions, rows, columns, text scale, warnings, and sparse/direct-effect inputs.
-- Render smoke tests and the forest visual QA matrix cover standard, cumulative, and leave-one-out plots across binary, continuous, and diagnostic data for Default and RevMan styles.
+- Render smoke tests and the forest visual QA matrix cover standard, cumulative, leave-one-out, and subgroup plots across binary, continuous, and diagnostic data for every maintained Forest Plot Style.
 - Contact sheets and individual problem plots show no obvious clipping, overlap, bad whitespace, asymmetry, unreadable text, or marker/CI/diamond color inconsistency.
 - CONTEXT language and ADR 0183 remain aligned with the implementation.

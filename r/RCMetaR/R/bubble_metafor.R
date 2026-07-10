@@ -242,7 +242,12 @@ rcmetar.bubble.ylim <- function(bundle) {
 rcmetar.bubble.x.ticks <- function(bundle) {
     ticks <- bundle$params$bp_xticks
     if (is.null(ticks) || length(ticks) == 0 || identical(ticks[1], "[default]")) {
-        return(NULL)
+        limits <- rcmetar.bubble.xlim(bundle)
+        if (is.null(limits)) {
+            return(NULL)
+        }
+        ticks <- pretty(limits, n=5)
+        return(ticks[ticks >= limits[[1]] & ticks <= limits[[2]]])
     }
     if (length(ticks) == 1 && is.character(ticks)) {
         ticks <- strsplit(ticks, ",", fixed=TRUE)[[1]]
