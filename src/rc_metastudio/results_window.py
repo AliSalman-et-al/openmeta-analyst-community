@@ -81,7 +81,9 @@ FOREST_STYLE_DEFAULT_COLORS = {
 NO_RESULTS_MESSAGE = "No results could be computed for this analysis."
 ROW_HEIGHT = 15  # by trial-and-error; seems to work very well
 SECTION_SPACING = ROW_HEIGHT
+MAX_VECTOR_PLOT_SCALE = 4.0
 QGraphicsSvgItem = None
+QSvgRenderer = None
 
 
 def _svg_item_class():
@@ -91,6 +93,15 @@ def _svg_item_class():
 
         QGraphicsSvgItem = _QGraphicsSvgItem
     return QGraphicsSvgItem
+
+
+def _svg_renderer_class():
+    global QSvgRenderer
+    if QSvgRenderer is None:
+        from PyQt5.QtSvg import QSvgRenderer as _QSvgRenderer
+
+        QSvgRenderer = _QSvgRenderer
+    return QSvgRenderer
 
 
 def _canonical_svg_path(image_path):
@@ -294,6 +305,8 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
     def __init__(self, results, parent=None):
 
         super(ResultsWindow, self).__init__(parent)
+        self._svg_plot_items = []
+        self._refitting_svg_plots = False
         self.setupUi(self)
         qt_layout.configure_resizable_window(self)
         self.copied_item = QByteArray()
@@ -309,7 +322,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         )
         self.results_nav_splitter.splitterMoved.connect(
             app_error_handler.safe_slot(
-                lambda _pos, _index: self._update_wrapped_text_widths(), parent=self
+                lambda _pos, _index: self._refit_viewport_items(), parent=self
             )
         )
 
@@ -429,12 +442,12 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
         return pixmap
 
-    def _fit_size_to_viewport(self, width, height):
+    def _fit_size_to_viewport(self, width, height, max_scale=1.0):
         if width <= 0 or height <= 0:
             return (width, height)
 
         viewport_width = self._plot_viewport_width()
-        scale = min(1.0, float(viewport_width) / float(width))
+        scale = min(max_scale, float(viewport_width) / float(width))
         return (max(1, int(width * scale)), max(1, int(height * scale)))
 
     def _plot_viewport_width(self):
@@ -596,13 +609,71 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             scene_height = max(scene_height, scene_rect.bottom() + padding)
         self.scene.setSceneRect(0, 0, scene_width, scene_height)
 
+    def _refit_viewport_items(self):
+        self._update_wrapped_text_widths()
+        self._refit_svg_plot_items()
+
+    def _refit_svg_plot_items(self, previous_heights=None):
+        if self._refitting_svg_plots or not self._svg_plot_items:
+            return
+
+        previous_heights = previous_heights or {}
+        self._refitting_svg_plots = True
+        try:
+            for item in sorted(
+                self._svg_plot_items, key=lambda plot_item: plot_item.scenePos().y()
+            ):
+                item_width = item.boundingRect().width()
+                item_height = item.boundingRect().height()
+                scaled_width, _scaled_height = self._fit_size_to_viewport(
+                    item_width,
+                    item_height,
+                    max_scale=MAX_VECTOR_PLOT_SCALE,
+                )
+                if item_width <= 0:
+                    continue
+
+                old_height = previous_heights.get(
+                    id(item), item.sceneBoundingRect().height()
+                )
+                new_scale = float(scaled_width) / float(item_width)
+                plot_y = item.scenePos().y()
+                if abs(new_scale - item.scale()) >= 0.001:
+                    item.setScale(new_scale)
+                height_delta = item.sceneBoundingRect().height() - old_height
+                if abs(height_delta) < 0.001:
+                    continue
+
+                for later_item in self.scene.items():
+                    if later_item is item or later_item.scenePos().y() <= plot_y:
+                        continue
+                    later_item.moveBy(0, height_delta)
+
+                for position in self.items_to_coords.values():
+                    if position.y() > plot_y:
+                        position.setY(position.y() + height_delta)
+                self.y_coord += height_delta
+
+            scene_bounds = self.scene.itemsBoundingRect()
+            self.scene.setSceneRect(
+                0,
+                0,
+                max(
+                    self.graphics_view.viewport().width(),
+                    scene_bounds.right() + padding,
+                ),
+                max(1, scene_bounds.bottom() + padding),
+            )
+        finally:
+            self._refitting_svg_plots = False
+
     def showEvent(self, event):
         super(ResultsWindow, self).showEvent(event)
-        self._update_wrapped_text_widths()
+        self._refit_viewport_items()
 
     def resizeEvent(self, event):
         super(ResultsWindow, self).resizeEvent(event)
-        self._update_wrapped_text_widths()
+        self._refit_viewport_items()
 
     def _get_plot_type(self, title):
         # Infer plot type from title because RCMetaR does not yet return an
@@ -678,7 +749,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         item_width = item.boundingRect().width()
         item_height = item.boundingRect().height()
         scaled_width, scaled_height = self._fit_size_to_viewport(
-            item_width, item_height
+            item_width, item_height, max_scale=MAX_VECTOR_PLOT_SCALE
         )
         if item_width > 0:
             item.setScale(float(scaled_width) / float(item_width))
@@ -694,6 +765,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         print("creating item @:%s" % position)
         self.scene.clearSelection()
         self.scene.addItem(item)
+        self._svg_plot_items.append(item)
         item.setPos(position)
         item.contextMenuEvent = self._make_context_menu(artifact, item)
 
@@ -780,8 +852,14 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             if isinstance(plot_item, _svg_item_class()) and os.path.exists(
                 artifact.canonical_svg_path
             ):
-                plot_item.renderer().load(artifact.canonical_svg_path)
-                self.scene.update()
+                previous_height = plot_item.sceneBoundingRect().height()
+                renderer = _svg_renderer_class()(artifact.canonical_svg_path, self)
+                if renderer.isValid():
+                    plot_item.setSharedRenderer(renderer)
+                    self._refit_svg_plot_items(
+                        previous_heights={id(plot_item): previous_height}
+                    )
+                    self.scene.update()
             elif isinstance(plot_item, QGraphicsPixmapItem):
                 pixmap = self.generate_pixmap(outpath)
                 if not pixmap.isNull():

@@ -1639,6 +1639,22 @@
     {
       "decision": "keep",
       "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_refits_svg_plots_and_reflows_sections_on_resize",
+      "reason": "Guards responsive SVG plot fitting, capped scaling, and result-section reflow reported in issue #272.",
+      "runtime_class": "subsecond",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
         "golden",
         "analysis_behavior"
       ],

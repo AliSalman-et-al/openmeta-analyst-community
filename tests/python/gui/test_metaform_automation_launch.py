@@ -2008,6 +2008,12 @@ def test_results_window_renders_summary_text_and_plot_navigation(tmp_path):
             isinstance(item, results_window.QGraphicsPixmapItem)
             for item in window.scene.items()
         )
+        pixmap_item = next(
+            item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsPixmapItem)
+        )
+        assert pixmap_item.pixmap().width() <= image.width()
         assert window.graphics_view.scene() is window.scene
     finally:
         window.close()
@@ -2060,6 +2066,102 @@ def test_results_window_displays_canonical_svg_plot_artifact(tmp_path):
         assert len(svg_items) == 1
         assert pixmap_items == []
         assert svg_items[0].scale() < 1.0
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_results_window_refits_svg_plots_and_reflows_sections_on_resize(tmp_path):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    plot_paths = {}
+    for name in ("forest", "cumulative"):
+        plot_path = tmp_path / (name + ".svg")
+        plot_path.write_text(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200">'
+            '<rect width="400" height="200" fill="white"/>'
+            "</svg>",
+            encoding="utf-8",
+        )
+        plot_paths[name] = str(plot_path)
+
+    reference = "Responsive plot reference"
+    window = results_window.ResultsWindow(
+        {
+            "texts": {"References": reference},
+            "images": {
+                "Forest Plot": plot_paths["forest"],
+                "Cumulative Forest Plot": plot_paths["cumulative"],
+            },
+            "image_order": ["Forest Plot", "Cumulative Forest Plot"],
+        }
+    )
+
+    try:
+        window.resize(1200, 800)
+        window.show()
+        app.processEvents()
+
+        svg_items = sorted(
+            (
+                item
+                for item in window.scene.items()
+                if isinstance(item, results_window.QGraphicsSvgItem)
+            ),
+            key=lambda item: item.scenePos().y(),
+        )
+        text_items = {
+            item.toPlainText(): item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsTextItem)
+        }
+
+        def assert_sections_are_separated():
+            assert (
+                text_items["Cumulative Forest Plot"].sceneBoundingRect().top()
+                - svg_items[0].sceneBoundingRect().bottom()
+                >= results_window.SECTION_SPACING
+            )
+            assert (
+                text_items["References"].sceneBoundingRect().top()
+                - svg_items[1].sceneBoundingRect().bottom()
+                >= results_window.SECTION_SPACING
+            )
+
+        def assert_plot_fills_viewport(plot_item):
+            plot_width = plot_item.sceneBoundingRect().width()
+            assert plot_width >= window.graphics_view.viewport().width() * 0.9
+            assert plot_width <= window.graphics_view.viewport().width()
+
+        assert len(svg_items) == 2
+        first_width = svg_items[0].sceneBoundingRect().width()
+        first_height = svg_items[0].sceneBoundingRect().height()
+        assert_plot_fills_viewport(svg_items[0])
+        assert first_width / first_height == pytest.approx(2.0)
+        assert_sections_are_separated()
+
+        window.resize(1600, 800)
+        app.processEvents()
+
+        second_width = svg_items[0].sceneBoundingRect().width()
+        second_height = svg_items[0].sceneBoundingRect().height()
+        assert second_width > first_width
+        assert_plot_fills_viewport(svg_items[0])
+        assert second_width / second_height == pytest.approx(2.0)
+        assert svg_items[0].scale() <= 4.0
+        assert_sections_are_separated()
+
+        window.resize(3000, 800)
+        app.processEvents()
+
+        assert svg_items[0].scale() == pytest.approx(4.0)
+        assert svg_items[0].sceneBoundingRect().width() == pytest.approx(1600)
+        assert_sections_are_separated()
     finally:
         window.close()
         app.processEvents()
@@ -2687,6 +2789,12 @@ def test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog(
     params_path = str(tmp_path / "forest_params")
     png_path = str(tmp_path / "forest.png")
     out_path = str(tmp_path / "edited.png")
+    Path(png_path).with_suffix(".svg").write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200">'
+        '<rect width="400" height="200" fill="white"/>'
+        "</svg>",
+        encoding="utf-8",
+    )
 
     class FakeSignal(object):
         def __init__(self):
@@ -2735,10 +2843,19 @@ def test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog(
         lambda: calls.append(("regenerate",)),
         raising=False,
     )
+    def generate_forest_plot(outpath):
+        calls.append(("generate", outpath))
+        Path(outpath).with_suffix(".svg").write_text(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">'
+            '<rect width="400" height="400" fill="white"/>'
+            "</svg>",
+            encoding="utf-8",
+        )
+
     monkeypatch.setattr(
         results_window.meta_py_r,
         "generate_forest_plot",
-        lambda outpath: calls.append(("generate", outpath)),
+        generate_forest_plot,
         raising=False,
     )
     monkeypatch.setattr(
@@ -2755,16 +2872,31 @@ def test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog(
 
     window = results_window.ResultsWindow(
         {
-            "texts": {},
-            "images": {},
-            "image_var_names": {},
-            "image_params_paths": {},
-            "image_order": [],
+            "texts": {"References": "Edited plot reference"},
+            "images": {"Forest Plot": png_path},
+            "image_params_paths": {"Forest Plot": params_path},
+            "image_order": ["Forest Plot"],
         }
     )
 
     try:
-        window.edit_forest_plot(params_path, png_path, plot_item=None)
+        window.resize(1200, 800)
+        window.show()
+        app.processEvents()
+        plot_item = next(
+            item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsSvgItem)
+        )
+        references_title = next(
+            item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsTextItem)
+            and item.toPlainText() == "References"
+        )
+        original_reference_top = references_title.sceneBoundingRect().top()
+
+        window.edit_forest_plot(params_path, png_path, plot_item=plot_item)
 
         assert calls == [
             ("dialog", {"fp_col1_str": "Study"}, png_path, True),
@@ -2778,6 +2910,12 @@ def test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog(
             ("generate", out_path),
             ("write", params_path),
         ]
+        assert references_title.sceneBoundingRect().top() > original_reference_top
+        assert (
+            references_title.sceneBoundingRect().top()
+            - plot_item.sceneBoundingRect().bottom()
+            >= results_window.SECTION_SPACING
+        )
     finally:
         window.close()
         app.processEvents()
