@@ -13,8 +13,6 @@
 \alias{construct.sequential.res.output}
 \alias{construct.subgroup.res.output}
 \alias{construct.subgroup.value.info}
-\alias{create.loo.side.by.side.plot.data}
-\alias{create.subgroup.side.by.side.plot.data}
 \alias{cum.ma.binary}
 \alias{cum.ma.continuous}
 \alias{cum.ma.diagnostic}
@@ -49,8 +47,8 @@ repeated-analysis output.
 \section{Leave-one-out analyses}{
 
 \code{loo.ma.binary()}, \code{loo.ma.continuous()},
-\code{loo.ma.diagnostic()}, \code{multiple.loo.diagnostic()}, and
-\code{create.loo.side.by.side.plot.data()} support influence-style workflows.
+\code{loo.ma.diagnostic()} and \code{multiple.loo.diagnostic()} support
+influence-style workflows.
 }
 
 \section{Subgroup analyses}{
@@ -58,9 +56,8 @@ repeated-analysis output.
 \code{subgroup.ma.binary()}, \code{subgroup.ma.continuous()},
 \code{subgroup.ma.diagnostic()}, \code{multiple.subgroup.diagnostic()},
 \code{get.subgroup.data.binary()}, \code{get.subgroup.data.cont()},
-\code{get.subgroup.data.diagnostic()}, and
-\code{create.subgroup.side.by.side.plot.data()} split data by covariate
-levels and format subgroup results.
+\code{get.subgroup.data.diagnostic()} split data by covariate levels and
+format subgroup results.
 }
 
 \section{Bootstrap analyses}{
@@ -79,4 +76,3 @@ resampling summaries and bootstrap plots.
 See \code{rcmetar.method.references("bootstrap")} for the bootstrap
 method citations used in result payloads.
 }
-

@@ -348,13 +348,7 @@ rcmetar.save.plot.data <- function(plot.data, out.path=NULL) {
     save.plot.data(plot.data, out.path)
 }
 
-rcmetar.draw.forest.plot <- function(plot.data, outpath, side.by.side=FALSE) {
-    if (isTRUE(side.by.side)) {
-        if (rcmetar.is.metafor.twin.forest(plot.data)) {
-            return(rcmetar.draw.metafor.twin.forest(plot.data, outpath))
-        }
-        stop("Forest plot data must be a metafor twin-panel render bundle.", call.=FALSE)
-    }
+rcmetar.draw.forest.plot <- function(plot.data, outpath) {
     if (rcmetar.is.metafor.forest.bundle(plot.data)) {
         return(rcmetar.draw.metafor.forest(plot.data, outpath))
     }

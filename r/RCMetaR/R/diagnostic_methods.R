@@ -237,45 +237,9 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
             remove.indices <- c(sens.index, spec.index)
 			references <- c(references, biv.results$References)
         } else {
-            ###
-            # we're not running bivariate; proceed as usual
-            # create side-by-side forest plots for sens and spec.
+            # Non-bivariate sensitivity and specificity are rendered by the
+            # ordinary per-metric loop below. Keep the shared SROC artifact.
             params.sens <- params.list[[sens.index]]
-            params.spec <- params.list[[spec.index]]
-            params.sens$create.plot <- FALSE
-            params.spec$create.plot <- FALSE
-            params.tmp <- list("left"=params.sens, "right"=params.spec)
-            
-            diagnostic.data.sens <- compute.diag.point.estimates(diagnostic.data, params.sens)
-            diagnostic.data.spec <- compute.diag.point.estimates(diagnostic.data, params.spec)
-            diagnostic.data.all <- list("left"=diagnostic.data.sens, "right"=diagnostic.data.spec)
-            
-            results.sens <- eval(call(fname, diagnostic.data.sens, params.sens))
-            results.spec <- eval(call(fname, diagnostic.data.spec, params.spec))
-            summary.sens <- list("Summary"=results.sens$Summary)
-            names(summary.sens) <- paste(eval(parse(text=paste("pretty.names$measure$", params.sens$measure,sep=""))), " Summary", sep="")
-            summary.spec <- list("Summary"=results.spec$Summary)
-            names(summary.spec) <- paste(eval(parse(text=paste("pretty.names$measure$", params.spec$measure,sep=""))), " Summary", sep="")
-            results <- c(results, summary.sens, summary.spec)
-			
-			references <- c(references, results.sens$References) # reference for method will be the same for both sens&spec
-            
-            res.sens <- results.sens$Summary$MAResults
-            res.spec <- results.spec$Summary$MAResults
-            res <- list("left"=res.sens, "right"=res.spec)
-            plot.data <- create.side.by.side.plot.data(diagnostic.data.all, params=params.tmp, res=res)
-            forest.path <- paste(params.sens$fp_outpath, sep="")
-            rcmetar.draw.forest.plot(plot.data, outpath=forest.path, side.by.side=TRUE)
-               
-            forest.plot.params.path <- save.data(om.data=diagnostic.data.all, res, params=params.tmp, plot.data)
-            plot.params.paths.tmp <- c("Sensitivity and Specificity Forest Plot"=forest.plot.params.path)
-            plot.params.paths <- c(plot.params.paths, plot.params.paths.tmp)
-            images.tmp <- c("Sensitivity and Specificity Forest Plot"=forest.path)
-            images <- c(images, images.tmp)
-            image.order <- c(image.order, "Sensitivity and Specificity Forest Plot")
-            plot.names.tmp <- c("forest plot"="forest.plot")
-            plot.names <- c(plot.names, plot.names.tmp)
-            
             # create SROC plot
             sroc.path <- rcmetar.scratch.path("roc.png")
             sroc.plot.data <- create.sroc.plot.data(diagnostic.data, params=params.sens)
@@ -285,62 +249,13 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
             sroc.plot.params.path <- save.plot.data(sroc.plot.data)
             plot.params.paths.tmp <- c("SROC"=sroc.plot.params.path)
             plot.params.paths <- c(plot.params.paths, plot.params.paths.tmp)
-            images.tmp <- c("SROC"=forest.path)
             images <- c(images, c("SROC"=sroc.path))
             image.order <- c(image.order, "SROC")
             plot.names <- c(plot.names, c("sroc"="sroc"))
-            remove.indices <- c(sens.index, spec.index)
         }
     }
-    
-    if (("NLR" %in% metrics) & ("PLR" %in% metrics)) {
-        # create side-by-side forest plots for NLR and PLR.
-        params.nlr <- params.list[[nlr.index]]
-        params.plr <- params.list[[plr.index]]
-        params.nlr$create.plot <- FALSE
-        params.plr$create.plot <- FALSE
-        params.tmp <- list("left"=params.nlr, "right"=params.plr)
-        
-        fname <- fnames[nlr.index]
-        diagnostic.data.nlr <- compute.diag.point.estimates(diagnostic.data, params.nlr)
-        diagnostic.data.plr <- compute.diag.point.estimates(diagnostic.data, params.plr)
-        diagnostic.data.all <- list("left"=diagnostic.data.nlr, "right"=diagnostic.data.plr)
-        
-        results.nlr <- eval(call(fname, diagnostic.data.nlr, params.nlr))
-        results.plr <- eval(call(fname, diagnostic.data.plr, params.plr))
-        summary.nlr <- list("Summary"=results.nlr$Summary)
-        names(summary.nlr) <- paste(eval(parse(text=paste("pretty.names$measure$", params.nlr$measure,sep=""))), " Summary", sep="")
-        summary.plr <- list("Summary"=results.plr$Summary)
-        names(summary.plr) <- paste(eval(parse(text=paste("pretty.names$measure$", params.plr$measure,sep=""))), " Summary", sep="")
-        results <- c(results, summary.nlr, summary.plr)
-		
-		references <- c(references, results.nlr$References) # reference for method will be the same for both nlr&plr
-		
-        res.nlr <- results.nlr$Summary$MAResults
-        res.plr <- results.plr$Summary$MAResults
-        res <- list("left"=res.nlr, "right"=res.plr)
-        
-        plot.data <- create.side.by.side.plot.data(diagnostic.data.all, res=res, params.tmp)
-        
-        forest.path <- paste(params.nlr$fp_outpath, sep="")
-        rcmetar.draw.forest.plot(plot.data, outpath=forest.path, side.by.side=TRUE)
-           
-        forest.plot.params.path <- save.data(diagnostic.data, res, params=params.tmp, plot.data)
-        plot.params.paths.tmp <- c("NLR and PLR Forest Plot"=forest.plot.params.path)
-        plot.params.paths <- c(plot.params.paths, plot.params.paths.tmp)
-               
-        images.tmp <- c("NLR and PLR Forest Plot"=forest.path)
-        image.order <- c(image.order, "NLR and PLR Forest Plot")
-        images <- c(images, images.tmp)
-        
-        plot.names.tmp <- c("forest plot"="forest.plot")
-        plot.names <- c(plot.names, plot.names.tmp)
-        
-        remove.indices <- c(remove.indices, nlr.index, plr.index)
-		
-    }
 
-    # remove fnames and params for side-by-side plots
+    # Bivariate sensitivity/specificity is the only paired analysis result.
     fnames <- fnames[setdiff(1:length(fnames), remove.indices)]
     params.list <- params.list[setdiff(1:length(params.list), remove.indices)]
 	
@@ -1759,33 +1674,4 @@ create.sroc.plot.data <- function(diagnostic.data, params){
     plot.options$roc.title <- params$roc_title
     # Preserve ROC plot options for callers that expose them in the UI.
     plot.data <- list("fitted.line" = fitted.line, "TPR"=TPR, "FPR"=FPR, "std.err"=std.err, "mult"=mult, "inv.var" = inv.var, "s.range" = s.range, "plot.options"=plot.options)
-}
-
-###################################################
-#            create side-by-side forest.plots     #
-###################################################
-
-create.side.by.side.plot.data <- function(diagnostic.data, params, res) {    
-    # creates data for two side-by-side forest plots
-    params.left <- params$left
-    params.right <- params$right
-    #params.left$fp_show_col1 <- 'TRUE'
-    #params.right$fp_show_col1 <- 'FALSE'
-    # only show study names on the left plot
-    res.left <- res$left
-    res.right <- res$right    
-    diagnostic.data.left <- diagnostic.data$left
-    diagnostic.data.right <- diagnostic.data$right
-
-    params.left$create.plot <- TRUE
-    params.right$create.plot <- TRUE
-    
-    plot.data.left <- create.plot.data.diagnostic(diagnostic.data.left, params.left, res.left)
-    plot.data.left$options$fp.title <- pretty.metric.name(as.character(params.left$measure))
-      
-    plot.data.right <- create.plot.data.diagnostic(diagnostic.data.right, params.right, res.right)
-    plot.data.right$options$fp.title <- pretty.metric.name(as.character(params.right$measure))
-    
-    plot.data <- list("left"=plot.data.left, "right"=plot.data.right)
-    plot.data
 }

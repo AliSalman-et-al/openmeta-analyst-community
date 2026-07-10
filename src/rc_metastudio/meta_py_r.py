@@ -1220,23 +1220,13 @@ def generate_reg_plot(file_path, params_name="plot.data"):
 
 
 @RfunctionCaller
-def generate_forest_plot(file_path, side_by_side=False, params_name="plot.data"):
-    if side_by_side:
-        print("generating a side-by-side forest plot...")
-        execute_r_function(
-            "rcmetar.draw.forest.plot",
-            _r_object_from_symbol(params_name),
-            str(file_path),
-            **{"side.by.side": True},
-        )
-    else:
-        print("generating a forest plot....")
-        execute_r_function(
-            "rcmetar.draw.forest.plot",
-            _r_object_from_symbol(params_name),
-            str(file_path),
-            **{"side.by.side": False},
-        )
+def generate_forest_plot(file_path, params_name="plot.data"):
+    print("generating a forest plot....")
+    execute_r_function(
+        "rcmetar.draw.forest.plot",
+        _r_object_from_symbol(params_name),
+        str(file_path),
+    )
 
 
 def parse_out_results(result):

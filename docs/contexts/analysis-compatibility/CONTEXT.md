@@ -377,7 +377,7 @@ The computed, per-render output of Forest Layout Preflight: device dimensions, t
 _Avoid_: Plot data, render bundle, style config
 
 **Forest Render Bundle**:
-The self-contained render spec persisted for a forest plot (the redefined `.plotdata` object): the `rma` result or normalized effect/CI/`slab` vectors, a precomputed ilab spec (ilab column matrix, headers, weights, effect/CI values, subgroup structure) for the chosen style, params, data-type, side-by-side flag, and Forest Plot Style. A builder (`rcmetar.regenerate.plot.data`) emits it from `(om.data, res, params, style)`; the renderer (`rcmetar.draw.forest.plot`) is a pure placer over `metafor::forest()`. It keeps the edit, save-as, and regenerate round-trip stable without reloading `om.data`.
+The self-contained render spec persisted for a forest plot (the redefined `.plotdata` object): the `rma` result or normalized effect/CI/`slab` vectors, a precomputed ilab spec (ilab column matrix, headers, weights, effect/CI values, subgroup structure) for the chosen style, params, data type, and Forest Plot Style. A builder (`rcmetar.regenerate.plot.data`) emits it from `(om.data, res, params, style)`; the renderer (`rcmetar.draw.forest.plot`) is a pure placer over `metafor::forest()`. It keeps the edit, save-as, and regenerate round-trip stable without reloading `om.data`.
 _Avoid_: Legacy plot.data, pickled plot
 
 **Forest Plot Style**:
@@ -408,9 +408,9 @@ _Avoid_: BMJ theme, journal skin
 The Plot Options Surface controls that apply to every Forest Plot Style: a single accent-color picker driving study points, CI lines, and the summary diamond, plus weight-scaled point sizing with a size multiplier. Distinct from the per-style control panels that own each style's columns.
 _Avoid_: Global plot theme, per-style colors only
 
-**Twin-Panel Side-by-Side Forest Plot**:
-The paired diagnostic forest plot that shows two metrics over the same studies in aligned panels (Sensitivity|Specificity and PLR|NLR), historically `two.forest.plots`. On the metafor Forest Renderer it is composed from two `metafor::forest()` panels under base-graphics `layout()` with a shared `ylim`/`rows`, not with `patchwork`; rows align by construction because both panels share the same studies in the same order.
-_Avoid_: Dual forest plot, patchwork panel
+**Standalone Diagnostic Forest Plot**:
+A single Plot Artifact for one diagnostic metric, including Sensitivity, Specificity, Positive Likelihood Ratio, and Negative Likelihood Ratio. Each artifact owns one Forest Render Bundle and can be displayed, edited, regenerated, and exported independently.
+_Avoid_: Twin forest plot, paired diagnostic panel, combined likelihood-ratio plot
 
 ## Headless Harness Notes
 

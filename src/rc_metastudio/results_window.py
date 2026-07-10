@@ -62,12 +62,6 @@ PLOT_EXPORT_EXTENSION_ALIASES = {
     "svg": (".svg", ".svgz"),
 }
 
-# these are special forest plots, in that multiple parameters objects are
-# require to re-generate them (and we invoke a different method!)
-SIDE_BY_SIDE_FOREST_PLOTS = (
-    "NLR and PLR Forest Plot",
-    "Sensitivity and Specificity",
-)
 NON_EDITABLE_FOREST_PLOTS = (
     "Cumulative Forest Plot",
     "Leave-One-Out Forest Plot",
@@ -860,9 +854,8 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             context_menu = QMenu(self)
             if artifact.params_path:
                 editable = bool(plot_options.option_groups(artifact.plot_type))
-                if artifact.plot_type == "forest" and (
-                    self._is_side_by_side_fp(artifact.title)
-                    or self._is_non_editable_fp(artifact.title)
+                if artifact.plot_type == "forest" and self._is_non_editable_fp(
+                    artifact.title
                 ):
                     editable = False
                 if editable:
@@ -974,11 +967,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                 if not pixmap.isNull():
                     plot_item.setPixmap(pixmap)
 
-    def _is_side_by_side_fp(self, title):
-        return any(
-            [side_by_side in title for side_by_side in SIDE_BY_SIDE_FOREST_PLOTS]
-        )
-
     def _is_non_editable_fp(self, title):
         normalized_title = title.casefold()
         return any(
@@ -1023,10 +1011,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             if file_path != "":
                 file_path = _path_with_export_extension(file_path, export_format)
                 if artifact.plot_type == "forest":
-                    if self._is_side_by_side_fp(artifact.title):
-                        meta_py_r.generate_forest_plot(file_path, side_by_side=True)
-                    else:
-                        meta_py_r.generate_forest_plot(file_path)
+                    meta_py_r.generate_forest_plot(file_path)
                 elif artifact.plot_type == "regression":
                     meta_py_r.generate_reg_plot(file_path)
                 else:

@@ -1,5 +1,9 @@
 # Replace the Custom Forest-Plot Engine with a metafor Renderer
 
+Amendment: ADR 0186 supersedes this ADR's side-by-side phase and render-bundle
+flag. Maintained diagnostic metrics now use standalone forest artifacts; the
+persisted Forest Render Bundle no longer carries a side-by-side field.
+
 Status: accepted — post-cutover Post-Port Refactor.
 
 RC MetaStudio should retire its custom grid-graphics forest-plot engine (`forest.plot`, `draw.forest.plot`, `draw.data.col`, and the `create.plot.data.*` render pipeline in `r/RCMetaR/R/plotting.R`) and render forest plots with `metafor::forest()` instead. `metafor` is already a first-class dependency (`DESCRIPTION`, `NAMESPACE` `import(metafor)`): every `rma.uni`/`rma.mh`/`rma.peto` fit that produces the `res` object already comes from it, and base `graphics` — which `forest()` uses — is already imported. So this reuses existing dependencies rather than adding a statistical capability. The custom engine hand-rolls square/CI/diamond drawing, CI-truncation arrows, device sizing, and heterogeneity annotation that `forest()` + `addpoly()` provide natively and more legibly.

@@ -128,7 +128,7 @@ NULL
 #' \code{append.image.order()} preserves plot ordering in result payloads.
 #'
 #' @section Plot and predictive-value helpers:
-#' \code{create.sroc.plot.data()}, \code{create.side.by.side.plot.data()},
+#' \code{create.sroc.plot.data()},
 #' \code{plot.bivariate()}, \code{bivariate.dx.test()},
 #' \code{compute.ppv()}, \code{compute.npv()}, and
 #' \code{plot.ppv.npv.by.prev()} build diagnostic displays.
@@ -142,7 +142,7 @@ NULL
 #' \code{rcmetar.method.references("diagnostic.bivariate")} for the
 #' statistical method citations used in result payloads.
 #'
-#' @aliases adjust.raw.data append.image.order bivariate.dx.test compute.diag.point.estimates compute.diagnostic.terms compute.npv compute.ppv create.side.by.side.plot.data create.sroc.plot.data diagnostic.bivariate.ml diagnostic.bivariate.ml.is.feasible diagnostic.bivariate.ml.parameters diagnostic.bivariate.ml.pretty.names diagnostic.fixed.inv.var diagnostic.fixed.inv.var.is.feasible diagnostic.fixed.inv.var.overall diagnostic.fixed.inv.var.parameters diagnostic.fixed.inv.var.pretty.names diagnostic.fixed.mh diagnostic.fixed.mh.is.feasible diagnostic.fixed.mh.overall diagnostic.fixed.mh.parameters diagnostic.fixed.mh.pretty.names diagnostic.fixed.peto diagnostic.fixed.peto.is.feasible diagnostic.fixed.peto.overall diagnostic.fixed.peto.parameters diagnostic.fixed.peto.pretty.names diagnostic.hsroc diagnostic.hsroc.is.feasible diagnostic.hsroc.ml.is.feasible diagnostic.hsroc.parameters diagnostic.hsroc.pretty.names diagnostic.random diagnostic.random.is.feasible diagnostic.random.overall diagnostic.random.parameters diagnostic.random.pretty.names diagnostic.transform.f get.res.for.one.diag.study multiple.diagnostic plot.bivariate plot.ppv.npv.by.prev
+#' @aliases adjust.raw.data append.image.order bivariate.dx.test compute.diag.point.estimates compute.diagnostic.terms compute.npv compute.ppv create.sroc.plot.data diagnostic.bivariate.ml diagnostic.bivariate.ml.is.feasible diagnostic.bivariate.ml.parameters diagnostic.bivariate.ml.pretty.names diagnostic.fixed.inv.var diagnostic.fixed.inv.var.is.feasible diagnostic.fixed.inv.var.overall diagnostic.fixed.inv.var.parameters diagnostic.fixed.inv.var.pretty.names diagnostic.fixed.mh diagnostic.fixed.mh.is.feasible diagnostic.fixed.mh.overall diagnostic.fixed.mh.parameters diagnostic.fixed.mh.pretty.names diagnostic.fixed.peto diagnostic.fixed.peto.is.feasible diagnostic.fixed.peto.overall diagnostic.fixed.peto.parameters diagnostic.fixed.peto.pretty.names diagnostic.hsroc diagnostic.hsroc.is.feasible diagnostic.hsroc.ml.is.feasible diagnostic.hsroc.parameters diagnostic.hsroc.pretty.names diagnostic.random diagnostic.random.is.feasible diagnostic.random.overall diagnostic.random.parameters diagnostic.random.pretty.names diagnostic.transform.f get.res.for.one.diag.study multiple.diagnostic plot.bivariate plot.ppv.npv.by.prev
 #' @name RCMetaR-diagnostic-methods
 NULL
 
@@ -196,16 +196,15 @@ NULL
 #'
 #' @section Leave-one-out analyses:
 #' \code{loo.ma.binary()}, \code{loo.ma.continuous()},
-#' \code{loo.ma.diagnostic()}, \code{multiple.loo.diagnostic()}, and
-#' \code{create.loo.side.by.side.plot.data()} support influence-style workflows.
+#' \code{loo.ma.diagnostic()} and \code{multiple.loo.diagnostic()} support
+#' influence-style workflows.
 #'
 #' @section Subgroup analyses:
 #' \code{subgroup.ma.binary()}, \code{subgroup.ma.continuous()},
 #' \code{subgroup.ma.diagnostic()}, \code{multiple.subgroup.diagnostic()},
 #' \code{get.subgroup.data.binary()}, \code{get.subgroup.data.cont()},
-#' \code{get.subgroup.data.diagnostic()}, and
-#' \code{create.subgroup.side.by.side.plot.data()} split data by covariate
-#' levels and format subgroup results.
+#' \code{get.subgroup.data.diagnostic()} split data by covariate levels and
+#' format subgroup results.
 #'
 #' @section Bootstrap analyses:
 #' \code{bootstrap()}, \code{bootstrap.binary()},
@@ -220,7 +219,7 @@ NULL
 #' See \code{rcmetar.method.references("bootstrap")} for the bootstrap
 #' method citations used in result payloads.
 #'
-#' @aliases boot.ma.output.results boot.meta.reg.cond.means.output.results boot.meta.reg.output.results bootstrap bootstrap.binary bootstrap.continuous calc.meta.reg.coeffs.and.cis construct.boot.res.and.value.info.for.results construct.sequential.res.output construct.subgroup.res.output construct.subgroup.value.info create.loo.side.by.side.plot.data create.subgroup.side.by.side.plot.data cum.ma.binary cum.ma.continuous cum.ma.diagnostic get.subgroup.data.binary get.subgroup.data.cont get.subgroup.data.diagnostic loo.ma.binary loo.ma.continuous loo.ma.diagnostic multiple.cum.ma.diagnostic multiple.loo.diagnostic multiple.subgroup.diagnostic plot.custom.boot subgroup.ma.binary subgroup.ma.continuous subgroup.ma.diagnostic update.plot.data.multiple
+#' @aliases boot.ma.output.results boot.meta.reg.cond.means.output.results boot.meta.reg.output.results bootstrap bootstrap.binary bootstrap.continuous calc.meta.reg.coeffs.and.cis construct.boot.res.and.value.info.for.results construct.sequential.res.output construct.subgroup.res.output construct.subgroup.value.info cum.ma.binary cum.ma.continuous cum.ma.diagnostic get.subgroup.data.binary get.subgroup.data.cont get.subgroup.data.diagnostic loo.ma.binary loo.ma.continuous loo.ma.diagnostic multiple.cum.ma.diagnostic multiple.loo.diagnostic multiple.subgroup.diagnostic plot.custom.boot subgroup.ma.binary subgroup.ma.continuous subgroup.ma.diagnostic update.plot.data.multiple
 #' @name RCMetaR-repeated-analyses
 NULL
 

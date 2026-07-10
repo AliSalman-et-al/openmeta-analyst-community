@@ -2423,7 +2423,10 @@ def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_p
             ("plot.data", "Leave-one-out Forest plot", "forest", False),
             ("plot.data", "Subgroup Forest Plot", "forest", False),
             ("plot.data", "Subgroups Forest Plot", "forest", False),
-            ("plot.data", "Sensitivity and Specificity", "forest", False),
+            ("plot.data", "Sensitivity Forest Plot", "forest", True),
+            ("plot.data", "Specificity Forest Plot", "forest", True),
+            ("plot.data", "Negative Likelihood Ratio Forest Plot", "forest", True),
+            ("plot.data", "Positive Likelihood Ratio Forest Plot", "forest", True),
             ("plot.data", "Regression Plot", "regression", True),
             (None, "Forest Plot", "forest", False),
         ]
@@ -2492,9 +2495,7 @@ def test_results_window_save_handler_regenerates_cumulative_forest_as_single_pan
     monkeypatch.setattr(
         results_window.meta_py_r,
         "generate_forest_plot",
-        lambda path, side_by_side=False: calls.append(
-            ("forest", path, side_by_side)
-        ),
+        lambda path: calls.append(("forest", path)),
         raising=False,
     )
     monkeypatch.setattr(
@@ -2508,7 +2509,7 @@ def test_results_window_save_handler_regenerates_cumulative_forest_as_single_pan
 
         assert calls == [
             ("load", "%s.plotdata" % artifact.params_path),
-            ("forest", str(tmp_path / "saved.pdf"), False),
+            ("forest", str(tmp_path / "saved.pdf")),
         ]
     finally:
         window.close()
@@ -2552,9 +2553,7 @@ def test_results_window_save_handler_accepts_backend_export_formats(
     monkeypatch.setattr(
         results_window.meta_py_r,
         "generate_forest_plot",
-        lambda path, side_by_side=False: calls.append(
-            ("forest", path, side_by_side)
-        ),
+        lambda path: calls.append(("forest", path)),
         raising=False,
     )
     monkeypatch.setattr(
@@ -2568,7 +2567,7 @@ def test_results_window_save_handler_accepts_backend_export_formats(
 
         assert calls == [
             ("load", "%s.plotdata" % artifact.params_path),
-            ("forest", str(tmp_path / ("saved.%s" % extension)), False),
+            ("forest", str(tmp_path / ("saved.%s" % extension))),
         ]
     finally:
         window.close()
@@ -2611,9 +2610,7 @@ def test_results_window_save_handler_preserves_requested_format_when_extension_i
     monkeypatch.setattr(
         results_window.meta_py_r,
         "generate_forest_plot",
-        lambda path, side_by_side=False: calls.append(
-            ("forest", path, side_by_side)
-        ),
+        lambda path: calls.append(("forest", path)),
         raising=False,
     )
     monkeypatch.setattr(
@@ -2627,7 +2624,7 @@ def test_results_window_save_handler_preserves_requested_format_when_extension_i
 
         assert calls == [
             ("load", "%s.plotdata" % artifact.params_path),
-            ("forest", str(tmp_path / "saved.svg"), False),
+            ("forest", str(tmp_path / "saved.svg")),
         ]
     finally:
         window.close()

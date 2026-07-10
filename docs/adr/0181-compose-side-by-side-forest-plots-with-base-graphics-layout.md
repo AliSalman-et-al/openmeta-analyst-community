@@ -1,6 +1,6 @@
 # Compose Side-by-Side Forest Plots with base-graphics layout(), Not patchwork
 
-Status: accepted — refines the ADR 0179 side-by-side phase.
+Status: superseded by ADR 0186.
 
 The Twin-Panel Side-by-Side Forest Plot (diagnostic Sens|Spec and PLR|NLR, currently `two.forest.plots`) should be rebuilt on the metafor Forest Renderer by composing two `metafor::forest()` panels with base-graphics `layout()`/`par(mfrow=c(1,2))` and a matched `ylim`/`rows`, rather than with the `patchwork` package. `patchwork` was evaluated because it offers an ergonomic composition API, but it is "the composer of ggplots": its panel-alignment works on ggplot2 gtables, and base-graphics plots can only be embedded via `wrap_elements(full = ~ forest(...))`, which requires `gridGraphics` and captures each panel as an opaque grob with no cross-panel row alignment. Against base-graphics `forest()`, `patchwork` therefore reduces to a costlier `par(mfrow)` while adding two new dependencies (`patchwork`, `gridGraphics`).
 
