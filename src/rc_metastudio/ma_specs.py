@@ -60,6 +60,132 @@ COUNT_BASED_DIAGNOSTIC_METHODS = set(
     ]
 )
 
+SHARED_DIAGNOSTIC_PARAMS = ("conf.level", "digits", "adjust", "to")
+
+
+class _DiagnosticMethodPanel(object):
+    """A group-specific method editor used by the unified diagnostic dialog."""
+
+    def __init__(self, owner, label, metric, label_widget, combo, param_box):
+        self.owner = owner
+        self.metric = metric
+        self.params = {}
+        self.widgets = []
+        self.label = label_widget
+        self.label.setText(label)
+        self.combo = combo
+        self.param_box = param_box
+        owner._cap_method_selector_width(self.combo)
+        self.param_box.setLayout(QGridLayout())
+        self.combo.currentIndexChanged[str].connect(
+            app_error_handler.safe_slot(
+                lambda _text: self._method_changed(), parent=owner
+            )
+        )
+
+    @property
+    def method(self):
+        return self.methods[str(self.combo.currentText())]
+
+    def populate(self):
+        meta_py_r.ma_dataset_to_simple_diagnostic_robj(
+            self.owner.model, var_name="tmp_obj"
+        )
+        self.methods = normalize_available_method_labels(
+            meta_py_r.get_available_methods(
+                for_data_type="diagnostic",
+                data_obj_name="tmp_obj",
+                metric=self.metric,
+            )
+        )
+        names = [
+            name
+            for name in self.methods
+            if self.methods[name] not in COUNT_BASED_DIAGNOSTIC_METHODS
+        ]
+        if "Diagnostic Fixed-Effect Peto" in names:
+            names.remove("Diagnostic Fixed-Effect Peto")
+        names.sort(reverse=True)
+        blocked = self.combo.blockSignals(True)
+        try:
+            self.combo.clear()
+            self.combo.addItems(names)
+        finally:
+            self.combo.blockSignals(blocked)
+        self._method_changed()
+
+    def _method_changed(self):
+        for widget in self.widgets:
+            self.param_box.layout().removeWidget(widget)
+            widget.deleteLater()
+        self.widgets = []
+        self.params = {}
+        method = self.method
+        definitions, defaults, order, metadata = meta_py_r.get_params(method)
+        self.param_box.setTitle(str(self.combo.currentText()))
+        description = QLabel(
+            "Description: %s" % meta_py_r.get_method_description(method)
+        )
+        description.setWordWrap(True)
+        self.param_box.layout().addWidget(description, 0, 0, 1, 2)
+        self.widgets.append(description)
+        row = 1
+        for name in order or definitions:
+            if name in SHARED_DIAGNOSTIC_PARAMS:
+                self.owner._register_shared_diagnostic_param(
+                    name, definitions[name], defaults.get(name), metadata.get(name)
+                )
+                continue
+            label = QLabel(parameter_display_label(name, metadata.get(name)))
+            label.setToolTip(parameter_description(name, metadata.get(name)))
+            control = self._control(
+                name, definitions[name], defaults.get(name), metadata
+            )
+            self.param_box.layout().addWidget(label, row, 0)
+            self.param_box.layout().addWidget(control, row, 1)
+            self.widgets.extend((label, control))
+            row += 1
+        qt_layout.fit_analysis_dialog_to_contents(self.owner)
+
+    def _control(self, name, definition, default, metadata):
+        if isinstance(definition, list):
+            control = QComboBox()
+            for value in definition:
+                control.addItem(
+                    parameter_value_display_label(name, value, metadata.get(name)),
+                    value,
+                )
+            index = self.owner._find_enum_item_index(control, default)
+            if index >= 0:
+                control.setCurrentIndex(index)
+            self.params[name] = default
+            control.currentIndexChanged[int].connect(
+                lambda index, n=name, c=control: self.params.__setitem__(
+                    n, self.owner._enum_item_value(c.itemData(index))
+                )
+            )
+        elif _is_integer_analysis_param(name) or definition == "int":
+            control = QSpinBox()
+            control.setRange(
+                1 if name in ANALYSIS_POSITIVE_INTEGER_PARAMS else 0, ANALYSIS_COUNT_MAX
+            )
+            control.setValue(int(default))
+            self.params[name] = int(default)
+            control.valueChanged[int].connect(
+                lambda value, n=name: self.params.__setitem__(n, value)
+            )
+        else:
+            control = QDoubleSpinBox()
+            control.setDecimals(6)
+            control.setRange(ANALYSIS_NUMERIC_MIN, ANALYSIS_NUMERIC_MAX)
+            control.setValue(float(default))
+            self.params[name] = float(default)
+            control.valueChanged[float].connect(
+                lambda value, n=name: self.params.__setitem__(n, value)
+            )
+        self.owner._cap_value_control_width(control)
+        return control
+
 
 class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
     def __init__(
@@ -148,6 +274,14 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         # the above dictionary) are not included in the diag_metrics
         # list -- we do not explicitly check for this here.
         self.diag_metrics = diag_metrics
+        self._combined_diagnostic = False
+        self._shared_diagnostic_param_specs = {
+            "conf.level": ("float", self.conf_level, None),
+            "digits": ("int", 3, None),
+            "adjust": ("float", 0.5, None),
+            "to": (["only0", "all"], "only0", None),
+        }
+        self._shared_diagnostic_widgets = []
 
         # diagnostic data requires a different UI because multiple
         # metrics can be selected. we handle this by allowing the
@@ -158,9 +292,12 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             # these booleans tell us for which of these groups we're getting parameters
             self.sens_spec = any([m in ("sens", "spec") for m in self.diag_metrics])
             self.lr_dor = any([m in ("lr", "dor") for m in self.diag_metrics])
+            self._combined_diagnostic = self.sens_spec and self.lr_dor
             self.setup_diagnostic_ui()
 
         self.populate_cbo_box()
+        if self._combined_diagnostic:
+            self._finish_combined_diagnostic_ui()
         qt_layout.fit_analysis_dialog_to_contents(self)
 
     def cancel(self):
@@ -178,7 +315,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             checkbox = QtWidgets.QCheckBox(covariate.name, self.cov_grp_box)
             checkbox.setChecked(row == 0)
             checkbox.toggled.connect(
-                app_error_handler.safe_slot(self._update_meta_regression_ok, parent=self)
+                app_error_handler.safe_slot(
+                    self._update_meta_regression_ok, parent=self
+                )
             )
             checkbox.toggled.connect(
                 app_error_handler.safe_slot(
@@ -208,9 +347,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         if not self.is_meta_regression:
             return
         selected = self._selected_covariates()
-        bubble_available = (
-            len(selected) == 1 and selected[0].data_type == CONTINUOUS
-        )
+        bubble_available = len(selected) == 1 and selected[0].data_type == CONTINUOUS
         self.plot_tab.setEnabled(bubble_available)
         self.plot_tab.setToolTip(
             ""
@@ -263,7 +400,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.regression_group.setVisible("regression" in groups)
         self.label_11.setVisible("summary" in groups)
         self.show_summary_line.setVisible("summary" in groups)
-        self.plot_tab.setEnabled(any(capability["styleable"] for capability in capabilities))
+        self.plot_tab.setEnabled(
+            any(capability["styleable"] for capability in capabilities)
+        )
         self._update_meta_regression_plot_availability()
 
     def run_meta_regression(self):
@@ -285,7 +424,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         studies = []
         has_missing_values = False
         for study in self.model.get_studies(only_if_included=True):
-            if all(study.id in covariate_values[cov.name] for cov in selected_covariates):
+            if all(
+                study.id in covariate_values[cov.name] for cov in selected_covariates
+            ):
                 studies.append(study)
             else:
                 has_missing_values = True
@@ -306,7 +447,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             metric = (
                 "Sens"
                 if self.sensitivity_radio.isChecked()
-                else "Spec" if self.specificity_radio.isChecked() else "DOR"
+                else "Spec"
+                if self.specificity_radio.isChecked()
+                else "DOR"
             )
             meta_py_r.ma_dataset_to_simple_diagnostic_robj(
                 self.model,
@@ -360,9 +503,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             )
             self.point_size_multiplier.setValue(
                 _float_plot_param(
-                    self.current_param_vals.get(
-                        "%s_point_size_multiplier" % prefix
-                    ),
+                    self.current_param_vals.get("%s_point_size_multiplier" % prefix),
                     1.0,
                 )
             )
@@ -554,7 +695,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         ]
         self.setup_params()
         self._set_parameter_box_title(self.method_cbo_box, self.parameter_grp_box)
-        self.ui_for_params()
+        self.ui_for_params(
+            excluded_names=SHARED_DIAGNOSTIC_PARAMS if self._combined_diagnostic else ()
+        )
         qt_layout.fit_analysis_dialog_to_contents(self)
 
     def _set_parameter_box_title(self, cbo_box, param_box):
@@ -677,7 +820,11 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.setup_params()
         self._set_parameter_box_title(cbo_box, param_box)
         if cbo_box is self.method_cbo_box:
-            self.ui_for_params()
+            self.ui_for_params(
+                excluded_names=SHARED_DIAGNOSTIC_PARAMS
+                if self._combined_diagnostic
+                else ()
+            )
 
     def clear_param_ui(self):
         for widget in self.current_widgets:
@@ -687,7 +834,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             widget.deleteLater()
             widget = None
 
-    def ui_for_params(self, adjust_root=True):
+    def ui_for_params(self, adjust_root=True, excluded_names=()):
         self._configure_plot_option_groups()
         if self.parameter_grp_box.layout() is None:
             layout = QGridLayout()
@@ -708,6 +855,14 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         if self.var_order is not None:
             for var_name in self.var_order:
+                if var_name in excluded_names:
+                    self._register_shared_diagnostic_param(
+                        var_name,
+                        self.current_params[var_name],
+                        self.current_defaults.get(var_name),
+                        self.param_d.get(var_name),
+                    )
+                    continue
                 val = self.current_params[var_name]
                 self.add_param(
                     self.parameter_grp_box.layout(), cur_grid_row, var_name, val
@@ -1039,31 +1194,111 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         print(self.current_defaults)
 
-    def diag_next(self):
-        add_plot_params(self)
-
-        # if the user selected both sens/spec and lr/dor
-        # then we will always show them the former first.
-        # thus the parameters we have now are for sens/spec
-        # note that we first add the forest plot parameters!
-        self.add_cur_analysis_details()
-
-        # we're going to show another analysis details form for the
-        # likelihood ratio and diagnostic odds ratio analyses.
-        # we pass along the parameters acquired for sens/spec
-        # in the diag_metrics* dictionary.
-        form = MA_Specs(
-            self.model,
-            parent=self.parent(),
-            diag_metrics=[
-                metric for metric in ("lr", "dor") if metric in self.diag_metrics
-            ],
-            meta_f_str=self.meta_f_str,
-            diag_metrics_to_analysis_details_d=self.diag_metrics_to_analysis_details,
-            conf_level=self.model.get_global_conf_level(),
+    def _register_shared_diagnostic_param(
+        self, name, definition, default, metadata=None
+    ):
+        if name not in SHARED_DIAGNOSTIC_PARAMS:
+            return
+        canonical_definition, canonical_default, existing_metadata = (
+            self._shared_diagnostic_param_specs[name]
         )
-        form.show()
-        self.hide()
+        self._shared_diagnostic_param_specs[name] = (
+            canonical_definition,
+            canonical_default,
+            metadata or existing_metadata,
+        )
+        if (
+            hasattr(self, "shared_diagnostic_params_box")
+            and self.shared_diagnostic_params_box.layout() is not None
+        ):
+            self._rebuild_shared_diagnostic_params()
+
+    def _finish_combined_diagnostic_ui(self):
+        self.setWindowTitle("Method & Parameters")
+        self.method_lbl.setText(diagnostic_metric_group_display_label("sens_spec"))
+
+        self.shared_diagnostic_params_box.show()
+        self.shared_diagnostic_params_box.setLayout(QGridLayout())
+
+        lr_label = diagnostic_metric_group_display_label("lr_dor")
+        self.lr_dor_method_lbl.show()
+        self.lr_dor_method_cbo_box.show()
+        self.lr_dor_parameter_grp_box.show()
+        self.lr_dor_panel = _DiagnosticMethodPanel(
+            self,
+            lr_label,
+            "DOR",
+            self.lr_dor_method_lbl,
+            self.lr_dor_method_cbo_box,
+            self.lr_dor_parameter_grp_box,
+        )
+        self.lr_dor_panel.populate()
+        self._rebuild_shared_diagnostic_params()
+
+    def _rebuild_shared_diagnostic_params(self):
+        layout = self.shared_diagnostic_params_box.layout()
+        for widget in self._shared_diagnostic_widgets:
+            layout.removeWidget(widget)
+            widget.deleteLater()
+        self._shared_diagnostic_widgets = []
+
+        for row, name in enumerate(SHARED_DIAGNOSTIC_PARAMS):
+            if name not in self._shared_diagnostic_param_specs:
+                continue
+            definition, default, metadata = self._shared_diagnostic_param_specs[name]
+            label = QLabel(parameter_display_label(name, metadata))
+            label.setToolTip(parameter_description(name, metadata))
+            value = self.current_param_vals.get(name, default)
+            if isinstance(definition, list):
+                control = QComboBox()
+                for option in definition:
+                    control.addItem(
+                        parameter_value_display_label(name, option, metadata), option
+                    )
+                index = self._find_enum_item_index(control, value)
+                if index >= 0:
+                    control.setCurrentIndex(index)
+                self.current_param_vals[name] = self._enum_item_value(
+                    control.currentData()
+                )
+                control.currentIndexChanged[int].connect(
+                    lambda index, n=name, c=control: (
+                        self.current_param_vals.__setitem__(
+                            n, self._enum_item_value(c.itemData(index))
+                        )
+                    )
+                )
+            elif name == "digits":
+                control = QSpinBox()
+                control.setRange(ANALYSIS_DIGITS_MIN, ANALYSIS_DIGITS_MAX)
+                control.setValue(validate_analysis_digits(value))
+                self.current_param_vals[name] = control.value()
+                control.valueChanged[int].connect(
+                    lambda new_value, n=name: self.current_param_vals.__setitem__(
+                        n, new_value
+                    )
+                )
+            else:
+                control = QDoubleSpinBox()
+                control.setDecimals(1 if name == "conf.level" else 6)
+                if name == "conf.level":
+                    control.setRange(50, CONFIDENCE_LEVEL_DISPLAY_MAX)
+                    control.setSuffix("%")
+                    value = validate_confidence_level(value)
+                else:
+                    control.setRange(0, ANALYSIS_NUMERIC_MAX)
+                    value = validate_correction_factor(value)
+                control.setValue(value)
+                self.current_param_vals[name] = control.value()
+                control.valueChanged[float].connect(
+                    lambda new_value, n=name: self.current_param_vals.__setitem__(
+                        n, new_value
+                    )
+                )
+            self._cap_value_control_width(control)
+            layout.addWidget(label, row, 0)
+            layout.addWidget(control, row, 1)
+            self._shared_diagnostic_widgets.extend((label, control))
 
     def add_cur_analysis_details(self):
         """
@@ -1076,19 +1311,50 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         # selected by the user
         metrics_to_run = list(self.diag_metrics_to_analysis_details.keys())
 
-        if self.sens_spec:
+        if self._combined_diagnostic:
+            first_params = self._diagnostic_params_for_method(
+                self.current_method, self.current_param_vals
+            )
+            second_params = self._diagnostic_params_for_method(
+                self.lr_dor_panel.method, self.lr_dor_panel.params
+            )
+            for metric in [m for m in ("Sens", "Spec") if m in metrics_to_run]:
+                self.diag_metrics_to_analysis_details[metric] = (
+                    self.current_method,
+                    copy.deepcopy(first_params),
+                )
+            for metric in [m for m in ("DOR", "PLR", "NLR") if m in metrics_to_run]:
+                self.diag_metrics_to_analysis_details[metric] = (
+                    self.lr_dor_panel.method,
+                    copy.deepcopy(second_params),
+                )
+        elif self.sens_spec:
             for metric in [m for m in ("Sens", "Spec") if m in metrics_to_run]:
                 self.diag_metrics_to_analysis_details[metric] = (
                     self.current_method,
                     self.current_param_vals,
                 )
         else:
-            # lr/dor
             for metric in [m for m in ("DOR", "PLR", "NLR") if m in metrics_to_run]:
                 self.diag_metrics_to_analysis_details[metric] = (
                     self.current_method,
                     self.current_param_vals,
                 )
+
+    def _diagnostic_params_for_method(self, method, local_params):
+        definitions, _defaults, _order, _metadata = meta_py_r.get_params(method)
+        params = {
+            name: value
+            for name, value in self.current_param_vals.items()
+            if name.startswith("fp_") or name.startswith("bp_")
+        }
+        for name in SHARED_DIAGNOSTIC_PARAMS:
+            if name in definitions and name in self.current_param_vals:
+                params[name] = self.current_param_vals[name]
+        for name in definitions:
+            if name not in SHARED_DIAGNOSTIC_PARAMS and name in local_params:
+                params[name] = local_params[name]
+        return params
 
     def setup_diagnostic_ui(self):
         ###
@@ -1111,24 +1377,19 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                 list(zip(metrics_to_run, [None for m in metrics_to_run]))
             )
 
-        if self.sens_spec and self.lr_dor:
-            self.buttonBox.clear()
-            next_button = self.buttonBox.addButton(
-                "next >", QDialogButtonBox.AcceptRole
-            )
-
-            # if both sets of metrics are selected, we need to next prompt the
-            # user for parameters regarding the second
-            self._set_accepted_handler(self.diag_next)
-
         # change some UI elements to refelct the current method
         window_title, method_label = "", ""
-        if self.sens_spec:
+        if self._combined_diagnostic:
+            window_title = "Method & Parameters"
+            method_label = diagnostic_metric_group_display_label("sens_spec")
+        elif self.sens_spec:
             metric_group_label = diagnostic_metric_group_display_label("sens_spec")
+            window_title = "Method & Parameters for %s" % metric_group_label
+            method_label = "Method for %s" % metric_group_label
         else:
             metric_group_label = diagnostic_metric_group_display_label("lr_dor")
-        window_title = "Method & Parameters for %s" % metric_group_label
-        method_label = "Method for %s" % metric_group_label
+            window_title = "Method & Parameters for %s" % metric_group_label
+            method_label = "Method for %s" % metric_group_label
 
         self.setWindowTitle(QtCore.QCoreApplication.translate("Dialog", window_title))
         self.method_lbl.setText(method_label)
@@ -1252,7 +1513,9 @@ def add_plot_params(specs_form):
     specs_form.current_param_vals["fp_show_raw_counts"] = (
         specs_form.show_raw_counts.isChecked()
     )
-    specs_form.current_param_vals["fp_show_headers"] = specs_form.show_headers.isChecked()
+    specs_form.current_param_vals["fp_show_headers"] = (
+        specs_form.show_headers.isChecked()
+    )
     specs_form.current_param_vals["fp_show_annotation"] = (
         specs_form.show_annotation.isChecked()
     )

@@ -2655,8 +2655,8 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_diagnostic_analysis_workflow.py::test_diagnostic_hsroc_next_does_not_run_before_lr_dor_screen",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "nodeid": "tests/python/gui/test_diagnostic_analysis_workflow.py::test_combined_diagnostic_metrics_use_one_method_dialog",
+      "reason": "Protects the unified diagnostic Method & Parameters workflow and its shared parameter mapping through offscreen Qt.",
       "runtime_class": "seconds",
       "size": "medium"
     },

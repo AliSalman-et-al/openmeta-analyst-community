@@ -83,7 +83,7 @@ def test_diagnostic_next_surfaces_specs_failure_instead_of_silent_dead_end():
         _close_without_prompt(app, window)
 
 
-def test_diagnostic_method_dialog_builds_with_working_backend():
+def test_diagnostic_method_dialog_builds_with_working_backend(monkeypatch):
     import launch
 
     app, window = launch.start_automation()
@@ -114,6 +114,12 @@ def test_diagnostic_method_dialog_builds_with_working_backend():
         }
         backend.get_params = lambda method: ({}, {}, [], {})
         backend.get_method_description = lambda method: "stub method"
+        monkeypatch.setattr(
+            backend,
+            "get_analysis_plot_capabilities",
+            lambda *args, **kwargs: [],
+            raising=False,
+        )
 
         form = window._build_analysis_specs_dialog(
             diag_metrics=["sens", "spec"],
@@ -179,9 +185,7 @@ def test_diagnostic_method_dialog_opens_without_multiple_metrics_note(monkeypatc
             if widget.isVisible()
         }
 
-        assert "Method & Parameters for Sensitivity and Specificity" in (
-            visible_dialog_titles
-        )
+        assert "Method & Parameters" in visible_dialog_titles
         assert "Diagnostic MA with Multiple Metrics" not in visible_dialog_titles
         assert metrics_form.isVisible() is False
     finally:
@@ -331,7 +335,7 @@ def test_diagnostic_multi_metric_failure_keeps_independent_results(monkeypatch):
         _close_without_prompt(app, window)
 
 
-def test_diagnostic_hsroc_next_does_not_run_before_lr_dor_screen(monkeypatch):
+def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
     import launch
 
     app, window = launch.start_automation()
@@ -353,15 +357,6 @@ def test_diagnostic_hsroc_next_does_not_run_before_lr_dor_screen(monkeypatch):
     unexpected_errors = []
     analysis_results = []
     run_calls = []
-    followup_metric_orders = []
-
-    class CapturingSpecs(object):
-        def __init__(self, *args, **kwargs):
-            followup_metric_orders.append(list(kwargs.get("diag_metrics") or []))
-
-        def show(self):
-            pass
-
     try:
         _create_diagnostic_dataset(window)
 
@@ -371,9 +366,53 @@ def test_diagnostic_hsroc_next_does_not_run_before_lr_dor_screen(monkeypatch):
             "HSROC": "diagnostic.hsroc",
             "Diagnostic Random-Effects": "diagnostic.random",
         }
-        backend.get_params = lambda method: ({}, {}, [], {})
+
+        def get_params(method):
+            if method == "diagnostic.hsroc":
+                return ({"num.iters": "int"}, {"num.iters": 5000}, ["num.iters"], {})
+            if method == "diagnostic.random":
+                definitions = {
+                    "rm.method": ["DL", "REML"],
+                    "conf.level": "float",
+                    "digits": "int",
+                    "adjust": "float",
+                    "to": ["only0", "all"],
+                }
+                defaults = {
+                    "rm.method": "DL",
+                    "conf.level": 95.0,
+                    "digits": 3,
+                    "adjust": 0.5,
+                    "to": "only0",
+                }
+                return (definitions, defaults, list(definitions), {})
+            definitions = {
+                "conf.level": "float",
+                "adjust": "float",
+                "to": ["only0", "all"],
+            }
+            defaults = {"conf.level": 95.0, "adjust": 0.5, "to": "only0"}
+            return (definitions, defaults, list(definitions), {})
+
+        backend.get_params = get_params
         backend.get_method_description = lambda method: "stub method"
-        backend.run_diagnostic_multi = lambda *args, **kwargs: run_calls.append(args)
+        monkeypatch.setattr(
+            backend,
+            "get_analysis_plot_capabilities",
+            lambda *args, **kwargs: [],
+            raising=False,
+        )
+        def run_diagnostic(*args, **kwargs):
+            run_calls.append(args)
+            return {
+                "texts": {},
+                "images": {},
+                "image_var_names": {},
+                "image_params_paths": {},
+                "image_order": [],
+            }
+
+        backend.run_diagnostic_multi = run_diagnostic
         backend.reset_Rs_working_dir = lambda: None
         monkeypatch.setattr(
             app_error_handler,
@@ -383,23 +422,61 @@ def test_diagnostic_hsroc_next_does_not_run_before_lr_dor_screen(monkeypatch):
         monkeypatch.setattr(
             window, "analysis", lambda result: analysis_results.append(result)
         )
+        preparation_errors = []
+        monkeypatch.setattr(
+            window,
+            "_show_analysis_specs_error",
+            lambda error: preparation_errors.append(error),
+        )
 
         form = window._build_analysis_specs_dialog(
             diag_metrics=["sens", "spec", "lr", "dor"],
             conf_level=window.model.get_global_conf_level(),
         )
-        monkeypatch.setattr(ma_specs, "MA_Specs", CapturingSpecs)
+        assert preparation_errors == [], "".join(
+            __import__("traceback").format_exception(preparation_errors[0])
+        )
+        assert form is not None
         form.method_cbo_box.setCurrentText("HSROC")
+        form.lr_dor_method_cbo_box.setCurrentText("Diagnostic Random-Effects")
+        form.current_param_vals.update(
+            {"conf.level": 90.0, "digits": 4, "adjust": 0.25, "to": "all"}
+        )
+        form.lr_dor_panel.params["rm.method"] = "REML"
+        form.add_cur_analysis_details()
 
+        assert form.windowTitle() == "Method & Parameters"
+        assert form.buttonBox.button(ma_specs.QDialogButtonBox.Ok) is not None
+        assert form.method_lbl.text() == "Sensitivity and Specificity"
+        assert form.lr_dor_method_lbl.text() == (
+            "Likelihood Ratios and Diagnostic Odds Ratio"
+        )
+        assert not any(button.text() == "next >" for button in form.buttonBox.buttons())
+        sens_method, sens_params = form.diag_metrics_to_analysis_details["Sens"]
+        dor_method, dor_params = form.diag_metrics_to_analysis_details["DOR"]
+        assert sens_method == "diagnostic.hsroc"
+        assert sens_params == {"num.iters": 5000}
+        assert dor_method == "diagnostic.random"
+        assert dor_params == {
+            "rm.method": "REML",
+            "conf.level": 90.0,
+            "digits": 4,
+            "adjust": 0.25,
+            "to": "all",
+        }
+        monkeypatch.setattr(
+            ma_specs,
+            "MA_Specs",
+            lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("opened a second Method & Parameters dialog")
+            ),
+        )
         form.buttonBox.accepted.emit()
         app.processEvents()
 
         assert unexpected_errors == []
-        assert analysis_results == []
-        assert run_calls == []
-        assert followup_metric_orders == [["lr", "dor"]]
-        assert form.diag_metrics_to_analysis_details["Sens"][0] == "diagnostic.hsroc"
-        assert form.diag_metrics_to_analysis_details["Spec"][0] == "diagnostic.hsroc"
+        assert len(analysis_results) == 1
+        assert run_calls
     finally:
         for name, value in saved.items():
             setattr(backend, name, value)
