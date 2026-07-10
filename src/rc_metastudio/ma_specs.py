@@ -35,6 +35,7 @@ import meta_py_r
 import progress_bar as progress_dialog
 import qt_layout
 import qt_text
+import plot_options
 from meta_globals import *
 from settings import *
 import diagnostic_explain
@@ -85,6 +86,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.model = model
         self._loading_plot_style = False
         self._setup_plot_controls()
+        self._configure_plot_option_groups()
         self._load_plot_params()
 
         if conf_level is None:
@@ -194,6 +196,15 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.style_cbo.currentIndexChanged[str].connect(
             app_error_handler.safe_slot(self._plot_style_changed, parent=self)
         )
+
+    def _configure_plot_option_groups(self):
+        groups = plot_options.option_groups("forest")
+        self.style_group.setVisible("style" in groups)
+        self.appearance_group.setVisible("appearance" in groups)
+        self.groupBox.setVisible("columns" in groups)
+        self.default_panel.setVisible("forest" in groups)
+        self.label_16.setVisible("summary" in groups)
+        self.show_summary_line.setVisible("summary" in groups)
 
     def _load_plot_params(self):
         self._loading_plot_style = True

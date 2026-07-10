@@ -74,7 +74,8 @@ test_that("meta-regression stores a self-contained metafor bubble plot bundle", 
     fixture$data,
     list(method = "meta.regression", params = fixture$params, workflow = "meta-regression")
   )
-  bundle <- bubble_load_saved_plot_data(unname(result$plot_params_paths[["Regression Plot"]]))
+  plot.path <- unname(result$plot_params_paths[["Regression Plot"]])
+  bundle <- bubble_load_saved_plot_data(plot.path)
 
   expect_equal(bundle$render_engine, "metafor")
   expect_equal(bundle$plot_type, "meta_regression_bubble")
@@ -83,6 +84,7 @@ test_that("meta-regression stores a self-contained metafor bubble plot bundle", 
   expect_true(inherits(bundle$res, "rma"))
   expect_equal(length(bundle$effects$ES), length(fixture$data@study.names))
   expect_equal(bundle$slab, fixture$data@study.names)
+  expect_true(all(file.exists(paste0(plot.path, c(".data", ".params", ".res")))))
 })
 
 test_that("meta-regression bubble plot redraws reject legacy non-metafor payloads", {
@@ -131,4 +133,31 @@ test_that("metafor bubble plot renderer supports Default, RevMan, and BMJ styles
     expect_gte(unname(dims[["width"]]), 2000)
     expect_gte(unname(dims[["height"]]), 1400)
   }
+})
+
+test_that("editable bubble options survive bundle regeneration", {
+  fixture <- bubble_binary_fixture("default")
+  result <- rcmetar.run.analysis(
+    fixture$data,
+    list(method = "meta.regression", params = fixture$params, workflow = "meta-regression")
+  )
+  params <- fixture$params
+  params$bp_style <- "bmj"
+  params$bp_accent_color <- "#123456"
+  params$bp_point_size_multiplier <- 1.5
+  params$bp_xlabel <- "Latitude (degrees)"
+  params$bp_plot_lb <- "10"
+  params$bp_plot_ub <- "60"
+  params$bp_xticks <- "10, 30, 50"
+  params$bp_show_confidence_band <- FALSE
+
+  bundle <- rcmetar.regenerate.regression.plot.data(fixture$data, result$res, params)
+  style.args <- rcmetar.bubble.style.args(bundle)
+
+  expect_equal(bundle$bp_style, "bmj")
+  expect_equal(bundle$xlabel, "Latitude (degrees)")
+  expect_equal(style.args$plim, c(0.75, 4.5))
+  expect_equal(rcmetar.bubble.xlim(bundle), c(10, 60))
+  expect_equal(rcmetar.bubble.x.ticks(bundle), c(10, 30, 50))
+  expect_false(rcmetar.bubble.param.is.true(bundle, "bp_show_confidence_band", TRUE))
 })

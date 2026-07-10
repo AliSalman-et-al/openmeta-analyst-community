@@ -1195,6 +1195,22 @@ def regenerate_plot_data(
 
 
 @RfunctionCaller
+def regenerate_regression_plot_data(
+    om_data_name="om.data",
+    res_name="res",
+    plot_params_name="params",
+    plot_data_name="plot.data",
+):
+    plot_data = execute_r_function(
+        "rcmetar.regenerate.regression.plot.data",
+        _r_object_from_symbol(om_data_name),
+        _r_object_from_symbol(res_name),
+        _r_object_from_symbol(plot_params_name),
+    )
+    ro.globalenv[_r_symbol(plot_data_name)] = plot_data
+
+
+@RfunctionCaller
 def generate_reg_plot(file_path, params_name="plot.data"):
     execute_r_function(
         "rcmetar.draw.regression.plot",

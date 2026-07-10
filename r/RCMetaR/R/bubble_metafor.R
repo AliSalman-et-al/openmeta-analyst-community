@@ -35,6 +35,12 @@ rcmetar.create.metafor.bubble.bundle <- function(
     yi <- if (is(reg.data, "OMData")) reg.data@y else reg.data$yi
     sei <- if (is(reg.data, "OMData")) reg.data@SE else sqrt(reg.data$vi)
     scale.str <- if (!is.null(params$measure)) get.scale(params) else g.get.scale(params$measure)
+    xlabel <- as.character(cov.name)
+    if (!is.null(params$bp_xlabel) && length(params$bp_xlabel) > 0 &&
+            !is.na(params$bp_xlabel[1]) && !identical(params$bp_xlabel[1], "[default]") &&
+            nzchar(as.character(params$bp_xlabel[1]))) {
+        xlabel <- as.character(params$bp_xlabel[1])
+    }
     list(
         render_engine="metafor",
         plot_type="meta_regression_bubble",
@@ -46,7 +52,7 @@ rcmetar.create.metafor.bubble.bundle <- function(
         effects=list(ES=as.numeric(yi), se=as.numeric(sei)),
         fitted.line=fitted.line,
         scale=scale.str,
-        xlabel=as.character(cov.name),
+        xlabel=xlabel,
         ylabel=rcmetar.bubble.default.ylabel(params)
     )
 }
@@ -157,7 +163,7 @@ rcmetar.bubble.style.args <- function(bundle) {
     point.bg <- grDevices::adjustcolor(accent, alpha.f=0.28)
     ci.shade <- grDevices::adjustcolor(accent, alpha.f=0.12)
     pi.shade <- grDevices::adjustcolor(accent, alpha.f=0.06)
-    switch(
+    style.args <- switch(
         bundle$bp_style,
         revman=list(
             pch=21,
@@ -196,9 +202,24 @@ rcmetar.bubble.style.args <- function(bundle) {
             las=1
         )
     )
+    point.multiplier <- suppressWarnings(as.numeric(bundle$params$bp_point_size_multiplier[1]))
+    if (length(point.multiplier) == 0 || !is.finite(point.multiplier) || point.multiplier <= 0) {
+        point.multiplier <- 1
+    }
+    style.args$plim <- c(0.5, 3) * point.multiplier
+    style.args
 }
 
 rcmetar.bubble.xlim <- function(bundle) {
+    lower <- bundle$params$bp_plot_lb
+    upper <- bundle$params$bp_plot_ub
+    if (!is.null(lower) && !is.null(upper) &&
+            !identical(lower[1], "[default]") && !identical(upper[1], "[default]")) {
+        bounds <- suppressWarnings(as.numeric(c(lower[[1]], upper[[1]])))
+        if (length(bounds) == 2 && all(is.finite(bounds)) && bounds[[1]] < bounds[[2]]) {
+            return(bounds)
+        }
+    }
     x <- as.numeric(bundle$moderator$values)
     x <- x[is.finite(x)]
     if (length(x) == 0) {
@@ -215,26 +236,19 @@ rcmetar.bubble.xlim <- function(bundle) {
 }
 
 rcmetar.bubble.ylim <- function(bundle) {
-    lower <- bundle$params$bp_plot_lb
-    upper <- bundle$params$bp_plot_ub
-    if (is.null(lower) || is.null(upper) || identical(lower[1], "[default]") || identical(upper[1], "[default]")) {
+    NULL
+}
+
+rcmetar.bubble.x.ticks <- function(bundle) {
+    ticks <- bundle$params$bp_xticks
+    if (is.null(ticks) || length(ticks) == 0 || identical(ticks[1], "[default]")) {
         return(NULL)
     }
-    bounds <- suppressWarnings(as.numeric(c(lower[[1]], upper[[1]])))
-    if (length(bounds) != 2 || any(!is.finite(bounds)) || bounds[[1]] >= bounds[[2]]) {
-        return(NULL)
+    if (length(ticks) == 1 && is.character(ticks)) {
+        ticks <- strsplit(ticks, ",", fixed=TRUE)[[1]]
     }
-    measure <- as.character(bundle$params$measure)
-    if (metric.is.log.scale(measure)) {
-        return(log(bounds))
-    }
-    if (metric.is.logit.scale(measure)) {
-        return(logit(pmin(pmax(bounds, .Machine$double.eps), 1 - .Machine$double.eps)))
-    }
-    if (metric.is.arcsine.scale(measure)) {
-        return(arcsine.sqrt(bounds))
-    }
-    bounds
+    ticks <- suppressWarnings(as.numeric(trimws(ticks)))
+    ticks[is.finite(ticks)]
 }
 
 rcmetar.bubble.refline <- function(bundle, ylim=NULL) {
@@ -304,6 +318,7 @@ rcmetar.draw.metafor.bubble <- function(bundle, outpath) {
         args <- rcmetar.bubble.style.args(bundle)
         ylim <- rcmetar.bubble.ylim(bundle)
         at <- rcmetar.bubble.axis.ticks(bundle, ylim)
+        x.ticks <- rcmetar.bubble.x.ticks(bundle)
         args <- c(
             list(
                 x=bundle$res,
@@ -327,6 +342,9 @@ rcmetar.draw.metafor.bubble <- function(bundle, outpath) {
             ),
             args
         )
+        if (length(x.ticks) > 0) {
+            args$xaxt <- "n"
+        }
         args <- rcmetar.bubble.compact.args(args)
         result <- tryCatch(
             do.call(metafor::regplot, args),
@@ -335,6 +353,9 @@ rcmetar.draw.metafor.bubble <- function(bundle, outpath) {
                 do.call(metafor::regplot, args)
             }
         )
+        if (length(x.ticks) > 0) {
+            graphics::axis(1, at=x.ticks)
+        }
         rcmetar.bubble.draw.legend(bundle, args)
         invisible(result)
     })

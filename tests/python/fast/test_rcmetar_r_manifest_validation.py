@@ -50,6 +50,7 @@ RCMetaR_PUBLIC_EXPORTS = {
     "rcmetar.method.references",
     "rcmetar.prepare.analysis.data",
     "rcmetar.regenerate.plot.data",
+    "rcmetar.regenerate.regression.plot.data",
     "rcmetar.run.analysis",
     "rcmetar.run.diagnostic.analyses",
     "rcmetar.run.permutation",

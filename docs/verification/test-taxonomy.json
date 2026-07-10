@@ -1556,6 +1556,35 @@
     {
       "decision": "keep",
       "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_edit_regression_plot_dialog_shows_only_bubble_options",
+      "reason": "Guards issue #275: the Meta-Regression Bubble Plot editor exposes regression options without forest-only controls.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_apply_regression_plot_edits_rebuilds_and_redraws_bubble_plot",
+      "reason": "Guards issue #275: applying bubble options persists, rebuilds, and redraws the selected Meta-Regression Bubble Plot.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
         "gui_compatibility",
         "analysis_behavior"
       ],

@@ -332,6 +332,18 @@ rcmetar.regenerate.plot.data <- function(om.data, res, params) {
     )
 }
 
+rcmetar.regenerate.regression.plot.data <- function(om.data, res, params) {
+    if (!inherits(res, "rma")) {
+        stop("Meta-regression bubble plots require a metafor rma result.", call.=FALSE)
+    }
+    coefficients <- as.numeric(res$b)
+    fitted.line <- list(
+        intercept=coefficients[[1]],
+        slope=if (length(coefficients) >= 2) coefficients[[2]] else 0
+    )
+    create.plot.data.reg(om.data, params, fitted.line, res=res)
+}
+
 rcmetar.save.plot.data <- function(plot.data, out.path=NULL) {
     save.plot.data(plot.data, out.path)
 }

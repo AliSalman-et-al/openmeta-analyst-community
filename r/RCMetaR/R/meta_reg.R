@@ -456,11 +456,10 @@ g.meta.regression <- function(
 		
 		# write the plot data to disk so we can save it
 		# Plot parameters are persisted separately when callers need editable plots.
-		plot.data.path <- save.plot.data(plot.data)
+		plot.data.path <- save.data(data, res, params, plot.data)
 		
 		images <- c("Regression Plot"=plot.path)
 		plot.names <- c("reg.plot"="reg.plot")
-		reg.plot.params.path <- save.plot.data(plot.data)
 		plot.params.paths <- c("Regression Plot"=plot.data.path)
 		
 		# add regression plot to results
@@ -869,11 +868,10 @@ meta.regression <- function(reg.data, params, cond.means.data=NULL, stop.at.rma=
             
             # write the plot data to disk so we can save it
             # Plot parameters are persisted separately when callers need editable plots.
-            plot.data.path <- save.plot.data(plot.data)
+            plot.data.path <- save.data(reg.data, res, params, plot.data)
 
             images <- c("Regression Plot"=plot.path)
             plot.names <- c("reg.plot"="reg.plot")
-            reg.plot.params.path <- save.plot.data(plot.data)
             plot.params.paths <- c("Regression Plot"=plot.data.path)
 			pure.res$weights <- weights(res)
             results <- list("input_data"=reg.data,

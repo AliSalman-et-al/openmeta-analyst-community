@@ -36,6 +36,7 @@ import ui_results_window
 import app_error_handler
 import forms.ui_edit_forest_plot
 import meta_py_r
+import plot_options
 import qt_layout
 import qt_text
 import result_sections
@@ -163,14 +164,16 @@ class SelectableResultsTextItem(QGraphicsTextItem):
             event.accept()
 
 
-class EditForestPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg):
+class EditPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg):
     applied = pyqtSignal()
 
-    def __init__(self, plot_params, image_path, parent=None):
-        super(EditForestPlotDialog, self).__init__(parent)
+    def __init__(self, plot_params, image_path, parent=None, plot_type="forest"):
+        super(EditPlotDialog, self).__init__(parent)
         self.setupUi(self)
         self._loading_style = False
         self._params = dict(plot_params or {})
+        self.plot_type = plot_type
+        self._option_groups = plot_options.option_groups(plot_type)
 
         self.color_btn.clicked.connect(
             app_error_handler.safe_slot(self._choose_color, parent=self)
@@ -186,12 +189,22 @@ class EditForestPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plo
             ok_button.clicked.connect(self.applied.emit)
 
         self._load_params(image_path)
+        self._configure_option_groups()
         qt_layout.fit_application_dialog_to_contents(self)
+
+    def _configure_option_groups(self):
+        self.groupBox.setVisible("columns" in self._option_groups)
+        self.default_panel.setVisible("forest" in self._option_groups)
+        self.label_16.setVisible("summary" in self._option_groups)
+        self.show_summary_line.setVisible("summary" in self._option_groups)
+        self.regression_group.setVisible("regression" in self._option_groups)
 
     def _load_params(self, image_path):
         self._loading_style = True
         try:
-            style = self._normalized_style(self._params.get("fp_style", "default"))
+            style = self._normalized_style(
+                self._params.get(self._param_name("style"), "default")
+            )
             self.style_cbo.setCurrentText(FOREST_STYLE_LABELS[style])
             self._set_text(
                 self.col1_str_edit, self._params.get("fp_col1_str", "Study or Subgroup")
@@ -216,10 +229,19 @@ class EditForestPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plo
             self.show_annotation.setChecked(
                 self._bool_param("fp_show_annotation", True)
             )
-            self._set_text(self.x_lbl_le, self._params.get("fp_xlabel", "[default]"))
-            self._set_text(self.plot_lb_le, self._params.get("fp_plot_lb", "[default]"))
-            self._set_text(self.plot_ub_le, self._params.get("fp_plot_ub", "[default]"))
-            self._set_text(self.x_ticks_le, self._params.get("fp_xticks", "[default]"))
+            self._set_text(
+                self.x_lbl_le, self._params.get(self._param_name("xlabel"), "[default]")
+            )
+            self._set_text(
+                self.plot_lb_le,
+                self._params.get(self._param_name("plot_lb"), "[default]"),
+            )
+            self._set_text(
+                self.plot_ub_le,
+                self._params.get(self._param_name("plot_ub"), "[default]"),
+            )
+            ticks_name = "bp_xticks" if self.plot_type == "regression" else "fp_xticks"
+            self._set_text(self.x_ticks_le, self._params.get(ticks_name, "[default]"))
             self.show_summary_line.setChecked(
                 self._bool_param("fp_show_summary_line", True)
             )
@@ -227,12 +249,21 @@ class EditForestPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plo
                 self.image_path, image_path or self._params.get("fp_outpath", "")
             )
             color = (
-                self._params.get("fp_accent_color")
+                self._params.get(self._param_name("accent_color"))
                 or FOREST_STYLE_DEFAULT_COLORS[style]
             )
             self._set_accent_color(color)
             self.point_size_multiplier.setValue(
-                self._float_param("fp_point_size_multiplier", 1.0)
+                self._float_param(self._param_name("point_size_multiplier"), 1.0)
+            )
+            self.show_regression_line.setChecked(
+                self._bool_param("bp_show_regression_line", True)
+            )
+            self.show_confidence_band.setChecked(
+                self._bool_param("bp_show_confidence_band", True)
+            )
+            self.show_prediction_interval.setChecked(
+                self._bool_param("bp_show_prediction_interval", False)
             )
         finally:
             self._loading_style = False
@@ -278,9 +309,12 @@ class EditForestPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plo
         style = str(self._scalar(style) or "default").strip().lower()
         return style if style in FOREST_STYLE_LABELS else "default"
 
+    def _param_name(self, suffix):
+        return "%s_%s" % ("bp" if self.plot_type == "regression" else "fp", suffix)
+
     def plot_params(self):
         style = FOREST_STYLE_VALUES.get(str(self.style_cbo.currentText()), "default")
-        return {
+        params = {
             "fp_style": style,
             "fp_show_col1": self.show_1.isChecked(),
             "fp_col1_str": qt_text.to_native_text(self.col1_str_edit.text()),
@@ -302,6 +336,25 @@ class EditForestPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plo
             "fp_show_summary_line": self.show_summary_line.isChecked(),
             "fp_outpath": qt_text.to_native_text(self.image_path.text()),
         }
+        if self.plot_type == "regression":
+            params = {
+                "bp_style": style,
+                "bp_accent_color": qt_text.to_native_text(self.accent_color.text()),
+                "bp_point_size_multiplier": self.point_size_multiplier.value(),
+                "bp_xlabel": qt_text.to_native_text(self.x_lbl_le.text()),
+                "bp_plot_lb": qt_text.to_native_text(self.plot_lb_le.text()),
+                "bp_plot_ub": qt_text.to_native_text(self.plot_ub_le.text()),
+                "bp_xticks": qt_text.to_native_text(self.x_ticks_le.text()),
+                "bp_show_regression_line": self.show_regression_line.isChecked(),
+                "bp_show_confidence_band": self.show_confidence_band.isChecked(),
+                "bp_show_prediction_interval": self.show_prediction_interval.isChecked(),
+                "bp_outpath": qt_text.to_native_text(self.image_path.text()),
+            }
+        return params
+
+
+# Compatibility name for callers and tests that still target the forest-only API.
+EditForestPlotDialog = EditPlotDialog
 
 
 class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
@@ -800,14 +853,17 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
             context_menu = QMenu(self)
             if artifact.params_path:
-                if artifact.plot_type == "forest" and not self._is_side_by_side_fp(
+                editable = bool(plot_options.option_groups(artifact.plot_type))
+                if artifact.plot_type == "forest" and self._is_side_by_side_fp(
                     artifact.title
                 ):
+                    editable = False
+                if editable:
                     action = QAction("Edit Plot", self)
                     action.triggered.connect(
                         app_error_handler.safe_slot(
-                            lambda _checked=False: self.edit_forest_plot(
-                                artifact.params_path, artifact.image_path, plot_item
+                            lambda _checked=False: self.edit_plot(
+                                artifact, plot_item
                             ),
                             parent=self,
                         )
@@ -821,6 +877,16 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             )
 
         return _graphics_item_context_menu
+
+    def edit_plot(self, artifact, plot_item):
+        if artifact.plot_type == "forest":
+            self.edit_forest_plot(
+                artifact.params_path, artifact.image_path, plot_item
+            )
+        elif artifact.plot_type == "regression":
+            self.edit_regression_plot(
+                artifact.params_path, artifact.image_path, plot_item
+            )
 
     def edit_forest_plot(self, params_path, png_path, plot_item):
         plot_params = meta_py_r.load_vars_for_plot(params_path, return_params_dict=True)
@@ -838,6 +904,35 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         )
         dialog.exec()
 
+    def edit_regression_plot(self, params_path, png_path, plot_item):
+        plot_params = meta_py_r.load_vars_for_plot(params_path, return_params_dict=True)
+        if plot_params is False:
+            return
+
+        dialog = EditPlotDialog(
+            plot_params, png_path, parent=self, plot_type="regression"
+        )
+        dialog.applied.connect(
+            app_error_handler.safe_slot(
+                lambda: self._apply_regression_plot_edits(
+                    dialog, params_path, png_path, plot_item
+                ),
+                parent=self,
+            )
+        )
+        dialog.exec()
+
+    def _apply_regression_plot_edits(self, dialog, params_path, png_path, plot_item):
+        updated_params = dialog.plot_params()
+        outpath = updated_params["bp_outpath"] or png_path
+        meta_py_r.update_plot_params(
+            updated_params, write_them_out=True, outpath="%s.params" % params_path
+        )
+        meta_py_r.regenerate_regression_plot_data()
+        meta_py_r.generate_reg_plot(outpath)
+        meta_py_r.write_out_plot_data(params_path)
+        self._refresh_plot_item(plot_item, "Regression Plot", outpath, params_path)
+
     def _apply_forest_plot_edits(self, dialog, params_path, png_path, plot_item):
         updated_params = dialog.plot_params()
         outpath = updated_params["fp_outpath"] or png_path
@@ -848,9 +943,13 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         meta_py_r.generate_forest_plot(outpath)
         meta_py_r.write_out_plot_data(params_path)
 
+        self._refresh_plot_item(plot_item, "Forest Plot", outpath, params_path)
+
+    def _refresh_plot_item(self, plot_item, title, outpath, params_path):
+
         if plot_item is not None:
             artifact = self.create_plot_artifact(
-                "Forest Plot", outpath, params_path=params_path
+                title, outpath, params_path=params_path
             )
             if isinstance(plot_item, _svg_item_class()) and os.path.exists(
                 artifact.canonical_svg_path

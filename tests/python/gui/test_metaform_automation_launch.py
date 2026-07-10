@@ -2471,6 +2471,7 @@ def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_p
             (
                 results_window.QPoint(10, 20),
                 [
+                    "Edit Plot",
                     "Save PDF Image As",
                     "Save PNG Image As",
                     "Save TIFF Image As",
@@ -2750,6 +2751,134 @@ def test_edit_forest_plot_dialog_apply_stays_open_and_ok_applies_and_closes():
         assert dialog.isVisible() is False
     finally:
         dialog.close()
+        app.processEvents()
+
+
+def test_edit_regression_plot_dialog_shows_only_bubble_options():
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    dialog = results_window.EditForestPlotDialog(
+        {
+            "bp_style": "bmj",
+            "bp_accent_color": "#123456",
+            "bp_point_size_multiplier": 1.5,
+            "bp_xlabel": "Latitude",
+            "bp_plot_lb": "0.25",
+            "bp_plot_ub": "4",
+            "bp_xticks": "0.5, 1, 2",
+            "bp_show_regression_line": True,
+            "bp_show_confidence_band": False,
+            "bp_show_prediction_interval": True,
+        },
+        "regression.png",
+        plot_type="regression",
+    )
+
+    try:
+        assert dialog.groupBox.isHidden()
+        assert dialog.default_panel.isHidden()
+        assert dialog.show_summary_line.isHidden()
+        assert not dialog.regression_group.isHidden()
+
+        params = dialog.plot_params()
+
+        assert params == {
+            "bp_style": "bmj",
+            "bp_accent_color": "#123456",
+            "bp_point_size_multiplier": 1.5,
+            "bp_xlabel": "Latitude",
+            "bp_plot_lb": "0.25",
+            "bp_plot_ub": "4",
+            "bp_xticks": "0.5, 1, 2",
+            "bp_show_regression_line": True,
+            "bp_show_confidence_band": False,
+            "bp_show_prediction_interval": True,
+            "bp_outpath": "regression.png",
+        }
+    finally:
+        dialog.close()
+        app.processEvents()
+
+
+def test_apply_regression_plot_edits_rebuilds_and_redraws_bubble_plot(
+    tmp_path, monkeypatch
+):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    calls = []
+    params_path = str(tmp_path / "regression_params")
+    image_path = str(tmp_path / "regression.png")
+
+    class FakeDialog(object):
+        def plot_params(self):
+            return {
+                "bp_style": "revman",
+                "bp_show_confidence_band": False,
+                "bp_outpath": image_path,
+            }
+
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "update_plot_params",
+        lambda params, write_them_out=False, outpath=None: calls.append(
+            ("update", params, write_them_out, outpath)
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "regenerate_regression_plot_data",
+        lambda: calls.append(("regenerate",)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "generate_reg_plot",
+        lambda path: calls.append(("draw", path)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "write_out_plot_data",
+        lambda path: calls.append(("write", path)),
+        raising=False,
+    )
+
+    window = results_window.ResultsWindow(
+        {"texts": {}, "images": {}, "image_params_paths": {}, "image_order": []}
+    )
+    try:
+        window._apply_regression_plot_edits(
+            FakeDialog(), params_path, image_path, plot_item=None
+        )
+
+        assert calls == [
+            (
+                "update",
+                {
+                    "bp_style": "revman",
+                    "bp_show_confidence_band": False,
+                    "bp_outpath": image_path,
+                },
+                True,
+                "%s.params" % params_path,
+            ),
+            ("regenerate",),
+            ("draw", image_path),
+            ("write", params_path),
+        ]
+    finally:
+        window.close()
         app.processEvents()
 
 
