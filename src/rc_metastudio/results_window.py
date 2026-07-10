@@ -181,6 +181,9 @@ class EditForestPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plo
         apply_button = self.buttonBox.button(QDialogButtonBox.Apply)
         if apply_button is not None:
             apply_button.clicked.connect(self.applied.emit)
+        ok_button = self.buttonBox.button(QDialogButtonBox.Ok)
+        if ok_button is not None:
+            ok_button.clicked.connect(self.applied.emit)
 
         self._load_params(image_path)
         qt_layout.fit_application_dialog_to_contents(self)

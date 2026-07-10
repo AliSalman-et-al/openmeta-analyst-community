@@ -186,7 +186,7 @@ class Ui_edit_forest_plot_dlg(object):
         self.verticalLayout.addLayout(self.horizontalLayout_4)
         self.buttonBox = QtWidgets.QDialogButtonBox(edit_forest_plot_dlg)
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Apply)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Apply|QtWidgets.QDialogButtonBox.Ok)
         self.buttonBox.setObjectName("buttonBox")
         self.verticalLayout.addWidget(self.buttonBox)
 

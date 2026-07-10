@@ -404,7 +404,7 @@
       <enum>Qt::Horizontal</enum>
      </property>
      <property name="standardButtons">
-      <set>QDialogButtonBox::Apply</set>
+      <set>QDialogButtonBox::Apply|QDialogButtonBox::Ok</set>
      </property>
     </widget>
    </item>

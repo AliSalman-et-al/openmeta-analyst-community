@@ -3683,6 +3683,20 @@
     {
       "decision": "keep",
       "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_edit_forest_plot_dialog_apply_stays_open_and_ok_applies_and_closes",
+      "reason": "Guards issue #273: Apply keeps the Edit Plot dialog open while OK applies the same edits and dismisses it.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
         "gui_compatibility",
         "analysis_behavior"
       ],

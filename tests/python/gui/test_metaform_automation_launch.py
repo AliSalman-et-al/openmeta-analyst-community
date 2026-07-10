@@ -2716,6 +2716,43 @@ def test_edit_forest_plot_dialog_round_trips_style_and_appearance_params(monkeyp
         app.processEvents()
 
 
+def test_edit_forest_plot_dialog_apply_stays_open_and_ok_applies_and_closes():
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    dialog = results_window.EditForestPlotDialog({}, "forest.png")
+    applied = []
+    dialog.applied.connect(lambda: applied.append(True))
+
+    try:
+        dialog.show()
+        app.processEvents()
+        apply_button = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.Apply)
+        ok_button = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.Ok)
+
+        assert apply_button is not None
+        assert ok_button is not None
+        apply_button.click()
+        app.processEvents()
+
+        assert applied == [True]
+        assert dialog.isVisible() is True
+
+        ok_button.click()
+        app.processEvents()
+
+        assert applied == [True, True]
+        assert dialog.result() == QtWidgets.QDialog.Accepted
+        assert dialog.isVisible() is False
+    finally:
+        dialog.close()
+        app.processEvents()
+
+
 def test_pre_run_plots_tab_exports_style_and_appearance_params(monkeypatch):
     import launch
     import test_backend_compat
