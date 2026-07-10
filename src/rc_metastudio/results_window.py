@@ -4,7 +4,7 @@
 
 import random
 from collections import namedtuple
-from PyQt5.QtCore import QByteArray, QPoint, QRectF, Qt, pyqtSignal
+from PyQt5.QtCore import QByteArray, QEvent, QPoint, QRectF, QTimer, Qt, pyqtSignal
 from PyQt5.QtGui import (
     QColor,
     QFont,
@@ -361,9 +361,11 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         super(ResultsWindow, self).__init__(parent)
         self._svg_plot_items = []
         self._refitting_svg_plots = False
+        self._viewport_refit_pending = False
         self._layout_items = []
         self._nav_items_to_sections = {}
         self.setupUi(self)
+        self.graphics_view.viewport().installEventFilter(self)
         qt_layout.configure_resizable_window(self)
         self.copied_item = QByteArray()
         self.paste_offset = 5
@@ -514,6 +516,9 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         """Fit one SVG item to the current viewport while preserving its ratio."""
         item_width = svg_item.boundingRect().width()
         item_height = svg_item.boundingRect().height()
+        if not self.isVisible():
+            return item_width, item_height
+
         scaled_width, scaled_height = self._fit_size_to_viewport(
             item_width,
             item_height,
@@ -694,6 +699,25 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self._refit_svg_plot_items()
         self._relayout_sections()
 
+    def _schedule_viewport_refit(self):
+        if self._viewport_refit_pending:
+            return
+        self._viewport_refit_pending = True
+        QTimer.singleShot(0, self._run_scheduled_viewport_refit)
+
+    def _run_scheduled_viewport_refit(self):
+        self._viewport_refit_pending = False
+        if self.isVisible():
+            self._refit_viewport_items()
+
+    def eventFilter(self, watched, event):
+        if (
+            watched is self.graphics_view.viewport()
+            and event.type() == QEvent.Resize
+        ):
+            self._schedule_viewport_refit()
+        return super(ResultsWindow, self).eventFilter(watched, event)
+
     def _refit_svg_plot_items(self):
         if self._refitting_svg_plots:
             return
@@ -738,11 +762,11 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
     def showEvent(self, event):
         super(ResultsWindow, self).showEvent(event)
-        self._refit_viewport_items()
+        self._schedule_viewport_refit()
 
     def resizeEvent(self, event):
         super(ResultsWindow, self).resizeEvent(event)
-        self._refit_viewport_items()
+        self._schedule_viewport_refit()
 
     def create_pixmap_item(
         self, pixmap, position, title, image_path, params_path=None, matrix=QTransform()

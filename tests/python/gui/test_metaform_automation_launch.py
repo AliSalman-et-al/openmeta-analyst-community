@@ -2150,6 +2150,8 @@ def test_results_window_displays_canonical_svg_plot_artifact(tmp_path):
     )
 
     try:
+        window.show()
+        app.processEvents()
         svg_items = [
             item
             for item in window.scene.items()
@@ -2275,6 +2277,71 @@ def test_results_window_refits_svg_plots_and_reflows_sections_on_resize(tmp_path
         narrow_viewport_width = window.graphics_view.viewport().width()
         assert svg_items[0].sceneBoundingRect().width() <= narrow_viewport_width
         assert_sections_are_separated()
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_results_window_refits_svg_after_viewport_geometry_settles(tmp_path):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    plot_path = tmp_path / "forest.svg"
+    plot_path.write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="800">'
+        '<rect width="1600" height="800" fill="white"/>'
+        "</svg>",
+        encoding="utf-8",
+    )
+    window = results_window.ResultsWindow(
+        {
+            "texts": {},
+            "images": {"Forest Plot": str(plot_path)},
+            "plot_capabilities": {
+                "Forest Plot": _plot_capability(editable=False),
+            },
+        }
+    )
+
+    try:
+        window.showMaximized()
+        app.processEvents()
+        plot_item = next(
+            item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsSvgItem)
+        )
+        initial_width = plot_item.sceneBoundingRect().width()
+        initial_view_width = window.graphics_view.width()
+        initial_viewport_width = window.graphics_view.viewport().width()
+        assert initial_width >= initial_viewport_width * 0.9
+        assert initial_width <= initial_viewport_width
+
+        settled_width = initial_view_width - 300
+        window.graphics_view.resize(settled_width, window.graphics_view.height())
+        app.processEvents()
+
+        viewport_width = window.graphics_view.viewport().width()
+        assert viewport_width < initial_width
+        available_width = viewport_width - window.x_coord - results_window.padding
+        assert plot_item.sceneBoundingRect().width() == pytest.approx(available_width)
+
+        shrunken_width = plot_item.sceneBoundingRect().width()
+        window.graphics_view.resize(initial_view_width, window.graphics_view.height())
+        app.processEvents()
+
+        grown_viewport_width = window.graphics_view.viewport().width()
+        grown_available_width = (
+            grown_viewport_width - window.x_coord - results_window.padding
+        )
+        assert plot_item.sceneBoundingRect().width() > shrunken_width
+        assert plot_item.sceneBoundingRect().width() == pytest.approx(
+            grown_available_width
+        )
     finally:
         window.close()
         app.processEvents()
