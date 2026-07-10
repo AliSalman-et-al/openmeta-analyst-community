@@ -2334,9 +2334,8 @@ def test_results_window_refits_svg_plot_after_in_place_regenerate(tmp_path):
         assert initial_width <= viewport_width
 
         write_svg(800, 400)
-        window._refresh_plot_item(
-            plot_item, "Forest Plot", str(plot_path), params_path=None
-        )
+        artifact = window.create_plot_artifact("Forest Plot", str(plot_path))
+        window._refresh_plot_item(plot_item, artifact, str(plot_path))
         app.processEvents()
 
         refreshed_width = plot_item.sceneBoundingRect().width()
@@ -2351,9 +2350,7 @@ def test_results_window_refits_svg_plot_after_in_place_regenerate(tmp_path):
         )
 
         write_svg(400, 800)
-        window._refresh_plot_item(
-            plot_item, "Forest Plot", str(plot_path), params_path=None
-        )
+        window._refresh_plot_item(plot_item, artifact, str(plot_path))
         app.processEvents()
 
         assert (
@@ -2362,9 +2359,7 @@ def test_results_window_refits_svg_plot_after_in_place_regenerate(tmp_path):
         )
 
         write_svg(400, 100)
-        window._refresh_plot_item(
-            plot_item, "Forest Plot", str(plot_path), params_path=None
-        )
+        window._refresh_plot_item(plot_item, artifact, str(plot_path))
         app.processEvents()
 
         assert (
@@ -2454,9 +2449,8 @@ def test_results_window_reflows_sections_after_raster_plot_regenerate(tmp_path):
         )
 
         write_plot(400, 800)
-        window._refresh_plot_item(
-            plot_item, "Forest Plot", str(plot_path), params_path=None
-        )
+        artifact = window.create_plot_artifact("Forest Plot", str(plot_path))
+        window._refresh_plot_item(plot_item, artifact, str(plot_path))
         app.processEvents()
 
         assert (
@@ -2764,6 +2758,121 @@ def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_p
             if params_path is None:
                 expected_actions = ["Save PNG Image As"]
             assert popups[-1] == (results_window.QPoint(10, 20), expected_actions)
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_results_window_applies_diagnostic_forest_edits_to_selected_plot_artifact(
+    tmp_path, monkeypatch
+):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    title = "Positive Likelihood Ratio Forest Plot"
+    params_path = str(tmp_path / "positive_likelihood_ratio_forest")
+    image_path = tmp_path / "positive_likelihood_ratio_forest.svg"
+    image_path.write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200">'
+        '<rect width="400" height="200" fill="white"/>'
+        "</svg>",
+        encoding="utf-8",
+    )
+    calls = []
+
+    class FakeSignal(object):
+        def __init__(self):
+            self.callback = None
+
+        def connect(self, callback):
+            self.callback = callback
+
+        def emit(self):
+            self.callback()
+
+    class FakeDialog(object):
+        def __init__(self, plot_params, dialog_image_path, parent=None):
+            calls.append(("dialog", plot_params, dialog_image_path))
+            self.applied = FakeSignal()
+
+        def plot_params(self):
+            return {"fp_outpath": str(image_path)}
+
+        def exec(self):
+            self.applied.emit()
+
+    window = results_window.ResultsWindow(
+        {
+            "texts": {},
+            "images": {title: str(image_path)},
+            "image_params_paths": {title: params_path},
+            "image_order": [title],
+            "plot_capabilities": {title: _plot_capability()},
+        }
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "load_vars_for_plot",
+        lambda path, return_params_dict=False: {"fp_col1_str": "Study"},
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "update_plot_params",
+        lambda *a, **k: None,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "regenerate_plot_data",
+        lambda: None,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "generate_forest_plot",
+        lambda path: image_path.write_text(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="800">'
+            '<rect width="400" height="800" fill="white"/>'
+            "</svg>",
+            encoding="utf-8",
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "write_out_plot_data",
+        lambda path: None,
+        raising=False,
+    )
+    monkeypatch.setattr(results_window, "EditForestPlotDialog", FakeDialog)
+
+    try:
+        window.resize(1200, 800)
+        window.show()
+        app.processEvents()
+        plot_item = next(
+            item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsSvgItem)
+        )
+        artifact = window.create_plot_artifact(
+            title, str(image_path), params_path=params_path
+        )
+
+        window.edit_plot(artifact, plot_item)
+        app.processEvents()
+
+        assert calls == [("dialog", {"fp_col1_str": "Study"}, str(image_path))]
+        assert (
+            plot_item.sceneBoundingRect().width()
+            / plot_item.sceneBoundingRect().height()
+            == pytest.approx(0.5)
+        )
     finally:
         window.close()
         app.processEvents()
@@ -3135,10 +3244,14 @@ def test_apply_regression_plot_edits_rebuilds_and_redraws_bubble_plot(
     window = results_window.ResultsWindow(
         {"texts": {}, "images": {}, "image_params_paths": {}, "image_order": []}
     )
+    artifact = results_window.PlotArtifact(
+        "Regression Plot",
+        image_path,
+        _plot_capability(plot_kind="regression", regenerator="regression"),
+        params_path=params_path,
+    )
     try:
-        window._apply_regression_plot_edits(
-            FakeDialog(), params_path, image_path, plot_item=None
-        )
+        window._apply_regression_plot_edits(FakeDialog(), artifact, plot_item=None)
 
         assert calls == [
             (
@@ -3604,7 +3717,10 @@ def test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog(
         )
         original_reference_top = references_title.sceneBoundingRect().top()
 
-        window.edit_forest_plot(params_path, png_path, plot_item=plot_item)
+        artifact = window.create_plot_artifact(
+            "Forest Plot", png_path, params_path=params_path
+        )
+        window.edit_forest_plot(artifact, plot_item=plot_item)
 
         assert calls == [
             ("dialog", {"fp_col1_str": "Study"}, png_path, True),

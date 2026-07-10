@@ -870,81 +870,86 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
     def edit_plot(self, artifact, plot_item):
         regenerator = artifact.capability["regenerator"]
         if regenerator == "forest":
-            self.edit_forest_plot(
-                artifact.params_path, artifact.image_path, plot_item
-            )
+            self.edit_forest_plot(artifact, plot_item)
         elif regenerator == "regression":
-            self.edit_regression_plot(
-                artifact.params_path, artifact.image_path, plot_item
-            )
+            self.edit_regression_plot(artifact, plot_item)
 
-    def edit_forest_plot(self, params_path, png_path, plot_item):
-        plot_params = meta_py_r.load_vars_for_plot(params_path, return_params_dict=True)
+    def edit_forest_plot(self, artifact, plot_item):
+        plot_params = meta_py_r.load_vars_for_plot(
+            artifact.params_path, return_params_dict=True
+        )
         if plot_params is False:
             return
 
-        dialog = EditForestPlotDialog(plot_params, png_path, parent=self)
+        dialog = EditForestPlotDialog(plot_params, artifact.image_path, parent=self)
         dialog.applied.connect(
             app_error_handler.safe_slot(
-                lambda: self._apply_forest_plot_edits(
-                    dialog, params_path, png_path, plot_item
-                ),
+                lambda: self._apply_forest_plot_edits(dialog, artifact, plot_item),
                 parent=self,
             )
         )
         dialog.exec()
 
-    def edit_regression_plot(self, params_path, png_path, plot_item):
-        plot_params = meta_py_r.load_vars_for_plot(params_path, return_params_dict=True)
+    def edit_regression_plot(self, artifact, plot_item):
+        plot_params = meta_py_r.load_vars_for_plot(
+            artifact.params_path, return_params_dict=True
+        )
         if plot_params is False:
             return
 
         dialog = EditPlotDialog(
-            plot_params, png_path, parent=self, plot_type="regression"
+            plot_params, artifact.image_path, parent=self, plot_type="regression"
         )
         dialog.applied.connect(
             app_error_handler.safe_slot(
-                lambda: self._apply_regression_plot_edits(
-                    dialog, params_path, png_path, plot_item
-                ),
+                lambda: self._apply_regression_plot_edits(dialog, artifact, plot_item),
                 parent=self,
             )
         )
         dialog.exec()
 
-    def _apply_regression_plot_edits(self, dialog, params_path, png_path, plot_item):
+    def _apply_regression_plot_edits(self, dialog, artifact, plot_item):
         updated_params = dialog.plot_params()
-        outpath = updated_params["bp_outpath"] or png_path
+        outpath = updated_params["bp_outpath"] or artifact.image_path
         meta_py_r.update_plot_params(
-            updated_params, write_them_out=True, outpath="%s.params" % params_path
+            updated_params,
+            write_them_out=True,
+            outpath="%s.params" % artifact.params_path,
         )
         meta_py_r.regenerate_regression_plot_data()
         meta_py_r.generate_reg_plot(outpath)
-        meta_py_r.write_out_plot_data(params_path)
-        self._refresh_plot_item(plot_item, "Regression Plot", outpath, params_path)
+        meta_py_r.write_out_plot_data(artifact.params_path)
+        self._refresh_plot_item(plot_item, artifact, outpath)
 
-    def _apply_forest_plot_edits(self, dialog, params_path, png_path, plot_item):
+    def _apply_forest_plot_edits(self, dialog, artifact, plot_item):
         updated_params = dialog.plot_params()
-        outpath = updated_params["fp_outpath"] or png_path
+        outpath = updated_params["fp_outpath"] or artifact.image_path
         meta_py_r.update_plot_params(
-            updated_params, write_them_out=True, outpath="%s.params" % params_path
+            updated_params,
+            write_them_out=True,
+            outpath="%s.params" % artifact.params_path,
         )
         meta_py_r.regenerate_plot_data()
         meta_py_r.generate_forest_plot(outpath)
-        meta_py_r.write_out_plot_data(params_path)
+        meta_py_r.write_out_plot_data(artifact.params_path)
 
-        self._refresh_plot_item(plot_item, "Forest Plot", outpath, params_path)
+        self._refresh_plot_item(plot_item, artifact, outpath)
 
-    def _refresh_plot_item(self, plot_item, title, outpath, params_path):
+    def _refresh_plot_item(self, plot_item, artifact, outpath):
 
         if plot_item is not None:
-            artifact = self.create_plot_artifact(
-                title, outpath, params_path=params_path
+            refreshed_artifact = PlotArtifact(
+                artifact.title,
+                outpath,
+                artifact.capability,
+                params_path=artifact.params_path,
             )
             if isinstance(plot_item, _svg_item_class()) and os.path.exists(
-                artifact.canonical_svg_path
+                refreshed_artifact.canonical_svg_path
             ):
-                renderer = _svg_renderer_class()(artifact.canonical_svg_path, self)
+                renderer = _svg_renderer_class()(
+                    refreshed_artifact.canonical_svg_path, self
+                )
                 if renderer.isValid():
                     plot_item.setSharedRenderer(renderer)
                     self._refit_viewport_items()
