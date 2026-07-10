@@ -142,9 +142,6 @@ DIAG_METRIC_NAMES_D = {
 
 DIAG_FIELDS_TO_RAW_INDICES = {"TP": 0, "FN": 1, "FP": 2, "TN": 3}
 
-# list of methods with no forest plot parameters
-METHODS_WITH_NO_FOREST_PLOT = ["diagnostic.hsroc", "diagnostic.bivariate.ml"]
-
 # this is the maximum size of a residual that we're willing to accept
 # when computing 2x2 data
 THRESHOLD = 1e-5

@@ -567,16 +567,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                         )
                         cur_grid_row += 1
 
-        # do we need to set forest plot parameters? if not,
-        # e.g., in the case of HSROC or other methdos that
-        # don't use our forest plotting, we don't show the
-        # corresponding tab for forest plot params.
-        # Prefer the explicit no-forest-plot list until method metadata exposes
-        # a positive "accepts forest plot params" capability.
-        if self.current_method in METHODS_WITH_NO_FOREST_PLOT:
-            self.plot_tab.setEnabled(False)
-        else:
-            self.plot_tab.setEnabled(True)
+        self.plot_tab.setEnabled(True)
         qt_layout.fit_analysis_dialog_to_contents(self, adjust_root=adjust_root)
 
     def add_param(self, layout, cur_grid_row, name, value):

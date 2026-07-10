@@ -1585,6 +1585,34 @@
     {
       "decision": "keep",
       "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_diagnostic_forest_methods_enable_pre_run_plots_tab[Bivariate (Maximum Likelihood)-diagnostic.bivariate.ml]",
+      "reason": "Guards issue #277: Bivariate diagnostic analysis exposes the shared Plots surface for its forest plot output.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_diagnostic_forest_methods_enable_pre_run_plots_tab[HSROC-diagnostic.hsroc]",
+      "reason": "Guards issue #277: HSROC diagnostic analysis exposes the shared Plots surface for its forest plot output.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
         "gui_compatibility",
         "analysis_behavior"
       ],

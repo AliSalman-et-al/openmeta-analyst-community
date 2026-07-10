@@ -2912,6 +2912,74 @@ def test_pre_run_plots_tab_exports_style_and_appearance_params(monkeypatch):
     app.processEvents()
 
 
+@pytest.mark.parametrize(
+    ("method_label", "method_name"),
+    [
+        ("Bivariate (Maximum Likelihood)", "diagnostic.bivariate.ml"),
+        ("HSROC", "diagnostic.hsroc"),
+    ],
+)
+def test_diagnostic_forest_methods_enable_pre_run_plots_tab(
+    method_label, method_name, monkeypatch
+):
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import ma_specs
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    meta_py_r = sys.modules["meta_py_r"]
+
+    class DiagnosticModel(object):
+        current_effect = "Sens"
+
+        def get_current_outcome_type(self):
+            return "diagnostic"
+
+        def included_studies_have_raw_data(self):
+            return True
+
+    monkeypatch.setattr(
+        meta_py_r,
+        "get_available_methods",
+        lambda **kwargs: {method_label: method_name},
+        raising=False,
+    )
+    monkeypatch.setattr(
+        meta_py_r, "get_params", lambda method: ({}, {}, None, {}), raising=False
+    )
+    monkeypatch.setattr(
+        meta_py_r,
+        "get_method_description",
+        lambda method: "Diagnostic analysis with forest plot output",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        meta_py_r,
+        "ma_dataset_to_simple_diagnostic_robj",
+        lambda model, **kwargs: None,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        ma_specs.MA_Specs, "_configure_plot_option_groups", lambda self: None
+    )
+
+    specs = None
+    try:
+        specs = ma_specs.MA_Specs(
+            DiagnosticModel(),
+            diag_metrics=["sens", "spec"],
+            conf_level=95.0,
+        )
+
+        assert specs.current_method == method_name
+        assert specs.plot_tab.isEnabled()
+    finally:
+        if specs is not None:
+            specs.close()
+        app.processEvents()
+
+
 def test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog(
     tmp_path, monkeypatch
 ):
