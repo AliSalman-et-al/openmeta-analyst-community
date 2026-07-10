@@ -8,10 +8,7 @@ rcmetar.revman.format.number <- function(values, digits) {
 }
 
 rcmetar.revman.format.effect.number <- function(values, digits) {
-    values <- as.numeric(values)
-    labels <- formatC(values, digits=as.integer(digits), format="fg", flag="#")
-    labels[is.na(values)] <- ""
-    labels
+    rcmetar.format.effect.number(values, digits)
 }
 
 rcmetar.revman.format.weight <- function(weights, n) {
@@ -227,7 +224,7 @@ rcmetar.revman.p.value.label <- function(p.value) {
     if (p.value < 0.001) {
         return("P < 0.001")
     }
-    paste("P =", round.display(p.value, 2))
+    paste("P =", format.p.value.display(p.value, RCMETAR_DEFAULT_DISPLAY_DIGITS))
 }
 
 rcmetar.revman.decorate.bundle <- function(bundle) {

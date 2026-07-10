@@ -69,7 +69,7 @@ rcmetar.plot.export.dpi <- function(size) {
     if (!is.null(size$dpi) && is.finite(size$dpi) && size$dpi > 0) {
         return(size$dpi)
     }
-    300
+    600
 }
 
 rcmetar.plot.pixel.size <- function(size) {

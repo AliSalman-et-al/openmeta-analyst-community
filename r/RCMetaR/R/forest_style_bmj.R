@@ -317,7 +317,7 @@ rcmetar.bmj.heterogeneity.display.label <- function(label) {
     sub("^Heterogeneity:", "Test for heterogeneity:", label)
 }
 
-rcmetar.bmj.compact.p.value.label <- function(p.value, digits=2) {
+rcmetar.bmj.compact.p.value.label <- function(p.value, digits=RCMETAR_DEFAULT_DISPLAY_DIGITS) {
     label <- rcmetar.revman.p.value.label(p.value)
     label <- gsub("P = ", "P=", label, fixed=TRUE)
     gsub("P < ", "P<", label, fixed=TRUE)
@@ -911,10 +911,7 @@ rcmetar.draw.bmj.headers <- function(bundle, layout, ilab, k, metric, method, sh
 }
 
 rcmetar.bmj.format.effect.number <- function(values, digits) {
-    values <- as.numeric(values)
-    labels <- formatC(values, digits=as.integer(digits), format="f")
-    labels[is.na(values)] <- ""
-    labels
+    rcmetar.format.effect.number(values, digits)
 }
 
 rcmetar.bmj.effect.label <- function(center, lower, upper, digits) {

@@ -539,6 +539,7 @@
           <item row="0" column="0"><widget class="QCheckBox" name="show_regression_line"><property name="text"><string>Show regression line</string></property><property name="checked"><bool>true</bool></property></widget></item>
           <item row="1" column="0"><widget class="QCheckBox" name="show_confidence_band"><property name="text"><string>Show confidence band</string></property><property name="checked"><bool>true</bool></property></widget></item>
           <item row="2" column="0"><widget class="QCheckBox" name="show_prediction_interval"><property name="text"><string>Show prediction interval</string></property></widget></item>
+          <item row="3" column="0"><widget class="QCheckBox" name="show_legend"><property name="text"><string>Show legend</string></property></widget></item>
          </layout>
         </widget>
        </item>

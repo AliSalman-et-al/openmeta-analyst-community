@@ -54,7 +54,7 @@ _KNOWN_PARAMETER_LABELS = {
     "rm.method": "Random-Effects Method",
     "to": "Correction Factor Target",
     "conf.level": "Confidence Level",
-    "digits": "Number of Digits",
+    "digits": "Decimal Places",
     "adjust": "Correction Factor",
     "num.iters": "Number of Iterations",
     "burn.in": "Burn-In Iterations",

@@ -480,7 +480,7 @@ rcmetar.run.diagnostic.analyses <- function(diagnostic.data, methods, params.lis
     result
 }
 
-rcmetar.run.permutation <- function(data, method="DL", mods=NULL, level=95, digits=4, iter=1000,
+rcmetar.run.permutation <- function(data, method="DL", mods=NULL, level=95, digits=RCMETAR_DEFAULT_DISPLAY_DIGITS, iter=1000,
                                       exact=FALSE, retpermdist=FALSE, ...) {
     if (!is.data.frame(data)) {
         stop("Permutation data must be a data frame.", call.=FALSE)

@@ -13,7 +13,7 @@ forest.plot.p.value.label <- function(p.value, digits, missing.label="") {
     if (display.value.is.missing(p.value)) {
         return(missing.label)
     }
-    formatted <- round.display(p.value, digits)
+    formatted <- format.p.value.display(p.value, digits)
     if (p.value < 10^(-digits)) {
         return(paste("P", formatted, sep=""))
     }

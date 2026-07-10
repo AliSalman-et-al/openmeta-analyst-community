@@ -25,6 +25,10 @@ rcmetar.create.metafor.bubble.bundle <- function(
         cov.name=NULL,
         cov.values=NULL,
         fitted.line=NULL) {
+    if (!is.null(params$bp_xlabel) && length(params$bp_xlabel) > 0 &&
+            !is.na(params$bp_xlabel[[1]]) && !identical(params$bp_xlabel[[1]], "[default]")) {
+        params$bp_xlabel <- rcmetar.limit.plot.input.text(params$bp_xlabel)
+    }
     if (is.null(cov.name)) {
         cov.name <- if (is(reg.data, "OMData")) reg.data@covariates[[1]]@cov.name else names(reg.data)[[1]]
     }
@@ -41,6 +45,7 @@ rcmetar.create.metafor.bubble.bundle <- function(
             nzchar(as.character(params$bp_xlabel[1]))) {
         xlabel <- as.character(params$bp_xlabel[1])
     }
+    xlabel <- rcmetar.truncate.plot.display.text(xlabel, rcmetar.plot.text.input.limit)
     list(
         render_engine="metafor",
         plot_type="meta_regression_bubble",

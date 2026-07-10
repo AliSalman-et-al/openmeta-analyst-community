@@ -117,6 +117,29 @@ test_that("meta-regression bubble plot redraws reject legacy non-metafor payload
   )
 })
 
+test_that("bubble plot text ceilings do not mutate source labels or effects", {
+  fixture <- bubble_binary_fixture("default")
+  original.name <- paste(rep("Long bubble study identity", 6), collapse=" ")
+  fixture$data@study.names[[1]] <- original.name
+  original.y <- fixture$data@y
+  fixture$params$bp_xlabel <- paste(rep("Long moderator axis", 8), collapse=" ")
+  res <- rma.uni(yi=fixture$data@y, sei=fixture$data@SE, mods=~fixture$data@covariates[[1]]@cov.vals)
+
+  bundle <- rcmetar.create.metafor.bubble.bundle(fixture$data, fixture$params, res)
+
+  expect_identical(fixture$data@study.names[[1]], original.name)
+  expect_identical(fixture$data@y, original.y)
+  expect_lte(nchar(bundle$slab[[1]]), 72)
+  expect_match(bundle$slab[[1]], "\\.\\.\\.")
+  expect_equal(nchar(bundle$xlabel), 80)
+
+  fixture$params$bp_xlabel <- "[default]"
+  fixture$data@covariates[[1]]@cov.name <- paste(rep("Long moderator name", 8), collapse=" ")
+  default.bundle <- rcmetar.create.metafor.bubble.bundle(fixture$data, fixture$params, res)
+  expect_equal(nchar(default.bundle$xlabel), 80)
+  expect_gt(nchar(default.bundle$moderator$name), 80)
+})
+
 test_that("metafor bubble plot renderer supports Default, RevMan, and BMJ styles", {
   for (style in c("default", "revman", "bmj")) {
     fixture <- bubble_binary_fixture(style, long.labels = TRUE)

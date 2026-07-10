@@ -1078,7 +1078,7 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         "rm.method": "DL",
         "to": "only0",
         "conf.level": 95.0,
-        "digits": 3,
+        "digits": 2,
         "adjust": 0.5,
         "theta.lower": -2.0,
     }
@@ -1104,8 +1104,8 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
             "description": "Level at which to compute confidence intervals",
         },
         "digits": {
-            "pretty.name": "Number of digits",
-            "description": "Number of digits to display in results",
+            "pretty.name": "Decimal places",
+            "description": "Decimal places for displayed estimates and intervals; p-values use at least 3",
         },
         "adjust": {
             "pretty.name": "Correction factor",
@@ -1282,7 +1282,7 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         assert specs[0].current_param_vals["rm.method"] == "DL"
         assert specs[0].current_param_vals["to"] == "only0"
         assert specs[0].current_param_vals["conf.level"] == 95.0
-        assert specs[0].current_param_vals["digits"] == 3
+        assert specs[0].current_param_vals["digits"] == 2
         assert specs[0].current_param_vals["adjust"] == 0.5
         assert specs[0].current_param_vals["theta.lower"] == -2.5
     finally:
@@ -1395,12 +1395,12 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
     params = {
         "binary.random": (
             {"rm.method": ["DL", "SJ"], "conf.level": "float", "digits": "float"},
-            {"rm.method": "DL", "conf.level": 95.0, "digits": 3},
+            {"rm.method": "DL", "conf.level": 95.0, "digits": 2},
             ["rm.method", "conf.level", "digits"],
         ),
         "binary.fixed.mh": (
             {"to": ["only0", "all"], "conf.level": "float", "digits": "float"},
-            {"to": "only0", "conf.level": 95.0, "digits": 3},
+            {"to": "only0", "conf.level": 95.0, "digits": 2},
             ["to", "conf.level", "digits"],
         ),
     }
@@ -1418,8 +1418,8 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
             "description": "Level at which to compute confidence intervals",
         },
         "digits": {
-            "pretty.name": "Number of digits",
-            "description": "Number of digits to display in results",
+            "pretty.name": "Decimal places",
+            "description": "Decimal places for displayed estimates and intervals; p-values use at least 3",
         },
     }
 
@@ -3279,6 +3279,64 @@ def test_shared_plot_options_surface_uses_default_arm_labels():
         app.processEvents()
 
 
+def test_plot_text_inputs_enforce_publication_readability_limit():
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+    from plot_text import PLOT_TEXT_INPUT_LIMIT
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    dialog = results_window.EditForestPlotDialog({}, "forest.png")
+
+    try:
+        fields = (
+            dialog.col1_str_edit,
+            dialog.col2_str_edit,
+            dialog.col3_str_edit,
+            dialog.col4_str_edit,
+            dialog.x_lbl_le,
+        )
+        for field in fields:
+            assert field.maxLength() == PLOT_TEXT_INPUT_LIMIT
+            assert "publication readability" in field.toolTip()
+            field.setText("x" * (PLOT_TEXT_INPUT_LIMIT + 20))
+            assert len(field.text()) == PLOT_TEXT_INPUT_LIMIT
+        assert dialog.plot_lb_le.maxLength() > PLOT_TEXT_INPUT_LIMIT
+        assert dialog.plot_ub_le.maxLength() > PLOT_TEXT_INPUT_LIMIT
+        assert dialog.x_ticks_le.maxLength() > PLOT_TEXT_INPUT_LIMIT
+    finally:
+        dialog.close()
+        app.processEvents()
+
+
+def test_edit_plot_dialog_flags_truncated_legacy_plot_text():
+    from PyQt5 import QtTest
+
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+    from plot_text import PLOT_TEXT_INPUT_LIMIT
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    dialog = results_window.EditForestPlotDialog(
+        {"fp_col1_str": "x" * (PLOT_TEXT_INPUT_LIMIT + 20)}, "forest.png"
+    )
+    try:
+        assert len(dialog.col1_str_edit.text()) == PLOT_TEXT_INPUT_LIMIT
+        assert dialog.col1_str_edit.property("plotTextWasTruncated") is True
+        assert "original is retained" in dialog.col1_str_edit.toolTip()
+        assert dialog.plot_params()["fp_col1_str"] == "x" * (PLOT_TEXT_INPUT_LIMIT + 20)
+        dialog.col1_str_edit.setFocus()
+        dialog.col1_str_edit.selectAll()
+        QtTest.QTest.keyClicks(dialog.col1_str_edit, "replacement")
+        assert dialog.plot_params()["fp_col1_str"] == "replacement"
+    finally:
+        dialog.close()
+        app.processEvents()
+
+
 def test_edit_forest_plot_dialog_apply_stays_open_and_ok_applies_and_closes():
     import launch
     import test_backend_compat
@@ -3336,6 +3394,7 @@ def test_edit_regression_plot_dialog_shows_only_bubble_options():
             "bp_show_regression_line": True,
             "bp_show_confidence_band": False,
             "bp_show_prediction_interval": True,
+            "bp_show_legend": True,
         },
         "regression.png",
         plot_type="regression",
@@ -3360,6 +3419,7 @@ def test_edit_regression_plot_dialog_shows_only_bubble_options():
             "bp_show_regression_line": True,
             "bp_show_confidence_band": False,
             "bp_show_prediction_interval": True,
+            "bp_show_legend": True,
             "bp_outpath": "regression.png",
         }
     finally:
@@ -3579,6 +3639,8 @@ def test_meta_regression_pre_run_plot_options_use_bubble_parameter_contract():
     form.show_confidence_band.setChecked(False)
     form.show_prediction_interval = QtWidgets.QCheckBox()
     form.show_prediction_interval.setChecked(True)
+    form.show_legend = QtWidgets.QCheckBox()
+    form.show_legend.setChecked(True)
 
     ma_specs.add_plot_params(form)
 
@@ -3597,6 +3659,7 @@ def test_meta_regression_pre_run_plot_options_use_bubble_parameter_contract():
         "bp_show_regression_line": True,
         "bp_show_confidence_band": False,
         "bp_show_prediction_interval": True,
+        "bp_show_legend": True,
     }
     app.processEvents()
 
@@ -3681,6 +3744,8 @@ def test_meta_regression_acceptance_passes_all_dialog_choices_to_adapter(monkeyp
     form.show_confidence_band.setChecked(False)
     form.show_prediction_interval = QtWidgets.QCheckBox()
     form.show_prediction_interval.setChecked(True)
+    form.show_legend = QtWidgets.QCheckBox()
+    form.show_legend.setChecked(True)
 
     monkeypatch.setattr(
         ma_specs.meta_py_r,

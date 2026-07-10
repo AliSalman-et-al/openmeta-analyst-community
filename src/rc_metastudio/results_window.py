@@ -38,6 +38,7 @@ import forms.ui_edit_forest_plot
 import meta_py_r
 from plot_defaults import FOREST_ARM_LABELS
 import plot_capabilities
+from plot_text import apply_plot_text_input_limits, plot_text_value, set_plot_text_value
 import qt_layout
 import qt_text
 import result_sections
@@ -61,6 +62,12 @@ PLOT_EXPORT_EXTENSION_ALIASES = {
     "png": (".png",),
     "tiff": (".tif", ".tiff"),
     "svg": (".svg", ".svgz"),
+}
+PLOT_EXPORT_GUIDANCE = {
+    "pdf": "Recommended vector format for journal submission and print workflows.",
+    "svg": "Scalable vector format; ideal for editing and lossless resizing.",
+    "tiff": "Publication-grade 600 dpi raster export with lossless compression.",
+    "png": "Publication-grade 600 dpi raster export for compatible submission systems.",
 }
 
 FOREST_STYLE_LABELS = {
@@ -171,6 +178,7 @@ class EditPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
     def __init__(self, plot_params, image_path, parent=None, plot_type="forest"):
         super(EditPlotDialog, self).__init__(parent)
         self.setupUi(self)
+        apply_plot_text_input_limits(self)
         self._loading_style = False
         self._params = dict(plot_params or {})
         self.plot_type = plot_type
@@ -268,6 +276,7 @@ class EditPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
             self.show_prediction_interval.setChecked(
                 self._bool_param("bp_show_prediction_interval", False)
             )
+            self.show_legend.setChecked(self._bool_param("bp_show_legend", False))
         finally:
             self._loading_style = False
 
@@ -289,7 +298,7 @@ class EditPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
         self.color_btn.setStyleSheet("background-color: %s;" % text)
 
     def _set_text(self, widget, value):
-        widget.setText(str(self._scalar(value)))
+        set_plot_text_value(widget, self._scalar(value))
 
     def _scalar(self, value):
         if isinstance(value, (list, tuple)) and value:
@@ -320,19 +329,19 @@ class EditPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
         params = {
             "fp_style": style,
             "fp_show_col1": self.show_1.isChecked(),
-            "fp_col1_str": qt_text.to_native_text(self.col1_str_edit.text()),
+            "fp_col1_str": qt_text.to_native_text(plot_text_value(self.col1_str_edit)),
             "fp_show_col2": self.show_2.isChecked(),
-            "fp_col2_str": qt_text.to_native_text(self.col2_str_edit.text()),
+            "fp_col2_str": qt_text.to_native_text(plot_text_value(self.col2_str_edit)),
             "fp_show_col3": self.show_3.isChecked(),
-            "fp_col3_str": qt_text.to_native_text(self.col3_str_edit.text()),
+            "fp_col3_str": qt_text.to_native_text(plot_text_value(self.col3_str_edit)),
             "fp_show_col4": self.show_4.isChecked(),
-            "fp_col4_str": qt_text.to_native_text(self.col4_str_edit.text()),
+            "fp_col4_str": qt_text.to_native_text(plot_text_value(self.col4_str_edit)),
             "fp_show_raw_counts": self.show_raw_counts.isChecked(),
             "fp_show_headers": self.show_headers.isChecked(),
             "fp_show_annotation": self.show_annotation.isChecked(),
             "fp_accent_color": qt_text.to_native_text(self.accent_color.text()),
             "fp_point_size_multiplier": self.point_size_multiplier.value(),
-            "fp_xlabel": qt_text.to_native_text(self.x_lbl_le.text()),
+            "fp_xlabel": qt_text.to_native_text(plot_text_value(self.x_lbl_le)),
             "fp_plot_lb": qt_text.to_native_text(self.plot_lb_le.text()),
             "fp_plot_ub": qt_text.to_native_text(self.plot_ub_le.text()),
             "fp_xticks": qt_text.to_native_text(self.x_ticks_le.text()),
@@ -347,13 +356,14 @@ class EditPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
                 "bp_style": style,
                 "bp_accent_color": qt_text.to_native_text(self.accent_color.text()),
                 "bp_point_size_multiplier": self.point_size_multiplier.value(),
-                "bp_xlabel": qt_text.to_native_text(self.x_lbl_le.text()),
+                "bp_xlabel": qt_text.to_native_text(plot_text_value(self.x_lbl_le)),
                 "bp_plot_lb": qt_text.to_native_text(self.plot_lb_le.text()),
                 "bp_plot_ub": qt_text.to_native_text(self.plot_ub_le.text()),
                 "bp_xticks": qt_text.to_native_text(self.x_ticks_le.text()),
                 "bp_show_regression_line": self.show_regression_line.isChecked(),
                 "bp_show_confidence_band": self.show_confidence_band.isChecked(),
                 "bp_show_prediction_interval": self.show_prediction_interval.isChecked(),
+                "bp_show_legend": self.show_legend.isChecked(),
                 "bp_outpath": qt_text.to_native_text(self.image_path.text()),
             }
             regression_display_path = self._scalar(
@@ -884,6 +894,13 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         def _graphics_item_context_menu(event):
             def add_save_as_menu_action(menu, export_format):
                 action = QAction("Save %s Image As" % export_format.label, self)
+                guidance = (
+                    PLOT_EXPORT_GUIDANCE[export_format.extension]
+                    if artifact.params_path
+                    else "Save the original raster image at its native resolution."
+                )
+                action.setStatusTip(guidance)
+                action.setToolTip(guidance)
 
                 def save_action(_checked=False, selected_format=export_format):
                     self.save_image_as(

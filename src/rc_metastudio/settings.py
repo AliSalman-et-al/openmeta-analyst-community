@@ -19,7 +19,7 @@ MAX_RECENT_FILES = 10
 MAIN_WINDOW_GROUP = "main_window"
 DEFAULT_SETTINGS = {
     "splash": True,
-    "digits": 3,
+    "digits": 2,
     "recent_files": [],
     # "method_params":{},
 }

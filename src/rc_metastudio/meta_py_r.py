@@ -1659,10 +1659,7 @@ def make_weights_str(results):
         print("Uh oh")
         raise Exception("make_weights_str() requires 'weights' in the results")
 
-    digits = 3
-    if "input_params" in results:
-        digits = results["input_params"].rx2("digits")[0]
-    digits = validate_analysis_digits(digits)
+    digits = PERCENTAGE_DISPLAY_DIGITS
     weights_object = results["weights"]
     weights = list(weights_object)
     weights = ["{0:.{digits}f}%".format(x, digits=digits) for x in weights]
@@ -1702,7 +1699,7 @@ def run_meta_regression(
 
     params = dict(params or {})
     params["conf.level"] = conf_level
-    params.setdefault("digits", 3)
+    params.setdefault("digits", 2)
     params["rm.method"] = "FE" if fixed_effects else params.get("rm.method", "DL")
     params["measure"] = metric_name
     return _run_RCMetaR_core_analysis(

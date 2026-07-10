@@ -385,7 +385,7 @@ diagnostic.fixed.inv.var.parameters <- function(){
                             "adjust"="float", "to"=apply_adjustment_to)
 
     # default values
-    defaults <- list("conf.level"=95, "digits"=3, "adjust"=.5, "to"="only0")
+    defaults <- list("conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS, "adjust"=.5, "to"="only0")
 
     var_order = c("conf.level", "digits", "adjust", "to")
 
@@ -396,7 +396,7 @@ diagnostic.fixed.inv.var.pretty.names <- function() {
     pretty.names <- list("pretty.name"="Diagnostic Fixed-Effect Inverse Variance", 
                          "description" = "Performs fixed-effect meta-analysis with inverse variance weighting.",
                          "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"), 
-                         "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
+                         "digits"=list("pretty.name"="Decimal places", "description"="Decimal places for displayed estimates and intervals; p-values use at least 3"),
                          "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
                          "to"=list("pretty.name"="Add correction factor to", "description"="When Add correction factor is set to \"only 0\", the correction factor
                                    is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor
@@ -515,7 +515,7 @@ diagnostic.fixed.mh.parameters <- function(){
                             "adjust"="float", "to"=apply_adjustment_to)
     
     # default values
-    defaults <- list("conf.level"=95, "digits"=3, "adjust"=.5, "to"="only0")
+    defaults <- list("conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS, "adjust"=.5, "to"="only0")
     
     var_order = c("conf.level", "digits", "adjust", "to")
     
@@ -527,7 +527,7 @@ diagnostic.fixed.mh.pretty.names <- function() {
     pretty.names <- list("pretty.name"="Diagnostic Fixed-Effect Mantel-Haenszel", 
                          "description" = "Performs fixed-effect meta-analysis using the Mantel-Haenszel method.",
                          "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"), 
-                         "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
+                         "digits"=list("pretty.name"="Decimal places", "description"="Decimal places for displayed estimates and intervals; p-values use at least 3"),
                          "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
                          "to"=list("pretty.name"="Add correction factor to", "description"="When Add correction factor is set to \"only 0\", the correction factor
                                    is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor
@@ -654,7 +654,7 @@ diagnostic.fixed.peto.parameters <- function(){
                   "adjust"="float", "to"=apply_adjustment_to)
   
   # default values
-  defaults <- list("conf.level"=95, "digits"=3, "adjust"=.5, "to"="only0")
+  defaults <- list("conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS, "adjust"=.5, "to"="only0")
   
   var_order = c("conf.level", "digits", "adjust", "to")
   
@@ -665,7 +665,7 @@ diagnostic.fixed.peto.pretty.names <- function() {
   pretty.names <- list("pretty.name"="Diagnostic Fixed-Effect Peto", 
                        "description" = "Performs fixed-effect meta-analysis using the Peto method.",
                        "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"), 
-                       "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
+                       "digits"=list("pretty.name"="Decimal places", "description"="Decimal places for displayed estimates and intervals; p-values use at least 3"),
                        "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
                        "to"=list("pretty.name"="Add correction factor to", "description"="When Add correction factor is set to \"only 0\", the correction factor
                                    is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor
@@ -773,7 +773,7 @@ diagnostic.random.parameters <- function(){
                             "adjust"="float", "to"=apply.adjustment.to)
     
     # default values
-    defaults <- list("rm.method"="DL", "conf.level"=95, "digits"=3,  
+    defaults <- list("rm.method"="DL", "conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS,
                             "adjust"=.5, "to"="only0")
     
     var.order <- c("rm.method", "conf.level", "digits", "adjust", "to")
@@ -794,7 +794,7 @@ diagnostic.random.pretty.names <- function() {
                          "description" = "Performs random-effects meta-analysis.",
                          "rm.method"=list("pretty.name"="Random-Effects method", "description"="Method for estimating between-studies heterogeneity", "rm.method.names"=rm_method_names),                      
                          "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"), 
-                         "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
+                         "digits"=list("pretty.name"="Decimal places", "description"="Decimal places for displayed estimates and intervals; p-values use at least 3"),
                          "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
                          "to"=list("pretty.name"="Correction factor target", "description"="When Add correction factor is set to \"only 0\", the correction factor
                                    is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor
@@ -1374,7 +1374,7 @@ hsroc.display.summary <- function(hsroc.sum, params, chain.out.dirs, diagnostic.
 
     digits <- params$digits
     if (is.null(digits) || is.na(digits)) {
-        digits <- 3
+        digits <- RCMETAR_DEFAULT_DISPLAY_DIGITS
     }
 
     summary.sensitivity.rows <- c("S Overall", "Sensitivity Overall", "Sensitivity (overall)")
@@ -1584,7 +1584,7 @@ diagnostic.bivariate.ml <- function(diagnostic.data, params){
     se_logit_spec = biv.results[1,4]
     correlation = biv.results[1,7]
 
-    digits = 4
+    digits = RCMETAR_DEFAULT_DISPLAY_DIGITS
     digits.str <- paste("%.", digits, "f", sep="")
     sensitivity <- sprintf(digits.str, invlogit(logit_sens))
 	# Un-hard-coding CI.. issue # 214

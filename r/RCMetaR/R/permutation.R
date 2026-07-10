@@ -28,7 +28,7 @@
 ############################################################################
 permuted.ma <- function(
 	# meta-analysis parameters
-	data, method, intercept=TRUE, level=95, digits=4, knha=FALSE, weighted=TRUE,
+	data, method, intercept=TRUE, level=95, digits=RCMETAR_DEFAULT_DISPLAY_DIGITS, knha=FALSE, weighted=TRUE,
 	# Permutation parameters
 	exact=FALSE, iter=1000, retpermdist=FALSE) {
 	
@@ -55,7 +55,7 @@ permuted.ma <- function(
 
 permuted.meta.reg <- function (
 	# meta-regresion parameters
-	data, method, mods, intercept=TRUE, level=95, digits=4, knha=FALSE, btt=NULL,
+	data, method, mods, intercept=TRUE, level=95, digits=RCMETAR_DEFAULT_DISPLAY_DIGITS, knha=FALSE, btt=NULL,
 	# Permutation parameters
 	exact=FALSE, iter=1000, retpermdist=FALSE,
 	# Other parameters
@@ -112,4 +112,3 @@ permutest.value.info <- function(retpermdist, meta.reg.mode=TRUE) {
 	}
 	return(info)
 }
-

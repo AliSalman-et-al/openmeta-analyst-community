@@ -18,3 +18,5 @@ User exports remain format-clean. Rendering a PNG, PDF, or TIFF outside the anal
 - Vector display artifacts use the authoritative viewport routine from ADR 0188.
 - Raster-only Plot Artifacts retain their original pixmap and regenerate viewport-sized previews from that source on resize.
 - Export and display lifecycles can evolve independently without weakening the Plot Capability Descriptor contract.
+- Regenerable PNG and TIFF exports use 600 dpi by default; PDF and SVG remain the preferred journal-submission formats because they preserve vector geometry and text at any final size.
+- Results Window export actions explain the vector/raster trade-off in their status and tool tips. Raster-only legacy artifacts are saved at their native resolution rather than being misleadingly described as publication-grade regenerations.

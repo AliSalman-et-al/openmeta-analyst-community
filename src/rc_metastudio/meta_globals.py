@@ -14,12 +14,13 @@ from PyQt5.QtWidgets import QUndoCommand
 APPLICATION_NAME = "RCMetaStudio"
 ORGANIZATION_NAME = "Research Consultancy"
 
-# number of digits to display
-NUM_DIGITS = 3
+# Default display precision. Editing and calculations retain their full values.
+NUM_DIGITS = 2
+PERCENTAGE_DISPLAY_DIGITS = 1
 
 # number of digits to display in calculator
 #   It is now a global here and in the data_table_view class. (However
-#   here we show four digits; there it is 3. We want different
+#   here we show four digits; ordinary display uses 2. We want different
 #   levels of granularity).
 CALC_NUM_DIGITS = 4
 
@@ -170,7 +171,7 @@ INVALID_CONFIDENCE_LEVEL_MESSAGE = (
 )
 ANALYSIS_DIGITS_MIN = 0
 ANALYSIS_DIGITS_MAX = 15
-INVALID_ANALYSIS_DIGITS_MESSAGE = "Number of digits must be a non-negative integer."
+INVALID_ANALYSIS_DIGITS_MESSAGE = "Decimal places must be a non-negative integer."
 ANALYSIS_NUMERIC_MIN = -1000000000.0
 ANALYSIS_NUMERIC_MAX = 1000000000.0
 ANALYSIS_COUNT_MAX = 1000000000

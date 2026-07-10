@@ -122,6 +122,39 @@ rcmetar.format.metafor.numeric <- function(values, digits) {
     ifelse(is.na(values), "", round.display(values, digits))
 }
 
+rcmetar.format.effect.number <- function(values, digits, max.decimals=6L) {
+    values <- as.numeric(values)
+    digits <- max(0L, as.integer(digits))
+    labels <- rep("", length(values))
+    finite <- is.finite(values)
+    labels[finite] <- formatC(values[finite], digits=digits, format="f")
+    small <- finite & values != 0 & abs(values) < 10^(-digits)
+    if (any(small)) {
+        required <- ceiling(-log10(abs(values[small]))) + 1L
+        use.scientific <- required > max.decimals
+        indexes <- which(small)
+        if (any(!use.scientific)) {
+            fixed.indexes <- indexes[!use.scientific]
+            fixed.digits <- required[!use.scientific]
+            labels[fixed.indexes] <- vapply(
+                seq_along(fixed.indexes),
+                function(i) formatC(
+                    values[fixed.indexes[[i]]], digits=fixed.digits[[i]], format="f"
+                ),
+                character(1)
+            )
+        }
+        if (any(use.scientific)) {
+            scientific.indexes <- indexes[use.scientific]
+            labels[scientific.indexes] <- formatC(
+                values[scientific.indexes], digits=max(1L, digits), format="e"
+            )
+        }
+    }
+    labels[is.na(values)] <- ""
+    labels
+}
+
 rcmetar.empty.forest.ilab <- function(n) {
     matrix <- matrix(character(0), nrow=n, ncol=0)
     list(matrix=matrix, columns=list(), headers=character(0), groups=character(0))
@@ -132,9 +165,19 @@ rcmetar.study.labels <- function(om.data) {
     years <- om.data@years
     if (!is.null(years) && length(years) == length(labels)) {
         has.year <- !is.na(years) & years != 0
-        labels[has.year] <- paste(labels[has.year], years[has.year], sep=", ")
+        for (index in which(has.year)) {
+            year <- as.character(years[[index]])
+            already.suffixed <- grepl(
+                paste0("(^|[^0-9])", year, "$"),
+                trimws(labels[[index]]),
+                perl=TRUE
+            )
+            if (!already.suffixed) {
+                labels[[index]] <- paste(labels[[index]], year, sep=", ")
+            }
+        }
     }
-    labels
+    rcmetar.truncate.plot.display.text(labels)
 }
 
 rcmetar.metafor.weights <- function(res) {
@@ -222,6 +265,8 @@ rcmetar.validate.forest.regeneration.state <- function(state) {
 }
 
 rcmetar.build.sequential.metafor.bundle <- function(om.data, params, results, variant, labels, legacy.plot.data=NULL) {
+    params <- rcmetar.normalize.plot.text.params(params)
+    labels <- rcmetar.truncate.plot.display.text(labels)
     if (is.null(legacy.plot.data)) {
         legacy.plot.data <- switch(
             variant,
@@ -281,6 +326,7 @@ rcmetar.build.sequential.metafor.bundle <- function(om.data, params, results, va
 }
 
 rcmetar.build.subgroup.metafor.bundle <- function(om.data, params, subgroup.data, legacy.plot.data=NULL) {
+    params <- rcmetar.normalize.plot.text.params(params)
     if (is.null(legacy.plot.data)) {
         legacy.plot.data <- switch(
             .rcmetar.data.type(om.data),
@@ -291,6 +337,7 @@ rcmetar.build.subgroup.metafor.bundle <- function(om.data, params, subgroup.data
     }
 
     subgroup.list <- as.character(subgroup.data$subgroup.list)
+    display.subgroup.list <- rcmetar.truncate.plot.display.text(subgroup.list)
     grouped.data <- subgroup.data$grouped.data
     subgroup.results <- subgroup.data$results
     study.data <- grouped.data[seq_along(subgroup.list)]
@@ -349,7 +396,7 @@ rcmetar.build.subgroup.metafor.bundle <- function(om.data, params, subgroup.data
         changed.params = legacy.plot.data$changed.params,
         legacy_plot_data = legacy.plot.data,
         subgroups = list(
-            names = subgroup.list,
+            names = display.subgroup.list,
             results = subgroup.results[seq_along(subgroup.list)],
             overall = subgroup.results[[length(subgroup.list) + 1]],
             study_rows = unlist(study.rows, use.names=FALSE),
@@ -389,6 +436,7 @@ rcmetar.metafor.subgroup.difference.test <- function(yi, sei, subgroup.values, p
 }
 
 rcmetar.build.binary.metafor.bundle <- function(binary.data, params, res, legacy.plot.data=NULL) {
+    params <- rcmetar.normalize.plot.text.params(params)
     if (is.null(legacy.plot.data)) {
         legacy.plot.data <- create.plot.data.generic(binary.data, params, res)
     }
@@ -425,6 +473,7 @@ rcmetar.build.binary.metafor.bundle <- function(binary.data, params, res, legacy
 }
 
 rcmetar.build.continuous.metafor.bundle <- function(cont.data, params, res, legacy.plot.data=NULL) {
+    params <- rcmetar.normalize.plot.text.params(params)
     if (is.null(legacy.plot.data)) {
         legacy.plot.data <- create.plot.data.generic(cont.data, params, res)
     }
@@ -460,6 +509,7 @@ rcmetar.build.continuous.metafor.bundle <- function(cont.data, params, res, lega
 }
 
 rcmetar.build.diagnostic.metafor.bundle <- function(diagnostic.data, params, res, legacy.plot.data=NULL) {
+    params <- rcmetar.normalize.plot.text.params(params)
     if (is.null(legacy.plot.data)) {
         legacy.plot.data <- create.plot.data.generic(diagnostic.data, params, res)
     }
@@ -667,11 +717,11 @@ rcmetar.metafor.effect.labels <- function(bundle) {
         ub <- transform$display.scale(c(bundle$res$ci.ub, bundle$res$ci.ub))
     }
     paste0(
-        round.display(y, digits),
+        rcmetar.format.effect.number(y, digits),
         " [",
-        round.display(lb, digits),
+        rcmetar.format.effect.number(lb, digits),
         ", ",
-        round.display(ub, digits),
+        rcmetar.format.effect.number(ub, digits),
         "]"
     )
 }

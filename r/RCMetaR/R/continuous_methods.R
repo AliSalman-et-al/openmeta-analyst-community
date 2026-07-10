@@ -230,7 +230,7 @@ continuous.fixed.parameters <- function(){
   params <- list("conf.level"="float", "digits"="int")
 
   # default values
-  defaults <- list("conf.level"=95, "digits"=3)
+  defaults <- list("conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS)
 
   var_order <- c("conf.level", "digits")
   parameters <- list("parameters"=params, "defaults"=defaults, "var_order"=var_order)
@@ -241,7 +241,7 @@ continuous.fixed.pretty.names <- function() {
     "pretty.name"="Continuous Fixed-Effect Inverse Variance",
      "description" = "Performs fixed-effect meta-analysis with inverse variance weighting.",
      "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"),
-     "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
+     "digits"=list("pretty.name"="Decimal places", "description"="Decimal places for displayed estimates and intervals; p-values use at least 3"),
      "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
      "to"=list("pretty.name"="Add correction factor to", "description"="When Add correction factor is set to \"only 0\", the correction factor
                is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor
@@ -347,7 +347,7 @@ continuous.random.parameters <- function() {
   params <- list("rm.method"=rm_method_ls, "conf.level"="float", "digits"="int")
 
   # default values
-  defaults <- list("rm.method"="DL", "conf.level"=95, "digits"=3)
+  defaults <- list("rm.method"="DL", "conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS)
 
   var_order <- c("rm.method", "conf.level", "digits")
   parameters <- list("parameters"=params, "defaults"=defaults, "var_order"=var_order)
@@ -368,7 +368,7 @@ continuous.random.pretty.names <- function() {
     "description" = "Performs random-effects meta-analysis.",
     "rm.method"=list("pretty.name"="Random-Effects method", "description"="Method for estimating between-studies heterogeneity", "rm.method.names"=rm_method_names),
     "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"),
-    "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
+    "digits"=list("pretty.name"="Decimal places", "description"="Decimal places for displayed estimates and intervals; p-values use at least 3"),
     "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
     "to"=list("pretty.name"="Correction factor target", "description"="When Add correction factor is set to \"only 0\", the correction factor
              is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor

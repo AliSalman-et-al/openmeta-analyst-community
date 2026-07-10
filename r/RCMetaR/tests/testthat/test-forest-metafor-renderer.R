@@ -267,6 +267,19 @@ test_that("binary Default Forest Style builds a self-contained metafor render bu
   expect_gt(file.info(redrawn_path)$size, 5000)
 })
 
+test_that("effect estimates and confidence limits never use probability thresholds", {
+  values <- c(0, 0.07, 0.006, 0.00004, 0.0000004, -0.006, NA_real_)
+  labels <- rcmetar.format.effect.number(values, 2)
+
+  expect_equal(
+    labels,
+    c("0.00", "0.07", "0.0060", "0.000040", "4.00e-07", "-0.0060", "")
+  )
+  expect_false(any(grepl("<", labels, fixed=TRUE)))
+  expect_equal(rcmetar.revman.format.effect.number(values, 2), labels)
+  expect_equal(rcmetar.bmj.format.effect.number(values, 2), labels)
+})
+
 test_that("forest style and universal appearance params persist in metafor bundles", {
   fixture <- metafor_binary_fixture()
   fixture$params$fp_style <- "bmj"
@@ -444,6 +457,21 @@ test_that("one-sided axis bounds and BMJ risk-difference bounds remain authorita
   fixture$params$fp_plot_ub <- "0.75"
   bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
   expect_equal(rcmetar.forest.bmj.alim(bundle), rcmetar.metafor.alim(bundle))
+})
+
+test_that("explicit axis bounds expand rather than clipping study point estimates", {
+  fixture <- metafor_binary_fixture()
+  fixture$params$fp_plot_lb <- "0.9"
+  fixture$params$fp_plot_ub <- "1.1"
+  res <- rma.uni(yi=fixture$data@y, sei=fixture$data@SE, method="DL")
+
+  for (style in c("default", "revman", "bmj")) {
+    fixture$params$fp_style <- style
+    bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+    plan <- rcmetar.forest.layout.preflight(bundle)
+    expect_lte(plan$x$alim[[1]], min(res$yi))
+    expect_gte(plan$x$alim[[2]], max(res$yi))
+  }
 })
 
 test_that("one extreme study interval does not squeeze the remaining forest", {
@@ -1048,6 +1076,50 @@ test_that("Default Forest Style sizing reserves space for long group headers", {
   expect_gt(file.info(png_path)$size, 5000)
 })
 
+test_that("plot text ceilings preserve source study names and numeric data", {
+  fixture <- metafor_binary_fixture()
+  original.name <- paste(rep("Very long identifying study name", 5), collapse = " ")
+  fixture$data@study.names[[1]] <- original.name
+  original.y <- fixture$data@y
+  fixture$params$fp_col1_str <- paste(rep("Long heading", 12), collapse = " ")
+  fixture$params$fp_xlabel <- paste(rep("Long axis label", 12), collapse = " ")
+  res <- rma.uni(yi=fixture$data@y, sei=fixture$data@SE, method="DL")
+
+  bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+
+  expect_identical(fixture$data@study.names[[1]], original.name)
+  expect_identical(fixture$data@y, original.y)
+  expect_lte(nchar(bundle$slab[[1]]), 72)
+  expect_match(bundle$slab[[1]], "\\.\\.\\.")
+  expect_true(endsWith(bundle$slab[[1]], as.character(fixture$data@years[[1]])))
+  expect_equal(nchar(bundle$params$fp_col1_str), 80)
+  expect_equal(nchar(bundle$params$fp_xlabel), 80)
+  expect_identical(
+    rcmetar.truncate.plot.display.text(c(NA_character_, "Study")),
+    c(NA_character_, "Study")
+  )
+})
+
+test_that("subgroup display headings truncate without changing grouping state", {
+  fixture <- metafor_binary_fixture()
+  long.group <- paste(rep("Long subgroup category", 6), collapse=" ")
+  fixture$params$cov_name <- "Era"
+  fixture$data@covariates <- list(new(
+    "CovariateValues", cov.name="Era",
+    cov.vals=c(rep(long.group, 3), rep("Short group", 3)),
+    cov.type="factor", ref.var=long.group
+  ))
+  result <- subgroup.ma.binary("binary.random", fixture$data, fixture$params)
+  bundle <- load_saved_plot_data(unname(result$plot_params_paths[[1]]))
+
+  expect_lte(nchar(bundle$subgroups$names[[1]]), 72)
+  expect_match(bundle$subgroups$names[[1]], "\\.\\.\\.")
+  expect_identical(
+    as.character(bundle$regeneration_state$subgroup_data$subgroup.list[[1]]),
+    long.group
+  )
+})
+
 test_that("RevMan raw-column layouts reserve space for long study labels", {
   short.fixture <- metafor_continuous_fixture()
   short.fixture$params$fp_style <- "revman"
@@ -1108,6 +1180,36 @@ test_that("single-study binary Default Forest Style uses normalized vectors", {
 
   expect_true(file.exists(png_path))
   expect_gt(file.info(png_path)$size, 3000)
+})
+
+test_that("journal display labels do not duplicate publication years", {
+  fixture <- metafor_binary_fixture(studies = 2)
+  fixture$data@study.names <- c("Alpha Trial 2024", "Beta Trial")
+  fixture$data@years <- as.integer(c(2024, 2023))
+
+  expect_equal(
+    rcmetar.study.labels(fixture$data),
+    c("Alpha Trial 2024", "Beta Trial, 2023")
+  )
+})
+
+test_that("subgroup model labels preserve readable word spacing", {
+  result <- list(QE=1.2, k=3, p=1, QEp=0.2, I2=30, tau2=0.1)
+  label <- rcmetar.default.model.label("RE Model for Subgroup", result)
+
+  expect_type(label, "character")
+  expect_match(label, "Subgroup (Q =", fixed=TRUE)
+  expect_match(label, "I² = 30.0%", fixed=TRUE)
+  expect_match(label, "τ² = 0.10", fixed=TRUE)
+})
+
+test_that("raster plot exports default to publication-grade resolution", {
+  expect_equal(rcmetar.plot.export.dpi(list()), 600)
+  expect_equal(rcmetar.plot.export.dpi(list(dpi=900)), 900)
+  expect_equal(
+    unname(rcmetar.plot.pixel.size(list(width=3, height=2))),
+    c(1800, 1200)
+  )
 })
 
 test_that("single-arm binary metrics build and render Default metafor bundles", {

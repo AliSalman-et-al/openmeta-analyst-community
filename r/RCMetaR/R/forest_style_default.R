@@ -421,13 +421,13 @@ rcmetar.default.model.label <- function(prefix, res) {
     if (is.null(res$QE)) {
         return(prefix)
     }
-    as.expression(bquote(paste(
-        .(prefix), " (Q = ", .(round.display(res$QE, 2)),
-        ", df = ", .(res$k - res$p), ", ",
-        .(rcmetar.default.p.value.label(res$QEp)), "; ",
-        I^2, " = ", .(round.display(res$I2, 1)), "%, ",
-        tau^2, " = ", .(round.display(res$tau2, 2)), ")"
-    )))
+    paste0(
+        prefix, " (Q = ", round.display(res$QE, 2),
+        ", df = ", res$k - res$p, ", ",
+        rcmetar.default.p.value.label(res$QEp), "; ",
+        "I² = ", round.display(res$I2, 1), "%, ",
+        "τ² = ", round.display(res$tau2, 2), ")"
+    )
 }
 
 rcmetar.default.subgroup.difference.label <- function(test) {
@@ -459,7 +459,7 @@ rcmetar.default.p.value.label <- function(p.value) {
         return("p = NA")
     }
     if (p.value < 0.001) {
-        return("p < .001")
+        return("p < 0.001")
     }
     paste("p =", round.display(p.value, 3))
 }

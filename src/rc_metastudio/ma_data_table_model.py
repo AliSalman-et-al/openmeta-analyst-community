@@ -223,7 +223,7 @@ class DatasetModel(QAbstractTableModel):
         # LABELS is rebuilt when the current data type or display mode changes.
         self.LABELS = None
 
-        self.NUM_DIGITS = 3
+        self.NUM_DIGITS = NUM_DIGITS
         self.dirty = False
 
     def reset_model(self):

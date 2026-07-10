@@ -503,7 +503,7 @@ is.single.numeric.covariate <- function(mods) {
 }
 
 # create regression plot data for g.meta.regression function
-g.create.plot.data.reg <- function(reg.data, cov.name, cov.vals, measure, level, fitted.line, res=NULL, digits=3) {
+g.create.plot.data.reg <- function(reg.data, cov.name, cov.vals, measure, level, fitted.line, res=NULL, digits=RCMETAR_DEFAULT_DISPLAY_DIGITS) {
 	if (!inherits(res, "rma")) {
 		stop("Meta-regression bubble plots require a metafor rma result.", call.=FALSE)
 	}
@@ -929,7 +929,7 @@ meta.regression.parameters <- function() {
     rm.methods <- c("HE", "DL", "SJ", "ML", "REML", "EB")
     list(
         parameters=list("rm.method"=rm.methods, "conf.level"="float", "digits"="int"),
-        defaults=list("rm.method"="REML", "conf.level"=95, "digits"=3),
+        defaults=list("rm.method"="REML", "conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS),
         var_order=c("rm.method", "conf.level", "digits")
     )
 }
@@ -1074,7 +1074,7 @@ binary.random.meta.regression.parameters <- function(){
     params <- list("rm.method"=rm_method_ls, "conf.level"="float", "digits"="int")
     
     # default values
-    defaults <- list("rm.method"="DL", "conf.level"=95, "digits"=3)
+    defaults <- list("rm.method"="DL", "conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS)
     
     var_order <- c("rm.method", "conf.level", "digits")
     parameters <- list("parameters"=params, "defaults"=defaults, "var_order"=var_order)

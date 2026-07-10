@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'src\rc_metastudio\forms\edit_forest_plot.ui'
+# Form implementation generated from reading ui file 'src/rc_metastudio/forms/edit_forest_plot.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -149,6 +149,9 @@ class Ui_edit_forest_plot_dlg(object):
         self.show_prediction_interval = QtWidgets.QCheckBox(self.regression_group)
         self.show_prediction_interval.setObjectName("show_prediction_interval")
         self.regression_layout.addWidget(self.show_prediction_interval, 2, 0, 1, 1)
+        self.show_legend = QtWidgets.QCheckBox(self.regression_group)
+        self.show_legend.setObjectName("show_legend")
+        self.regression_layout.addWidget(self.show_legend, 3, 0, 1, 1)
         self.verticalLayout.addWidget(self.regression_group)
         self.gridLayout_4 = QtWidgets.QGridLayout()
         self.gridLayout_4.setObjectName("gridLayout_4")
@@ -248,6 +251,7 @@ class Ui_edit_forest_plot_dlg(object):
         self.show_regression_line.setText(_translate("edit_forest_plot_dlg", "Show regression line"))
         self.show_confidence_band.setText(_translate("edit_forest_plot_dlg", "Show confidence band"))
         self.show_prediction_interval.setText(_translate("edit_forest_plot_dlg", "Show prediction interval"))
+        self.show_legend.setText(_translate("edit_forest_plot_dlg", "Show legend"))
         self.label_12.setText(_translate("edit_forest_plot_dlg", "X-axis label:"))
         self.label_13.setText(_translate("edit_forest_plot_dlg", "X-axis ticks:"))
         self.x_ticks_le.setText(_translate("edit_forest_plot_dlg", "[default]"))

@@ -381,7 +381,7 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
                 defaults = {
                     "rm.method": "DL",
                     "conf.level": 95.0,
-                    "digits": 3,
+                    "digits": 2,
                     "adjust": 0.5,
                     "to": "only0",
                 }

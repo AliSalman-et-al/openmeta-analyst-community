@@ -38,6 +38,7 @@ import progress_bar as progress_dialog
 import qt_layout
 import qt_text
 import plot_capabilities
+from plot_text import apply_plot_text_input_limits
 from plot_defaults import apply_default_forest_arm_labels
 from meta_globals import *
 from settings import *
@@ -205,6 +206,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         super(MA_Specs, self).__init__(parent)
         self.setupUi(self)
+        apply_plot_text_input_limits(self)
         apply_default_forest_arm_labels(self)
         if _text_value(self.image_path) == "":
             self.image_path.setText(analysis_output_path("forest.png"))
@@ -281,7 +283,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self._combined_diagnostic = False
         self._shared_diagnostic_param_specs = {
             "conf.level": ("float", self.conf_level, None),
-            "digits": ("int", 3, None),
+            "digits": ("int", 2, None),
             "adjust": ("float", 0.5, None),
             "to": (["only0", "all"], "only0", None),
         }
@@ -526,6 +528,11 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                     _bool_plot_param(
                         self.current_param_vals.get("bp_show_prediction_interval"),
                         False,
+                    )
+                )
+                self.show_legend.setChecked(
+                    _bool_plot_param(
+                        self.current_param_vals.get("bp_show_legend"), False
                     )
                 )
             self.show_raw_counts.setChecked(
@@ -1490,6 +1497,7 @@ def add_plot_params(specs_form):
                 "bp_show_regression_line": specs_form.show_regression_line.isChecked(),
                 "bp_show_confidence_band": specs_form.show_confidence_band.isChecked(),
                 "bp_show_prediction_interval": specs_form.show_prediction_interval.isChecked(),
+                "bp_show_legend": specs_form.show_legend.isChecked(),
             }
         )
         return
