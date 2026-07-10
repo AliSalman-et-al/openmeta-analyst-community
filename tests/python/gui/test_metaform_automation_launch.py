@@ -15,6 +15,22 @@ from PyQt5.QtWidgets import QHeaderView
 REPO_ROOT = os.getcwd()
 
 
+def _plot_capability(
+    plot_kind="forest",
+    editable=True,
+    styleable=True,
+    composition="single",
+    regenerator="forest",
+):
+    return {
+        "plot_kind": plot_kind,
+        "editable": editable,
+        "styleable": styleable,
+        "composition": composition,
+        "regenerator": regenerator,
+    }
+
+
 def _assert_compact_table_fits_visible_cells(table):
     owner = table.window()
     owner.resize(owner.width() + 180, owner.height())
@@ -1988,6 +2004,7 @@ def test_results_window_renders_summary_text_and_plot_navigation(tmp_path):
             "image_var_names": {"Forest Plot": "forest_plot"},
             "image_params_paths": {"Forest Plot": str(tmp_path / "forest_params")},
             "image_order": ["Forest Plot"],
+            "plot_capabilities": {"Forest Plot": _plot_capability()},
         }
     )
 
@@ -2048,6 +2065,7 @@ def test_results_window_displays_canonical_svg_plot_artifact(tmp_path):
             "image_var_names": {"Forest Plot": "forest_plot"},
             "image_params_paths": {"Forest Plot": str(tmp_path / "forest_params")},
             "image_order": ["Forest Plot"],
+            "plot_capabilities": {"Forest Plot": _plot_capability()},
         }
     )
 
@@ -2099,6 +2117,12 @@ def test_results_window_refits_svg_plots_and_reflows_sections_on_resize(tmp_path
                 "Cumulative Forest Plot": plot_paths["cumulative"],
             },
             "image_order": ["Forest Plot", "Cumulative Forest Plot"],
+            "plot_capabilities": {
+                "Forest Plot": _plot_capability(editable=False),
+                "Cumulative Forest Plot": _plot_capability(
+                    plot_kind="cumulative_forest", editable=False
+                ),
+            },
         }
     )
 
@@ -2195,6 +2219,7 @@ def test_results_window_places_references_after_images_and_wraps_them(tmp_path):
             "image_var_names": {"Forest Plot": "forest_plot"},
             "image_params_paths": {"Forest Plot": str(tmp_path / "forest_params")},
             "image_order": ["Forest Plot"],
+            "plot_capabilities": {"Forest Plot": _plot_capability()},
         }
     )
 
@@ -2418,26 +2443,33 @@ def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_p
 
     try:
         menu_cases = [
-            ("plot.data", "Forest Plot", "forest", True),
-            ("plot.data", "Cumulative Forest Plot", "forest", False),
-            ("plot.data", "Leave-one-out Forest plot", "forest", False),
-            ("plot.data", "Subgroup Forest Plot", "forest", False),
-            ("plot.data", "Subgroups Forest Plot", "forest", False),
-            ("plot.data", "Sensitivity Forest Plot", "forest", True),
-            ("plot.data", "Specificity Forest Plot", "forest", True),
-            ("plot.data", "Negative Likelihood Ratio Forest Plot", "forest", True),
-            ("plot.data", "Positive Likelihood Ratio Forest Plot", "forest", True),
-            ("plot.data", "Regression Plot", "regression", True),
-            (None, "Forest Plot", "forest", False),
+            ("plot.data", "Forest Plot", "forest", True, "forest"),
+            ("plot.data", "Cumulative Forest Plot", "cumulative_forest", False, "forest"),
+            ("plot.data", "Leave-one-out Forest plot", "leave_one_out_forest", False, "forest"),
+            ("plot.data", "Subgroup Forest Plot", "subgroup_forest", False, "forest"),
+            ("plot.data", "Subgroups Forest Plot", "subgroup_forest", False, "forest"),
+            ("plot.data", "Sensitivity Forest Plot", "forest", True, "forest"),
+            ("plot.data", "Specificity Forest Plot", "forest", True, "forest"),
+            ("plot.data", "Negative Likelihood Ratio Forest Plot", "forest", True, "forest"),
+            ("plot.data", "Positive Likelihood Ratio Forest Plot", "forest", True, "forest"),
+            ("plot.data", "Regression Plot", "regression", True, "regression"),
+            ("plot.data", "A title without a plot hint", "forest", True, "forest"),
+            ("plot.data", "Forest Plot", "other", False, "none"),
+            (None, "Forest Plot", "forest", False, "forest"),
         ]
 
-        for params_path, title, plot_type, editable in menu_cases:
+        for params_path, title, plot_kind, editable, regenerator in menu_cases:
             event = FakeEvent()
             artifact = results_window.PlotArtifact(
                 title,
                 "missing.png",
+                _plot_capability(
+                    plot_kind=plot_kind,
+                    editable=editable,
+                    styleable=plot_kind not in ("other", "roc", "sroc"),
+                    regenerator=regenerator,
+                ),
                 params_path=params_path,
-                plot_type=plot_type,
             )
             handler = window._make_context_menu(artifact, plot_item=None)
             handler(event)
@@ -2482,8 +2514,8 @@ def test_results_window_save_handler_regenerates_cumulative_forest_as_single_pan
     artifact = results_window.PlotArtifact(
         "Cumulative Forest Plot",
         str(tmp_path / "forest.png"),
+        _plot_capability(plot_kind="cumulative_forest", editable=False),
         params_path=str(tmp_path / "forest_params"),
-        plot_type="forest",
     )
 
     monkeypatch.setattr(
@@ -2540,8 +2572,8 @@ def test_results_window_save_handler_accepts_backend_export_formats(
     artifact = results_window.PlotArtifact(
         "Forest Plot",
         str(tmp_path / "forest.png"),
+        _plot_capability(),
         params_path=str(tmp_path / "forest_params"),
-        plot_type="forest",
     )
 
     monkeypatch.setattr(
@@ -2597,8 +2629,8 @@ def test_results_window_save_handler_preserves_requested_format_when_extension_i
     artifact = results_window.PlotArtifact(
         "Forest Plot",
         str(tmp_path / "forest.png"),
+        _plot_capability(),
         params_path=str(tmp_path / "forest_params"),
-        plot_type="forest",
     )
 
     monkeypatch.setattr(
@@ -2953,14 +2985,18 @@ def test_diagnostic_forest_methods_enable_pre_run_plots_tab(
     )
     monkeypatch.setattr(
         meta_py_r,
+        "get_analysis_plot_capabilities",
+        lambda data_type, method, workflow="standard": [
+            _plot_capability(plot_kind="forest")
+        ],
+        raising=False,
+    )
+    monkeypatch.setattr(
+        meta_py_r,
         "ma_dataset_to_simple_diagnostic_robj",
         lambda model, **kwargs: None,
         raising=False,
     )
-    monkeypatch.setattr(
-        ma_specs.MA_Specs, "_configure_plot_option_groups", lambda self: None
-    )
-
     specs = None
     try:
         specs = ma_specs.MA_Specs(
@@ -3078,6 +3114,7 @@ def test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog(
             "images": {"Forest Plot": png_path},
             "image_params_paths": {"Forest Plot": params_path},
             "image_order": ["Forest Plot"],
+            "plot_capabilities": {"Forest Plot": _plot_capability()},
         }
     )
 
@@ -3181,6 +3218,9 @@ def test_results_window_uses_reader_oriented_section_names_and_order(tmp_path):
             },
             "images": {"Forest Plot": plot_paths["forest"]},
             "image_order": ["Forest Plot"],
+            "plot_capabilities": {
+                "Forest Plot": _plot_capability(editable=False)
+            },
         }
     )
     try:
@@ -3208,6 +3248,26 @@ def test_results_window_uses_reader_oriented_section_names_and_order(tmp_path):
                 "Summary ROC": plot_paths["roc"],
             },
             "image_order": ["Summary ROC", "Density plots", "Trace plots"],
+            "plot_capabilities": {
+                "Summary ROC": _plot_capability(
+                    plot_kind="sroc",
+                    editable=False,
+                    styleable=False,
+                    regenerator="none",
+                ),
+                "Density plots": _plot_capability(
+                    plot_kind="other",
+                    editable=False,
+                    styleable=False,
+                    regenerator="none",
+                ),
+                "Trace plots": _plot_capability(
+                    plot_kind="other",
+                    editable=False,
+                    styleable=False,
+                    regenerator="none",
+                ),
+            },
         }
     )
     try:

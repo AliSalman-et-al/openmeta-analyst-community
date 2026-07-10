@@ -46,7 +46,7 @@
 #' Use \code{rcmetar.method.references()} to inspect the statistical references
 #' associated with a method family.
 #'
-#' @aliases rcmetar.run.analysis rcmetar.run.diagnostic.analyses rcmetar.run.permutation rcmetar.validate.analysis.request rcmetar.analysis.methods rcmetar.available.methods rcmetar.method.parameters rcmetar.method.description rcmetar.set.global.conf.level rcmetar.get.mult.from.conf.level rcmetar.create.covariate.values rcmetar.create.binary.data rcmetar.create.continuous.data rcmetar.create.diagnostic.data rcmetar.prepare.analysis.data rcmetar.impute.binary rcmetar.impute.diagnostic rcmetar.impute.continuous.study rcmetar.impute.continuous.prepost rcmetar.back.calculate.continuous rcmetar.convert.scale rcmetar.binary.study.effect rcmetar.continuous.study.effect rcmetar.diagnostic.study.effects rcmetar.regenerate.plot.data rcmetar.save.plot.data rcmetar.draw.forest.plot rcmetar.draw.regression.plot rcmetar.graphics.off rcmetar.method.references
+#' @aliases rcmetar.run.analysis rcmetar.run.diagnostic.analyses rcmetar.run.permutation rcmetar.validate.analysis.request rcmetar.analysis.methods rcmetar.analysis.plot.capabilities rcmetar.available.methods rcmetar.method.parameters rcmetar.method.description rcmetar.set.global.conf.level rcmetar.get.mult.from.conf.level rcmetar.create.covariate.values rcmetar.create.binary.data rcmetar.create.continuous.data rcmetar.create.diagnostic.data rcmetar.prepare.analysis.data rcmetar.impute.binary rcmetar.impute.diagnostic rcmetar.impute.continuous.study rcmetar.impute.continuous.prepost rcmetar.back.calculate.continuous rcmetar.convert.scale rcmetar.binary.study.effect rcmetar.continuous.study.effect rcmetar.diagnostic.study.effects rcmetar.regenerate.plot.data rcmetar.save.plot.data rcmetar.draw.forest.plot rcmetar.draw.regression.plot rcmetar.graphics.off rcmetar.method.references
 #' @name RCMetaR-core-api
 NULL
 
@@ -137,6 +137,35 @@ rcmetar.method.description <- function(method) {
         return(as.character(pretty.names$description))
     }
     "None provided."
+}
+
+rcmetar.analysis.plot.capabilities <- function(data.type, method, workflow="standard") {
+    method <- .rcmetar.validate.method.name(method)
+    data.type <- .rcmetar.match.arg(tolower(as.character(data.type)), c("binary", "continuous", "diagnostic"), "data.type")
+    workflow <- .rcmetar.normalize.workflow(workflow)
+    if (!(method %in% rcmetar.analysis.methods(data.type, workflow))) {
+        stop(sprintf("Method '%s' is not available for %s %s analysis.", method, data.type, workflow), call.=FALSE)
+    }
+
+    descriptor <- .rcmetar.plot.descriptor
+    if (workflow == "cumulative") return(list(descriptor("cumulative_forest", FALSE, TRUE, "forest")))
+    if (workflow == "leave-one-out") return(list(descriptor("leave_one_out_forest", FALSE, TRUE, "forest")))
+    if (workflow == "subgroup") return(list(descriptor("subgroup_forest", FALSE, TRUE, "forest")))
+    if (workflow == "bootstrap") return(list(descriptor("other", FALSE, FALSE, "none")))
+    if (workflow == "meta-regression") return(list(descriptor("regression", TRUE, TRUE, "regression")))
+    if (method == "diagnostic.hsroc") {
+        return(list(
+            descriptor("sroc", FALSE, FALSE, "none"),
+            descriptor("forest", TRUE, TRUE, "forest")
+        ))
+    }
+    if (method == "diagnostic.bivariate.ml") {
+        return(list(
+            descriptor("roc", FALSE, FALSE, "none"),
+            descriptor("forest", TRUE, TRUE, "forest")
+        ))
+    }
+    list(descriptor("forest", TRUE, TRUE, "forest"))
 }
 
 rcmetar.set.global.conf.level <- function(conf.level) {
@@ -386,6 +415,7 @@ rcmetar.run.analysis <- function(om.data, request=NULL, method=NULL, params=list
         "meta-regression"=meta.regression(om.data, request$params, request$cond.means.data, request$stop.at.rma)
     )
 
+    result <- .rcmetar.attach.plot.capabilities(result, request)
     .rcmetar.attach.request(result, request)
 }
 
@@ -421,12 +451,14 @@ rcmetar.run.diagnostic.analyses <- function(diagnostic.data, methods, params.lis
         subgroup=multiple.subgroup.diagnostic(methods, params.list, diagnostic.data)
     )
 
-    attr(result, "rcmetar.request") <- list(
+    result.request <- list(
         data.type="diagnostic",
         methods=as.character(methods),
         params.list=params.list,
         workflow=workflow
     )
+    result <- .rcmetar.attach.plot.capabilities(result, result.request)
+    attr(result, "rcmetar.request") <- result.request
     result
 }
 
@@ -655,4 +687,71 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
         attr(result, "rcmetar.request") <- request
     }
     result
+}
+
+.rcmetar.attach.plot.capabilities <- function(result, request) {
+    if (!is.list(result) || is.null(result$images) || length(result$images) == 0) {
+        return(result)
+    }
+    image.names <- names(result$images)
+    if (is.null(image.names) || any(!nzchar(image.names))) {
+        stop("Every RCMetaR plot artifact must have a non-empty title.", call.=FALSE)
+    }
+    if (is.null(result$plot_capabilities)) {
+        descriptor <- .rcmetar.homogeneous.plot.capability(result, request)
+        result$plot_capabilities <- setNames(
+            lapply(image.names, function(title) descriptor),
+            image.names
+        )
+    }
+    if (!setequal(names(result$plot_capabilities), image.names)) {
+        stop("Plot capability descriptors must match the returned plot artifacts.", call.=FALSE)
+    }
+    result
+}
+
+.rcmetar.homogeneous.plot.capability <- function(result, request) {
+    workflow <- as.character(request$workflow[[1]])
+    methods <- if (!is.null(request$methods)) request$methods else request$method
+    methods <- as.character(methods)
+
+    plot.kind <- switch(
+        workflow,
+        cumulative="cumulative_forest",
+        "leave-one-out"="leave_one_out_forest",
+        subgroup="subgroup_forest",
+        bootstrap="other",
+        "meta-regression"="regression",
+        standard={
+            if (length(methods) != 1 || methods %in% c("diagnostic.hsroc", "diagnostic.bivariate.ml")) {
+                stop("Heterogeneous diagnostic plot producers must declare their own capabilities.", call.=FALSE)
+            }
+            "forest"
+        },
+        stop(sprintf("No plot capability contract for workflow '%s'.", workflow), call.=FALSE)
+    )
+    forest.kinds <- c("forest", "cumulative_forest", "leave_one_out_forest", "subgroup_forest")
+    styleable <- plot.kind %in% c(forest.kinds, "regression")
+    params.paths <- result$plot_params_paths
+    has.params <- !is.null(params.paths) && length(params.paths) > 0
+    editable <- workflow == "standard" && has.params && plot.kind %in% c("forest", "regression")
+    regenerator <- if (plot.kind %in% forest.kinds) {
+        "forest"
+    } else if (plot.kind == "regression") {
+        "regression"
+    } else {
+        "none"
+    }
+
+    .rcmetar.plot.descriptor(plot.kind, editable, styleable, regenerator)
+}
+
+.rcmetar.plot.descriptor <- function(plot.kind, editable, styleable, regenerator) {
+    list(
+        plot_kind=plot.kind,
+        editable=isTRUE(editable),
+        styleable=isTRUE(styleable),
+        composition="single",
+        regenerator=regenerator
+    )
 }

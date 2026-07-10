@@ -27,6 +27,7 @@ LEGACY_ALIAS_PATTERN = re.compile(
 S4_CLASS_PATTERN = re.compile(r"setClass\(\s*[\"']([^\"']+)[\"']")
 RCMetaR_PUBLIC_EXPORTS = {
     "rcmetar.analysis.methods",
+    "rcmetar.analysis.plot.capabilities",
     "rcmetar.available.methods",
     "rcmetar.back.calculate.continuous",
     "rcmetar.binary.study.effect",

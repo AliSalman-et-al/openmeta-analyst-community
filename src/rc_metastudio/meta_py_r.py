@@ -12,6 +12,7 @@ from analysis_method_labels import (
     normalize_available_method_labels,
 )
 import result_sections
+import plot_capabilities
 from study_effect_shapes import (
     effect_triplet,
     normalize_diagnostic_effects,
@@ -465,6 +466,17 @@ def get_available_methods(for_data_type=None, data_obj_name=None, metric=None):
 @RfunctionCaller
 def get_method_description(method_name):
     return execute_r_function("rcmetar.method.description", str(method_name))[0]
+
+
+@RfunctionCaller
+def get_analysis_plot_capabilities(data_type, method_name, workflow="standard"):
+    capabilities = execute_r_function(
+        "rcmetar.analysis.plot.capabilities",
+        str(data_type),
+        str(method_name),
+        workflow=str(_normalize_RCMetaR_workflow(workflow)),
+    )
+    return R_parse_tools.recursioner(capabilities)
 
 
 # def ma_dataset_to_binary_robj(table_model, var_name):
@@ -1236,6 +1248,7 @@ def parse_out_results(result):
     text_d = {}
     image_var_name_d, image_params_paths_d, image_path_d = {}, {}, {}
     image_order = None
+    plot_capability_d = {}
 
     if _r_inherits(result, "try-error"):
         raise RuntimeError(_r_error_message(result))
@@ -1265,6 +1278,8 @@ def parse_out_results(result):
                 image_params_paths_d = {}
             else:
                 image_params_paths_d = R_parse_tools.recursioner(text)
+        elif text_n == "plot_capabilities":
+            plot_capability_d = R_parse_tools.recursioner(text)
         elif text_n == "References":
             text_d[display_text_n] = result_sections.format_references(text)
         elif text_n in ("weights", "Weights"):
@@ -1306,8 +1321,9 @@ def parse_out_results(result):
         "texts": text_d,
         "image_params_paths": image_params_paths_d,
         "image_order": image_order,
+        "plot_capabilities": plot_capability_d,
     }
-
+    to_return["plot_capabilities"] = plot_capabilities.validate_result(to_return)
     return to_return
 
 

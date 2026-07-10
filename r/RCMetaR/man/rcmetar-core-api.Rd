@@ -7,6 +7,7 @@
 \alias{rcmetar.run.permutation}
 \alias{rcmetar.validate.analysis.request}
 \alias{rcmetar.analysis.methods}
+\alias{rcmetar.analysis.plot.capabilities}
 \alias{rcmetar.available.methods}
 \alias{rcmetar.method.parameters}
 \alias{rcmetar.method.description}

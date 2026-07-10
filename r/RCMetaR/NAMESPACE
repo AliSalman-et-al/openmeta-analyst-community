@@ -3,6 +3,7 @@
 S3method(print,summary.data)
 S3method(print,summary.display)
 export(rcmetar.analysis.methods)
+export(rcmetar.analysis.plot.capabilities)
 export(rcmetar.available.methods)
 export(rcmetar.back.calculate.continuous)
 export(rcmetar.binary.study.effect)

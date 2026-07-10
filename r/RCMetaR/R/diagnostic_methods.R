@@ -199,19 +199,15 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
         metrics <- c(metrics, params.list[[count]]$measure)
         if (params.list[[count]]$measure=="Sens") {
             sens.index <- count
-			png(filename=paste(params.list[[count]]$fp_outpath,"INTER",sep="")) # to fix windows popping out at you issue
         }
         if (params.list[[count]]$measure=="Spec") {
             spec.index <- count
-			png(filename=paste(params.list[[count]]$fp_outpath,"INTER",sep="")) # to fix windows popping out at you issue
         }
         if (params.list[[count]]$measure=="PLR") {
             plr.index <- count
-			png(filename=paste(params.list[[count]]$fp_outpath,"INTER",sep="")) # to fix windows popping out at you issue
         }
         if (params.list[[count]]$measure=="NLR") {
             nlr.index <- count
-			png(filename=paste(params.list[[count]]$fp_outpath,"INTER",sep="")) # to fix windows popping out at you issue
         }
     }
     
@@ -219,6 +215,7 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
     image.order <- c()
     plot.names <- c()
     plot.params.paths <- c()
+    plot.capabilities <- list()
     plot.pdfs.paths <- c() # sometimes we want to just output pdfs at run-time
     remove.indices <- c()
 	references <- c()
@@ -233,6 +230,7 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
             biv.results <- eval(call(fname, diagnostic.data, params.sens))
             results <- c(results, biv.results$Summary)
             images <- c(images, biv.results$images)
+            plot.capabilities <- c(plot.capabilities, biv.results$plot_capabilities)
             image.order <- append.image.order(image.order, biv.results)
             remove.indices <- c(sens.index, spec.index)
 			references <- c(references, biv.results$References)
@@ -250,6 +248,7 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
             plot.params.paths.tmp <- c("SROC"=sroc.plot.params.path)
             plot.params.paths <- c(plot.params.paths, plot.params.paths.tmp)
             images <- c(images, c("SROC"=sroc.path))
+            plot.capabilities[["SROC"]] <- .rcmetar.plot.descriptor("sroc", FALSE, FALSE, "none")
             image.order <- c(image.order, "SROC")
             plot.names <- c(plot.names, c("sroc"="sroc"))
         }
@@ -270,6 +269,7 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
             images.tmp <- results.tmp$images
             names(images.tmp) <- paste(eval(parse(text=paste("pretty.names$measure$",params.list[[count]]$measure,sep=""))), " Forest Plot", sep="")
             images <- c(images, images.tmp)
+            plot.capabilities[[names(images.tmp)[[1]]]] <- .rcmetar.plot.descriptor("forest", TRUE, TRUE, "forest")
             image.order <- c(image.order, names(images.tmp))
             plot.params.paths.tmp <- results.tmp$plot_params_paths
             names(plot.params.paths.tmp) <- paste(eval(parse(text=paste("pretty.names$measure$", params.list[[count]]$measure,sep=""))), " Forest Plot", sep="")
@@ -286,8 +286,9 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
     graphics.off()
     results <- c(results, list("images"=images,
 					           "image_order"=image.order,
-							   "plot_names"=plot.names, 
+                               "plot_names"=plot.names,
                                "plot_params_paths"=plot.params.paths,
+                               "plot_capabilities"=plot.capabilities,
 							   "References"=rcmetar.unique.references(references)))
     results
 }
@@ -1494,10 +1495,17 @@ diagnostic.hsroc <- function(diagnostic.data, params){
     ####
     # and the images
     images <- hsroc.display.images(hsroc.sum, out.dir, params)
+    plot.capabilities <- setNames(
+        lapply(names(images), function(name) .rcmetar.plot.descriptor("other", FALSE, FALSE, "none")),
+        names(images)
+    )
 
     # we don't want the SROC plot to be mixed in with 
     # the density plots...
     roc.plot.name <- "Summary ROC"
+    if (roc.plot.name %in% names(plot.capabilities)) {
+        plot.capabilities[[roc.plot.name]] <- .rcmetar.plot.descriptor("sroc", FALSE, FALSE, "none")
+    }
     image.names <- names(images)
     image.order <- c()
     if (roc.plot.name %in% image.names) {
@@ -1506,7 +1514,8 @@ diagnostic.hsroc <- function(diagnostic.data, params){
     image.order <- c(image.order, image.names[image.names!=roc.plot.name])
 	references <- rcmetar.method.references("hsroc")
     results <- list("images"=images,
-			        "image_order"=image.order,
+                    "image_order"=image.order,
+                    "plot_capabilities"=plot.capabilities,
 					"Summary"=summary,
 					"References"=rcmetar.unique.references(references))
 
@@ -1602,9 +1611,11 @@ diagnostic.bivariate.ml <- function(diagnostic.data, params){
                                  filepath=path.to.roc.plot.base)
 
     images <- c("ROC Plot"=paste(path.to.roc.plot.base, ".png", sep=""))
+    plot.capabilities <- list("ROC Plot"=.rcmetar.plot.descriptor("roc", FALSE, FALSE, "none"))
 
 	references <- rcmetar.method.references("diagnostic.bivariate")
     results <- list("images"=images,
+                    "plot_capabilities"=plot.capabilities,
 			        "Summary"=list("Bivariate Summary"=summary.text),
 					"References"=rcmetar.unique.references(references))
 }

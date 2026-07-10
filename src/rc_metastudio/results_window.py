@@ -36,7 +36,7 @@ import ui_results_window
 import app_error_handler
 import forms.ui_edit_forest_plot
 import meta_py_r
-import plot_options
+import plot_capabilities
 import qt_layout
 import qt_text
 import result_sections
@@ -62,12 +62,6 @@ PLOT_EXPORT_EXTENSION_ALIASES = {
     "svg": (".svg", ".svgz"),
 }
 
-NON_EDITABLE_FOREST_PLOTS = (
-    "Cumulative Forest Plot",
-    "Leave-One-Out Forest Plot",
-    "Subgroup Forest Plot",
-    "Subgroups Forest Plot",
-)
 FOREST_STYLE_LABELS = {
     "default": "Default (metafor)",
     "revman": "RevMan",
@@ -120,11 +114,12 @@ def _path_with_export_extension(file_path, export_format):
 
 
 class PlotArtifact(object):
-    def __init__(self, title, image_path, params_path=None, plot_type=None):
+    def __init__(self, title, image_path, capability, params_path=None):
         self.title = title
         self.image_path = str(image_path)
         self.params_path = params_path
-        self.plot_type = plot_type
+        self.capability = dict(capability)
+        self.plot_kind = self.capability["plot_kind"]
         self.canonical_svg_path = _canonical_svg_path(self.image_path)
 
     def display_path(self):
@@ -173,7 +168,7 @@ class EditPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
         self._loading_style = False
         self._params = dict(plot_params or {})
         self.plot_type = plot_type
-        self._option_groups = plot_options.option_groups(plot_type)
+        self._option_groups = plot_capabilities.option_groups(plot_type)
 
         self.color_btn.clicked.connect(
             app_error_handler.safe_slot(self._choose_color, parent=self)
@@ -405,6 +400,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self.params_paths = {}
         if "image_params_paths" in results:
             self.params_paths = results["image_params_paths"]
+        self.plot_capabilities = results["plot_capabilities"]
 
         self.items_to_coords = {}
         self._wrapped_text_items = []
@@ -459,8 +455,8 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         return PlotArtifact(
             title,
             image_path,
+            self.plot_capabilities[title],
             params_path=params_path,
-            plot_type=self._get_plot_type(title),
         )
 
     def add_text_section(self, title, display_title, text):
@@ -731,18 +727,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         super(ResultsWindow, self).resizeEvent(event)
         self._refit_viewport_items()
 
-    def _get_plot_type(self, title):
-        # Infer plot type from title because RCMetaR does not yet return an
-        # explicit plot type field.
-        # more...
-        plot_type = None
-        tmp_title = title.lower()
-        if "forest" in tmp_title:
-            plot_type = "forest"
-        elif "regression" in tmp_title:
-            plot_type = "regression"
-        return plot_type
-
     def create_pixmap_item(
         self, pixmap, position, title, image_path, params_path=None, matrix=QTransform()
     ):
@@ -852,13 +836,8 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                 menu.addAction(action)
 
             context_menu = QMenu(self)
-            if artifact.params_path:
-                editable = bool(plot_options.option_groups(artifact.plot_type))
-                if artifact.plot_type == "forest" and self._is_non_editable_fp(
-                    artifact.title
-                ):
-                    editable = False
-                if editable:
+            if artifact.capability["editable"]:
+                if plot_capabilities.option_groups(artifact.plot_kind):
                     action = QAction("Edit Plot", self)
                     action.triggered.connect(
                         app_error_handler.safe_slot(
@@ -879,11 +858,12 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         return _graphics_item_context_menu
 
     def edit_plot(self, artifact, plot_item):
-        if artifact.plot_type == "forest":
+        regenerator = artifact.capability["regenerator"]
+        if regenerator == "forest":
             self.edit_forest_plot(
                 artifact.params_path, artifact.image_path, plot_item
             )
-        elif artifact.plot_type == "regression":
+        elif regenerator == "regression":
             self.edit_regression_plot(
                 artifact.params_path, artifact.image_path, plot_item
             )
@@ -967,15 +947,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                 if not pixmap.isNull():
                     plot_item.setPixmap(pixmap)
 
-    def _is_non_editable_fp(self, title):
-        normalized_title = title.casefold()
-        return any(
-            [
-                non_editable.casefold() in normalized_title
-                for non_editable in NON_EDITABLE_FOREST_PLOTS
-            ]
-        )
-
     def save_image_as(self, artifact, unscaled_image=None, format=None):
         if not isinstance(artifact, PlotArtifact):
             artifact = self.create_plot_artifact(
@@ -994,10 +965,11 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             # call, this object will be in the namespace
             meta_py_r.load_in_R("%s.plotdata" % artifact.params_path)
 
+            regenerator = artifact.capability["regenerator"]
             default_path = {
                 "forest": "forest_plot",
                 "regression": "regression",
-            }[artifact.plot_type]
+            }[regenerator]
             default_path = "%s.%s" % (default_path, export_format.extension)
 
             # where to save the graphic?
@@ -1010,15 +982,10 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             # now we re-generate it, unless they canceled, of course
             if file_path != "":
                 file_path = _path_with_export_extension(file_path, export_format)
-                if artifact.plot_type == "forest":
-                    meta_py_r.generate_forest_plot(file_path)
-                elif artifact.plot_type == "regression":
-                    meta_py_r.generate_reg_plot(file_path)
-                else:
-                    print(
-                        "sorry -- I don't know how to draw %s plots!"
-                        % artifact.plot_type
-                    )
+                function_name = plot_capabilities.regenerator_name(regenerator)
+                if function_name is None:
+                    raise ValueError("Plot is not regeneratable: %s" % artifact.title)
+                getattr(meta_py_r, function_name)(file_path)
         else:  # case where we just have the png and can't regenerate the pdf from plot data
             default_path = ".".join([artifact.title.replace(" ", "_"), "png"])
             file_path, _selected_filter = QFileDialog.getSaveFileName(
@@ -1044,6 +1011,7 @@ def _normalize_results(results):
     normalized["images"] = dict(normalized.get("images") or {})
     normalized["image_var_names"] = dict(normalized.get("image_var_names") or {})
     normalized["image_params_paths"] = dict(normalized.get("image_params_paths") or {})
+    normalized["plot_capabilities"] = plot_capabilities.validate_result(normalized)
     normalized.setdefault("image_order", None)
 
     if not normalized["texts"] and not normalized["images"]:
@@ -1059,6 +1027,7 @@ def _empty_results():
         "image_var_names": {},
         "image_params_paths": {},
         "image_order": None,
+        "plot_capabilities": {},
     }
 
 

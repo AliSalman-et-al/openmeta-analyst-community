@@ -7,6 +7,67 @@
     {
       "decision": "keep",
       "evidence": [
+        "packaging_contract",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_release_readiness_contract.py::test_version_bump_script_updates_all_release_version_surfaces",
+      "reason": "Guards coordinated version updates across release metadata surfaces.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_rcmetar_r_manifest_validation.py::test_custom_grid_forest_engine_is_retired",
+      "reason": "Prevents the retired custom forest renderer from returning to the active R stack.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_pre_run_plots_tab_exports_style_and_appearance_params",
+      "reason": "Guards pre-run plot option persistence through the real analysis dialog.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem",
+        "qt"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_save_handler_regenerates_cumulative_forest_as_single_panel",
+      "reason": "Guards cumulative plot export through the standalone forest regenerator.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
         "release_readiness"
       ],
       "external_dependencies": [
@@ -15,6 +76,90 @@
       "lane": "fast",
       "nodeid": "tests/python/fast/test_analysis_method_labels.py::test_available_method_labels_are_normalized_without_changing_method_keys",
       "reason": "Fast verification guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_plot_capabilities.py::test_option_groups_are_keyed_by_explicit_plot_kind",
+      "reason": "Guards the shared plot-kind option registry used by both plot configuration entry points.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_plot_capabilities.py::test_regenerator_is_resolved_from_a_safe_registry",
+      "reason": "Prevents analysis metadata from selecting arbitrary executable regeneration functions.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_plot_capabilities.py::test_validate_result_rejects_unknown_capability_values",
+      "reason": "Rejects invalid plot capability metadata at the Analysis Adapter boundary.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_plot_capabilities.py::test_validate_result_requires_one_descriptor_per_plot_artifact",
+      "reason": "Enforces the required one-to-one plot capability descriptor contract.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_plot_capabilities.py::test_validate_result_requires_plot_data_for_editable_artifacts",
+      "reason": "Ensures editable plot metadata always names the plot data needed for regeneration.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_plot_capabilities.py::test_validate_result_returns_normalized_descriptors",
+      "reason": "Guards normalized descriptor values consumed by the Results window.",
       "runtime_class": "subsecond",
       "size": "small"
     },

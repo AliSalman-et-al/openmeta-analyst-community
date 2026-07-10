@@ -95,7 +95,40 @@ diagnostic_fixture <- function(measure = "Sens") {
 expect_analysis_result <- function(result) {
   expect_type(result, "list")
   expect_true(any(c("Summary", "images", "res", "res.info") %in% names(result)))
+  if (length(result$images) > 0) {
+    expect_named(result$plot_capabilities, names(result$images), ignore.order = TRUE)
+    expect_true(all(vapply(
+      result$plot_capabilities,
+      function(descriptor) identical(
+        names(descriptor),
+        c("plot_kind", "editable", "styleable", "composition", "regenerator")
+      ),
+      logical(1)
+    )))
+  }
 }
+
+test_that("plot capability metadata distinguishes workflow-specific forest kinds", {
+  fixture <- binary_fixture()
+  expected_kinds <- c(
+    standard = "forest",
+    cumulative = "cumulative_forest",
+    "leave-one-out" = "leave_one_out_forest",
+    subgroup = "subgroup_forest"
+  )
+
+  for (workflow in names(expected_kinds)) {
+    result <- rcmetar.run.analysis(
+      fixture$data,
+      list(method = "binary.random", params = fixture$params, workflow = workflow)
+    )
+    expect_true(all(vapply(
+      result$plot_capabilities,
+      function(descriptor) identical(descriptor$plot_kind, unname(expected_kinds[[workflow]])),
+      logical(1)
+    )))
+  }
+})
 
 test_that("representative binary analysis paths execute", {
   fixture <- binary_fixture()
@@ -151,7 +184,10 @@ test_that("core diagnostic multi-analysis facade preserves multi-metric results"
   fixture <- diagnostic_fixture("Sens")
   sens_params <- fixture$params
   spec_params <- fixture$params
+  sens_params$create.plot <- TRUE
+  spec_params$create.plot <- TRUE
   spec_params$measure <- "Spec"
+  spec_params$fp_outpath <- file.path("r_tmp", "forest_Spec.png")
   spec_effects <- get.res.for.one.diag.study(fixture$data, spec_params)
   spec_data <- fixture$data
   spec_data@y <- spec_effects$b
@@ -166,6 +202,10 @@ test_that("core diagnostic multi-analysis facade preserves multi-metric results"
   expect_analysis_result(result)
   expect_true(any(grepl("Sens|Spec", names(result))))
   expect_equal(attr(result, "rcmetar.request")$workflow, "standard")
+  expect_false(any(file.exists(paste0(
+    c(sens_params$fp_outpath, spec_params$fp_outpath),
+    "INTER"
+  ))))
 })
 
 test_that("diagnostic study effects include confidence intervals for each metric", {

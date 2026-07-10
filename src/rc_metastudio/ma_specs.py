@@ -35,7 +35,7 @@ import meta_py_r
 import progress_bar as progress_dialog
 import qt_layout
 import qt_text
-import plot_options
+import plot_capabilities
 from meta_globals import *
 from settings import *
 import diagnostic_explain
@@ -86,7 +86,6 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.model = model
         self._loading_plot_style = False
         self._setup_plot_controls()
-        self._configure_plot_option_groups()
         self._load_plot_params()
 
         if conf_level is None:
@@ -198,13 +197,21 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         )
 
     def _configure_plot_option_groups(self):
-        groups = plot_options.option_groups("forest")
+        workflow = self.meta_f_str or "standard"
+        capabilities = meta_py_r.get_analysis_plot_capabilities(
+            self.data_type, self.current_method, workflow=workflow
+        )
+        plot_kinds = [capability["plot_kind"] for capability in capabilities]
+        groups = frozenset().union(
+            *(plot_capabilities.option_groups(plot_kind) for plot_kind in plot_kinds)
+        )
         self.style_group.setVisible("style" in groups)
         self.appearance_group.setVisible("appearance" in groups)
         self.groupBox.setVisible("columns" in groups)
         self.default_panel.setVisible("forest" in groups)
-        self.label_16.setVisible("summary" in groups)
+        self.label_11.setVisible("summary" in groups)
         self.show_summary_line.setVisible("summary" in groups)
+        self.plot_tab.setEnabled(any(capability["styleable"] for capability in capabilities))
 
     def _load_plot_params(self):
         self._loading_plot_style = True
@@ -518,6 +525,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             widget = None
 
     def ui_for_params(self, adjust_root=True):
+        self._configure_plot_option_groups()
         if self.parameter_grp_box.layout() is None:
             layout = QGridLayout()
             layout.setAlignment(Qt.AlignTop)
@@ -567,7 +575,6 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                         )
                         cur_grid_row += 1
 
-        self.plot_tab.setEnabled(True)
         qt_layout.fit_analysis_dialog_to_contents(self, adjust_root=adjust_root)
 
     def add_param(self, layout, cur_grid_row, name, value):
@@ -1271,12 +1278,19 @@ def _empty_diagnostic_result():
         "images": {},
         "image_var_names": {},
         "image_params_paths": {},
+        "plot_capabilities": {},
         "image_order": [],
     }
 
 
 def _merge_diagnostic_result(merged_result, metric_result):
-    for key in ("texts", "images", "image_var_names", "image_params_paths"):
+    for key in (
+        "texts",
+        "images",
+        "image_var_names",
+        "image_params_paths",
+        "plot_capabilities",
+    ):
         merged_result[key].update(metric_result.get(key, {}))
 
     image_order = metric_result.get("image_order")
