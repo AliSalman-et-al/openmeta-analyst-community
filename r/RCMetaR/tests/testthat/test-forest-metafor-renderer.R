@@ -227,16 +227,14 @@ test_that("binary Default Forest Style builds a self-contained metafor render bu
 
   expect_true(file.exists(png_path))
   expect_gt(file.info(png_path)$size, 5000)
-  expect_true(file.exists(rcmetar.plot.canonical_svg_path(png_path)))
-  expect_gt(file.info(rcmetar.plot.canonical_svg_path(png_path))$size, 1000)
+  expect_false(file.exists(rcmetar.plot.canonical_svg_path(png_path)))
   png_size <- read_png_dimensions(png_path)
   expect_gte(png_size[["width"]], 900)
   expect_gte(png_size[["height"]], 500)
 
   expect_true(file.exists(pdf_path))
   expect_gt(file.info(pdf_path)$size, 1000)
-  expect_true(file.exists(rcmetar.plot.canonical_svg_path(pdf_path)))
-  expect_gt(file.info(rcmetar.plot.canonical_svg_path(pdf_path))$size, 1000)
+  expect_false(file.exists(rcmetar.plot.canonical_svg_path(pdf_path)))
   expect_equal(pdftools::pdf_info(pdf_path)$pages, 1)
 
   expect_true(file.exists(svg_path))
@@ -250,8 +248,7 @@ test_that("binary Default Forest Style builds a self-contained metafor render bu
   expect_true(file.exists(tiff_path))
   expect_gt(file.info(tiff_path)$size, 1000)
   expect_equal(rcmetar.plot.file.extension(tiff_path), "tiff")
-  expect_true(file.exists(rcmetar.plot.canonical_svg_path(tiff_path)))
-  expect_gt(file.info(rcmetar.plot.canonical_svg_path(tiff_path))$size, 1000)
+  expect_false(file.exists(rcmetar.plot.canonical_svg_path(tiff_path)))
   expect_length(dim(tiff::readTIFF(tiff_path)), 3)
 
   expect_equal(rcmetar.plot.file.extension(contains_png_pdf_path), "pdf")

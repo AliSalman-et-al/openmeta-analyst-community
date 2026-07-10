@@ -126,6 +126,8 @@ test_that("metafor bubble plot renderer supports Default, RevMan, and BMJ styles
     dims <- bubble_png_dimensions(png_path)
     expect_gt(file.info(png_path)$size, 1000)
     expect_gt(file.info(pdf_path)$size, 1000)
+    expect_false(file.exists(rcmetar.plot.canonical_svg_path(png_path)))
+    expect_false(file.exists(rcmetar.plot.canonical_svg_path(pdf_path)))
     expect_gte(unname(dims[["width"]]), 2000)
     expect_gte(unname(dims[["height"]]), 1400)
   }

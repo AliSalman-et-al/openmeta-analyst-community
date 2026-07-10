@@ -95,7 +95,8 @@ rcmetar.render.plot_file <- function(outpath, size, draw) {
         return(rcmetar.render.plot_svg(outpath, size, draw))
     }
 
-    svg.path <- rcmetar.plot.canonical_svg_path(outpath)
+    svg.path <- tempfile(pattern="rcmetar-plot-", fileext=".svg")
+    on.exit(unlink(svg.path), add=TRUE)
     result <- rcmetar.render.plot_svg(svg.path, size, draw)
     rcmetar.export.svg_render(svg.path, outpath, size)
     invisible(result)
