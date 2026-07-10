@@ -23,6 +23,7 @@ test_that("comprehensive visual QA accounts for every user-visible plot family",
   expect_true(all(inventory$status %in% c("covered", "excluded")))
   expect_true(all(nzchar(inventory$reason[inventory$status == "excluded"])))
   expect_true(all(nzchar(inventory$evidence[inventory$status == "excluded"])))
+  expect_setequal(unique(inventory$plot_kind), names(.rcmetar.plot.kind.capabilities()))
 
   covered <- inventory$family[inventory$status == "covered"]
   expect_silent(qa$qa_validate_visual_coverage(inventory, covered))
@@ -30,22 +31,36 @@ test_that("comprehensive visual QA accounts for every user-visible plot family",
     qa$qa_validate_visual_coverage(inventory, setdiff(covered, "regression")),
     "missing covered plot families: regression"
   )
+  expect_error(
+    qa$qa_validate_visual_coverage(inventory, covered, c(qa$qa_supported_plot_kinds(), "new_plot_kind")),
+    "registry disagree"
+  )
 
   output.root <- tempfile("visual-qa-report-")
   dir.create(output.root)
+  forest.image <- tempfile(fileext = ".png")
+  bubble.image <- tempfile(fileext = ".png")
+  writeBin(as.raw(1:10), forest.image)
+  writeBin(as.raw(1:10), bubble.image)
   forest <- data.frame(
     case=paste0(covered[covered != "regression"], "__case"),
     family=covered[covered != "regression"],
-    image="plot.png",
-    bytes=1000
+    kind="binary_two_arm", workflow="standard", style="default", scenario="base",
+    image=forest.image, bytes=1000, error=NA_character_
   )
   bubble <- data.frame(
     case="regression__case",
     family="regression",
-    image="bubble.png",
-    bytes=1000
+    kind="binary", workflow="meta-regression", style="default", scenario="base",
+    image=bubble.image, bytes=1000, error=NA_character_
   )
   expect_silent(qa$qa_write_visual_qa_reports(output.root, forest, bubble))
   expect_true(file.exists(file.path(output.root, "coverage.csv")))
   expect_true(file.exists(file.path(output.root, "manifest.csv")))
+  failed <- bubble
+  failed$error <- "renderer exploded"
+  expect_error(
+    qa$qa_write_visual_qa_reports(output.root, forest, failed),
+    "Visual QA render failures"
+  )
 })

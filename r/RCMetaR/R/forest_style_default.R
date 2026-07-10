@@ -369,6 +369,7 @@ rcmetar.draw.default.summary.diamond <- function(res, row, color) {
 }
 
 rcmetar.draw.default.subgroups <- function(bundle, x, cex) {
+    accent <- rcmetar.forest.accent.color(bundle$params)
     for (i in seq_along(bundle$subgroups$names)) {
         label <- bundle$subgroups$names[[i]]
         label.y <- bundle$subgroups$header_rows[[i]]
@@ -384,6 +385,8 @@ rcmetar.draw.default.subgroups <- function(bundle, x, cex) {
             bundle$subgroups$results[[i]],
             row=bundle$subgroups$polygon_rows[[i]],
             mlab=rcmetar.default.model.label("RE Model for Subgroup", bundle$subgroups$results[[i]]),
+            col=accent,
+            border=accent,
             cex=cex
         )
     }
@@ -398,6 +401,8 @@ rcmetar.draw.default.subgroups <- function(bundle, x, cex) {
         bundle$subgroups$overall,
         row=bundle$subgroups$overall_row,
         mlab=rcmetar.default.model.label("RE Model for All Studies", bundle$subgroups$overall),
+        col=accent,
+        border=accent,
         cex=cex
     )
     if (!is.null(bundle$subgroups$difference_test)) {

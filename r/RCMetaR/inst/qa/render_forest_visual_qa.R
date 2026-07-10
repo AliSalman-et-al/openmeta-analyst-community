@@ -328,6 +328,7 @@ qa_render_case <- function(kind, workflow, style, scenario.name, scenarios, outp
     scenario = scenario.name,
     image = normalizePath(image.path, winslash = "\\", mustWork = TRUE),
     bytes = info$size,
+    error = NA_character_,
     stringsAsFactors = FALSE
   )
 }
@@ -351,6 +352,7 @@ qa_render_matrix <- function(output.root = qa_root(qa_find_repo_root()), format 
         cat("ERROR", case.name, conditionMessage(error), "\n")
         data.frame(
           case = case.name,
+          family = paste0(gsub("-", "_", cases$workflow[i]), "_forest"),
           kind = cases$kind[i],
           workflow = cases$workflow[i],
           style = cases$style[i],

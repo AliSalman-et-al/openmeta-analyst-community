@@ -805,8 +805,8 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
     .rcmetar.plot.descriptor.for.kind(plot.kind, has.params)
 }
 
-.rcmetar.plot.kind.capability <- function(plot.kind) {
-    capabilities <- list(
+.rcmetar.plot.kind.capabilities <- function() {
+    list(
         forest=list(styleable=TRUE, regenerator="forest", option.groups=TRUE),
         cumulative_forest=list(styleable=TRUE, regenerator="forest", option.groups=TRUE),
         leave_one_out_forest=list(styleable=TRUE, regenerator="forest", option.groups=TRUE),
@@ -816,6 +816,10 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
         sroc=list(styleable=FALSE, regenerator="none", option.groups=FALSE),
         other=list(styleable=FALSE, regenerator="none", option.groups=FALSE)
     )
+}
+
+.rcmetar.plot.kind.capability <- function(plot.kind) {
+    capabilities <- .rcmetar.plot.kind.capabilities()
     capability <- capabilities[[plot.kind]]
     if (is.null(capability)) {
         stop(sprintf("No plot capability contract for plot kind '%s'.", plot.kind), call.=FALSE)

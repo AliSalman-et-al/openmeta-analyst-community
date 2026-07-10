@@ -594,6 +594,9 @@ rcmetar.forest.bmj.alim <- function(bundle) {
     if (metric.is.log.scale(measure)) {
         return(rcmetar.forest.journal.ratio.alim(bundle))
     }
+    if (rcmetar.forest.has.explicit.axis.bounds(bundle)) {
+        return(rcmetar.forest.journal.alim(bundle))
+    }
     if (identical(measure, "RD")) {
         return(c(-1, 1))
     }

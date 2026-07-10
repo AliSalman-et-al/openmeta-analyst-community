@@ -353,7 +353,7 @@ test_that("Forest Layout Preflight produces deterministic layout plans for Defau
   expect_gt(default.plan$device$height, 0)
   expect_gte(default.plan$typography$cex, 0.78)
   expect_equal(default.plan$rows$study_rows, nrow(default.bundle$ilab$matrix):1)
-  expect_equal(default.plan$x$alim, rcmetar.forest.journal.alim(default.bundle))
+  expect_equal(default.plan$x$alim, rcmetar.forest.journal.ratio.alim(default.bundle))
   expect_equal(default.plan$columns$ilab.xpos, rcmetar.metafor.layout(default.bundle, default.plan$device, default.plan$x$alim)$ilab.xpos)
 
   fixture$params$fp_style <- "revman"
@@ -425,6 +425,27 @@ test_that("explicit Forest Plot axis ticks override adaptive defaults for every 
   }
 })
 
+test_that("one-sided axis bounds and BMJ risk-difference bounds remain authoritative", {
+  fixture <- metafor_binary_fixture()
+  res <- rma.uni(yi=fixture$data@y, sei=fixture$data@SE, method="DL")
+
+  fixture$params$fp_plot_lb <- "0.25"
+  fixture$params$fp_plot_ub <- "[default]"
+  for (style in c("default", "revman", "bmj")) {
+    fixture$params$fp_style <- style
+    bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+    plan <- rcmetar.forest.layout.preflight(bundle)
+    expect_equal(plan$x$alim[[1]], rcmetar.metafor.alim(bundle)[[1]])
+  }
+
+  fixture$params$measure <- "RD"
+  fixture$params$fp_style <- "bmj"
+  fixture$params$fp_plot_lb <- "-0.5"
+  fixture$params$fp_plot_ub <- "0.75"
+  bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+  expect_equal(rcmetar.forest.bmj.alim(bundle), rcmetar.metafor.alim(bundle))
+})
+
 test_that("one extreme study interval does not squeeze the remaining forest", {
   fixture <- metafor_entered_binary_fixture(6)
   fixture$data@SE[[1]] <- 1.8
@@ -447,6 +468,24 @@ test_that("one extreme study interval does not squeeze the remaining forest", {
     expect_lt(plan$x$alim[[2]], max(full.upper))
     expect_true(all(res$yi >= plan$x$alim[[1]] & res$yi <= plan$x$alim[[2]]))
     expect_true(res$ci.lb >= plan$x$alim[[1]] && res$ci.ub <= plan$x$alim[[2]])
+  }
+})
+
+test_that("one extreme interval is clipped for sparse analyses", {
+  fixture <- metafor_entered_binary_fixture(3)
+  fixture$data@SE[[1]] <- 2.4
+  res <- rma.uni(yi=fixture$data@y, sei=fixture$data@SE, method="DL")
+  z <- stats::qnorm(0.975)
+  full.lower <- res$yi - z * sqrt(res$vi)
+  full.upper <- res$yi + z * sqrt(res$vi)
+
+  for (style in c("default", "revman", "bmj")) {
+    fixture$params$fp_style <- style
+    bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+    plan <- rcmetar.forest.layout.preflight(bundle)
+    expect_gt(plan$x$alim[[1]], min(full.lower))
+    expect_lt(plan$x$alim[[2]], max(full.upper))
+    expect_true(all(res$yi >= plan$x$alim[[1]] & res$yi <= plan$x$alim[[2]]))
   }
 })
 
@@ -1603,8 +1642,22 @@ test_that("subgroup workflow saves and renders Default metafor subtotal diamonds
   expect_true(is.finite(bundle$subgroups$difference_test$QM))
   expect_equal(bundle$subgroups$difference_test$df, 1)
   expect_true(inherits(bundle$subgroups$overall, "rma"))
+  expect_equal(rcmetar.forest.accent.color(bundle$params), "#2f5597")
   expect_true(file.exists(unname(result$images[[1]])))
   expect_gt(file.info(unname(result$images[[1]]))$size, 5000)
+
+  plan <- rcmetar.forest.layout.preflight(bundle)
+  expect_true(all(bundle$effect$yi >= plan$x$alim[[1]] &
+                  bundle$effect$yi <= plan$x$alim[[2]]))
+  expected.labels <- rcmetar.forest.left.block.labels(bundle)
+  measured.width <- rcmetar.forest.with.measurement.device(max(vapply(
+    expected.labels,
+    function(label) max(strwidth(label, units = "inches", cex = plan$typography$cex)),
+    numeric(1)
+  )))
+  expect_gte(plan$device$left_block_width, measured.width)
+  expect_gt(min(plan$x$alim) - rcmetar.forest.study.x(plan$layout),
+            measured.width * diff(plan$x$alim) / plan$device$plot_width)
 })
 
 test_that("subgroup workflow saves and renders RevMan subtotal diamonds", {
@@ -1629,6 +1682,7 @@ test_that("subgroup workflow saves and renders RevMan subtotal diamonds", {
   expect_equal(bundle$ilab$headers, c("Events", "Total", "Events", "Total", "Weight"))
   expect_length(bundle$subgroups$polygon_rows, 2)
   expect_true(inherits(bundle$subgroups$overall, "rma"))
+  expect_equal(rcmetar.forest.accent.color(bundle$params), "#000000")
   expect_match(bundle$style_blocks$heterogeneity, "Heterogeneity: Tau²")
   expect_match(bundle$style_blocks$test_overall, "Test for overall effect: Z =")
   expect_true(file.exists(unname(result$images[[1]])))

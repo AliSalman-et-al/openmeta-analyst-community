@@ -47,7 +47,15 @@ qa_visual_coverage_inventory <- function() {
   )
 }
 
-qa_validate_visual_coverage <- function(inventory, produced.families) {
+qa_supported_plot_kinds <- function() {
+  if (!exists(".rcmetar.plot.kind.capabilities", mode = "function")) {
+    stop("RCMetaR Plot Capability Descriptor registry is not loaded.", call. = FALSE)
+  }
+  names(.rcmetar.plot.kind.capabilities())
+}
+
+qa_validate_visual_coverage <- function(inventory, produced.families,
+                                        supported.plot.kinds = qa_supported_plot_kinds()) {
   duplicate.families <- unique(inventory$family[duplicated(inventory$family)])
   if (length(duplicate.families) > 0) {
     stop(
@@ -59,6 +67,16 @@ qa_validate_visual_coverage <- function(inventory, produced.families) {
   invalid.status <- setdiff(unique(inventory$status), c("covered", "excluded"))
   if (length(invalid.status) > 0) {
     stop("Visual QA inventory contains invalid status values.", call. = FALSE)
+  }
+  missing.contract.kinds <- setdiff(supported.plot.kinds, unique(inventory$plot_kind))
+  unknown.inventory.kinds <- setdiff(unique(inventory$plot_kind), supported.plot.kinds)
+  if (length(missing.contract.kinds) > 0 || length(unknown.inventory.kinds) > 0) {
+    stop(
+      "Visual QA inventory and Plot Capability Descriptor registry disagree. Missing: ",
+      paste(missing.contract.kinds, collapse = ", "),
+      "; unknown: ", paste(unknown.inventory.kinds, collapse = ", "),
+      call. = FALSE
+    )
   }
   excluded <- inventory$status == "excluded"
   if (any(!nzchar(inventory$reason[excluded])) ||
@@ -94,20 +112,54 @@ qa_find_visual_script_root <- function(start = getwd()) {
 
 qa_write_visual_qa_reports <- function(output.root, forest.manifest, bubble.manifest) {
   inventory <- qa_visual_coverage_inventory()
-  produced <- unique(c(forest.manifest$family, bubble.manifest$family))
-  qa_validate_visual_coverage(inventory, produced)
-  required <- c("case", "family", "image", "bytes")
+  required <- c("case", "family", "kind", "workflow", "style", "scenario", "image", "bytes", "error")
   if (!all(required %in% names(forest.manifest)) ||
       !all(required %in% names(bubble.manifest))) {
     stop("Visual QA manifests do not share the required report columns.", call.=FALSE)
   }
+  combined <- rbind(forest.manifest[required], bubble.manifest[required])
+  failed <- !is.na(combined$error) & nzchar(combined$error)
+  missing.image <- is.na(combined$image) | !file.exists(combined$image)
+  empty.image <- is.na(combined$bytes) | combined$bytes <= 0
+  successful <- !(failed | missing.image | empty.image)
+  if (any(!successful)) {
+    bad <- combined$case[!successful]
+    stop(
+      "Visual QA render failures: ", paste(bad, collapse = ", "),
+      ". Inspect the preserved harness manifests for error details.",
+      call. = FALSE
+    )
+  }
+  qa_validate_visual_coverage(inventory, unique(combined$family[successful]))
   utils::write.csv(inventory, file.path(output.root, "coverage.csv"), row.names = FALSE)
-  utils::write.csv(
-    rbind(forest.manifest[required], bubble.manifest[required]),
-    file.path(output.root, "manifest.csv"),
-    row.names = FALSE
-  )
+  utils::write.csv(combined, file.path(output.root, "manifest.csv"), row.names = FALSE)
   invisible(inventory)
+}
+
+qa_write_visual_qa_matrix <- function(repo.root, output.root) {
+  python <- Sys.which(c("python", "python3"))
+  python <- unname(python[nzchar(python)])
+  if (length(python) == 0) {
+    stop("Python is required to generate the high-resolution visual QA matrix.", call. = FALSE)
+  }
+  python <- python[[1]]
+  script <- file.path(repo.root, "r", "RCMetaR", "inst", "qa", "forest_contact_sheets.py")
+  matrix.root <- file.path(output.root, "matrix")
+  dir.create(matrix.root, recursive = TRUE, showWarnings = FALSE)
+  status <- system2(
+    python,
+    c(script, file.path(output.root, "manifest.csv"), "--out-dir", matrix.root),
+    stdout = TRUE,
+    stderr = TRUE
+  )
+  if (!identical(attr(status, "status"), NULL) && attr(status, "status") != 0) {
+    stop("High-resolution visual QA matrix generation failed: ", paste(status, collapse = "\n"), call. = FALSE)
+  }
+  expected <- file.path(matrix.root, "contact_all.png")
+  if (!file.exists(expected) || file.info(expected)$size <= 0) {
+    stop("High-resolution visual QA matrix was not produced.", call. = FALSE)
+  }
+  invisible(expected)
 }
 
 qa_run_comprehensive_visual_qa <- function(repo.root = qa_find_visual_script_root()) {
@@ -141,6 +193,7 @@ qa_run_comprehensive_visual_qa <- function(repo.root = qa_find_visual_script_roo
     forest.manifest,
     bubble.manifest
   )
+  qa_write_visual_qa_matrix(repo.root, output.root)
   cat(
     "Rendered", nrow(forest.manifest) + nrow(bubble.manifest),
     "covered plot QA cases to", output.root, "\n"
