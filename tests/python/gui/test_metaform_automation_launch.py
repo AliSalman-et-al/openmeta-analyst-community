@@ -2126,7 +2126,7 @@ def test_results_window_displays_canonical_svg_plot_artifact(tmp_path):
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     plot_path = tmp_path / "forest.png"
-    svg_path = tmp_path / "forest.svg"
+    svg_path = tmp_path / "forest.display.svg"
     image = results_window.QImage(1600, 800, results_window.QImage.Format_RGB32)
     image.fill(results_window.Qt.white)
     assert image.save(str(plot_path), "PNG")
@@ -2142,6 +2142,7 @@ def test_results_window_displays_canonical_svg_plot_artifact(tmp_path):
         {
             "texts": {},
             "images": {"Forest Plot": str(plot_path)},
+            "display_images": {"Forest Plot": str(svg_path)},
             "image_var_names": {"Forest Plot": "forest_plot"},
             "image_params_paths": {"Forest Plot": str(tmp_path / "forest_params")},
             "image_order": ["Forest Plot"],
@@ -2342,6 +2343,77 @@ def test_results_window_refits_svg_after_viewport_geometry_settles(tmp_path):
         assert plot_item.sceneBoundingRect().width() == pytest.approx(
             grown_available_width
         )
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_results_window_refits_raster_fallback_from_original_source(tmp_path):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    plot_path = tmp_path / "legacy-plot.png"
+    image = results_window.QImage(
+        1600, 800, results_window.QImage.Format_ARGB32
+    )
+    image.fill(0xFFFFFFFF)
+    assert image.save(str(plot_path), "PNG")
+    window = results_window.ResultsWindow(
+        {
+            "texts": {},
+            "images": {"Legacy Plot": str(plot_path)},
+            "plot_capabilities": {
+                "Legacy Plot": _plot_capability(
+                    plot_kind="other",
+                    editable=False,
+                    styleable=False,
+                    regenerator="none",
+                ),
+            },
+        }
+    )
+
+    try:
+        window.showMaximized()
+        app.processEvents()
+        plot_item = next(
+            item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsPixmapItem)
+        )
+        initial_width = plot_item.sceneBoundingRect().width()
+        initial_view_width = window.graphics_view.width()
+        initial_available_width = (
+            window.graphics_view.viewport().width()
+            - window.x_coord
+            - results_window.padding
+        )
+        assert initial_width == pytest.approx(initial_available_width, abs=5)
+
+        window.graphics_view.resize(
+            initial_view_width - 300, window.graphics_view.height()
+        )
+        app.processEvents()
+        shrunken_width = plot_item.sceneBoundingRect().width()
+        shrunken_available_width = (
+            window.graphics_view.viewport().width()
+            - window.x_coord
+            - results_window.padding
+        )
+        assert shrunken_width < initial_width
+        assert shrunken_width == pytest.approx(shrunken_available_width, abs=5)
+
+        window.graphics_view.resize(initial_view_width, window.graphics_view.height())
+        app.processEvents()
+        assert plot_item.sceneBoundingRect().width() == pytest.approx(
+            initial_width, abs=5
+        )
+        assert plot_item.source_pixmap.width() == 1600
+        assert plot_item.source_pixmap.height() == 800
     finally:
         window.close()
         app.processEvents()
@@ -3308,6 +3380,13 @@ def test_apply_regression_plot_edits_rebuilds_and_redraws_bubble_plot(
     calls = []
     params_path = str(tmp_path / "regression_params")
     image_path = str(tmp_path / "regression.png")
+    display_path = str(tmp_path / "regression.display.svg")
+    Path(display_path).write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200">'
+        '<rect width="400" height="200" fill="white"/>'
+        "</svg>",
+        encoding="utf-8",
+    )
 
     class FakeDialog(object):
         def plot_params(self):
@@ -3315,6 +3394,7 @@ def test_apply_regression_plot_edits_rebuilds_and_redraws_bubble_plot(
                 "bp_style": "revman",
                 "bp_show_confidence_band": False,
                 "bp_outpath": image_path,
+                "bp_display_path": display_path,
             }
 
     monkeypatch.setattr(
@@ -3331,10 +3411,20 @@ def test_apply_regression_plot_edits_rebuilds_and_redraws_bubble_plot(
         lambda: calls.append(("regenerate",)),
         raising=False,
     )
+    def generate_reg_plot(path):
+        calls.append(("draw", path))
+        height = 300 + 100 * sum(call[0] == "draw" for call in calls)
+        Path(display_path).write_text(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="%d">'
+            '<rect width="400" height="%d" fill="white"/>'
+            "</svg>" % (height, height),
+            encoding="utf-8",
+        )
+
     monkeypatch.setattr(
         results_window.meta_py_r,
         "generate_reg_plot",
-        lambda path: calls.append(("draw", path)),
+        generate_reg_plot,
         raising=False,
     )
     monkeypatch.setattr(
@@ -3345,32 +3435,54 @@ def test_apply_regression_plot_edits_rebuilds_and_redraws_bubble_plot(
     )
 
     window = results_window.ResultsWindow(
-        {"texts": {}, "images": {}, "image_params_paths": {}, "image_order": []}
-    )
-    artifact = results_window.PlotArtifact(
-        "Regression Plot",
-        image_path,
-        _plot_capability(plot_kind="regression", regenerator="regression"),
-        params_path=params_path,
+        {
+            "texts": {},
+            "images": {"Regression Plot": image_path},
+            "display_images": {"Regression Plot": display_path},
+            "image_params_paths": {"Regression Plot": params_path},
+            "image_order": ["Regression Plot"],
+            "plot_capabilities": {
+                "Regression Plot": _plot_capability(
+                    plot_kind="regression", regenerator="regression"
+                )
+            },
+        }
     )
     try:
-        window._apply_regression_plot_edits(FakeDialog(), artifact, plot_item=None)
+        window.resize(1200, 800)
+        window.show()
+        app.processEvents()
+        plot_item = next(
+            item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsSvgItem)
+        )
+        artifact = window.create_plot_artifact(
+            "Regression Plot", image_path, params_path=params_path
+        )
 
-        assert calls == [
-            (
-                "update",
-                {
-                    "bp_style": "revman",
-                    "bp_show_confidence_band": False,
-                    "bp_outpath": image_path,
-                },
-                True,
-                "%s.params" % params_path,
-            ),
-            ("regenerate",),
-            ("draw", image_path),
-            ("write", params_path),
-        ]
+        window._apply_regression_plot_edits(FakeDialog(), artifact, plot_item)
+        window._apply_regression_plot_edits(FakeDialog(), artifact, plot_item)
+        app.processEvents()
+
+        assert artifact.display_image_path == display_path
+        assert sum(call[0] == "update" for call in calls) == 2
+        assert sum(call[0] == "draw" for call in calls) == 2
+        assert all(
+            call[1]["bp_display_path"] == display_path
+            for call in calls
+            if call[0] == "update"
+        )
+        assert plot_item.boundingRect().height() == pytest.approx(500)
+
+        initial_width = plot_item.sceneBoundingRect().width()
+        view_width = window.graphics_view.width()
+        window.graphics_view.resize(view_width - 200, window.graphics_view.height())
+        app.processEvents()
+        assert plot_item.sceneBoundingRect().width() < initial_width
+        window.graphics_view.resize(view_width, window.graphics_view.height())
+        app.processEvents()
+        assert plot_item.sceneBoundingRect().width() > initial_width - 5
     finally:
         window.close()
         app.processEvents()
@@ -3432,6 +3544,8 @@ def test_pre_run_plots_tab_exports_style_and_appearance_params(monkeypatch):
     assert form.current_param_vals["fp_show_annotation"] is False
     assert form.current_param_vals["fp_col3_str"] == "Treatment"
     assert form.current_param_vals["fp_col4_str"] == "Control"
+    assert form.current_param_vals["fp_display_path"].endswith(".display.svg")
+    assert Path(form.current_param_vals["fp_display_path"]).parent != Path(".")
     app.processEvents()
 
 
@@ -3468,6 +3582,9 @@ def test_meta_regression_pre_run_plot_options_use_bubble_parameter_contract():
 
     ma_specs.add_plot_params(form)
 
+    display_path = form.current_param_vals.pop("bp_display_path")
+    assert display_path.endswith(".display.svg")
+    assert Path(display_path).parent != Path(".")
     assert form.current_param_vals == {
         "bp_style": "bmj",
         "bp_accent_color": "#654321",
@@ -3711,8 +3828,9 @@ def test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog(
     calls = []
     params_path = str(tmp_path / "forest_params")
     png_path = str(tmp_path / "forest.png")
+    display_path = str(tmp_path / "forest.display.svg")
     out_path = str(tmp_path / "edited.png")
-    Path(png_path).with_suffix(".svg").write_text(
+    Path(display_path).write_text(
         '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200">'
         '<rect width="400" height="200" fill="white"/>'
         "</svg>",
@@ -3736,6 +3854,7 @@ def test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog(
             self._params = {
                 "fp_col1_str": "EDIT TEST HEADING",
                 "fp_outpath": out_path,
+                "fp_display_path": display_path,
             }
             calls.append(("dialog", plot_params, image_path, parent is not None))
 
@@ -3768,10 +3887,11 @@ def test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog(
     )
     def generate_forest_plot(outpath):
         calls.append(("generate", outpath))
-        Path(outpath).with_suffix(".svg").write_text(
-            '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">'
-            '<rect width="400" height="400" fill="white"/>'
-            "</svg>",
+        height = 300 + 100 * sum(call[0] == "generate" for call in calls)
+        Path(display_path).write_text(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="%d">'
+            '<rect width="400" height="%d" fill="white"/>'
+            "</svg>" % (height, height),
             encoding="utf-8",
         )
 
@@ -3797,6 +3917,7 @@ def test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog(
         {
             "texts": {"References": "Edited plot reference"},
             "images": {"Forest Plot": png_path},
+            "display_images": {"Forest Plot": display_path},
             "image_params_paths": {"Forest Plot": params_path},
             "image_order": ["Forest Plot"],
             "plot_capabilities": {"Forest Plot": _plot_capability()},
@@ -3824,25 +3945,33 @@ def test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog(
             "Forest Plot", png_path, params_path=params_path
         )
         window.edit_forest_plot(artifact, plot_item=plot_item)
+        window.edit_forest_plot(artifact, plot_item=plot_item)
+        app.processEvents()
 
-        assert calls == [
-            ("dialog", {"fp_col1_str": "Study"}, png_path, True),
-            (
-                "update",
-                {"fp_col1_str": "EDIT TEST HEADING", "fp_outpath": out_path},
-                True,
-                "%s.params" % params_path,
-            ),
-            ("regenerate",),
-            ("generate", out_path),
-            ("write", params_path),
-        ]
+        assert artifact.display_image_path == display_path
+        assert sum(call[0] == "update" for call in calls) == 2
+        assert sum(call[0] == "generate" for call in calls) == 2
+        assert all(
+            call[1]["fp_display_path"] == display_path
+            for call in calls
+            if call[0] == "update"
+        )
+        assert plot_item.boundingRect().height() == pytest.approx(500)
         assert references_title.sceneBoundingRect().top() > original_reference_top
         assert (
             references_title.sceneBoundingRect().top()
             - plot_item.sceneBoundingRect().bottom()
             >= results_window.SECTION_SPACING
         )
+
+        initial_width = plot_item.sceneBoundingRect().width()
+        view_width = window.graphics_view.width()
+        window.graphics_view.resize(view_width - 200, window.graphics_view.height())
+        app.processEvents()
+        assert plot_item.sceneBoundingRect().width() < initial_width
+        window.graphics_view.resize(view_width, window.graphics_view.height())
+        app.processEvents()
+        assert plot_item.sceneBoundingRect().width() > initial_width - 5
     finally:
         window.close()
         app.processEvents()

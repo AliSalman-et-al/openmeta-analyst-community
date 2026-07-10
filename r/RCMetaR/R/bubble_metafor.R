@@ -306,6 +306,7 @@ rcmetar.bubble.draw.legend <- function(bundle, style.args) {
 
 rcmetar.draw.metafor.bubble <- function(bundle, outpath) {
     size <- rcmetar.bubble.measure.device(bundle)
+    display.path <- rcmetar.plot.display_path_for_bundle(bundle, outpath, "bp")
     rcmetar.render.plot_file(outpath, size, function() {
         old.par <- graphics::par(no.readonly=TRUE)
         on.exit(graphics::par(old.par), add=TRUE)
@@ -358,5 +359,5 @@ rcmetar.draw.metafor.bubble <- function(bundle, outpath) {
         }
         rcmetar.bubble.draw.legend(bundle, args)
         invisible(result)
-    })
+    }, display.path=display.path)
 }

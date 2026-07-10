@@ -20,6 +20,8 @@ from PyQt5.QtWidgets import (
 )
 
 import copy
+import hashlib
+import os
 import sys
 
 import forms.ui_ma_specs
@@ -1459,8 +1461,19 @@ def _is_integer_analysis_param(name):
     return name == "digits" or _is_count_analysis_param(name)
 
 
+def _display_svg_path(output_path):
+    root, _extension = os.path.splitext(str(output_path))
+    normalized_path = os.path.normcase(os.path.abspath(str(output_path)))
+    path_digest = hashlib.sha256(normalized_path.encode("utf-8")).hexdigest()[:12]
+    plot_name = os.path.basename(root) or "plot"
+    return analysis_output_path(
+        "%s-%s.display.svg" % (plot_name, path_digest)
+    )
+
+
 def add_plot_params(specs_form):
     if getattr(specs_form, "meta_f_str", None) == "meta-regression":
+        bubble_outpath = _text_value(specs_form.image_path)
         specs_form.current_param_vals.update(
             {
                 "bp_style": PLOT_STYLE_VALUES.get(
@@ -1472,7 +1485,8 @@ def add_plot_params(specs_form):
                 "bp_xticks": _validated_plot_ticks(specs_form.x_ticks_le),
                 "bp_plot_lb": _validated_plot_bound(specs_form.plot_lb_le),
                 "bp_plot_ub": _validated_plot_bound(specs_form.plot_ub_le),
-                "bp_outpath": _text_value(specs_form.image_path),
+                "bp_outpath": bubble_outpath,
+                "bp_display_path": _display_svg_path(bubble_outpath),
                 "bp_show_regression_line": specs_form.show_regression_line.isChecked(),
                 "bp_show_confidence_band": specs_form.show_confidence_band.isChecked(),
                 "bp_show_prediction_interval": specs_form.show_prediction_interval.isChecked(),
@@ -1492,7 +1506,11 @@ def add_plot_params(specs_form):
     specs_form.current_param_vals["fp_show_col4"] = specs_form.show_4.isChecked()
     specs_form.current_param_vals["fp_col4_str"] = _text_value(specs_form.col4_str_edit)
     specs_form.current_param_vals["fp_xlabel"] = _text_value(specs_form.x_lbl_le)
-    specs_form.current_param_vals["fp_outpath"] = _text_value(specs_form.image_path)
+    forest_outpath = _text_value(specs_form.image_path)
+    specs_form.current_param_vals["fp_outpath"] = forest_outpath
+    specs_form.current_param_vals["fp_display_path"] = _display_svg_path(
+        forest_outpath
+    )
 
     plot_lb = _text_value(specs_form.plot_lb_le)
     specs_form.current_param_vals["fp_plot_lb"] = "[default]"
@@ -1601,6 +1619,7 @@ def _diagnostic_analysis_requests(specs_form):
         )
         new_str = new_str + "_%s" % diag_metric.lower() + ".png"
         param_vals["fp_outpath"] = new_str
+        param_vals["fp_display_path"] = _display_svg_path(new_str)
 
         # update the metric
         param_vals["measure"] = diag_metric
@@ -1724,6 +1743,7 @@ def _empty_diagnostic_result():
     return {
         "texts": {},
         "images": {},
+        "display_images": {},
         "image_var_names": {},
         "image_params_paths": {},
         "plot_capabilities": {},
@@ -1735,6 +1755,7 @@ def _merge_diagnostic_result(merged_result, metric_result):
     for key in (
         "texts",
         "images",
+        "display_images",
         "image_var_names",
         "image_params_paths",
         "plot_capabilities",

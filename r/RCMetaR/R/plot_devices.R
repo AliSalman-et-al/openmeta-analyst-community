@@ -28,6 +28,43 @@ rcmetar.plot.canonical_svg_path <- function(outpath) {
     sub("[.][^.]*$", ".svg", path)
 }
 
+rcmetar.plot.scalar_path <- function(path) {
+    if (is.null(path) || length(path) != 1 || is.na(path) ||
+            !nzchar(as.character(path))) {
+        return(NULL)
+    }
+    as.character(path)
+}
+
+rcmetar.plot.paths.equal <- function(left, right) {
+    left <- rcmetar.plot.scalar_path(left)
+    right <- rcmetar.plot.scalar_path(right)
+    if (is.null(left) || is.null(right)) {
+        return(FALSE)
+    }
+    identical(
+        normalizePath(as.character(left), winslash="/", mustWork=FALSE),
+        normalizePath(as.character(right), winslash="/", mustWork=FALSE)
+    )
+}
+
+rcmetar.plot.display_path_for_bundle <- function(bundle, outpath, prefix) {
+    params <- bundle$params
+    if (is.null(params)) {
+        return(NULL)
+    }
+    requested.outpath <- rcmetar.plot.scalar_path(
+        params[[paste0(prefix, "_outpath")]]
+    )
+    display.path <- rcmetar.plot.scalar_path(
+        params[[paste0(prefix, "_display_path")]]
+    )
+    if (!rcmetar.plot.paths.equal(requested.outpath, outpath) || is.null(display.path)) {
+        return(NULL)
+    }
+    display.path
+}
+
 rcmetar.plot.export.dpi <- function(size) {
     if (!is.null(size$dpi) && is.finite(size$dpi) && size$dpi > 0) {
         return(size$dpi)
@@ -89,14 +126,33 @@ rcmetar.export.svg_render <- function(svg.path, outpath, size) {
     invisible(ext)
 }
 
-rcmetar.render.plot_file <- function(outpath, size, draw) {
+rcmetar.render.plot_file <- function(outpath, size, draw, display.path=NULL) {
     ext <- rcmetar.plot.file.extension(outpath)
+    display.path <- rcmetar.plot.scalar_path(display.path)
     if (identical(ext, "svg") || identical(ext, "svgz")) {
-        return(rcmetar.render.plot_svg(outpath, size, draw))
+        if (is.null(display.path)) {
+            return(rcmetar.render.plot_svg(outpath, size, draw))
+        }
+        dir.create(dirname(display.path), recursive=TRUE, showWarnings=FALSE)
+        result <- rcmetar.render.plot_svg(display.path, size, draw)
+        if (!rcmetar.plot.paths.equal(display.path, outpath)) {
+            if (!isTRUE(file.copy(display.path, outpath, overwrite=TRUE))) {
+                stop("Could not copy the internal SVG display artifact to the requested output.", call.=FALSE)
+            }
+        }
+        return(invisible(result))
     }
 
-    svg.path <- tempfile(pattern="rcmetar-plot-", fileext=".svg")
-    on.exit(unlink(svg.path), add=TRUE)
+    keep.display <- !is.null(display.path)
+    svg.path <- if (keep.display) as.character(display.path) else tempfile(
+        pattern="rcmetar-plot-", fileext=".svg"
+    )
+    if (keep.display) {
+        dir.create(dirname(svg.path), recursive=TRUE, showWarnings=FALSE)
+    }
+    if (!keep.display) {
+        on.exit(unlink(svg.path), add=TRUE)
+    }
     result <- rcmetar.render.plot_svg(svg.path, size, draw)
     rcmetar.export.svg_render(svg.path, outpath, size)
     invisible(result)

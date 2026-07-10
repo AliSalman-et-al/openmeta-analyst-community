@@ -244,6 +244,7 @@ rcmetar.default.layout <- function(bundle, size, alim) {
 rcmetar.draw.default.forest <- function(bundle, outpath) {
     plan <- rcmetar.forest.layout.preflight(bundle, style="default")
     size <- plan$device
+    display.path <- rcmetar.plot.display_path_for_bundle(bundle, outpath, "fp")
     rcmetar.render.plot_file(outpath, size, function() {
 
     op <- graphics::par(no.readonly=TRUE)
@@ -334,7 +335,7 @@ rcmetar.draw.default.forest <- function(bundle, outpath) {
     rcmetar.draw.default.heterogeneity(bundle, rcmetar.forest.study.x(layout), cex=size$cex)
 
     invisible(bundle$changed.params)
-    })
+    }, display.path=display.path)
 }
 
 rcmetar.draw.default.metafor.forest <- function(bundle, outpath) {

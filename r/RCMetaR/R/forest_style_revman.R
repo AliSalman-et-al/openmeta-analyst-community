@@ -337,6 +337,7 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
 
     plan <- rcmetar.forest.layout.preflight(bundle, style="revman")
     size <- plan$device
+    display.path <- rcmetar.plot.display_path_for_bundle(bundle, outpath, "fp")
     rcmetar.render.plot_file(outpath, size, function() {
 
     op <- graphics::par(no.readonly=TRUE)
@@ -435,7 +436,7 @@ rcmetar.draw.revman.forest <- function(bundle, outpath) {
     rcmetar.draw.revman.bottom.blocks(bundle, rcmetar.forest.study.x(layout), plot.info$cex, layout)
 
     invisible(bundle$changed.params)
-    })
+    }, display.path=display.path)
 }
 
 rcmetar.draw.revman.sequential.forest <- function(bundle, outpath) {
@@ -443,6 +444,7 @@ rcmetar.draw.revman.sequential.forest <- function(bundle, outpath) {
     plan <- rcmetar.forest.layout.preflight(bundle, style=style)
     size <- plan$device
     size$bg <- "white"
+    display.path <- rcmetar.plot.display_path_for_bundle(bundle, outpath, "fp")
     rcmetar.render.plot_file(outpath, size, function() {
 
     op <- graphics::par(no.readonly=TRUE)
@@ -500,7 +502,7 @@ rcmetar.draw.revman.sequential.forest <- function(bundle, outpath) {
     )
     rcmetar.draw.metafor.sequential.text(bundle, rows, layout, k, plan$typography$cex)
     invisible(bundle$changed.params)
-    })
+    }, display.path=display.path)
 }
 
 rcmetar.revman.method.label <- function(bundle) {

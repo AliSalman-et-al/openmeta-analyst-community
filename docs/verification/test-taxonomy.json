@@ -53,6 +53,22 @@
       "decision": "keep",
       "evidence": [
         "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_analysis_workflow.py::test_per_metric_diagnostic_merge_preserves_display_artifacts",
+      "reason": "Guards the explicit display artifact contract when independent diagnostic metric results are merged for the Results Window.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
         "release_readiness"
       ],
       "external_dependencies": [
@@ -1974,6 +1990,22 @@
       "lane": "golden",
       "nodeid": "tests/analysis_regression/golden/test_golden_baseline_manifest_validation.py::test_baseline_manifest_requires_capture_metadata_contract",
       "reason": "Protects golden baseline comparison and manifest tooling.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_refits_raster_fallback_from_original_source",
+      "reason": "Guards responsive Results Window sizing for raster-only Plot Artifacts without cumulative resampling loss.",
       "runtime_class": "seconds",
       "size": "medium"
     },

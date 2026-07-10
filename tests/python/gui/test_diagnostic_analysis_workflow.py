@@ -483,6 +483,42 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
         _close_without_prompt(app, window)
 
 
+def test_per_metric_diagnostic_merge_preserves_display_artifacts():
+    import ma_specs
+
+    def run_metric(_method, params):
+        metric = params["measure"]
+        title = "%s Forest Plot" % metric
+        return {
+            "texts": {"%s Summary" % metric: "%s ok" % metric},
+            "images": {title: "%s.png" % metric.lower()},
+            "display_images": {title: "%s.display.svg" % metric.lower()},
+            "image_var_names": {},
+            "image_params_paths": {},
+            "plot_capabilities": {
+                title: {
+                    "plot_kind": "forest",
+                    "editable": False,
+                    "styleable": True,
+                    "composition": "single",
+                    "regenerator": "forest",
+                }
+            },
+            "image_order": [title],
+        }
+
+    result = ma_specs._run_diagnostic_methods_per_metric(
+        ["diagnostic.random", "diagnostic.random"],
+        [{"measure": "Sens"}, {"measure": "Spec"}],
+        run_metric,
+    )
+
+    assert result["display_images"] == {
+        "Sens Forest Plot": "sens.display.svg",
+        "Spec Forest Plot": "spec.display.svg",
+    }
+
+
 def test_diagnostic_run_rejects_unconfigured_metric_slots(monkeypatch):
     import launch
 

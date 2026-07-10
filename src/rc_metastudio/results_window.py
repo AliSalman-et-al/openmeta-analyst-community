@@ -100,13 +100,6 @@ def _svg_renderer_class():
     return QSvgRenderer
 
 
-def _canonical_svg_path(image_path):
-    root, ext = os.path.splitext(str(image_path))
-    if ext.lower() in (".svg", ".svgz"):
-        return str(image_path)
-    return "%s.svg" % root
-
-
 def _path_with_export_extension(file_path, export_format):
     aliases = PLOT_EXPORT_EXTENSION_ALIASES[export_format.extension]
     if os.path.splitext(str(file_path))[1].lower() in aliases:
@@ -115,17 +108,19 @@ def _path_with_export_extension(file_path, export_format):
 
 
 class PlotArtifact(object):
-    def __init__(self, title, image_path, capability, params_path=None):
+    def __init__(
+        self, title, image_path, capability, params_path=None, display_path=None
+    ):
         self.title = title
         self.image_path = str(image_path)
         self.params_path = params_path
         self.capability = dict(capability)
         self.plot_kind = self.capability["plot_kind"]
-        self.canonical_svg_path = _canonical_svg_path(self.image_path)
+        self.display_image_path = str(display_path or self.image_path)
 
     def display_path(self):
-        if os.path.exists(self.canonical_svg_path):
-            return self.canonical_svg_path
+        if os.path.exists(self.display_image_path):
+            return self.display_image_path
         return self.image_path
 
     def has_vector_display(self):
@@ -158,6 +153,16 @@ class SelectableResultsTextItem(QGraphicsTextItem):
                 type(e), e, e.__traceback__, parent=self._results_window
             )
             event.accept()
+
+
+class ResponsivePixmapItem(QGraphicsPixmapItem):
+    def __init__(self, source_pixmap):
+        super(ResponsivePixmapItem, self).__init__()
+        self.source_pixmap = QPixmap(source_pixmap)
+        self.setTransformationMode(Qt.SmoothTransformation)
+
+    def replace_source(self, source_pixmap):
+        self.source_pixmap = QPixmap(source_pixmap)
 
 
 class EditPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg):
@@ -334,6 +339,9 @@ class EditPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
             "fp_show_summary_line": self.show_summary_line.isChecked(),
             "fp_outpath": qt_text.to_native_text(self.image_path.text()),
         }
+        forest_display_path = self._scalar(self._params.get("fp_display_path", ""))
+        if forest_display_path:
+            params["fp_display_path"] = forest_display_path
         if self.plot_type == "regression":
             params = {
                 "bp_style": style,
@@ -348,6 +356,11 @@ class EditPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
                 "bp_show_prediction_interval": self.show_prediction_interval.isChecked(),
                 "bp_outpath": qt_text.to_native_text(self.image_path.text()),
             }
+            regression_display_path = self._scalar(
+                self._params.get("bp_display_path", "")
+            )
+            if regression_display_path:
+                params["bp_display_path"] = regression_display_path
         return params
 
 
@@ -360,6 +373,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
         super(ResultsWindow, self).__init__(parent)
         self._svg_plot_items = []
+        self._raster_plot_items = []
         self._refitting_svg_plots = False
         self._viewport_refit_pending = False
         self._layout_items = []
@@ -398,6 +412,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         results = _normalize_results(results)
 
         self.images = results["images"]
+        self.display_images = results["display_images"]
         print("images returned from analytic routine: %s" % self.images)
         self.image_order = None
         if "image_order" in results:
@@ -466,6 +481,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             image_path,
             self.plot_capabilities[title],
             params_path=params_path,
+            display_path=self.display_images.get(title),
         )
 
     def add_text_section(self, title, display_title, text):
@@ -697,6 +713,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
     def _refit_viewport_items(self):
         self._update_wrapped_text_widths()
         self._refit_svg_plot_items()
+        self._refit_raster_plot_items()
         self._relayout_sections()
 
     def _schedule_viewport_refit(self):
@@ -732,6 +749,17 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                 self._fit_vector_plot_to_viewport(item)
         finally:
             self._refitting_svg_plots = False
+
+    def _refit_raster_plot_items(self):
+        for item in self._raster_plot_items:
+            source = item.source_pixmap
+            if source.isNull():
+                continue
+            scaled_width, _scaled_height = self._fit_size_to_viewport(
+                source.width(), source.height()
+            )
+            item.setPixmap(source)
+            item.setScale(float(scaled_width) / float(source.width()))
 
     def _relayout_sections(self):
         """Place every result item from its current measured size and stored order."""
@@ -772,7 +800,8 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self, pixmap, position, title, image_path, params_path=None, matrix=QTransform()
     ):
         artifact = self.create_plot_artifact(title, image_path, params_path=params_path)
-        item = QGraphicsPixmapItem(pixmap)
+        item = ResponsivePixmapItem(QPixmap(image_path))
+        item.setPixmap(pixmap)
         item.setToolTip(
             'To save the image:\nright-click on the image and choose "save image as".'
         )
@@ -794,6 +823,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         # item.setMatrix(matrix)
         self.scene.clearSelection()
         self.scene.addItem(item)
+        self._raster_plot_items.append(item)
         self._layout_items.append(item)
         item.setPos(position)
 
@@ -970,22 +1000,23 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                 outpath,
                 artifact.capability,
                 params_path=artifact.params_path,
+                display_path=artifact.display_image_path,
             )
-            if isinstance(plot_item, _svg_item_class()) and os.path.exists(
-                refreshed_artifact.canonical_svg_path
-            ):
+            if isinstance(
+                plot_item, _svg_item_class()
+            ) and refreshed_artifact.has_vector_display():
                 renderer = _svg_renderer_class()(
-                    refreshed_artifact.canonical_svg_path, self
+                    refreshed_artifact.display_path(), self
                 )
                 if renderer.isValid():
                     plot_item.setSharedRenderer(renderer)
                     self._refit_viewport_items()
                     self.scene.update()
-            elif isinstance(plot_item, QGraphicsPixmapItem):
-                pixmap = self.generate_pixmap(outpath)
-                if not pixmap.isNull():
-                    plot_item.setPixmap(pixmap)
-                    self._relayout_sections()
+            elif isinstance(plot_item, ResponsivePixmapItem):
+                source_pixmap = QPixmap(outpath)
+                if not source_pixmap.isNull():
+                    plot_item.replace_source(source_pixmap)
+                    self._refit_viewport_items()
 
     def save_image_as(self, artifact, unscaled_image=None, format=None):
         if not isinstance(artifact, PlotArtifact):
@@ -1049,9 +1080,18 @@ def _normalize_results(results):
     normalized = dict(results)
     normalized["texts"] = dict(normalized.get("texts") or {})
     normalized["images"] = dict(normalized.get("images") or {})
+    normalized["display_images"] = dict(normalized.get("display_images") or {})
     normalized["image_var_names"] = dict(normalized.get("image_var_names") or {})
     normalized["image_params_paths"] = dict(normalized.get("image_params_paths") or {})
     normalized["plot_capabilities"] = plot_capabilities.validate_result(normalized)
+    extra_display_images = sorted(
+        set(normalized["display_images"]) - set(normalized["images"])
+    )
+    if extra_display_images:
+        raise ValueError(
+            "Display artifacts have no matching plot artifact: %s"
+            % ", ".join(extra_display_images)
+        )
     normalized.setdefault("image_order", None)
 
     if not normalized["texts"] and not normalized["images"]:
@@ -1064,6 +1104,7 @@ def _empty_results():
     return {
         "texts": {"No Results": NO_RESULTS_MESSAGE},
         "images": {},
+        "display_images": {},
         "image_var_names": {},
         "image_params_paths": {},
         "image_order": None,

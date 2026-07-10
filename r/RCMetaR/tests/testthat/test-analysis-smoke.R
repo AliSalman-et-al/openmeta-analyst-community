@@ -220,6 +220,46 @@ test_that("representative binary analysis paths execute", {
   expect_analysis_result(rcmetar.run.analysis(fixture$data, list(method = "binary.random", params = fixture$params, workflow = "subgroup")))
 })
 
+test_that("forest analysis returns an explicit internal SVG display artifact", {
+  fixture <- continuous_fixture()
+  fixture$params$create.plot <- TRUE
+  fixture$params$fp_outpath <- tempfile(fileext = ".png")
+  fixture$params$fp_display_path <- tempfile(pattern = "forest-display-", fileext = ".svg")
+
+  result <- rcmetar.run.analysis(
+    fixture$data,
+    list(method = "continuous.random", params = fixture$params)
+  )
+
+  expect_equal(unname(result$images[["Forest Plot"]]), fixture$params$fp_outpath)
+  expect_equal(
+    unname(result$display_images[["Forest Plot"]]),
+    fixture$params$fp_display_path
+  )
+  expect_true(file.exists(fixture$params$fp_outpath))
+  expect_true(file.exists(fixture$params$fp_display_path))
+  expect_false(file.exists(rcmetar.plot.canonical_svg_path(fixture$params$fp_outpath)))
+
+  fixture$params$fp_outpath <- tempfile(pattern = "forest-export-", fileext = ".svg")
+  fixture$params$fp_display_path <- tempfile(
+    pattern = "forest-internal-display-", fileext = ".svg"
+  )
+  svg.result <- rcmetar.run.analysis(
+    fixture$data,
+    list(method = "continuous.random", params = fixture$params)
+  )
+  expect_false(rcmetar.plot.paths.equal(
+    fixture$params$fp_outpath,
+    fixture$params$fp_display_path
+  ))
+  expect_equal(
+    unname(svg.result$display_images[["Forest Plot"]]),
+    fixture$params$fp_display_path
+  )
+  expect_true(file.exists(fixture$params$fp_outpath))
+  expect_true(file.exists(fixture$params$fp_display_path))
+})
+
 test_that("representative continuous analysis paths execute", {
   fixture <- continuous_fixture()
   expect_analysis_result(rcmetar.run.analysis(fixture$data, list(method = "continuous.random", params = fixture$params)))
@@ -268,8 +308,14 @@ test_that("core diagnostic multi-analysis facade preserves multi-metric results"
   spec_params <- fixture$params
   sens_params$create.plot <- TRUE
   spec_params$create.plot <- TRUE
+  sens_params$fp_display_path <- tempfile(
+    pattern = "diagnostic-sens-display-", fileext = ".svg"
+  )
   spec_params$measure <- "Spec"
   spec_params$fp_outpath <- file.path("r_tmp", "forest_Spec.png")
+  spec_params$fp_display_path <- tempfile(
+    pattern = "diagnostic-spec-display-", fileext = ".svg"
+  )
   spec_effects <- get.res.for.one.diag.study(fixture$data, spec_params)
   spec_data <- fixture$data
   spec_data@y <- spec_effects$b
@@ -283,6 +329,16 @@ test_that("core diagnostic multi-analysis facade preserves multi-metric results"
 
   expect_analysis_result(result)
   expect_true(any(grepl("Sens|Spec", names(result))))
+  expect_named(
+    result$display_images,
+    c("Sensitivity Forest Plot", "Specificity Forest Plot"),
+    ignore.order = TRUE
+  )
+  expect_false("SROC" %in% names(result$display_images))
+  expect_true(all(file.exists(c(
+    sens_params$fp_display_path,
+    spec_params$fp_display_path
+  ))))
   expect_equal(attr(result, "rcmetar.request")$workflow, "standard")
   expect_false(any(file.exists(paste0(
     c(sens_params$fp_outpath, spec_params$fp_outpath),

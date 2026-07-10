@@ -69,6 +69,8 @@ bubble_load_saved_plot_data <- function(path) {
 
 test_that("meta-regression stores a self-contained metafor bubble plot bundle", {
   fixture <- bubble_binary_fixture("default")
+  fixture$params$bp_outpath <- tempfile(fileext = ".png")
+  fixture$params$bp_display_path <- tempfile(pattern = "bubble-display-", fileext = ".svg")
 
   result <- rcmetar.run.analysis(
     fixture$data,
@@ -78,6 +80,12 @@ test_that("meta-regression stores a self-contained metafor bubble plot bundle", 
   bundle <- bubble_load_saved_plot_data(plot.path)
 
   expect_true(result$plot_capabilities[["Regression Plot"]]$editable)
+  expect_equal(
+    unname(result$display_images[["Regression Plot"]]),
+    fixture$params$bp_display_path
+  )
+  expect_true(file.exists(fixture$params$bp_outpath))
+  expect_true(file.exists(fixture$params$bp_display_path))
   expect_equal(bundle$render_engine, "metafor")
   expect_equal(bundle$plot_type, "meta_regression_bubble")
   expect_equal(bundle$bp_style, "default")

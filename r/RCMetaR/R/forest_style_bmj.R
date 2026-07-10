@@ -713,6 +713,7 @@ rcmetar.draw.bmj.forest <- function(bundle, outpath) {
 
     plan <- rcmetar.forest.bmj.layout.preflight(bundle)
     size <- plan$device
+    display.path <- rcmetar.plot.display_path_for_bundle(bundle, outpath, "fp")
     rcmetar.render.plot_file(outpath, size, function() {
 
     op <- graphics::par(no.readonly=TRUE)
@@ -792,7 +793,7 @@ rcmetar.draw.bmj.forest <- function(bundle, outpath) {
     rcmetar.draw.bmj.bottom.blocks(bundle, rcmetar.forest.study.x(layout), plot.info$cex, layout, summary$res)
 
     invisible(bundle$changed.params)
-    })
+    }, display.path=display.path)
 }
 
 rcmetar.bmj.summary.effect <- function(bundle) {

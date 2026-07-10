@@ -1250,6 +1250,7 @@ def parse_out_results(result):
     # in R (for graphics manipulation).
     text_d = {}
     image_var_name_d, image_params_paths_d, image_path_d = {}, {}, {}
+    display_image_path_d = {}
     image_order = None
     plot_capability_d = {}
 
@@ -1269,6 +1270,8 @@ def parse_out_results(result):
         print("\n--------\n")
         if text_n == "images":
             image_path_d = R_parse_tools.recursioner(text)
+        elif text_n == "display_images":
+            display_image_path_d = R_parse_tools.recursioner(text)
         elif text_n == "image_order":
             image_order = list(text)
         elif text_n == "plot_names":
@@ -1320,6 +1323,7 @@ def parse_out_results(result):
 
     to_return = {
         "images": image_path_d,
+        "display_images": display_image_path_d,
         "image_var_names": image_var_name_d,
         "texts": text_d,
         "image_params_paths": image_params_paths_d,

@@ -431,6 +431,7 @@ rcmetar.run.analysis <- function(om.data, request=NULL, method=NULL, params=list
         "meta-regression"=meta.regression(om.data, request$params, request$cond.means.data, request$stop.at.rma)
     )
 
+    result <- .rcmetar.attach.plot.display.artifacts(result, request)
     result <- .rcmetar.attach.plot.capabilities(result, request)
     .rcmetar.attach.request(result, request)
 }
@@ -473,6 +474,7 @@ rcmetar.run.diagnostic.analyses <- function(diagnostic.data, methods, params.lis
         params.list=params.list,
         workflow=workflow
     )
+    result <- .rcmetar.attach.plot.display.artifacts(result, result.request)
     result <- .rcmetar.attach.plot.capabilities(result, result.request)
     attr(result, "rcmetar.request") <- result.request
     result
@@ -701,6 +703,49 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
 .rcmetar.attach.request <- function(result, request) {
     if (is.list(result)) {
         attr(result, "rcmetar.request") <- request
+    }
+    result
+}
+
+.rcmetar.request.plot.path.pairs <- function(request) {
+    params.list <- if (!is.null(request$params.list)) request$params.list else list(request$params)
+    pairs <- list()
+    for (params in params.list) {
+        for (prefix in c("fp", "bp")) {
+            output.path <- rcmetar.plot.scalar_path(
+                params[[paste0(prefix, "_outpath")]]
+            )
+            display.path <- rcmetar.plot.scalar_path(
+                params[[paste0(prefix, "_display_path")]]
+            )
+            if (!is.null(output.path) && !is.null(display.path)) {
+                pairs[[length(pairs) + 1]] <- list(
+                    output=output.path,
+                    display=display.path
+                )
+            }
+        }
+    }
+    pairs
+}
+
+.rcmetar.attach.plot.display.artifacts <- function(result, request) {
+    if (!is.list(result) || is.null(result$images) || length(result$images) == 0) {
+        return(result)
+    }
+    pairs <- .rcmetar.request.plot.path.pairs(request)
+    display.images <- character(0)
+    for (title in names(result$images)) {
+        image.path <- result$images[[title]]
+        for (pair in pairs) {
+            if (rcmetar.plot.paths.equal(image.path, pair$output) && file.exists(pair$display)) {
+                display.images[[title]] <- pair$display
+                break
+            }
+        }
+    }
+    if (length(display.images) > 0) {
+        result$display_images <- display.images
     }
     result
 }
