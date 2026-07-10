@@ -38,7 +38,6 @@ import qt_text
 import plot_capabilities
 from meta_globals import *
 from settings import *
-import diagnostic_explain
 
 _fromUtf8 = lambda s: s
 
@@ -1121,16 +1120,6 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             # if both sets of metrics are selected, we need to next prompt the
             # user for parameters regarding the second
             self._set_accepted_handler(self.diag_next)
-
-            # in the case that both 'families' of metrics are selected,
-            # we prompt the user for two different methods (because different
-            # methods are available for these). this is confusing, so
-            # we'll here tell the user what's up (issue #83, issue #115)
-            # (but we only show it if they haven't disabled this)
-
-            if get_setting("explain_diag"):
-                diag_explain_window = diagnostic_explain.DiagnosticExplain(parent=self)
-                diag_explain_window.show()
 
         # change some UI elements to refelct the current method
         window_title, method_label = "", ""

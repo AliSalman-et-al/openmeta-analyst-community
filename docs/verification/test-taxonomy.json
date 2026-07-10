@@ -37,6 +37,21 @@
     {
       "decision": "keep",
       "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_analysis_workflow.py::test_diagnostic_method_dialog_opens_without_multiple_metrics_note",
+      "reason": "Protects the direct Diagnostic Metrics to Method & Parameters handoff from the retired informational interstitial.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
         "gui_compatibility",
         "release_readiness"
       ],

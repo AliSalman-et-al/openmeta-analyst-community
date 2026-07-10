@@ -132,6 +132,64 @@ def test_diagnostic_method_dialog_builds_with_working_backend():
         _close_without_prompt(app, window)
 
 
+def test_diagnostic_method_dialog_opens_without_multiple_metrics_note(monkeypatch):
+    import launch
+
+    app, window = launch.start_automation()
+    import diag_metrics
+    import ma_specs
+
+    backend = ma_specs.meta_py_r
+    saved = {
+        name: getattr(backend, name)
+        for name in (
+            "get_available_methods",
+            "get_params",
+            "get_method_description",
+            "ma_dataset_to_simple_diagnostic_robj",
+        )
+    }
+    try:
+        _create_diagnostic_dataset(window)
+        monkeypatch.setattr(
+            window.model, "included_studies_have_raw_data", lambda: True
+        )
+
+        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
+        backend.get_available_methods = lambda **kwargs: {
+            "Diagnostic Random-Effects": "diagnostic.random",
+        }
+        backend.get_params = lambda method: ({}, {}, [], {})
+        backend.get_method_description = lambda method: "stub method"
+        monkeypatch.setattr(
+            backend,
+            "get_analysis_plot_capabilities",
+            lambda data_type, method, workflow="standard": [],
+            raising=False,
+        )
+
+        metrics_form = diag_metrics.Diag_Metrics(window.model, parent=window)
+        metrics_form.show()
+        metrics_form.ok()
+        app.processEvents()
+
+        visible_dialog_titles = {
+            str(widget.windowTitle())
+            for widget in app.topLevelWidgets()
+            if widget.isVisible()
+        }
+
+        assert "Method & Parameters for Sensitivity and Specificity" in (
+            visible_dialog_titles
+        )
+        assert "Diagnostic MA with Multiple Metrics" not in visible_dialog_titles
+        assert metrics_form.isVisible() is False
+    finally:
+        for name, value in saved.items():
+            setattr(backend, name, value)
+        _close_without_prompt(app, window)
+
+
 def test_diagnostic_backend_failure_does_not_open_empty_results(monkeypatch):
     import launch
 

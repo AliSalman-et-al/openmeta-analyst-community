@@ -21,7 +21,6 @@ DEFAULT_SETTINGS = {
     "splash": True,
     "digits": 3,
     "recent_files": [],
-    "explain_diag": True,
     # "method_params":{},
 }
 
