@@ -9,8 +9,8 @@ This ADR fixes the per-family × style column sets, the device-sizing method, an
 **Default (metafor)** is a metafor-idiomatic redesign, not a reproduction of the legacy column set: study label | raw-count `ilab` columns | metafor's built-in effect/CI annotation, with the raw counts drawn per family (binary two-group events/total, diagnostic counts, continuous optional mean/SD/N). Its per-style control panel exposes metafor-native toggles for those `ilab` columns rather than the legacy col1–4 abstraction.
 
 **RevMan and BMJ** are full faithful layout templates with per-family `ilab` column sets:
-- Binary: Experimental events/total, Control events/total.
-- Continuous: Experimental Mean/SD/Total, Control Mean/SD/Total.
+- Binary: Intervention events/total, Control events/total.
+- Continuous: Intervention Mean/SD/Total, Control Mean/SD/Total.
 - Diagnostic (in-house, no official layout exists): all four `TP`/`FP`/`FN`/`TN` cells as separate columns, matching RevMan's diagnostic-test-accuracy table convention, so the columns stay constant across Sens/Spec/DOR/PLR/NLR.
 
 Both styles additionally render the recognizable faithful blocks for every family: a weight-% column, subgroup subtotals with diamonds, a heterogeneity block (τ²/χ²/df/P/I²), and a test-for-overall-effect line (Z, P). Directional "Favours A / Favours B" axis labels are rendered **only for binary and continuous**, where a favoring direction exists; diagnostic uses a plain metric axis label instead, rather than inventing directional wording RevMan/BMJ do not define.

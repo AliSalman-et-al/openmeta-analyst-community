@@ -199,8 +199,9 @@ rcmetar.bmj.direction.labels <- function(bundle) {
             measure %in% c(binary.one.arm.metrics, continuous.one.arm.metrics)) {
         return(list(left="", right="", axis=pretty.metric.name(as.character(bundle$params$measure))))
     }
-    left <- "Favors control"
-    right <- "Favors experimental"
+    labels <- rcmetar.default.arm.labels()
+    left <- paste("Favors", tolower(labels[[2]]))
+    right <- paste("Favors", tolower(labels[[1]]))
     if (!is.null(bundle$params$fp_col4_str) && bundle$params$fp_col4_str != "[default]") {
         left <- paste("Favors", tolower(as.character(bundle$params$fp_col4_str)))
     }

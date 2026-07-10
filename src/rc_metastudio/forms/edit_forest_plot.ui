@@ -181,7 +181,7 @@
         <item row="2" column="1">
          <widget class="QLineEdit" name="col3_str_edit">
           <property name="text">
-           <string>Ev/Trt</string>
+           <string>[default]</string>
           </property>
          </widget>
         </item>
@@ -205,7 +205,7 @@
         <item row="3" column="1">
          <widget class="QLineEdit" name="col4_str_edit">
           <property name="text">
-           <string>Ev/Ctrl</string>
+           <string>[default]</string>
           </property>
          </widget>
         </item>

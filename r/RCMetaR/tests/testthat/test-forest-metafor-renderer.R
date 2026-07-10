@@ -9,7 +9,7 @@ metafor_binary_params <- function(outpath) {
     to = "only0",
     fp_col4_str = "Control",
     fp_xticks = "[default]",
-    fp_col3_str = "Experimental",
+    fp_col3_str = "[default]",
     fp_show_col3 = TRUE,
     fp_show_col2 = TRUE,
     fp_show_col1 = TRUE,
@@ -207,7 +207,7 @@ test_that("binary Default Forest Style builds a self-contained metafor render bu
   expect_equal(bundle$fp_style, "default")
   expect_equal(bundle$ilab$headers, c("Events", "Non-events", "Events", "Non-events"))
   expect_equal(unname(bundle$ilab$matrix[1, ]), c("4", "119", "11", "128"))
-  expect_equal(bundle$ilab$groups, c("Experimental", "Control"))
+  expect_equal(bundle$ilab$groups, c("Intervention", "Control"))
   expect_equal(nrow(bundle$ilab$matrix), length(fixture$data@study.names))
   expect_true(inherits(bundle$res, "rma"))
 
@@ -314,13 +314,13 @@ test_that("binary RevMan Forest Style builds faithful count, weight, and block s
 
   expect_equal(bundle$fp_style, "revman")
   expect_equal(bundle$ilab$headers, c("Events", "Total", "Events", "Total", "Weight"))
-  expect_equal(bundle$ilab$groups, c("Experimental", "Control"))
+  expect_equal(bundle$ilab$groups, c("Intervention", "Control"))
   expect_equal(unname(bundle$ilab$matrix[1, ]), c("4", "123", "11", "139", paste0(round.display(weights(res)[[1]], 1), "%")))
   expect_match(bundle$style_blocks$heterogeneity, "Heterogeneity: Tau²")
   expect_match(bundle$style_blocks$heterogeneity, "Chi²")
   expect_match(bundle$style_blocks$heterogeneity, "I²")
   expect_match(bundle$style_blocks$test_overall, "Test for overall effect: Z =")
-  expect_equal(bundle$style_blocks$favours_left, "Favours Experimental")
+  expect_equal(bundle$style_blocks$favours_left, "Favours Intervention")
   expect_equal(bundle$style_blocks$favours_right, "Favours Control")
   expect_equal(rcmetar.revman.study.header(bundle), "Study or Subgroup")
   expect_false(any(grepl("bias|rob", c(names(bundle$style_blocks), unlist(bundle$style_blocks)), ignore.case = TRUE)))
@@ -506,7 +506,7 @@ test_that("RevMan X-axis footer labels align to the plotted effect axis", {
   expect_equal(footer$axis.x, mean(layout$alim), tolerance = 1e-8)
   expect_gt(footer$left.max.width, 0)
   expect_gt(footer$right.max.width, 0)
-  expect_equal(bundle$style_blocks$favours_left, "Favours Experimental")
+  expect_equal(bundle$style_blocks$favours_left, "Favours Intervention")
   expect_equal(bundle$style_blocks$favours_right, "Favours Control")
 
   diagnostic.fixture <- metafor_diagnostic_fixture(measure = "Sens")
@@ -590,10 +590,10 @@ test_that("BMJ Forest Style builds faithful family columns and renders smoke cas
     binary = list(
       fixture = metafor_binary_fixture(),
       expected_headers = c("", "", "Weight"),
-      expected_groups = c("Experimental", "Control"),
+      expected_groups = c("Intervention", "Control"),
       axis_label = "",
       favours_left = "Favors control",
-      favours_right = "Favors experimental"
+      favours_right = "Favors intervention"
     ),
     continuous = list(
       fixture = metafor_continuous_fixture(),

@@ -122,8 +122,9 @@ rcmetar.revman.diagnostic.ilab <- function(diagnostic.data, params, res=NULL) {
 }
 
 rcmetar.revman.arm.labels <- function(params) {
-    experimental <- "Experimental"
-    control <- "Control"
+    labels <- rcmetar.default.arm.labels()
+    experimental <- labels[[1]]
+    control <- labels[[2]]
     if (!is.null(params$fp_col3_str) && params$fp_col3_str != "[default]") {
         experimental <- as.character(params$fp_col3_str)
     }
@@ -186,8 +187,9 @@ rcmetar.revman.direction.labels <- function(bundle) {
             measure %in% c(binary.one.arm.metrics, continuous.one.arm.metrics)) {
         return(list(left="", right="", axis=pretty.metric.name(as.character(bundle$params$measure))))
     }
-    left <- "Favours Experimental"
-    right <- "Favours Control"
+    labels <- rcmetar.default.arm.labels()
+    left <- paste("Favours", labels[[1]])
+    right <- paste("Favours", labels[[2]])
     if (!is.null(bundle$params$fp_col3_str) && bundle$params$fp_col3_str != "[default]") {
         left <- paste("Favours", as.character(bundle$params$fp_col3_str))
     }

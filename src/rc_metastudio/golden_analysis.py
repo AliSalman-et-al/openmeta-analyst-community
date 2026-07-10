@@ -13,6 +13,7 @@ import zipfile
 import headless_analysis
 import meta_globals
 import meta_py_r
+from plot_defaults import FOREST_ARM_LABELS
 
 
 DEFAULT_TOLERANCES = {
@@ -59,8 +60,8 @@ def _common_plot_params(path):
         "digits": 3.0,
         "fp_col1_str": "Study or Subgroup",
         "fp_col2_str": "[default]",
-        "fp_col3_str": "Ev/Trt",
-        "fp_col4_str": "Ev/Ctrl",
+        "fp_col3_str": FOREST_ARM_LABELS[0],
+        "fp_col4_str": FOREST_ARM_LABELS[1],
         "fp_xlabel": "[default]",
         "fp_outpath": path,
         "fp_plot_lb": "[default]",

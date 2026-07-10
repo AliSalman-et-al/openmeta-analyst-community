@@ -405,7 +405,7 @@ The RevMan Forest Style layout used when raw arm-level columns are unavailable o
 _Avoid_: Default fallback, broken RevMan, empty RevMan columns
 
 **RevMan Compact Template**:
-The RevMan Forest Style layout used for forest plot variants whose rows are not ordinary study-arm comparisons, such as cumulative and leave-one-out plots. It preserves RevMan's typography, rule, effect/CI annotation, summary, and axis conventions without inventing Experimental/Control arm columns.
+The RevMan Forest Style layout used for forest plot variants whose rows are not ordinary study-arm comparisons, such as cumulative and leave-one-out plots. It preserves RevMan's typography, rule, effect/CI annotation, summary, and axis conventions without inventing Intervention/Control arm columns.
 _Avoid_: Full RevMan table for cumulative plots, Default cumulative fallback
 
 **BMJ Forest Style**:

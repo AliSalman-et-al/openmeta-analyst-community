@@ -36,6 +36,7 @@ import progress_bar as progress_dialog
 import qt_layout
 import qt_text
 import plot_capabilities
+from plot_defaults import apply_default_forest_arm_labels
 from meta_globals import *
 from settings import *
 
@@ -202,6 +203,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         super(MA_Specs, self).__init__(parent)
         self.setupUi(self)
+        apply_default_forest_arm_labels(self)
         if _text_value(self.image_path) == "":
             self.image_path.setText(analysis_output_path("forest.png"))
         global meta_py_r

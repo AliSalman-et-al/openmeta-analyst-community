@@ -3104,6 +3104,33 @@ def test_edit_forest_plot_dialog_round_trips_style_and_appearance_params(monkeyp
         app.processEvents()
 
 
+def test_shared_plot_options_surface_uses_default_arm_labels():
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+    from forms.ui_ma_specs import Ui_Dialog
+    from plot_defaults import apply_default_forest_arm_labels
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    analysis_dialog = QtWidgets.QDialog()
+    analysis_form = Ui_Dialog()
+    analysis_form.setupUi(analysis_dialog)
+    apply_default_forest_arm_labels(analysis_form)
+    edit_dialog = results_window.EditForestPlotDialog({}, "forest.png")
+
+    try:
+        assert analysis_form.col3_str_edit.text() == "Intervention"
+        assert analysis_form.col4_str_edit.text() == "Control"
+        assert edit_dialog.col3_str_edit.text() == "Intervention"
+        assert edit_dialog.col4_str_edit.text() == "Control"
+    finally:
+        edit_dialog.close()
+        analysis_dialog.close()
+        app.processEvents()
+
+
 def test_edit_forest_plot_dialog_apply_stays_open_and_ok_applies_and_closes():
     import launch
     import test_backend_compat

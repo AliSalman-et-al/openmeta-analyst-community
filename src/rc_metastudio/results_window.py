@@ -36,6 +36,7 @@ import ui_results_window
 import app_error_handler
 import forms.ui_edit_forest_plot
 import meta_py_r
+from plot_defaults import FOREST_ARM_LABELS
 import plot_capabilities
 import qt_layout
 import qt_text
@@ -208,10 +209,12 @@ class EditPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
                 self.col2_str_edit, self._params.get("fp_col2_str", "[default]")
             )
             self._set_text(
-                self.col3_str_edit, self._params.get("fp_col3_str", "Experimental")
+                self.col3_str_edit,
+                self._params.get("fp_col3_str", FOREST_ARM_LABELS[0]),
             )
             self._set_text(
-                self.col4_str_edit, self._params.get("fp_col4_str", "Control")
+                self.col4_str_edit,
+                self._params.get("fp_col4_str", FOREST_ARM_LABELS[1]),
             )
             self.show_1.setChecked(self._bool_param("fp_show_col1", True))
             self.show_2.setChecked(self._bool_param("fp_show_col2", True))

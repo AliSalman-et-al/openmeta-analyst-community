@@ -14,7 +14,7 @@ rcmetar.binary.default.ilab <- function(binary.data, params) {
         return(rcmetar.empty.default.ilab(length(binary.data@study.names)))
     }
     if (as.character(params$measure) %in% binary.one.arm.metrics) {
-        group <- "Experimental"
+        group <- rcmetar.default.arm.labels()[[1]]
         if (!is.null(params$fp_col3_str) && params$fp_col3_str != "[default]") {
             group <- as.character(params$fp_col3_str)
         }
@@ -37,21 +37,21 @@ rcmetar.binary.default.ilab <- function(binary.data, params) {
         ))
     }
     columns <- list(
-        list(key="experimental_events", group="Experimental", header="Events", values=rcmetar.format.metafor.raw(binary.data@g1O1)),
-        list(key="experimental_nonevents", group="Experimental", header="Non-events", values=rcmetar.format.metafor.raw(binary.data@g1O2)),
-        list(key="control_events", group="Control", header="Events", values=rcmetar.format.metafor.raw(binary.data@g2O1)),
-        list(key="control_nonevents", group="Control", header="Non-events", values=rcmetar.format.metafor.raw(binary.data@g2O2))
+        list(key="experimental_events", group="intervention", header="Events", values=rcmetar.format.metafor.raw(binary.data@g1O1)),
+        list(key="experimental_nonevents", group="intervention", header="Non-events", values=rcmetar.format.metafor.raw(binary.data@g1O2)),
+        list(key="control_events", group="control", header="Events", values=rcmetar.format.metafor.raw(binary.data@g2O1)),
+        list(key="control_nonevents", group="control", header="Non-events", values=rcmetar.format.metafor.raw(binary.data@g2O2))
     )
     if (!rcmetar.param.is.true(params, "fp_show_col3", TRUE)) {
-        columns <- columns[!vapply(columns, function(column) column$group == "Experimental", logical(1))]
+        columns <- columns[!vapply(columns, function(column) column$group == "intervention", logical(1))]
     }
     if (!rcmetar.param.is.true(params, "fp_show_col4", TRUE)) {
-        columns <- columns[!vapply(columns, function(column) column$group == "Control", logical(1))]
+        columns <- columns[!vapply(columns, function(column) column$group == "control", logical(1))]
     }
     if (length(columns) == 0) {
         return(rcmetar.empty.default.ilab(length(binary.data@study.names)))
     }
-    groups <- c("Experimental", "Control")
+    groups <- rcmetar.default.arm.labels()
     if (!is.null(params$fp_col3_str) && params$fp_col3_str != "[default]") {
         groups[1] <- as.character(params$fp_col3_str)
     }
@@ -59,9 +59,9 @@ rcmetar.binary.default.ilab <- function(binary.data, params) {
         groups[2] <- as.character(params$fp_col4_str)
     }
     for (i in seq_along(columns)) {
-        if (columns[[i]]$group == "Experimental") {
+        if (columns[[i]]$group == "intervention") {
             columns[[i]]$group <- groups[1]
-        } else if (columns[[i]]$group == "Control") {
+        } else if (columns[[i]]$group == "control") {
             columns[[i]]$group <- groups[2]
         }
     }
@@ -86,7 +86,7 @@ rcmetar.continuous.default.ilab <- function(cont.data, params) {
         return(rcmetar.empty.default.ilab(length(cont.data@study.names)))
     }
     digits <- as.integer(params$digits)
-    groups <- c("Experimental", "Control")
+    groups <- rcmetar.default.arm.labels()
     if (!is.null(params$fp_col3_str) && params$fp_col3_str != "[default]") {
         groups[1] <- as.character(params$fp_col3_str)
     } else if (length(cont.data@g1.name) > 0 && nzchar(cont.data@g1.name[1])) {
