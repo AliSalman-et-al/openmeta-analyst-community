@@ -41,7 +41,6 @@ import add_new_dialogs
 import results_window
 import ma_specs
 import diag_metrics
-import meta_reg_form
 import meta_subgroup_form
 import edit_dialog
 import edit_group_name_form
@@ -550,7 +549,12 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         qt_layout.show_centered(form)
 
     def meta_reg(self):
-        form = meta_reg_form.MetaRegForm(self.model, parent=self)
+        form = self._build_analysis_specs_dialog(
+            meta_f_str="meta-regression",
+            conf_level=self.model.get_global_conf_level(),
+        )
+        if form is None:
+            return
         qt_layout.show_centered(form)
 
     def data_dirtied(self):

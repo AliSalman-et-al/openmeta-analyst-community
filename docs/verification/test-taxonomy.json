@@ -53,6 +53,65 @@
       "decision": "keep",
       "evidence": [
         "gui_compatibility",
+        "r_stack"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_meta_regression_acceptance_passes_all_dialog_choices_to_adapter",
+      "reason": "Guards propagation of method, covariate, model, and bubble plot choices to the Analysis Adapter.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_meta_regression_enables_plots_only_for_one_continuous_covariate",
+      "reason": "Prevents bubble plot controls from appearing actionable for unsupported moderator selections.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_meta_regression_uses_shared_method_covariates_and_plots_dialog",
+      "reason": "Guards routing meta-regression through the shared Method, Covariates, and Plots dialog.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_meta_regression_pre_run_plot_options_use_bubble_parameter_contract",
+      "reason": "Guards pre-run bubble plot options at the Python-to-R parameter contract.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
         "release_readiness"
       ],
       "external_dependencies": [

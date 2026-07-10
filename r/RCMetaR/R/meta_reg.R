@@ -854,6 +854,10 @@ meta.regression <- function(reg.data, params, cond.means.data=NULL, stop.at.rma=
             betas <- res$b
             fitted.line <- list(intercept=betas[1], slope=betas[2])
             plot.path <- "./r_tmp/reg.png"
+            if (!is.null(params$bp_outpath) && length(params$bp_outpath) > 0 &&
+                    !is.na(params$bp_outpath[1]) && nzchar(as.character(params$bp_outpath[1]))) {
+                plot.path <- as.character(params$bp_outpath[1])
+            }
             plot.data <- create.plot.data.reg(reg.data, params, fitted.line, res=res)
 
             # Use generated axis labels unless the caller supplies richer labels.
@@ -919,6 +923,15 @@ meta.regression <- function(reg.data, params, cond.means.data=NULL, stop.at.rma=
 	references <- rcmetar.method.references("meta.regression")
 	results[["References"]] <- references
     results
+}
+
+meta.regression.parameters <- function() {
+    rm.methods <- c("HE", "DL", "SJ", "ML", "REML", "EB")
+    list(
+        parameters=list("rm.method"=rm.methods, "conf.level"="float", "digits"="int"),
+        defaults=list("rm.method"="REML", "conf.level"=95, "digits"=3),
+        var_order=c("rm.method", "conf.level", "digits")
+    )
 }
 
 cond.means.info <- function(cond.means.data) {

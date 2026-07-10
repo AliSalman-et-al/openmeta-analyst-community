@@ -444,7 +444,9 @@ def get_params(method_name):
 
 
 @RfunctionCaller
-def get_available_methods(for_data_type=None, data_obj_name=None, metric=None):
+def get_available_methods(
+    for_data_type=None, data_obj_name=None, metric=None, workflow="standard"
+):
     """
     Returns a list of methods available in RCMetaR for the particular data_type
     (if one is given).
@@ -458,6 +460,7 @@ def get_available_methods(for_data_type=None, data_obj_name=None, metric=None):
             ),
             "om.data": _r_null_if_none(data_arg),
             "metric": _r_null_if_none(None if metric is None else str(metric)),
+            "workflow": str(workflow),
         },
     )
     return normalize_available_method_labels(R_parse_tools.recursioner(methods))
@@ -1688,20 +1691,16 @@ def run_meta_regression(
     results_name="results_obj",
     fixed_effects=False,
     conf_level=None,
+    params=None,
 ):
 
     conf_level = validate_confidence_level(conf_level)
 
-    method_str = "FE" if fixed_effects else "DL"
-
-    # conf.level and digits are caller-supplied where available.
-    params = {
-        "conf.level": conf_level,
-        "digits": 3,
-        "method": method_str,
-        "rm.method": "ML",
-        "measure": metric_name,
-    }
+    params = dict(params or {})
+    params["conf.level"] = conf_level
+    params.setdefault("digits", 3)
+    params["rm.method"] = "FE" if fixed_effects else params.get("rm.method", "DL")
+    params["measure"] = metric_name
     return _run_RCMetaR_core_analysis(
         data_name,
         "meta.regression",

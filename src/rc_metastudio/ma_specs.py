@@ -83,6 +83,8 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         meta_py_r = sys.modules.get("meta_py_r", meta_py_r)
 
         self.current_param_vals = external_params or {}
+        self.meta_f_str = meta_f_str
+        self.is_meta_regression = meta_f_str == "meta-regression"
         self.model = model
         self._loading_plot_style = False
         self._setup_plot_controls()
@@ -92,12 +94,10 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             raise ValueError("CONFIDENCE LEVEL MUST BE SPECIFIED")
         self.conf_level = validate_confidence_level(conf_level)
 
-        # if not none, we assume we're running a meta
-        # method
-        self.meta_f_str = meta_f_str
-
         self._accepted_connection = None
-        self._set_accepted_handler(self.run_ma)
+        self._set_accepted_handler(
+            self.run_meta_regression if self.is_meta_regression else self.run_ma
+        )
         self.buttonBox.rejected.connect(
             app_error_handler.safe_slot(self.cancel, parent=self)
         )
@@ -112,6 +112,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         )
 
         self.data_type = self.model.get_current_outcome_type()
+        self._setup_covariates_tab()
         print("data type: %s" % self.data_type)
         if self.data_type != "binary":
             self.disable_bin_only_fields()
@@ -167,6 +168,57 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         print("(cancel)")
         self.reject()
 
+    def _setup_covariates_tab(self):
+        if not self.is_meta_regression:
+            self.specs_tab.removeTab(self.specs_tab.indexOf(self.covariates_tab))
+            self.regression_group.hide()
+            return
+
+        self.covs_and_check_boxes = []
+        for row, covariate in enumerate(self.model.dataset.covariates):
+            checkbox = QtWidgets.QCheckBox(covariate.name, self.cov_grp_box)
+            checkbox.setChecked(row == 0)
+            checkbox.toggled.connect(
+                app_error_handler.safe_slot(self._update_meta_regression_ok, parent=self)
+            )
+            checkbox.toggled.connect(
+                app_error_handler.safe_slot(
+                    self._update_meta_regression_plot_availability, parent=self
+                )
+            )
+            self.covariates_layout.addWidget(checkbox, row, 0)
+            self.covs_and_check_boxes.append((covariate, checkbox))
+        self.diagnostic_regression_group.setVisible(self.data_type == "diagnostic")
+        self.image_path.setText(analysis_output_path("reg.png"))
+        self._update_meta_regression_ok()
+        self._update_meta_regression_plot_availability()
+
+    def _selected_covariates(self):
+        return [
+            covariate
+            for covariate, checkbox in self.covs_and_check_boxes
+            if checkbox.isChecked()
+        ]
+
+    def _update_meta_regression_ok(self):
+        button = self.buttonBox.button(QDialogButtonBox.Ok)
+        if button is not None:
+            button.setEnabled(bool(self._selected_covariates()))
+
+    def _update_meta_regression_plot_availability(self):
+        if not self.is_meta_regression:
+            return
+        selected = self._selected_covariates()
+        bubble_available = (
+            len(selected) == 1 and selected[0].data_type == CONTINUOUS
+        )
+        self.plot_tab.setEnabled(bubble_available)
+        self.plot_tab.setToolTip(
+            ""
+            if bubble_available
+            else "Bubble plot options require exactly one continuous covariate."
+        )
+
     def _set_accepted_handler(self, handler):
         if self._accepted_connection is None:
             self._accepted_connection = app_error_handler.connect_safely(
@@ -209,26 +261,129 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.appearance_group.setVisible("appearance" in groups)
         self.groupBox.setVisible("columns" in groups)
         self.default_panel.setVisible("forest" in groups)
+        self.regression_group.setVisible("regression" in groups)
         self.label_11.setVisible("summary" in groups)
         self.show_summary_line.setVisible("summary" in groups)
         self.plot_tab.setEnabled(any(capability["styleable"] for capability in capabilities))
+        self._update_meta_regression_plot_availability()
+
+    def run_meta_regression(self):
+        selected_covariates = self._selected_covariates()
+        if not selected_covariates:
+            QMessageBox.warning(
+                self,
+                "No Covariates Selected",
+                "Select at least one covariate before running meta-regression.",
+            )
+            return
+
+        covariate_values = {
+            covariate.name: self.model.dataset.get_values_for_cov(
+                covariate.name, ids_for_keys=True
+            )
+            for covariate in selected_covariates
+        }
+        studies = []
+        has_missing_values = False
+        for study in self.model.get_studies(only_if_included=True):
+            if all(study.id in covariate_values[cov.name] for cov in selected_covariates):
+                studies.append(study)
+            else:
+                has_missing_values = True
+
+        if has_missing_values:
+            choice = QMessageBox.warning(
+                self,
+                "Missing Covariate Values",
+                "Some studies do not have values for the selected covariates. "
+                "Run the regression without those studies?",
+                QMessageBox.Yes | QMessageBox.No,
+            )
+            if choice == QMessageBox.No:
+                return
+
+        metric = self.model.current_effect
+        if self.data_type == "diagnostic":
+            metric = (
+                "Sens"
+                if self.sensitivity_radio.isChecked()
+                else "Spec" if self.specificity_radio.isChecked() else "DOR"
+            )
+            meta_py_r.ma_dataset_to_simple_diagnostic_robj(
+                self.model,
+                metric=metric,
+                covs_to_include=selected_covariates,
+                studies=studies,
+            )
+        elif self.data_type == "continuous":
+            meta_py_r.ma_dataset_to_simple_continuous_robj(
+                self.model, covs_to_include=selected_covariates, studies=studies
+            )
+        else:
+            meta_py_r.ma_dataset_to_simple_binary_robj(
+                self.model,
+                include_raw_data=False,
+                covs_to_include=selected_covariates,
+                studies=studies,
+            )
+
+        add_plot_params(self)
+        result = meta_py_r.run_meta_regression(
+            self.model.dataset,
+            studies,
+            selected_covariates,
+            metric,
+            fixed_effects=self.fixed_effects_radio.isChecked(),
+            conf_level=self.current_param_vals.get("conf.level", self.conf_level),
+            params=self.current_param_vals,
+        )
+        if isinstance(result, str):
+            QMessageBox.critical(
+                self,
+                "Analysis Failed",
+                "Sorry, there was an error performing the regression.\n%s" % result,
+            )
+            return
+        self.parent().analysis(result)
+        self.accept()
 
     def _load_plot_params(self):
         self._loading_plot_style = True
         try:
+            prefix = "bp" if self.is_meta_regression else "fp"
             style = _normalized_plot_style(
-                self.current_param_vals.get("fp_style", "default")
+                self.current_param_vals.get("%s_style" % prefix, "default")
             )
             self.style_cbo.setCurrentText(PLOT_STYLE_LABELS[style])
             self._set_plot_accent_color(
-                self.current_param_vals.get("fp_accent_color")
+                self.current_param_vals.get("%s_accent_color" % prefix)
                 or PLOT_STYLE_DEFAULT_COLORS[style]
             )
             self.point_size_multiplier.setValue(
                 _float_plot_param(
-                    self.current_param_vals.get("fp_point_size_multiplier"), 1.0
+                    self.current_param_vals.get(
+                        "%s_point_size_multiplier" % prefix
+                    ),
+                    1.0,
                 )
             )
+            if self.is_meta_regression:
+                self.show_regression_line.setChecked(
+                    _bool_plot_param(
+                        self.current_param_vals.get("bp_show_regression_line"), True
+                    )
+                )
+                self.show_confidence_band.setChecked(
+                    _bool_plot_param(
+                        self.current_param_vals.get("bp_show_confidence_band"), True
+                    )
+                )
+                self.show_prediction_interval.setChecked(
+                    _bool_plot_param(
+                        self.current_param_vals.get("bp_show_prediction_interval"),
+                        False,
+                    )
+                )
             self.show_raw_counts.setChecked(
                 _bool_plot_param(
                     self.current_param_vals.get("fp_show_raw_counts"), True
@@ -448,9 +603,14 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             else:
                 metric = "Sens"
 
-        self.available_method_d = meta_py_r.get_available_methods(
-            for_data_type=self.data_type, data_obj_name=tmp_obj_name, metric=metric
-        )
+        method_query = {
+            "for_data_type": self.data_type,
+            "data_obj_name": tmp_obj_name,
+            "metric": metric,
+        }
+        if self.meta_f_str is not None:
+            method_query["workflow"] = self.meta_f_str
+        self.available_method_d = meta_py_r.get_available_methods(**method_query)
         self.available_method_d = normalize_available_method_labels(
             self.available_method_d
         )
@@ -471,8 +631,8 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         ###
         # Hide bivariate diagnostic methods when sensitivity and specificity
         # cannot both be estimated from the selected effects.
-        if self.data_type == "diagnostic":
-            biv_ml_name = "Bivariate (Maximum Likelihood)"
+        biv_ml_name = "Bivariate (Maximum Likelihood)"
+        if self.data_type == "diagnostic" and not self.is_meta_regression:
             for biv_method in (biv_ml_name, "HSROC"):
                 method_function = self.available_method_d.get(biv_method)
                 should_remove_bivariate_method = (
@@ -500,7 +660,11 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         ###
         # default to bivariate method for diagnostic
-        if self.data_type == "diagnostic" and biv_ml_name in method_names:
+        if (
+            self.data_type == "diagnostic"
+            and not self.is_meta_regression
+            and biv_ml_name in method_names
+        ):
             method_names.remove(biv_ml_name)
             method_names.insert(0, biv_ml_name)
 
@@ -1044,6 +1208,26 @@ def _is_integer_analysis_param(name):
 
 
 def add_plot_params(specs_form):
+    if getattr(specs_form, "meta_f_str", None) == "meta-regression":
+        specs_form.current_param_vals.update(
+            {
+                "bp_style": PLOT_STYLE_VALUES.get(
+                    str(specs_form.style_cbo.currentText()), "default"
+                ),
+                "bp_accent_color": _text_value(specs_form.accent_color),
+                "bp_point_size_multiplier": specs_form.point_size_multiplier.value(),
+                "bp_xlabel": _text_value(specs_form.x_lbl_le),
+                "bp_xticks": _validated_plot_ticks(specs_form.x_ticks_le),
+                "bp_plot_lb": _validated_plot_bound(specs_form.plot_lb_le),
+                "bp_plot_ub": _validated_plot_bound(specs_form.plot_ub_le),
+                "bp_outpath": _text_value(specs_form.image_path),
+                "bp_show_regression_line": specs_form.show_regression_line.isChecked(),
+                "bp_show_confidence_band": specs_form.show_confidence_band.isChecked(),
+                "bp_show_prediction_interval": specs_form.show_prediction_interval.isChecked(),
+            }
+        )
+        return
+
     specs_form.current_param_vals["fp_style"] = PLOT_STYLE_VALUES.get(
         str(specs_form.style_cbo.currentText()), "default"
     )
@@ -1089,6 +1273,16 @@ def add_plot_params(specs_form):
     specs_form.current_param_vals["fp_point_size_multiplier"] = (
         specs_form.point_size_multiplier.value()
     )
+
+
+def _validated_plot_bound(widget):
+    value = _text_value(widget)
+    return value if value != "[default]" and check_plot_bound(value) else "[default]"
+
+
+def _validated_plot_ticks(widget):
+    value = _text_value(widget)
+    return value if value != "[default]" and seems_sane(value) else "[default]"
 
 
 def _normalized_plot_style(style):

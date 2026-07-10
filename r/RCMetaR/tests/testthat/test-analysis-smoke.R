@@ -250,6 +250,17 @@ test_that("core method discovery and metadata avoid direct implementation export
   expect_named(params, c("parameters", "defaults", "var_order", "pretty.names"), ignore.order = TRUE)
   expect_true("conf.level" %in% names(params$parameters))
 
+  regression.methods <- rcmetar.available.methods(
+    "binary", fixture$data, "OR", workflow = "meta-regression"
+  )
+  expect_identical(unname(unlist(regression.methods)), "meta.regression")
+  regression.params <- rcmetar.method.parameters("meta.regression")
+  expect_identical(
+    regression.params$var_order,
+    c("rm.method", "conf.level", "digits")
+  )
+  expect_identical(regression.params$defaults$rm.method, "REML")
+
   description <- rcmetar.method.description("binary.random")
   expect_type(description, "character")
   expect_true(nzchar(description))

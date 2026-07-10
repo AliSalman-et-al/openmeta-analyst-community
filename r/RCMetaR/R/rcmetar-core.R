@@ -58,7 +58,7 @@ rcmetar.analysis.methods <- function(data.type=NULL, workflow=NULL) {
             "leave-one-out"=c("binary.fixed.inv.var", "binary.fixed.mh", "binary.fixed.peto", "binary.random"),
             subgroup=c("binary.fixed.inv.var", "binary.fixed.mh", "binary.fixed.peto", "binary.random"),
             bootstrap=c("binary.fixed.inv.var", "binary.fixed.mh", "binary.fixed.peto", "binary.random"),
-            "meta-regression"=c("meta.regression", "binary.fixed.inv.var", "binary.fixed.mh", "binary.fixed.peto", "binary.random")
+            "meta-regression"=c("meta.regression")
         ),
         continuous=list(
             standard=c("continuous.fixed", "continuous.random"),
@@ -66,14 +66,14 @@ rcmetar.analysis.methods <- function(data.type=NULL, workflow=NULL) {
             "leave-one-out"=c("continuous.fixed", "continuous.random"),
             subgroup=c("continuous.fixed", "continuous.random"),
             bootstrap=c("continuous.fixed", "continuous.random"),
-            "meta-regression"=c("meta.regression", "continuous.fixed", "continuous.random")
+            "meta-regression"=c("meta.regression")
         ),
         diagnostic=list(
             standard=c("diagnostic.fixed.inv.var", "diagnostic.fixed.mh", "diagnostic.fixed.peto", "diagnostic.random", "diagnostic.hsroc", "diagnostic.bivariate.ml"),
             cumulative=c("diagnostic.fixed.inv.var", "diagnostic.fixed.mh", "diagnostic.fixed.peto", "diagnostic.random"),
             "leave-one-out"=c("diagnostic.fixed.inv.var", "diagnostic.fixed.mh", "diagnostic.fixed.peto", "diagnostic.random"),
             subgroup=c("diagnostic.fixed.inv.var", "diagnostic.fixed.mh", "diagnostic.fixed.peto", "diagnostic.random"),
-            "meta-regression"=c("meta.regression", "diagnostic.fixed.inv.var", "diagnostic.fixed.mh", "diagnostic.fixed.peto", "diagnostic.random")
+            "meta-regression"=c("meta.regression")
         )
     )
 

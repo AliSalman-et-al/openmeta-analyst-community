@@ -1591,6 +1591,41 @@ def test_required_advanced_analysis_actions_open_real_gui_dialogs(monkeypatch):
             os.chdir(REPO_ROOT)
 
 
+def test_meta_regression_uses_shared_method_covariates_and_plots_dialog(monkeypatch):
+    import launch
+
+    app, window = launch.start_automation()
+    meta_form = sys.modules["meta_form"]
+    built = []
+    shown = []
+
+    class SharedSpecsDialog(object):
+        pass
+
+    def build_specs(**kwargs):
+        built.append(kwargs)
+        return SharedSpecsDialog()
+
+    monkeypatch.setattr(window, "_build_analysis_specs_dialog", build_specs)
+    monkeypatch.setattr(meta_form.qt_layout, "show_centered", shown.append)
+
+    try:
+        window.meta_reg()
+
+        assert built == [
+            {
+                "meta_f_str": "meta-regression",
+                "conf_level": window.model.get_global_conf_level(),
+            }
+        ]
+        assert len(shown) == 1
+        assert isinstance(shown[0], SharedSpecsDialog)
+    finally:
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
 def test_meta_regression_action_stays_disabled_without_covariates_when_data_are_enabled():
     import launch
 
@@ -2939,6 +2974,197 @@ def test_pre_run_plots_tab_exports_style_and_appearance_params(monkeypatch):
     assert form.current_param_vals["fp_col3_str"] == "Treatment"
     assert form.current_param_vals["fp_col4_str"] == "Control"
     app.processEvents()
+
+
+def test_meta_regression_pre_run_plot_options_use_bubble_parameter_contract():
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import ma_specs
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+
+    class RegressionPlotForm(object):
+        meta_f_str = "meta-regression"
+
+    form = RegressionPlotForm()
+    form.current_param_vals = {}
+    form.style_cbo = QtWidgets.QComboBox()
+    form.style_cbo.addItems(["Default (metafor)", "RevMan", "BMJ"])
+    form.style_cbo.setCurrentText("BMJ")
+    form.accent_color = QtWidgets.QLineEdit("#654321")
+    form.point_size_multiplier = QtWidgets.QDoubleSpinBox()
+    form.point_size_multiplier.setValue(1.25)
+    form.x_lbl_le = QtWidgets.QLineEdit("Latitude")
+    form.x_ticks_le = QtWidgets.QLineEdit("-20, 0, 20")
+    form.plot_lb_le = QtWidgets.QLineEdit("-30")
+    form.plot_ub_le = QtWidgets.QLineEdit("30")
+    form.image_path = QtWidgets.QLineEdit("regression.png")
+    form.show_regression_line = QtWidgets.QCheckBox()
+    form.show_regression_line.setChecked(True)
+    form.show_confidence_band = QtWidgets.QCheckBox()
+    form.show_confidence_band.setChecked(False)
+    form.show_prediction_interval = QtWidgets.QCheckBox()
+    form.show_prediction_interval.setChecked(True)
+
+    ma_specs.add_plot_params(form)
+
+    assert form.current_param_vals == {
+        "bp_style": "bmj",
+        "bp_accent_color": "#654321",
+        "bp_point_size_multiplier": 1.25,
+        "bp_xlabel": "Latitude",
+        "bp_xticks": "-20, 0, 20",
+        "bp_plot_lb": "-30",
+        "bp_plot_ub": "30",
+        "bp_outpath": "regression.png",
+        "bp_show_regression_line": True,
+        "bp_show_confidence_band": False,
+        "bp_show_prediction_interval": True,
+    }
+    app.processEvents()
+
+
+def test_meta_regression_acceptance_passes_all_dialog_choices_to_adapter(monkeypatch):
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import ma_specs
+    import meta_globals
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    calls = []
+
+    class Covariate(object):
+        name = "latitude"
+        data_type = meta_globals.CONTINUOUS
+
+    class Study(object):
+        def __init__(self, study_id):
+            self.id = study_id
+
+    studies = [Study(1), Study(2)]
+    covariate = Covariate()
+
+    class Dataset(object):
+        def get_values_for_cov(self, name, ids_for_keys=False):
+            assert name == "latitude"
+            assert ids_for_keys is True
+            return {1: -10.0, 2: 20.0}
+
+    class Model(object):
+        current_effect = "OR"
+        dataset = Dataset()
+
+        def get_studies(self, only_if_included=False):
+            assert only_if_included is True
+            return studies
+
+    class Parent(object):
+        def analysis(self, result):
+            calls.append(("analysis", result))
+
+    class Form(object):
+        meta_f_str = "meta-regression"
+        data_type = "binary"
+        conf_level = 95.0
+        model = Model()
+        current_param_vals = {
+            "rm.method": "SJ",
+            "conf.level": 90.0,
+            "digits": 4,
+        }
+        _parent = Parent()
+
+        def _selected_covariates(self):
+            return [covariate]
+
+        def parent(self):
+            return self._parent
+
+        def accept(self):
+            calls.append(("accepted",))
+
+    form = Form()
+    form.fixed_effects_radio = QtWidgets.QRadioButton()
+    form.fixed_effects_radio.setChecked(True)
+    form.style_cbo = QtWidgets.QComboBox()
+    form.style_cbo.addItems(["Default (metafor)", "RevMan", "BMJ"])
+    form.style_cbo.setCurrentText("RevMan")
+    form.accent_color = QtWidgets.QLineEdit("#123456")
+    form.point_size_multiplier = QtWidgets.QDoubleSpinBox()
+    form.point_size_multiplier.setValue(1.5)
+    form.x_lbl_le = QtWidgets.QLineEdit("Latitude")
+    form.x_ticks_le = QtWidgets.QLineEdit("-10, 0, 10")
+    form.plot_lb_le = QtWidgets.QLineEdit("-20")
+    form.plot_ub_le = QtWidgets.QLineEdit("20")
+    form.image_path = QtWidgets.QLineEdit("bubble.png")
+    form.show_regression_line = QtWidgets.QCheckBox()
+    form.show_regression_line.setChecked(True)
+    form.show_confidence_band = QtWidgets.QCheckBox()
+    form.show_confidence_band.setChecked(False)
+    form.show_prediction_interval = QtWidgets.QCheckBox()
+    form.show_prediction_interval.setChecked(True)
+
+    monkeypatch.setattr(
+        ma_specs.meta_py_r,
+        "ma_dataset_to_simple_binary_robj",
+        lambda *args, **kwargs: calls.append(("prepare", args, kwargs)),
+        raising=False,
+    )
+
+    def run_meta_regression(*args, **kwargs):
+        calls.append(("run", args, kwargs))
+        return {"texts": {"Summary": "meta-regression"}, "images": {}}
+
+    monkeypatch.setattr(
+        ma_specs.meta_py_r,
+        "run_meta_regression",
+        run_meta_regression,
+        raising=False,
+    )
+
+    ma_specs.MA_Specs.run_meta_regression(form)
+
+    assert calls[0][0] == "prepare"
+    assert calls[1][0] == "run"
+    assert calls[1][1][1:4] == (studies, [covariate], "OR")
+    assert calls[1][2]["fixed_effects"] is True
+    assert calls[1][2]["conf_level"] == 90.0
+    assert calls[1][2]["params"]["rm.method"] == "SJ"
+    assert calls[1][2]["params"]["digits"] == 4
+    assert calls[1][2]["params"]["bp_style"] == "revman"
+    assert calls[1][2]["params"]["bp_outpath"] == "bubble.png"
+    assert calls[-2][0] == "analysis"
+    assert calls[-1] == ("accepted",)
+    app.processEvents()
+
+
+def test_meta_regression_enables_plots_only_for_one_continuous_covariate():
+    import ma_specs
+    import meta_globals
+
+    class Covariate(object):
+        def __init__(self, data_type):
+            self.data_type = data_type
+
+    class Form(object):
+        is_meta_regression = True
+
+        def _selected_covariates(self):
+            return self.selected
+
+    form = Form()
+    form.plot_tab = QtWidgets.QWidget()
+    form.selected = [Covariate(meta_globals.CONTINUOUS)]
+
+    ma_specs.MA_Specs._update_meta_regression_plot_availability(form)
+    assert form.plot_tab.isEnabled()
+
+    form.selected.append(Covariate(meta_globals.CONTINUOUS))
+    ma_specs.MA_Specs._update_meta_regression_plot_availability(form)
+    assert not form.plot_tab.isEnabled()
+    assert "exactly one continuous covariate" in form.plot_tab.toolTip()
 
 
 @pytest.mark.parametrize(
