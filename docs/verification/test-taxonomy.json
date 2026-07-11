@@ -7,6 +7,99 @@
     {
       "decision": "keep",
       "evidence": [
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem",
+        "subprocess"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_forest_plot_defaults_contract.py::test_forest_plot_defaults_are_generated_from_shared_contract",
+      "reason": "Guards the shared generated forest-plot defaults consumed by the Python UI and R renderer.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_edit_plot_dialog_flags_truncated_legacy_plot_text",
+      "reason": "Guards lossless handling of legacy plot labels that exceed the maintained editing limit.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_plot_text_inputs_enforce_publication_readability_limit",
+      "reason": "Guards publication-readability limits on editable plot labels without constraining numeric fields.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_refits_svg_after_viewport_geometry_settles",
+      "reason": "Guards deferred SVG fitting against the realized Results-window viewport geometry.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_reflows_sections_after_raster_plot_regenerate",
+      "reason": "Guards ordered Results-window reflow after a raster plot changes dimensions during regeneration.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_shared_plot_options_surface_uses_default_arm_labels",
+      "reason": "Guards consistent Intervention and Control defaults across pre-run and edit-plot surfaces.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
         "packaging_contract",
         "release_readiness"
       ],
