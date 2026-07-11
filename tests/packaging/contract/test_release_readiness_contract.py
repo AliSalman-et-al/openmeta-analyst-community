@@ -77,6 +77,10 @@ def test_version_bump_script_updates_all_release_version_surfaces(tmp_path):
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, target)
 
+    description_path = tmp_path / "r/RCMetaR/DESCRIPTION"
+    description = description_path.read_text(encoding="utf-8")
+    description_path.write_bytes(description.replace("\n", "\r\n").encode("utf-8"))
+
     bump_version = load_module(
         "bump_version_for_release_contract", ROOT / "scripts" / "bump_version.py"
     )

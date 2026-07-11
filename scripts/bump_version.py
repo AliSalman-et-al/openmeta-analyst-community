@@ -71,12 +71,12 @@ def main(argv: list[str] | None = None) -> int:
         ),
         (
             root / "r" / "RCMetaR" / "DESCRIPTION",
-            r"(?m)^Version: \d+\.\d+\.\d+$",
+            r"(?m)^Version: \d+\.\d+\.\d+(?=\r?$)",
             f"Version: {args.version}",
         ),
         (
             root / "r" / "RCMetaR" / "DESCRIPTION",
-            r"(?m)^Date: \d{4}-\d{2}-\d{2}$",
+            r"(?m)^Date: \d{4}-\d{2}-\d{2}(?=\r?$)",
             f"Date: {args.date}",
         ),
     ]
