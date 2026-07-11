@@ -4,22 +4,30 @@ All notable RC MetaStudio changes will be recorded in this file.
 
 RC MetaStudio starts a fresh maintained-product changelog. Historical release history for the Original OpenMeta[Analyst] Project is not reconstructed here; see [NOTICE.md](NOTICE.md) for provenance.
 
-## 0.1.1 - Unreleased
+## 0.1.1 - 2026-07-11 (Prerelease)
 
 ### Added
 
-- Added metafor-backed forest plot rendering for default, RevMan, and BMJ styles, including entered-effect and one-arm analysis families.
-- Added journal-ready SVG-first plot export devices with PNG, PDF, and TIFF conversion support.
-- Added side-by-side diagnostic forest plot composition and visual QA contact-sheet tooling.
-- Added metafor-backed bubble plot rendering for meta-regression outputs.
-- Added focused R renderer tests and visual QA coverage for forest and bubble plot behavior.
+- Added publication-style Default, RevMan, and BMJ forest plots across supported analysis families.
+- Added publication-style bubble plots for meta-regression results.
+- Added editable plot controls for supported forest and bubble plots.
+- Added Windows x64 and macOS Intel x64 prerelease packages.
 
 ### Changed
 
-- Replaced the legacy custom forest plot renderer with the metafor-backed renderer.
-- Replaced the legacy bubble plot renderer with the metafor-backed renderer.
-- Improved forest plot layout preflight, spacing, axis labels, headers, gutters, text scaling, and raw-column visibility across supported styles.
-- Renamed RCMetaR R source files to canonical `.R` casing and refreshed generated package documentation.
+- Improved plot sizing and live reflow in the Results window.
+- Improved plot layout, labels, spacing, scaling, and display precision across supported styles.
+- Improved PDF, PNG, SVG, and TIFF export behavior and removed unwanted intermediate files.
+- Split diagnostic forest results into separate editable plots for each metric.
+- Simplified diagnostic and meta-regression setup so method, parameter, covariate, and plot choices use consistent screens.
+- Simplified the README around downloading and using RC MetaStudio; moved maintenance commands into a separate maintainer guide.
+
+### Fixed
+
+- Fixed plot edits that did not apply, did not close as expected, or failed for cumulative, leave-one-out, subgroup, and diagnostic forest plots.
+- Fixed missing plot-editing and export actions for supported result types.
+- Fixed regenerated plots overlapping later Results-window content.
+- Fixed plots rendering too small on first display or failing to follow window resizing.
 
 ## 0.1.0 - 2026-07-06
 
