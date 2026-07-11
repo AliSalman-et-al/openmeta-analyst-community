@@ -1,6 +1,6 @@
 [project]
 name = "rc-metastudio"
-version = "0.1.0"
+version = "0.1.1"
 description = "RC MetaStudio open-source desktop software for advanced meta-analysis."
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
@@ -61,4 +61,9 @@ markers = [
     "analysis_behavior: evidence for preserved statistical analysis behavior.",
     "gui_compatibility: evidence for GUI compatibility or workflow preservation.",
     "release_readiness: evidence for release, packaging, or cutover readiness.",
+]
+
+[dependency-groups]
+dev = [
+    "pillow>=12.3.0",
 ]

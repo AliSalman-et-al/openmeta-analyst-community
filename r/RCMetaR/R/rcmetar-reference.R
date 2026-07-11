@@ -128,7 +128,7 @@ NULL
 #' \code{append.image.order()} preserves plot ordering in result payloads.
 #'
 #' @section Plot and predictive-value helpers:
-#' \code{create.sroc.plot.data()}, \code{create.side.by.side.plot.data()},
+#' \code{create.sroc.plot.data()},
 #' \code{plot.bivariate()}, \code{bivariate.dx.test()},
 #' \code{compute.ppv()}, \code{compute.npv()}, and
 #' \code{plot.ppv.npv.by.prev()} build diagnostic displays.
@@ -142,7 +142,7 @@ NULL
 #' \code{rcmetar.method.references("diagnostic.bivariate")} for the
 #' statistical method citations used in result payloads.
 #'
-#' @aliases adjust.raw.data append.image.order bivariate.dx.test compute.diag.point.estimates compute.diagnostic.terms compute.npv compute.ppv create.side.by.side.plot.data create.sroc.plot.data diagnostic.bivariate.ml diagnostic.bivariate.ml.is.feasible diagnostic.bivariate.ml.parameters diagnostic.bivariate.ml.pretty.names diagnostic.fixed.inv.var diagnostic.fixed.inv.var.is.feasible diagnostic.fixed.inv.var.overall diagnostic.fixed.inv.var.parameters diagnostic.fixed.inv.var.pretty.names diagnostic.fixed.mh diagnostic.fixed.mh.is.feasible diagnostic.fixed.mh.overall diagnostic.fixed.mh.parameters diagnostic.fixed.mh.pretty.names diagnostic.fixed.peto diagnostic.fixed.peto.is.feasible diagnostic.fixed.peto.overall diagnostic.fixed.peto.parameters diagnostic.fixed.peto.pretty.names diagnostic.hsroc diagnostic.hsroc.is.feasible diagnostic.hsroc.ml.is.feasible diagnostic.hsroc.parameters diagnostic.hsroc.pretty.names diagnostic.random diagnostic.random.is.feasible diagnostic.random.overall diagnostic.random.parameters diagnostic.random.pretty.names diagnostic.transform.f get.res.for.one.diag.study multiple.diagnostic plot.bivariate plot.ppv.npv.by.prev
+#' @aliases adjust.raw.data append.image.order bivariate.dx.test compute.diag.point.estimates compute.diagnostic.terms compute.npv compute.ppv create.sroc.plot.data diagnostic.bivariate.ml diagnostic.bivariate.ml.is.feasible diagnostic.bivariate.ml.parameters diagnostic.bivariate.ml.pretty.names diagnostic.fixed.inv.var diagnostic.fixed.inv.var.is.feasible diagnostic.fixed.inv.var.overall diagnostic.fixed.inv.var.parameters diagnostic.fixed.inv.var.pretty.names diagnostic.fixed.mh diagnostic.fixed.mh.is.feasible diagnostic.fixed.mh.overall diagnostic.fixed.mh.parameters diagnostic.fixed.mh.pretty.names diagnostic.fixed.peto diagnostic.fixed.peto.is.feasible diagnostic.fixed.peto.overall diagnostic.fixed.peto.parameters diagnostic.fixed.peto.pretty.names diagnostic.hsroc diagnostic.hsroc.is.feasible diagnostic.hsroc.ml.is.feasible diagnostic.hsroc.parameters diagnostic.hsroc.pretty.names diagnostic.random diagnostic.random.is.feasible diagnostic.random.overall diagnostic.random.parameters diagnostic.random.pretty.names diagnostic.transform.f get.res.for.one.diag.study multiple.diagnostic plot.bivariate plot.ppv.npv.by.prev
 #' @name RCMetaR-diagnostic-methods
 NULL
 
@@ -196,16 +196,15 @@ NULL
 #'
 #' @section Leave-one-out analyses:
 #' \code{loo.ma.binary()}, \code{loo.ma.continuous()},
-#' \code{loo.ma.diagnostic()}, \code{multiple.loo.diagnostic()}, and
-#' \code{create.loo.side.by.side.plot.data()} support influence-style workflows.
+#' \code{loo.ma.diagnostic()} and \code{multiple.loo.diagnostic()} support
+#' influence-style workflows.
 #'
 #' @section Subgroup analyses:
 #' \code{subgroup.ma.binary()}, \code{subgroup.ma.continuous()},
 #' \code{subgroup.ma.diagnostic()}, \code{multiple.subgroup.diagnostic()},
 #' \code{get.subgroup.data.binary()}, \code{get.subgroup.data.cont()},
-#' \code{get.subgroup.data.diagnostic()}, and
-#' \code{create.subgroup.side.by.side.plot.data()} split data by covariate
-#' levels and format subgroup results.
+#' \code{get.subgroup.data.diagnostic()} split data by covariate levels and
+#' format subgroup results.
 #'
 #' @section Bootstrap analyses:
 #' \code{bootstrap()}, \code{bootstrap.binary()},
@@ -220,7 +219,7 @@ NULL
 #' See \code{rcmetar.method.references("bootstrap")} for the bootstrap
 #' method citations used in result payloads.
 #'
-#' @aliases boot.ma.output.results boot.meta.reg.cond.means.output.results boot.meta.reg.output.results bootstrap bootstrap.binary bootstrap.continuous calc.meta.reg.coeffs.and.cis construct.boot.res.and.value.info.for.results construct.sequential.res.output construct.subgroup.res.output construct.subgroup.value.info create.loo.side.by.side.plot.data create.subgroup.side.by.side.plot.data cum.ma.binary cum.ma.continuous cum.ma.diagnostic get.subgroup.data.binary get.subgroup.data.cont get.subgroup.data.diagnostic loo.ma.binary loo.ma.continuous loo.ma.diagnostic multiple.cum.ma.diagnostic multiple.loo.diagnostic multiple.subgroup.diagnostic plot.custom.boot subgroup.ma.binary subgroup.ma.continuous subgroup.ma.diagnostic update.plot.data.multiple
+#' @aliases boot.ma.output.results boot.meta.reg.cond.means.output.results boot.meta.reg.output.results bootstrap bootstrap.binary bootstrap.continuous calc.meta.reg.coeffs.and.cis construct.boot.res.and.value.info.for.results construct.sequential.res.output construct.subgroup.res.output construct.subgroup.value.info cum.ma.binary cum.ma.continuous cum.ma.diagnostic get.subgroup.data.binary get.subgroup.data.cont get.subgroup.data.diagnostic loo.ma.binary loo.ma.continuous loo.ma.diagnostic multiple.cum.ma.diagnostic multiple.loo.diagnostic multiple.subgroup.diagnostic plot.custom.boot subgroup.ma.binary subgroup.ma.continuous subgroup.ma.diagnostic update.plot.data.multiple
 #' @name RCMetaR-repeated-analyses
 NULL
 
@@ -259,10 +258,10 @@ NULL
 #' @name RCMetaR-meta-regression
 NULL
 
-#' Forest plot and display data builders
+#' Forest render bundle and display data builders
 #'
 #' Functions that turn analysis results into rc-metastudio plot data,
-#' forest-plot grobs, formatted labels, tick marks, and result tables.
+#' metafor Forest Render Bundles, formatted labels, and result tables.
 #'
 #' @section Plot data:
 #' \code{create.plot.data.generic()}, \code{create.plot.data.binary()},
@@ -273,25 +272,19 @@ NULL
 #' \code{create.subgroup.plot.data.binary()},
 #' \code{create.subgroup.plot.data.cont()}, and
 #' \code{create.subgroup.plot.data.diagnostic()} build data structures consumed
-#' by plotting functions.
+#' by plotting functions and the metafor forest renderer.
 #'
 #' @section Forest plot drawing:
-#' \code{forest.plot()}, \code{draw.forest.plot()}, \code{create.grobs()},
-#' \code{draw.data.col()}, \code{draw.label.col()}, \code{draw.normal.CI()},
-#' \code{draw.summary.CI()}, \code{draw.summary.CI.no.scaled.diamond()},
-#' \code{two.forest.plots()}, and \code{sroc.plot()} draw analysis figures.
+#' \code{rcmetar.draw.forest.plot()} and \code{sroc.plot()} draw analysis figures.
 #'
 #' @section Layout and labels:
-#' \code{calc.box.sizes()}, \code{calc.forest.plot.size()},
-#' \code{calc.plot.range()}, \code{calc.tick.marks()},
-#' \code{calc.viewport.layout()}, \code{calc.width.list()},
-#' \code{calculate.radii()}, \code{check.label()},
+#' \code{calc.plot.range()}, \code{calculate.radii()}, \code{check.label()},
 #' \code{create.effect.size.label()}, \code{format.data.cols()},
 #' \code{format.effect.sizes()}, \code{format.raw.data.col()},
-#' \code{create.plot.options()}, \code{set.plot.options()}, and
+#' \code{set.plot.options()}, and
 #' \code{update.changed.plot.params()} control display formatting.
 #'
-#' @aliases additional.columns assign.rows calc.box.sizes calc.forest.plot.size calc.plot.range calc.tick.marks calc.viewport.layout calc.width.list calculate.radii check.label create.effect.size.label create.grobs create.plot.data.binary create.plot.data.continuous create.plot.data.cum create.plot.data.diagnostic create.plot.data.generic create.plot.data.loo create.plot.data.overall create.plot.data.reg create.plot.options create.subgroup.plot.data.binary create.subgroup.plot.data.cont create.subgroup.plot.data.diagnostic create.subgroup.plot.data.generic draw.data.col draw.forest.plot draw.label.col draw.normal.CI draw.summary.CI draw.summary.CI.no.scaled.diamond forest.plot format.data.cols format.effect.sizes format.raw.data.col create.overall.display create.subgroup.display create.summary.disp pretty.metric.name set.plot.options sroc.plot two.forest.plots update.changed.plot.params
+#' @aliases calc.plot.range calculate.radii check.label create.effect.size.label create.plot.data.binary create.plot.data.continuous create.plot.data.cum create.plot.data.diagnostic create.plot.data.generic create.plot.data.loo create.plot.data.overall create.plot.data.reg create.subgroup.plot.data.binary create.subgroup.plot.data.cont create.subgroup.plot.data.diagnostic create.subgroup.plot.data.generic format.data.cols format.effect.sizes format.raw.data.col create.overall.display create.subgroup.display create.summary.disp pretty.metric.name set.plot.options sroc.plot update.changed.plot.params
 #' @name RCMetaR-plotting
 NULL
 

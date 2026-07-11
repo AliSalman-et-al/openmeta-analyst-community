@@ -16,15 +16,21 @@ class Ui_DiagnosticDataForm(object):
         DiagnosticDataForm.setObjectName("DiagnosticDataForm")
         DiagnosticDataForm.resize(380, 412)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(
+            QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
+        )
         DiagnosticDataForm.setWindowIcon(icon)
         self.verticalLayout = QtWidgets.QVBoxLayout(DiagnosticDataForm)
         self.verticalLayout.setObjectName("verticalLayout")
         self.two_by_two_table = QtWidgets.QTableWidget(DiagnosticDataForm)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.two_by_two_table.sizePolicy().hasHeightForWidth())
+        sizePolicy.setHeightForWidth(
+            self.two_by_two_table.sizePolicy().hasHeightForWidth()
+        )
         self.two_by_two_table.setSizePolicy(sizePolicy)
         self.two_by_two_table.setMinimumSize(QtCore.QSize(0, 0))
         self.two_by_two_table.setMaximumSize(QtCore.QSize(16777215, 16777215))
@@ -53,14 +59,18 @@ class Ui_DiagnosticDataForm(object):
         item = QtWidgets.QTableWidgetItem()
         self.two_by_two_table.setHorizontalHeaderItem(2, item)
         self.verticalLayout.addWidget(self.two_by_two_table)
-        spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        spacerItem = QtWidgets.QSpacerItem(
+            20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding
+        )
         self.verticalLayout.addItem(spacerItem)
         self.horizontalLayout_6 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_6.setObjectName("horizontalLayout_6")
         self.clear_Btn = QtWidgets.QPushButton(DiagnosticDataForm)
         self.clear_Btn.setObjectName("clear_Btn")
         self.horizontalLayout_6.addWidget(self.clear_Btn)
-        spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem1 = QtWidgets.QSpacerItem(
+            40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
+        )
         self.horizontalLayout_6.addItem(spacerItem1)
         self.back_calc_Btn = QtWidgets.QPushButton(DiagnosticDataForm)
         self.back_calc_Btn.setEnabled(False)
@@ -77,7 +87,9 @@ class Ui_DiagnosticDataForm(object):
         self.prevalence_txt_box.setMaximumSize(QtCore.QSize(75, 16777215))
         self.prevalence_txt_box.setObjectName("prevalence_txt_box")
         self.horizontalLayout_3.addWidget(self.prevalence_txt_box)
-        spacerItem2 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem2 = QtWidgets.QSpacerItem(
+            40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
+        )
         self.horizontalLayout_3.addItem(spacerItem2)
         self.verticalLayout.addLayout(self.horizontalLayout_3)
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
@@ -88,7 +100,7 @@ class Ui_DiagnosticDataForm(object):
         font = QtGui.QFont()
         font.setFamily("Verdana")
         self.label_13.setFont(font)
-        self.label_13.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignHCenter)
+        self.label_13.setAlignment(QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter)
         self.label_13.setObjectName("label_13")
         self.horizontalLayout_2.addWidget(self.label_13)
         self.effect_cbo_box = QtWidgets.QComboBox(DiagnosticDataForm)
@@ -96,7 +108,9 @@ class Ui_DiagnosticDataForm(object):
         self.effect_cbo_box.setMaximumSize(QtCore.QSize(76, 20))
         self.effect_cbo_box.setObjectName("effect_cbo_box")
         self.horizontalLayout_2.addWidget(self.effect_cbo_box)
-        spacerItem3 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem3 = QtWidgets.QSpacerItem(
+            40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
+        )
         self.horizontalLayout_2.addItem(spacerItem3)
         self.verticalLayout.addLayout(self.horizontalLayout_2)
         self.groupBox = QtWidgets.QGroupBox(DiagnosticDataForm)
@@ -104,12 +118,16 @@ class Ui_DiagnosticDataForm(object):
         self.groupBox.setObjectName("groupBox")
         self.gridLayout = QtWidgets.QGridLayout(self.groupBox)
         self.gridLayout.setObjectName("gridLayout")
-        spacerItem4 = QtWidgets.QSpacerItem(26, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem4 = QtWidgets.QSpacerItem(
+            26, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
+        )
         self.gridLayout.addItem(spacerItem4, 0, 0, 2, 1)
         self.ci_label = QtWidgets.QLabel(self.groupBox)
         self.ci_label.setObjectName("ci_label")
         self.gridLayout.addWidget(self.ci_label, 0, 2, 1, 1)
-        spacerItem5 = QtWidgets.QSpacerItem(26, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem5 = QtWidgets.QSpacerItem(
+            26, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
+        )
         self.gridLayout.addItem(spacerItem5, 0, 3, 2, 1)
         self.horizontalLayout_7 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_7.setObjectName("horizontalLayout_7")
@@ -119,7 +137,9 @@ class Ui_DiagnosticDataForm(object):
         font = QtGui.QFont()
         font.setFamily("Verdana")
         self.label_14.setFont(font)
-        self.label_14.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
+        self.label_14.setAlignment(
+            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
+        )
         self.label_14.setObjectName("label_14")
         self.horizontalLayout_7.addWidget(self.label_14)
         self.effect_txt_box = QtWidgets.QLineEdit(self.groupBox)
@@ -166,19 +186,23 @@ class Ui_DiagnosticDataForm(object):
         self.inconsistencyLabel.setFont(font)
         self.inconsistencyLabel.setObjectName("inconsistencyLabel")
         self.horizontalLayout_4.addWidget(self.inconsistencyLabel)
-        spacerItem6 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem6 = QtWidgets.QSpacerItem(
+            40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
+        )
         self.horizontalLayout_4.addItem(spacerItem6)
         self.buttonBox = QtWidgets.QDialogButtonBox(DiagnosticDataForm)
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setStandardButtons(
+            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
+        )
         self.buttonBox.setObjectName("buttonBox")
         self.horizontalLayout_4.addWidget(self.buttonBox)
         self.verticalLayout.addLayout(self.horizontalLayout_4)
         self.prevalence_lbl.setBuddy(self.prevalence_txt_box)
 
         self.retranslateUi(DiagnosticDataForm)
-        self.buttonBox.accepted.connect(DiagnosticDataForm.accept) # type: ignore
-        self.buttonBox.rejected.connect(DiagnosticDataForm.reject) # type: ignore
+        self.buttonBox.accepted.connect(DiagnosticDataForm.accept)  # type: ignore
+        self.buttonBox.rejected.connect(DiagnosticDataForm.reject)  # type: ignore
         QtCore.QMetaObject.connectSlotsByName(DiagnosticDataForm)
         DiagnosticDataForm.setTabOrder(self.two_by_two_table, self.clear_Btn)
         DiagnosticDataForm.setTabOrder(self.clear_Btn, self.back_calc_Btn)
@@ -188,7 +212,9 @@ class Ui_DiagnosticDataForm(object):
 
     def retranslateUi(self, DiagnosticDataForm):
         _translate = QtCore.QCoreApplication.translate
-        DiagnosticDataForm.setWindowTitle(_translate("DiagnosticDataForm", "Diagnostic Data"))
+        DiagnosticDataForm.setWindowTitle(
+            _translate("DiagnosticDataForm", "Diagnostic Data")
+        )
         item = self.two_by_two_table.verticalHeaderItem(0)
         item.setText(_translate("DiagnosticDataForm", "(Test) +"))
         item = self.two_by_two_table.verticalHeaderItem(1)
@@ -202,14 +228,27 @@ class Ui_DiagnosticDataForm(object):
         item = self.two_by_two_table.horizontalHeaderItem(2)
         item.setText(_translate("DiagnosticDataForm", "Total"))
         self.clear_Btn.setText(_translate("DiagnosticDataForm", "Clear Form"))
-        self.back_calc_Btn.setText(_translate("DiagnosticDataForm", "Back-Calculate Table"))
+        self.back_calc_Btn.setText(
+            _translate("DiagnosticDataForm", "Back-Calculate Table")
+        )
         self.prevalence_lbl.setText(_translate("DiagnosticDataForm", "Prevalence"))
         self.label_13.setText(_translate("DiagnosticDataForm", "Metric"))
-        self.ci_label.setToolTip(_translate("DiagnosticDataForm", "Use the box to the left to set the % confidence interval"))
-        self.ci_label.setText(_translate("DiagnosticDataForm", "X% Confidence Interval"))
+        self.ci_label.setToolTip(
+            _translate(
+                "DiagnosticDataForm",
+                "Use the box to the left to set the % confidence interval",
+            )
+        )
+        self.ci_label.setText(
+            _translate("DiagnosticDataForm", "X% Confidence Interval")
+        )
         self.label_14.setText(_translate("DiagnosticDataForm", "Est."))
         self.label.setText(_translate("DiagnosticDataForm", "["))
         self.label_4.setText(_translate("DiagnosticDataForm", ","))
         self.label_3.setText(_translate("DiagnosticDataForm", "]"))
-        self.inconsistencyLabel.setText(_translate("DiagnosticDataForm", "INCONSISTENT FORM"))
+        self.inconsistencyLabel.setText(
+            _translate("DiagnosticDataForm", "INCONSISTENT FORM")
+        )
+
+
 import icons_rc

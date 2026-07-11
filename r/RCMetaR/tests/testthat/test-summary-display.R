@@ -141,6 +141,34 @@ expect_values_inside_header_columns <- function(header, values, labels) {
   }
 }
 
+test_that("ordinary numeric display never applies p-value threshold notation", {
+  expect_equal(round.display(c(-0.809, -0.0004, 0.0004, 0.809), 3), c("-0.809", "-0.000", "0.000", "0.809"))
+})
+
+test_that("display precision policy favors readable estimates without weakening p-values", {
+  expect_equal(RCMetaR:::RCMETAR_DEFAULT_DISPLAY_DIGITS, 2L)
+  expect_equal(RCMetaR:::display.digits(), 2L)
+  expect_equal(RCMetaR:::format.p.value.display(0.0154, 2), "0.015")
+  expect_equal(RCMetaR:::format.p.value.display(0.0004, 2), "< 0.001")
+  expect_equal(RCMetaR:::format.p.value.display(0.01544, 4), "0.0154")
+})
+
+test_that("analysis method customization defaults to two decimal places", {
+  parameter.functions <- c(
+    "binary.fixed.inv.var.parameters", "binary.fixed.mh.parameters",
+    "binary.fixed.peto.parameters", "binary.random.parameters",
+    "continuous.fixed.parameters", "continuous.random.parameters",
+    "diagnostic.fixed.inv.var.parameters", "diagnostic.fixed.mh.parameters",
+    "diagnostic.fixed.peto.parameters", "diagnostic.random.parameters",
+    "meta.regression.parameters", "binary.random.meta.regression.parameters"
+  )
+
+  for (function.name in parameter.functions) {
+    parameters <- get(function.name, envir=asNamespace("RCMetaR"))()
+    expect_equal(parameters$defaults$digits, 2L, info=function.name)
+  }
+})
+
 test_that("summary display uses readable labels and aligned columns", {
   rendered <- capture.output(print(summary_display_fixture()))
   text <- paste(rendered, collapse = "\n")
@@ -149,7 +177,7 @@ test_that("summary display uses readable labels and aligned columns", {
   expect_match(text, "I\u00b2", fixed = TRUE)
   expect_false(grepl("tau^2", text, fixed = TRUE))
   expect_false(grepl("I^2", text, fixed = TRUE))
-  expect_match(text, "92.645%", fixed = TRUE)
+  expect_match(text, "92.6%", fixed = TRUE)
   expect_false(grepl(" Results (log scale)", text, fixed = TRUE))
   expect_match(
     text,
@@ -202,7 +230,7 @@ test_that("subgroup heterogeneity display uses readable I-squared labels", {
 
   expect_match(text, "I\u00b2", fixed = TRUE)
   expect_false(grepl("I^2", text, fixed = TRUE))
-  expect_match(text, "92.645%", fixed = TRUE)
+  expect_match(text, "92.6%", fixed = TRUE)
 })
 
 test_that("subgroup display leaves unavailable statistics blank", {

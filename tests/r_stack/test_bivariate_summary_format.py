@@ -6,7 +6,7 @@ import textwrap
 import pytest
 
 
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 
 _BIVARIATE_SUMMARY_DRIVER = textwrap.dedent(
@@ -19,9 +19,9 @@ _BIVARIATE_SUMMARY_DRIVER = textwrap.dedent(
       quit(status=42)
     }
 
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/classes.r")))
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/utilities.r")))
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/diagnostic_methods.r")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/classes.R")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/utilities.R")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/diagnostic_methods.R")))
 
     work <- tempfile("bivariate_summary_")
     dir.create(work)

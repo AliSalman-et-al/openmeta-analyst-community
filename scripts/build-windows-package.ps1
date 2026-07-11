@@ -17,12 +17,7 @@ $artifactDir = Join-Path $repoRoot "artifacts"
 $distRoot = Join-Path $repoRoot "build\windows-package\dist"
 $workRoot = Join-Path $repoRoot "build\windows-package\work"
 $appDir = Join-Path $distRoot "RCMetaStudio"
-$archiveRootName = if ($ArchiveRootName) { $ArchiveRootName } else { $ArtifactName }
-if ($archiveRootName -match '[\\/:*?"<>|]') {
-    throw "ArchiveRootName must be a single portable directory name, not '$archiveRootName'."
-}
 $archiveStagingRoot = Join-Path $workRoot "zip-staging"
-$archiveRootDir = Join-Path $archiveStagingRoot $archiveRootName
 $zipPath = Join-Path $artifactDir "$ArtifactName.zip"
 $tmpZipPath = "$zipPath.tmp"
 if (-not $RPackageCacheRoot) {
@@ -44,6 +39,14 @@ function Resolve-CommandOrRepoPath {
     }
     $command = Get-Command $Path -ErrorAction Stop
     return $command.Source
+}
+
+function Get-ProjectVersion {
+    param([string]$PythonExe)
+    $pyprojectPath = Join-Path $repoRoot "pyproject.toml"
+    $version = & $PythonExe -c "import pathlib, sys, tomllib; print(tomllib.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))['project']['version'])" $pyprojectPath
+    if ($LASTEXITCODE -ne 0 -or -not $version) { throw "Could not resolve RC MetaStudio version from pyproject.toml." }
+    return $version.Trim()
 }
 
 function Assert-PathExists {
@@ -244,7 +247,7 @@ function Get-RPackageCacheKey {
 function Test-RDependencyPackages {
     param([string]$RscriptExe, [string]$Library)
     if (-not (Test-Path $Library)) { return $false }
-    $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','metafor','lme4','pdftools','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }; if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
+    $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','metafor','lme4','pdftools','rsvg','svglite','tiff','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }; if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
     & $RscriptExe -e $verify
     return ($LASTEXITCODE -eq 0)
 }
@@ -252,7 +255,7 @@ function Test-RDependencyPackages {
 function Test-BundledRPackages {
     param([string]$RscriptExe, [string]$Library)
     if (-not (Test-Path $Library)) { return $false }
-    $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','RCMetaR','metafor','lme4','pdftools','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }; if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
+    $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','RCMetaR','metafor','lme4','pdftools','rsvg','svglite','tiff','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }; if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
     & $RscriptExe -e $verify
     return ($LASTEXITCODE -eq 0)
 }
@@ -369,7 +372,7 @@ function Install-BundledRPackages {
 
     Write-Step "Installing local RCMetaR package"
     Install-LocalRPackagesFromSource -Root $Root
-    & $rscriptExe -e "pkgs <- c('HSROC','RCMetaR','metafor','lme4','pdftools','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
+    & $rscriptExe -e "pkgs <- c('HSROC','RCMetaR','metafor','lme4','pdftools','rsvg','svglite','tiff','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
     if ($LASTEXITCODE -ne 0) { throw "Bundled R package verification failed." }
 
     if (-not (Test-BundledRPackages -RscriptExe $rscriptExe -Library $rLibrary)) { throw "Bundled R package verification failed after local RCMetaR install." }
@@ -392,6 +395,13 @@ $PythonExe = Resolve-CommandOrRepoPath -Path $PythonExe
 
 & $PythonExe -c "import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 11) else 1)"
 if ($LASTEXITCODE -ne 0) { throw "Windows packaging requires Python 3.11 to match the CI runtime and PyQt5 wheel support." }
+
+$projectVersion = Get-ProjectVersion -PythonExe $PythonExe
+$archiveRootName = if ($ArchiveRootName) { $ArchiveRootName } else { "RCMetaStudio-$projectVersion-windows-x64" }
+if ($archiveRootName -match '[\\/:*?"<>|]') {
+    throw "ArchiveRootName must be a single portable directory name, not '$archiveRootName'."
+}
+$archiveRootDir = Join-Path $archiveStagingRoot $archiveRootName
 
 $requiredPyInstallerVersion = "6.21.0"
 $installedPyInstallerVersion = & $PythonExe -c "import PyInstaller; print(PyInstaller.__version__)" 2>$null

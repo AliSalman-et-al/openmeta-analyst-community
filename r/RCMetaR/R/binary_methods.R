@@ -4,7 +4,7 @@
 ####################################
 # RC MetaStudio                #
 # ----                             #
-# binary_methods.r                 # 
+# binary_methods.R                 #
 # Facade module; wraps methods     #
 # that perform analysis on binary  #
 # data in a coherent interface.    # 
@@ -21,7 +21,17 @@ binary.one.arm.metrics <- c("PR", "PLN", "PLO", "PAS", "PFT")
 
 
 compute.for.one.bin.study <- function(binary.data, params){
-    res <- escalc(params$measure, ai=binary.data@g1O1, bi=binary.data@g1O2, 
+    if (params$measure %in% binary.one.arm.metrics) {
+        res <- escalc(
+            params$measure,
+            xi=binary.data@g1O1,
+            ni=binary.data@g1O1 + binary.data@g1O2,
+            add=params$adjust,
+            to=params$to
+        )
+        return(res)
+    }
+    res <- escalc(params$measure, ai=binary.data@g1O1, bi=binary.data@g1O2,
                                     ci=binary.data@g2O1, di=binary.data@g2O2,
                                     add=params$adjust, to=params$to)
     res             
@@ -73,9 +83,7 @@ binary.transform.f <- function(metric.str){
             arcsine.sqrt(x) 
         } else if (metric.str %in% binary.freeman_tukey.metrics){
             ni <- extra.args[['ni']]
-          if (length(x)==1) {
              transf.pft(x, ni)
-          }
         } else {
             # identity function
             x
@@ -221,7 +229,7 @@ binary.fixed.inv.var <- function(binary.data, params){
 		
 		forest.plot.params.path <- ""
 		if (is.null(params$supress.output) || !params$supress.output) {
-            params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+            params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
             changed.params <- c(changed.params, params.changed.in.forest.plot)
             params <- update.changed.plot.params(params, changed.params)
             # update params values
@@ -272,7 +280,7 @@ binary.fixed.inv.var.parameters <- function(){
                    "to"=apply_adjustment_to)
     
     # default values
-    defaults <- list("conf.level"=95, "digits"=3, "adjust"=.5, "to"="only0")
+    defaults <- list("conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS, "adjust"=.5, "to"="only0")
     
     var_order = c("conf.level", "digits", "adjust", "to")
     
@@ -283,7 +291,7 @@ binary.fixed.inv.var.pretty.names <- function() {
     pretty.names <- list("pretty.name"="Binary Fixed-Effect Inverse Variance", 
                          "description" = "Performs fixed-effect meta-analysis with inverse variance weighting.",
                          "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"), 
-                         "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
+                         "digits"=list("pretty.name"="Decimal places", "description"="Decimal places for displayed estimates and intervals; p-values use at least 3"),
                          "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
                          "to"=list("pretty.name"="Add correction factor to", "description"="When Add correction factor is set to \"only 0\", the correction factor
                                    is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor
@@ -338,7 +346,7 @@ binary.fixed.mh <- function(binary.data, params){
 		forest.plot.params.path <- ""
 		if (is.null(params$supress.output) || !params$supress.output) {
 	        # list of changed params values
-	        params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+	        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
 	        changed.params <- c(changed.params, params.changed.in.forest.plot)
 	        params <- update.changed.plot.params(params, changed.params)
 	        # dump the forest plot params to disk; return path to
@@ -410,7 +418,7 @@ binary.fixed.mh.parameters <- function(){
                             "adjust"="float", "to"=apply_adjustment_to)
     
     # default values
-    defaults <- list("conf.level"=95, "digits"=3, "adjust"=.5, "to"="only0")
+    defaults <- list("conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS, "adjust"=.5, "to"="only0")
     
     var_order = c("conf.level", "digits", "adjust", "to")
     
@@ -422,7 +430,7 @@ binary.fixed.mh.pretty.names <- function() {
     pretty.names <- list("pretty.name"="Binary Fixed-Effect Mantel-Haenszel", 
                          "description" = "Performs fixed-effect meta-analysis using the Mantel-Haenszel method.",
                          "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"), 
-                         "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
+                         "digits"=list("pretty.name"="Decimal places", "description"="Decimal places for displayed estimates and intervals; p-values use at least 3"),
                          "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
                          "to"=list("pretty.name"="Add correction factor to", "description"="When Add correction factor is set to \"only 0\", the correction factor
                                    is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor
@@ -498,7 +506,7 @@ binary.fixed.peto <- function(binary.data, params) {
 		forest.plot.params.path <- ""
 		if (is.null(params$supress.output) || !params$supress.output) {
 	        # list of changed params values
-	        params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+	        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
 	        changed.params <- c(changed.params, params.changed.in.forest.plot)
 	        params <- update.changed.plot.params(params, changed.params)
 	        # dump the forest plot params to disk; return path to
@@ -561,7 +569,7 @@ binary.fixed.peto.parameters <- function(){
                    "adjust"="float", "to"=apply_adjustment_to)
     
     # default values
-    defaults <- list("conf.level"=95, "digits"=3, "adjust"=.5, "to"="only0")
+    defaults <- list("conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS, "adjust"=.5, "to"="only0")
     
     var_order = c("conf.level", "digits", "adjust", "to")
     
@@ -572,7 +580,7 @@ binary.fixed.peto.pretty.names <- function() {
     pretty.names <- list("pretty.name"="Binary Fixed-Effect Peto", 
                          "description" = "Performs fixed-effect meta-analysis using the Peto method.",
                          "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"), 
-                         "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
+                         "digits"=list("pretty.name"="Decimal places", "description"="Decimal places for displayed estimates and intervals; p-values use at least 3"),
                          "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
                          "to"=list("pretty.name"="Add correction factor to", "description"="When Add correction factor is set to \"only 0\", the correction factor
                                    is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor
@@ -646,7 +654,7 @@ binary.random <- function(binary.data, params) {
 		forest.plot.params.path <- ""
 		if (is.null(params$supress.output) || !params$supress.output) {
 	        # list of changed params values
-	        params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+	        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
 	        changed.params <- c(changed.params, params.changed.in.forest.plot)
 	        params <- update.changed.plot.params(params, changed.params)
 	        # dump the forest plot params to disk; return path to
@@ -698,7 +706,7 @@ binary.random.parameters <- function(){
                    "adjust"="float", "to"=apply_adjustment_to)
        
     # default values
-    defaults <- list("rm.method"="DL", "conf.level"=95, "digits"=3, "adjust"=.5, "to"="only0")
+    defaults <- list("rm.method"="DL", "conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS, "adjust"=.5, "to"="only0")
     
     var_order <- c("rm.method", "conf.level", "digits", "adjust", "to")
     parameters <- list("parameters"=params, "defaults"=defaults, "var_order"=var_order)
@@ -718,7 +726,7 @@ binary.random.pretty.names <- function() {
                          "description" = "Performs random-effects meta-analysis.",
                          "rm.method"=list("pretty.name"="Random-Effects method", "description"="Method for estimating between-studies heterogeneity", "rm.method.names"=rm_method_names),                      
                          "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"), 
-                         "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
+                         "digits"=list("pretty.name"="Decimal places", "description"="Decimal places for displayed estimates and intervals; p-values use at least 3"),
                          "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
                          "to"=list("pretty.name"="Correction factor target", "description"="When Add correction factor is set to \"only 0\", the correction factor
                                    is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor

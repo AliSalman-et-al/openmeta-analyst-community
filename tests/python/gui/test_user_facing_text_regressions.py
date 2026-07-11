@@ -19,7 +19,6 @@ GENERATED_UI_MODULE_NAMES = [
     "forms.ui_csv_import_page",
     "forms.ui_data_type_page",
     "forms.ui_diagnostic_data_form",
-    "forms.ui_diagnostic_explain_dlg",
     "forms.ui_diagnostic_metrics",
     "forms.ui_edit_dialog",
     "forms.ui_edit_forest_plot",
@@ -95,7 +94,6 @@ def test_option_group_forms_fit_checkbox_and_radio_labels():
         "forms.ui_csv_import_page",
         "forms.ui_diagnostic_data_form",
         "forms.ui_diagnostic_metrics",
-        "forms.ui_diagnostic_explain_dlg",
         "forms.ui_edit_forest_plot",
         "forms.ui_ma_specs",
         "forms.ui_meta_reg",
@@ -434,7 +432,6 @@ def test_generated_qdialog_surfaces_use_declarative_fixed_size_and_fit_combos():
         "forms.ui_change_cov_type",
         "forms.ui_cov_subgroup_dlg",
         "forms.ui_diagnostic_data_form",
-        "forms.ui_diagnostic_explain_dlg",
         "forms.ui_diagnostic_metrics",
         "forms.ui_edit_dialog",
         "forms.ui_edit_forest_plot",
@@ -1168,13 +1165,9 @@ def test_application_fit_allows_embedded_pages_to_fill_page_containers():
             assert page.maximumHeight() == QtWidgets.QWIDGETSIZE_MAX
             assert page.minimumWidth() >= page.sizeHint().width()
             assert (
-                page.sizePolicy().horizontalPolicy()
-                == QtWidgets.QSizePolicy.Expanding
+                page.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Expanding
             )
-            assert (
-                page.sizePolicy().verticalPolicy()
-                == QtWidgets.QSizePolicy.Expanding
-            )
+            assert page.sizePolicy().verticalPolicy() == QtWidgets.QSizePolicy.Expanding
     finally:
         root.close()
         root.deleteLater()
@@ -1223,8 +1216,7 @@ def test_application_fit_wraps_embedded_page_text_inside_container_width():
             assert page.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
             assert page.width() >= container.contentsRect().width() - 4
             assert (
-                page.minimumWidth()
-                >= qt_layout.APPLICATION_WRAPPED_PAGE_MINIMUM_WIDTH
+                page.minimumWidth() >= qt_layout.APPLICATION_WRAPPED_PAGE_MINIMUM_WIDTH
             )
             assert page.minimumWidth() < 700
     finally:
@@ -1267,8 +1259,7 @@ def test_application_fit_propagates_root_width_floor_to_embedded_pages_before_re
             assert page.minimumWidth() >= page.sizeHint().width()
             assert page.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
             assert (
-                page.sizePolicy().horizontalPolicy()
-                == QtWidgets.QSizePolicy.Expanding
+                page.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Expanding
             )
     finally:
         root.close()
@@ -1352,8 +1343,6 @@ def test_issue_76_to_105_reported_bad_user_facing_strings_are_absent():
             "src/rc_metastudio/forms/change_cov_type_form.ui",
             "src/rc_metastudio/forms/ui_cov_subgroup_dlg.py",
             "src/rc_metastudio/forms/cov_subgroup_dlg.ui",
-            "src/rc_metastudio/forms/ui_diagnostic_explain_dlg.py",
-            "src/rc_metastudio/forms/diag_explain_form.ui",
             "src/rc_metastudio/forms/ui_diagnostic_data_form.py",
             "src/rc_metastudio/forms/diagnostic_data_form.ui",
             "src/rc_metastudio/forms/ui_diagnostic_metrics.py",
@@ -1398,12 +1387,12 @@ def test_issue_76_to_105_reported_bad_user_facing_strings_are_absent():
             "src/rc_metastudio/ma_data_table_model.py",
             "src/rc_metastudio/ma_data_table_view.py",
             "src/rc_metastudio/meta_globals.py",
-            "r/RCMetaR/R/binary_methods.r",
-            "r/RCMetaR/R/continuous_methods.r",
-            "r/RCMetaR/R/diagnostic_methods.r",
-            "r/RCMetaR/R/meta_methods.r",
-            "r/RCMetaR/R/plotting.r",
-            "r/RCMetaR/R/utilities.r",
+            "r/RCMetaR/R/binary_methods.R",
+            "r/RCMetaR/R/continuous_methods.R",
+            "r/RCMetaR/R/diagnostic_methods.R",
+            "r/RCMetaR/R/meta_methods.R",
+            "r/RCMetaR/R/plotting.R",
+            "r/RCMetaR/R/utilities.R",
             *HELP_HTML,
         ]
     )
@@ -1501,6 +1490,7 @@ def test_issue_76_to_105_reported_bad_user_facing_strings_are_absent():
         '_translate("MainWindow", "new dataset")',
         '_translate("Dialog", "method")',
         '_translate("Dialog", "forest plot")',
+        '_translate("Dialog", "Forest Plot")',
         '_translate("new_covariate_dialog", "add new covariate")',
         '_translate("BinaryDataForm", "back-calculate table")',
         "<string>back-calculate table</string>",
@@ -1509,6 +1499,7 @@ def test_issue_76_to_105_reported_bad_user_facing_strings_are_absent():
         '_translate("edit_dialog", "edit dataset")',
         "<string>edit dataset</string>",
         '_translate("edit_forest_plot_dlg", "edit forest plot")',
+        '_translate("edit_forest_plot_dlg", "Edit Forest Plot")',
         "<string>edit forest plot</string>",
         '_translate("new_follow_up_dialog", "add new follow-up")',
         "<string>add new follow-up</string>",
@@ -1536,7 +1527,7 @@ def test_issue_76_to_105_reported_bad_user_facing_strings_are_absent():
         'QAction("save pdf image as"',
         'QAction("save png image as"',
         'QAction("edit plot"',
-        'QAction("Edit Plot"',
+        'QAction("Edit Forest Plot"',
         "tau^2",
         "I^2",
         "Results (log scale)",
@@ -1563,8 +1554,6 @@ def test_issue_76_to_105_corrected_user_facing_strings_are_present():
             "src/rc_metastudio/forms/change_cov_type_form.ui",
             "src/rc_metastudio/forms/ui_cov_subgroup_dlg.py",
             "src/rc_metastudio/forms/cov_subgroup_dlg.ui",
-            "src/rc_metastudio/forms/ui_diagnostic_explain_dlg.py",
-            "src/rc_metastudio/forms/diag_explain_form.ui",
             "src/rc_metastudio/forms/ui_diagnostic_data_form.py",
             "src/rc_metastudio/forms/diagnostic_data_form.ui",
             "src/rc_metastudio/forms/ui_diagnostic_metrics.py",
@@ -1606,12 +1595,12 @@ def test_issue_76_to_105_corrected_user_facing_strings_are_present():
             "src/rc_metastudio/ma_data_table_model.py",
             "src/rc_metastudio/ma_data_table_view.py",
             "src/rc_metastudio/meta_globals.py",
-            "r/RCMetaR/R/continuous_methods.r",
-            "r/RCMetaR/R/meta_reg.r",
-            "r/RCMetaR/R/binary_methods.r",
-            "r/RCMetaR/R/meta_methods.r",
-            "r/RCMetaR/R/plotting.r",
-            "r/RCMetaR/R/utilities.r",
+            "r/RCMetaR/R/continuous_methods.R",
+            "r/RCMetaR/R/meta_reg.R",
+            "r/RCMetaR/R/binary_methods.R",
+            "r/RCMetaR/R/meta_methods.R",
+            "r/RCMetaR/R/plotting.R",
+            "r/RCMetaR/R/utilities.R",
             *HELP_HTML,
         ]
     )
@@ -1673,18 +1662,19 @@ def test_issue_76_to_105_corrected_user_facing_strings_are_present():
         '_translate("MainWindow", "Leave-One-Out Meta-Analysis")',
         '_translate("MainWindow", "New Dataset")',
         '_translate("Dialog", "Method")',
-        '_translate("Dialog", "Forest Plot")',
+        '_translate("Dialog", "Plots")',
         '_translate("new_covariate_dialog", "Add Covariate")',
         '_translate("BinaryDataForm", "Back-Calculate Table")',
         '_translate("ContinuousDataForm", "Back-Calculate Table")',
         '_translate("DiagnosticDataForm", "Back-Calculate Table")',
         '_translate("diag_metric", "Select Metrics for Analysis")',
         '_translate("edit_dialog", "Edit Dataset")',
-        '_translate("edit_forest_plot_dlg", "Edit Forest Plot")',
+        '_translate("edit_forest_plot_dlg", "Edit Plot")',
         '_translate("running", "Running Analysis...")',
         '_translate("DataTypePage", "Proportion")',
         'QAction("Rename Group %s"',
         'QAction("Rename Covariate %s"',
+        'QAction("Edit Plot"',
         'QAction("Save PDF Image As"',
         'QAction("Save PNG Image As"',
     ]

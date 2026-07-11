@@ -27,6 +27,7 @@ LEGACY_ALIAS_PATTERN = re.compile(
 S4_CLASS_PATTERN = re.compile(r"setClass\(\s*[\"']([^\"']+)[\"']")
 RCMetaR_PUBLIC_EXPORTS = {
     "rcmetar.analysis.methods",
+    "rcmetar.analysis.plot.capabilities",
     "rcmetar.available.methods",
     "rcmetar.back.calculate.continuous",
     "rcmetar.binary.study.effect",
@@ -50,6 +51,7 @@ RCMetaR_PUBLIC_EXPORTS = {
     "rcmetar.method.references",
     "rcmetar.prepare.analysis.data",
     "rcmetar.regenerate.plot.data",
+    "rcmetar.regenerate.regression.plot.data",
     "rcmetar.run.analysis",
     "rcmetar.run.diagnostic.analyses",
     "rcmetar.run.permutation",
@@ -395,7 +397,7 @@ def parse_packages(field_value):
 
 def legacy_exported_functions_from_source():
     names = set()
-    for path in RCMetaR_R_DIR.glob("*.r"):
+    for path in RCMetaR_R_DIR.glob("*.R"):
         text = path.read_text(encoding="utf-8")
         names.update(LEGACY_EXPORT_PATTERN.findall(text))
         names.update(match.group(1) for match in LEGACY_ALIAS_PATTERN.finditer(text))
@@ -404,7 +406,7 @@ def legacy_exported_functions_from_source():
 
 def s4_classes_from_source():
     names = set()
-    for path in RCMetaR_R_DIR.glob("*.r"):
+    for path in RCMetaR_R_DIR.glob("*.R"):
         names.update(S4_CLASS_PATTERN.findall(path.read_text(encoding="utf-8")))
     return names
 
@@ -427,13 +429,15 @@ def test_RCMetaR_description_declares_only_direct_package_dependencies():
         "boot",
         "grDevices",
         "graphics",
-        "grid",
         "HSROC",
         "lme4",
         "methods",
         "metafor",
         "pdftools",
+        "rsvg",
         "stats",
+        "svglite",
+        "tiff",
         "utils",
     }
     assert parse_packages(fields["Suggests"]) == {"coda", "roxygen2", "testthat"}
@@ -442,11 +446,35 @@ def test_RCMetaR_description_declares_only_direct_package_dependencies():
     assert "exportPattern" not in RCMetaR_NAMESPACE.read_text(encoding="utf-8")
 
 
+def test_custom_grid_forest_engine_is_retired():
+    source_text = "\n".join(
+        path.read_text(encoding="utf-8") for path in RCMetaR_R_DIR.glob("*.R")
+    )
+
+    retired_function_defs = {
+        "forest.plot",
+        "draw.forest.plot",
+        "draw.data.col",
+        "two.forest.plots",
+        "create.grobs",
+        "calc.viewport.layout",
+        "calc.forest.plot.size",
+        "draw.normal.CI",
+        "draw.summary.CI",
+        "draw.summary.CI.no.scaled.diamond",
+    }
+    defined_functions = set(LEGACY_EXPORT_PATTERN.findall(source_text))
+
+    assert defined_functions.isdisjoint(retired_function_defs)
+    assert "fp_legacy_renderer" not in source_text
+    assert re.search(r"\b(?:grid\.|grid[A-Z_a-z])", source_text) is None
+
+
 def test_RCMetaR_source_uses_namespace_imports_instead_of_attach_calls():
     package_attach_pattern = re.compile(r"\b(?:library|require)\s*\(")
 
     offenders = []
-    for path in RCMetaR_R_DIR.glob("*.r"):
+    for path in RCMetaR_R_DIR.glob("*.R"):
         if package_attach_pattern.search(path.read_text(encoding="utf-8")):
             offenders.append(path.relative_to(REPO_ROOT).as_posix())
 
@@ -529,10 +557,10 @@ def test_meta_py_r_retired_obsolete_latin1_bridge_hacks():
     obsolete_tokens = [
         "_sanitize_for_R",
         "_cchar_to_str_with_latin1_fallback",
-        ".decode(\"latin-1\"",
-        ".decode(\"latin1\"",
-        ".encode(\"latin-1\"",
-        ".encode(\"latin1\"",
+        '.decode("latin-1"',
+        '.decode("latin1"',
+        '.encode("latin-1"',
+        '.encode("latin1"',
     ]
 
     offenders = [token for token in obsolete_tokens if token in text]

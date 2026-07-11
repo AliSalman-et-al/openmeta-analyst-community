@@ -5,7 +5,7 @@
 #                                  #
 # RC MetaStudio                #
 # ----                             #
-# classes.r                        # 
+# classes.R                        #
 # contains RCMetaR data class      #
 # definitions.                     #
 #                                  #    

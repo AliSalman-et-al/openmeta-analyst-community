@@ -49,12 +49,12 @@ def test_validate_analysis_digits_accepts_non_negative_integer_precision():
 
 def test_validate_analysis_digits_rejects_negative_and_non_integer_values():
     for value in (-1, "-5", 1.5, "2.5", math.inf, math.nan, None, "bad"):
-        with pytest.raises(ValueError, match="Number of digits"):
+        with pytest.raises(ValueError, match="Decimal places"):
             validate_analysis_digits(value)
 
 
 def test_normalize_confidence_level_params_rejects_invalid_digits():
-    with pytest.raises(ValueError, match="Number of digits"):
+    with pytest.raises(ValueError, match="Decimal places"):
         normalize_confidence_level_params({"conf.level": 95, "digits": -5})
 
 

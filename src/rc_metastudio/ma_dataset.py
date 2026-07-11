@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 """UI-independent dataset model for studies, outcomes, follow-ups, and groups."""
+
 import pdb
 from PyQt5.QtCore import pyqtRemoveInputHook
 import copy
@@ -692,6 +693,7 @@ class Study:
             outcome_name = outcome.name
 
         self.outcomes_to_follow_ups[outcome_name].pop(follow_up_name)
+
 
 class MetaAnalyticUnit:
     """

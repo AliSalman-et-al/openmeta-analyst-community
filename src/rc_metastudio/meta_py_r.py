@@ -12,6 +12,7 @@ from analysis_method_labels import (
     normalize_available_method_labels,
 )
 import result_sections
+import plot_capabilities
 from study_effect_shapes import (
     effect_triplet,
     normalize_diagnostic_effects,
@@ -443,7 +444,9 @@ def get_params(method_name):
 
 
 @RfunctionCaller
-def get_available_methods(for_data_type=None, data_obj_name=None, metric=None):
+def get_available_methods(
+    for_data_type=None, data_obj_name=None, metric=None, workflow="standard"
+):
     """
     Returns a list of methods available in RCMetaR for the particular data_type
     (if one is given).
@@ -457,6 +460,7 @@ def get_available_methods(for_data_type=None, data_obj_name=None, metric=None):
             ),
             "om.data": _r_null_if_none(data_arg),
             "metric": _r_null_if_none(None if metric is None else str(metric)),
+            "workflow": str(workflow),
         },
     )
     return normalize_available_method_labels(R_parse_tools.recursioner(methods))
@@ -465,6 +469,17 @@ def get_available_methods(for_data_type=None, data_obj_name=None, metric=None):
 @RfunctionCaller
 def get_method_description(method_name):
     return execute_r_function("rcmetar.method.description", str(method_name))[0]
+
+
+@RfunctionCaller
+def get_analysis_plot_capabilities(data_type, method_name, workflow="standard"):
+    capabilities = execute_r_function(
+        "rcmetar.analysis.plot.capabilities",
+        str(data_type),
+        str(method_name),
+        workflow=str(_normalize_RCMetaR_workflow(workflow)),
+    )
+    return R_parse_tools.recursioner(capabilities)
 
 
 # def ma_dataset_to_binary_robj(table_model, var_name):
@@ -1165,16 +1180,16 @@ def update_plot_params(
     # R-palatable
     params_df = ro.r["data.frame"](**plot_params)
     ro.globalenv["tmp.params"] = params_df
+    plot_params_symbol = _r_symbol(plot_params_name)
 
     for param_name in plot_params:
         param_name = _r_symbol(param_name)
-        plot_params_name = _r_symbol(plot_params_name)
         execute_r_string(
-            "%s$%s <- tmp.params$%s" % (plot_params_name, param_name, param_name)
+            "%s$%s <- tmp.params$%s" % (plot_params_symbol, param_name, param_name)
         )
 
     if write_them_out:
-        execute_r_function("save", **{"list": "tmp.params", "file": str(outpath)})
+        execute_r_function("save", **{"list": plot_params_symbol, "file": str(outpath)})
 
 
 @RfunctionCaller
@@ -1195,6 +1210,22 @@ def regenerate_plot_data(
 
 
 @RfunctionCaller
+def regenerate_regression_plot_data(
+    om_data_name="om.data",
+    res_name="res",
+    plot_params_name="params",
+    plot_data_name="plot.data",
+):
+    plot_data = execute_r_function(
+        "rcmetar.regenerate.regression.plot.data",
+        _r_object_from_symbol(om_data_name),
+        _r_object_from_symbol(res_name),
+        _r_object_from_symbol(plot_params_name),
+    )
+    ro.globalenv[_r_symbol(plot_data_name)] = plot_data
+
+
+@RfunctionCaller
 def generate_reg_plot(file_path, params_name="plot.data"):
     execute_r_function(
         "rcmetar.draw.regression.plot",
@@ -1204,23 +1235,13 @@ def generate_reg_plot(file_path, params_name="plot.data"):
 
 
 @RfunctionCaller
-def generate_forest_plot(file_path, side_by_side=False, params_name="plot.data"):
-    if side_by_side:
-        print("generating a side-by-side forest plot...")
-        execute_r_function(
-            "rcmetar.draw.forest.plot",
-            _r_object_from_symbol(params_name),
-            str(file_path),
-            **{"side.by.side": True},
-        )
-    else:
-        print("generating a forest plot....")
-        execute_r_function(
-            "rcmetar.draw.forest.plot",
-            _r_object_from_symbol(params_name),
-            str(file_path),
-            **{"side.by.side": False},
-        )
+def generate_forest_plot(file_path, params_name="plot.data"):
+    print("generating a forest plot....")
+    execute_r_function(
+        "rcmetar.draw.forest.plot",
+        _r_object_from_symbol(params_name),
+        str(file_path),
+    )
 
 
 def parse_out_results(result):
@@ -1229,7 +1250,9 @@ def parse_out_results(result):
     # in R (for graphics manipulation).
     text_d = {}
     image_var_name_d, image_params_paths_d, image_path_d = {}, {}, {}
+    display_image_path_d = {}
     image_order = None
+    plot_capability_d = {}
 
     if _r_inherits(result, "try-error"):
         raise RuntimeError(_r_error_message(result))
@@ -1247,6 +1270,8 @@ def parse_out_results(result):
         print("\n--------\n")
         if text_n == "images":
             image_path_d = R_parse_tools.recursioner(text)
+        elif text_n == "display_images":
+            display_image_path_d = R_parse_tools.recursioner(text)
         elif text_n == "image_order":
             image_order = list(text)
         elif text_n == "plot_names":
@@ -1259,13 +1284,18 @@ def parse_out_results(result):
                 image_params_paths_d = {}
             else:
                 image_params_paths_d = R_parse_tools.recursioner(text)
+        elif text_n == "plot_capabilities":
+            plot_capability_d = R_parse_tools.recursioner(text)
         elif text_n == "References":
             text_d[display_text_n] = result_sections.format_references(text)
         elif text_n in ("weights", "Weights"):
             text_d["Weights"] = make_weights_str(result)
-        elif (
-            text_n in ["res", "res.info", "input_data", "input_params"]
-        ):  # skip low-level RCMetaR internals that are not display sections
+        elif text_n in [
+            "res",
+            "res.info",
+            "input_data",
+            "input_params",
+        ]:  # skip low-level RCMetaR internals that are not display sections
             pass
         elif "gui.ignore" in text_n:
             pass
@@ -1293,12 +1323,14 @@ def parse_out_results(result):
 
     to_return = {
         "images": image_path_d,
+        "display_images": display_image_path_d,
         "image_var_names": image_var_name_d,
         "texts": text_d,
         "image_params_paths": image_params_paths_d,
         "image_order": image_order,
+        "plot_capabilities": plot_capability_d,
     }
-
+    to_return["plot_capabilities"] = plot_capabilities.validate_result(to_return)
     return to_return
 
 
@@ -1627,10 +1659,7 @@ def make_weights_str(results):
         print("Uh oh")
         raise Exception("make_weights_str() requires 'weights' in the results")
 
-    digits = 3
-    if "input_params" in results:
-        digits = results["input_params"].rx2("digits")[0]
-    digits = validate_analysis_digits(digits)
+    digits = PERCENTAGE_DISPLAY_DIGITS
     weights_object = results["weights"]
     weights = list(weights_object)
     weights = ["{0:.{digits}f}%".format(x, digits=digits) for x in weights]
@@ -1663,20 +1692,16 @@ def run_meta_regression(
     results_name="results_obj",
     fixed_effects=False,
     conf_level=None,
+    params=None,
 ):
 
     conf_level = validate_confidence_level(conf_level)
 
-    method_str = "FE" if fixed_effects else "DL"
-
-    # conf.level and digits are caller-supplied where available.
-    params = {
-        "conf.level": conf_level,
-        "digits": 3,
-        "method": method_str,
-        "rm.method": "ML",
-        "measure": metric_name,
-    }
+    params = dict(params or {})
+    params["conf.level"] = conf_level
+    params.setdefault("digits", 2)
+    params["rm.method"] = "FE" if fixed_effects else params.get("rm.method", "DL")
+    params["measure"] = metric_name
     return _run_RCMetaR_core_analysis(
         data_name,
         "meta.regression",

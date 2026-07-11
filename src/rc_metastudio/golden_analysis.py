@@ -13,6 +13,7 @@ import zipfile
 import headless_analysis
 import meta_globals
 import meta_py_r
+from plot_defaults import FOREST_ARM_LABELS
 
 
 DEFAULT_TOLERANCES = {
@@ -57,10 +58,10 @@ def _common_plot_params(path):
     return {
         "conf.level": 95.0,
         "digits": 3.0,
-        "fp_col1_str": "Studies",
+        "fp_col1_str": "Study or Subgroup",
         "fp_col2_str": "[default]",
-        "fp_col3_str": "Ev/Trt",
-        "fp_col4_str": "Ev/Ctrl",
+        "fp_col3_str": FOREST_ARM_LABELS[0],
+        "fp_col4_str": FOREST_ARM_LABELS[1],
         "fp_xlabel": "[default]",
         "fp_outpath": path,
         "fp_plot_lb": "[default]",
@@ -421,11 +422,11 @@ def curated_golden_bundles(root_dir=None):
     )
     binary_cumulative_params = dict(
         binary_params,
-        **{"fp_outpath": _analysis_output_path("golden_amino_cumulative_forest.png")}
+        **{"fp_outpath": _analysis_output_path("golden_amino_cumulative_forest.png")},
     )
     binary_loo_params = dict(
         binary_params,
-        **{"fp_outpath": _analysis_output_path("golden_amino_loo_forest.png")}
+        **{"fp_outpath": _analysis_output_path("golden_amino_loo_forest.png")},
     )
     continuous_cumulative_params = dict(
         continuous_params,
@@ -437,7 +438,7 @@ def curated_golden_bundles(root_dir=None):
     )
     continuous_loo_params = dict(
         continuous_params,
-        **{"fp_outpath": _analysis_output_path("golden_continuous_loo_forest.png")}
+        **{"fp_outpath": _analysis_output_path("golden_continuous_loo_forest.png")},
     )
     amino_group = dict(
         (name, "early" if i % 2 == 0 else "late")

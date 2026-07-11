@@ -887,6 +887,7 @@ class CommandCellEdit(QUndoCommand):
         )
 
         print(("CommandCellEdit created with parameters: %s" % str(debug_params)))
+
     @DebugHelper
     def redo(self):
         index = self._get_index()

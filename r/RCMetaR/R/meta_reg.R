@@ -440,7 +440,7 @@ g.meta.regression <- function(
 		plot.path <- "./r_tmp/reg.png"
 	    cov.name <- mods[['numeric']][[1]]
 		cov.vals <- data[[cov.name]]
-		plot.data <- g.create.plot.data.reg(data, cov.name, cov.vals, measure, level, fitted.line)
+		plot.data <- g.create.plot.data.reg(data, cov.name, cov.vals, measure, level, fitted.line, res=res, digits=digits)
 		
 		# Use generated axis labels unless the caller supplies richer labels.
 		
@@ -456,11 +456,16 @@ g.meta.regression <- function(
 		
 		# write the plot data to disk so we can save it
 		# Plot parameters are persisted separately when callers need editable plots.
-		plot.data.path <- save.plot.data(plot.data)
+		plot.params <- list(
+			"rm.method"=method,
+			"conf.level"=level,
+			"digits"=digits,
+			"measure"=measure
+		)
+		plot.data.path <- save.data(data, res, plot.params, plot.data)
 		
 		images <- c("Regression Plot"=plot.path)
 		plot.names <- c("reg.plot"="reg.plot")
-		reg.plot.params.path <- save.plot.data(plot.data)
 		plot.params.paths <- c("Regression Plot"=plot.data.path)
 		
 		# add regression plot to results
@@ -504,32 +509,24 @@ is.single.numeric.covariate <- function(mods) {
 }
 
 # create regression plot data for g.meta.regression function
-g.create.plot.data.reg <- function(reg.data, cov.name, cov.vals, measure, level, fitted.line) {
-	scale.str <- g.get.scale(measure)
-	plot.data <- list("fitted.line" = fitted.line,
-			types = c(rep(0, length(reg.data$slab))),
-			scale = scale.str,
-			covariate = list(varname = cov.name, values = cov.vals))
-	mult <- get.mult.from.conf.level(level)
-	
-	
-	y <- reg.data$yi
-	se <- sqrt(reg.data$vi)
-	effects <- list(ES = y,
-			se = se)
-	plot.data$effects <- effects
-	
-	###
-	# Plot sizing defaults can move into params when exposed by the UI.
-	plot.data$sym.size <- 1
-	plot.data$lcol <- "darkred"
-	plot.data$lweight <- 3
-	plot.data$lpattern <- "dotted"
-	plot.data$plotregion <- "n"
-	plot.data$mcolor <- "darkgreen"
-	plot.data$regline <- TRUE
-	
-	plot.data
+g.create.plot.data.reg <- function(reg.data, cov.name, cov.vals, measure, level, fitted.line, res=NULL, digits=RCMETAR_DEFAULT_DISPLAY_DIGITS) {
+	if (!inherits(res, "rma")) {
+		stop("Meta-regression bubble plots require a metafor rma result.", call.=FALSE)
+	}
+	params <- list(
+		measure=measure,
+		conf.level=level,
+		digits=digits,
+		fp_style="default"
+	)
+	rcmetar.create.metafor.bubble.bundle(
+		reg.data=reg.data,
+		params=params,
+		res=res,
+		cov.name=cov.name,
+		cov.values=cov.vals,
+		fitted.line=fitted.line
+	)
 }
 
 # get scale for g.meta.regression function and derivatives
@@ -863,7 +860,11 @@ meta.regression <- function(reg.data, params, cond.means.data=NULL, stop.at.rma=
             betas <- res$b
             fitted.line <- list(intercept=betas[1], slope=betas[2])
             plot.path <- "./r_tmp/reg.png"
-            plot.data <- create.plot.data.reg(reg.data, params, fitted.line)
+            if (!is.null(params$bp_outpath) && length(params$bp_outpath) > 0 &&
+                    !is.na(params$bp_outpath[1]) && nzchar(as.character(params$bp_outpath[1]))) {
+                plot.path <- as.character(params$bp_outpath[1])
+            }
+            plot.data <- create.plot.data.reg(reg.data, params, fitted.line, res=res)
 
             # Use generated axis labels unless the caller supplies richer labels.
             plot.data$xlabel <- reg.data@covariates[[1]]@cov.name
@@ -877,11 +878,10 @@ meta.regression <- function(reg.data, params, cond.means.data=NULL, stop.at.rma=
             
             # write the plot data to disk so we can save it
             # Plot parameters are persisted separately when callers need editable plots.
-            plot.data.path <- save.plot.data(plot.data)
+            plot.data.path <- save.data(reg.data, res, params, plot.data)
 
             images <- c("Regression Plot"=plot.path)
             plot.names <- c("reg.plot"="reg.plot")
-            reg.plot.params.path <- save.plot.data(plot.data)
             plot.params.paths <- c("Regression Plot"=plot.data.path)
 			pure.res$weights <- weights(res)
             results <- list("input_data"=reg.data,
@@ -929,6 +929,15 @@ meta.regression <- function(reg.data, params, cond.means.data=NULL, stop.at.rma=
 	references <- rcmetar.method.references("meta.regression")
 	results[["References"]] <- references
     results
+}
+
+meta.regression.parameters <- function() {
+    rm.methods <- c("HE", "DL", "SJ", "ML", "REML", "EB")
+    list(
+        parameters=list("rm.method"=rm.methods, "conf.level"="float", "digits"="int"),
+        defaults=list("rm.method"="REML", "conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS),
+        var_order=c("rm.method", "conf.level", "digits")
+    )
 }
 
 cond.means.info <- function(cond.means.data) {
@@ -1028,16 +1037,8 @@ binary.fixed.meta.regression <- function(reg.data, params){
         betas <- res$b
         fitted.line <- list(intercept=betas[1], slope=betas[2])
         plot.path <- "./r_tmp/reg.png"
-        plot.data <- create.plot.data.reg(reg.data, params, fitted.line, selected.cov=cov.name)
-        meta.regression.plot(plot.data, outpath=plot.path, symSize=1,
-                                  lcol = "darkred",
-                                  y.axis.label = "Effect size",
-                                  xlabel= cov.name,
-                                  lweight = 3,
-                                  lpatern = "dotted",
-                                  plotregion = "n",
-                                  mcolor = "darkgreen",
-                                  regline = TRUE)   
+        plot.data <- create.plot.data.reg(reg.data, params, fitted.line, selected.cov=cov.name, res=res)
+        meta.regression.plot(plot.data, outpath=plot.path)
         images <- c("Regression Plot"=plot.path)
         plot.names <- c("forest plot"="reg.plot")
         results <- list("images"=images, "Summary"=capture.output.and.collapse(reg.disp), "plot_names"=plot.names)
@@ -1065,16 +1066,8 @@ random.meta.regression <- function(reg.data, params, cov.name){
     else {
         plot.path <- params$rp_outpath
     }
-    plot.data <- create.plot.data.reg(reg.data, params, fitted.line, selected.cov=cov.name)
-    meta.regression.plot(plot.data, outpath=plot.path, symSize=1,
-                                  lcol = "darkred",
-                                  y.axis.label = "Effect size",
-                                  xlabel= cov.name,
-                                  lweight = 3,
-                                  lpatern = "solid",
-                                  plotregion = "n",
-                                  mcolor = "black",
-                                  regline = TRUE)   
+    plot.data <- create.plot.data.reg(reg.data, params, fitted.line, selected.cov=cov.name, res=res)
+    meta.regression.plot(plot.data, outpath=plot.path)
     images <- c("Regression Plot"=plot.path)
     plot.names <- c("forest plot"="reg.plot")
     results <- list("images"=images, "Summary"=capture.output.and.collapse(reg.disp), "plot_names"=plot.names)
@@ -1087,7 +1080,7 @@ binary.random.meta.regression.parameters <- function(){
     params <- list("rm.method"=rm_method_ls, "conf.level"="float", "digits"="int")
     
     # default values
-    defaults <- list("rm.method"="DL", "conf.level"=95, "digits"=3)
+    defaults <- list("rm.method"="DL", "conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS)
     
     var_order <- c("rm.method", "conf.level", "digits")
     parameters <- list("parameters"=params, "defaults"=defaults, "var_order"=var_order)

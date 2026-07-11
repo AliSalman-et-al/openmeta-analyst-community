@@ -16,7 +16,9 @@ class Ui_BinaryDataForm(object):
         BinaryDataForm.setObjectName("BinaryDataForm")
         BinaryDataForm.resize(394, 382)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(
+            QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
+        )
         BinaryDataForm.setWindowIcon(icon)
         self.verticalLayout_4 = QtWidgets.QVBoxLayout(BinaryDataForm)
         self.verticalLayout_4.setObjectName("verticalLayout_4")
@@ -53,14 +55,20 @@ class Ui_BinaryDataForm(object):
         font = QtGui.QFont()
         font.setFamily("Verdana")
         self.label_20.setFont(font)
-        self.label_20.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing)
+        self.label_20.setAlignment(
+            QtCore.Qt.AlignBottom | QtCore.Qt.AlignRight | QtCore.Qt.AlignTrailing
+        )
         self.label_20.setObjectName("label_20")
         self.gridLayout_5.addWidget(self.label_20, 1, 0, 1, 1)
         self.raw_data_table = QtWidgets.QTableWidget(BinaryDataForm)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.raw_data_table.sizePolicy().hasHeightForWidth())
+        sizePolicy.setHeightForWidth(
+            self.raw_data_table.sizePolicy().hasHeightForWidth()
+        )
         self.raw_data_table.setSizePolicy(sizePolicy)
         self.raw_data_table.setMinimumSize(QtCore.QSize(0, 0))
         self.raw_data_table.setMaximumSize(QtCore.QSize(16777215, 16777215))
@@ -98,7 +106,9 @@ class Ui_BinaryDataForm(object):
         font = QtGui.QFont()
         font.setFamily("Verdana")
         self.label_21.setFont(font)
-        self.label_21.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
+        self.label_21.setAlignment(
+            QtCore.Qt.AlignRight | QtCore.Qt.AlignTrailing | QtCore.Qt.AlignVCenter
+        )
         self.label_21.setObjectName("label_21")
         self.gridLayout_5.addWidget(self.label_21, 2, 0, 1, 1)
         self.label_22 = QtWidgets.QLabel(BinaryDataForm)
@@ -107,7 +117,9 @@ class Ui_BinaryDataForm(object):
         font.setBold(True)
         font.setWeight(75)
         self.label_22.setFont(font)
-        self.label_22.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
+        self.label_22.setAlignment(
+            QtCore.Qt.AlignRight | QtCore.Qt.AlignTrailing | QtCore.Qt.AlignVCenter
+        )
         self.label_22.setObjectName("label_22")
         self.gridLayout_5.addWidget(self.label_22, 3, 0, 1, 1)
         self.verticalLayout_3.addLayout(self.gridLayout_5)
@@ -117,7 +129,9 @@ class Ui_BinaryDataForm(object):
         self.clear_Btn = QtWidgets.QPushButton(BinaryDataForm)
         self.clear_Btn.setObjectName("clear_Btn")
         self.horizontalLayout_17.addWidget(self.clear_Btn)
-        spacerItem = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem = QtWidgets.QSpacerItem(
+            40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
+        )
         self.horizontalLayout_17.addItem(spacerItem)
         self.back_calc_btn = QtWidgets.QPushButton(BinaryDataForm)
         self.back_calc_btn.setEnabled(False)
@@ -139,7 +153,9 @@ class Ui_BinaryDataForm(object):
         self.effect_cbo_box.setMaximumSize(QtCore.QSize(76, 20))
         self.effect_cbo_box.setObjectName("effect_cbo_box")
         self.horizontalLayout_13.addWidget(self.effect_cbo_box)
-        spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem1 = QtWidgets.QSpacerItem(
+            40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
+        )
         self.horizontalLayout_13.addItem(spacerItem1)
         self.verticalLayout_4.addLayout(self.horizontalLayout_13)
         self.groupBox = QtWidgets.QGroupBox(BinaryDataForm)
@@ -147,12 +163,16 @@ class Ui_BinaryDataForm(object):
         self.groupBox.setObjectName("groupBox")
         self.gridLayout_6 = QtWidgets.QGridLayout(self.groupBox)
         self.gridLayout_6.setObjectName("gridLayout_6")
-        spacerItem2 = QtWidgets.QSpacerItem(32, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem2 = QtWidgets.QSpacerItem(
+            32, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
+        )
         self.gridLayout_6.addItem(spacerItem2, 0, 0, 2, 1)
         self.ci_label = QtWidgets.QLabel(self.groupBox)
         self.ci_label.setObjectName("ci_label")
         self.gridLayout_6.addWidget(self.ci_label, 0, 2, 1, 1)
-        spacerItem3 = QtWidgets.QSpacerItem(32, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem3 = QtWidgets.QSpacerItem(
+            32, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
+        )
         self.gridLayout_6.addItem(spacerItem3, 0, 3, 2, 1)
         self.horizontalLayout_15 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_15.setObjectName("horizontalLayout_15")
@@ -162,7 +182,9 @@ class Ui_BinaryDataForm(object):
         font = QtGui.QFont()
         font.setFamily("Verdana")
         self.est_lbl.setFont(font)
-        self.est_lbl.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
+        self.est_lbl.setAlignment(
+            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
+        )
         self.est_lbl.setObjectName("est_lbl")
         self.horizontalLayout_15.addWidget(self.est_lbl)
         self.effect_txt_box = QtWidgets.QLineEdit(self.groupBox)
@@ -178,7 +200,9 @@ class Ui_BinaryDataForm(object):
         font = QtGui.QFont()
         font.setFamily("Verdana")
         self.low_lbl.setFont(font)
-        self.low_lbl.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
+        self.low_lbl.setAlignment(
+            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
+        )
         self.low_lbl.setObjectName("low_lbl")
         self.horizontalLayout_16.addWidget(self.low_lbl)
         self.low_txt_box = QtWidgets.QLineEdit(self.groupBox)
@@ -199,7 +223,9 @@ class Ui_BinaryDataForm(object):
         font = QtGui.QFont()
         font.setFamily("Verdana")
         self.high_lbl.setFont(font)
-        self.high_lbl.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
+        self.high_lbl.setAlignment(
+            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
+        )
         self.high_lbl.setObjectName("high_lbl")
         self.horizontalLayout_16.addWidget(self.high_lbl)
         self.gridLayout_6.addLayout(self.horizontalLayout_16, 1, 2, 1, 1)
@@ -218,18 +244,22 @@ class Ui_BinaryDataForm(object):
         self.inconsistencyLabel.setFont(font)
         self.inconsistencyLabel.setObjectName("inconsistencyLabel")
         self.horizontalLayout_14.addWidget(self.inconsistencyLabel)
-        spacerItem4 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem4 = QtWidgets.QSpacerItem(
+            40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
+        )
         self.horizontalLayout_14.addItem(spacerItem4)
         self.buttonBox = QtWidgets.QDialogButtonBox(BinaryDataForm)
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setStandardButtons(
+            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
+        )
         self.buttonBox.setObjectName("buttonBox")
         self.horizontalLayout_14.addWidget(self.buttonBox)
         self.verticalLayout_4.addLayout(self.horizontalLayout_14)
 
         self.retranslateUi(BinaryDataForm)
-        self.buttonBox.rejected.connect(BinaryDataForm.reject) # type: ignore
-        self.buttonBox.accepted.connect(BinaryDataForm.accept) # type: ignore
+        self.buttonBox.rejected.connect(BinaryDataForm.reject)  # type: ignore
+        self.buttonBox.accepted.connect(BinaryDataForm.accept)  # type: ignore
         QtCore.QMetaObject.connectSlotsByName(BinaryDataForm)
         BinaryDataForm.setTabOrder(self.raw_data_table, self.clear_Btn)
         BinaryDataForm.setTabOrder(self.clear_Btn, self.back_calc_btn)
@@ -263,11 +293,20 @@ class Ui_BinaryDataForm(object):
         self.clear_Btn.setText(_translate("BinaryDataForm", "Clear Form"))
         self.back_calc_btn.setText(_translate("BinaryDataForm", "Back-Calculate Table"))
         self.label_17.setText(_translate("BinaryDataForm", "Effect"))
-        self.ci_label.setToolTip(_translate("BinaryDataForm", "Use the box to the left to set the % confidence interval"))
+        self.ci_label.setToolTip(
+            _translate(
+                "BinaryDataForm",
+                "Use the box to the left to set the % confidence interval",
+            )
+        )
         self.ci_label.setText(_translate("BinaryDataForm", "X% Confidence Interval"))
         self.est_lbl.setText(_translate("BinaryDataForm", "Est."))
         self.low_lbl.setText(_translate("BinaryDataForm", "["))
         self.label_23.setText(_translate("BinaryDataForm", ","))
         self.high_lbl.setText(_translate("BinaryDataForm", "]"))
-        self.inconsistencyLabel.setText(_translate("BinaryDataForm", "INCONSISTENT FORM"))
+        self.inconsistencyLabel.setText(
+            _translate("BinaryDataForm", "INCONSISTENT FORM")
+        )
+
+
 import icons_rc

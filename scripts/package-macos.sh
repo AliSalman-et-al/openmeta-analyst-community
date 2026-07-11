@@ -122,13 +122,15 @@ fi
 build_args=(
   --architecture "$architecture"
   --artifact-name "$artifact_name"
-  --archive-root-name "${archive_root_name:-$artifact_name}"
   --bundle-identifier "$bundle_identifier"
   --python-exe "$python_exe"
   --r-runtime-root "$r_runtime_root"
   --r-package-cache-root "$r_package_cache_root"
   --skip-dependency-install
 )
+if [ -n "$archive_root_name" ]; then
+  build_args+=(--archive-root-name "$archive_root_name")
+fi
 if [ "$skip_clean" -eq 1 ]; then
   build_args+=(--skip-clean)
 fi

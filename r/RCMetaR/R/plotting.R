@@ -13,7 +13,7 @@ forest.plot.p.value.label <- function(p.value, digits, missing.label="") {
     if (display.value.is.missing(p.value)) {
         return(missing.label)
     }
-    formatted <- round.display(p.value, digits)
+    formatted <- format.p.value.display(p.value, digits)
     if (p.value < 10^(-digits)) {
         return(paste("P", formatted, sep=""))
     }
@@ -42,7 +42,7 @@ create.plot.data.generic <- function(om.data, params, res, selected.cov=NULL){
     transform.name <- get.transform.name(om.data)
     plot.options <- set.plot.options(params)
     # Set n, the number of studies, for PFT metric.
-    if (params$measure=="PFT" && length(om.data@g1O1) > 1 && length(om.data@g1O2)) {
+    if (params$measure=="PFT" && length(om.data@g1O1) > 0 && length(om.data@g1O2) > 0) {
         n <- om.data@g1O1 + om.data@g1O2  # Number of subjects
     }
 	else {
@@ -88,7 +88,7 @@ create.plot.data.generic <- function(om.data, params, res, selected.cov=NULL){
     study.names <- om.data@study.names
     years <- om.data@years
     study.names[years != 0] <- paste(study.names[years != 0], years[years != 0], sep=" ")
-    plot.data <- list(label = c(paste(params$fp_col1_str, sep = ""), study.names, overall),
+    plot.data <- list(label = c(rcmetar.forest.study.header.label(params$fp_col1_str), study.names, overall),
                       types = c(3, rep(0, length(om.data@study.names)), 2),
                       scale = scale.str,
                       options = plot.options)
@@ -186,6 +186,10 @@ create.plot.data.binary <- function(binary.data, params, res, selected.cov = NUL
          plot.data$col4 <- list(nums = binary.data@g2O1, denoms = binary.data@g2O1 + binary.data@g2O2)
     }
 
+    if (rcmetar.metafor.binary.default.supported(binary.data, params, selected.cov=selected.cov)) {
+        plot.data <- rcmetar.build.binary.metafor.bundle(binary.data, params, res, plot.data)
+    }
+
     plot.data
 }
 
@@ -226,6 +230,9 @@ create.plot.data.diagnostic <- function(diagnostic.data, params, res, selected.c
         changed.params$fp_col3_str <- label
         plot.data$changed.params <- changed.params
     }
+    if (rcmetar.metafor.diagnostic.default.supported(diagnostic.data, params, selected.cov=selected.cov)) {
+        plot.data <- rcmetar.build.diagnostic.metafor.bundle(diagnostic.data, params, res, plot.data)
+    }
     plot.data
 }
 
@@ -233,6 +240,9 @@ create.plot.data.continuous <- function(cont.data, params, res, selected.cov = N
     # Creates a data structure that can be passed to forest.plot
     # res is the output of a call to the Metafor function rma
     plot.data <- create.plot.data.generic(cont.data, params, res, selected.cov=selected.cov)
+    if (rcmetar.metafor.continuous.default.supported(cont.data, params, selected.cov=selected.cov)) {
+        plot.data <- rcmetar.build.continuous.metafor.bundle(cont.data, params, res, plot.data)
+    }
     plot.data
 }
 
@@ -364,7 +374,7 @@ create.plot.data.cum <- function(om.data, params, res) {
     # type 4 does not get plotted! Generates empty row in plot.
     study.names <- c(study.names, "")
     # extra blank name to align rows with standard plot
-    plot.data$label <- c(as.character(params$fp_col1_str), study.names)
+    plot.data$label <- c(rcmetar.forest.study.header.label(params$fp_col1_str), study.names)
     plot.data
 }
 
@@ -374,7 +384,7 @@ create.plot.data.loo <- function(om.data, params, res) {
     # First entry of res contains overall summary
     study.names <- c("Overall", paste("- ", om.data@study.names, sep=""))
     plot.data <- create.plot.data.overall(om.data, params, res, res.overall)
-    plot.data$label <- c(as.character(params$fp_col1_str), study.names)
+    plot.data$label <- c(rcmetar.forest.study.header.label(params$fp_col1_str), study.names)
     plot.data$types <- c(3, 5, rep(0, length(om.data@study.names)))
     plot.data
 }
@@ -465,7 +475,7 @@ create.subgroup.plot.data.generic <- function(subgroup.data, params, data.type, 
     }
     QEp <- forest.plot.p.value.label(cur.res$QEp, params$digits)
     overall <- forest.plot.heterogeneity.suffix(I2, QEp)
-    label.col <- c(as.character(params$fp_col1_str), label.col, paste("Overall", overall, sep=""))
+    label.col <- c(rcmetar.forest.study.header.label(params$fp_col1_str), label.col, paste("Overall", overall, sep=""))
     plot.options <- set.plot.options(params)
     if (params$fp_plot_lb == "[default]") {
         plot.options$plot.lb <- params$fp_plot_lb
@@ -582,34 +592,27 @@ create.subgroup.plot.data.cont <- function(subgroup.data, params) {
 }
 
 # create regression plot data
-create.plot.data.reg <- function(reg.data, params, fitted.line, selected.cov=NULL) {
-     scale.str <- get.scale(params)
-     cov.name <- reg.data@covariates[[1]]@cov.name
-     cov.vals <- reg.data@covariates[[1]]@cov.vals
-     plot.data <- list("fitted.line" = fitted.line,
-                      types = c(rep(0, length(reg.data@study.names))),
-                      scale = scale.str,
-                      covariate = list(varname = cov.name, values = cov.vals))
-     mult <- get.mult.from.conf.level(params$conf.level)
-
-
-     y <- reg.data@y
-     se <- reg.data@SE
-     effects <- list(ES = y,
-                    se = se)
-     plot.data$effects <- effects
-
-     ###
-     # Plot sizing defaults can move into params when exposed by the UI.
-     plot.data$sym.size <- 1
-     plot.data$lcol <- "darkred"
-     plot.data$lweight <- 3
-     plot.data$lpattern <- "dotted"
-     plot.data$plotregion <- "n"
-     plot.data$mcolor <- "darkgreen"
-     plot.data$regline <- TRUE
-
-     plot.data
+create.plot.data.reg <- function(reg.data, params, fitted.line, selected.cov=NULL, res=NULL) {
+     if (!inherits(res, "rma")) {
+         stop("Meta-regression bubble plots require a metafor rma result.", call.=FALSE)
+     }
+     cov.index <- 1
+     if (!is.null(selected.cov)) {
+         cov.names <- vapply(reg.data@covariates, function(covariate) covariate@cov.name, character(1))
+         match.index <- match(as.character(selected.cov), cov.names)
+         if (!is.na(match.index)) {
+             cov.index <- match.index
+         }
+     }
+     covariate <- reg.data@covariates[[cov.index]]
+     rcmetar.create.metafor.bubble.bundle(
+         reg.data=reg.data,
+         params=params,
+         res=res,
+         cov.name=covariate@cov.name,
+         cov.values=covariate@cov.vals,
+         fitted.line=fitted.line
+     )
 }
 
 
@@ -633,7 +636,7 @@ set.plot.options <- function(params) {
     } else {
       plot.options$show.study.col <- FALSE
     }
-    plot.options$col1.str <- as.character(params$fp_col1_str)
+    plot.options$col1.str <- rcmetar.forest.study.header.label(params$fp_col1_str)
 
     if (params$fp_show_col2=='TRUE') {
       plot.options$show.col2 <- TRUE
@@ -801,817 +804,13 @@ pretty.metric.name <- function(metric) {
 ###################################
 
 #######################################
-#            forest plot              #
-#######################################
-forest.plot <- function(forest.data, outpath) {
-  png(filename=rcmetar.scratch.path("INTER")) # to fix windows popping out at you issue
-
-  # calculates plot sizes and layout, and then calls draw.forest.plot.
-  # forest.data is a list contains the following fields:
-  #
-  # - effects.disp - list with 3 fields:
-  #     - y.disp - vector of effect sizes in display scale
-  #     - lb.disp - conf. int. lower bound in display scale
-  #     - ub.disp - conf. int. upper bound in display scale
-  #
-  # - effects - list with 3 fields:
-  #     - ES - vector of effect sizes in calc. scale
-  #     - LL - conf. int. lower bound in calc. scale
-  #     - UL - conf. int. upper bound in calc. scale
-  #
-  # - types - vector specifying row types:
-  #     - 0 - study-level data
-  #     - 1 - subgroup summary data
-  #     - 2 - overall summary data
-  #     - 3 - row of column labels
-  #     - 4 - blank row (e.g. for empty summary row in right-hand side of cumulative plot)
-  #     - 5 - overall summary data with unscaled diamond (e.g. for leave-one-out plots)
-  #
-  # - label - vector of row labels of length 1 more than length of effect sizes.
-  #           First entry is usually "Studies" assuming first row has type 3.
-  #
-  # - scale - transformation scale - takes one of the following values:
-  #     - "standard" - untransformed
-  #     - "log"
-  #     - "logit"
-  #     - "arcsine"
-  #
-  # - options - plot options
-  #
-  # - plot range - range of x-values in which to draw plot
-  #
-  #
-  forest.data <- format.data.cols(forest.data)
-  # format the text of the data columns displayed on forest plot
-  types <- forest.data$types
-  num.labels <- length(forest.data$label)
-  rows <- assign.rows(types, num.labels)
-  # row numbers of forest plot including blank rows (after summary rows)
-  forest.data$rows <- rows
-
-  forest.data <- create.grobs(forest.data)
-  # create graphical objects for study and data columns.
-
-  plot.size <- calc.forest.plot.size(forest.data)
-  # calculate height and width of output file
-  forest.data$data.col.width <- plot.size$data.col.width
-  how.wide <- plot.size$how.wide
-  # width of output file
-  how.tall <- plot.size$how.tall
-  # height of output file
-  viewport.layout <- calc.viewport.layout(forest.data, just="left")
-  # calculate the layout of the viewport
-
-  # Detect PNG output paths by scanning for the literal ".png".
-  # Note that this means that, technically, if someone tries
-  # to save an iamge to my.pngimg.pdf, it will save it instead
-  # as a png. on the other hand, why would someone do that?
-  if (length(grep(".png", outpath)) != 0){
-      png(filename=outpath, width = how.wide, height = how.tall+2 , units = "in", res = 144)
-  }
-  else{
-      pdf(file=outpath, width = how.wide+1, height = how.tall+2)
-  }
-
-  pushViewport(viewport(layout=viewport.layout))
-  changed.params <- draw.forest.plot(forest.data)
-
-  graphics.off()
-
-
-  changed.params
-}
-
-#############################################################
-#   functions for creating graphical objects and viewports  #
-#############################################################
-
-create.grobs <- function(forest.data) {
-    # create graphical objects for study and data cols.
-    # and add them to forest.data
-    show.study.col <- forest.data$options$show.study.col
-
-    additional.cols.grob <- c()
-    # create graphical object for data columns.
-    if (length(forest.data$additional.col.data)>0 ){
-         additional.cols.grob <- additional.columns(forest.data, "bold")
-         forest.data$additional.cols.grob <- additional.cols.grob
-    }
-    if (show.study.col==TRUE) {
-        study.col.grob <- study.column(forest.data, "bold")
-        # create graphical object for study column
-        forest.data$study.col.grob <- study.col.grob
-    }
-    forest.data
-}
-
-additional.columns <- function(forest.data, font = "bold") {
-    # Gets data for effect sizes column (col 2) and raw data (cols 3 and 4),
-    # if user has chosen to display them.
-    additional.columns <- vector("list", length(forest.data$additional.col.data))
-
-    for (j in 1:length(forest.data$additional.col.data)){
-        content<-rep(NA, length(forest.data$label))
-
-        for (i in 1:length(forest.data$label)){
-          if ((forest.data$types[i] == 1) || (forest.data$types[i] == 2))
-            content[i] <- list(textGrob(forest.data$additional.col.data[[j]][[i]],
-                      x=1, just = "right", gp = gpar(fontface = "bold", fontfamily="mono", fontsize="10")))
-          else
-            content[i] <- list(textGrob(forest.data$additional.col.data[[j]][[i]],
-                      x=1, just = "right", gp = gpar(fontface = "plain", fontfamily="mono", fontsize="10")))
-        }
-        rows <- forest.data$rows
-        additional.columns[[j]] <-list(content = content, rows = rows)
-    }
-    additional.columns
-}
-
-study.column <- function(forest.data, title.font="bold") {
-    # Gets data for the study name column
-    # called by draw.forest.plot
-    content<-rep(NA, length(forest.data$label))
-    for (i in 1:length(forest.data$label)){
-      if (forest.data$types[i] !=  0)
-        content[i] <- list(textGrob(forest.data$label[i], x=0, just = "left", gp = gpar(fontface = title.font, fontsize="10")))
-      else
-        content[i] <- list(textGrob(forest.data$label[i], x=0, just = "left", gp = gpar(fontface = "plain", fontsize="10")))
-    }
-
-    study.column.list <- list(content = content)
-    study.column.list
-}
-
-calc.viewport.layout <- function(forest.data, just){
-    # Calculates layout for forest plot viewport
-    if (length(forest.data$additional.col.data)>0 ){
-        num.additional.cols <- length(forest.data$additional.cols.grob)
-    } else {
-        num.additional.cols <- 0
-    }
-    forest.plot.params <- create.plot.options(forest.data, gapSize = 3.2, plotWidth=5)
-    # These dimensions are derived here until forest plot options carry them.
-    rows <- forest.data$rows
-    num.rows <- rows[length(rows)]
-    # number of rows including blank rows
-    width.list <- calc.width.list(forest.data)
-    num.cols <- length(width.list) + 1
-    # 1 more for the plot itself
-
-    if (length(width.list) > 0) {
-        vp.width <- unit.c(width.list,  forest.plot.params$effect.col.width)
-    } else {
-        vp.width <- unit.c(forest.plot.params$effect.col.width)
-    }
-    vp.layout <- grid.layout(num.rows+1, num.cols,
-                             widths=vp.width,
-                             heights = unit(rep(1, num.rows)  , "lines"),
-                             just=just)
-}
-
-calc.forest.plot.size <- function(forest.data){
-    # Calculates width and height of the plot.
-    show.study.col <- forest.data$options$show.study.col
-    if (length(forest.data$additional.col.data)>0 ){
-        num.additional.cols <- length(forest.data$additional.cols.grob)
-    } else {
-        num.additional.cols <- 0
-    }
-    forest.plot.params <- create.plot.options(forest.data, gapSize = 3.2, plotWidth=5)
-    # These dimensions are derived here until forest plot options carry them.
-    rows <- forest.data$rows
-    num.rows <- rows[length(rows)]
-
-    row.height <- convertY(unit(1, "lines") , "inches" , valueOnly=TRUE)
-
-    # height of each row in inches
-    how.tall <- num.rows * row.height
-    width.list <- calc.width.list(forest.data)
-    if (show.study.col==TRUE) {
-        if (num.additional.cols > 0) {
-            data.col.width <- sum( convertX(   unit.c(width.list[3:length(width.list)]) , "inches" , valueOnly=TRUE ) )  +
-                      (num.additional.cols - 1) * convertX(forest.plot.params$col.gap, "inches" , valueOnly=TRUE )
-        } else {
-            data.col.width <- 0
-        }
-
-    } else {
-        if (num.additional.cols > 0) {
-            data.col.width <- sum( convertX(   unit.c(width.list) , "inches" , valueOnly=TRUE ) )  +
-                      (num.additional.cols - 1) * convertX(forest.plot.params$col.gap, "inches" , valueOnly=TRUE )
-        } else {
-            data.col.width <- 0
-        }
-    }
-
-    if (length(width.list) > 0) {
-        how.wide <- sum(convertX(unit.c(width.list) , "inches" , valueOnly=TRUE ) )  +
-                    # width of data columns
-                    convertX(forest.plot.params$effect.col.width, "inches" , valueOnly=TRUE ) +
-                    # width of actual forest plot
-                    2 * convertX(forest.plot.params$col.gap, "inches" , valueOnly=TRUE )
-                    # two extra column gap widths for spacing.
-    } else {
-        how.wide <- convertX(forest.plot.params$effect.col.width, "inches" , valueOnly=TRUE ) +
-                    2 * convertX(forest.plot.params$col.gap, "inches" , valueOnly=TRUE )
-    }
-    plot.size <- list("how.wide"=how.wide, "how.tall"=how.tall, "data.col.width"=data.col.width)
-}
-
-calc.width.list <- function(forest.data) {
-    # calculate widths of study column and data columns.
-    show.study.col <- forest.data$options$show.study.col
-    forest.plot.params <- create.plot.options(forest.data, gapSize = 3.2, plotWidth=5)
-    # These dimensions are derived here until forest plot options carry them.
-    width.list <-vector("list")
-    if (show.study.col==TRUE) {
-        study.col.grob <- forest.data$study.col.grob
-        width.list[[1]] <- unit.c(max(unit(rep(1, length(forest.data$label)),
-                                "grobwidth", study.col.grob$content)), forest.plot.params$col.gap)
-        if (length(forest.data$additional.col.data)>0 ) {
-            additional.cols.grob <- forest.data$additional.cols.grob
-            for (i in 1:length(additional.cols.grob))  {
-                width.list[[i+1]] <- unit.c(width.list[[i]], max(unit(rep(1, length(forest.data$label)),
-                                   "grobwidth", additional.cols.grob[[i]]$content)), forest.plot.params$col.gap)
-            }
-        }
-    } else {
-        if (length(forest.data$additional.col.data)>0 ) {
-            additional.cols.grob <- forest.data$additional.cols.grob
-            width.list[[1]] <- unit.c(max(unit(rep(1, length(forest.data$label)),
-                                   "grobwidth", additional.cols.grob[[1]]$content)), forest.plot.params$col.gap)
-            if (length(forest.data$additional.col.data)>1) {
-                for (i in 2:length(additional.cols.grob))  {
-                    width.list[[i]] <- unit.c(width.list[[i-1]], max(unit(rep(1, length(forest.data$label)),
-                                   "grobwidth", additional.cols.grob[[i]]$content)), forest.plot.params$col.gap)
-                }
-            }
-        }
-    }
-    if (length(width.list) > 0) {
-        width.list <- width.list[[length(width.list)]]
-    }
-    width.list
-}
-
-assign.rows <- function(types, num.labels) {
-    # assign row numbers for plot data, skipping blank rows after rows of type 1,2, or 3
-    rows<-c(1, rep(NA, (num.labels-1) ) )
-    for (i in 1:(num.labels-1)){
-        if (types[i] == 3  &&  (types[i+1] == 0 || types[i+1] == 5))
-            # For leave-one-out plots - 5 is the overall summary
-            rows[i+1] <- rows[i] + 2
-        else if (types[i] == 5  &&  types[i+1] == 0)
-            # For leave-one-out plots - 5 is the overall summary
-          rows[i+1] <- rows[i] + 2
-        else if (types[i] == 0  &&  (types[i+1] == 2 || types[i+1] == 4))
-            rows[i+1] <- rows[i]  + 2
-        else if (types[i] == 0  &&  types[i+1] == 1 )
-            rows[i+1] <- rows[i] + 1
-        else if (types[i] == 1  &&  types[i+1] == 0 )
-            rows[i+1] <- rows[i] + 2
-        else if (types[i] == 1  &&  (types[i+1] == 2 || types[i+1] == 4))
-            rows[i+1] <- rows[i] + 2
-        else if (types[i] == 5)
-            rows[i+1] <- rows[i] + 2
-        else
-           rows[i+1] <- rows[i] + 1
-    }
-    rows
-}
-
-#############################################
-#   functions for drawing the forest plot   #
-#############################################
-
-draw.forest.plot <- function(forest.data){
-    # Draws forest plot
-    show.study.col <- forest.data$options$show.study.col
-
-    # create graphical object for data columns.
-    if (length(forest.data$additional.col.data)>0 ){
-         additional.cols.grob <- forest.data$additional.cols.grob
-         num.additional.cols <- length(additional.cols.grob)
-    } else {
-         num.additional.cols <- 0
-    }
-    rows <- forest.data$rows
-    # Draw the text in study col and additional cols
-    if (show.study.col==TRUE) {
-      study.col.grob <- forest.data$study.col.grob
-      #graphical object for study column
-      draw.label.col(study.col.grob, 1, rows)
-      # first two cols. are study col. and gap 1
-      if (num.additional.cols > 0 )  {
-          for (i in 1:num.additional.cols){
-               draw.label.col(additional.cols.grob[[i]], 2*i+1, rows)
-               # Note: col indices start at 3
-          }
-      }
-    } else {
-          # study col. and gap 1 not displayed
-      if (num.additional.cols>0 )  {
-          for (i in 1:num.additional.cols){
-               draw.label.col(additional.cols.grob[[i]], 2*i-1, rows)
-               # col. indices start at 1
-          }
-      }
-    }
-
-    if (forest.data$options$show.study.col==TRUE) {
-      layout.pos.col <- 2*num.additional.cols + 3
-    } else {
-      layout.pos.col <- 2*num.additional.cols + 1
-      # not displaying study col. or first gap.
-    }
-    changed.params <- draw.data.col(forest.data, j=layout.pos.col,
-                             color.overall = "lightblue",
-                             color.subgroup = "yellow",
-                             summary.line.col= "red",
-                             summary.line.pat = "dashed",
-                             diam.size = .8
-                             )
-    changed.params
-}
-
-# Function to draw a cell in a text column
-draw.label.col <- function(col, j, rows) {
-  # Insert data columns from forest.data$additional.col.data into the plot
-  # called by draw.forest.plot
-
-  for (i in 1:length(rows)) {
-    pushViewport(viewport(layout.pos.row=rows[i], layout.pos.col=j))
-    # Labels are grobs containing their location so just
-    # have to grid.draw() them
-    grid.draw(col$content[[i]])
-    popViewport()
-  }
-}
-
-draw.data.col <- function(forest.data, j, color.overall = "black",
-                          color.subgroup = "black",
-                          summary.line.col = "darkred",
-                          summary.line.pat = "dashed",
-                          diam.size) {
-
-    # Draws the actual forest plot graph (excluding data columns)
-    effects <- forest.data$effects
-    plot.options <- forest.data$options
-    plot.range <- forest.data$plot.range
-    if (!is.null(forest.data$summary.est)) {
-       # This is the summary estimate for loo plots.
-       summary.est <- forest.data$summary.est
-    } else {
-       summary.est <- effects$ES[length(effects$ES)]
-    }
-    x.axis.label <- plot.options$xlabel
-    fp.title = plot.options$fp.title
-    user.ticks = plot.options$xticks
-    label <- c()
-    show.y.axis = plot.options$show.y.axis
-    changed.params <- list()
-    pushViewport(viewport(layout.pos.col=j, xscale=plot.range))
-
-    if (show.y.axis == TRUE) {
-        if (forest.data$scale == "log" && min(plot.range)<0 && max(plot.range)>0 ) {
-        grid.lines(x=unit(0, "native"), y=0:1)
-        }
-        if (forest.data$scale == "standard" && min(plot.range)<0 && max(plot.range)>0 ) {
-            grid.lines(x=unit(0, "native"), y=0:1)
-        }
-        if (forest.data$scale == "logit" && min(plot.range)<0 && max(plot.range)>0 ) {
-            grid.lines(x=unit(0, "native"), y=0:1)
-        }
-    }
-
-    if (forest.data$options$show.summary.line == TRUE) {
-          # draw vertical line for summary
-          grid.lines(x=unit(summary.est, "native"),
-          y=0:1, gp=gpar(lty = summary.line.pat, col= summary.line.col))
-    }
-
-    if  (forest.data$scale == "standard") {
-        if (is.na(user.ticks)) {
-            grid.xaxis(gp=gpar(cex=0.6))
-            xaxp <- par("xaxp")
-            # Get the x ticks
-            ticks <- seq(from=xaxp[1], to=xaxp[2], by=(xaxp[2] - xaxp[1]) / xaxp[3])
-        } else {
-            ticks <- user.ticks
-            axis.range <- c(min(plot.range[1], ticks), max(plot.range[2], ticks))
-            grid.xaxis(at = user.ticks , label = user.ticks, gp=gpar(cex=0.6))
-            grid.xaxis(at = plot.range, label = FALSE)
-            # Second call to grid.xaxis extends the axis to the plot range if necessary.
-        }
-    }
-
-    if (forest.data$scale == "log")  {
-        log.ticks <- c()
-        if (is.na(user.ticks[1])) {
-            # Some cheap tricks to make the axis ticks look nice (in most cases)...
-            # Note that "at'' is in log scale but 'label'' is in standard scale
-            to.make.ticks <- range(exp(plot.range))
-            ticks <- axTicks(1, axp=c(to.make.ticks, 3), usr=c(-100, 100), log=TRUE)
-            log.ticks <- log(ticks)
-            log.ticks <- sort(c(log.ticks, plot.range, summary.est))
-            lower.bound <- min(plot.range)
-            upper.bound <- max(plot.range)
-		        log.ticks <- log.ticks[log.ticks >= lower.bound]    # remember it is additive on this scale
-            log.ticks <- log.ticks[log.ticks <= upper.bound]
-            ticks <- exp(log.ticks)
-            label <- round(ticks, 2)
-            changed.params$fp_xticks <- ticks
-        } else {
-		        ticks <- user.ticks[user.ticks > 0]
-            # no negative tick marks in log scale
-            if (length(ticks) > 0) {
-                ticks <- unique(ticks)
-                log.ticks <- log(sort(ticks))
-                label = round(ticks, 2)
-                axis.range <- c(min(plot.range[1], log.ticks), max(plot.range[2], log.ticks))
-            } else {
-            # no valid tick marks so just plot axis.
-                log.ticks <- plot.range
-                label <- rep("", 2)
-            }
-        }
-        grid.xaxis(at = log.ticks, label = label, gp=gpar(cex=0.6))
-        grid.xaxis(at = plot.range, label = FALSE)
-        # Second call to grid.xaxis extends the axis to the plot range if necessary.
-    }
-
-    if (forest.data$scale == "logit")  {
-        if (is.na(user.ticks)) {
-          lb <- min(plot.range)
-          ub <- max(plot.range)
-          to.make.ticks <- c(lb, ub)
-          ticks <- axTicks(1, axp=c(to.make.ticks, 4))
-          changed.params$fp_xticks <- ticks
-        } else {
-		        ticks <- user.ticks
-        }
-        grid.xaxis(at = ticks , label = round(ticks, 2), gp=gpar(cex=0.6))
-    }
-
-    if (forest.data$scale == "arcsine")  {
-      if (is.na(user.ticks)) {
-        lb <- min(plot.range)
-        ub <- max(plot.range)
-        to.make.ticks <- c(lb, ub)
-        ticks <- axTicks(1, axp=c(to.make.ticks, 4))
-        changed.params$fp_xticks <- ticks
-      } else {
-        ticks <- user.ticks
-      }
-      grid.xaxis(at = ticks , label = round(ticks, 2), gp=gpar(cex=0.6))
-    }
-
-    grid.text(x.axis.label, y=unit(-2, "lines"), gp=gpar(cex=0.8))
-    data.col.width <- forest.data$data.col.width
-    # Width of data cols., not including study column or forest plot.
-    rows <- forest.data$rows[-1]
-    types <- forest.data$types[-1]
-    num.rows <- rows[length(rows)]
-    grid.text(fp.title, x=unit(-data.col.width, "inches"), y=unit(num.rows + 2, "lines"), gp=gpar(cex=1.0), just="left")
-    popViewport()
-    box.sizes <- calc.box.sizes(forest.data, box.sca=0.8)
-    # Sizes of boxes (or diamonds) in plot
-    for (i in 1:length(rows)) {
-        pushViewport(viewport(layout.pos.row=rows[i], layout.pos.col=j,
-                          xscale=plot.range))
-        if (types[i] == 0){
-            draw.normal.CI(effects$LL[i], effects$ES[i], effects$UL[i], box.sizes[i])
-        }
-        else if (types[i] == 1){
-            draw.summary.CI(effects$LL[i], effects$ES[i], effects$UL[i], box.sizes[i], color.subgroup, diam.size )
-        }
-        else if (types[i] == 2){
-            draw.summary.CI(effects$LL[i], effects$ES[i], effects$UL[i], box.sizes[i], color.overall, diam.size )
-        }
-        else if (types[i] == 5){
-          draw.summary.CI.no.scaled.diamond(effects$LL[i], effects$ES[i], effects$UL[i], box.sizes[i], color.overall, diam.size, plot.range)
-        }
-        popViewport()
-    }
-
-    changed.params
-}
-
-calc.tick.marks <- function(plot.range, scale) {
-    if (scale == "log")  {
-        if (is.na(user.ticks)) {
-            # some cheap tricks to make the axis ticks look nice (in most cases)...
-            # Note that at is in log scale but label is in standard scale
-            to.make.ticks <- range(exp(plot.range))
-            ticks <- axTicks(1, axp=c(to.make.ticks, 3), usr=c(-100, 100), log=TRUE)
-            calc.ticks <- log(ticks)
-
-            lower.bound <- min(plot.range)
-            upper.bound <- max(plot.range)
-            # find the largest tick mark less than the lower bound of plot.range, if there is one.
-            if (calc.ticks[1] <= lower.bound) {
-                min.tick <- max(calc.ticks[calc.ticks <= lower.bound])
-            }
-            # find the smallest tick mark greater than the upper bound of plot.range, if there is one.
-            if (calc.ticks[length(calc.ticks)] >= upper.bound) {
-                max.tick <- min(calc.ticks[calc.ticks >= upper.bound])
-            }
-            calc.ticks <- calc.ticks[calc.ticks >= min.tick]    # remember it is additive on this scale
-            calc.ticks <- calc.ticks[calc.ticks <= max.tick]
-            ticks <- exp(calc.ticks)
-            changed.params$fp_xticks <- ticks
-    } else {
-		        ticks <- user.ticks
-            calc.ticks <- log(user.ticks)
-    }
-        grid.xaxis(at = calc.ticks , label = round(ticks, 3), gp=gpar(cex=0.6))
-  }
-  if (scale == "logit")  {
-        if (is.na(user.ticks)) {
-          lb <- min(plot.range)
-          ub <- max(plot.range)
-          to.make.ticks <- c(lb, ub)
-          ticks <- axTicks(1, axp=c(to.make.ticks, 4))
-          ticks <- c(ticks, summary.est)
-          changed.params$fp_xticks <- ticks
-        } else {
-		        ticks <- user.ticks
-        }
-        grid.xaxis(at = ticks , label = round(ticks, 3), gp=gpar(cex=0.6))
-  }
-  calc.ticks
-}
-
-calc.box.sizes <- function(forest.data, box.sca = 1) {
-    # Calculates sizes for c.i. boxes and diamonds in forest plot.
-
-    # weights for the boxes
-    # note that 1.96 is a convention [not necessary for the scaling]
-    # the analysis functions determine the CI width (e.g. 95% or 99%)
-    # this is just scaling the boxes according to the SE
-	# CHANGED as part of issue # 214
-	mult <- get.mult.from.conf.level()
-    precision <- NULL
-    user.lb <- NULL
-    user.ub <- NULL
-    effects <- forest.data$effects
-    # i have kept the "ifs" below: when we decide to include more metrics
-    # these will be expanded
-
-    if (forest.data$scale == "log"){
-           precision <- sqrt(1 / ((effects$UL - effects$LL)/(2*mult)))
-    } else if (forest.data$scale == "standard") {
-          precision <- sqrt(1 / ((effects$UL - effects$LL)/(2*mult)))
-    } else if (forest.data$scale == "logit") {
-          precision <- sqrt(1 / ((effects$UL - effects$LL)/(2*mult)))
-    } else if (forest.data$scale == "arcsine") {
-      precision <- sqrt(1 / ((effects$UL - effects$LL)/(2*mult)))
-    }
-    box.sizes <- box.sca * precision/max(precision)
-    # sizes of the boxes in the forest plot - proportional to width of CI
-}
-
-draw.normal.CI <- function(LL, ES, UL, size) {
-  # draws a non-summary rect-plus-CI
-  # "native" units to position relative to
-  # the x-axis scale, and "snpc" units to size relative to
-  # the height of the row
-  # ("snpc" stands for "square normalised parent coordinates"
-  #  which means that the value is calculated as a proportion
-  #  of the width and height of the current viewport and the
-  #  physically smaller of these is used)
-     # called by draw.forest.plot
-  grid.rect(x=unit(ES, "native"),
-            width=unit(size, "snpc"), height=unit(size, "snpc"),
-            gp=gpar(fill="black"))
-  # Draw arrow if exceed col range
-  # convertX() used to convert between coordinate systems
-
-# Single-study subgroup summaries can be wider than their CI. The caller above
-# should prefer summary bounds when determining the x scale in that case.
-
-  if ((convertX(unit(UL, "native"), "npc", valueOnly=TRUE) > 1)  &&  (convertX(unit(LL, "native"), "npc", valueOnly=TRUE) >= 0)) {
-    # this line is too long on the right - draw a right arrow from LL to 1 (in approriate coords.)
-    #grid.arrows(x=unit(c(LL, 1), c("native", "npc")), length=unit(0.05, "inches"))
-	grid.lines(x=unit(c(LL, 1), c("native", "npc")), arrow=arrow(length=unit(0.05, "inches")), y=0.5)
-
-  }
-  else if ((convertX(unit(UL, "native"), "npc", valueOnly=TRUE) <= 1)  &&  (convertX(unit(LL, "native"), "npc", valueOnly=TRUE) < 0)) {
-    # this line is too long on the left - draw a left arrow from UL to 0 (in approriate coords.)
-    #grid.arrows(x=unit(c(UL, 0), c("native", "npc")), length=unit(0.05, "inches"))
-	grid.lines(x=unit(c(UL, 0), c("native", "npc")), arrow=arrow(length=unit(0.05, "inches")), y=0.5)
-
-  }
-  else if ((convertX(unit(UL, "native"), "npc", valueOnly=TRUE) > 1)   &&  (convertX(unit(LL, "native"), "npc", valueOnly=TRUE) < 0)) {
-    # this line is too long on both sides - draw a left arrow from ES to 0 and a right arrow from ES to 1 (in approriate coords.)
-    #grid.arrows(x=unit(c(ES, 0), c("native", "npc")), length=unit(0.05, "inches"))
-	grid.lines(x=unit(c(ES, 0), c("native", "npc")), arrow=arrow(length=unit(0.05, "inches")), y=0.5)
-    #grid.arrows(x=unit(c(ES, 1), c("native", "npc")), length=unit(0.05, "inches"))
-	grid.lines(x=unit(c(ES, 1), c("native", "npc")), arrow=arrow(length=unit(0.05, "inches")), y=0.5)
-
-  }
-  else {
-    # this line is too short - draw white if totally inside rect
-    line.col <- if ((convertX(unit(ES, "native") + unit(0.5*size, "lines"),
-                             "native", valueOnly=TRUE) > UL) &&
-                   (convertX(unit(ES, "native") - unit(0.5*size, "lines"),
-                             "native", valueOnly=TRUE) < LL))
-      "white"
-    else
-       # this line is just right
-      "black"
-    grid.lines(x=unit(c(LL, UL), "native"), y=0.5,
-               gp=gpar(col=line.col))
-  }
-}
-
-# Function to draw a summary "diamond" as wide as confidence interval
-draw.summary.CI <- function(LL, ES, UL, size, color, diam.height) {
-    # for diamonds: using half the height of the equivalent rect
-    grid.polygon(x=unit(c(LL, ES, UL, ES), "native"),
-               y=unit(0.5 + c(0, 0.35*diam.height, 0, -0.35*diam.height), "npc"), gp=gpar(fill=color))
-}
-
-draw.summary.CI.no.scaled.diamond <- function(LL, ES, UL, size, color, diam.height, plot.range) {
-  # draws a summary-CI without scaling on the width of the diamond
-  # "native" units to position relative to
-  # the x-axis scale, and "snpc" units to size relative to
-  # the height of the row
-  # ("snpc" stands for "square normalised parent coordinates"
-  #  which means that the value is calculated as a proportion
-  #  of the width and height of the current viewport and the
-  #  physically smaller of these is used)
-  # called by draw.forest.plot
-  #if (scale == "log") {
-  #    diam.width <- convertX(unit(diam.height, "snpc"), "native", valueOnly=TRUE)
-  #} else {
-  #    diam.width <- 0.5*convertX(unit(diam.height, "snpc"), "native", valueOnly=TRUE)
-  #}
-  plot.width <- plot.range[2] - plot.range[1]
-  grid.polygon(x=unit(c(ES-plot.width/30, ES, ES+plot.width/30, ES), "native"),
-               y=unit(0.5 + c(0, 0.5*diam.height, 0, -0.5*diam.height), "npc"), gp=gpar(fill=color))
-  if ((convertX(unit(UL, "native"), "npc", valueOnly=TRUE) > 1)  &&  (convertX(unit(LL, "native"), "npc", valueOnly=TRUE) >= 0)) {
-    # this line is too long on the right - draw a right arrow from LL to 1 (in approriate coords.)
-    #grid.arrows(x=unit(c(LL, 1), c("native", "npc")), length=unit(0.05, "inches"))
-	grid.lines(x=unit(c(LL, 1), c("native", "npc")), arrow=arrow(length=unit(0.05, "inches")), y=0.5)
-  }
-  else if ((convertX(unit(UL, "native"), "npc", valueOnly=TRUE) <= 1)  &&  (convertX(unit(LL, "native"), "npc", valueOnly=TRUE) < 0)) {
-    # this line is too long on the left - draw a left arrow from UL to 0 (in approriate coords.)
-    #grid.arrows(x=unit(c(UL, 0), c("native", "npc")), length=unit(0.05, "inches"))
-	grid.lines(x=unit(c(UL, 0), c("native", "npc")), arrow=arrow(length=unit(0.05, "inches")), y=0.5)
-  }
-  else if ((convertX(unit(UL, "native"), "npc", valueOnly=TRUE) > 1)   &&  (convertX(unit(LL, "native"), "npc", valueOnly=TRUE) < 0)){
-    # this line is too long on both sides - draw a left arrow from ES to 0 and a right arrow from ES to 1 (in approriate coords.)
-    #grid.arrows(x=unit(c(ES, 0), c("native", "npc")), length=unit(0.05, "inches"))
-	grid.lines(x=unit(c(ES, 0), c("native", "npc")), arrow=arrow(length=unit(0.05, "inches")), y=0.5)
-
-    #grid.arrows(x=unit(c(ES, 1), c("native", "npc")), length=unit(0.05, "inches"))
-	grid.lines(x=unit(c(ES, 1), c("native", "npc")), arrow=arrow(length=unit(0.05, "inches")), y=0.5)
-  }
-  else {
-    # this line is too short - draw white if totally inside rect
-    line.col <- if ((convertX(unit(ES, "native") + unit(0.5*size, "lines"), "native", valueOnly=TRUE) > UL) &&
-                                (convertX(unit(ES, "native") - unit(0.5*size, "lines"), "native", valueOnly=TRUE) < LL))
-      "white"
-    else
-      # this line is just right
-      "black"
-    grid.lines(x=unit(c(LL, UL), "native"), y=0.5,
-               gp=gpar(col=line.col))
-  }
-}
-
-create.plot.options <- function(forest.data, gapSize, plotWidth) {
-    # This function is unrelated to the user options that are passed in
-    # via forest.data$options. It just specifies gapSize (space between columns) and plotWidth (width of effect size col.).
-    # This function is only called by calc.viewport.layout and calc.forest.plot.size.
-    effect.col.width <- unit(plotWidth, "inches")
-    # width of the forest plot
-    forest.params = list(
-        col.gap = unit(gapSize, "mm"),
-        effect.col.width = effect.col.width
-    )
-    forest.params
-}
-
-#######################################
-#            two forest plots         #
-#######################################
-
-two.forest.plots <- function(forest.data, outpath) {
-   png(filename=rcmetar.scratch.path("INTER")) # to fix windows popping out at you issue
-
-   # draw two forest plots side by side.
-   forest.data1 <- forest.data$left
-   forest.data2 <- forest.data$right
-   forest.data1 <- format.data.cols(forest.data1)
-   types1 <- forest.data1$types
-   num.labels1 <- length(forest.data1$label)
-   rows1 <- assign.rows(types1, num.labels1)
-   # row numbers of forest plot including blank rows (after summary rows)
-   forest.data1$rows <- rows1
-   forest.data1 <- create.grobs(forest.data1)
-   forest.data2 <- format.data.cols(forest.data2)
-   types2 <- forest.data2$types
-   num.labels2 <- length(forest.data2$label)
-   rows2 <- assign.rows(types2, num.labels2)
-   # row numbers of forest plot including blank rows (after summary rows)
-   forest.data2$rows <- rows2
-   forest.data2 <- create.grobs(forest.data2)
-   # create graphical objects for study and data columns.
-   plot.size1 <- calc.forest.plot.size(forest.data1)
-   forest.data1$data.col.width <- plot.size1$data.col.width
-   plot.size2 <- calc.forest.plot.size(forest.data2)
-   forest.data2$data.col.width <- plot.size2$data.col.width
-   # calculate heights and widths of plots
-   viewport.layout1 <- calc.viewport.layout(forest.data1, just="left")
-   platform <- Sys.info()
-   viewport.layout2 <- calc.viewport.layout(forest.data2, just="left")
-
-   # calculate layouts of plots
-   how.wide1 <- plot.size1$how.wide
-   how.wide2 <- plot.size2$how.wide
-   width <- how.wide1 + how.wide2
-   how.tall1 <- plot.size1$how.tall
-   how.tall2 <- plot.size2$how.tall
-   how.tall <- max(how.tall1, how.tall2)
-
-   if (platform[[1]]=="Windows") {
-       x.pos <- 1 + (how.wide1 - how.wide2) / (4 * how.wide1)
-   } else {
-       x.pos <- 1 + (how.wide1 - how.wide2) / how.wide1
-   }
-   if (length(grep(".png", outpath)) != 0){
-      png(filename=outpath, width = how.wide1 + how.wide2, height = how.tall+1 , units = "in", res = 144)
-   } else{
-      pdf(file=outpath, width = how.wide1 + how.wide2 + 1, height = how.tall+2)
-   }
-   pushViewport(viewport(layout=grid.layout(1,2, widths=unit(c(how.wide1, how.wide2), c("in", "in")))))
-   pushViewport(viewport(layout=viewport.layout1, layout.pos.col=1))
-   changed.params <- draw.forest.plot(forest.data1)
-   # Only saving params changes for the left forest plot, because currently plot edit
-   # can't handle two sets of params values for xticks or plot bounds.
-   # Plot editing currently persists only the left forest plot parameters.
-   popViewport()
-   pushViewport(viewport(layout=viewport.layout2, layout.pos.col=2))
-   draw.forest.plot(forest.data2)
-   popViewport(2)
-   graphics.off()
-   changed.params
-}
-
-#######################################
-#       meta-regression scatter       #
+#       meta-regression bubble facade #
 #######################################
 meta.regression.plot <- function(plot.data, outpath, ...) {
-	png(filename=rcmetar.scratch.path("INTER")) # to fix windows popping out at you issue
-
-    lweight = 1
-    lpattern = "solid"
-    lcol = "blue"
-    ES <- plot.data$effects$ES
-    se <- plot.data$effects$se
-    # make the data data.frame
-    data.reg <- data.frame(plot.data$effects, types=plot.data$types)
-    # data for plot (only keep the studies - not the summaries)
-    data.reg <- subset(data.reg, types==0)
-    cov.name <- plot.data$covariate$varname
-    cov.values <- plot.data$covariate$values
-    x.range.min <- min(cov.values)
-    x.range.max <- max(cov.values)
-    x.range <- x.range.max - x.range.min
-    x.min <- x.range.min - (x.range / 5)
-    x.max <- x.range.max + (x.range / 5)
-    y.range.min <- min(ES)
-    y.range.max <- max(ES)
-    y.range <- y.range.max - y.range.min
-    y.min <- y.range.min - (y.range / 5)
-    y.max <- y.range.max + (y.range / 5)
-
-    if (length(grep(".png", outpath)) != 0){
-        png(filename=outpath, width=10 , height=5, units="in", res=144)
-    } else {
-        pdf(file=outpath, width=10 , height=5)
+    if (!rcmetar.is.metafor.bubble.bundle(plot.data)) {
+        stop("Meta-regression bubble plots require a metafor-backed plot bundle.", call.=FALSE)
     }
-
-    plot(y = data.reg$ES, x=cov.values,
-                          xlim=c(x.min, x.max),
-                          ylim=c(y.min, y.max),
-                          xlab=plot.data$xlabel,
-                          ylab=plot.data$ylabel, type='n')
-    symbols(y = data.reg$ES, x=cov.values,
-                circles = 1 / data.reg$se,
-                inches=.3,
-                bty=plot.data$plotregion, add=TRUE)
-    if (plot.data$regline)  {
-       x<-c(x.range.min, x.range.max)
-       y<-c (plot.data$fitted.line$intercept +
-                x.range.min*plot.data$fitted.line$slope, plot.data$fitted.line$intercept +
-                x.range.max*plot.data$fitted.line$slope)
-       lines(x, y, col=lcol, lwd=lweight, lty=lpattern)
-    }
-    # write the plot data out to disk
-    graphics.off()
+    rcmetar.draw.metafor.bubble(plot.data, outpath)
 }
 
 ######################################

@@ -26,7 +26,7 @@ on:
       release_tag:
         description: Existing release tag to receive uploaded package artifacts.
         required: true
-        default: v0.1.0
+        default: v0.1.1
         type: string
   push:
     tags:
@@ -65,6 +65,12 @@ jobs:
       - name: Install Python
         run: uv python install 3.11
 
+      - name: Resolve RC MetaStudio version
+        id: package-version
+        run: |
+          $version = python -c "import pathlib, tomllib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text(encoding='utf-8'))['project']['version'])"
+          "version=$version" >> $env:GITHUB_OUTPUT
+
       - name: Set up R for bundled runtime
         uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
         with:
@@ -85,7 +91,7 @@ jobs:
           key: bundled-r-library-v2-windows-${{ steps.r-cache-key.outputs.version }}-${{ env.RCMS_CRAN_REPO_KEY }}-${{ hashFiles('scripts/install-r-deps.R', 'docs/verification/RCMetaR-r-dependencies.json', 'r/RCMetaR/DESCRIPTION') }}
 
       - name: Build Windows package
-        run: .\scripts\package-windows.ps1 -ArtifactName RCMetaStudio-windows-x64 -ArchiveRootName "RCMetaStudio-${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}-windows-x64" -RRuntimeRoot "${{ steps.r-cache-key.outputs.runtime-root }}"
+        run: .\scripts\package-windows.ps1 -ArtifactName RCMetaStudio-windows-x64 -ArchiveRootName "RCMetaStudio-${{ steps.package-version.outputs.version }}-windows-x64" -RRuntimeRoot "${{ steps.r-cache-key.outputs.runtime-root }}"
 
       - name: Upload Windows package artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -134,6 +140,12 @@ jobs:
       - name: Install Python
         run: uv python install 3.11
 
+      - name: Resolve RC MetaStudio version
+        id: package-version
+        run: |
+          version="$(python -c "import pathlib, tomllib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text(encoding='utf-8'))['project']['version'])")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - name: Set up R for bundled runtime
         uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
         with:
@@ -154,7 +166,7 @@ jobs:
           key: bundled-r-library-v2-macos-x64-${{ steps.r-cache-key.outputs.version }}-${{ env.RCMS_CRAN_REPO_KEY }}-${{ hashFiles('scripts/install-r-deps.R', 'docs/verification/RCMetaR-r-dependencies.json', 'r/RCMetaR/DESCRIPTION') }}
 
       - name: Build macOS package
-        run: bash scripts/package-macos.sh --architecture x64 --artifact-name RCMetaStudio-macos-x64 --archive-root-name "RCMetaStudio-${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}-macos-x64" --r-runtime-root "${{ steps.r-cache-key.outputs.runtime-root }}"
+        run: bash scripts/package-macos.sh --architecture x64 --artifact-name RCMetaStudio-macos-x64 --archive-root-name "RCMetaStudio-${{ steps.package-version.outputs.version }}-macos-x64" --r-runtime-root "${{ steps.r-cache-key.outputs.runtime-root }}"
 
       - name: Upload macOS package artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -199,6 +211,12 @@ jobs:
       - name: Install Python
         run: uv python install 3.11
 
+      - name: Resolve RC MetaStudio version
+        id: package-version
+        run: |
+          version="$(python -c "import pathlib, tomllib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text(encoding='utf-8'))['project']['version'])")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - name: Set up R for bundled runtime
         uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
         with:
@@ -224,7 +242,7 @@ jobs:
           echo "The shared lock currently pins PyQt5-Qt5==5.15.2, which has no macOS arm64 wheel."
 
       - name: Build macOS package
-        run: bash scripts/package-macos.sh --architecture arm64 --artifact-name RCMetaStudio-macos-arm64 --archive-root-name "RCMetaStudio-${{ inputs.release_tag }}-macos-arm64" --r-runtime-root "${{ steps.r-cache-key.outputs.runtime-root }}"
+        run: bash scripts/package-macos.sh --architecture arm64 --artifact-name RCMetaStudio-macos-arm64 --archive-root-name "RCMetaStudio-${{ steps.package-version.outputs.version }}-macos-arm64" --r-runtime-root "${{ steps.r-cache-key.outputs.runtime-root }}"
 
       - name: Upload macOS package artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

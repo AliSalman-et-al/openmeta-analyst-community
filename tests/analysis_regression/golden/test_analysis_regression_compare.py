@@ -316,7 +316,9 @@ def test_comprehensive_golden_baseline_capture_writes_reproducible_bundle(
     with _import_legacy_golden_modules() as (golden_analysis, _, _):
         bundles = [
             _capture_bundle("amino-binary-random", "amino.rcms", "binary.random"),
-            _capture_bundle("continuous-random", "continuous.rcms", "continuous.random"),
+            _capture_bundle(
+                "continuous-random", "continuous.rcms", "continuous.random"
+            ),
         ]
         plot = tmp_path / "plot.png"
         plot.write_bytes(b"plot")

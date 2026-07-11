@@ -40,17 +40,23 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 _DRIVER = textwrap.dedent(
     """
-    import os, sys
+    import os, sys, tempfile
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     os.environ["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     sys.path.insert(0, os.path.join(__REPO_ROOT__, "src"))
     sys.path.insert(0, os.path.join(__REPO_ROOT__, "src", "rc_metastudio"))
+    sys.path.insert(0, os.path.join(__REPO_ROOT__, "src", "rc_metastudio", "forms"))
     sys.path.insert(0, os.path.join(__REPO_ROOT__, "tests", "python", "fast"))
 
     import test_backend_compat
     test_backend_compat.install()
     try:
         import meta_py_r
-        meta_py_r.RlibLoader().load_RCMetaR()
+        try:
+            meta_py_r.RlibLoader().load_RCMetaR()
+        except Exception:
+            source_package = os.path.join(__REPO_ROOT__, "r", "RCMetaR")
+            meta_py_r.ro.r("devtools::load_all")(source_package, quiet=True)
     except Exception as exc:
         # R / rpy2 / RCMetaR not available in this environment.
         sys.stdout.write("SKIP %s: %s\\n" % (exc.__class__.__name__, exc))
@@ -195,6 +201,90 @@ _DRIVER = textwrap.dedent(
         var_name="issue146_continuous",
     )
     assert_text_survived("issue146_continuous")
+    # The production forest renderer cannot compose a study label from a
+    # missing year. Preserve the conversion assertion above, then provide a
+    # valid analysis fixture for the cross-layer display contract below.
+    ro.r("issue146_continuous@years[2] <- 2001L")
+
+    analysis_dir = tempfile.mkdtemp(prefix="rcmetastudio-display-contract-")
+    forest_path = os.path.join(analysis_dir, "forest.png")
+    forest_display_path = os.path.join(analysis_dir, "forest.display.svg")
+    continuous_result = meta_py_r.run_continuous_ma(
+        "continuous.random",
+        {
+            "conf.level": 95.0,
+            "digits": 3,
+            "measure": "MD",
+            "rm.method": "DL",
+            "fp_style": "default",
+            "fp_col1_str": "Study or Subgroup",
+            "fp_col2_str": "[default]",
+            "fp_col3_str": "Intervention",
+            "fp_col4_str": "Control",
+            "fp_xlabel": "[default]",
+            "fp_outpath": forest_path,
+            "fp_display_path": forest_display_path,
+            "fp_plot_lb": "[default]",
+            "fp_plot_ub": "[default]",
+            "fp_show_col1": True,
+            "fp_show_col2": True,
+            "fp_show_col3": True,
+            "fp_show_col4": True,
+            "fp_show_summary_line": True,
+            "fp_xticks": "[default]",
+            "create.plot": True,
+            "write.to.file": False,
+        },
+        cont_data_name="issue146_continuous",
+    )
+    assert continuous_result["images"]["Forest Plot"] == forest_path
+    assert continuous_result["display_images"]["Forest Plot"] == forest_display_path
+
+    from PyQt5 import QtWidgets
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    result_window = results_window.ResultsWindow(continuous_result)
+    result_window.showMaximized()
+    for _ in range(5):
+        app.processEvents()
+    plot_item = next(
+        item for item in result_window.scene.items()
+        if isinstance(item, results_window.QGraphicsSvgItem)
+    )
+    initial_view_width = result_window.graphics_view.width()
+    initial_plot_width = plot_item.sceneBoundingRect().width()
+    initial_available_width = (
+        result_window.graphics_view.viewport().width()
+        - result_window.x_coord
+        - results_window.padding
+    )
+    assert initial_plot_width >= initial_available_width * 0.9
+
+    result_window.graphics_view.resize(
+        initial_view_width - 200,
+        result_window.graphics_view.height(),
+    )
+    for _ in range(3):
+        app.processEvents()
+    shrunken_width = plot_item.sceneBoundingRect().width()
+    assert shrunken_width < initial_plot_width
+
+    result_window.graphics_view.resize(
+        initial_view_width,
+        result_window.graphics_view.height(),
+    )
+    for _ in range(3):
+        app.processEvents()
+    assert plot_item.sceneBoundingRect().width() > shrunken_width
+
+    before_splitter_width = plot_item.sceneBoundingRect().width()
+    result_window.results_nav_splitter.moveSplitter(360, 1)
+    for _ in range(3):
+        app.processEvents()
+    assert plot_item.sceneBoundingRect().width() < before_splitter_width
+    result_window.close()
+    app.processEvents()
 
     diagnostic_model = FakeModel("diagnostic", [[6, 21, 9, 18], [3, 56, 7, 57]])
     meta_py_r.ma_dataset_to_simple_diagnostic_robj(
@@ -420,7 +510,7 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
             )
             params <- data.frame(
               conf.level=95, digits=3, measure="OR", rm.method="DL", to="only0", adjust=0.5,
-              fp_col1_str="Studies", fp_col2_str="[default]", fp_col3_str="Ev/Trt", fp_col4_str="Ev/Ctrl",
+              fp_col1_str="Study or Subgroup", fp_col2_str="[default]", fp_col3_str="Ev/Trt", fp_col4_str="Ev/Ctrl",
               fp_xlabel="[default]", fp_outpath="./r_tmp/meta_regression_names_forest.png",
               fp_plot_lb="[default]", fp_plot_ub="[default]", fp_show_col1=TRUE,
               fp_show_col2=TRUE, fp_show_col3=TRUE, fp_show_col4=TRUE,
@@ -523,6 +613,29 @@ _HSROC_SUMMARY_DRIVER = textwrap.dedent(
     assert ", , theta" not in combined, combined
     assert ", , alpha" not in combined, combined
     assert ", , pi" not in combined, combined
+
+    artifact_result = ro.r(
+        '''
+        list(
+          images = c(`Forest Plot` = "forest.png"),
+          display_images = c(`Forest Plot` = "managed/forest.display.svg"),
+          plot_capabilities = list(
+            `Forest Plot` = list(
+              plot_kind = "forest",
+              editable = FALSE,
+              styleable = TRUE,
+              composition = "single",
+              regenerator = "forest"
+            )
+          )
+        )
+        '''
+    )
+    parsed_artifact = meta_py_r.parse_out_results(artifact_result)
+    assert parsed_artifact["images"] == {"Forest Plot": "forest.png"}
+    assert parsed_artifact["display_images"] == {
+        "Forest Plot": "managed/forest.display.svg"
+    }
     assert not texts["Between-study parameters"].startswith(
         "Between-study parameters\\n"
     ), texts
@@ -573,7 +686,7 @@ _HSROC_SUMMARY_DRIVER = textwrap.dedent(
     assert parsed_direct["texts"]["Other Summary"] == "Lower bound Upper bound", parsed_direct
     assert parsed_direct["texts"]["Raw Text Summary"] == "Lower bound Upper bound", parsed_direct
 
-    classes_path = os.path.join(repo_root, "r", "RCMetaR", "R", "classes.r")
+    classes_path = os.path.join(repo_root, "r", "RCMetaR", "R", "classes.R")
     ro.r("source(%r)" % classes_path.replace(os.sep, "/"))
     context_summary = ro.r(
         '''
@@ -688,7 +801,7 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
             )
             params <- data.frame(
               conf.level=95, digits=3, measure="OR", rm.method="DL", to="only0", adjust=0.5,
-              fp_col1_str="Studies", fp_col2_str="[default]", fp_col3_str="Ev/Trt", fp_col4_str="Ev/Ctrl",
+              fp_col1_str="Study or Subgroup", fp_col2_str="[default]", fp_col3_str="Ev/Trt", fp_col4_str="Ev/Ctrl",
               fp_xlabel="[default]", fp_outpath="./r_tmp/issue113_forest.png",
               fp_plot_lb="[default]", fp_plot_ub="[default]", fp_show_col1=TRUE,
               fp_show_col2=TRUE, fp_show_col3=TRUE, fp_show_col4=TRUE,

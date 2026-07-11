@@ -99,7 +99,12 @@ def relative_order(text, *needles):
 
 
 def pytest_path_tokens(text):
-    return set(re.findall(r"tests[/\\](?:python|analysis_regression|packaging|r_stack)(?:[/\\][A-Za-z_]+)?", text))
+    return set(
+        re.findall(
+            r"tests[/\\](?:python|analysis_regression|packaging|r_stack)(?:[/\\][A-Za-z_]+)?",
+            text,
+        )
+    )
 
 
 def pytest_option_tokens(text):
@@ -130,6 +135,7 @@ def test_windows_distributable_contract_is_declared():
         "Assert-AppLayout",
         "Invoke-PackagedAppSmokeTest",
         "Invoke-PackagedWizardLayoutSmokeTest",
+        "Get-ProjectVersion",
         "Get-RPackageCacheKey",
         "Test-BundledRPackages",
         "Copy-RLibraryPackages",
@@ -161,14 +167,24 @@ def test_windows_distributable_contract_is_declared():
     assert "src/rc_metastudio/__main__.py" in spec
     assert "src\\rc_metastudio\\launch.py" not in script["text"]
     assert "src/rc_metastudio/launch.py" not in spec
-    assert 'if ($ArchiveRootName) { $ArchiveRootName } else { $ArtifactName }' in script["text"]
+    assert "tomllib.loads" in script["text"]
+    assert (
+        'if ($ArchiveRootName) { $ArchiveRootName } else { "RCMetaStudio-$projectVersion-windows-x64" }'
+        in script["text"]
+    )
     assert "ArchiveRootName must be a single portable directory name" in script["text"]
     assert '$archiveStagingRoot = Join-Path $workRoot "zip-staging"' in script["text"]
-    assert "Copy-DirectoryTree -Source $SourceDirectory -Destination $ArchiveRootDirectory" in script["text"]
+    assert (
+        "Copy-DirectoryTree -Source $SourceDirectory -Destination $ArchiveRootDirectory"
+        in script["text"]
+    )
     assert "CreateFromDirectory($ArchiveStagingRoot, $tmpZipPath" in script["text"]
-    assert "Assert-ZipLayout -Path $zipPath -ArchiveRootName $archiveRootName" in script["text"]
+    assert (
+        "Assert-ZipLayout -Path $zipPath -ArchiveRootName $archiveRootName"
+        in script["text"]
+    )
     assert 'if (-not $entryName.StartsWith("$ArchiveRootName\\"))' in script["text"]
-    assert '$ArchiveRootName\\_internal\\PyQt5\\' in script["text"]
+    assert "$ArchiveRootName\\_internal\\PyQt5\\" in script["text"]
 
 
 def test_windows_r_cache_reinstalls_local_packages_after_cache_restore():
@@ -216,7 +232,7 @@ def test_packaged_smoke_launches_visual_wizard_layout_gate():
     assert '$env:QT_QPA_PLATFORM = "offscreen"' in script
     assert "WindowStyle Hidden" in script
     assert "RCMS_AUTOMATION_SMOKE_LOG = $env:RCMS_AUTOMATION_SMOKE_LOG" in script
-    assert '$env:RCMS_AUTOMATION_SMOKE_LOG = $smokeLogPath' in script
+    assert "$env:RCMS_AUTOMATION_SMOKE_LOG = $smokeLogPath" in script
     assert "automation-wizard-layout-smoke.log" in script
     assert "QT_QPA_PLATFORM = $env:QT_QPA_PLATFORM" in script
 
@@ -248,10 +264,7 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
     assert "tests/*" in workflow["text"]
     assert "docs/verification/RCMetaR-r-dependencies.json" in workflow["text"]
     assert "docs/verification/test-taxonomy.json" in workflow["text"]
-    assert (
-        ".\\scripts\\verify-smoke.ps1 -Sync -RequireREvidence"
-        in workflow["runs"]
-    )
+    assert ".\\scripts\\verify-smoke.ps1 -Sync -RequireREvidence" in workflow["runs"]
     assert (
         ".\\scripts\\verify-fast.ps1 -Sync -RequireREvidence -StrictTaxonomy"
         in workflow["runs"]
@@ -297,16 +310,11 @@ def test_package_workflow_builds_path_aware_artifacts():
     assert all(re.fullmatch(r"[0-9a-f]{40}", ref) for _, ref, _ in workflow["uses"])
     assert workflow["paths"] == {"v*"}
     assert any(
-        "RCMetaStudio-windows-x64.zip" in run
-        for run in workflow["text"].splitlines()
+        "RCMetaStudio-windows-x64.zip" in run for run in workflow["text"].splitlines()
     )
+    assert any("RCMetaStudio-macos-x64" in run for run in workflow["text"].splitlines())
     assert any(
-        "RCMetaStudio-macos-x64" in run
-        for run in workflow["text"].splitlines()
-    )
-    assert any(
-        "RCMetaStudio-macos-arm64" in run
-        for run in workflow["text"].splitlines()
+        "RCMetaStudio-macos-arm64" in run for run in workflow["text"].splitlines()
     )
     assert (
         "build\\windows-package\\dist\\RCMetaStudio\\automation-wizard-layout-smoke.log"
@@ -322,19 +330,48 @@ def test_package_workflow_builds_path_aware_artifacts():
     )
     assert "-RRuntimeRoot" in workflow["text"]
     assert "--r-runtime-root" in workflow["text"]
-    assert '-ArchiveRootName "RCMetaStudio-${{ github.event_name == \'push\' && github.ref_name || inputs.release_tag }}-windows-x64"' in workflow["text"]
-    assert '--archive-root-name "RCMetaStudio-${{ github.event_name == \'push\' && github.ref_name || inputs.release_tag }}-macos-x64"' in workflow["text"]
-    assert '--archive-root-name "RCMetaStudio-${{ inputs.release_tag }}-macos-arm64"' in workflow["text"]
-    assert "if: ${{ github.event_name == 'push' || inputs.build_windows }}" in workflow["text"]
-    assert "if: ${{ github.event_name == 'push' || inputs.build_macos }}" in workflow["text"]
-    assert "${{ github.event_name == 'push' || inputs.build_windows }}" in workflow["text"]
-    assert "${{ github.event_name == 'push' || inputs.build_macos }}" in workflow["text"]
-    assert "RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}" in workflow["text"]
+    assert workflow["text"].count("Resolve RC MetaStudio version") == 3
+    assert "tomllib.loads" in workflow["text"]
+    assert (
+        "-ArchiveRootName \"RCMetaStudio-${{ steps.package-version.outputs.version }}-windows-x64\""
+        in workflow["text"]
+    )
+    assert (
+        "--archive-root-name \"RCMetaStudio-${{ steps.package-version.outputs.version }}-macos-x64\""
+        in workflow["text"]
+    )
+    assert (
+        '--archive-root-name "RCMetaStudio-${{ steps.package-version.outputs.version }}-macos-arm64"'
+        in workflow["text"]
+    )
+    assert (
+        "if: ${{ github.event_name == 'push' || inputs.build_windows }}"
+        in workflow["text"]
+    )
+    assert (
+        "if: ${{ github.event_name == 'push' || inputs.build_macos }}"
+        in workflow["text"]
+    )
+    assert (
+        "${{ github.event_name == 'push' || inputs.build_windows }}" in workflow["text"]
+    )
+    assert (
+        "${{ github.event_name == 'push' || inputs.build_macos }}" in workflow["text"]
+    )
+    assert (
+        "RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}"
+        in workflow["text"]
+    )
     assert "publish_release:" in workflow["text"]
     assert "release_tag:" in workflow["text"]
     assert "Publish Release Assets" in workflow["text"]
-    assert "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093" in workflow["text"]
-    assert 'gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber' in workflow["text"]
+    assert (
+        "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093"
+        in workflow["text"]
+    )
+    assert (
+        'gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber' in workflow["text"]
+    )
     assert "contents: write" in workflow["text"]
     assert "timeout-minutes: 45" in workflow["text"]
     assert "timeout-minutes: 60" in workflow["text"]
@@ -412,6 +449,7 @@ def test_macos_distributable_contract_is_declared():
         "require_free_space_gb",
         "repo_path",
         "resolve_existing_dir",
+        "project_version",
         "copy_tree",
         "sha256_file",
         "sha256_stdin_12",
@@ -438,14 +476,25 @@ def test_macos_distributable_contract_is_declared():
     assert "src/rc_metastudio/__main__.py" in script["text"]
     assert "src/rc_metastudio/launch.py" not in script["text"]
     assert 'bundle_identifier="org.researchconsultancy.rc-metastudio"' in script["text"]
-    assert "--archive-root-name must be a single portable directory name" in script["text"]
-    assert 'archive_root_name="${archive_root_name:-$artifact_name}"' in script["text"]
+    assert (
+        "--archive-root-name must be a single portable directory name" in script["text"]
+    )
+    assert "tomllib.loads" in script["text"]
+    assert 'archive_root_name="${archive_root_name:-RCMetaStudio-$resolved_project_version-macos-$architecture}"' in script["text"]
     assert 'archive_staging_root="$work_root/zip-staging"' in script["text"]
-    assert 'copy_tree "$app_bundle" "$archive_root_dir/RCMetaStudio.app"' in script["text"]
+    assert (
+        'copy_tree "$app_bundle" "$archive_root_dir/RCMetaStudio.app"' in script["text"]
+    )
     assert 'cd "$archive_staging_root"' in script["text"]
     assert 'zip -qry "$tmp_zip_path" "$archive_root_name"' in script["text"]
-    assert 'name for name in names if name and not name.startswith(f"{archive_root_name}/")' in script["text"]
-    assert 'f"{archive_root_name}/RCMetaStudio.app/Contents/MacOS/RCMetaStudio"' in script["text"]
+    assert (
+        'name for name in names if name and not name.startswith(f"{archive_root_name}/")'
+        in script["text"]
+    )
+    assert (
+        'f"{archive_root_name}/RCMetaStudio.app/Contents/MacOS/RCMetaStudio"'
+        in script["text"]
+    )
     assert (
         'bundle_identifier="org.researchconsultancy.rc-metastudio"'
         in local_script["text"]
@@ -470,6 +519,7 @@ def test_local_macos_package_script_uses_shared_build_script():
         "uv sync --locked",
         "uv run pytest tests/python/fast/test_pyqt5_verification_path.py tests/python/fast/test_pyqt5_generated_ui_imports.py tests/python/fast/test_project_pickle_migration.py tests/python/fast/test_qt_text_boundaries.py",
         '--r-runtime-root "$r_runtime_root"',
+        'build_args+=(--archive-root-name "$archive_root_name")',
         'bash "$repo_root/scripts/build-macos-package.sh"',
     )
 
@@ -489,7 +539,10 @@ def test_shared_r_dependency_installer_is_used_by_packagers():
     assert "cran_package_install_types <- function()" in installer
     assert '.Platform$pkgType != "source"' in installer
     assert 'return(c("binary", "source"))' in installer
-    assert 'install.packages(missing, lib = lib, dependencies = NA, type = package_install_type)' in installer
+    assert (
+        "install.packages(missing, lib = lib, dependencies = NA, type = package_install_type)"
+        in installer
+    )
     assert 'Sys.info()[["sysname"]]' not in installer
     assert {
         "Get-RPackageCacheKey",

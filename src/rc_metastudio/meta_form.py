@@ -41,7 +41,6 @@ import add_new_dialogs
 import results_window
 import ma_specs
 import diag_metrics
-import meta_reg_form
 import meta_subgroup_form
 import edit_dialog
 import edit_group_name_form
@@ -550,7 +549,12 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         qt_layout.show_centered(form)
 
     def meta_reg(self):
-        form = meta_reg_form.MetaRegForm(self.model, parent=self)
+        form = self._build_analysis_specs_dialog(
+            meta_f_str="meta-regression",
+            conf_level=self.model.get_global_conf_level(),
+        )
+        if form is None:
+            return
         qt_layout.show_centered(form)
 
     def data_dirtied(self):
@@ -572,7 +576,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     # facade exposes richer method metadata.
     def cum_ma(self):
         # NOTE that we do not allow cumulative meta-analysis on
-            # Diagnostic data are not routed through cumulative MA here.
+        # Diagnostic data are not routed through cumulative MA here.
         # if we're dealing with diag data.
         form = None
         # note that the spec form gets *this* form as a parameter.
@@ -900,7 +904,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                 "the results.\n\nDetails: %s: %s" % (e.__class__.__name__, e),
             )
             return
-        form.show()
+        form.showMaximized()
 
     def edit_group_name(self, cur_group_name):
         orig_group_name = copy.copy(cur_group_name)

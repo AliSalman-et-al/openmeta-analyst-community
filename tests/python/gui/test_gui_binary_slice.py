@@ -19,7 +19,8 @@ def test_real_metaform_opens_binary_continuous_and_diagnostic_projects():
         app, window = launch.start_automation()
         try:
             assert (
-                window.open(os.path.abspath(os.path.join("sample_projects", name))) is True
+                window.open(os.path.abspath(os.path.join("sample_projects", name)))
+                is True
             )
 
             model = window.tableView.model()
@@ -99,7 +100,8 @@ def test_representative_projects_round_trip_without_byte_identical_expectations(
         saved_path = str(tmp_path / name)
         try:
             assert (
-                window.open(os.path.abspath(os.path.join("sample_projects", name))) is True
+                window.open(os.path.abspath(os.path.join("sample_projects", name)))
+                is True
             )
             expected = _dataset_summary(window.model.dataset)
             meta_form = sys.modules["meta_form"]
@@ -135,8 +137,12 @@ def test_project_file_dialogs_use_rc_metastudio_project_filter(monkeypatch):
 
     try:
         meta_form = sys.modules["meta_form"]
-        monkeypatch.setattr(meta_form.QFileDialog, "getOpenFileName", choose_open_project)
-        monkeypatch.setattr(meta_form.QFileDialog, "getSaveFileName", choose_save_project)
+        monkeypatch.setattr(
+            meta_form.QFileDialog, "getOpenFileName", choose_open_project
+        )
+        monkeypatch.setattr(
+            meta_form.QFileDialog, "getSaveFileName", choose_save_project
+        )
 
         assert window.open() is False
         assert window.save_as() is None

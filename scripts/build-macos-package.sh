@@ -103,6 +103,16 @@ repo_path() {
   esac
 }
 
+project_version() {
+  "$python_exe" - "$repo_root/pyproject.toml" <<'PY'
+import pathlib
+import sys
+import tomllib
+
+print(tomllib.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))["project"]["version"])
+PY
+}
+
 resolve_existing_dir() {
   local path="$1"
   local description="$2"
@@ -177,13 +187,7 @@ dist_root="$repo_root/build/macos-package/$architecture/dist"
 work_root="$repo_root/build/macos-package/$architecture/work"
 app_bundle="$dist_root/RCMetaStudio.app"
 app_root="$app_bundle/Contents/MacOS"
-archive_root_name="${archive_root_name:-$artifact_name}"
-if [[ -z "$archive_root_name" || "$archive_root_name" == *"/"* || "$archive_root_name" == *"\\"* ]]; then
-  echo "--archive-root-name must be a single portable directory name." >&2
-  exit 2
-fi
 archive_staging_root="$work_root/zip-staging"
-archive_root_dir="$archive_staging_root/$archive_root_name"
 zip_path="$artifact_dir/$artifact_name.zip"
 tmp_zip_path="$zip_path.tmp"
 r_package_cache_root="${r_package_cache_root:-$artifact_dir/r-library-cache}"
@@ -200,6 +204,14 @@ if [ ! -x "$python_exe" ]; then
   echo "Python executable was not found or is not executable: $python_exe" >&2
   exit 1
 fi
+
+resolved_project_version="$(project_version)"
+archive_root_name="${archive_root_name:-RCMetaStudio-$resolved_project_version-macos-$architecture}"
+if [[ -z "$archive_root_name" || "$archive_root_name" == *"/"* || "$archive_root_name" == *"\\"* ]]; then
+  echo "--archive-root-name must be a single portable directory name." >&2
+  exit 2
+fi
+archive_root_dir="$archive_staging_root/$archive_root_name"
 
 "$python_exe" - <<'PY'
 import PyInstaller
@@ -302,13 +314,13 @@ cache_library="$r_package_cache_root/$r_package_cache_key/library"
 test_r_dependency_packages() {
   local library="$1"
   [ -d "$library" ] || return 1
-  R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" "$rscript" -e "lib <- normalizePath('$library', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','metafor','lme4','pdftools','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)" >/dev/null 2>&1
+  R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" "$rscript" -e "lib <- normalizePath('$library', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','metafor','lme4','pdftools','rsvg','svglite','tiff','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)" >/dev/null 2>&1
 }
 
 test_bundled_r_packages() {
   local library="$1"
   [ -d "$library" ] || return 1
-  R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" "$rscript" -e "lib <- normalizePath('$library', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','RCMetaR','metafor','lme4','pdftools','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)" >/dev/null 2>&1
+  R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" "$rscript" -e "lib <- normalizePath('$library', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','RCMetaR','metafor','lme4','pdftools','rsvg','svglite','tiff','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)" >/dev/null 2>&1
 }
 
 copy_r_library() {
@@ -355,7 +367,7 @@ fi
 
 step "Installing local RCMetaR package"
 install_local_r_packages
-R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$rscript" -e "pkgs <- c('HSROC','RCMetaR','metafor','lme4','pdftools','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
+R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$rscript" -e "pkgs <- c('HSROC','RCMetaR','metafor','lme4','pdftools','rsvg','svglite','tiff','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
 
 if ! test_bundled_r_packages "$r_lib"; then
   echo "Bundled R package verification failed after local RCMetaR install." >&2

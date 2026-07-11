@@ -4,7 +4,7 @@
 #######################################
 # RC MetaStudio                   #
 # ----                                #
-# diagnostic_methods.r                # 
+# diagnostic_methods.R                #
 # Facade module; wraps methods        #
 # that perform analysis on diagnostic #
 # data in a coherent interface.       # 
@@ -199,19 +199,15 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
         metrics <- c(metrics, params.list[[count]]$measure)
         if (params.list[[count]]$measure=="Sens") {
             sens.index <- count
-			png(filename=paste(params.list[[count]]$fp_outpath,"INTER",sep="")) # to fix windows popping out at you issue
         }
         if (params.list[[count]]$measure=="Spec") {
             spec.index <- count
-			png(filename=paste(params.list[[count]]$fp_outpath,"INTER",sep="")) # to fix windows popping out at you issue
         }
         if (params.list[[count]]$measure=="PLR") {
             plr.index <- count
-			png(filename=paste(params.list[[count]]$fp_outpath,"INTER",sep="")) # to fix windows popping out at you issue
         }
         if (params.list[[count]]$measure=="NLR") {
             nlr.index <- count
-			png(filename=paste(params.list[[count]]$fp_outpath,"INTER",sep="")) # to fix windows popping out at you issue
         }
     }
     
@@ -219,6 +215,7 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
     image.order <- c()
     plot.names <- c()
     plot.params.paths <- c()
+    plot.capabilities <- list()
     plot.pdfs.paths <- c() # sometimes we want to just output pdfs at run-time
     remove.indices <- c()
 	references <- c()
@@ -233,49 +230,14 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
             biv.results <- eval(call(fname, diagnostic.data, params.sens))
             results <- c(results, biv.results$Summary)
             images <- c(images, biv.results$images)
+            plot.capabilities <- c(plot.capabilities, biv.results$plot_capabilities)
             image.order <- append.image.order(image.order, biv.results)
             remove.indices <- c(sens.index, spec.index)
 			references <- c(references, biv.results$References)
         } else {
-            ###
-            # we're not running bivariate; proceed as usual
-            # create side-by-side forest plots for sens and spec.
+            # Non-bivariate sensitivity and specificity are rendered by the
+            # ordinary per-metric loop below. Keep the shared SROC artifact.
             params.sens <- params.list[[sens.index]]
-            params.spec <- params.list[[spec.index]]
-            params.sens$create.plot <- FALSE
-            params.spec$create.plot <- FALSE
-            params.tmp <- list("left"=params.sens, "right"=params.spec)
-            
-            diagnostic.data.sens <- compute.diag.point.estimates(diagnostic.data, params.sens)
-            diagnostic.data.spec <- compute.diag.point.estimates(diagnostic.data, params.spec)
-            diagnostic.data.all <- list("left"=diagnostic.data.sens, "right"=diagnostic.data.spec)
-            
-            results.sens <- eval(call(fname, diagnostic.data.sens, params.sens))
-            results.spec <- eval(call(fname, diagnostic.data.spec, params.spec))
-            summary.sens <- list("Summary"=results.sens$Summary)
-            names(summary.sens) <- paste(eval(parse(text=paste("pretty.names$measure$", params.sens$measure,sep=""))), " Summary", sep="")
-            summary.spec <- list("Summary"=results.spec$Summary)
-            names(summary.spec) <- paste(eval(parse(text=paste("pretty.names$measure$", params.spec$measure,sep=""))), " Summary", sep="")
-            results <- c(results, summary.sens, summary.spec)
-			
-			references <- c(references, results.sens$References) # reference for method will be the same for both sens&spec
-            
-            res.sens <- results.sens$Summary$MAResults
-            res.spec <- results.spec$Summary$MAResults
-            res <- list("left"=res.sens, "right"=res.spec)
-            plot.data <- create.side.by.side.plot.data(diagnostic.data.all, params=params.tmp, res=res)
-            forest.path <- paste(params.sens$fp_outpath, sep="")
-            two.forest.plots(plot.data, outpath=forest.path)
-               
-            forest.plot.params.path <- save.data(om.data=diagnostic.data.all, res, params=params.tmp, plot.data)
-            plot.params.paths.tmp <- c("Sensitivity and Specificity Forest Plot"=forest.plot.params.path)
-            plot.params.paths <- c(plot.params.paths, plot.params.paths.tmp)
-            images.tmp <- c("Sensitivity and Specificity Forest Plot"=forest.path)
-            images <- c(images, images.tmp)
-            image.order <- c(image.order, "Sensitivity and Specificity Forest Plot")
-            plot.names.tmp <- c("forest plot"="forest.plot")
-            plot.names <- c(plot.names, plot.names.tmp)
-            
             # create SROC plot
             sroc.path <- rcmetar.scratch.path("roc.png")
             sroc.plot.data <- create.sroc.plot.data(diagnostic.data, params=params.sens)
@@ -285,63 +247,14 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
             sroc.plot.params.path <- save.plot.data(sroc.plot.data)
             plot.params.paths.tmp <- c("SROC"=sroc.plot.params.path)
             plot.params.paths <- c(plot.params.paths, plot.params.paths.tmp)
-            images.tmp <- c("SROC"=forest.path)
             images <- c(images, c("SROC"=sroc.path))
+            plot.capabilities[["SROC"]] <- .rcmetar.plot.descriptor.for.kind("sroc", has.params=TRUE)
             image.order <- c(image.order, "SROC")
             plot.names <- c(plot.names, c("sroc"="sroc"))
-            remove.indices <- c(sens.index, spec.index)
         }
     }
-    
-    if (("NLR" %in% metrics) & ("PLR" %in% metrics)) {
-        # create side-by-side forest plots for NLR and PLR.
-        params.nlr <- params.list[[nlr.index]]
-        params.plr <- params.list[[plr.index]]
-        params.nlr$create.plot <- FALSE
-        params.plr$create.plot <- FALSE
-        params.tmp <- list("left"=params.nlr, "right"=params.plr)
-        
-        fname <- fnames[nlr.index]
-        diagnostic.data.nlr <- compute.diag.point.estimates(diagnostic.data, params.nlr)
-        diagnostic.data.plr <- compute.diag.point.estimates(diagnostic.data, params.plr)
-        diagnostic.data.all <- list("left"=diagnostic.data.nlr, "right"=diagnostic.data.plr)
-        
-        results.nlr <- eval(call(fname, diagnostic.data.nlr, params.nlr))
-        results.plr <- eval(call(fname, diagnostic.data.plr, params.plr))
-        summary.nlr <- list("Summary"=results.nlr$Summary)
-        names(summary.nlr) <- paste(eval(parse(text=paste("pretty.names$measure$", params.nlr$measure,sep=""))), " Summary", sep="")
-        summary.plr <- list("Summary"=results.plr$Summary)
-        names(summary.plr) <- paste(eval(parse(text=paste("pretty.names$measure$", params.plr$measure,sep=""))), " Summary", sep="")
-        results <- c(results, summary.nlr, summary.plr)
-		
-		references <- c(references, results.nlr$References) # reference for method will be the same for both nlr&plr
-		
-        res.nlr <- results.nlr$Summary$MAResults
-        res.plr <- results.plr$Summary$MAResults
-        res <- list("left"=res.nlr, "right"=res.plr)
-        
-        plot.data <- create.side.by.side.plot.data(diagnostic.data.all, res=res, params.tmp)
-        
-        forest.path <- paste(params.nlr$fp_outpath, sep="")
-        two.forest.plots(plot.data, outpath=forest.path)
-           
-        forest.plot.params.path <- save.data(diagnostic.data, res, params=params.tmp, plot.data)
-        plot.params.paths.tmp <- c("NLR and PLR Forest Plot"=forest.plot.params.path)
-        plot.params.paths <- c(plot.params.paths, plot.params.paths.tmp)
-               
-        images.tmp <- c("NLR and PLR Forest Plot"=forest.path)
-        image.order <- c(image.order, "NLR and PLR Forest Plot")
-        images <- c(images, images.tmp)
-        
-        plot.names.tmp <- c("forest plot"="forest.plot")
-        plot.names <- c(plot.names, plot.names.tmp)
-        
-        remove.indices <- c(remove.indices, nlr.index, plr.index)
-		
-		cat("end of plr/nlr stuff")
-    }
 
-    # remove fnames and params for side-by-side plots
+    # Bivariate sensitivity/specificity is the only paired analysis result.
     fnames <- fnames[setdiff(1:length(fnames), remove.indices)]
     params.list <- params.list[setdiff(1:length(params.list), remove.indices)]
 	
@@ -356,6 +269,10 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
             images.tmp <- results.tmp$images
             names(images.tmp) <- paste(eval(parse(text=paste("pretty.names$measure$",params.list[[count]]$measure,sep=""))), " Forest Plot", sep="")
             images <- c(images, images.tmp)
+            plot.capabilities[[names(images.tmp)[[1]]]] <- .rcmetar.plot.descriptor.for.kind(
+                "forest",
+                has.params=length(results.tmp$plot_params_paths) > 0
+            )
             image.order <- c(image.order, names(images.tmp))
             plot.params.paths.tmp <- results.tmp$plot_params_paths
             names(plot.params.paths.tmp) <- paste(eval(parse(text=paste("pretty.names$measure$", params.list[[count]]$measure,sep=""))), " Forest Plot", sep="")
@@ -372,8 +289,9 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
     graphics.off()
     results <- c(results, list("images"=images,
 					           "image_order"=image.order,
-							   "plot_names"=plot.names, 
+                               "plot_names"=plot.names,
                                "plot_params_paths"=plot.params.paths,
+                               "plot_capabilities"=plot.capabilities,
 							   "References"=rcmetar.unique.references(references)))
     results
 }
@@ -432,7 +350,7 @@ diagnostic.fixed.inv.var <- function(diagnostic.data, params){
             plot.data <- create.plot.data.diagnostic(diagnostic.data, params, res)
             changed.params <- plot.data$changed.params
             # list of changed params values
-            params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+            params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
             changed.params <- c(changed.params, params.changed.in.forest.plot)
             params <- update.changed.plot.params(params, changed.params)
             # dump the forest plot params to disk; return path to
@@ -467,7 +385,7 @@ diagnostic.fixed.inv.var.parameters <- function(){
                             "adjust"="float", "to"=apply_adjustment_to)
 
     # default values
-    defaults <- list("conf.level"=95, "digits"=3, "adjust"=.5, "to"="only0")
+    defaults <- list("conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS, "adjust"=.5, "to"="only0")
 
     var_order = c("conf.level", "digits", "adjust", "to")
 
@@ -478,7 +396,7 @@ diagnostic.fixed.inv.var.pretty.names <- function() {
     pretty.names <- list("pretty.name"="Diagnostic Fixed-Effect Inverse Variance", 
                          "description" = "Performs fixed-effect meta-analysis with inverse variance weighting.",
                          "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"), 
-                         "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
+                         "digits"=list("pretty.name"="Decimal places", "description"="Decimal places for displayed estimates and intervals; p-values use at least 3"),
                          "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
                          "to"=list("pretty.name"="Add correction factor to", "description"="When Add correction factor is set to \"only 0\", the correction factor
                                    is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor
@@ -563,7 +481,7 @@ diagnostic.fixed.mh <- function(diagnostic.data, params){
             plot.data <- create.plot.data.diagnostic(diagnostic.data, params, res)
             changed.params <- plot.data$changed.params
             # list of changed params values
-            params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+            params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
             changed.params <- c(changed.params, params.changed.in.forest.plot)
             params <- update.changed.plot.params(params, changed.params)
             # dump the forest plot params to disk; return path to
@@ -597,7 +515,7 @@ diagnostic.fixed.mh.parameters <- function(){
                             "adjust"="float", "to"=apply_adjustment_to)
     
     # default values
-    defaults <- list("conf.level"=95, "digits"=3, "adjust"=.5, "to"="only0")
+    defaults <- list("conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS, "adjust"=.5, "to"="only0")
     
     var_order = c("conf.level", "digits", "adjust", "to")
     
@@ -609,7 +527,7 @@ diagnostic.fixed.mh.pretty.names <- function() {
     pretty.names <- list("pretty.name"="Diagnostic Fixed-Effect Mantel-Haenszel", 
                          "description" = "Performs fixed-effect meta-analysis using the Mantel-Haenszel method.",
                          "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"), 
-                         "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
+                         "digits"=list("pretty.name"="Decimal places", "description"="Decimal places for displayed estimates and intervals; p-values use at least 3"),
                          "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
                          "to"=list("pretty.name"="Add correction factor to", "description"="When Add correction factor is set to \"only 0\", the correction factor
                                    is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor
@@ -698,7 +616,7 @@ diagnostic.fixed.peto <- function(diagnostic.data, params){
         plot.data <- create.plot.data.diagnostic(diagnostic.data, params, res)
         changed.params <- plot.data$changed.params
         # list of changed params values
-        params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
         changed.params <- c(changed.params, params.changed.in.forest.plot)
         params <- update.changed.plot.params(params, changed.params)
         # dump the forest plot params to disk; return path to
@@ -736,7 +654,7 @@ diagnostic.fixed.peto.parameters <- function(){
                   "adjust"="float", "to"=apply_adjustment_to)
   
   # default values
-  defaults <- list("conf.level"=95, "digits"=3, "adjust"=.5, "to"="only0")
+  defaults <- list("conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS, "adjust"=.5, "to"="only0")
   
   var_order = c("conf.level", "digits", "adjust", "to")
   
@@ -747,7 +665,7 @@ diagnostic.fixed.peto.pretty.names <- function() {
   pretty.names <- list("pretty.name"="Diagnostic Fixed-Effect Peto", 
                        "description" = "Performs fixed-effect meta-analysis using the Peto method.",
                        "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"), 
-                       "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
+                       "digits"=list("pretty.name"="Decimal places", "description"="Decimal places for displayed estimates and intervals; p-values use at least 3"),
                        "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
                        "to"=list("pretty.name"="Add correction factor to", "description"="When Add correction factor is set to \"only 0\", the correction factor
                                    is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor
@@ -819,7 +737,7 @@ diagnostic.random <- function(diagnostic.data, params){
             plot.data <- create.plot.data.diagnostic(diagnostic.data, params, res)
             changed.params <- plot.data$changed.params
             # list of changed params values
-            params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+            params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
             changed.params <- c(changed.params, params.changed.in.forest.plot)
             params <- update.changed.plot.params(params, changed.params)
             # update params values
@@ -855,7 +773,7 @@ diagnostic.random.parameters <- function(){
                             "adjust"="float", "to"=apply.adjustment.to)
     
     # default values
-    defaults <- list("rm.method"="DL", "conf.level"=95, "digits"=3,  
+    defaults <- list("rm.method"="DL", "conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS,
                             "adjust"=.5, "to"="only0")
     
     var.order <- c("rm.method", "conf.level", "digits", "adjust", "to")
@@ -876,7 +794,7 @@ diagnostic.random.pretty.names <- function() {
                          "description" = "Performs random-effects meta-analysis.",
                          "rm.method"=list("pretty.name"="Random-Effects method", "description"="Method for estimating between-studies heterogeneity", "rm.method.names"=rm_method_names),                      
                          "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"), 
-                         "digits"=list("pretty.name"="Number of digits", "description"="Number of digits to display in results"),
+                         "digits"=list("pretty.name"="Decimal places", "description"="Decimal places for displayed estimates and intervals; p-values use at least 3"),
                          "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
                          "to"=list("pretty.name"="Correction factor target", "description"="When Add correction factor is set to \"only 0\", the correction factor
                                    is added to all cells of each two-by-two table that contains at least one zero. When set to \"all\", the correction factor
@@ -1456,7 +1374,7 @@ hsroc.display.summary <- function(hsroc.sum, params, chain.out.dirs, diagnostic.
 
     digits <- params$digits
     if (is.null(digits) || is.na(digits)) {
-        digits <- 3
+        digits <- RCMETAR_DEFAULT_DISPLAY_DIGITS
     }
 
     summary.sensitivity.rows <- c("S Overall", "Sensitivity Overall", "Sensitivity (overall)")
@@ -1580,10 +1498,17 @@ diagnostic.hsroc <- function(diagnostic.data, params){
     ####
     # and the images
     images <- hsroc.display.images(hsroc.sum, out.dir, params)
+    plot.capabilities <- setNames(
+        lapply(names(images), function(name) .rcmetar.plot.descriptor.for.kind("other", has.params=FALSE)),
+        names(images)
+    )
 
     # we don't want the SROC plot to be mixed in with 
     # the density plots...
     roc.plot.name <- "Summary ROC"
+    if (roc.plot.name %in% names(plot.capabilities)) {
+        plot.capabilities[[roc.plot.name]] <- .rcmetar.plot.descriptor.for.kind("sroc", has.params=FALSE)
+    }
     image.names <- names(images)
     image.order <- c()
     if (roc.plot.name %in% image.names) {
@@ -1592,7 +1517,8 @@ diagnostic.hsroc <- function(diagnostic.data, params){
     image.order <- c(image.order, image.names[image.names!=roc.plot.name])
 	references <- rcmetar.method.references("hsroc")
     results <- list("images"=images,
-			        "image_order"=image.order,
+                    "image_order"=image.order,
+                    "plot_capabilities"=plot.capabilities,
 					"Summary"=summary,
 					"References"=rcmetar.unique.references(references))
 
@@ -1658,7 +1584,7 @@ diagnostic.bivariate.ml <- function(diagnostic.data, params){
     se_logit_spec = biv.results[1,4]
     correlation = biv.results[1,7]
 
-    digits = 4
+    digits = RCMETAR_DEFAULT_DISPLAY_DIGITS
     digits.str <- paste("%.", digits, "f", sep="")
     sensitivity <- sprintf(digits.str, invlogit(logit_sens))
 	# Un-hard-coding CI.. issue # 214
@@ -1688,9 +1614,13 @@ diagnostic.bivariate.ml <- function(diagnostic.data, params){
                                  filepath=path.to.roc.plot.base)
 
     images <- c("ROC Plot"=paste(path.to.roc.plot.base, ".png", sep=""))
+    plot.capabilities <- list(
+        "ROC Plot"=.rcmetar.plot.descriptor.for.kind("roc", has.params=FALSE)
+    )
 
 	references <- rcmetar.method.references("diagnostic.bivariate")
     results <- list("images"=images,
+                    "plot_capabilities"=plot.capabilities,
 			        "Summary"=list("Bivariate Summary"=summary.text),
 					"References"=rcmetar.unique.references(references))
 }
@@ -1760,30 +1690,4 @@ create.sroc.plot.data <- function(diagnostic.data, params){
     plot.options$roc.title <- params$roc_title
     # Preserve ROC plot options for callers that expose them in the UI.
     plot.data <- list("fitted.line" = fitted.line, "TPR"=TPR, "FPR"=FPR, "std.err"=std.err, "mult"=mult, "inv.var" = inv.var, "s.range" = s.range, "plot.options"=plot.options)
-}
-
-###################################################
-#            create side-by-side forest.plots     #
-###################################################
-
-create.side.by.side.plot.data <- function(diagnostic.data, params, res) {    
-    # creates data for two side-by-side forest plots
-    params.left <- params$left
-    params.right <- params$right
-    #params.left$fp_show_col1 <- 'TRUE'
-    #params.right$fp_show_col1 <- 'FALSE'
-    # only show study names on the left plot
-    res.left <- res$left
-    res.right <- res$right    
-    diagnostic.data.left <- diagnostic.data$left
-    diagnostic.data.right <- diagnostic.data$right
-    
-    plot.data.left <- create.plot.data.diagnostic(diagnostic.data.left, params.left, res.left)
-    plot.data.left$options$fp.title <- pretty.metric.name(as.character(params.left$measure))
-      
-    plot.data.right <- create.plot.data.diagnostic(diagnostic.data.right, params.right, res.right)
-    plot.data.right$options$fp.title <- pretty.metric.name(as.character(params.right$measure))
-    
-    plot.data <- list("left"=plot.data.left, "right"=plot.data.right)
-    plot.data
 }

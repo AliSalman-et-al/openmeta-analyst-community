@@ -33,7 +33,6 @@
 #' @import boot
 #' @import grDevices
 #' @import graphics
-#' @import grid
 #' @import HSROC
 #' @import lme4
 #' @import metafor

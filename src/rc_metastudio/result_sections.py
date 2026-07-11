@@ -24,7 +24,6 @@ HSROC_SECTION_TITLES = {
 }
 
 SECTION_TITLE_REPLACEMENTS = {
-    "NLR and PLR Forest Plot": "Negative and Positive Likelihood Ratio Forest Plot",
     "Density plots": "Density Plots",
     "Trace plots": "Trace Plots",
     "Leave-one-out Forest plot": "Leave-One-Out Forest Plot",

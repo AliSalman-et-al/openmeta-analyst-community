@@ -4,7 +4,32 @@ All notable RC MetaStudio changes will be recorded in this file.
 
 RC MetaStudio starts a fresh maintained-product changelog. Historical release history for the Original OpenMeta[Analyst] Project is not reconstructed here; see [NOTICE.md](NOTICE.md) for provenance.
 
-## 0.1.0 - Unreleased
+## 0.1.1 - 2026-07-11 (Prerelease)
+
+### Added
+
+- Added publication-style Default, RevMan, and BMJ forest plots across supported analysis families.
+- Added publication-style bubble plots for meta-regression results.
+- Added editable plot controls for supported forest and bubble plots.
+- Added Windows x64 and macOS Intel x64 prerelease packages.
+
+### Changed
+
+- Improved plot sizing and live reflow in the Results window.
+- Improved plot layout, labels, spacing, scaling, and display precision across supported styles.
+- Improved PDF, PNG, SVG, and TIFF export behavior and removed unwanted intermediate files.
+- Split diagnostic forest results into separate editable plots for each metric.
+- Simplified diagnostic and meta-regression setup so method, parameter, covariate, and plot choices use consistent screens.
+- Simplified the README around downloading and using RC MetaStudio; moved maintenance commands into a separate maintainer guide.
+
+### Fixed
+
+- Fixed plot edits that did not apply, did not close as expected, or failed for cumulative, leave-one-out, subgroup, and diagnostic forest plots.
+- Fixed missing plot-editing and export actions for supported result types.
+- Fixed regenerated plots overlapping later Results-window content.
+- Fixed plots rendering too small on first display or failing to follow window resizing.
+
+## 0.1.0 - 2026-07-06
 
 ### Added
 

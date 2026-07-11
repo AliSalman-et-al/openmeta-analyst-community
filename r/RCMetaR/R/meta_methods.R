@@ -24,8 +24,6 @@ cum.ma.binary <- function(fname, binary.data, params){
     res <- eval(call(fname, binary.data, params.tmp))
     res.overall <- eval(call(paste(fname, ".overall", sep=""), res))
     # parse out the overall estimate
-    plot.data <- create.plot.data.binary(binary.data, params, res.overall)
-    # data for standard forest plot
     
     # iterate over the binaryData elements, adding one study at a time
     cum.results <- array(list(NULL), dim=c(length(binary.data@study.names)))
@@ -81,18 +79,16 @@ cum.ma.binary <- function(fname, binary.data, params){
     params.cum$fp_col2_str <- "Cumulative Estimate"
     # column labels for the cumulative (right-hand) plot
     plot.data.cum <- create.plot.data.cum(om.data=binary.data, params.cum, res=cum.results)
-    two.plot.data <- list("left"=plot.data, "right"=plot.data.cum)
-    changed.params <- plot.data$changed.params
-    # List of changed params values for standard (left) plot - not cumulative plot!
-    # Currently plot edit can't handle two sets of params values for xticks or plot bounds.
-    # Could be changed in future.
-    params.changed.in.forest.plot <- two.forest.plots(two.plot.data, outpath=forest.path)
-    changed.params <- c(changed.params, params.changed.in.forest.plot)
-    # Update params changed in two.forest.plots
+    if (rcmetar.metafor.default.supported(params.cum)) {
+        plot.data <- rcmetar.build.sequential.metafor.bundle(binary.data, params.cum, cum.results, "cumulative", study.names, plot.data.cum)
+        changed.params <- plot.data$changed.params
+        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+    }
+    # Update params changed while drawing the metafor forest plot
     params <- update.changed.plot.params(params, changed.params)
     # we use the system time as our unique-enough string to store
     # the params object
-    forest.plot.params.path <- save.data(binary.data, res, params, two.plot.data)
+    forest.plot.params.path <- save.data(binary.data, res, params, plot.data)
     # Now we package the results in a dictionary (technically, a named 
     # vector). In particular, there are two fields that must be returned; 
     # a dictionary of images (mapping titles to image paths) and a list of texts
@@ -570,7 +566,13 @@ loo.ma.binary <- function(fname, binary.data, params){
     plot.data <- create.plot.data.loo(binary.data, params, res=loo.results)
     changed.params <- plot.data$changed.params
     # list of changed params values
-    params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+    if (rcmetar.metafor.default.supported(params)) {
+        plot.data <- rcmetar.build.sequential.metafor.bundle(binary.data, params, loo.results, "leave-one-out", study.names, plot.data)
+        changed.params <- plot.data$changed.params
+        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+    } else {
+        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+    }
     changed.params <- c(changed.params, params.changed.in.forest.plot)
     params <- update.changed.plot.params(params, changed.params)
     # update params values
@@ -617,8 +619,6 @@ cum.ma.continuous <- function(fname, cont.data, params){
     res <- eval(call(fname, cont.data, params.tmp))
     res.overall <- eval(call(paste(fname, ".overall", sep=""), res))
     # parse out the overall estimate
-    plot.data <- create.plot.data.continuous(cont.data, params, res=res.overall)
-    # data for standard forest plot
     
     params$fp_show_col3 <- FALSE
     params$fp_show_col4 <- FALSE
@@ -684,18 +684,16 @@ cum.ma.continuous <- function(fname, cont.data, params){
     params.cum$fp_col1_str <- "Cumulative Studies"
     params.cum$fp_col2_str <- "Cumulative Estimate"
     plot.data.cum <- create.plot.data.cum(om.data=cont.data, params.cum, res=cum.results)
-    two.plot.data <- list("left"=plot.data, "right"=plot.data.cum)
-    changed.params <- plot.data$changed.params
-    # List of changed params values for standard (left) plot - not cumulative plot!
-    # Currently plot edit can't handle two sets of params values for xticks or plot bounds.
-    # Could be changed in future.
-    params.changed.in.forest.plot <- two.forest.plots(two.plot.data, outpath=forest.path)
-    changed.params <- c(changed.params, params.changed.in.forest.plot)
-    # Update params changed in two.forest.plots
+    if (rcmetar.metafor.default.supported(params.cum)) {
+        plot.data <- rcmetar.build.sequential.metafor.bundle(cont.data, params.cum, cum.results, "cumulative", study.names, plot.data.cum)
+        changed.params <- plot.data$changed.params
+        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+    }
+    # Update params changed while drawing the metafor forest plot
     params <- update.changed.plot.params(params, changed.params)
     # we use the system time as our unique-enough string to store
     # the params object
-    forest.plot.params.path <- save.data(cont.data, res=cum.results, params, two.plot.data)
+    forest.plot.params.path <- save.data(cont.data, res=cum.results, params, plot.data)
     #
     # Now we package the results in a dictionary (technically, a named 
     # vector). In particular, there are two fields that must be returned; 
@@ -734,8 +732,6 @@ cum.ma.diagnostic <- function(fname, diagnostic.data, params){
 	res <- eval(call(fname, diagnostic.data, params.tmp))
 	res.overall <- eval(call(paste(fname, ".overall", sep=""), res))
 	# parse out the overall estimate
-	plot.data <- create.plot.data.diagnostic(diagnostic.data, params, res.overall)
-	# data for standard forest plot
 	
 	####
 	#### SOMETHING MISSING HERE?
@@ -793,18 +789,16 @@ cum.ma.diagnostic <- function(fname, diagnostic.data, params){
 	params.cum$fp_col2_str <- "Cumulative Estimate"
 	# column labels for the cumulative (right-hand) plot
 	plot.data.cum <- create.plot.data.cum(om.data=diagnostic.data, params.cum, res=cum.results)
-	two.plot.data <- list("left"=plot.data, "right"=plot.data.cum)
-	changed.params <- plot.data$changed.params
-	# List of changed params values for standard (left) plot - not cumulative plot!
-	# Currently plot edit can't handle two sets of params values for xticks or plot bounds.
-	# Could be changed in future.
-	params.changed.in.forest.plot <- two.forest.plots(two.plot.data, outpath=forest.path)
-	changed.params <- c(changed.params, params.changed.in.forest.plot)
-	# Update params changed in two.forest.plots
+	if (rcmetar.metafor.default.supported(params.cum)) {
+		plot.data <- rcmetar.build.sequential.metafor.bundle(diagnostic.data, params.cum, cum.results, "cumulative", study.names, plot.data.cum)
+		changed.params <- plot.data$changed.params
+		params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+	}
+	# Update params changed while drawing the metafor forest plot
 	params <- update.changed.plot.params(params, changed.params)
 	# we use the system time as our unique-enough string to store
 	# the params object
-	forest.plot.params.path <- save.data(diagnostic.data, res, params, two.plot.data)
+	forest.plot.params.path <- save.data(diagnostic.data, res, params, plot.data)
 	# Now we package the results in a dictionary (technically, a named 
 	# vector). In particular, there are two fields that must be returned; 
 	# a dictionary of images (mapping titles to image paths) and a list of texts
@@ -956,7 +950,13 @@ loo.ma.continuous <- function(fname, cont.data, params){
     plot.data <- create.plot.data.loo(cont.data, params, res=loo.results)
     changed.params <- plot.data$changed.params
     # list of changed params values
-    params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+    if (rcmetar.metafor.default.supported(params)) {
+        plot.data <- rcmetar.build.sequential.metafor.bundle(cont.data, params, loo.results, "leave-one-out", study.names, plot.data)
+        changed.params <- plot.data$changed.params
+        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+    } else {
+        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+    }
     changed.params <- c(changed.params, params.changed.in.forest.plot)
     params <- update.changed.plot.params(params, changed.params)
     # update params values
@@ -1049,7 +1049,13 @@ subgroup.ma.binary <- function(fname, binary.data, params){
     plot.data <- create.subgroup.plot.data.binary(subgroup.data, params)
     changed.params <- plot.data$changed.params
     # list of changed params values
-    params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+    if (rcmetar.metafor.default.supported(params)) {
+        plot.data <- rcmetar.build.subgroup.metafor.bundle(binary.data, params, subgroup.data, plot.data)
+        changed.params <- plot.data$changed.params
+        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+    } else {
+        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+    }
     changed.params <- c(changed.params, params.changed.in.forest.plot)
     params <- update.changed.plot.params(params, changed.params)
     # update params values
@@ -1083,6 +1089,7 @@ get.subgroup.data.binary <- function(binary.data, cov.val, cov.vals) {
   y.tmp <- binary.data@y[cov.vals == cov.val]
   SE.tmp <- binary.data@SE[cov.vals == cov.val]
   names.tmp <- binary.data@study.names[cov.vals == cov.val]
+  years.tmp <- binary.data@years[cov.vals == cov.val]
   if (length(binary.data@g1O1) > 0){
     g1O1.tmp <- binary.data@g1O1[cov.vals == cov.val]
     g1O2.tmp <- binary.data@g1O2[cov.vals == cov.val]
@@ -1090,9 +1097,11 @@ get.subgroup.data.binary <- function(binary.data, cov.val, cov.vals) {
     g2O2.tmp <- binary.data@g2O2[cov.vals == cov.val]
     subgroup.data <- new('BinaryData', g1O1=g1O1.tmp, 
                           g1O2=g1O2.tmp, g2O1=g2O1.tmp, 
-                          g2O2=g2O2.tmp, y=y.tmp, SE=SE.tmp, study.names=names.tmp)
+                          g2O2=g2O2.tmp, y=y.tmp, SE=SE.tmp, study.names=names.tmp,
+                          years=years.tmp, g1.name=binary.data@g1.name, g2.name=binary.data@g2.name)
   } else {
-    subgroup.data <- new('BinaryData', y=y.tmp, SE=SE.tmp, study.names=names.tmp)
+    subgroup.data <- new('BinaryData', y=y.tmp, SE=SE.tmp, study.names=names.tmp,
+                         years=years.tmp, g1.name=binary.data@g1.name, g2.name=binary.data@g2.name)
   }
   subgroup.data
 }
@@ -1148,7 +1157,13 @@ subgroup.ma.continuous <- function(fname, cont.data, params){
     plot.data <- create.subgroup.plot.data.cont(subgroup.data, params)
     changed.params <- plot.data$changed.params
     # list of changed params values
-    params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+    if (rcmetar.metafor.default.supported(params)) {
+        plot.data <- rcmetar.build.subgroup.metafor.bundle(cont.data, params, subgroup.data, plot.data)
+        changed.params <- plot.data$changed.params
+        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+    } else {
+        params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+    }
     changed.params <- c(changed.params, params.changed.in.forest.plot)
     params <- update.changed.plot.params(params, changed.params)
     # update params values
@@ -1184,6 +1199,7 @@ get.subgroup.data.cont <- function(cont.data, cov.val, cov.vals) {
       y.tmp <- cont.data@y[cov.vals == cov.val]
       SE.tmp <- cont.data@SE[cov.vals == cov.val]
       names.tmp <- cont.data@study.names[cov.vals == cov.val]
+      years.tmp <- cont.data@years[cov.vals == cov.val]
   if (length(cont.data@N1) > 0){
       N1.tmp <- cont.data@N1[cov.vals == cov.val]
       mean1.tmp <- cont.data@mean1[cov.vals == cov.val]
@@ -1195,11 +1211,13 @@ get.subgroup.data.cont <- function(cont.data, cov.val, cov.vals) {
                           N1=N1.tmp, mean1=mean1.tmp , sd1=sd1.tmp, 
                           N2=N2.tmp, mean2=mean2.tmp, sd2=sd2.tmp,
                           y=y.tmp, SE=SE.tmp, 
-                          study.names=names.tmp)
+                          study.names=names.tmp, years=years.tmp,
+                          g1.name=cont.data@g1.name, g2.name=cont.data@g2.name)
     } else {
     subgroup.data <- new('ContinuousData', 
                           y=y.tmp, SE=SE.tmp, 
-                          study.names=names.tmp)
+                          study.names=names.tmp, years=years.tmp,
+                          g1.name=cont.data@g1.name, g2.name=cont.data@g2.name)
     }
     subgroup.data
 }
@@ -1238,7 +1256,7 @@ update.plot.data.multiple <- function(binary.data, params, results) {
         plot.options$show.summary.line <- TRUE
     }
     # plot options passed in via params
-    plot.data <- list(label = c(paste(params$fp_col1_str, sep = ""), binary.data@study.names, "Overall"),
+    plot.data <- list(label = c(rcmetar.forest.study.header.label(params$fp_col1_str), binary.data@study.names, "Overall"),
                     types = c(3, rep(0, length(binary.data@study.names)), 2),
                     scale = scale.str,
                     data.type = data.type,
@@ -1303,141 +1321,19 @@ multiple.loo.diagnostic <- function(fnames, params.list, diagnostic.data) {
     #              fnames
     # diagnostic.data -- the (diagnostic data) that is to be analyzed 
     ###
-    metrics <- c()
     results <- list()
     pretty.names <- diagnostic.fixed.inv.var.pretty.names()
-    sens.spec.outpath <- c()
 	references <- c()
-    for (count in 1:length(params.list)) {
-        metrics <- c(metrics, params.list[[count]]$measure)
-        if (params.list[[count]]$measure=="Sens") {
-            sens.index <- count
-            #sens.spec.outpath <- params.list[[count]]$fp_outpath
-        }
-        if (params.list[[count]]$measure=="Spec") {
-            spec.index <- count
-            #sens.spec.outpath <- params.list[[count]]$fp_outpath
-        }
-        if (params.list[[count]]$measure=="PLR") {
-            plr.index <- count
-            #if (params.list[[count]]$fp_outpath==sens.spec.outpath) {
-            # for future use - check that path names are distinct.    
-            #    params.list[[count]]$fp_outpath <- paste(sub(".png","",sens.spec.outpath), "1.png", sep="")   
-                # if fp_outpath is the same as for sens or spec, append a 1.
-            #}
-        }
-        if (params.list[[count]]$measure=="NLR") {
-            nlr.index <- count
-            #if (params.list[[count]]$fp_outpath==sens.spec.outpath) {
-            #    params.list[[count]]$fp_outpath <- paste(sub(".png","",sens.spec.outpath), "1.png", sep="")   
-            #    # if fp_outpath is the same as for sens or spec, append a 1.
-            #}
-        }
-    }
     
     images <- c()
     plot.names <- c()
     plot.params.paths <- c()
-    remove.indices <- c()
 
-    if (("Sens" %in% metrics) & ("Spec" %in% metrics)) {
-        # create side-by-side forest plots for sens and spec.
-        params.sens <- params.list[[sens.index]]
-        params.spec <- params.list[[spec.index]]
-        params.sens$create.plot <- FALSE
-        params.sens$write.to.file <- FALSE
-        params.spec$create.plot <- FALSE
-        params.spec$write.to.file <- FALSE
-        params.tmp <- list("left"=params.sens, "right"=params.spec)
-        
-        fname <- fnames[sens.index]
-        diagnostic.data.sens <- compute.diag.point.estimates(diagnostic.data, params.sens)
-        diagnostic.data.spec <- compute.diag.point.estimates(diagnostic.data, params.spec)
-        
-        results.sens <- loo.ma.diagnostic(fname, diagnostic.data.sens, params.sens)
-        results.spec <- loo.ma.diagnostic(fname, diagnostic.data.spec, params.spec)
-
-        diagnostic.data.sens.spec <- list("left"=diagnostic.data.sens, "right"=diagnostic.data.spec)
-        
-        summary.sens <- list("Summary"=results.sens$Summary)
-        names(summary.sens) <- paste(eval(parse(text=paste("pretty.names$measure$", params.sens$measure,sep=""))), " Summary", sep="")
-        summary.spec <- list("Summary"=results.spec$Summary)
-        names(summary.spec) <- paste(eval(parse(text=paste("pretty.names$measure$", params.spec$measure,sep=""))), " Summary", sep="")
-        results <- c(results, summary.sens, summary.spec)
-		
-		references <- c(references, results.sens$References) # spec reference will be the same
-        
-        res.sens.spec <- list("left"=results.sens$res, "right"=results.spec$res)
-        plot.data <- create.loo.side.by.side.plot.data(diagnostic.data.sens.spec, params.tmp, res=res.sens.spec)
-        
-        forest.path <- paste(params.sens$fp_outpath, sep="")
-        two.forest.plots(plot.data, outpath=forest.path)
-           
-        forest.plot.params.path <- save.data(om.data=diagnostic.data.sens.spec, res.sens.spec, params=params.tmp, plot.data)
-        plot.params.paths.tmp <- c("Sensitivity and Specificity Forest Plot"=forest.plot.params.path)
-        plot.params.paths <- c(plot.params.paths, plot.params.paths.tmp)
-               
-        images.tmp <- c("Sensitivity and Specificity Forest Plot"=forest.path)
-        images <- c(images, images.tmp)
-        
-        plot.names.tmp <- c("forest plot"="forest.plot")
-        plot.names <- c(plot.names, plot.names.tmp)
-     
-        remove.indices <- c(sens.index, spec.index)
-    }
     
-    if (("NLR" %in% metrics) & ("PLR" %in% metrics)) {
-        # create side-by-side forest plots for NLR and PLR.
-        params.nlr <- params.list[[nlr.index]]
-        params.plr <- params.list[[plr.index]]
-        params.nlr$create.plot <- FALSE
-        params.nlr$write.to.file <- FALSE
-        params.plr$create.plot <- FALSE
-        params.plr$write.to.file <- FALSE
-        params.tmp <- list("left"=params.nlr, "right"=params.plr)
-        
-        fname <- fnames[nlr.index]
-        diagnostic.data.nlr <- compute.diag.point.estimates(diagnostic.data, params.nlr)
-        diagnostic.data.plr <- compute.diag.point.estimates(diagnostic.data, params.plr)
-        results.nlr <- loo.ma.diagnostic(fname, diagnostic.data.nlr, params.nlr)
-        results.plr <- loo.ma.diagnostic(fname, diagnostic.data.plr, params.plr)
-        diagnostic.data.nlr.plr <- list("left"=diagnostic.data.nlr, "right"=diagnostic.data.plr)
-        
-		references <- c(references, results.nlr$References)
-		
-		summary.nlr <- list("Summary"=results.nlr$Summary)
-        names(summary.nlr) <- paste(eval(parse(text=paste("pretty.names$measure$", params.nlr$measure,sep=""))), " Summary", sep="")
-        summary.plr <- list("Summary"=results.plr$Summary)
-        names(summary.plr) <- paste(eval(parse(text=paste("pretty.names$measure$", params.plr$measure,sep=""))), " Summary", sep="")
-        results <- c(results, summary.nlr, summary.plr)
-        
-        res.nlr.plr <- list("left"=results.nlr$res, "right"=results.plr$res)
-        plot.data <- create.loo.side.by.side.plot.data(diagnostic.data.nlr.plr, params.tmp, res=res.nlr.plr)
-        
-        forest.path <- paste(params.nlr$fp_outpath, sep="")
-        two.forest.plots(plot.data, outpath=forest.path)
-           
-        forest.plot.params.path <- save.data(diagnostic.data.nlr.plr, res.nlr.plr, params=params.tmp, plot.data)
-        # Persist plot params so NLR/PLR forest plots can be edited later.
-        plot.params.paths.tmp <- c("NLR and PLR Forest Plot"=forest.plot.params.path)
-        plot.params.paths <- c(plot.params.paths, plot.params.paths.tmp)
-               
-        images.tmp <- c("NLR and PLR Forest Plot"=forest.path)
-        images <- c(images, images.tmp)
-        
-        plot.names.tmp <- c("forest plot"="forest.plot")
-        plot.names <- c(plot.names, plot.names.tmp)
-        
-        remove.indices <- c(remove.indices, nlr.index, plr.index)
-    }
-
-    # remove fnames and params for side-by-side plots
-    fnames <- fnames[setdiff(1:length(fnames), remove.indices)]
-    params.list <- params.list[setdiff(1:length(params.list), remove.indices)]
 
     if (length(params.list) > 0) {
         for (count in 1:length(params.list)) {
-            # create ma summaries and single (not side-by-side) forest plots.
+            # Create summaries and standalone diagnostic forest plots.
             #pretty.names <- eval(call(paste(fnames[count],".pretty.names",sep="")))
             diagnostic.data.tmp <- compute.diag.point.estimates(diagnostic.data, params.list[[count]])
             results.tmp <- loo.ma.diagnostic(fnames[[count]], diagnostic.data.tmp, params.list[[count]])
@@ -1523,12 +1419,18 @@ loo.ma.diagnostic <- function(fname, diagnostic.data, params){
 			diagnostic.random = paste("Diagnostic Random-Effects Model\n\nMetric: ", metric.name, sep=""))
     loo.disp <- create.overall.display(res=loo.results, study.names, params, model.title, data.type="diagnostic")
         
-    if (is.null(params$create.plot)) {
+    if (!identical(params$create.plot, FALSE)) {
         plot.data <- create.plot.data.loo(diagnostic.data, params, res=loo.results)
         forest.path <- paste(params$fp_outpath, sep="")
         changed.params <- plot.data$changed.params
         # list of changed params values
-        params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+        if (rcmetar.metafor.default.supported(params)) {
+            plot.data <- rcmetar.build.sequential.metafor.bundle(diagnostic.data, params, loo.results, "leave-one-out", study.names, plot.data)
+            changed.params <- plot.data$changed.params
+            params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+        } else {
+            params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+        }
         changed.params <- c(changed.params, params.changed.in.forest.plot)
         params <- update.changed.plot.params(params, changed.params)
         # update params values
@@ -1557,25 +1459,6 @@ loo.ma.diagnostic <- function(fname, diagnostic.data, params){
     results
 }
 
-create.loo.side.by.side.plot.data <- function(diagnostic.data, params, res) {    
-    # creates data for two side-by-side leave-one-out forest plots
-    params.left <- params$left
-    params.right <- params$right
-    params.left$fp_show_col1 <- 'TRUE'
-    params.right$fp_show_col1 <- 'FALSE'
-    # only show study names on the left plot
-    res.left <- res$left
-    res.right <- res$right 
-    diagnostic.data.left <- diagnostic.data$left
-    diagnostic.data.right <- diagnostic.data$right
-    study.names <- c("Overall", paste("- ", diagnostic.data.left@study.names, sep=""))
-    plot.data.left <- create.plot.data.loo(diagnostic.data.left, params.left, res.left)
-    plot.data.left$options$fp.title <- pretty.metric.name(as.character(params.left$measure))
-    plot.data.right <- create.plot.data.loo(diagnostic.data.right, params.right, res.right)
-    plot.data.right$options$fp.title <- pretty.metric.name(as.character(params.right$measure))
-    plot.data <- list("left"=plot.data.left, "right"=plot.data.right)
-    plot.data
-}
 
 #################################
 #  subgroup diagnostic methods  #
@@ -1590,158 +1473,20 @@ multiple.subgroup.diagnostic <- function(fnames, params.list, diagnostic.data) {
     #              fnames
     # diagnostic.data -- the (diagnostic data) that is to be analyzed 
     ###
-    metrics <- c()
     results <- list()
     pretty.names <- diagnostic.fixed.inv.var.pretty.names()
-    sens.spec.outpath <- c()
-    for (count in 1:length(params.list)) {
-        metrics <- c(metrics, params.list[[count]]$measure)
-        if (params.list[[count]]$measure=="Sens") {
-            sens.index <- count
-            #sens.spec.outpath <- params.list[[count]]$fp_outpath
-        }
-        if (params.list[[count]]$measure=="Spec") {
-            spec.index <- count
-            #sens.spec.outpath <- params.list[[count]]$fp_outpath
-        }
-        if (params.list[[count]]$measure=="PLR") {
-            plr.index <- count
-            #if (params.list[[count]]$fp_outpath==sens.spec.outpath) {
-            # for future use - check that path names are distinct.    
-            #    params.list[[count]]$fp_outpath <- paste(sub(".png","",sens.spec.outpath), "1.png", sep="")   
-                # if fp_outpath is the same as for sens or spec, append a 1.
-            #}
-        }
-        if (params.list[[count]]$measure=="NLR") {
-            nlr.index <- count
-            #if (params.list[[count]]$fp_outpath==sens.spec.outpath) {
-            #    params.list[[count]]$fp_outpath <- paste(sub(".png","",sens.spec.outpath), "1.png", sep="")   
-            #    # if fp_outpath is the same as for sens or spec, append a 1.
-            #}
-        }
-    }
     cov.name <- as.character(params.list[[1]]$cov_name)
     selected.cov <- get.cov(diagnostic.data, cov.name)
     images <- c()
     plot.names <- c()
     plot.params.paths <- c()
-    remove.indices <- c()
 	references <- c()
 
-    if (("Sens" %in% metrics) & ("Spec" %in% metrics)) {
-        # create side-by-side subgroup forest plots for sens and spec.
-       
-        params.sens <- params.list[[sens.index]]
-        params.spec <- params.list[[spec.index]]
-        params.sens$create.plot <- FALSE
-        params.spec$create.plot <- FALSE
-        params.tmp <- list("left"=params.sens, "right"=params.spec)
-        
-        fname <- fnames[sens.index]
-        diagnostic.data.sens <- compute.diag.point.estimates(diagnostic.data, params.sens)
-        diagnostic.data.spec <- compute.diag.point.estimates(diagnostic.data, params.spec)
-        
-        results.sens <- subgroup.ma.diagnostic(fname, diagnostic.data.sens, params.sens, selected.cov)
-        results.spec <- subgroup.ma.diagnostic(fname, diagnostic.data.spec, params.spec, selected.cov)
-		diagnostic.data.sens.spec <- list("left"=diagnostic.data.sens, "right"=diagnostic.data.spec) ##
-		
-        subgroup.data.sens <- results.sens$subgroup.data
-        subgroup.data.spec <- results.spec$subgroup.data
-        subgroup.data.all <- list("left"=subgroup.data.sens, "right"=subgroup.data.spec)
-		
-		references <- c(references, results.sens$References) # spec reference will be the same
-      
-        summary.sens <- list("Summary"=results.sens$Summary)
-        names(summary.sens) <- paste(eval(parse(text=paste("pretty.names$measure$", params.sens$measure,sep=""))), " Summary", sep="")
-        summary.spec <- list("Summary"=results.spec$Summary)
-        names(summary.spec) <- paste(eval(parse(text=paste("pretty.names$measure$", params.spec$measure,sep=""))), " Summary", sep="")
-        results <- c(results, summary.sens, summary.spec)
-		
-		res.sens.spec <- list("left"=results.sens$res, "right"=results.spec$res) ##
-		
-        #res.sens <- results.sens$res
-        #res.spec <- results.spec$res
-        #res <- list("left"=res.sens, "right"=res.spec)
-        
-        plot.data <- create.subgroup.side.by.side.plot.data(subgroup.data.all, params=params.tmp)
-        
-        forest.path <- paste(params.sens$fp_outpath, sep="")
-        two.forest.plots(plot.data, outpath=forest.path)
-           
-        ######forest.plot.params.path <- save.data(subgroup.data.all, params=params.tmp)
-		forest.plot.params.path <- save.data(om.data=diagnostic.data.sens.spec, res.sens.spec, params=params.tmp, plot.data)
-        plot.params.paths.tmp <- c("Sensitivity and Specificity Forest Plot"=forest.plot.params.path)
-        plot.params.paths <- c(plot.params.paths, plot.params.paths.tmp)
-               
-        images.tmp <- c("Sensitivity and Specificity Forest Plot"=forest.path)
-        images <- c(images, images.tmp)
-        
-        plot.names.tmp <- c("forest plot"="forest.plot")
-        plot.names <- c(plot.names, plot.names.tmp)
-     
-        remove.indices <- c(sens.index, spec.index)
-    }
     
-    if (("NLR" %in% metrics) & ("PLR" %in% metrics)) {
-        # create side-by-side forest plots for NLR and PLR.
-        params.nlr <- params.list[[nlr.index]]
-        params.plr <- params.list[[plr.index]]
-        params.nlr$create.plot <- FALSE
-        params.plr$create.plot <- FALSE
-        params.tmp <- list("left"=params.nlr, "right"=params.plr)
-        
-        fname <- fnames[nlr.index]
-        diagnostic.data.nlr <- compute.diag.point.estimates(diagnostic.data, params.nlr)
-        diagnostic.data.plr <- compute.diag.point.estimates(diagnostic.data, params.plr)
-        
-        results.nlr <- subgroup.ma.diagnostic(fname, diagnostic.data.nlr, params.nlr, selected.cov)
-        results.plr <- subgroup.ma.diagnostic(fname, diagnostic.data.plr, params.plr, selected.cov)
-		diagnostic.data.nlr.plr <- list("left"=diagnostic.data.nlr, "right"=diagnostic.data.plr)  ###
-		
-        subgroup.data.nlr <- results.nlr$subgroup.data
-        subgroup.data.plr <- results.plr$subgroup.data
-        subgroup.data.all <- list("left"=subgroup.data.nlr, "right"=subgroup.data.plr)
-		
-		references <- c(references, results.nlr$References)
-        
-        summary.nlr <- list("Summary"=results.nlr$Summary)
-        names(summary.nlr) <- paste(eval(parse(text=paste("pretty.names$measure$", params.nlr$measure,sep=""))), " Summary", sep="")
-        summary.plr <- list("Summary"=results.plr$Summary)
-        names(summary.plr) <- paste(eval(parse(text=paste("pretty.names$measure$", params.plr$measure,sep=""))), " Summary", sep="")
-        results <- c(results, summary.nlr, summary.plr)
-		
-		res.nlr.plr <- list("left"=results.nlr$res, "right"=results.plr$res) ##
-        
-        #res.nlr <- results.nlr$res
-        #res.plr <- results.plr$res
-        #res <- list("left"=res.nlr, "right"=res.plr)
-        
-        plot.data <- create.subgroup.side.by.side.plot.data(subgroup.data.all, params.tmp)
-        
-        forest.path <- paste(params.nlr$fp_outpath, sep="")
-        two.forest.plots(plot.data, outpath=forest.path)
-        
-		forest.plot.params.path <- save.data(diagnostic.data.nlr.plr, res.nlr.plr, params=params.tmp, plot.data)
-        ######forest.plot.params.path <- save.data(subgroup.data.all, params=params.tmp)
-        plot.params.paths.tmp <- c("NLR and PLR Forest Plot"=forest.plot.params.path)
-        plot.params.paths <- c(plot.params.paths, plot.params.paths.tmp)
-               
-        images.tmp <- c("NLR and PLR Forest Plot"=forest.path)
-        images <- c(images, images.tmp)
-        
-        plot.names.tmp <- c("forest plot"="forest.plot")
-        plot.names <- c(plot.names, plot.names.tmp)
-        
-        remove.indices <- c(remove.indices, nlr.index, plr.index)
-    }
-
-    # remove fnames and params for side-by-side plots
-    fnames <- fnames[setdiff(1:length(fnames), remove.indices)]
-    params.list <- params.list[setdiff(1:length(params.list), remove.indices)]
 
     if (length(params.list) > 0) {
         for (count in 1:length(params.list)) {
-            # create ma summaries and single (not side-by-side) forest plots.
+            # Create summaries and standalone diagnostic forest plots.
             #pretty.names <- eval(call(paste(fnames[count],".pretty.names",sep="")))
             diagnostic.data.tmp <- compute.diag.point.estimates(diagnostic.data, params.list[[count]])
             results.tmp <- subgroup.ma.diagnostic(fnames[[count]], diagnostic.data.tmp, params.list[[count]], selected.cov)
@@ -1821,7 +1566,13 @@ subgroup.ma.diagnostic <- function(fname, diagnostic.data, params, selected.cov)
         plot.data <- create.subgroup.plot.data.diagnostic(subgroup.data, params)
         changed.params <- plot.data$changed.params
         # list of changed params values
-        params.changed.in.forest.plot <- forest.plot(forest.data=plot.data, outpath=forest.path)
+        if (rcmetar.metafor.default.supported(params)) {
+            plot.data <- rcmetar.build.subgroup.metafor.bundle(diagnostic.data, params, subgroup.data, plot.data)
+            changed.params <- plot.data$changed.params
+            params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+        } else {
+            params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
+        }
         changed.params <- c(changed.params, params.changed.in.forest.plot)
         params <- update.changed.plot.params(params, changed.params)
         # update params values
@@ -1857,6 +1608,7 @@ get.subgroup.data.diagnostic <- function(diagnostic.data, cov.val, cov.vals) {
   y.tmp <- diagnostic.data@y[cov.vals == cov.val]
   SE.tmp <- diagnostic.data@SE[cov.vals == cov.val]
   names.tmp <- diagnostic.data@study.names[cov.vals == cov.val]
+  years.tmp <- diagnostic.data@years[cov.vals == cov.val]
   if (length(diagnostic.data@TP) > 0){
     TP.tmp <- diagnostic.data@TP[cov.vals==cov.val]
     FN.tmp <- diagnostic.data@FN[cov.vals==cov.val]
@@ -1864,29 +1616,11 @@ get.subgroup.data.diagnostic <- function(diagnostic.data, cov.val, cov.vals) {
     FP.tmp <- diagnostic.data@FP[cov.vals==cov.val]
     subgroup.data <- new('DiagnosticData', TP=TP.tmp, 
                           FN=FN.tmp , TN=TN.tmp, 
-                          FP=FP.tmp, y=y.tmp, SE=SE.tmp, study.names=names.tmp)
+                          FP=FP.tmp, y=y.tmp, SE=SE.tmp, study.names=names.tmp,
+                          years=years.tmp)
   } else {
-    subgroup.data <- new('DiagnosticData', y=y.tmp, SE=SE.tmp, study.names=names.tmp)
+    subgroup.data <- new('DiagnosticData', y=y.tmp, SE=SE.tmp, study.names=names.tmp,
+                         years=years.tmp)
   }
   subgroup.data
-}
-
-create.subgroup.side.by.side.plot.data <- function(subgroup.data, params) {    
-    # creates data for two side-by-side forest plots
-    params.left <- params$left
-    params.right <- params$right
-    params.left$fp_show_col1 <- 'TRUE'
-    params.right$fp_show_col1 <- 'FALSE'
-    # only show study names on the left plot
-    subgroup.data.left <- subgroup.data$left
-    subgroup.data.right <- subgroup.data$right
-    
-    plot.data.left <- create.subgroup.plot.data.diagnostic(subgroup.data.left, params.left)
-    plot.data.left$options$fp.title <- pretty.metric.name(as.character(params.left$measure))
-      
-    plot.data.right <- create.subgroup.plot.data.diagnostic(subgroup.data.right, params.right)
-    plot.data.right$options$fp.title <- pretty.metric.name(as.character(params.right$measure))
-    
-    plot.data <- list("left"=plot.data.left, "right"=plot.data.right)
-    plot.data
 }

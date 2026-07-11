@@ -18,7 +18,6 @@ UI_MODULES = {
     "src/rc_metastudio/forms/cov_subgroup_dlg.ui": "src/rc_metastudio/forms/ui_cov_subgroup_dlg.py",
     "src/rc_metastudio/forms/csv_import_page.ui": "src/rc_metastudio/forms/ui_csv_import_page.py",
     "src/rc_metastudio/forms/data_type_page.ui": "src/rc_metastudio/forms/ui_data_type_page.py",
-    "src/rc_metastudio/forms/diag_explain_form.ui": "src/rc_metastudio/forms/ui_diagnostic_explain_dlg.py",
     "src/rc_metastudio/forms/diagnostic_data_form.ui": "src/rc_metastudio/forms/ui_diagnostic_data_form.py",
     "src/rc_metastudio/forms/diagnostic_metrics.ui": "src/rc_metastudio/forms/ui_diagnostic_metrics.py",
     "src/rc_metastudio/forms/edit_dialog2.ui": "src/rc_metastudio/forms/ui_edit_dialog.py",

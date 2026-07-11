@@ -140,8 +140,7 @@ def test_identity_audit_accepts_current_project_and_rcmetar_boundaries(tmp_path)
     )
     write_text(
         tmp_path / "pyproject.toml",
-        'name = "rc-metastudio"\n'
-        'description = "RC MetaStudio environment."\n',
+        'name = "rc-metastudio"\ndescription = "RC MetaStudio environment."\n',
     )
 
     result = run_audit(tmp_path)

@@ -5,7 +5,7 @@
 #                                  #
 # RC MetaStudio                #
 # ----                             #
-# utilities.r                      #
+# utilities.R                      #
 #                                  #
 # Utilities for pretty-printing    #
 # results.                         #
@@ -219,11 +219,34 @@ create.repeat.string <- function(symbol, num.repeats) {
   repeat.string
 }
  
+RCMETAR_DEFAULT_DISPLAY_DIGITS <- 2L
+RCMETAR_MINIMUM_P_VALUE_DIGITS <- 3L
+
+display.digits <- function(params=NULL, minimum=0L) {
+  digits <- RCMETAR_DEFAULT_DISPLAY_DIGITS
+  if (!is.null(params) && !is.null(params$digits) && length(params$digits) > 0) {
+    candidate <- suppressWarnings(as.integer(params$digits[[1]]))
+    if (!is.na(candidate) && candidate >= 0) {
+      digits <- candidate
+    }
+  }
+  max(as.integer(minimum), digits)
+}
+
+p.value.display.digits <- function(digits=RCMETAR_DEFAULT_DISPLAY_DIGITS) {
+  candidate <- suppressWarnings(as.integer(digits[[1]]))
+  if (length(candidate) == 0 || is.na(candidate) || candidate < 0) {
+    candidate <- RCMETAR_DEFAULT_DISPLAY_DIGITS
+  }
+  max(RCMETAR_MINIMUM_P_VALUE_DIGITS, candidate)
+}
+
 round.display <- function(x, digits) {
   digits.str <- paste("%.", digits, "f", sep="")
-  x.disp <- c()
-  x.disp[x < 10^(-digits)] <- paste("< ", 10^(-digits), sep="")
-  x.disp[x >= 10^(-digits)] <- sprintf(digits.str, x[x>=10^(-digits)])
+  x.disp <- rep("", length(x))
+  finite <- is.finite(x)
+  x.disp[finite] <- sprintf(digits.str, x[finite])
+  x.disp[!finite & is.na(x)] <- NA_character_
   x.disp
 }
 
@@ -249,7 +272,12 @@ format.p.value.display <- function(value, digits) {
   if (display.value.is.missing(value)) {
     return("")
   }
-  round.display(value, digits)
+  digits <- p.value.display.digits(digits)
+  threshold <- 10^(-digits)
+  formatted <- round.display(value, digits)
+  small.nonnegative <- is.finite(value) & value >= 0 & value < threshold
+  formatted[small.nonnegative] <- paste("< ", threshold, sep="")
+  formatted
 }
 
 g.round.display.zval <- function(x, digits) {
@@ -271,12 +299,15 @@ g.round.display.zval <- function(x, digits) {
 
 create.summary.disp <- function(om.data, params, res, model.title) {
   # create tables for diplaying summary of ma results
-  digits.str <- paste("%.", params$digits, "f", sep="")
+  result.digits <- display.digits(params)
+  se.digits <- display.digits(params, minimum=3L)
+  digits.str <- paste("%.", result.digits, "f", sep="")
+  se.digits.str <- paste("%.", se.digits, "f", sep="")
   transform.name <- get.transform.name(om.data)
   scale.str <- get.scale(params)
   tau2 <- format.numeric.display(res$tau2, digits.str)
   degf <- res$k - 1
-  I2 <- format.percent.display(res$I2, digits.str)
+  I2 <- format.percent.display(res$I2, "%.1f")
   QLabel =  paste("Q(df=", degf, ")", sep="")
   # Set n, the vector of numbers of studies, for PFT metric.
   if (params$measure=="PFT" && length(om.data@g1O1) > 0 && length(om.data@g1O2) > 0) {
@@ -296,7 +327,7 @@ create.summary.disp <- function(om.data, params, res, model.title) {
   y.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(res$b, ni=n))
   lb.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(res$ci.lb, ni=n))
   ub.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(res$ci.ub, ni=n))
-  se <- sprintf(digits.str, res$se)
+  se <- sprintf(se.digits.str, res$se)
 
   if (res$method=="FE") {
     het.col.labels <- c(QLabel, "Het. p-value")
@@ -412,6 +443,12 @@ save.data <- function(om.data, res, params, plot.data, out.path=NULL) {
   }
 
   save(om.data, file=paste(out.path, ".data", sep=""))
+  if (inherits(plot.data$regeneration_state, "rcmetar_forest_regeneration_state")) {
+    res <- plot.data$regeneration_state
+    for (param.name in names(res$param_overrides)) {
+      params[[param.name]] <- res$param_overrides[[param.name]]
+    }
+  }
   save(res, file=paste(out.path, ".res", sep=""))
   
   save(plot.data, file=paste(out.path, ".plotdata", sep=""))
@@ -466,11 +503,13 @@ create.regression.display <- function(res, params, display.data) {
     
   reg.array <- array(dim=c(length(cov.display.col)+1, length(col.labels)), dimnames=list(NULL, col.labels))
   reg.array[1,] <- col.labels
-  digits.str <- paste("%.", params$digits, "f", sep="")
+  result.digits <- display.digits(params)
+  se.digits <- display.digits(params, minimum=3L)
+  digits.str <- paste("%.", result.digits, "f", sep="")
   coeffs <- sprintf(digits.str, res$b)#; print(paste(c("coeffs:", coeffs))); ###
   if (bootstrap.type!="boot.meta.reg") {
-    se <- round.display(res$se, digits=params$digits)
-    pvals <- round.display(res$pval, digits=params$digits)
+    se <- round.display(res$se, digits=se.digits)
+    pvals <- format.p.value.display(res$pval, params$digits)
   }
   lbs <- sprintf(digits.str, res$ci.lb)
   ubs <- sprintf(digits.str, res$ci.ub)
@@ -486,7 +525,6 @@ create.regression.display <- function(res, params, display.data) {
   if (n.factor.covs > 0) {
     # there are factor covariants - insert spaces for reference var. row.
     insert.row <- n.cont.rows + 1
-    print(paste(c("insert.row outer: ", insert.row)))
     for (count in 1:n.factor.covs) {
     n.levels <- factor.n.levels[count]
     #print(paste(c("n.levels", n.levels))) #####
@@ -516,7 +554,7 @@ create.regression.display <- function(res, params, display.data) {
     reg.array[2:n.rows, "p-value"] <- pvals.tmp
     
     omnibus.pval.array <- array(dim=c(1,1))
-    omnibus.pval.array[1,1] <- round.display(res$QMp, digits=params$digits)
+    omnibus.pval.array[1,1] <- format.p.value.display(res$QMp, params$digits)
     arrays <- list(arr1=reg.array, arr2=omnibus.pval.array)
   } else {
     arrays <- list(arr1=reg.array)
@@ -571,7 +609,8 @@ adjusted_means_display <- function(res, params, display.data) {
   }
 
   mult <- get.mult.from.conf.level(params$conf.level)
-  digits.str <- paste("%.", params$digits, "f", sep="")
+  digits.str <- paste("%.", display.digits(params), "f", sep="")
+  se.digits.str <- paste("%.", display.digits(params, minimum=3L), "f", sep="")
 
   design.matrix <- cbind(
     Intercept=rep(1, n.levels),
@@ -605,7 +644,7 @@ adjusted_means_display <- function(res, params, display.data) {
   adj.array[2:(n.levels + 1), "Estimate"] <- sprintf(digits.str, estimates.disp)
   adj.array[2:(n.levels + 1), "Lower bound"] <- sprintf(digits.str, ci.lb.disp)
   adj.array[2:(n.levels + 1), "Upper bound"] <- sprintf(digits.str, ci.ub.disp)
-  adj.array[2:(n.levels + 1), "Std. error"] <- sprintf(digits.str, se)
+  adj.array[2:(n.levels + 1), "Std. error"] <- sprintf(se.digits.str, se)
 
   metric.name <- pretty.metric.name(as.character(params$measure))
   model.title <- paste("Adjusted Means\n\nMetric: ", metric.name, sep="")
@@ -640,11 +679,12 @@ create.overall.display <- function(res, study.names, params, model.title, data.t
     lb <- res[[count]]$ci.lb
     ub <- res[[count]]$ci.ub
     se <- res[[count]]$se
-    digits.str <- paste("%.", params$digits, "f", sep="")
+    digits.str <- paste("%.", display.digits(params), "f", sep="")
+    se.digits.str <- paste("%.", display.digits(params, minimum=3L), "f", sep="")
     y.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(y, n=NULL))
     lb.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(lb, n=NULL))
     ub.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(ub, n=NULL))
-    se.disp <- sprintf(digits.str, se)
+    se.disp <- sprintf(se.digits.str, se)
     
     pVal <- format.p.value.display(res[[count]]$pval, params$digits)
     overall.array[count+1,] <- c(study.names[count], y.disp, lb.disp, ub.disp, se.disp, pVal)
@@ -690,11 +730,12 @@ create.subgroup.display <- function(res, study.names, params, model.title, data.
     lb <- res[[count]]$ci.lb
     ub <- res[[count]]$ci.ub
     se <- res[[count]]$se
-    digits.str <- paste("%.", params$digits, "f", sep="")
+    digits.str <- paste("%.", display.digits(params), "f", sep="")
+    se.digits.str <- paste("%.", display.digits(params, minimum=3L), "f", sep="")
     y.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(y, n))
     lb.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(lb, n))
     ub.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(ub, n))
-    se.disp <- sprintf(digits.str, se)
+    se.disp <- sprintf(se.digits.str, se)
     if (!display.value.is.missing(res[[count]]$QE)) {
       degf <- res[[count]]$k - 1
       QE <- sprintf(digits.str, res[[count]]$QE)
@@ -702,7 +743,7 @@ create.subgroup.display <- function(res, study.names, params, model.title, data.
     } else {
       QE <- ""
     }
-    I2 <- format.percent.display(res[[count]]$I2, digits.str)
+    I2 <- format.percent.display(res[[count]]$I2, "%.1f")
     QEp <- format.p.value.display(res[[count]]$QEp, params$digits)
     pVal <- format.p.value.display(res[[count]]$pval, params$digits)
     zVal <- g.round.display.zval(res[[count]]$zval, digits=params$digits)

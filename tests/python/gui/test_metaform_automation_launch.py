@@ -15,6 +15,22 @@ from PyQt5.QtWidgets import QHeaderView
 REPO_ROOT = os.getcwd()
 
 
+def _plot_capability(
+    plot_kind="forest",
+    editable=True,
+    styleable=True,
+    composition="single",
+    regenerator="forest",
+):
+    return {
+        "plot_kind": plot_kind,
+        "editable": editable,
+        "styleable": styleable,
+        "composition": composition,
+        "regenerator": regenerator,
+    }
+
+
 def _assert_compact_table_fits_visible_cells(table):
     owner = table.window()
     owner.resize(owner.width() + 180, owner.height())
@@ -47,7 +63,9 @@ def _assert_compact_table_fits_visible_cells(table):
     vertical_header_width = 0
     if not table.verticalHeader().isHidden():
         vertical_header_width = table.verticalHeader().sizeHint().width()
-    required_width = vertical_header_width + sum(content_widths) + 2 * table.frameWidth()
+    required_width = (
+        vertical_header_width + sum(content_widths) + 2 * table.frameWidth()
+    )
     assert table.minimumWidth() >= required_width
 
     if not table_is_measurable:
@@ -386,7 +404,9 @@ def test_main_data_grid_leaves_spare_width_outside_data_columns(sample_project):
 
     app, window = launch.start_automation()
     try:
-        assert window.open(os.path.abspath(os.path.join("sample_projects", sample_project)))
+        assert window.open(
+            os.path.abspath(os.path.join("sample_projects", sample_project))
+        )
 
         _assert_table_view_leaves_spare_width_outside_data_columns(window.tableView)
     finally:
@@ -404,7 +424,9 @@ def test_undo_immediately_after_open_does_not_clear_loaded_project(sample_projec
 
     app, window = launch.start_automation()
     try:
-        assert window.open(os.path.abspath(os.path.join("sample_projects", sample_project)))
+        assert window.open(
+            os.path.abspath(os.path.join("sample_projects", sample_project))
+        )
 
         loaded_model = window.model
         loaded_row_count = loaded_model.rowCount()
@@ -558,7 +580,9 @@ def test_automation_launch_opens_meantime_project_and_enables_subgroup_analysis(
     app, window = launch.start_automation()
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "meantime.rcms")))
+            window.open(
+                os.path.abspath(os.path.join("sample_projects", "meantime.rcms"))
+            )
             is True
         )
 
@@ -609,7 +633,9 @@ def test_opened_sample_projects_return_native_table_values_for_pyqt5_rendering()
         app, window = launch.start_automation()
         try:
             assert (
-                window.open(os.path.abspath(os.path.join("sample_projects", project_name)))
+                window.open(
+                    os.path.abspath(os.path.join("sample_projects", project_name))
+                )
                 is True
             )
             model = window.tableView.model()
@@ -964,8 +990,8 @@ def test_standard_meta_analysis_opens_specs_and_runs_through_backend(monkeypatch
             def __init__(self, result, parent=None):
                 shown.append((result, parent))
 
-            def show(self):
-                shown.append("shown")
+            def showMaximized(self):
+                shown.append("maximized")
 
         def run(method, params, _method=method_name):
             calls.append(method)
@@ -1007,7 +1033,8 @@ def test_standard_meta_analysis_opens_specs_and_runs_through_backend(monkeypatch
 
         try:
             assert (
-                window.open(os.path.abspath(os.path.join("sample_projects", name))) is True
+                window.open(os.path.abspath(os.path.join("sample_projects", name)))
+                is True
             )
 
             window.action_go.trigger()
@@ -1022,7 +1049,7 @@ def test_standard_meta_analysis_opens_specs_and_runs_through_backend(monkeypatch
                     {"texts": {"Summary": "%s model" % method_name}, "images": {}},
                     window,
                 ),
-                "shown",
+                "maximized",
             ]
         finally:
             window.close()
@@ -1051,7 +1078,7 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         "rm.method": "DL",
         "to": "only0",
         "conf.level": 95.0,
-        "digits": 3,
+        "digits": 2,
         "adjust": 0.5,
         "theta.lower": -2.0,
     }
@@ -1077,8 +1104,8 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
             "description": "Level at which to compute confidence intervals",
         },
         "digits": {
-            "pretty.name": "Number of digits",
-            "description": "Number of digits to display in results",
+            "pretty.name": "Decimal places",
+            "description": "Decimal places for displayed estimates and intervals; p-values use at least 3",
         },
         "adjust": {
             "pretty.name": "Correction factor",
@@ -1155,13 +1182,12 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
             )
             + 48
         )
-        assert widest_method_label > qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
         assert (
-            method_combo.minimumWidth()
-            == min(
-                widest_method_label,
-                qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH,
-            )
+            widest_method_label > qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
+        )
+        assert method_combo.minimumWidth() == min(
+            widest_method_label,
+            qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH,
         )
         assert (
             method_combo.maximumWidth()
@@ -1256,7 +1282,7 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         assert specs[0].current_param_vals["rm.method"] == "DL"
         assert specs[0].current_param_vals["to"] == "only0"
         assert specs[0].current_param_vals["conf.level"] == 95.0
-        assert specs[0].current_param_vals["digits"] == 3
+        assert specs[0].current_param_vals["digits"] == 2
         assert specs[0].current_param_vals["adjust"] == 0.5
         assert specs[0].current_param_vals["theta.lower"] == -2.5
     finally:
@@ -1369,12 +1395,12 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
     params = {
         "binary.random": (
             {"rm.method": ["DL", "SJ"], "conf.level": "float", "digits": "float"},
-            {"rm.method": "DL", "conf.level": 95.0, "digits": 3},
+            {"rm.method": "DL", "conf.level": 95.0, "digits": 2},
             ["rm.method", "conf.level", "digits"],
         ),
         "binary.fixed.mh": (
             {"to": ["only0", "all"], "conf.level": "float", "digits": "float"},
-            {"to": "only0", "conf.level": 95.0, "digits": 3},
+            {"to": "only0", "conf.level": 95.0, "digits": 2},
             ["to", "conf.level", "digits"],
         ),
     }
@@ -1392,8 +1418,8 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
             "description": "Level at which to compute confidence intervals",
         },
         "digits": {
-            "pretty.name": "Number of digits",
-            "description": "Number of digits to display in results",
+            "pretty.name": "Decimal places",
+            "description": "Decimal places for displayed estimates and intervals; p-values use at least 3",
         },
     }
 
@@ -1441,9 +1467,7 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
         assert stable_minimum_width >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
         assert specs.layout().sizeConstraint() == QtWidgets.QLayout.SetFixedSize
         assert specs.maximumSize() == specs.minimumSize()
-        assert (
-            specs.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Fixed
-        )
+        assert specs.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Fixed
         assert specs.sizePolicy().verticalPolicy() == QtWidgets.QSizePolicy.Fixed
         assert specs.isSizeGripEnabled() is False
 
@@ -1536,7 +1560,8 @@ def test_required_advanced_analysis_actions_open_real_gui_dialogs(monkeypatch):
 
         try:
             assert (
-                window.open(os.path.abspath(os.path.join("sample_projects", name))) is True
+                window.open(os.path.abspath(os.path.join("sample_projects", name)))
+                is True
             )
             cov_values = {
                 study.name: index
@@ -1564,6 +1589,41 @@ def test_required_advanced_analysis_actions_open_real_gui_dialogs(monkeypatch):
             window.close()
             app.processEvents()
             os.chdir(REPO_ROOT)
+
+
+def test_meta_regression_uses_shared_method_covariates_and_plots_dialog(monkeypatch):
+    import launch
+
+    app, window = launch.start_automation()
+    meta_form = sys.modules["meta_form"]
+    built = []
+    shown = []
+
+    class SharedSpecsDialog(object):
+        pass
+
+    def build_specs(**kwargs):
+        built.append(kwargs)
+        return SharedSpecsDialog()
+
+    monkeypatch.setattr(window, "_build_analysis_specs_dialog", build_specs)
+    monkeypatch.setattr(meta_form.qt_layout, "show_centered", shown.append)
+
+    try:
+        window.meta_reg()
+
+        assert built == [
+            {
+                "meta_f_str": "meta-regression",
+                "conf_level": window.model.get_global_conf_level(),
+            }
+        ]
+        assert len(shown) == 1
+        assert isinstance(shown[0], SharedSpecsDialog)
+    finally:
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
 
 
 def test_meta_regression_action_stays_disabled_without_covariates_when_data_are_enabled():
@@ -1805,8 +1865,8 @@ def test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe(monke
         def __init__(self, result, parent=None):
             shown.append((result, parent))
 
-        def show(self):
-            shown.append("shown")
+        def showMaximized(self):
+            shown.append("maximized")
 
     def run_meta_regression(dataset, studies, covariates, metric, **kwargs):
         shown.append(
@@ -1870,7 +1930,7 @@ def test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe(monke
                 },
                 window,
             ),
-            "shown",
+            "maximized",
         ]
 
         factor_column = window.model.columnCount() - 1
@@ -1942,16 +2002,61 @@ def test_sequential_analysis_results_use_results_window(monkeypatch):
         def __init__(self, result, parent=None):
             shown.append((result, parent))
 
-        def show(self):
-            shown.append("shown")
+        def showMaximized(self):
+            shown.append("maximized")
 
     monkeypatch.setattr(meta_form.results_window, "ResultsWindow", ResultDialog)
 
     try:
         window.analysis(results)
 
-        assert shown == [(results, window), "shown"]
+        assert shown == [(results, window), "maximized"]
     finally:
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
+def test_analysis_opens_results_window_maximized_and_fits_svg_plot(tmp_path):
+    import launch
+    import results_window
+
+    plot_path = tmp_path / "forest.svg"
+    plot_path.write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="800">'
+        '<rect width="1600" height="800" fill="white"/>'
+        "</svg>",
+        encoding="utf-8",
+    )
+    app, window = launch.start_automation()
+    try:
+        window.analysis(
+            {
+                "texts": {},
+                "images": {"Forest Plot": str(plot_path)},
+                "plot_capabilities": {
+                    "Forest Plot": _plot_capability(editable=False),
+                },
+            }
+        )
+        app.processEvents()
+
+        result_windows = window.findChildren(results_window.ResultsWindow)
+        assert len(result_windows) == 1
+        result_window = result_windows[0]
+        assert result_window.isVisible()
+        assert result_window.isMaximized()
+        plot_item = next(
+            item
+            for item in result_window.scene.items()
+            if isinstance(item, results_window.QGraphicsSvgItem)
+        )
+        viewport_width = result_window.graphics_view.viewport().width()
+        assert plot_item.sceneBoundingRect().width() >= viewport_width * 0.9
+        assert plot_item.sceneBoundingRect().width() <= viewport_width
+    finally:
+        for result_window in window.findChildren(results_window.ResultsWindow):
+            result_window.close()
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -1979,6 +2084,7 @@ def test_results_window_renders_summary_text_and_plot_navigation(tmp_path):
             "image_var_names": {"Forest Plot": "forest_plot"},
             "image_params_paths": {"Forest Plot": str(tmp_path / "forest_params")},
             "image_order": ["Forest Plot"],
+            "plot_capabilities": {"Forest Plot": _plot_capability()},
         }
     )
 
@@ -1999,7 +2105,498 @@ def test_results_window_renders_summary_text_and_plot_navigation(tmp_path):
             isinstance(item, results_window.QGraphicsPixmapItem)
             for item in window.scene.items()
         )
+        pixmap_item = next(
+            item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsPixmapItem)
+        )
+        assert pixmap_item.pixmap().width() <= image.width()
         assert window.graphics_view.scene() is window.scene
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_results_window_displays_canonical_svg_plot_artifact(tmp_path):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    plot_path = tmp_path / "forest.png"
+    svg_path = tmp_path / "forest.display.svg"
+    image = results_window.QImage(1600, 800, results_window.QImage.Format_RGB32)
+    image.fill(results_window.Qt.white)
+    assert image.save(str(plot_path), "PNG")
+    svg_path.write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="800">'
+        '<rect width="1600" height="800" fill="white"/>'
+        '<text x="20" y="60">Forest Plot</text>'
+        "</svg>",
+        encoding="utf-8",
+    )
+
+    window = results_window.ResultsWindow(
+        {
+            "texts": {},
+            "images": {"Forest Plot": str(plot_path)},
+            "display_images": {"Forest Plot": str(svg_path)},
+            "image_var_names": {"Forest Plot": "forest_plot"},
+            "image_params_paths": {"Forest Plot": str(tmp_path / "forest_params")},
+            "image_order": ["Forest Plot"],
+            "plot_capabilities": {"Forest Plot": _plot_capability()},
+        }
+    )
+
+    try:
+        window.show()
+        app.processEvents()
+        svg_items = [
+            item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsSvgItem)
+        ]
+        pixmap_items = [
+            item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsPixmapItem)
+        ]
+
+        assert len(svg_items) == 1
+        assert pixmap_items == []
+        assert svg_items[0].scale() < 1.0
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_results_window_refits_svg_plots_and_reflows_sections_on_resize(tmp_path):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    plot_paths = {}
+    for name in ("forest", "cumulative"):
+        plot_path = tmp_path / (name + ".svg")
+        plot_path.write_text(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200">'
+            '<rect width="400" height="200" fill="white"/>'
+            "</svg>",
+            encoding="utf-8",
+        )
+        plot_paths[name] = str(plot_path)
+
+    reference = "Responsive plot reference"
+    window = results_window.ResultsWindow(
+        {
+            "texts": {"References": reference},
+            "images": {
+                "Forest Plot": plot_paths["forest"],
+                "Cumulative Forest Plot": plot_paths["cumulative"],
+            },
+            "image_order": ["Forest Plot", "Cumulative Forest Plot"],
+            "plot_capabilities": {
+                "Forest Plot": _plot_capability(editable=False),
+                "Cumulative Forest Plot": _plot_capability(
+                    plot_kind="cumulative_forest", editable=False
+                ),
+            },
+        }
+    )
+
+    try:
+        window.resize(1200, 800)
+        window.show()
+        app.processEvents()
+
+        svg_items = sorted(
+            (
+                item
+                for item in window.scene.items()
+                if isinstance(item, results_window.QGraphicsSvgItem)
+            ),
+            key=lambda item: item.scenePos().y(),
+        )
+        text_items = {
+            item.toPlainText(): item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsTextItem)
+        }
+
+        def assert_sections_are_separated():
+            assert (
+                text_items["Cumulative Forest Plot"].sceneBoundingRect().top()
+                - svg_items[0].sceneBoundingRect().bottom()
+                >= results_window.SECTION_SPACING
+            )
+            assert (
+                text_items["References"].sceneBoundingRect().top()
+                - svg_items[1].sceneBoundingRect().bottom()
+                >= results_window.SECTION_SPACING
+            )
+
+        def assert_plot_fills_viewport(plot_item):
+            plot_width = plot_item.sceneBoundingRect().width()
+            assert plot_width >= window.graphics_view.viewport().width() * 0.9
+            assert plot_width <= window.graphics_view.viewport().width()
+
+        assert len(svg_items) == 2
+        first_width = svg_items[0].sceneBoundingRect().width()
+        first_height = svg_items[0].sceneBoundingRect().height()
+        assert_plot_fills_viewport(svg_items[0])
+        assert first_width / first_height == pytest.approx(2.0)
+        assert_sections_are_separated()
+
+        window.resize(1600, 800)
+        app.processEvents()
+
+        second_width = svg_items[0].sceneBoundingRect().width()
+        second_height = svg_items[0].sceneBoundingRect().height()
+        assert second_width > first_width
+        assert_plot_fills_viewport(svg_items[0])
+        assert second_width / second_height == pytest.approx(2.0)
+        assert svg_items[0].scale() <= 4.0
+        assert_sections_are_separated()
+
+        window.resize(3000, 800)
+        app.processEvents()
+
+        assert svg_items[0].scale() == pytest.approx(4.0)
+        assert svg_items[0].sceneBoundingRect().width() == pytest.approx(1600)
+        assert_sections_are_separated()
+
+        splitter_width = window.results_nav_splitter.width()
+        window.results_nav_splitter.setSizes([splitter_width - 100, 100])
+        window.results_nav_splitter.splitterMoved.emit(0, 0)
+        app.processEvents()
+
+        narrow_viewport_width = window.graphics_view.viewport().width()
+        assert svg_items[0].sceneBoundingRect().width() <= narrow_viewport_width
+        assert_sections_are_separated()
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_results_window_refits_svg_after_viewport_geometry_settles(tmp_path):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    plot_path = tmp_path / "forest.svg"
+    plot_path.write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="800">'
+        '<rect width="1600" height="800" fill="white"/>'
+        "</svg>",
+        encoding="utf-8",
+    )
+    window = results_window.ResultsWindow(
+        {
+            "texts": {},
+            "images": {"Forest Plot": str(plot_path)},
+            "plot_capabilities": {
+                "Forest Plot": _plot_capability(editable=False),
+            },
+        }
+    )
+
+    try:
+        window.showMaximized()
+        app.processEvents()
+        plot_item = next(
+            item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsSvgItem)
+        )
+        initial_width = plot_item.sceneBoundingRect().width()
+        initial_view_width = window.graphics_view.width()
+        initial_viewport_width = window.graphics_view.viewport().width()
+        assert initial_width >= initial_viewport_width * 0.9
+        assert initial_width <= initial_viewport_width
+
+        settled_width = initial_view_width - 300
+        window.graphics_view.resize(settled_width, window.graphics_view.height())
+        app.processEvents()
+
+        viewport_width = window.graphics_view.viewport().width()
+        assert viewport_width < initial_width
+        available_width = viewport_width - window.x_coord - results_window.padding
+        assert plot_item.sceneBoundingRect().width() == pytest.approx(available_width)
+
+        shrunken_width = plot_item.sceneBoundingRect().width()
+        window.graphics_view.resize(initial_view_width, window.graphics_view.height())
+        app.processEvents()
+
+        grown_viewport_width = window.graphics_view.viewport().width()
+        grown_available_width = (
+            grown_viewport_width - window.x_coord - results_window.padding
+        )
+        assert plot_item.sceneBoundingRect().width() > shrunken_width
+        assert plot_item.sceneBoundingRect().width() == pytest.approx(
+            grown_available_width
+        )
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_results_window_refits_raster_fallback_from_original_source(tmp_path):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    plot_path = tmp_path / "legacy-plot.png"
+    image = results_window.QImage(
+        1600, 800, results_window.QImage.Format_ARGB32
+    )
+    image.fill(0xFFFFFFFF)
+    assert image.save(str(plot_path), "PNG")
+    window = results_window.ResultsWindow(
+        {
+            "texts": {},
+            "images": {"Legacy Plot": str(plot_path)},
+            "plot_capabilities": {
+                "Legacy Plot": _plot_capability(
+                    plot_kind="other",
+                    editable=False,
+                    styleable=False,
+                    regenerator="none",
+                ),
+            },
+        }
+    )
+
+    try:
+        window.showMaximized()
+        app.processEvents()
+        plot_item = next(
+            item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsPixmapItem)
+        )
+        initial_width = plot_item.sceneBoundingRect().width()
+        initial_view_width = window.graphics_view.width()
+        initial_available_width = (
+            window.graphics_view.viewport().width()
+            - window.x_coord
+            - results_window.padding
+        )
+        assert initial_width == pytest.approx(initial_available_width, abs=5)
+
+        window.graphics_view.resize(
+            initial_view_width - 300, window.graphics_view.height()
+        )
+        app.processEvents()
+        shrunken_width = plot_item.sceneBoundingRect().width()
+        shrunken_available_width = (
+            window.graphics_view.viewport().width()
+            - window.x_coord
+            - results_window.padding
+        )
+        assert shrunken_width < initial_width
+        assert shrunken_width == pytest.approx(shrunken_available_width, abs=5)
+
+        window.graphics_view.resize(initial_view_width, window.graphics_view.height())
+        app.processEvents()
+        assert plot_item.sceneBoundingRect().width() == pytest.approx(
+            initial_width, abs=5
+        )
+        assert plot_item.source_pixmap.width() == 1600
+        assert plot_item.source_pixmap.height() == 800
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_results_window_refits_svg_plot_after_in_place_regenerate(tmp_path):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    plot_path = tmp_path / "forest.svg"
+
+    def write_svg(width, height):
+        plot_path.write_text(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d">'
+            '<rect width="%d" height="%d" fill="white"/>'
+            "</svg>" % (width, height, width, height),
+            encoding="utf-8",
+        )
+
+    write_svg(400, 200)
+    window = results_window.ResultsWindow(
+        {
+            "texts": {
+                "Summary": "Meta-analysis summary.",
+                "Weights": "Study weights remain readable after the plot.",
+            },
+            "images": {"Forest Plot": str(plot_path)},
+            "plot_capabilities": {
+                "Forest Plot": _plot_capability(editable=False),
+            },
+        }
+    )
+
+    try:
+        window.resize(1200, 800)
+        window.show()
+        app.processEvents()
+        plot_item = next(
+            item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsSvgItem)
+        )
+        initial_width = plot_item.sceneBoundingRect().width()
+        weights_title = next(
+            item
+            for item in window.scene.items()
+            if isinstance(item, QtWidgets.QGraphicsTextItem)
+            and "Weights" in item.toPlainText()
+        )
+        initial_weights_y = weights_title.scenePos().y()
+        viewport_width = window.graphics_view.viewport().width()
+        assert initial_width >= viewport_width * 0.9
+        assert initial_width <= viewport_width
+
+        write_svg(800, 400)
+        artifact = window.create_plot_artifact("Forest Plot", str(plot_path))
+        window._refresh_plot_item(plot_item, artifact, str(plot_path))
+        app.processEvents()
+
+        refreshed_width = plot_item.sceneBoundingRect().width()
+        refreshed_height = plot_item.sceneBoundingRect().height()
+        refreshed_viewport_width = window.graphics_view.viewport().width()
+        assert refreshed_width >= refreshed_viewport_width * 0.9
+        assert refreshed_width <= refreshed_viewport_width
+        assert refreshed_width / refreshed_height == pytest.approx(2.0)
+        assert (
+            weights_title.sceneBoundingRect().top()
+            >= plot_item.sceneBoundingRect().bottom()
+        )
+
+        write_svg(400, 800)
+        window._refresh_plot_item(plot_item, artifact, str(plot_path))
+        app.processEvents()
+
+        assert (
+            weights_title.sceneBoundingRect().top()
+            >= plot_item.sceneBoundingRect().bottom()
+        )
+
+        write_svg(400, 100)
+        window._refresh_plot_item(plot_item, artifact, str(plot_path))
+        app.processEvents()
+
+        assert (
+            weights_title.sceneBoundingRect().top()
+            >= plot_item.sceneBoundingRect().bottom()
+        )
+        assert weights_title.scenePos().y() < initial_weights_y
+
+        fresh_window = results_window.ResultsWindow(
+            {
+                "texts": {
+                    "Summary": "Meta-analysis summary.",
+                    "Weights": "Study weights remain readable after the plot.",
+                },
+                "images": {"Forest Plot": str(plot_path)},
+                "plot_capabilities": {
+                    "Forest Plot": _plot_capability(editable=False),
+                },
+            }
+        )
+        try:
+            fresh_window.resize(1200, 800)
+            fresh_window.show()
+            app.processEvents()
+            fresh_weights_title = next(
+                item
+                for item in fresh_window.scene.items()
+                if isinstance(item, QtWidgets.QGraphicsTextItem)
+                and item.toPlainText() == "Weights"
+            )
+            assert weights_title.scenePos().y() == pytest.approx(
+                fresh_weights_title.scenePos().y()
+            )
+        finally:
+            fresh_window.close()
+            app.processEvents()
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_results_window_reflows_sections_after_raster_plot_regenerate(tmp_path):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    plot_path = tmp_path / "forest.png"
+
+    def write_plot(width, height):
+        image = results_window.QImage(
+            width, height, results_window.QImage.Format_ARGB32
+        )
+        image.fill(0xFFFFFFFF)
+        assert image.save(str(plot_path))
+
+    write_plot(400, 200)
+    window = results_window.ResultsWindow(
+        {
+            "texts": {
+                "Summary": "Meta-analysis summary.",
+                "Weights": "Study weights remain readable after the plot.",
+            },
+            "images": {"Forest Plot": str(plot_path)},
+            "plot_capabilities": {
+                "Forest Plot": _plot_capability(editable=False),
+            },
+        }
+    )
+
+    try:
+        window.resize(1200, 800)
+        window.show()
+        app.processEvents()
+        plot_item = next(
+            item
+            for item in window.scene.items()
+            if isinstance(item, QtWidgets.QGraphicsPixmapItem)
+        )
+        weights_title = next(
+            item
+            for item in window.scene.items()
+            if isinstance(item, QtWidgets.QGraphicsTextItem)
+            and item.toPlainText() == "Weights"
+        )
+
+        write_plot(400, 800)
+        artifact = window.create_plot_artifact("Forest Plot", str(plot_path))
+        window._refresh_plot_item(plot_item, artifact, str(plot_path))
+        app.processEvents()
+
+        assert (
+            weights_title.sceneBoundingRect().top()
+            - plot_item.sceneBoundingRect().bottom()
+            >= results_window.SECTION_SPACING
+        )
     finally:
         window.close()
         app.processEvents()
@@ -2033,6 +2630,7 @@ def test_results_window_places_references_after_images_and_wraps_them(tmp_path):
             "image_var_names": {"Forest Plot": "forest_plot"},
             "image_params_paths": {"Forest Plot": str(tmp_path / "forest_params")},
             "image_order": ["Forest Plot"],
+            "plot_capabilities": {"Forest Plot": _plot_capability()},
         }
     )
 
@@ -2189,12 +2787,15 @@ def test_results_window_text_context_menu_is_reentrant_safe(monkeypatch):
         FakeMenu.current.aboutToHide.emit()
         text_items[0].contextMenuEvent(FakeEvent())
         assert len(popups) == 2
+        FakeMenu.current.aboutToHide.emit()
     finally:
         window.close()
         app.processEvents()
 
 
-def test_results_window_figure_context_menus_only_offer_save_actions(monkeypatch):
+def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_plots(
+    monkeypatch,
+):
     import launch
     import test_backend_compat
 
@@ -2253,40 +2854,1189 @@ def test_results_window_figure_context_menus_only_offer_save_actions(monkeypatch
 
     try:
         menu_cases = [
-            ("plot.data", "Forest Plot", "forest"),
-            ("plot.data", "Sensitivity and Specificity", "forest"),
-            ("plot.data", "Regression Plot", "regression"),
-            (None, "Forest Plot", "forest"),
+            ("plot.data", "Forest Plot", "forest", True, "forest"),
+            ("plot.data", "Cumulative Forest Plot", "cumulative_forest", True, "forest"),
+            ("plot.data", "Leave-one-out Forest plot", "leave_one_out_forest", True, "forest"),
+            ("plot.data", "Subgroup Forest Plot", "subgroup_forest", True, "forest"),
+            ("plot.data", "Subgroups Forest Plot", "subgroup_forest", True, "forest"),
+            ("plot.data", "Sensitivity Forest Plot", "forest", True, "forest"),
+            ("plot.data", "Specificity Forest Plot", "forest", True, "forest"),
+            ("plot.data", "Negative Likelihood Ratio Forest Plot", "forest", True, "forest"),
+            ("plot.data", "Positive Likelihood Ratio Forest Plot", "forest", True, "forest"),
+            ("plot.data", "Regression Plot", "regression", True, "regression"),
+            ("plot.data", "A title without a plot hint", "forest", True, "forest"),
+            ("plot.data", "Forest Plot", "other", False, "none"),
+            (None, "Forest Plot", "forest", False, "forest"),
         ]
 
-        for params_path, title, plot_type in menu_cases:
+        for params_path, title, plot_kind, editable, regenerator in menu_cases:
             event = FakeEvent()
-            handler = window._make_context_menu(
-                params_path,
+            artifact = results_window.PlotArtifact(
                 title,
                 "missing.png",
-                qpixmap_item=None,
-                plot_type=plot_type,
+                _plot_capability(
+                    plot_kind=plot_kind,
+                    editable=editable,
+                    styleable=plot_kind not in ("other", "roc", "sroc"),
+                    regenerator=regenerator,
+                ),
+                params_path=params_path,
             )
+            handler = window._make_context_menu(artifact, plot_item=None)
             handler(event)
             assert event.accepted is True
             FakeMenu.current.aboutToHide.emit()
+            expected_actions = [
+                "Save PDF Image As",
+                "Save PNG Image As",
+                "Save TIFF Image As",
+                "Save SVG Image As",
+            ]
+            if editable:
+                expected_actions.insert(0, "Edit Plot")
+            if params_path is None:
+                expected_actions = ["Save PNG Image As"]
+            assert popups[-1] == (results_window.QPoint(10, 20), expected_actions)
+    finally:
+        window.close()
+        app.processEvents()
 
-        assert popups == [
-            (
-                results_window.QPoint(10, 20),
-                ["Save PDF Image As", "Save PNG Image As"],
-            ),
-            (
-                results_window.QPoint(10, 20),
-                ["Save PDF Image As", "Save PNG Image As"],
-            ),
-            (
-                results_window.QPoint(10, 20),
-                ["Save PDF Image As", "Save PNG Image As"],
-            ),
-            (results_window.QPoint(10, 20), ["Save PNG Image As"]),
+
+@pytest.mark.parametrize(
+    ("title", "plot_kind"),
+    (
+        ("Cumulative Forest Plot", "cumulative_forest"),
+        ("Leave-one-out Forest Plot", "leave_one_out_forest"),
+        ("Subgroup Forest Plot", "subgroup_forest"),
+    ),
+)
+def test_results_window_applies_forest_edits_to_selected_variant_artifact(
+    tmp_path, monkeypatch, title, plot_kind
+):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    params_path = str(tmp_path / plot_kind)
+    image_path = tmp_path / (plot_kind + ".svg")
+    image_path.write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200">'
+        '<rect width="400" height="200" fill="white"/>'
+        "</svg>",
+        encoding="utf-8",
+    )
+    calls = []
+
+    class FakeSignal(object):
+        def __init__(self):
+            self.callback = None
+
+        def connect(self, callback):
+            self.callback = callback
+
+        def emit(self):
+            self.callback()
+
+    class FakeDialog(object):
+        def __init__(self, plot_params, dialog_image_path, parent=None):
+            calls.append(("dialog", plot_params, dialog_image_path))
+            self.applied = FakeSignal()
+
+        def plot_params(self):
+            return {"fp_outpath": str(image_path)}
+
+        def exec(self):
+            self.applied.emit()
+
+    window = results_window.ResultsWindow(
+        {
+            "texts": {},
+            "images": {title: str(image_path)},
+            "image_params_paths": {title: params_path},
+            "image_order": [title],
+            "plot_capabilities": {
+                title: _plot_capability(plot_kind=plot_kind)
+            },
+        }
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "load_vars_for_plot",
+        lambda path, return_params_dict=False: {"fp_col1_str": "Study"},
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "update_plot_params",
+        lambda *a, **k: None,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "regenerate_plot_data",
+        lambda: None,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "generate_forest_plot",
+        lambda path: image_path.write_text(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="800">'
+            '<rect width="400" height="800" fill="white"/>'
+            "</svg>",
+            encoding="utf-8",
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "write_out_plot_data",
+        lambda path: None,
+        raising=False,
+    )
+    monkeypatch.setattr(results_window, "EditForestPlotDialog", FakeDialog)
+
+    try:
+        window.resize(1200, 800)
+        window.show()
+        app.processEvents()
+        plot_item = next(
+            item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsSvgItem)
+        )
+        artifact = window.create_plot_artifact(
+            title, str(image_path), params_path=params_path
+        )
+
+        window.edit_plot(artifact, plot_item)
+        app.processEvents()
+
+        assert calls == [("dialog", {"fp_col1_str": "Study"}, str(image_path))]
+        assert (
+            plot_item.sceneBoundingRect().width()
+            / plot_item.sceneBoundingRect().height()
+            == pytest.approx(0.5)
+        )
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_results_window_save_handler_regenerates_cumulative_forest_as_single_panel(
+    tmp_path, monkeypatch
+):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    calls = []
+    window = results_window.ResultsWindow(
+        {
+            "texts": {},
+            "images": {},
+            "image_var_names": {},
+            "image_params_paths": {},
+            "image_order": [],
+        }
+    )
+    artifact = results_window.PlotArtifact(
+        "Cumulative Forest Plot",
+        str(tmp_path / "forest.png"),
+        _plot_capability(plot_kind="cumulative_forest", editable=False),
+        params_path=str(tmp_path / "forest_params"),
+    )
+
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "load_in_R",
+        lambda path: calls.append(("load", path)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "generate_forest_plot",
+        lambda path: calls.append(("forest", path)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.QFileDialog,
+        "getSaveFileName",
+        lambda *args, **kwargs: (str(tmp_path / "saved.pdf"), ""),
+    )
+
+    try:
+        window.save_image_as(artifact, format="pdf")
+
+        assert calls == [
+            ("load", "%s.plotdata" % artifact.params_path),
+            ("forest", str(tmp_path / "saved.pdf")),
         ]
+    finally:
+        window.close()
+        app.processEvents()
+
+
+@pytest.mark.parametrize("extension", ["pdf", "png", "tiff", "svg"])
+def test_results_window_save_handler_accepts_backend_export_formats(
+    tmp_path, monkeypatch, extension
+):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    calls = []
+    window = results_window.ResultsWindow(
+        {
+            "texts": {},
+            "images": {},
+            "image_var_names": {},
+            "image_params_paths": {},
+            "image_order": [],
+        }
+    )
+    artifact = results_window.PlotArtifact(
+        "Forest Plot",
+        str(tmp_path / "forest.png"),
+        _plot_capability(),
+        params_path=str(tmp_path / "forest_params"),
+    )
+
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "load_in_R",
+        lambda path: calls.append(("load", path)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "generate_forest_plot",
+        lambda path: calls.append(("forest", path)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.QFileDialog,
+        "getSaveFileName",
+        lambda *args, **kwargs: (str(tmp_path / ("saved.%s" % extension)), ""),
+    )
+
+    try:
+        window.save_image_as(artifact, format=extension)
+
+        assert calls == [
+            ("load", "%s.plotdata" % artifact.params_path),
+            ("forest", str(tmp_path / ("saved.%s" % extension))),
+        ]
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_results_window_save_handler_preserves_requested_format_when_extension_is_omitted(
+    tmp_path, monkeypatch
+):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    calls = []
+    window = results_window.ResultsWindow(
+        {
+            "texts": {},
+            "images": {},
+            "image_var_names": {},
+            "image_params_paths": {},
+            "image_order": [],
+        }
+    )
+    artifact = results_window.PlotArtifact(
+        "Forest Plot",
+        str(tmp_path / "forest.png"),
+        _plot_capability(),
+        params_path=str(tmp_path / "forest_params"),
+    )
+
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "load_in_R",
+        lambda path: calls.append(("load", path)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "generate_forest_plot",
+        lambda path: calls.append(("forest", path)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.QFileDialog,
+        "getSaveFileName",
+        lambda *args, **kwargs: (str(tmp_path / "saved"), ""),
+    )
+
+    try:
+        window.save_image_as(artifact, format="svg")
+
+        assert calls == [
+            ("load", "%s.plotdata" % artifact.params_path),
+            ("forest", str(tmp_path / "saved.svg")),
+        ]
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_edit_forest_plot_dialog_round_trips_style_and_appearance_params(monkeypatch):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    dialog = results_window.EditForestPlotDialog(
+        {
+            "fp_style": "default",
+            "fp_col1_str": "Study or Subgroup",
+            "fp_col2_str": "[default]",
+            "fp_col3_str": "Treatment",
+            "fp_col4_str": "Control",
+            "fp_show_col1": True,
+            "fp_show_col2": True,
+            "fp_show_col3": True,
+            "fp_show_col4": True,
+            "fp_show_raw_counts": True,
+            "fp_show_headers": True,
+            "fp_show_annotation": True,
+            "fp_accent_color": "#2f5597",
+            "fp_point_size_multiplier": 1.0,
+            "fp_xlabel": "[default]",
+            "fp_plot_lb": "[default]",
+            "fp_plot_ub": "[default]",
+            "fp_xticks": "[default]",
+            "fp_show_summary_line": True,
+        },
+        "forest.png",
+    )
+
+    try:
+        assert dialog.style_cbo.currentText() == "Default (metafor)"
+        dialog.style_cbo.setCurrentText("BMJ")
+        dialog.show_raw_counts.setChecked(False)
+        dialog.show_headers.setChecked(False)
+        dialog.show_annotation.setChecked(False)
+        dialog.point_size_multiplier.setValue(1.75)
+
+        params = dialog.plot_params()
+
+        assert params["fp_style"] == "bmj"
+        assert params["fp_accent_color"] == "#6b58a6"
+        assert params["fp_show_raw_counts"] is False
+        assert params["fp_show_headers"] is False
+        assert params["fp_show_annotation"] is False
+        assert params["fp_point_size_multiplier"] == 1.75
+    finally:
+        dialog.close()
+        app.processEvents()
+
+
+def test_shared_plot_options_surface_uses_default_arm_labels():
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+    from forms.ui_ma_specs import Ui_Dialog
+    from plot_defaults import apply_default_forest_arm_labels
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    analysis_dialog = QtWidgets.QDialog()
+    analysis_form = Ui_Dialog()
+    analysis_form.setupUi(analysis_dialog)
+    apply_default_forest_arm_labels(analysis_form)
+    edit_dialog = results_window.EditForestPlotDialog({}, "forest.png")
+
+    try:
+        assert analysis_form.col3_str_edit.text() == "Intervention"
+        assert analysis_form.col4_str_edit.text() == "Control"
+        assert edit_dialog.col3_str_edit.text() == "Intervention"
+        assert edit_dialog.col4_str_edit.text() == "Control"
+    finally:
+        edit_dialog.close()
+        analysis_dialog.close()
+        app.processEvents()
+
+
+def test_plot_text_inputs_enforce_publication_readability_limit():
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+    from plot_text import PLOT_TEXT_INPUT_LIMIT
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    dialog = results_window.EditForestPlotDialog({}, "forest.png")
+
+    try:
+        fields = (
+            dialog.col1_str_edit,
+            dialog.col2_str_edit,
+            dialog.col3_str_edit,
+            dialog.col4_str_edit,
+            dialog.x_lbl_le,
+        )
+        for field in fields:
+            assert field.maxLength() == PLOT_TEXT_INPUT_LIMIT
+            assert "publication readability" in field.toolTip()
+            field.setText("x" * (PLOT_TEXT_INPUT_LIMIT + 20))
+            assert len(field.text()) == PLOT_TEXT_INPUT_LIMIT
+        assert dialog.plot_lb_le.maxLength() > PLOT_TEXT_INPUT_LIMIT
+        assert dialog.plot_ub_le.maxLength() > PLOT_TEXT_INPUT_LIMIT
+        assert dialog.x_ticks_le.maxLength() > PLOT_TEXT_INPUT_LIMIT
+    finally:
+        dialog.close()
+        app.processEvents()
+
+
+def test_edit_plot_dialog_flags_truncated_legacy_plot_text():
+    from PyQt5 import QtTest
+
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+    from plot_text import PLOT_TEXT_INPUT_LIMIT
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    dialog = results_window.EditForestPlotDialog(
+        {"fp_col1_str": "x" * (PLOT_TEXT_INPUT_LIMIT + 20)}, "forest.png"
+    )
+    try:
+        assert len(dialog.col1_str_edit.text()) == PLOT_TEXT_INPUT_LIMIT
+        assert dialog.col1_str_edit.property("plotTextWasTruncated") is True
+        assert "original is retained" in dialog.col1_str_edit.toolTip()
+        assert dialog.plot_params()["fp_col1_str"] == "x" * (PLOT_TEXT_INPUT_LIMIT + 20)
+        dialog.col1_str_edit.setFocus()
+        dialog.col1_str_edit.selectAll()
+        QtTest.QTest.keyClicks(dialog.col1_str_edit, "replacement")
+        assert dialog.plot_params()["fp_col1_str"] == "replacement"
+    finally:
+        dialog.close()
+        app.processEvents()
+
+
+def test_edit_forest_plot_dialog_apply_stays_open_and_ok_applies_and_closes():
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    dialog = results_window.EditForestPlotDialog({}, "forest.png")
+    applied = []
+    dialog.applied.connect(lambda: applied.append(True))
+
+    try:
+        dialog.show()
+        app.processEvents()
+        apply_button = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.Apply)
+        ok_button = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.Ok)
+
+        assert apply_button is not None
+        assert ok_button is not None
+        apply_button.click()
+        app.processEvents()
+
+        assert applied == [True]
+        assert dialog.isVisible() is True
+
+        ok_button.click()
+        app.processEvents()
+
+        assert applied == [True, True]
+        assert dialog.result() == QtWidgets.QDialog.Accepted
+        assert dialog.isVisible() is False
+    finally:
+        dialog.close()
+        app.processEvents()
+
+
+def test_edit_regression_plot_dialog_shows_only_bubble_options():
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    dialog = results_window.EditForestPlotDialog(
+        {
+            "bp_style": "bmj",
+            "bp_accent_color": "#123456",
+            "bp_point_size_multiplier": 1.5,
+            "bp_xlabel": "Latitude",
+            "bp_plot_lb": "0.25",
+            "bp_plot_ub": "4",
+            "bp_xticks": "0.5, 1, 2",
+            "bp_show_regression_line": True,
+            "bp_show_confidence_band": False,
+            "bp_show_prediction_interval": True,
+            "bp_show_legend": True,
+        },
+        "regression.png",
+        plot_type="regression",
+    )
+
+    try:
+        assert dialog.groupBox.isHidden()
+        assert dialog.default_panel.isHidden()
+        assert dialog.show_summary_line.isHidden()
+        assert not dialog.regression_group.isHidden()
+
+        params = dialog.plot_params()
+
+        assert params == {
+            "bp_style": "bmj",
+            "bp_accent_color": "#123456",
+            "bp_point_size_multiplier": 1.5,
+            "bp_xlabel": "Latitude",
+            "bp_plot_lb": "0.25",
+            "bp_plot_ub": "4",
+            "bp_xticks": "0.5, 1, 2",
+            "bp_show_regression_line": True,
+            "bp_show_confidence_band": False,
+            "bp_show_prediction_interval": True,
+            "bp_show_legend": True,
+            "bp_outpath": "regression.png",
+        }
+    finally:
+        dialog.close()
+        app.processEvents()
+
+
+def test_apply_regression_plot_edits_rebuilds_and_redraws_bubble_plot(
+    tmp_path, monkeypatch
+):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    calls = []
+    params_path = str(tmp_path / "regression_params")
+    image_path = str(tmp_path / "regression.png")
+    display_path = str(tmp_path / "regression.display.svg")
+    Path(display_path).write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200">'
+        '<rect width="400" height="200" fill="white"/>'
+        "</svg>",
+        encoding="utf-8",
+    )
+
+    class FakeDialog(object):
+        def plot_params(self):
+            return {
+                "bp_style": "revman",
+                "bp_show_confidence_band": False,
+                "bp_outpath": image_path,
+                "bp_display_path": display_path,
+            }
+
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "update_plot_params",
+        lambda params, write_them_out=False, outpath=None: calls.append(
+            ("update", params, write_them_out, outpath)
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "regenerate_regression_plot_data",
+        lambda: calls.append(("regenerate",)),
+        raising=False,
+    )
+    def generate_reg_plot(path):
+        calls.append(("draw", path))
+        height = 300 + 100 * sum(call[0] == "draw" for call in calls)
+        Path(display_path).write_text(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="%d">'
+            '<rect width="400" height="%d" fill="white"/>'
+            "</svg>" % (height, height),
+            encoding="utf-8",
+        )
+
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "generate_reg_plot",
+        generate_reg_plot,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "write_out_plot_data",
+        lambda path: calls.append(("write", path)),
+        raising=False,
+    )
+
+    window = results_window.ResultsWindow(
+        {
+            "texts": {},
+            "images": {"Regression Plot": image_path},
+            "display_images": {"Regression Plot": display_path},
+            "image_params_paths": {"Regression Plot": params_path},
+            "image_order": ["Regression Plot"],
+            "plot_capabilities": {
+                "Regression Plot": _plot_capability(
+                    plot_kind="regression", regenerator="regression"
+                )
+            },
+        }
+    )
+    try:
+        window.resize(1200, 800)
+        window.show()
+        app.processEvents()
+        plot_item = next(
+            item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsSvgItem)
+        )
+        artifact = window.create_plot_artifact(
+            "Regression Plot", image_path, params_path=params_path
+        )
+
+        window._apply_regression_plot_edits(FakeDialog(), artifact, plot_item)
+        window._apply_regression_plot_edits(FakeDialog(), artifact, plot_item)
+        app.processEvents()
+
+        assert artifact.display_image_path == display_path
+        assert sum(call[0] == "update" for call in calls) == 2
+        assert sum(call[0] == "draw" for call in calls) == 2
+        assert all(
+            call[1]["bp_display_path"] == display_path
+            for call in calls
+            if call[0] == "update"
+        )
+        assert plot_item.boundingRect().height() == pytest.approx(500)
+
+        initial_width = plot_item.sceneBoundingRect().width()
+        view_width = window.graphics_view.width()
+        window.graphics_view.resize(view_width - 200, window.graphics_view.height())
+        app.processEvents()
+        assert plot_item.sceneBoundingRect().width() < initial_width
+        window.graphics_view.resize(view_width, window.graphics_view.height())
+        app.processEvents()
+        assert plot_item.sceneBoundingRect().width() > initial_width - 5
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_pre_run_plots_tab_exports_style_and_appearance_params(monkeypatch):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import ma_specs
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+
+    class PlotDefaultsForm(object):
+        pass
+
+    form = PlotDefaultsForm()
+    form.current_param_vals = {}
+    form.style_cbo = QtWidgets.QComboBox()
+    form.style_cbo.addItems(["Default (metafor)", "RevMan", "BMJ"])
+    form.style_cbo.setCurrentText("RevMan")
+    form.show_1 = QtWidgets.QCheckBox()
+    form.show_1.setChecked(True)
+    form.col1_str_edit = QtWidgets.QLineEdit("Study or Subgroup")
+    form.show_2 = QtWidgets.QCheckBox()
+    form.show_2.setChecked(False)
+    form.col2_str_edit = QtWidgets.QLineEdit("[default]")
+    form.show_3 = QtWidgets.QCheckBox()
+    form.show_3.setChecked(True)
+    form.col3_str_edit = QtWidgets.QLineEdit("Treatment")
+    form.show_4 = QtWidgets.QCheckBox()
+    form.show_4.setChecked(True)
+    form.col4_str_edit = QtWidgets.QLineEdit("Control")
+    form.x_lbl_le = QtWidgets.QLineEdit("Odds Ratio")
+    form.image_path = QtWidgets.QLineEdit("forest.png")
+    form.plot_lb_le = QtWidgets.QLineEdit("[default]")
+    form.plot_ub_le = QtWidgets.QLineEdit("[default]")
+    form.x_ticks_le = QtWidgets.QLineEdit("[default]")
+    form.show_summary_line = QtWidgets.QCheckBox()
+    form.show_summary_line.setChecked(True)
+    form.show_raw_counts = QtWidgets.QCheckBox()
+    form.show_raw_counts.setChecked(False)
+    form.show_headers = QtWidgets.QCheckBox()
+    form.show_headers.setChecked(False)
+    form.show_annotation = QtWidgets.QCheckBox()
+    form.show_annotation.setChecked(False)
+    form.accent_color = QtWidgets.QLineEdit("#123456")
+    form.point_size_multiplier = QtWidgets.QDoubleSpinBox()
+    form.point_size_multiplier.setValue(1.5)
+
+    ma_specs.add_plot_params(form)
+
+    assert form.current_param_vals["fp_style"] == "revman"
+    assert form.current_param_vals["fp_accent_color"] == "#123456"
+    assert form.current_param_vals["fp_point_size_multiplier"] == 1.5
+    assert form.current_param_vals["fp_show_raw_counts"] is False
+    assert form.current_param_vals["fp_show_headers"] is False
+    assert form.current_param_vals["fp_show_annotation"] is False
+    assert form.current_param_vals["fp_col3_str"] == "Treatment"
+    assert form.current_param_vals["fp_col4_str"] == "Control"
+    assert form.current_param_vals["fp_display_path"].endswith(".display.svg")
+    assert Path(form.current_param_vals["fp_display_path"]).parent != Path(".")
+    app.processEvents()
+
+
+def test_meta_regression_pre_run_plot_options_use_bubble_parameter_contract():
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import ma_specs
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+
+    class RegressionPlotForm(object):
+        meta_f_str = "meta-regression"
+
+    form = RegressionPlotForm()
+    form.current_param_vals = {}
+    form.style_cbo = QtWidgets.QComboBox()
+    form.style_cbo.addItems(["Default (metafor)", "RevMan", "BMJ"])
+    form.style_cbo.setCurrentText("BMJ")
+    form.accent_color = QtWidgets.QLineEdit("#654321")
+    form.point_size_multiplier = QtWidgets.QDoubleSpinBox()
+    form.point_size_multiplier.setValue(1.25)
+    form.x_lbl_le = QtWidgets.QLineEdit("Latitude")
+    form.x_ticks_le = QtWidgets.QLineEdit("-20, 0, 20")
+    form.plot_lb_le = QtWidgets.QLineEdit("-30")
+    form.plot_ub_le = QtWidgets.QLineEdit("30")
+    form.image_path = QtWidgets.QLineEdit("regression.png")
+    form.show_regression_line = QtWidgets.QCheckBox()
+    form.show_regression_line.setChecked(True)
+    form.show_confidence_band = QtWidgets.QCheckBox()
+    form.show_confidence_band.setChecked(False)
+    form.show_prediction_interval = QtWidgets.QCheckBox()
+    form.show_prediction_interval.setChecked(True)
+    form.show_legend = QtWidgets.QCheckBox()
+    form.show_legend.setChecked(True)
+
+    ma_specs.add_plot_params(form)
+
+    display_path = form.current_param_vals.pop("bp_display_path")
+    assert display_path.endswith(".display.svg")
+    assert Path(display_path).parent != Path(".")
+    assert form.current_param_vals == {
+        "bp_style": "bmj",
+        "bp_accent_color": "#654321",
+        "bp_point_size_multiplier": 1.25,
+        "bp_xlabel": "Latitude",
+        "bp_xticks": "-20, 0, 20",
+        "bp_plot_lb": "-30",
+        "bp_plot_ub": "30",
+        "bp_outpath": "regression.png",
+        "bp_show_regression_line": True,
+        "bp_show_confidence_band": False,
+        "bp_show_prediction_interval": True,
+        "bp_show_legend": True,
+    }
+    app.processEvents()
+
+
+def test_meta_regression_acceptance_passes_all_dialog_choices_to_adapter(monkeypatch):
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import ma_specs
+    import meta_globals
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    calls = []
+
+    class Covariate(object):
+        name = "latitude"
+        data_type = meta_globals.CONTINUOUS
+
+    class Study(object):
+        def __init__(self, study_id):
+            self.id = study_id
+
+    studies = [Study(1), Study(2)]
+    covariate = Covariate()
+
+    class Dataset(object):
+        def get_values_for_cov(self, name, ids_for_keys=False):
+            assert name == "latitude"
+            assert ids_for_keys is True
+            return {1: -10.0, 2: 20.0}
+
+    class Model(object):
+        current_effect = "OR"
+        dataset = Dataset()
+
+        def get_studies(self, only_if_included=False):
+            assert only_if_included is True
+            return studies
+
+    class Parent(object):
+        def analysis(self, result):
+            calls.append(("analysis", result))
+
+    class Form(object):
+        meta_f_str = "meta-regression"
+        data_type = "binary"
+        conf_level = 95.0
+        model = Model()
+        current_param_vals = {
+            "rm.method": "SJ",
+            "conf.level": 90.0,
+            "digits": 4,
+        }
+        _parent = Parent()
+
+        def _selected_covariates(self):
+            return [covariate]
+
+        def parent(self):
+            return self._parent
+
+        def accept(self):
+            calls.append(("accepted",))
+
+    form = Form()
+    form.fixed_effects_radio = QtWidgets.QRadioButton()
+    form.fixed_effects_radio.setChecked(True)
+    form.style_cbo = QtWidgets.QComboBox()
+    form.style_cbo.addItems(["Default (metafor)", "RevMan", "BMJ"])
+    form.style_cbo.setCurrentText("RevMan")
+    form.accent_color = QtWidgets.QLineEdit("#123456")
+    form.point_size_multiplier = QtWidgets.QDoubleSpinBox()
+    form.point_size_multiplier.setValue(1.5)
+    form.x_lbl_le = QtWidgets.QLineEdit("Latitude")
+    form.x_ticks_le = QtWidgets.QLineEdit("-10, 0, 10")
+    form.plot_lb_le = QtWidgets.QLineEdit("-20")
+    form.plot_ub_le = QtWidgets.QLineEdit("20")
+    form.image_path = QtWidgets.QLineEdit("bubble.png")
+    form.show_regression_line = QtWidgets.QCheckBox()
+    form.show_regression_line.setChecked(True)
+    form.show_confidence_band = QtWidgets.QCheckBox()
+    form.show_confidence_band.setChecked(False)
+    form.show_prediction_interval = QtWidgets.QCheckBox()
+    form.show_prediction_interval.setChecked(True)
+    form.show_legend = QtWidgets.QCheckBox()
+    form.show_legend.setChecked(True)
+
+    monkeypatch.setattr(
+        ma_specs.meta_py_r,
+        "ma_dataset_to_simple_binary_robj",
+        lambda *args, **kwargs: calls.append(("prepare", args, kwargs)),
+        raising=False,
+    )
+
+    def run_meta_regression(*args, **kwargs):
+        calls.append(("run", args, kwargs))
+        return {"texts": {"Summary": "meta-regression"}, "images": {}}
+
+    monkeypatch.setattr(
+        ma_specs.meta_py_r,
+        "run_meta_regression",
+        run_meta_regression,
+        raising=False,
+    )
+
+    ma_specs.MA_Specs.run_meta_regression(form)
+
+    assert calls[0][0] == "prepare"
+    assert calls[1][0] == "run"
+    assert calls[1][1][1:4] == (studies, [covariate], "OR")
+    assert calls[1][2]["fixed_effects"] is True
+    assert calls[1][2]["conf_level"] == 90.0
+    assert calls[1][2]["params"]["rm.method"] == "SJ"
+    assert calls[1][2]["params"]["digits"] == 4
+    assert calls[1][2]["params"]["bp_style"] == "revman"
+    assert calls[1][2]["params"]["bp_outpath"] == "bubble.png"
+    assert calls[-2][0] == "analysis"
+    assert calls[-1] == ("accepted",)
+    app.processEvents()
+
+
+def test_meta_regression_enables_plots_only_for_one_continuous_covariate():
+    import ma_specs
+    import meta_globals
+
+    class Covariate(object):
+        def __init__(self, data_type):
+            self.data_type = data_type
+
+    class Form(object):
+        is_meta_regression = True
+
+        def _selected_covariates(self):
+            return self.selected
+
+    form = Form()
+    form.plot_tab = QtWidgets.QWidget()
+    form.selected = [Covariate(meta_globals.CONTINUOUS)]
+
+    ma_specs.MA_Specs._update_meta_regression_plot_availability(form)
+    assert form.plot_tab.isEnabled()
+
+    form.selected.append(Covariate(meta_globals.CONTINUOUS))
+    ma_specs.MA_Specs._update_meta_regression_plot_availability(form)
+    assert not form.plot_tab.isEnabled()
+    assert "exactly one continuous covariate" in form.plot_tab.toolTip()
+
+
+@pytest.mark.parametrize(
+    ("method_label", "method_name"),
+    [
+        ("Bivariate (Maximum Likelihood)", "diagnostic.bivariate.ml"),
+        ("HSROC", "diagnostic.hsroc"),
+    ],
+)
+def test_diagnostic_forest_methods_enable_pre_run_plots_tab(
+    method_label, method_name, monkeypatch
+):
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import ma_specs
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    meta_py_r = sys.modules["meta_py_r"]
+
+    class DiagnosticModel(object):
+        current_effect = "Sens"
+
+        def get_current_outcome_type(self):
+            return "diagnostic"
+
+        def included_studies_have_raw_data(self):
+            return True
+
+    monkeypatch.setattr(
+        meta_py_r,
+        "get_available_methods",
+        lambda **kwargs: {method_label: method_name},
+        raising=False,
+    )
+    monkeypatch.setattr(
+        meta_py_r, "get_params", lambda method: ({}, {}, None, {}), raising=False
+    )
+    monkeypatch.setattr(
+        meta_py_r,
+        "get_method_description",
+        lambda method: "Diagnostic analysis with forest plot output",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        meta_py_r,
+        "get_analysis_plot_capabilities",
+        lambda data_type, method, workflow="standard": [
+            _plot_capability(plot_kind="forest")
+        ],
+        raising=False,
+    )
+    monkeypatch.setattr(
+        meta_py_r,
+        "ma_dataset_to_simple_diagnostic_robj",
+        lambda model, **kwargs: None,
+        raising=False,
+    )
+    specs = None
+    try:
+        specs = ma_specs.MA_Specs(
+            DiagnosticModel(),
+            diag_metrics=["sens", "spec"],
+            conf_level=95.0,
+        )
+
+        assert specs.current_method == method_name
+        assert specs.plot_tab.isEnabled()
+    finally:
+        if specs is not None:
+            specs.close()
+        app.processEvents()
+
+
+def test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog(
+    tmp_path, monkeypatch
+):
+    import launch
+    import test_backend_compat
+
+    test_backend_compat.install()
+    import results_window
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    calls = []
+    params_path = str(tmp_path / "forest_params")
+    png_path = str(tmp_path / "forest.png")
+    display_path = str(tmp_path / "forest.display.svg")
+    out_path = str(tmp_path / "edited.png")
+    Path(display_path).write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200">'
+        '<rect width="400" height="200" fill="white"/>'
+        "</svg>",
+        encoding="utf-8",
+    )
+
+    class FakeSignal(object):
+        def __init__(self):
+            self._callbacks = []
+
+        def connect(self, callback):
+            self._callbacks.append(callback)
+
+        def emit(self):
+            for callback in self._callbacks:
+                callback()
+
+    class FakeEditForestPlotDialog(object):
+        def __init__(self, plot_params, image_path, parent=None):
+            self.applied = FakeSignal()
+            self._params = {
+                "fp_col1_str": "EDIT TEST HEADING",
+                "fp_outpath": out_path,
+                "fp_display_path": display_path,
+            }
+            calls.append(("dialog", plot_params, image_path, parent is not None))
+
+        def exec(self):
+            self.applied.emit()
+            return results_window.QDialog.Rejected
+
+        def plot_params(self):
+            return dict(self._params)
+
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "load_vars_for_plot",
+        lambda path, return_params_dict=False: {"fp_col1_str": "Study"},
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "update_plot_params",
+        lambda updated_params, write_them_out=False, outpath=None: calls.append(
+            ("update", updated_params, write_them_out, outpath)
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "regenerate_plot_data",
+        lambda: calls.append(("regenerate",)),
+        raising=False,
+    )
+    def generate_forest_plot(outpath):
+        calls.append(("generate", outpath))
+        height = 300 + 100 * sum(call[0] == "generate" for call in calls)
+        Path(display_path).write_text(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="%d">'
+            '<rect width="400" height="%d" fill="white"/>'
+            "</svg>" % (height, height),
+            encoding="utf-8",
+        )
+
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "generate_forest_plot",
+        generate_forest_plot,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "write_out_plot_data",
+        lambda path: calls.append(("write", path)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window,
+        "EditForestPlotDialog",
+        FakeEditForestPlotDialog,
+    )
+
+    window = results_window.ResultsWindow(
+        {
+            "texts": {"References": "Edited plot reference"},
+            "images": {"Forest Plot": png_path},
+            "display_images": {"Forest Plot": display_path},
+            "image_params_paths": {"Forest Plot": params_path},
+            "image_order": ["Forest Plot"],
+            "plot_capabilities": {"Forest Plot": _plot_capability()},
+        }
+    )
+
+    try:
+        window.resize(1200, 800)
+        window.show()
+        app.processEvents()
+        plot_item = next(
+            item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsSvgItem)
+        )
+        references_title = next(
+            item
+            for item in window.scene.items()
+            if isinstance(item, results_window.QGraphicsTextItem)
+            and item.toPlainText() == "References"
+        )
+        original_reference_top = references_title.sceneBoundingRect().top()
+
+        artifact = window.create_plot_artifact(
+            "Forest Plot", png_path, params_path=params_path
+        )
+        window.edit_forest_plot(artifact, plot_item=plot_item)
+        window.edit_forest_plot(artifact, plot_item=plot_item)
+        app.processEvents()
+
+        assert artifact.display_image_path == display_path
+        assert sum(call[0] == "update" for call in calls) == 2
+        assert sum(call[0] == "generate" for call in calls) == 2
+        assert all(
+            call[1]["fp_display_path"] == display_path
+            for call in calls
+            if call[0] == "update"
+        )
+        assert plot_item.boundingRect().height() == pytest.approx(500)
+        assert references_title.sceneBoundingRect().top() > original_reference_top
+        assert (
+            references_title.sceneBoundingRect().top()
+            - plot_item.sceneBoundingRect().bottom()
+            >= results_window.SECTION_SPACING
+        )
+
+        initial_width = plot_item.sceneBoundingRect().width()
+        view_width = window.graphics_view.width()
+        window.graphics_view.resize(view_width - 200, window.graphics_view.height())
+        app.processEvents()
+        assert plot_item.sceneBoundingRect().width() < initial_width
+        window.graphics_view.resize(view_width, window.graphics_view.height())
+        app.processEvents()
+        assert plot_item.sceneBoundingRect().width() > initial_width - 5
     finally:
         window.close()
         app.processEvents()
@@ -2350,6 +4100,9 @@ def test_results_window_uses_reader_oriented_section_names_and_order(tmp_path):
             },
             "images": {"Forest Plot": plot_paths["forest"]},
             "image_order": ["Forest Plot"],
+            "plot_capabilities": {
+                "Forest Plot": _plot_capability(editable=False)
+            },
         }
     )
     try:
@@ -2377,6 +4130,26 @@ def test_results_window_uses_reader_oriented_section_names_and_order(tmp_path):
                 "Summary ROC": plot_paths["roc"],
             },
             "image_order": ["Summary ROC", "Density plots", "Trace plots"],
+            "plot_capabilities": {
+                "Summary ROC": _plot_capability(
+                    plot_kind="sroc",
+                    editable=False,
+                    styleable=False,
+                    regenerator="none",
+                ),
+                "Density plots": _plot_capability(
+                    plot_kind="other",
+                    editable=False,
+                    styleable=False,
+                    regenerator="none",
+                ),
+                "Trace plots": _plot_capability(
+                    plot_kind="other",
+                    editable=False,
+                    styleable=False,
+                    regenerator="none",
+                ),
+            },
         }
     )
     try:
@@ -2409,7 +4182,8 @@ def test_real_metaform_save_as_round_trips_representative_projects(
 
         try:
             assert (
-                window.open(os.path.abspath(os.path.join("sample_projects", name))) is True
+                window.open(os.path.abspath(os.path.join("sample_projects", name)))
+                is True
             )
             expected = _dataset_summary(window.model.dataset)
             meta_form = sys.modules["meta_form"]
@@ -2685,9 +4459,9 @@ def test_data_type_page_buttons_center_icons_inside_declared_slots():
             )
             for button in data_type_page._data_type_buttons()
         }
-        assert all(rendered == declared for rendered, declared in icon_sizes.values()), (
-            icon_sizes
-        )
+        assert all(
+            rendered == declared for rendered, declared in icon_sizes.values()
+        ), icon_sizes
     finally:
         wizard.close()
         app.processEvents()
@@ -3228,7 +5002,9 @@ def test_data_entry_dialogs_construct_with_stub_backend(monkeypatch):
         binary_dialog.close()
 
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "continuous.rcms")))
+            window.open(
+                os.path.abspath(os.path.join("sample_projects", "continuous.rcms"))
+            )
             is True
         )
         model = window.model
@@ -3292,7 +5068,9 @@ def test_data_entry_dialog_tables_expand_and_show_all_rows(monkeypatch):
         )
 
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "continuous.rcms")))
+            window.open(
+                os.path.abspath(os.path.join("sample_projects", "continuous.rcms"))
+            )
             is True
         )
         model = window.model
@@ -3405,7 +5183,9 @@ def test_analysis_dialog_family_uses_shared_base_size(monkeypatch):
         )
 
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "continuous.rcms")))
+            window.open(
+                os.path.abspath(os.path.join("sample_projects", "continuous.rcms"))
+            )
             is True
         )
         model = window.model

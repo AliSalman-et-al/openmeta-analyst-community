@@ -23,7 +23,9 @@ class Ui_WizardPage(object):
         self.instructions.setObjectName("instructions")
         self.verticalLayout_2.addWidget(self.instructions)
         self.groupBox = QtWidgets.QGroupBox(WizardPage)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Minimum)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Minimum
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.groupBox.sizePolicy().hasHeightForWidth())
@@ -45,7 +47,9 @@ class Ui_WizardPage(object):
         self.delimter_lbl.setObjectName("delimter_lbl")
         self.horizontalLayout.addWidget(self.delimter_lbl)
         self.delimter_le = QtWidgets.QLineEdit(self.groupBox)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.delimter_le.sizePolicy().hasHeightForWidth())
@@ -53,7 +57,9 @@ class Ui_WizardPage(object):
         self.delimter_le.setMaximumSize(QtCore.QSize(20, 16777215))
         self.delimter_le.setObjectName("delimter_le")
         self.horizontalLayout.addWidget(self.delimter_le)
-        spacerItem = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem = QtWidgets.QSpacerItem(
+            40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
+        )
         self.horizontalLayout.addItem(spacerItem)
         self.verticalLayout.addLayout(self.horizontalLayout)
         self.horizontalLayout_3 = QtWidgets.QHBoxLayout()
@@ -62,7 +68,9 @@ class Ui_WizardPage(object):
         self.label_2.setObjectName("label_2")
         self.horizontalLayout_3.addWidget(self.label_2)
         self.quotechar_le = QtWidgets.QLineEdit(self.groupBox)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.quotechar_le.sizePolicy().hasHeightForWidth())
@@ -70,7 +78,9 @@ class Ui_WizardPage(object):
         self.quotechar_le.setMaximumSize(QtCore.QSize(20, 16777215))
         self.quotechar_le.setObjectName("quotechar_le")
         self.horizontalLayout_3.addWidget(self.quotechar_le)
-        spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem1 = QtWidgets.QSpacerItem(
+            40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
+        )
         self.horizontalLayout_3.addItem(spacerItem1)
         self.verticalLayout.addLayout(self.horizontalLayout_3)
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
@@ -80,7 +90,11 @@ class Ui_WizardPage(object):
         self.horizontalLayout_2.addWidget(self.file_path_lbl)
         self.select_file_btn = QtWidgets.QPushButton(self.groupBox)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/function_icon_set/function_icon_set/folder_48.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(
+            QtGui.QPixmap(":/function_icon_set/function_icon_set/folder_48.png"),
+            QtGui.QIcon.Normal,
+            QtGui.QIcon.Off,
+        )
         self.select_file_btn.setIcon(icon)
         self.select_file_btn.setObjectName("select_file_btn")
         self.horizontalLayout_2.addWidget(self.select_file_btn)
@@ -92,10 +106,14 @@ class Ui_WizardPage(object):
         self.horizontalLayout_4 = QtWidgets.QHBoxLayout(self.groupBox_2)
         self.horizontalLayout_4.setObjectName("horizontalLayout_4")
         self.required_fmt_table = QtWidgets.QTableWidget(self.groupBox_2)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.required_fmt_table.sizePolicy().hasHeightForWidth())
+        sizePolicy.setHeightForWidth(
+            self.required_fmt_table.sizePolicy().hasHeightForWidth()
+        )
         self.required_fmt_table.setSizePolicy(sizePolicy)
         self.required_fmt_table.setMaximumSize(QtCore.QSize(16777215, 16777215))
         font = QtGui.QFont()
@@ -113,10 +131,14 @@ class Ui_WizardPage(object):
         self.horizontalLayout_5 = QtWidgets.QHBoxLayout(self.preview_grp_box)
         self.horizontalLayout_5.setObjectName("horizontalLayout_5")
         self.preview_table = QtWidgets.QTableWidget(self.preview_grp_box)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.preview_table.sizePolicy().hasHeightForWidth())
+        sizePolicy.setHeightForWidth(
+            self.preview_table.sizePolicy().hasHeightForWidth()
+        )
         self.preview_table.setSizePolicy(sizePolicy)
         font = QtGui.QFont()
         font.setPointSize(8)
@@ -139,21 +161,32 @@ class Ui_WizardPage(object):
         _translate = QtCore.QCoreApplication.translate
         WizardPage.setWindowTitle(_translate("WizardPage", "WizardPage"))
         WizardPage.setTitle(_translate("WizardPage", "Choose CSV File"))
-        self.instructions.setText(_translate("WizardPage", "Please select a CSV file to import:\n"
-"The CSV should match the format of the spreadsheet currently displayed under \"required CSV format\". Don\'t worry if the column titles are not the same, these can be changed later.\n"
-"\n"
-"Also, things will be OK if you don\'t have data for all the columns, however if you have data for a column to the right of a column for which you do not have data, the left hand column(s) must exist (but have blank cells).\n"
-"\n"
-"Additional columns will be treated as covariates."))
+        self.instructions.setText(
+            _translate(
+                "WizardPage",
+                "Please select a CSV file to import:\n"
+                'The CSV should match the format of the spreadsheet currently displayed under "required CSV format". Don\'t worry if the column titles are not the same, these can be changed later.\n'
+                "\n"
+                "Also, things will be OK if you don't have data for all the columns, however if you have data for a column to the right of a column for which you do not have data, the left hand column(s) must exist (but have blank cells).\n"
+                "\n"
+                "Additional columns will be treated as covariates.",
+            )
+        )
         self.groupBox.setTitle(_translate("WizardPage", "Import Options"))
-        self.from_excel_chkbx.setText(_translate("WizardPage", "CSV exported from Excel?"))
+        self.from_excel_chkbx.setText(
+            _translate("WizardPage", "CSV exported from Excel?")
+        )
         self.has_headers_chkbx.setText(_translate("WizardPage", "Has column labels?"))
         self.delimter_lbl.setText(_translate("WizardPage", "Delimiter:"))
         self.delimter_le.setText(_translate("WizardPage", ","))
         self.label_2.setText(_translate("WizardPage", "Quote Character:"))
-        self.quotechar_le.setText(_translate("WizardPage", "\""))
+        self.quotechar_le.setText(_translate("WizardPage", '"'))
         self.file_path_lbl.setText(_translate("WizardPage", "No file has been chosen."))
         self.select_file_btn.setText(_translate("WizardPage", "Select CSV file..."))
         self.groupBox_2.setTitle(_translate("WizardPage", "Required CSV format"))
-        self.preview_grp_box.setTitle(_translate("WizardPage", "Preview of imported data"))
+        self.preview_grp_box.setTitle(
+            _translate("WizardPage", "Preview of imported data")
+        )
+
+
 import icons_rc

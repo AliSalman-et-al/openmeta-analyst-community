@@ -459,9 +459,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         raw_dict = self.get_raw_diag_data()  # values are floats or None
         for field in raw_dict.keys():
             i = DIAG_FIELDS_TO_RAW_INDICES[field]
-            self.ma_unit.tx_groups[self.group_str].raw_data[i] = raw_dict[
-                field
-            ]
+            self.ma_unit.tx_groups[self.group_str].raw_data[i] = raw_dict[field]
 
     def get_raw_diag_data(self, convert_None_to_NA_string=False):
         """Returns a dictionary of the raw data in the table (TP,FN,FP,TN),

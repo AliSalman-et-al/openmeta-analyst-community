@@ -369,9 +369,7 @@ if (length(archive_args)) {
     archive_args: list[str] = []
     for name, version in sorted(archive_packages.items()):
         archive_args.extend([name, version, archive_url_by_package[name]])
-    with tempfile.TemporaryDirectory(
-        prefix="RCMetaR-default-r-install-"
-    ) as temp_name:
+    with tempfile.TemporaryDirectory(prefix="RCMetaR-default-r-install-") as temp_name:
         install_script = Path(temp_name) / "install-default-r-deps.R"
         install_script.write_text(r_code, encoding="utf-8")
         run_streamed(

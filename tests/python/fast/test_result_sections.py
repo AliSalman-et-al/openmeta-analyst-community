@@ -58,9 +58,11 @@ def test_display_titles_normalize_result_navigation_labels():
     }
 
     assert section_display_title("Summary", context) == "Meta-Analysis Summary"
-    assert (
-        section_display_title("NLR and PLR Forest Plot", context)
-        == "Negative and Positive Likelihood Ratio Forest Plot"
+    assert section_display_title("NLR Forest Plot", context) == (
+        "Negative Likelihood Ratio Forest Plot"
+    )
+    assert section_display_title("PLR Forest Plot", context) == (
+        "Positive Likelihood Ratio Forest Plot"
     )
     assert section_display_title("Density plots", context) == "Density Plots"
     assert (

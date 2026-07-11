@@ -7,6 +7,250 @@
     {
       "decision": "keep",
       "evidence": [
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem",
+        "subprocess"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_forest_plot_defaults_contract.py::test_forest_plot_defaults_are_generated_from_shared_contract",
+      "reason": "Guards the shared generated forest-plot defaults consumed by the Python UI and R renderer.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_edit_plot_dialog_flags_truncated_legacy_plot_text",
+      "reason": "Guards lossless handling of legacy plot labels that exceed the maintained editing limit.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_plot_text_inputs_enforce_publication_readability_limit",
+      "reason": "Guards publication-readability limits on editable plot labels without constraining numeric fields.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_refits_svg_after_viewport_geometry_settles",
+      "reason": "Guards deferred SVG fitting against the realized Results-window viewport geometry.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_reflows_sections_after_raster_plot_regenerate",
+      "reason": "Guards ordered Results-window reflow after a raster plot changes dimensions during regeneration.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_shared_plot_options_surface_uses_default_arm_labels",
+      "reason": "Guards consistent Intervention and Control defaults across pre-run and edit-plot surfaces.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "packaging_contract",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_release_readiness_contract.py::test_version_bump_script_updates_all_release_version_surfaces",
+      "reason": "Guards coordinated version updates across release metadata surfaces.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_rcmetar_r_manifest_validation.py::test_custom_grid_forest_engine_is_retired",
+      "reason": "Prevents the retired custom forest renderer from returning to the active R stack.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_analysis_workflow.py::test_diagnostic_method_dialog_opens_without_multiple_metrics_note",
+      "reason": "Protects the direct Diagnostic Metrics to Method & Parameters handoff from the retired informational interstitial.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_analysis_workflow.py::test_per_metric_diagnostic_merge_preserves_display_artifacts",
+      "reason": "Guards the explicit display artifact contract when independent diagnostic metric results are merged for the Results Window.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_pre_run_plots_tab_exports_style_and_appearance_params",
+      "reason": "Guards pre-run plot option persistence through the real analysis dialog.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "r_stack"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_meta_regression_acceptance_passes_all_dialog_choices_to_adapter",
+      "reason": "Guards propagation of method, covariate, model, and bubble plot choices to the Analysis Adapter.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_meta_regression_enables_plots_only_for_one_continuous_covariate",
+      "reason": "Prevents bubble plot controls from appearing actionable for unsupported moderator selections.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_meta_regression_uses_shared_method_covariates_and_plots_dialog",
+      "reason": "Guards routing meta-regression through the shared Method, Covariates, and Plots dialog.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_meta_regression_pre_run_plot_options_use_bubble_parameter_contract",
+      "reason": "Guards pre-run bubble plot options at the Python-to-R parameter contract.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem",
+        "qt"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_save_handler_regenerates_cumulative_forest_as_single_panel",
+      "reason": "Guards cumulative plot export through the standalone forest regenerator.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
         "release_readiness"
       ],
       "external_dependencies": [
@@ -15,6 +259,155 @@
       "lane": "fast",
       "nodeid": "tests/python/fast/test_analysis_method_labels.py::test_available_method_labels_are_normalized_without_changing_method_keys",
       "reason": "Fast verification guard suitable for default feedback.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_plot_capabilities.py::test_editable_plot_kind_requires_a_compatible_regenerator",
+      "reason": "Prevents editable plot metadata from selecting a regenerator that does not implement its plot kind.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_plot_capabilities.py::test_option_groups_are_keyed_by_explicit_plot_kind",
+      "reason": "Guards the shared plot-kind option registry used by both plot configuration entry points.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_plot_capabilities.py::test_regenerator_is_resolved_from_a_safe_registry",
+      "reason": "Prevents analysis metadata from selecting arbitrary executable regeneration functions.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_plot_capabilities.py::test_validate_result_rejects_unknown_capability_values",
+      "reason": "Rejects invalid plot capability metadata at the Analysis Adapter boundary.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_plot_capabilities.py::test_validate_result_requires_one_descriptor_per_plot_artifact",
+      "reason": "Enforces the required one-to-one plot capability descriptor contract.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_plot_capabilities.py::test_validate_result_requires_plot_data_for_editable_artifacts",
+      "reason": "Ensures editable plot metadata always names the plot data needed for regeneration.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_plot_capabilities.py::test_validate_result_returns_normalized_descriptors",
+      "reason": "Guards normalized descriptor values consumed by the Results window.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem",
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_applies_forest_edits_to_selected_variant_artifact[Cumulative Forest Plot-cumulative_forest]",
+      "reason": "Exercises Edit Plot Apply through the Results Window for cumulative forest artifacts.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem",
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_applies_forest_edits_to_selected_variant_artifact[Leave-one-out Forest Plot-leave_one_out_forest]",
+      "reason": "Exercises Edit Plot Apply through the Results Window for leave-one-out forest artifacts.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "r_stack",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem",
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_applies_forest_edits_to_selected_variant_artifact[Subgroup Forest Plot-subgroup_forest]",
+      "reason": "Exercises Edit Plot Apply through the Results Window for subgroup forest artifacts.",
       "runtime_class": "subsecond",
       "size": "small"
     },
@@ -1556,6 +1949,63 @@
     {
       "decision": "keep",
       "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_edit_regression_plot_dialog_shows_only_bubble_options",
+      "reason": "Guards issue #275: the Meta-Regression Bubble Plot editor exposes regression options without forest-only controls.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_apply_regression_plot_edits_rebuilds_and_redraws_bubble_plot",
+      "reason": "Guards issue #275: applying bubble options persists, rebuilds, and redraws the selected Meta-Regression Bubble Plot.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_diagnostic_forest_methods_enable_pre_run_plots_tab[Bivariate (Maximum Likelihood)-diagnostic.bivariate.ml]",
+      "reason": "Guards issue #277: Bivariate diagnostic analysis exposes the shared Plots surface for its forest plot output.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_diagnostic_forest_methods_enable_pre_run_plots_tab[HSROC-diagnostic.hsroc]",
+      "reason": "Guards issue #277: HSROC diagnostic analysis exposes the shared Plots surface for its forest plot output.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
         "gui_compatibility",
         "analysis_behavior"
       ],
@@ -1633,6 +2083,54 @@
       "lane": "golden",
       "nodeid": "tests/analysis_regression/golden/test_golden_baseline_manifest_validation.py::test_baseline_manifest_requires_capture_metadata_contract",
       "reason": "Protects golden baseline comparison and manifest tooling.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_refits_raster_fallback_from_original_source",
+      "reason": "Guards responsive Results Window sizing for raster-only Plot Artifacts without cumulative resampling loss.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_refits_svg_plots_and_reflows_sections_on_resize",
+      "reason": "Guards responsive SVG plot fitting, capped scaling, and result-section reflow reported in issue #272.",
+      "runtime_class": "subsecond",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_analysis_opens_results_window_maximized_and_fits_svg_plot",
+      "reason": "Guards Issue #282's maximized Results Window launch and initial SVG viewport fit.",
       "runtime_class": "seconds",
       "size": "medium"
     },
@@ -2347,8 +2845,8 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_diagnostic_analysis_workflow.py::test_diagnostic_hsroc_next_does_not_run_before_lr_dor_screen",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "nodeid": "tests/python/gui/test_diagnostic_analysis_workflow.py::test_combined_diagnostic_metrics_use_one_method_dialog",
+      "reason": "Protects the unified diagnostic Method & Parameters workflow and its shared parameter mapping through offscreen Qt.",
       "runtime_class": "seconds",
       "size": "medium"
     },
@@ -3547,10 +4045,168 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_figure_context_menus_only_offer_save_actions",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_displays_canonical_svg_plot_artifact",
+      "reason": "Covers canonical SVG plot display behavior in the Results window.",
       "runtime_class": "seconds",
       "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_refits_svg_plot_after_in_place_regenerate",
+      "reason": "Guards Issue #282's shared SVG fit contract after in-place regeneration.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_plots",
+      "reason": "Guards the Results window context menu contract for regenerable Forest Render Bundles.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_save_handler_accepts_backend_export_formats[pdf]",
+      "reason": "Guards Results window forest-plot regeneration for supported export formats.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_save_handler_accepts_backend_export_formats[png]",
+      "reason": "Guards Results window forest-plot regeneration for supported export formats.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_save_handler_accepts_backend_export_formats[svg]",
+      "reason": "Guards Results window forest-plot regeneration for supported export formats.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_save_handler_accepts_backend_export_formats[tiff]",
+      "reason": "Guards Results window forest-plot regeneration for supported export formats.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_results_window_save_handler_preserves_requested_format_when_extension_is_omitted",
+      "reason": "Guards Results window forest-plot regeneration when users omit an export extension.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_edit_forest_plot_dialog_round_trips_style_and_appearance_params",
+      "reason": "Guards Edit Forest Plot dialog parameter round-tripping across Forest Plot Styles.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_edit_forest_plot_dialog_apply_stays_open_and_ok_applies_and_closes",
+      "reason": "Guards issue #273: Apply keeps the Edit Plot dialog open while OK applies the same edits and dismisses it.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog",
+      "reason": "Guards issue #268: Apply-only forest plot edits regenerate the Forest Render Bundle without closing the dialog.",
+      "runtime_class": "subsecond",
+      "size": "small"
     },
     {
       "decision": "keep",
