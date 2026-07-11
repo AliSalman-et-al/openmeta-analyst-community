@@ -456,7 +456,13 @@ g.meta.regression <- function(
 		
 		# write the plot data to disk so we can save it
 		# Plot parameters are persisted separately when callers need editable plots.
-		plot.data.path <- save.data(data, res, params, plot.data)
+		plot.params <- list(
+			"rm.method"=method,
+			"conf.level"=level,
+			"digits"=digits,
+			"measure"=measure
+		)
+		plot.data.path <- save.data(data, res, plot.params, plot.data)
 		
 		images <- c("Regression Plot"=plot.path)
 		plot.names <- c("reg.plot"="reg.plot")

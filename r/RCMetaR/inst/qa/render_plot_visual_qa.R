@@ -48,10 +48,14 @@ qa_visual_coverage_inventory <- function() {
 }
 
 qa_supported_plot_kinds <- function() {
-  if (!exists(".rcmetar.plot.kind.capabilities", mode = "function")) {
+  registry <- get0(".rcmetar.plot.kind.capabilities", mode="function", inherits=TRUE)
+  if (is.null(registry) && requireNamespace("RCMetaR", quietly=TRUE)) {
+    registry <- getFromNamespace(".rcmetar.plot.kind.capabilities", "RCMetaR")
+  }
+  if (is.null(registry)) {
     stop("RCMetaR Plot Capability Descriptor registry is not loaded.", call. = FALSE)
   }
-  names(.rcmetar.plot.kind.capabilities())
+  names(registry())
 }
 
 qa_validate_visual_coverage <- function(inventory, produced.families,

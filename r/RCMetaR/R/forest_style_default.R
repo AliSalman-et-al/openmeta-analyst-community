@@ -209,8 +209,8 @@ rcmetar.default.heterogeneity.measure.label <- function(bundle) {
     paste0(
         "RE Model (Q = ", round.display(res$QE, 2),
         ", df = ", res$k - res$p, ", ",
-        rcmetar.default.p.value.label(res$QEp), "; I² = ",
-        round.display(res$I2, 1), "%, tau² = ",
+        rcmetar.default.p.value.label(res$QEp), "; I\u00b2 = ",
+        round.display(res$I2, 1), "%, tau\u00b2 = ",
         round.display(res$tau2, 2), ")"
     )
 }
@@ -425,8 +425,8 @@ rcmetar.default.model.label <- function(prefix, res) {
         prefix, " (Q = ", round.display(res$QE, 2),
         ", df = ", res$k - res$p, ", ",
         rcmetar.default.p.value.label(res$QEp), "; ",
-        "I² = ", round.display(res$I2, 1), "%, ",
-        "τ² = ", round.display(res$tau2, 2), ")"
+        "I\u00b2 = ", round.display(res$I2, 1), "%, ",
+        "\u03c4\u00b2 = ", round.display(res$tau2, 2), ")"
     )
 }
 

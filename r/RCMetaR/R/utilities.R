@@ -525,7 +525,6 @@ create.regression.display <- function(res, params, display.data) {
   if (n.factor.covs > 0) {
     # there are factor covariants - insert spaces for reference var. row.
     insert.row <- n.cont.rows + 1
-    print(paste(c("insert.row outer: ", insert.row)))
     for (count in 1:n.factor.covs) {
     n.levels <- factor.n.levels[count]
     #print(paste(c("n.levels", n.levels))) #####

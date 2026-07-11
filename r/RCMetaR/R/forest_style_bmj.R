@@ -295,11 +295,11 @@ rcmetar.bmj.summary.result <- function(bundle) {
 
 rcmetar.bmj.heterogeneity.label <- function(bundle) {
     label <- rcmetar.revman.heterogeneity.label(bundle)
-    label <- gsub("Tau² = ", "Tau²=", label, fixed=TRUE)
-    label <- gsub("Chi² = ", "Chi²=", label, fixed=TRUE)
+    label <- gsub("Tau\u00b2 = ", "Tau\u00b2=", label, fixed=TRUE)
+    label <- gsub("Chi\u00b2 = ", "Chi\u00b2=", label, fixed=TRUE)
     label <- gsub(", df = ", ", df=", label, fixed=TRUE)
     label <- gsub(" (P ", ", P ", label, fixed=TRUE)
-    label <- gsub("); I² = ", "; I²=", label, fixed=TRUE)
+    label <- gsub("); I\u00b2 = ", "; I\u00b2=", label, fixed=TRUE)
     label <- gsub("P = ", "P=", label, fixed=TRUE)
     label <- gsub("P < ", "P<", label, fixed=TRUE)
     label

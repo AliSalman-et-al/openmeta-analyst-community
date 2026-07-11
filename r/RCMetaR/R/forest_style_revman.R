@@ -170,10 +170,10 @@ rcmetar.revman.heterogeneity.label <- function(bundle) {
         return("")
     }
     paste0(
-        "Heterogeneity: Tau² = ", round.display(res$tau2, 2),
-        "; Chi² = ", round.display(res$QE, 2),
+        "Heterogeneity: Tau\u00b2 = ", round.display(res$tau2, 2),
+        "; Chi\u00b2 = ", round.display(res$QE, 2),
         ", df = ", res$k - res$p,
-        " (", rcmetar.revman.p.value.label(res$QEp), "); I² = ",
+        " (", rcmetar.revman.p.value.label(res$QEp), "); I\u00b2 = ",
         round.display(res$I2, 0), "%"
     )
 }

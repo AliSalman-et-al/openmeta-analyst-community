@@ -1,6 +1,10 @@
 test_that("comprehensive visual QA accounts for every user-visible plot family", {
-  repo.root <- normalizePath(file.path(testthat::test_path(), "..", "..", "..", ".."), winslash = "/")
-  script <- file.path(repo.root, "r", "RCMetaR", "inst", "qa", "render_plot_visual_qa.R")
+  script <- system.file("qa", "render_plot_visual_qa.R", package="RCMetaR")
+  if (!nzchar(script)) {
+    repo.root <- normalizePath(file.path(testthat::test_path(), "..", "..", "..", ".."), winslash = "/")
+    script <- file.path(repo.root, "r", "RCMetaR", "inst", "qa", "render_plot_visual_qa.R")
+  }
+  expect_true(file.exists(script))
   qa <- new.env(parent = globalenv())
   sys.source(script, envir = qa)
 

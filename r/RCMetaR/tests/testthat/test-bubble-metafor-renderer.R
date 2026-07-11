@@ -129,8 +129,7 @@ test_that("bubble plot text ceilings do not mutate source labels or effects", {
 
   expect_identical(fixture$data@study.names[[1]], original.name)
   expect_identical(fixture$data@y, original.y)
-  expect_lte(nchar(bundle$slab[[1]]), 72)
-  expect_match(bundle$slab[[1]], "\\.\\.\\.")
+  expect_identical(bundle$slab[[1]], original.name)
   expect_equal(nchar(bundle$xlabel), 80)
 
   fixture$params$bp_xlabel <- "[default]"

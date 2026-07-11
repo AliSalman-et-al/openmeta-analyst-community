@@ -28,6 +28,7 @@
 \alias{rcmetar.continuous.study.effect}
 \alias{rcmetar.diagnostic.study.effects}
 \alias{rcmetar.regenerate.plot.data}
+\alias{rcmetar.regenerate.regression.plot.data}
 \alias{rcmetar.save.plot.data}
 \alias{rcmetar.draw.forest.plot}
 \alias{rcmetar.draw.regression.plot}
