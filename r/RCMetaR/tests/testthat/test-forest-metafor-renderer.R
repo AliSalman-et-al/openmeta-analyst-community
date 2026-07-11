@@ -459,18 +459,17 @@ test_that("one-sided axis bounds and BMJ risk-difference bounds remain authorita
   expect_equal(rcmetar.forest.bmj.alim(bundle), rcmetar.metafor.alim(bundle))
 })
 
-test_that("explicit axis bounds expand rather than clipping study point estimates", {
+test_that("narrow explicit axis bounds remain exact for every style", {
   fixture <- metafor_binary_fixture()
-  fixture$params$fp_plot_lb <- "0.9"
-  fixture$params$fp_plot_ub <- "1.1"
+  fixture$params$fp_plot_lb <- "10"
+  fixture$params$fp_plot_ub <- "11"
   res <- rma.uni(yi=fixture$data@y, sei=fixture$data@SE, method="DL")
 
   for (style in c("default", "revman", "bmj")) {
     fixture$params$fp_style <- style
     bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
     plan <- rcmetar.forest.layout.preflight(bundle)
-    expect_lte(plan$x$alim[[1]], min(res$yi))
-    expect_gte(plan$x$alim[[2]], max(res$yi))
+    expect_equal(plan$x$alim, rcmetar.metafor.alim(bundle))
   }
 })
 

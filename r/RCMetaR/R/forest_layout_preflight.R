@@ -482,10 +482,6 @@ rcmetar.forest.journal.alim <- function(bundle) {
     raw <- rcmetar.metafor.alim(bundle)
     if (rcmetar.forest.has.explicit.axis.bound(bundle, "lower")) alim[[1]] <- raw[[1]]
     if (rcmetar.forest.has.explicit.axis.bound(bundle, "upper")) alim[[2]] <- raw[[2]]
-    if (length(yi) > 0) {
-        alim[[1]] <- min(alim[[1]], min(yi))
-        alim[[2]] <- max(alim[[2]], max(yi))
-    }
     alim
 }
 
