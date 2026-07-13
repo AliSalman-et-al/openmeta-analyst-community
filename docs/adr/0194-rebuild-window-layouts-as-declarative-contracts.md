@@ -1,0 +1,3 @@
+# Rebuild Window Layouts as Declarative Contracts
+
+Every RC MetaStudio window will own an explicit Declarative Layout Contract in its canonical Qt Designer form and directly associated widget code. The shared runtime layer will enforce only Window Archetype behavior, screen-bounded initial placement, Geometry Ownership, persistence, and screen-transition policy; it will not infer layouts from child coordinates, mutate arbitrary descendants, or repeatedly refit visible root windows. The rewrite includes an application-wide audit to remove or redesign fixed root sizes, absolute positioning, contradictory constraints, resize loops, and other behavior that competes with Qt layout negotiation.

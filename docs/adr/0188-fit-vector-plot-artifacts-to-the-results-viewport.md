@@ -2,6 +2,8 @@
 
 Status: accepted.
 
+Supersession note: ADR 0195 supersedes the maximize-on-every-open policy. The plot-fit and responsive viewport rules in this ADR remain active.
+
 The Results Window opens maximized, and every vector Plot Artifact uses one authoritative fit-to-viewport routine for initial creation, show/resize, splitter movement, and in-place regeneration. The routine preserves aspect ratio and the existing 4× scale cap; centralizing the scale calculation keeps the reader view responsive without changing Analysis Behavior or Plot Artifact content.
 
 ## Considered Options

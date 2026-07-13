@@ -1,0 +1,3 @@
+# Gate Adaptive Layouts with Layered Application-Wide Evidence
+
+The adaptive-layout rewrite will be accepted only with a static audit of every canonical UI form, parameterized GUI coverage across the 800 by 600 constrained case, the 1024 by 640 Full-Usability Floor, larger logical areas, representative long content, and multiple scale factors, plus behavioral coverage for focus, overflow, stable runtime geometry, restoration, clamping, and splitters. Windows x64 and macOS Intel x64 packages must provide native smoke and screenshot evidence for human polish review, while pixel-diff testing remains out of scope under the existing GUI-similarity policy.
