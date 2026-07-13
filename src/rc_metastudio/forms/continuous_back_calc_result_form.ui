@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ContinuousBackCalcResultForm</class>
+ <widget class="QDialog" name="ContinuousBackCalcResultForm">
+  <property name="geometry"><rect><x>0</x><y>0</y><width>0</width><height>0</height></rect></property>
+  <property name="windowTitle"><string>Choose Back Calculation Result</string></property>
+  <layout class="QVBoxLayout" name="dialog_layout">
+   <item><widget class="QScrollArea" name="content_scroll">
+    <property name="frameShape"><enum>QFrame::NoFrame</enum></property><property name="widgetResizable"><bool>true</bool></property><property name="horizontalScrollBarPolicy"><enum>Qt::ScrollBarAlwaysOff</enum></property><property name="verticalScrollBarPolicy"><enum>Qt::ScrollBarAsNeeded</enum></property>
+    <widget class="QWidget" name="content_widget"><property name="geometry"><rect><x>0</x><y>0</y><width>0</width><height>0</height></rect></property>
+     <layout class="QVBoxLayout" name="content_layout">
+      <item><widget class="QLabel" name="info_label"><property name="text"><string>Choose the appropriate back-calculation assumption.</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+      <item><widget class="Line" name="line"><property name="orientation"><enum>Qt::Horizontal</enum></property></widget></item>
+      <item><layout class="QHBoxLayout" name="choice1_layout"><item><widget class="QRadioButton" name="choice1_btn"><property name="text"><string/></property><property name="checked"><bool>true</bool></property></widget></item><item><widget class="QLabel" name="choice1_label"><property name="text"><string>Choice 1</string></property><property name="wordWrap"><bool>true</bool></property><property name="buddy"><cstring>choice1_btn</cstring></property></widget></item></layout></item>
+      <item><layout class="QHBoxLayout" name="choice2_layout"><item><widget class="QRadioButton" name="choice2_btn"><property name="text"><string/></property></widget></item><item><widget class="QLabel" name="choice2_label"><property name="text"><string>Choice 2</string></property><property name="wordWrap"><bool>true</bool></property><property name="buddy"><cstring>choice2_btn</cstring></property></widget></item></layout></item>
+     </layout>
+    </widget>
+   </widget></item>
+   <item><widget class="QDialogButtonBox" name="buttonBox"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="standardButtons"><set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set></property></widget></item>
+  </layout>
+ </widget>
+ <tabstops><tabstop>choice1_btn</tabstop><tabstop>choice2_btn</tabstop><tabstop>buttonBox</tabstop></tabstops>
+ <resources/>
+ <connections><connection><sender>buttonBox</sender><signal>accepted()</signal><receiver>ContinuousBackCalcResultForm</receiver><slot>accept()</slot><hints/></connection><connection><sender>buttonBox</sender><signal>rejected()</signal><receiver>ContinuousBackCalcResultForm</receiver><slot>reject()</slot><hints/></connection></connections>
+</ui>

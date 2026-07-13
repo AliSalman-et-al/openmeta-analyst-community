@@ -7,6 +7,191 @@
     {
       "decision": "keep",
       "evidence": ["gui_compatibility"],
+      "external_dependencies": ["filesystem", "qt"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_pyqt5_ui_generation.py::test_ui_generator_reproduces_owned_raw_output_without_reformatting_peers",
+      "reason": "Guards raw deterministic generation for the Continuous companions and preserves semantically equivalent peer formatting.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_variants_are_transactional_and_screen_bounded[size0]",
+      "reason": "Guards the Continuous Data Transactional Dialog on a normal logical screen.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_variants_are_transactional_and_screen_bounded[size1]",
+      "reason": "Guards the Continuous Data Transactional Dialog at the Full-Usability Floor.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_variants_are_transactional_and_screen_bounded[size2]",
+      "reason": "Guards the Continuous Data Transactional Dialog on a constrained logical screen.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_metric_transition_does_not_resize_visible_root",
+      "reason": "Guards stable visible root geometry during a public metric transition.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_major_variant_behavior_matrix[tx_mean-size0]",
+      "reason": "Guards the one-arm Continuous Data variant on a normal logical screen.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_long_values_and_large_font_overflow_inside_content",
+      "reason": "Guards enlarged-font semantic fields and internal table overflow.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_back_calculation_choice_keeps_guidance_and_actions_reachable[size0]",
+      "reason": "Guards wrapped back-calculation guidance and reachable actions on a normal screen.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_back_calculation_choice_keeps_guidance_and_actions_reachable[size1]",
+      "reason": "Guards back-calculation reachability at the Full-Usability Floor.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_back_calculation_choice_keeps_guidance_and_actions_reachable[size2]",
+      "reason": "Guards back-calculation reachability on a constrained logical screen.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_major_variant_behavior_matrix[tx_mean-size1]",
+      "reason": "Guards one-arm behavior at the Full-Usability Floor.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_major_variant_behavior_matrix[tx_mean-size2]",
+      "reason": "Guards one-arm behavior on a constrained logical screen.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_major_variant_behavior_matrix[md_simple-size0]",
+      "reason": "Guards MD simple-data calculation behavior on a normal screen.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_major_variant_behavior_matrix[md_simple-size1]",
+      "reason": "Guards MD simple-data behavior at the Full-Usability Floor.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_major_variant_behavior_matrix[md_simple-size2]",
+      "reason": "Guards MD simple-data behavior on a constrained logical screen.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_major_variant_behavior_matrix[smd_pre_post-size0]",
+      "reason": "Guards SMD pre-post correlation behavior on a normal screen.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_major_variant_behavior_matrix[smd_pre_post-size1]",
+      "reason": "Guards SMD pre-post behavior at the Full-Usability Floor.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_major_variant_behavior_matrix[smd_pre_post-size2]",
+      "reason": "Guards SMD pre-post behavior on a constrained logical screen.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_long_metric_choice_is_fully_accessible[size0]",
+      "reason": "Guards full long-metric access at the Full-Usability Floor.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_long_metric_choice_is_fully_accessible[size1]",
+      "reason": "Guards full long-metric access on a constrained logical screen.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_successful_continuous_back_calculation_updates_data_without_root_growth[size0]",
+      "reason": "Guards successful back-calculation through the visible action and choice path on a normal logical screen.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_successful_continuous_back_calculation_updates_data_without_root_growth[size1]",
+      "reason": "Guards successful back-calculation and stable geometry at the Full-Usability Floor.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_successful_continuous_back_calculation_updates_data_without_root_growth[size2]",
+      "reason": "Guards successful back-calculation and stable geometry on a constrained logical screen.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_continuous_effect_fields_fit_metric_domain_samples[md]",
+      "reason": "Guards semantic MD field width against its representative formatted domain.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_continuous_effect_fields_fit_metric_domain_samples[smd]",
+      "reason": "Guards semantic SMD field width against its representative formatted domain.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_continuous_effect_fields_fit_metric_domain_samples[tx_mean]",
+      "reason": "Guards semantic one-arm field width against its representative formatted domain.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
       "external_dependencies": ["qt"],
       "lane": "gui",
       "nodeid": "tests/python/gui/test_binary_data_transactional_layout.py::test_binary_data_declares_transactional_overflow_and_reachable_actions",
@@ -1447,8 +1632,8 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_continuous_calculator_grid_columns_fill_expanded_table_width",
-      "reason": "Covers fast GUI/data-model behavior required by the verification lane.",
+      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_continuous_calculator_grid_columns_keep_internal_overflow",
+      "reason": "Guards Continuous Data table overflow without top-level width growth.",
       "runtime_class": "subsecond",
       "size": "small"
     },

@@ -1,3 +1,4 @@
+import ast
 from io import StringIO
 from pathlib import Path
 import subprocess
@@ -16,6 +17,7 @@ UI_MODULES = {
     "src/rc_metastudio/forms/choose_back_calc_result_form.ui": "src/rc_metastudio/forms/ui_choose_back_calc_result_form.py",
     "src/rc_metastudio/forms/choose_metric_page.ui": "src/rc_metastudio/forms/ui_choose_metric_page.py",
     "src/rc_metastudio/forms/continuous_data_form.ui": "src/rc_metastudio/forms/ui_continuous_data_form.py",
+    "src/rc_metastudio/forms/continuous_back_calc_result_form.ui": "src/rc_metastudio/forms/ui_continuous_back_calc_result_form.py",
     "src/rc_metastudio/forms/cov_reg_dlg2.ui": "src/rc_metastudio/forms/ui_meta_reg.py",
     "src/rc_metastudio/forms/cov_subgroup_dlg.ui": "src/rc_metastudio/forms/ui_cov_subgroup_dlg.py",
     "src/rc_metastudio/forms/csv_import_page.ui": "src/rc_metastudio/forms/ui_csv_import_page.py",
@@ -44,6 +46,13 @@ def compile_ui(source, target):
     uic.compileUi(str(source), generated)
     source_label = source.relative_to(ROOT).as_posix()
     rendered = generated.getvalue().replace(str(source), source_label, 1)
+    if target.exists():
+        existing = target.read_text(encoding="utf-8")
+        try:
+            if ast.dump(ast.parse(existing)) == ast.dump(ast.parse(rendered)):
+                return
+        except SyntaxError:
+            pass
     with target.open("w", encoding="utf-8", newline="\n") as output:
         output.write(rendered)
 

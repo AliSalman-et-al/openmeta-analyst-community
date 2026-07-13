@@ -334,6 +334,20 @@ def binary_effect_display_samples(metric, digits=CALC_NUM_DIGITS):
     return ("-" + precision, precision)
 
 
+def continuous_effect_display_samples(metric, digits=CALC_NUM_DIGITS):
+    """Return formatter-derived semantic samples for continuous effect fields.
+
+    Continuous effect domains are mathematically unbounded, so values beyond
+    these common display magnitudes remain reachable through QLineEdit's native
+    horizontal navigation rather than forcing the dialog to grow indefinitely.
+    """
+    magnitude = 10.9999 if metric == "SMD" else 9999.9999
+    return tuple(
+        format_calculator_display_value(value, digits)
+        for value in (-magnitude, magnitude)
+    )
+
+
 def helper_set_current_effect(
     ma_unit, txt_boxes, current_effect, group_str, data_type, mult=None
 ):
@@ -378,7 +392,11 @@ def helper_set_current_effect(
         semantic_samples=(
             binary_effect_display_samples(current_effect)
             if data_type == "binary"
-            else None
+            else (
+                continuous_effect_display_samples(current_effect)
+                if data_type == "continuous"
+                else None
+            )
         ),
     )
 

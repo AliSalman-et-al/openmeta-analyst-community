@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 
+import pytest
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import (
     QDialog,
@@ -416,6 +417,44 @@ def test_calculator_effect_ci_fields_fit_signed_precision(qapp, monkeypatch):
         _assert_effect_ci_fields_fit_signed_precision(qapp, form)
 
 
+@pytest.mark.parametrize(
+    ("metric", "representative"),
+    [("MD", "-9999.9999"), ("SMD", "-10.9999"), ("TX Mean", "9999.9999")],
+    ids=["md", "smd", "tx_mean"],
+)
+def test_continuous_effect_fields_fit_metric_domain_samples(
+    qapp, monkeypatch, metric, representative
+):
+    import calculator_routines
+
+    monkeypatch.setattr(
+        calculator_routines.meta_py_r,
+        "continuous_convert_scale",
+        lambda value, *args, **kwargs: value,
+    )
+    unit = FakeContinuousMAUnit()
+    fields = {name: QLineEdit() for name in ("effect", "lower", "upper")}
+    calculator_routines.helper_set_current_effect(
+        unit,
+        fields,
+        metric,
+        "Group 1" if metric == "TX Mean" else "Group 1-Group 2",
+        "continuous",
+        mult=1.96,
+    )
+    for field in fields.values():
+        margins = field.textMargins()
+        frame = field.style().pixelMetric(QStyle.PM_DefaultFrameWidth, None, field)
+        required = (
+            field.fontMetrics().horizontalAdvance(representative)
+            + margins.left()
+            + margins.right()
+            + 2 * frame
+        )
+        assert field.minimumWidth() >= required
+        assert field.maximumWidth() >= required
+
+
 def test_binary_calculator_grid_columns_fill_expanded_table_width(qapp, monkeypatch):
     import binary_data_form
 
@@ -784,9 +823,7 @@ class FakeContinuousMAUnit:
         pass
 
 
-def test_continuous_calculator_grid_columns_fill_expanded_table_width(
-    qapp, monkeypatch
-):
+def test_continuous_calculator_grid_columns_keep_internal_overflow(qapp, monkeypatch):
     import continuous_data_form
 
     monkeypatch.setattr(
@@ -811,7 +848,18 @@ def test_continuous_calculator_grid_columns_fill_expanded_table_width(
         conf_level=95.0,
     )
 
-    _assert_calculator_table_content_columns_fill_width(qapp, form.simple_table)
+    form.resize(360, form.height())
+    form.show()
+    qapp.processEvents()
+    table = form.simple_table
+    header = table.horizontalHeader()
+    assert header.sectionResizeMode(0) == QHeaderView.Interactive
+    assert not header.stretchLastSection()
+    assert table.horizontalScrollBarPolicy() == QtCore.Qt.ScrollBarAsNeeded
+    assert (
+        sum(header.sectionSize(column) for column in range(table.columnCount()))
+        > table.viewport().width()
+    )
 
 
 def test_continuous_calculator_keeps_long_imputed_values_compact(qapp, monkeypatch):
