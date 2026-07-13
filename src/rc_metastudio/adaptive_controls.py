@@ -56,6 +56,7 @@ class ChoiceControlController(QObject):
         QEvent.ApplicationFontChange,
         QEvent.FontChange,
         QEvent.PaletteChange,
+        QEvent.Show,
         QEvent.StyleChange,
     }
     if hasattr(QEvent, "ScreenChangeInternal"):
@@ -169,7 +170,8 @@ class ChoiceControlController(QObject):
             + combo.style().pixelMetric(QStyle.PM_LayoutLeftMargin, None, combo)
             + combo.style().pixelMetric(QStyle.PM_LayoutRightMargin, None, combo)
         )
-        return max(combo.width(), text_width + chrome)
+        display_width = combo.width() if combo.isVisible() else combo.sizeHint().width()
+        return max(display_width, text_width + chrome)
 
     def _install_complete_value_tooltips(self):
         self.tooltip_scan_applied_count += 1

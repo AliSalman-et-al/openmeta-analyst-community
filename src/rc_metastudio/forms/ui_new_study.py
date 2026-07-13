@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'new_study_dlg.ui'
+# Form implementation generated from reading ui file 'src/rc_metastudio/forms/new_study_dlg.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -19,6 +19,7 @@ class Ui_new_study_dialog(object):
         self.verticalLayout.setObjectName("verticalLayout")
         self.formLayout = QtWidgets.QFormLayout()
         self.formLayout.setFieldGrowthPolicy(QtWidgets.QFormLayout.AllNonFixedFieldsGrow)
+        self.formLayout.setRowWrapPolicy(QtWidgets.QFormLayout.WrapAllRows)
         self.formLayout.setObjectName("formLayout")
         self.label_2 = QtWidgets.QLabel(new_study_dialog)
         self.label_2.setObjectName("label_2")

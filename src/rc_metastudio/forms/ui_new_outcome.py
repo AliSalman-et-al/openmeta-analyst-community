@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'new_outcome_dlg.ui'
+# Form implementation generated from reading ui file 'src/rc_metastudio/forms/new_outcome_dlg.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -19,6 +19,7 @@ class Ui_Dialog(object):
         self.verticalLayout.setObjectName("verticalLayout")
         self.formLayout = QtWidgets.QFormLayout()
         self.formLayout.setFieldGrowthPolicy(QtWidgets.QFormLayout.AllNonFixedFieldsGrow)
+        self.formLayout.setRowWrapPolicy(QtWidgets.QFormLayout.WrapAllRows)
         self.formLayout.setObjectName("formLayout")
         self.label_2 = QtWidgets.QLabel(Dialog)
         self.label_2.setObjectName("label_2")
@@ -30,9 +31,7 @@ class Ui_Dialog(object):
         self.label = QtWidgets.QLabel(Dialog)
         self.label.setObjectName("label")
         self.formLayout.setWidget(1, QtWidgets.QFormLayout.LabelRole, self.label)
-        self.datatype_cbo_box = QtWidgets.QComboBox(Dialog)
-        self.datatype_cbo_box.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon)
-        self.datatype_cbo_box.setMinimumContentsLength(12)
+        self.datatype_cbo_box = AdaptiveComboBox(Dialog)
         self.datatype_cbo_box.setObjectName("datatype_cbo_box")
         self.formLayout.setWidget(1, QtWidgets.QFormLayout.FieldRole, self.datatype_cbo_box)
         self.verticalLayout.addLayout(self.formLayout)
@@ -55,4 +54,5 @@ class Ui_Dialog(object):
         Dialog.setWindowTitle(_translate("Dialog", "Add Outcome"))
         self.label_2.setText(_translate("Dialog", "Outcome name:"))
         self.label.setText(_translate("Dialog", "Type of outcome:"))
+from adaptive_controls import AdaptiveComboBox
 import icons_rc

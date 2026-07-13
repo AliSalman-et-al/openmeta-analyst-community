@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import sys, time, traceback
-from PyQt5 import QtWidgets
+from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import QThread
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtWidgets import QSplashScreen
@@ -19,10 +19,62 @@ import meta_globals
 meta_py_r_backend.install_meta_py_r_backend()
 import app_error_handler
 import settings
+import adaptive_window
+import icons_rc  # noqa: F401 - registers canonical Qt image resources
 
 SPLASH_DISPLAY_TIME = 0  # Keep startup smoke tests fast; packaged builds may override.
 APPLICATION_ICON_PATH = ":/misc/meta.png"
 AUTOMATION_SMOKE_LOG_ENV = "RCMS_AUTOMATION_SMOKE_LOG"
+
+
+def screen_bounded_splash_pixmap(source, available_logical_size):
+    """Bound a splash in Logical Layout Space while preserving source DPR."""
+    pixmap = QPixmap(source)
+    available = QtCore.QSize(available_logical_size)
+    if pixmap.isNull() or not available.isValid():
+        return pixmap
+
+    device_pixel_ratio = max(1.0, pixmap.devicePixelRatioF())
+    logical_width = pixmap.width() / device_pixel_ratio
+    logical_height = pixmap.height() / device_pixel_ratio
+    if (
+        logical_width <= available.width()
+        and logical_height <= available.height()
+    ):
+        return pixmap
+
+    scale = min(
+        available.width() / logical_width,
+        available.height() / logical_height,
+    )
+    target_logical_width = max(1, int(logical_width * scale))
+    target_logical_height = max(1, int(logical_height * scale))
+    target_physical_size = QtCore.QSize(
+        max(1, round(target_logical_width * device_pixel_ratio)),
+        max(1, round(target_logical_height * device_pixel_ratio)),
+    )
+    bounded = pixmap.scaled(
+        target_physical_size,
+        QtCore.Qt.IgnoreAspectRatio,
+        QtCore.Qt.SmoothTransformation,
+    )
+    bounded.setDevicePixelRatio(device_pixel_ratio)
+    return bounded
+
+
+def create_startup_splash():
+    """Build the startup Transient Window from high-DPI-capable resources."""
+    splash_pixmap = QPixmap(":/misc/splash.png")
+    screen = QtWidgets.QApplication.primaryScreen()
+    if screen is not None:
+        splash_pixmap = screen_bounded_splash_pixmap(
+            splash_pixmap, screen.availableGeometry().size()
+        )
+    splash = QSplashScreen(splash_pixmap)
+    adaptive_window.register_adaptive_window(
+        splash, adaptive_window.WindowRole.TRANSIENT
+    )
+    return splash
 
 
 def _write_automation_smoke_log(message):
@@ -164,8 +216,7 @@ def start():
     _set_application_icon(app)
     settings.setup_directories()
 
-    splash_pixmap = QPixmap(":/misc/splash.png")
-    splash = QSplashScreen(splash_pixmap)
+    splash = create_startup_splash()
     splash.show()
     splash_starttime = time.time()
 

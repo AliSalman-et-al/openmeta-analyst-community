@@ -402,6 +402,8 @@ class AdaptiveWindowController(QObject):
         preferred = self.window.sizeHint()
         if not preferred.isValid():
             preferred = self.window.minimumSizeHint()
+        if not preferred.isValid() and self.window.size().isValid():
+            preferred = self.window.size()
         if not preferred.isValid():
             preferred = QSize(1, 1)
         minimum = self.window.minimumSizeHint()

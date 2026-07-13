@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'change_group_name_dlg.ui'
+# Form implementation generated from reading ui file 'src/rc_metastudio/forms/change_group_name_dlg.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -19,6 +19,7 @@ class Ui_group_name_dialog(object):
         self.verticalLayout.setObjectName("verticalLayout")
         self.formLayout = QtWidgets.QFormLayout()
         self.formLayout.setFieldGrowthPolicy(QtWidgets.QFormLayout.AllNonFixedFieldsGrow)
+        self.formLayout.setRowWrapPolicy(QtWidgets.QFormLayout.WrapAllRows)
         self.formLayout.setObjectName("formLayout")
         self.field_lbl = QtWidgets.QLabel(group_name_dialog)
         self.field_lbl.setObjectName("field_lbl")

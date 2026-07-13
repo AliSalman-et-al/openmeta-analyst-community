@@ -79,6 +79,96 @@
       "evidence": ["gui_compatibility"],
       "external_dependencies": ["qt"],
       "lane": "gui",
+      "nodeid": "tests/python/gui/test_compact_transient_layout.py::test_complete_compact_transactional_inventory_is_content_preferred",
+      "reason": "Guards the complete compact, About/Legal, progress, and splash inventory across constrained, floor, large, and enlarged-font conditions.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_compact_transient_layout.py::test_long_choice_values_remain_available_without_widening_the_dialog",
+      "reason": "Guards complete long choice values through bounded popup overflow rather than root growth.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_compact_transient_layout.py::test_about_legal_has_explicit_overflow_and_reachable_action",
+      "reason": "Guards About/Legal Required Content overflow and its always-reachable Close action under enlarged fonts.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_compact_transient_layout.py::test_all_progress_entry_points_are_minimal_stable_transient_windows",
+      "reason": "Guards every maintained progress entry point as a minimal stable Transient Window.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_compact_transient_layout.py::test_startup_splash_declares_transient_archetype",
+      "reason": "Guards startup splash classification and its high-DPI-capable resource.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_compact_transient_layout.py::test_bounded_dpr_splash_preserves_its_logical_size",
+      "reason": "Guards a bounded DPR 2 splash against unintended logical shrinkage.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_compact_transient_layout.py::test_oversized_dpr_splash_is_bounded_without_double_scaling",
+      "reason": "Guards DPR-preserving physical scaling to an aspect-safe logical screen bound.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "subprocess"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_compact_transient_layout.py::test_remaining_inventory_survives_representative_process_scale_factors",
+      "reason": "Guards representative compact and Transient surfaces across process-level Qt scale factors.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_compact_transient_layout.py::test_canonical_forms_do_not_hard_code_platform_fonts",
+      "reason": "Guards canonical Qt Designer forms against platform-specific font families and absolute point sizes.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
       "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_diagnostic_data_declares_transactional_overflow_and_reachable_actions",
       "reason": "Guards the Diagnostic Data declarative Transactional layout and internal table overflow.",
       "runtime_class": "seconds",

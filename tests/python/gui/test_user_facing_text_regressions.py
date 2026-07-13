@@ -11,6 +11,7 @@ HELP_HTML = sorted(
 )
 
 GENERATED_UI_MODULE_NAMES = [
+    "forms.ui_about_legal",
     "forms.ui_binary_data_form",
     "forms.ui_change_cov_type",
     "forms.ui_choose_back_calc_result_form",

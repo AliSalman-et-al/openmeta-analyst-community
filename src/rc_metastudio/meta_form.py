@@ -50,6 +50,7 @@ import change_cov_type_form
 import network_view
 import conf_level_dialog
 import main_wizard
+import about_legal_dialog
 
 import forms.ui_running
 
@@ -172,7 +173,9 @@ class ImportProgress(QDialog, forms.ui_running.Ui_running):
 
         self.setWindowTitle("Importing from CSV...")
         self.progress_bar.setRange(min_, max_)
-        qt_layout.fit_application_dialog_to_contents(self)
+        self._layout_controller = adaptive_window.register_adaptive_window(
+            self, adaptive_window.WindowRole.TRANSIENT
+        )
 
     def setValue(self, value):
         if self.progress_bar.minimum() <= value <= self.progress_bar.maximum():
@@ -661,22 +664,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         qt_layout.show_centered(form)
 
     def show_about_legal(self):
-        QMessageBox.about(
-            self,
-            "About/Legal",
-            "RC MetaStudio {version}\n\n"
-            "Open-source desktop software for advanced meta-analysis, developed "
-            "and maintained by Research Consultancy (RC).\n\n"
-            "Maintainer: Ali Salman and RC MetaStudio contributors\n"
-            "License: GPL-3.0-or-later\n"
-            "Issues: https://github.com/AliSalman-et-al/rc-metastudio/issues\n\n"
-            "RC MetaStudio is distributed without warranty, including without "
-            "the implied warranty of merchantability or fitness for a particular "
-            "purpose.\n\n"
-            "RC MetaStudio is derived from the Original OpenMeta[Analyst] Project "
-            "and is independently maintained. See NOTICE.md for "
-            "provenance and affiliation details.".format(version=meta_globals.VERSION),
-        )
+        return about_legal_dialog.AboutLegalDialog(self).exec()
 
     def meta_subgroup(self, selected_cov):
         form = None

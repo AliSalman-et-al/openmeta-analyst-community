@@ -10,6 +10,7 @@ from PyQt5 import uic
 ROOT = Path(__file__).resolve().parents[1]
 
 UI_MODULES = {
+    "src/rc_metastudio/forms/about_legal.ui": "src/rc_metastudio/forms/ui_about_legal.py",
     "src/rc_metastudio/forms/binary_data_form2.ui": "src/rc_metastudio/forms/ui_binary_data_form.py",
     "src/rc_metastudio/forms/change_cov_type_form.ui": "src/rc_metastudio/forms/ui_change_cov_type.py",
     "src/rc_metastudio/forms/conf_level_dialog.ui": "src/rc_metastudio/forms/ui_conf_level_dialog.py",

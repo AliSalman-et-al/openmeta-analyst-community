@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'new_covariate_dlg.ui'
+# Form implementation generated from reading ui file 'src/rc_metastudio/forms/new_covariate_dlg.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -19,6 +19,7 @@ class Ui_new_covariate_dialog(object):
         self.verticalLayout.setObjectName("verticalLayout")
         self.formLayout = QtWidgets.QFormLayout()
         self.formLayout.setFieldGrowthPolicy(QtWidgets.QFormLayout.AllNonFixedFieldsGrow)
+        self.formLayout.setRowWrapPolicy(QtWidgets.QFormLayout.WrapAllRows)
         self.formLayout.setObjectName("formLayout")
         self.label_2 = QtWidgets.QLabel(new_covariate_dialog)
         self.label_2.setObjectName("label_2")
@@ -30,9 +31,7 @@ class Ui_new_covariate_dialog(object):
         self.label = QtWidgets.QLabel(new_covariate_dialog)
         self.label.setObjectName("label")
         self.formLayout.setWidget(1, QtWidgets.QFormLayout.LabelRole, self.label)
-        self.datatype_cbo_box = QtWidgets.QComboBox(new_covariate_dialog)
-        self.datatype_cbo_box.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon)
-        self.datatype_cbo_box.setMinimumContentsLength(12)
+        self.datatype_cbo_box = AdaptiveComboBox(new_covariate_dialog)
         self.datatype_cbo_box.setObjectName("datatype_cbo_box")
         self.formLayout.setWidget(1, QtWidgets.QFormLayout.FieldRole, self.datatype_cbo_box)
         self.verticalLayout.addLayout(self.formLayout)
@@ -55,4 +54,5 @@ class Ui_new_covariate_dialog(object):
         new_covariate_dialog.setWindowTitle(_translate("new_covariate_dialog", "Add Covariate"))
         self.label_2.setText(_translate("new_covariate_dialog", "Covariate name:"))
         self.label.setText(_translate("new_covariate_dialog", "Type of covariate:"))
+from adaptive_controls import AdaptiveComboBox
 import icons_rc

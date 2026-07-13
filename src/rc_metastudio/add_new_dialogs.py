@@ -7,6 +7,7 @@ import forms.ui_new_follow_up
 import forms.ui_new_outcome
 import forms.ui_new_covariate
 import forms.ui_new_study
+import adaptive_controls
 import adaptive_window
 
 # import pdb
@@ -40,6 +41,7 @@ class AddNewOutcomeForm(QDialog, forms.ui_new_outcome.Ui_Dialog):
 
         self.setupUi(self)
         self._populate_combo_box()
+        adaptive_controls.configure_choice_control(self.datatype_cbo_box)
         adaptive_window.register_adaptive_window(
             self, adaptive_window.WindowRole.TRANSACTIONAL
         )
@@ -67,6 +69,7 @@ class AddNewCovariateForm(QDialog, forms.ui_new_covariate.Ui_new_covariate_dialo
         super(AddNewCovariateForm, self).__init__(parent)
         self.setupUi(self)
         self._populate_combo_box()
+        adaptive_controls.configure_choice_control(self.datatype_cbo_box)
         adaptive_window.register_adaptive_window(
             self, adaptive_window.WindowRole.TRANSACTIONAL
         )

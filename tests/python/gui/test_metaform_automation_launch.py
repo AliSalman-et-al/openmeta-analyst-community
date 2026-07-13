@@ -4831,20 +4831,26 @@ def test_removed_help_surfaces_do_not_leave_active_ui_or_urls():
         )
         assert window.action_about_legal.text() == "About/Legal"
 
-        about_calls = []
-        original_about = QtWidgets.QMessageBox.about
-        QtWidgets.QMessageBox.about = lambda *args: about_calls.append(args)
+        import about_legal_dialog
+
+        about_dialogs = []
+        original_exec = about_legal_dialog.AboutLegalDialog.exec
+        about_legal_dialog.AboutLegalDialog.exec = (
+            lambda dialog: about_dialogs.append(dialog)
+        )
         try:
             window.action_about_legal.trigger()
         finally:
-            QtWidgets.QMessageBox.about = original_about
-        about_text = about_calls[0][2]
+            about_legal_dialog.AboutLegalDialog.exec = original_exec
+        about_text = about_dialogs[0].content_scroll_area.toPlainText()
+        assert about_dialogs[0].property("RCMS_window_archetype") == "transactional"
         assert "RC MetaStudio" in about_text
         assert "Ali Salman" in about_text
         assert "GPL-3.0-or-later" in about_text
         assert "without warranty" in about_text.lower()
         assert "Original OpenMeta[Analyst] Project" in about_text
         assert "NOTICE.md" in about_text
+        about_dialogs[0].close()
 
         wizard = main_wizard.MainWizard()
         welcome = wizard.page(main_wizard.Page_Welcome)
