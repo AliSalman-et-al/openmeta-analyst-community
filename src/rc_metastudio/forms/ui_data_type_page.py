@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'src\rc_metastudio\forms\data_type_page.ui'
+# Form implementation generated from reading ui file 'src/rc_metastudio/forms/data_type_page.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -15,192 +15,193 @@ class Ui_DataTypePage(object):
     def setupUi(self, DataTypePage):
         DataTypePage.setObjectName("DataTypePage")
         DataTypePage.resize(450, 400)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred
-        )
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(DataTypePage.sizePolicy().hasHeightForWidth())
         DataTypePage.setSizePolicy(sizePolicy)
-        self.verticalLayout = QtWidgets.QVBoxLayout(DataTypePage)
+        self.workflowPageLayout = QtWidgets.QVBoxLayout(DataTypePage)
+        self.workflowPageLayout.setContentsMargins(0, 0, 0, 0)
+        self.workflowPageLayout.setObjectName("workflowPageLayout")
+        self.pageScrollArea = QtWidgets.QScrollArea(DataTypePage)
+        self.pageScrollArea.setFocusPolicy(QtCore.Qt.NoFocus)
+        self.pageScrollArea.setFrameShape(QtWidgets.QFrame.NoFrame)
+        self.pageScrollArea.setWidgetResizable(True)
+        self.pageScrollArea.setObjectName("pageScrollArea")
+        self.pageScrollContent = QtWidgets.QWidget()
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Preferred)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.pageScrollContent.sizePolicy().hasHeightForWidth())
+        self.pageScrollContent.setSizePolicy(sizePolicy)
+        self.pageScrollContent.setObjectName("pageScrollContent")
+        self.verticalLayout = QtWidgets.QVBoxLayout(self.pageScrollContent)
         self.verticalLayout.setObjectName("verticalLayout")
-        self.label_2 = QtWidgets.QLabel(DataTypePage)
+        self.label_2 = QtWidgets.QLabel(self.pageScrollContent)
         font = QtGui.QFont()
         font.setUnderline(False)
         self.label_2.setFont(font)
         self.label_2.setObjectName("label_2")
         self.verticalLayout.addWidget(self.label_2)
-        self.horizontalLayout_3 = QtWidgets.QHBoxLayout()
-        self.horizontalLayout_3.setObjectName("horizontalLayout_3")
-        self.onearm_proportion_Button = QtWidgets.QToolButton(DataTypePage)
+        self.oneArmDataTypesLayout = QtWidgets.QGridLayout()
+        self.oneArmDataTypesLayout.setObjectName("oneArmDataTypesLayout")
+        self.onearm_proportion_Button = QtWidgets.QToolButton(self.pageScrollContent)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.onearm_proportion_Button.sizePolicy().hasHeightForWidth())
+        self.onearm_proportion_Button.setSizePolicy(sizePolicy)
         icon = QtGui.QIcon()
-        icon.addPixmap(
-            QtGui.QPixmap(":/new_dataset/startscreens/proportion.png"),
-            QtGui.QIcon.Normal,
-            QtGui.QIcon.Off,
-        )
+        icon.addPixmap(QtGui.QPixmap(":/new_dataset/startscreens/proportion.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.onearm_proportion_Button.setIcon(icon)
         self.onearm_proportion_Button.setIconSize(QtCore.QSize(40, 40))
         self.onearm_proportion_Button.setCheckable(True)
-        self.onearm_proportion_Button.setToolButtonStyle(
-            QtCore.Qt.ToolButtonTextUnderIcon
-        )
+        self.onearm_proportion_Button.setToolButtonStyle(QtCore.Qt.ToolButtonTextUnderIcon)
         self.onearm_proportion_Button.setObjectName("onearm_proportion_Button")
         self.buttonGroup = QtWidgets.QButtonGroup(DataTypePage)
         self.buttonGroup.setObjectName("buttonGroup")
         self.buttonGroup.addButton(self.onearm_proportion_Button)
-        self.horizontalLayout_3.addWidget(self.onearm_proportion_Button)
-        self.onearm_mean_Button = QtWidgets.QToolButton(DataTypePage)
+        self.oneArmDataTypesLayout.addWidget(self.onearm_proportion_Button, 0, 0, 1, 1)
+        self.onearm_mean_Button = QtWidgets.QToolButton(self.pageScrollContent)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.onearm_mean_Button.sizePolicy().hasHeightForWidth())
+        self.onearm_mean_Button.setSizePolicy(sizePolicy)
         self.onearm_mean_Button.setBaseSize(QtCore.QSize(10, 10))
         icon1 = QtGui.QIcon()
-        icon1.addPixmap(
-            QtGui.QPixmap(":/new_dataset/startscreens/mean.png"),
-            QtGui.QIcon.Normal,
-            QtGui.QIcon.Off,
-        )
+        icon1.addPixmap(QtGui.QPixmap(":/new_dataset/startscreens/mean.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.onearm_mean_Button.setIcon(icon1)
         self.onearm_mean_Button.setIconSize(QtCore.QSize(40, 40))
         self.onearm_mean_Button.setCheckable(True)
         self.onearm_mean_Button.setToolButtonStyle(QtCore.Qt.ToolButtonTextUnderIcon)
         self.onearm_mean_Button.setObjectName("onearm_mean_Button")
         self.buttonGroup.addButton(self.onearm_mean_Button)
-        self.horizontalLayout_3.addWidget(self.onearm_mean_Button)
-        self.onearm_single_reg_coef_Button = QtWidgets.QToolButton(DataTypePage)
+        self.oneArmDataTypesLayout.addWidget(self.onearm_mean_Button, 0, 1, 1, 1)
+        self.onearm_single_reg_coef_Button = QtWidgets.QToolButton(self.pageScrollContent)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.onearm_single_reg_coef_Button.sizePolicy().hasHeightForWidth())
+        self.onearm_single_reg_coef_Button.setSizePolicy(sizePolicy)
         self.onearm_single_reg_coef_Button.setBaseSize(QtCore.QSize(10, 10))
         icon2 = QtGui.QIcon()
-        icon2.addPixmap(
-            QtGui.QPixmap(":/new_dataset/startscreens/single_reg_coef.png"),
-            QtGui.QIcon.Normal,
-            QtGui.QIcon.Off,
-        )
+        icon2.addPixmap(QtGui.QPixmap(":/new_dataset/startscreens/single_reg_coef.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.onearm_single_reg_coef_Button.setIcon(icon2)
         self.onearm_single_reg_coef_Button.setIconSize(QtCore.QSize(40, 40))
         self.onearm_single_reg_coef_Button.setCheckable(True)
-        self.onearm_single_reg_coef_Button.setToolButtonStyle(
-            QtCore.Qt.ToolButtonTextUnderIcon
-        )
-        self.onearm_single_reg_coef_Button.setObjectName(
-            "onearm_single_reg_coef_Button"
-        )
+        self.onearm_single_reg_coef_Button.setToolButtonStyle(QtCore.Qt.ToolButtonTextUnderIcon)
+        self.onearm_single_reg_coef_Button.setObjectName("onearm_single_reg_coef_Button")
         self.buttonGroup.addButton(self.onearm_single_reg_coef_Button)
-        self.horizontalLayout_3.addWidget(self.onearm_single_reg_coef_Button)
-        self.onearm_generic_effect_size_Button = QtWidgets.QToolButton(DataTypePage)
+        self.oneArmDataTypesLayout.addWidget(self.onearm_single_reg_coef_Button, 1, 0, 1, 1)
+        self.onearm_generic_effect_size_Button = QtWidgets.QToolButton(self.pageScrollContent)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.onearm_generic_effect_size_Button.sizePolicy().hasHeightForWidth())
+        self.onearm_generic_effect_size_Button.setSizePolicy(sizePolicy)
         self.onearm_generic_effect_size_Button.setBaseSize(QtCore.QSize(10, 10))
         icon3 = QtGui.QIcon()
-        icon3.addPixmap(
-            QtGui.QPixmap(":/new_dataset/startscreens/gen_eff_size.png"),
-            QtGui.QIcon.Normal,
-            QtGui.QIcon.Off,
-        )
+        icon3.addPixmap(QtGui.QPixmap(":/new_dataset/startscreens/gen_eff_size.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.onearm_generic_effect_size_Button.setIcon(icon3)
         self.onearm_generic_effect_size_Button.setIconSize(QtCore.QSize(40, 40))
         self.onearm_generic_effect_size_Button.setCheckable(True)
-        self.onearm_generic_effect_size_Button.setToolButtonStyle(
-            QtCore.Qt.ToolButtonTextUnderIcon
-        )
+        self.onearm_generic_effect_size_Button.setToolButtonStyle(QtCore.Qt.ToolButtonTextUnderIcon)
         self.onearm_generic_effect_size_Button.setArrowType(QtCore.Qt.NoArrow)
-        self.onearm_generic_effect_size_Button.setObjectName(
-            "onearm_generic_effect_size_Button"
-        )
+        self.onearm_generic_effect_size_Button.setObjectName("onearm_generic_effect_size_Button")
         self.buttonGroup.addButton(self.onearm_generic_effect_size_Button)
-        self.horizontalLayout_3.addWidget(self.onearm_generic_effect_size_Button)
-        spacerItem = QtWidgets.QSpacerItem(
-            40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
-        )
-        self.horizontalLayout_3.addItem(spacerItem)
-        self.verticalLayout.addLayout(self.horizontalLayout_3)
-        self.line_2 = QtWidgets.QFrame(DataTypePage)
+        self.oneArmDataTypesLayout.addWidget(self.onearm_generic_effect_size_Button, 1, 1, 1, 1)
+        self.verticalLayout.addLayout(self.oneArmDataTypesLayout)
+        self.line_2 = QtWidgets.QFrame(self.pageScrollContent)
         self.line_2.setFrameShape(QtWidgets.QFrame.HLine)
         self.line_2.setFrameShadow(QtWidgets.QFrame.Sunken)
         self.line_2.setObjectName("line_2")
         self.verticalLayout.addWidget(self.line_2)
-        self.label_4 = QtWidgets.QLabel(DataTypePage)
+        self.label_4 = QtWidgets.QLabel(self.pageScrollContent)
         self.label_4.setObjectName("label_4")
         self.verticalLayout.addWidget(self.label_4)
-        self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
-        self.horizontalLayout_2.setObjectName("horizontalLayout_2")
-        self.twoarm_proportions_Button = QtWidgets.QToolButton(DataTypePage)
+        self.multiArmDataTypesLayout = QtWidgets.QGridLayout()
+        self.multiArmDataTypesLayout.setObjectName("multiArmDataTypesLayout")
+        self.twoarm_proportions_Button = QtWidgets.QToolButton(self.pageScrollContent)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.twoarm_proportions_Button.sizePolicy().hasHeightForWidth())
+        self.twoarm_proportions_Button.setSizePolicy(sizePolicy)
         self.twoarm_proportions_Button.setBaseSize(QtCore.QSize(10, 10))
         icon4 = QtGui.QIcon()
-        icon4.addPixmap(
-            QtGui.QPixmap(":/new_dataset/startscreens/proportions.png"),
-            QtGui.QIcon.Normal,
-            QtGui.QIcon.Off,
-        )
+        icon4.addPixmap(QtGui.QPixmap(":/new_dataset/startscreens/proportions.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.twoarm_proportions_Button.setIcon(icon4)
         self.twoarm_proportions_Button.setIconSize(QtCore.QSize(72, 44))
         self.twoarm_proportions_Button.setCheckable(True)
-        self.twoarm_proportions_Button.setToolButtonStyle(
-            QtCore.Qt.ToolButtonTextUnderIcon
-        )
+        self.twoarm_proportions_Button.setToolButtonStyle(QtCore.Qt.ToolButtonTextUnderIcon)
         self.twoarm_proportions_Button.setObjectName("twoarm_proportions_Button")
         self.buttonGroup.addButton(self.twoarm_proportions_Button)
-        self.horizontalLayout_2.addWidget(self.twoarm_proportions_Button)
-        self.twoarm_means_Button = QtWidgets.QToolButton(DataTypePage)
+        self.multiArmDataTypesLayout.addWidget(self.twoarm_proportions_Button, 0, 0, 1, 1)
+        self.twoarm_means_Button = QtWidgets.QToolButton(self.pageScrollContent)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.twoarm_means_Button.sizePolicy().hasHeightForWidth())
+        self.twoarm_means_Button.setSizePolicy(sizePolicy)
         self.twoarm_means_Button.setBaseSize(QtCore.QSize(10, 10))
         icon5 = QtGui.QIcon()
-        icon5.addPixmap(
-            QtGui.QPixmap(":/new_dataset/startscreens/means.png"),
-            QtGui.QIcon.Normal,
-            QtGui.QIcon.Off,
-        )
+        icon5.addPixmap(QtGui.QPixmap(":/new_dataset/startscreens/means.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.twoarm_means_Button.setIcon(icon5)
         self.twoarm_means_Button.setIconSize(QtCore.QSize(54, 40))
         self.twoarm_means_Button.setCheckable(True)
         self.twoarm_means_Button.setToolButtonStyle(QtCore.Qt.ToolButtonTextUnderIcon)
         self.twoarm_means_Button.setObjectName("twoarm_means_Button")
         self.buttonGroup.addButton(self.twoarm_means_Button)
-        self.horizontalLayout_2.addWidget(self.twoarm_means_Button)
-        self.twoarm_smds_Button = QtWidgets.QToolButton(DataTypePage)
+        self.multiArmDataTypesLayout.addWidget(self.twoarm_means_Button, 0, 1, 1, 1)
+        self.twoarm_smds_Button = QtWidgets.QToolButton(self.pageScrollContent)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.twoarm_smds_Button.sizePolicy().hasHeightForWidth())
+        self.twoarm_smds_Button.setSizePolicy(sizePolicy)
         self.twoarm_smds_Button.setBaseSize(QtCore.QSize(10, 10))
         icon6 = QtGui.QIcon()
-        icon6.addPixmap(
-            QtGui.QPixmap(":/new_dataset/startscreens/smd.png"),
-            QtGui.QIcon.Normal,
-            QtGui.QIcon.Off,
-        )
+        icon6.addPixmap(QtGui.QPixmap(":/new_dataset/startscreens/smd.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.twoarm_smds_Button.setIcon(icon6)
         self.twoarm_smds_Button.setIconSize(QtCore.QSize(40, 40))
         self.twoarm_smds_Button.setCheckable(True)
         self.twoarm_smds_Button.setToolButtonStyle(QtCore.Qt.ToolButtonTextUnderIcon)
         self.twoarm_smds_Button.setObjectName("twoarm_smds_Button")
         self.buttonGroup.addButton(self.twoarm_smds_Button)
-        self.horizontalLayout_2.addWidget(self.twoarm_smds_Button)
-        spacerItem1 = QtWidgets.QSpacerItem(
-            40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
-        )
-        self.horizontalLayout_2.addItem(spacerItem1)
-        self.verticalLayout.addLayout(self.horizontalLayout_2)
-        self.line_4 = QtWidgets.QFrame(DataTypePage)
+        self.multiArmDataTypesLayout.addWidget(self.twoarm_smds_Button, 1, 0, 1, 1)
+        self.verticalLayout.addLayout(self.multiArmDataTypesLayout)
+        self.line_4 = QtWidgets.QFrame(self.pageScrollContent)
         self.line_4.setFrameShape(QtWidgets.QFrame.HLine)
         self.line_4.setFrameShadow(QtWidgets.QFrame.Sunken)
         self.line_4.setObjectName("line_4")
         self.verticalLayout.addWidget(self.line_4)
-        self.label_5 = QtWidgets.QLabel(DataTypePage)
+        self.label_5 = QtWidgets.QLabel(self.pageScrollContent)
         self.label_5.setObjectName("label_5")
         self.verticalLayout.addWidget(self.label_5)
-        self.horizontalLayout = QtWidgets.QHBoxLayout()
-        self.horizontalLayout.setObjectName("horizontalLayout")
-        self.diagnostic_Button = QtWidgets.QToolButton(DataTypePage)
+        self.diagnosticDataTypeLayout = QtWidgets.QHBoxLayout()
+        self.diagnosticDataTypeLayout.setObjectName("diagnosticDataTypeLayout")
+        self.diagnostic_Button = QtWidgets.QToolButton(self.pageScrollContent)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.diagnostic_Button.sizePolicy().hasHeightForWidth())
+        self.diagnostic_Button.setSizePolicy(sizePolicy)
         self.diagnostic_Button.setBaseSize(QtCore.QSize(10, 10))
         icon7 = QtGui.QIcon()
-        icon7.addPixmap(
-            QtGui.QPixmap(":/new_dataset/startscreens/diagnostic.png"),
-            QtGui.QIcon.Normal,
-            QtGui.QIcon.Off,
-        )
+        icon7.addPixmap(QtGui.QPixmap(":/new_dataset/startscreens/diagnostic.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.diagnostic_Button.setIcon(icon7)
         self.diagnostic_Button.setIconSize(QtCore.QSize(85, 44))
         self.diagnostic_Button.setCheckable(True)
         self.diagnostic_Button.setToolButtonStyle(QtCore.Qt.ToolButtonTextUnderIcon)
         self.diagnostic_Button.setObjectName("diagnostic_Button")
         self.buttonGroup.addButton(self.diagnostic_Button)
-        self.horizontalLayout.addWidget(self.diagnostic_Button)
-        spacerItem2 = QtWidgets.QSpacerItem(
-            40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
-        )
-        self.horizontalLayout.addItem(spacerItem2)
-        self.verticalLayout.addLayout(self.horizontalLayout)
+        self.diagnosticDataTypeLayout.addWidget(self.diagnostic_Button)
+        spacerItem = QtWidgets.QSpacerItem(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.diagnosticDataTypeLayout.addItem(spacerItem)
+        self.verticalLayout.addLayout(self.diagnosticDataTypeLayout)
+        self.pageScrollArea.setWidget(self.pageScrollContent)
+        self.workflowPageLayout.addWidget(self.pageScrollArea)
 
         self.retranslateUi(DataTypePage)
         QtCore.QMetaObject.connectSlotsByName(DataTypePage)
@@ -208,33 +209,18 @@ class Ui_DataTypePage(object):
     def retranslateUi(self, DataTypePage):
         _translate = QtCore.QCoreApplication.translate
         DataTypePage.setWindowTitle(_translate("DataTypePage", "WizardPage"))
-        DataTypePage.setTitle(
-            _translate("DataTypePage", "What type of data do you have?")
-        )
-        self.label_2.setText(
-            _translate(
-                "DataTypePage",
-                "One piece of data from each study or studies with one group",
-            )
-        )
+        DataTypePage.setTitle(_translate("DataTypePage", "What type of data do you have?"))
+        self.label_2.setText(_translate("DataTypePage", "One piece of data from each study or studies with one group"))
         self.onearm_proportion_Button.setText(_translate("DataTypePage", "Proportion"))
         self.onearm_mean_Button.setText(_translate("DataTypePage", "Mean"))
-        self.onearm_single_reg_coef_Button.setText(
-            _translate("DataTypePage", "Regression\nCoefficient")
-        )
-        self.onearm_generic_effect_size_Button.setText(
-            _translate("DataTypePage", "Generic\nEffect Size")
-        )
-        self.label_4.setText(
-            _translate("DataTypePage", "Data on two or more groups per study")
-        )
-        self.twoarm_proportions_Button.setText(
-            _translate("DataTypePage", "Proportions")
-        )
+        self.onearm_single_reg_coef_Button.setText(_translate("DataTypePage", "Regression\n"
+"Coefficient"))
+        self.onearm_generic_effect_size_Button.setText(_translate("DataTypePage", "Generic\n"
+"Effect Size"))
+        self.label_4.setText(_translate("DataTypePage", "Data on two or more groups per study"))
+        self.twoarm_proportions_Button.setText(_translate("DataTypePage", "Proportions"))
         self.twoarm_means_Button.setText(_translate("DataTypePage", "Means"))
         self.twoarm_smds_Button.setText(_translate("DataTypePage", "SMD"))
         self.label_5.setText(_translate("DataTypePage", "Data on test performance"))
         self.diagnostic_Button.setText(_translate("DataTypePage", "Diagnostic"))
-
-
 import icons_rc

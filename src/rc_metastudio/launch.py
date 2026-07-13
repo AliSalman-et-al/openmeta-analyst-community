@@ -302,12 +302,16 @@ def start_wizard_layout_smoke():
 
     try:
         for scenario_name, wizard, actions in scenarios:
-            _show_wizard_for_layout_smoke(app, wizard, scenario_name)
+            stable_geometry = _show_wizard_for_layout_smoke(
+                app, wizard, scenario_name
+            )
             for action, expected_page_id, value in actions:
                 _advance_wizard_layout_smoke_page(
                     app, wizard, action, expected_page_id, value
                 )
-                _assert_wizard_layout_smoke_page(app, wizard, scenario_name)
+                _assert_wizard_layout_smoke_page(
+                    app, wizard, scenario_name, stable_geometry
+                )
     finally:
         for _scenario_name, wizard, _actions in scenarios:
             wizard.close()
@@ -321,6 +325,7 @@ def _show_wizard_for_layout_smoke(app, wizard, scenario_name):
     wizard.show()
     _flush_gui_events(app)
     _assert_wizard_layout_smoke_page(app, wizard, scenario_name)
+    return _window_frame_tuple(wizard)
 
 
 def _advance_wizard_layout_smoke_page(app, wizard, action, expected_page_id, value):
@@ -343,7 +348,9 @@ def _advance_wizard_layout_smoke_page(app, wizard, action, expected_page_id, val
     _flush_gui_events(app)
 
 
-def _assert_wizard_layout_smoke_page(app, wizard, scenario_name):
+def _assert_wizard_layout_smoke_page(
+    app, wizard, scenario_name, expected_geometry=None
+):
     _flush_gui_events(app)
     page = wizard.currentPage()
     if page is None:
@@ -364,6 +371,35 @@ def _assert_wizard_layout_smoke_page(app, wizard, scenario_name):
         raise SystemExit("Wizard layout smoke saw an empty body: %s" % scenario_name)
     if wizard.wizardStyle() != QtWidgets.QWizard.ModernStyle:
         raise SystemExit("Wizard layout smoke expected ModernStyle: %s" % scenario_name)
+    if wizard.property("RCMS_window_archetype") != "workflow":
+        raise SystemExit(
+            "Wizard layout smoke expected Workflow Window policy: %s"
+            % scenario_name
+        )
+    overflow = page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
+    if overflow is None or not overflow.widgetResizable():
+        raise SystemExit(
+            "Wizard layout smoke expected a page Overflow Boundary: %s"
+            % scenario_name
+        )
+    for button_role in (
+        QtWidgets.QWizard.BackButton,
+        QtWidgets.QWizard.NextButton,
+        QtWidgets.QWizard.FinishButton,
+        QtWidgets.QWizard.CancelButton,
+    ):
+        if overflow.isAncestorOf(wizard.button(button_role)):
+            raise SystemExit(
+                "Wizard navigation entered page overflow: %s" % scenario_name
+            )
+    if (
+        expected_geometry is not None
+        and _window_frame_tuple(wizard) != expected_geometry
+    ):
+        raise SystemExit(
+            "Visible Workflow Window geometry changed between pages: %s"
+            % scenario_name
+        )
     if page.sizeHint().width() <= 0 or page.sizeHint().height() <= 0:
         raise SystemExit(
             "Wizard layout smoke saw an invalid page size hint: %s" % scenario_name
@@ -376,6 +412,11 @@ def _assert_wizard_layout_smoke_page(app, wizard, scenario_name):
     image = pixmap.toImage()
     if pixmap.isNull() or image.isNull() or image.width() <= 0 or image.height() <= 0:
         raise SystemExit("Wizard layout smoke could not render: %s" % scenario_name)
+
+
+def _window_frame_tuple(window):
+    geometry = window.frameGeometry()
+    return geometry.x(), geometry.y(), geometry.width(), geometry.height()
 
 
 def _assert_visible_children_are_laid_out(page, scenario_name):

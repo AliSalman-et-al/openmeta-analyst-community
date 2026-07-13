@@ -68,7 +68,7 @@ def test_combo_policy_caps_closed_control_but_keeps_popup_full_width(qapp):
     assert combo.sizePolicy().horizontalPolicy() != QtWidgets.QSizePolicy.Expanding
 
 
-def test_application_wizard_uses_minimum_layout_constraint_without_refit_filter(qapp):
+def test_application_wizard_uses_workflow_policy_without_legacy_refit(qapp):
     import main_wizard
 
     wizard = main_wizard.MainWizard(path="new_dataset")
@@ -76,7 +76,8 @@ def test_application_wizard_uses_minimum_layout_constraint_without_refit_filter(
         wizard.restart()
         qapp.processEvents()
 
-        assert wizard.layout().sizeConstraint() == QtWidgets.QLayout.SetMinimumSize
+        assert wizard.property("RCMS_window_archetype") == "workflow"
+        assert wizard.currentPage().findChild(QtWidgets.QScrollArea, "pageScrollArea")
         assert not hasattr(wizard, "_oma_first_show_refit_filter")
         assert wizard.property("RCMS_first_show_refit_options") is None
         assert wizard.property("RCMS_stable_fit_size") is None

@@ -4306,22 +4306,6 @@ def test_welcome_wizard_open_existing_selects_project(monkeypatch):
         app.processEvents()
 
 
-def test_wizard_size_refit_ignores_closed_wizard_without_current_page(monkeypatch):
-    import launch
-    from PyQt5 import QtWidgets
-    import main_wizard
-
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-    wizard = main_wizard.MainWizard(path="csv_import")
-    try:
-        monkeypatch.setattr(wizard, "currentPage", lambda: None)
-
-        wizard._change_size(-1)
-    finally:
-        wizard.close()
-        app.processEvents()
-
-
 def test_modal_dialogs_center_over_parent_window():
     import launch
     from PyQt5 import QtWidgets
@@ -4394,6 +4378,7 @@ def test_data_type_page_multiline_buttons_fit_icon_and_caption():
     wizard = main_wizard.MainWizard(path="new_dataset")
     try:
         wizard.restart()
+        wizard.show()
         app.processEvents()
 
         data_type_page = wizard.page(main_wizard.Page_DataType)
@@ -4404,14 +4389,13 @@ def test_data_type_page_multiline_buttons_fit_icon_and_caption():
 
         for button in multiline_buttons:
             assert "\n" in button.text()
-            assert button.maximumHeight() >= button.sizeHint().height()
-            assert button.minimumHeight() >= button.sizeHint().height()
+            assert button.height() >= button.sizeHint().height()
     finally:
         wizard.close()
         app.processEvents()
 
 
-def test_data_type_page_data_type_buttons_use_uniform_size():
+def test_data_type_page_reflows_buttons_without_horizontal_overflow():
     import launch
     from PyQt5 import QtWidgets
     import main_wizard
@@ -4420,25 +4404,14 @@ def test_data_type_page_data_type_buttons_use_uniform_size():
     wizard = main_wizard.MainWizard(path="new_dataset")
     try:
         wizard.restart()
+        wizard.show()
         app.processEvents()
 
         data_type_page = wizard.page(main_wizard.Page_DataType)
-        data_type_buttons = [
-            data_type_page.onearm_proportion_Button,
-            data_type_page.onearm_mean_Button,
-            data_type_page.onearm_single_reg_coef_Button,
-            data_type_page.onearm_generic_effect_size_Button,
-            data_type_page.twoarm_proportions_Button,
-            data_type_page.twoarm_means_Button,
-            data_type_page.twoarm_smds_Button,
-            data_type_page.diagnostic_Button,
-        ]
-
-        button_sizes = {
-            button.objectName(): (button.size().width(), button.size().height())
-            for button in data_type_buttons
-        }
-        assert len(set(button_sizes.values())) == 1, button_sizes
+        overflow = data_type_page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
+        assert overflow.horizontalScrollBar().maximum() == 0
+        assert data_type_page.oneArmDataTypesLayout.columnCount() == 2
+        assert data_type_page.multiArmDataTypesLayout.columnCount() == 2
     finally:
         wizard.close()
         app.processEvents()
@@ -4471,7 +4444,7 @@ def test_data_type_page_buttons_center_icons_inside_declared_slots():
         app.processEvents()
 
 
-def test_new_dataset_wizard_sizes_to_show_diagnostic_choice():
+def test_new_dataset_wizard_overflow_keeps_diagnostic_choice_reachable():
     import launch
     from PyQt5 import QtWidgets
     import main_wizard
@@ -4486,16 +4459,21 @@ def test_new_dataset_wizard_sizes_to_show_diagnostic_choice():
         data_type_page.layout().activate()
         app.processEvents()
 
+        overflow = data_type_page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
         diagnostic_button = data_type_page.diagnostic_Button
-        assert data_type_page.rect().contains(diagnostic_button.geometry())
-        assert wizard.minimumHeight() >= data_type_page.sizeHint().height()
-        assert wizard.minimumHeight() >= wizard.sizeHint().height()
+        overflow.ensureWidgetVisible(diagnostic_button)
+        app.processEvents()
+        diagnostic_rect = QtCore.QRect(
+            diagnostic_button.mapTo(overflow.viewport(), QtCore.QPoint()),
+            diagnostic_button.size(),
+        )
+        assert overflow.viewport().rect().intersects(diagnostic_rect)
     finally:
         wizard.close()
         app.processEvents()
 
 
-def test_new_dataset_wizard_uses_declarative_minimum_size_policy():
+def test_new_dataset_wizard_uses_replacement_workflow_policy():
     import launch
     from PyQt5 import QtWidgets
     import main_wizard
@@ -4506,7 +4484,8 @@ def test_new_dataset_wizard_uses_declarative_minimum_size_policy():
         wizard.restart()
         app.processEvents()
 
-        assert wizard.layout().sizeConstraint() == QtWidgets.QLayout.SetMinimumSize
+        assert wizard.property("RCMS_window_archetype") == "workflow"
+        assert wizard.property("RCMS_window_role") == "workflow"
         assert not hasattr(wizard, "_oma_first_show_refit_filter")
         assert wizard.property("RCMS_first_show_refit_options") is None
     finally:
@@ -4585,40 +4564,36 @@ def test_new_dataset_wizard_pages_fill_body_without_clipping_content():
             assert abs(page_body_width - stable_body_width) <= 4
             assert abs(wizard.width() - stable_wizard_width) <= 4
             assert page.width() >= page_body_width - 4
-            _assert_visible_children_fit_page(page)
+            overflow = page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
+            assert overflow is not None
+            assert page.rect().contains(overflow.geometry())
     finally:
         wizard.close()
         app.processEvents()
 
 
-def _assert_visible_children_fit_page(page):
-    page_rect = page.rect().adjusted(0, 0, 1, 1)
-    for child in page.findChildren(QtWidgets.QWidget):
-        if child is page or not child.isVisible():
-            continue
-        child_rect = child.geometry()
-        mapped_top_left = child.parentWidget().mapTo(page, child_rect.topLeft())
-        mapped_rect = child_rect
-        mapped_rect.moveTopLeft(mapped_top_left)
-        assert page_rect.contains(mapped_rect), child.objectName()
+def test_data_type_page_canonical_form_declares_reflow_and_overflow():
+    ui_path = (
+        Path(__file__).resolve().parents[3]
+        / "src"
+        / "rc_metastudio"
+        / "forms"
+        / "data_type_page.ui"
+    )
+    root = ET.parse(ui_path).getroot().find("widget")
 
-
-def test_data_type_page_canonical_geometry_covers_normalized_content():
-    import launch
-    from PyQt5 import QtWidgets
-    import main_wizard
-
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-    data_type_page = main_wizard.DataTypePage()
-    try:
-        data_type_page.layout().activate()
-        ui_tree = ET.parse(Path("src", "forms", "data_type_page.ui"))
-        ui_height = int(ui_tree.findtext(".//height"))
-
-        assert ui_height >= data_type_page.minimumHeight()
-    finally:
-        data_type_page.close()
-        app.processEvents()
+    assert root.find("./layout").get("name") == "workflowPageLayout"
+    assert root.find(".//widget[@name='pageScrollArea']") is not None
+    assert (
+        root.find(".//layout[@name='oneArmDataTypesLayout']").get("class")
+        == "QGridLayout"
+    )
+    assert (
+        root.find(".//layout[@name='multiArmDataTypesLayout']").get("class")
+        == "QGridLayout"
+    )
+    assert root.find("./property[@name='minimumSize']") is None
+    assert root.find("./property[@name='maximumSize']") is None
 
 
 @pytest.mark.parametrize(

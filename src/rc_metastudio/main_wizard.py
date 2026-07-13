@@ -7,22 +7,24 @@ import forms.ui_data_type_page
 import forms.ui_outcome_name_page
 import forms.ui_welcome_page
 
-from PyQt5.QtCore import QSize, Qt
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon, QPainter, QPixmap
 from PyQt5.QtWidgets import (
     QAction,
+    QApplication,
     QFileDialog,
     QAbstractButton,
     QMenu,
     QMessageBox,
-    QWIDGETSIZE_MAX,
     QSizePolicy,
+    QScrollArea,
     QTableWidgetItem,
     QWizard,
     QWizardPage,
 )
 import meta_globals
 import app_error_handler
+import adaptive_window
 import qt_layout
 import qt_text
 import tabular_data
@@ -38,10 +40,8 @@ class WelcomePage(QWizardPage, forms.ui_welcome_page.Ui_WizardPage):
         self.recent_datasets = recent_datasets
         self.selected_dataset = None
         self._setup_connections()
-        qt_layout.fit_text_to_contents(self, adjust_root=False)
 
     def initializePage(self):
-        # self.wizard().adjustSize()
         pass
 
     def isComplete(self):  # disable next/back buttons
@@ -159,12 +159,9 @@ class DataTypePage(QWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
             app_error_handler.safe_slot(self._button_selected, parent=self)
         )
 
-        self._normalize_data_type_button_sizes()
-        qt_layout.fit_text_to_contents(self, adjust_root=False)
-        self._fit_page_to_data_type_contents()
+        self._configure_data_type_buttons()
 
     def initializePage(self):
-        # self.wizard().adjustSize()
         self.setFocus()
 
     def _data_type_buttons(self):
@@ -179,20 +176,14 @@ class DataTypePage(QWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
             self.diagnostic_Button,
         ]
 
-    def _normalize_data_type_button_sizes(self):
+    def _configure_data_type_buttons(self):
         buttons = self._data_type_buttons()
         for button in buttons:
             self._center_button_icon_in_declared_slot(button)
-            button.setMinimumSize(QSize(0, 0))
-            button.setMaximumSize(QSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX))
-
-        common_size = QSize(
-            max(button.sizeHint().width() for button in buttons),
-            max(button.sizeHint().height() for button in buttons),
-        )
-        for button in buttons:
-            button.setFixedSize(common_size)
-            button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+            button.setFocusPolicy(Qt.StrongFocus)
+        for current, following in zip(buttons, buttons[1:]):
+            self.setTabOrder(current, following)
 
     def _center_button_icon_in_declared_slot(self, button):
         icon_size = button.iconSize()
@@ -217,12 +208,6 @@ class DataTypePage(QWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
             painter.end()
 
         button.setIcon(QIcon(canvas))
-
-    def _fit_page_to_data_type_contents(self):
-        layout = self.layout()
-        if layout is not None:
-            layout.activate()
-        self.setMinimumSize(self.minimumSize().expandedTo(self.sizeHint()))
 
     def _button_selected(self, button):
         # print("button clicked %s" % str(button))
@@ -305,7 +290,6 @@ class ChooseMetricPage(QWizardPage, forms.ui_choose_metric_page.Ui_WizardPage):
         self.metric_cbo_box.currentIndexChanged[int].connect(
             app_error_handler.safe_slot(self._metric_choice_changed, parent=self)
         )
-        qt_layout.fit_text_to_contents(self, adjust_root=False)
 
     def initializePage(self):
         data_type = self.wizard().get_dataset_info()["data_type"]
@@ -334,11 +318,8 @@ class ChooseMetricPage(QWizardPage, forms.ui_choose_metric_page.Ui_WizardPage):
             default_item_text = self.metric_cbo_box.itemText(index_of_default)
             default_item_text += " (DEFAULT)"
             self.metric_cbo_box.setItemText(index_of_default, default_item_text)
-            # Resize the dialog
             self.metric_cbo_box.blockSignals(False)
-            qt_layout.fit_text_to_contents(self, adjust_root=False)
 
-        # self.wizard().adjustSize()
 
     def _metric_choice_changed(self, newindex):
         self.wizard().set_effect(_qt_item_text(self.metric_cbo_box.itemData(newindex)))
@@ -360,7 +341,6 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
     def __init__(self, parent=None):
         super(CsvImportPage, self).__init__(parent)
         self.setupUi(self)
-        qt_layout.fit_option_groups_to_contents(self, adjust_root=False)
 
         self.select_file_btn.clicked.connect(
             app_error_handler.safe_slot(
@@ -660,10 +640,8 @@ class OutcomeNamePage(QWizardPage, forms.ui_outcome_name_page.Ui_WizardPage):
         self.setupUi(self)
 
         self.registerField("outcomeName*", self.outcome_name_LineEdit)
-        qt_layout.fit_text_to_contents(self, adjust_root=False)
 
     def initializePage(self):
-        # self.wizard().adjustSize()
         pass
 
     def nextId(self):
@@ -702,29 +680,46 @@ class MainWizard(QWizard):
             self.setStartId(Page_DataType)
             self.setWindowTitle("Create a New Dataset")
 
-        # make the displayed size of the pages reasonable
-        self.currentIdChanged.connect(
-            app_error_handler.safe_slot(self._change_size, parent=self)
+        self._layout_controller = adaptive_window.register_adaptive_window(
+            self, adaptive_window.WindowRole.WORKFLOW
         )
-        qt_layout.fit_application_dialog_to_contents(self)
-
-    def _change_size(self, pageid):
-        self._fit_current_page_to_contents()
-
-    def _fit_current_page_to_contents(self):
-        current_page = self.currentPage()
-        if current_page is None:
-            return
-        qt_layout.fit_text_to_contents(current_page, adjust_root=False)
-        qt_layout.fit_application_dialog_to_contents(self)
+        self._focus_reveal_connected = False
 
     def showEvent(self, event):
+        """Scope focus observation to the wizard's visible lifetime."""
         super(MainWizard, self).showEvent(event)
-        qt_layout.sync_application_wizard_pages_to_body(self)
+        app = QApplication.instance()
+        if app is not None and not self._focus_reveal_connected:
+            app.focusChanged.connect(self._reveal_focused_control)
+            self._focus_reveal_connected = True
 
-    def resizeEvent(self, event):
-        super(MainWizard, self).resizeEvent(event)
-        qt_layout.sync_application_wizard_pages_to_body(self)
+    def hideEvent(self, event):
+        self._disconnect_focus_reveal()
+        super(MainWizard, self).hideEvent(event)
+
+    def closeEvent(self, event):
+        self._disconnect_focus_reveal()
+        super(MainWizard, self).closeEvent(event)
+
+    def _disconnect_focus_reveal(self):
+        if not self._focus_reveal_connected:
+            return
+        app = QApplication.instance()
+        if app is not None:
+            try:
+                app.focusChanged.disconnect(self._reveal_focused_control)
+            except (TypeError, RuntimeError):
+                pass
+        self._focus_reveal_connected = False
+
+    def _reveal_focused_control(self, _previous, current):
+        """Keep keyboard focus reachable within the current Overflow Boundary."""
+        page = self.currentPage()
+        if page is None or current is None:
+            return
+        overflow = page.findChild(QScrollArea, "pageScrollArea")
+        if overflow is not None and overflow.widget().isAncestorOf(current):
+            overflow.ensureWidgetVisible(current)
 
     def set_wizard_path(self, path):
         self.info_d["path"] = path

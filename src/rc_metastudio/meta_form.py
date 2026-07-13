@@ -281,7 +281,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             parent=self, recent_datasets=get_setting("recent_files")
         )
 
-        if qt_layout.exec_centered(start_up_wizard):
+        if start_up_wizard.exec():
             wizard_data = start_up_wizard.get_results()
             self._handle_wizard_results(wizard_data)
 
@@ -310,7 +310,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                 return
 
         wizard = main_wizard.MainWizard(parent=self, path="new_dataset")
-        if qt_layout.exec_centered(wizard):
+        if wizard.exec():
             wizard_data = wizard.get_results()
             self._handle_wizard_results(wizard_data)
 
@@ -448,7 +448,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def _import_csv(self):
         """Import data from csv file"""
         wizard = main_wizard.MainWizard(parent=self, path="csv_import")
-        if qt_layout.exec_centered(wizard):
+        if wizard.exec():
             wizard_data = wizard.get_results()
             self._handle_wizard_results(wizard_data)
 

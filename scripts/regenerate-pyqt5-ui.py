@@ -1,3 +1,4 @@
+from io import StringIO
 from pathlib import Path
 import subprocess
 import sys
@@ -39,8 +40,12 @@ UI_MODULES = {
 
 
 def compile_ui(source, target):
+    generated = StringIO()
+    uic.compileUi(str(source), generated)
+    source_label = source.relative_to(ROOT).as_posix()
+    rendered = generated.getvalue().replace(str(source), source_label, 1)
     with target.open("w", encoding="utf-8", newline="\n") as output:
-        uic.compileUi(str(source), output)
+        output.write(rendered)
 
 
 def main():

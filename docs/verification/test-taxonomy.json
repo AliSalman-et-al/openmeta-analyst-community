@@ -7,6 +7,126 @@
     {
       "decision": "keep",
       "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_main_wizard_is_a_stable_workflow_window",
+      "reason": "Guards Workflow Window registration and stable user-owned geometry across page and content changes.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_every_wizard_page_declares_a_focus_revealing_overflow_boundary",
+      "reason": "Guards canonical page Overflow Boundaries, keyboard focus revelation, and navigation outside scrolling content.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_csv_preview_overflows_inside_stable_wizard_and_finish_stays_reachable",
+      "reason": "Guards content-rich CSV preview overflow and stable reachable workflow actions.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt", "subprocess"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_workflow_layout_survives_process_level_scale_factors",
+      "reason": "Guards the replacement Workflow Window contract across process-level Qt scale factors.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_tab_and_backtab_follow_logical_order_and_reveal_controls",
+      "reason": "Guards logical keyboard traversal, navigation reachability, and focused-control revelation within workflow overflow.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_hidden_and_closed_wizards_stop_observing_application_focus",
+      "reason": "Guards lifecycle-scoped focus observation so inactive workflow windows perform no reveal work.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_workflow_path_matrix_is_bounded_stable_and_scrollable[None-available_size0]",
+      "reason": "Guards the startup workflow at 800 by 600 with enlarged fonts, stable outer geometry, overflow, and reachable actions.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_workflow_path_matrix_is_bounded_stable_and_scrollable[None-available_size1]",
+      "reason": "Guards the startup workflow at 1024 by 640 with enlarged fonts, stable outer geometry, overflow, and reachable actions.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_workflow_path_matrix_is_bounded_stable_and_scrollable[new_dataset-available_size0]",
+      "reason": "Guards the new-dataset workflow at 800 by 600 with enlarged fonts, stable geometry, overflow, and reachable actions.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_workflow_path_matrix_is_bounded_stable_and_scrollable[new_dataset-available_size1]",
+      "reason": "Guards the new-dataset workflow at 1024 by 640 with enlarged fonts, stable geometry, overflow, and reachable actions.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_workflow_path_matrix_is_bounded_stable_and_scrollable[csv_import-available_size0]",
+      "reason": "Guards the CSV workflow and content-rich preview at 800 by 600 with enlarged fonts and stable reachable chrome.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_workflow_path_matrix_is_bounded_stable_and_scrollable[csv_import-available_size1]",
+      "reason": "Guards the CSV workflow and content-rich preview at 1024 by 640 with enlarged fonts and stable reachable chrome.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
       "external_dependencies": ["qt", "filesystem"],
       "lane": "gui",
       "nodeid": "tests/python/gui/test_edit_dataset_workspace_layout.py::test_edit_dataset_is_modal_workspace_with_persisted_placement_and_panes",
@@ -3379,8 +3499,8 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_declarative_dialog_sizing.py::test_application_wizard_uses_minimum_layout_constraint_without_refit_filter",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "nodeid": "tests/python/gui/test_declarative_dialog_sizing.py::test_application_wizard_uses_workflow_policy_without_legacy_refit",
+      "reason": "Guards the replacement Workflow Window policy and canonical overflow without legacy refit behavior.",
       "runtime_class": "seconds",
       "size": "medium"
     },
@@ -3971,8 +4091,8 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_data_type_page_canonical_geometry_covers_normalized_content",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_data_type_page_canonical_form_declares_reflow_and_overflow",
+      "reason": "Guards the canonical data-type page grid, Overflow Boundary, and absence of fixed root constraints.",
       "runtime_class": "seconds",
       "size": "medium"
     },
@@ -3986,8 +4106,8 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_data_type_page_data_type_buttons_use_uniform_size",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_data_type_page_reflows_buttons_without_horizontal_overflow",
+      "reason": "Guards the canonical two-column data-type layout against unnecessary horizontal overflow.",
       "runtime_class": "seconds",
       "size": "medium"
     },
@@ -4521,8 +4641,8 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_new_dataset_wizard_sizes_to_show_diagnostic_choice",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_new_dataset_wizard_overflow_keeps_diagnostic_choice_reachable",
+      "reason": "Guards keyboard-reachable diagnostic choice through the data page Overflow Boundary.",
       "runtime_class": "seconds",
       "size": "medium"
     },
@@ -4537,8 +4657,8 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_new_dataset_wizard_uses_declarative_minimum_size_policy",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_new_dataset_wizard_uses_replacement_workflow_policy",
+      "reason": "Guards replacement Workflow Window registration without legacy sizing markers.",
       "runtime_class": "seconds",
       "size": "medium"
     },
@@ -5184,21 +5304,6 @@
       "lane": "gui",
       "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_wizard_layout_smoke_renders_core_wizard_pages",
       "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_wizard_size_refit_ignores_closed_wizard_without_current_page",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "seconds",
       "size": "medium"
     },
