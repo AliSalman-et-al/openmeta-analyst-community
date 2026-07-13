@@ -348,6 +348,16 @@ def continuous_effect_display_samples(metric, digits=CALC_NUM_DIGITS):
     )
 
 
+def diagnostic_effect_display_samples(metric, digits=CALC_NUM_DIGITS):
+    """Return valid display-domain samples for diagnostic effect fields."""
+    precision = "0." + ("0" * digits)
+    if metric in {"Sens", "Spec"}:
+        return (precision, "1." + ("0" * digits))
+    # Diagnostic ratios are positive and unbounded. Keep common values visible;
+    # larger entries remain reachable through native line-edit navigation.
+    return (precision, "9999." + ("9" * digits))
+
+
 def helper_set_current_effect(
     ma_unit, txt_boxes, current_effect, group_str, data_type, mult=None
 ):
@@ -395,7 +405,7 @@ def helper_set_current_effect(
             else (
                 continuous_effect_display_samples(current_effect)
                 if data_type == "continuous"
-                else None
+                else diagnostic_effect_display_samples(current_effect)
             )
         ),
     )

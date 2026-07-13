@@ -7,6 +7,136 @@
     {
       "decision": "keep",
       "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_diagnostic_data_declares_transactional_overflow_and_reachable_actions",
+      "reason": "Guards the Diagnostic Data declarative Transactional layout and internal table overflow.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_count_entry_preserves_diagnostic_behavior_without_root_growth[size0]",
+      "reason": "Guards count-based diagnostic entry and stable geometry on a large logical screen.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_count_entry_preserves_diagnostic_behavior_without_root_growth[size1]",
+      "reason": "Guards count-based diagnostic entry and stable geometry at the Full-Usability Floor.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_count_entry_preserves_diagnostic_behavior_without_root_growth[size2]",
+      "reason": "Guards count-based diagnostic entry and stable geometry in a Constrained Layout.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_entered_effect_switching_is_semantically_sized_and_geometry_stable",
+      "reason": "Guards direct diagnostic effect entry, semantic field sizing, and stable metric transitions.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_back_calculation_updates_counts_without_root_growth",
+      "reason": "Guards diagnostic Back-Calculation while preserving visible root geometry.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_large_font_count_overflow_and_focus_stay_inside_content",
+      "reason": "Guards table overflow and keyboard focus reachability with enlarged fonts.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_invalid_count_guidance_wraps_and_remains_reachable",
+      "reason": "Guards complete reachable validation guidance for invalid diagnostic counts.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_direct_effect_validation_is_complete_and_reachable_with_large_font[effect]",
+      "reason": "Guards numeric Direct Effect-Size Entry validation, rollback, and reachable acceptance with enlarged fonts.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_direct_effect_validation_is_complete_and_reachable_with_large_font[interval]",
+      "reason": "Guards diagnostic interval ordering validation, rollback, and reachable acceptance with enlarged fonts.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_diagnostic_metric_availability_preserves_workflow_and_explains_limits[raw-counts]",
+      "reason": "Guards complete diagnostic metric availability for Raw Count Entry.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_diagnostic_metric_availability_preserves_workflow_and_explains_limits[entered-effects]",
+      "reason": "Guards diagnostic metric availability and guidance for Entered Diagnostic Effect Estimates.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_metric_guidance_and_focus_remain_reachable_with_large_font",
+      "reason": "Guards scrollable metric guidance, reachable focus, and fixed primary action placement.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
       "external_dependencies": ["filesystem", "qt"],
       "lane": "fast",
       "nodeid": "tests/python/fast/test_pyqt5_ui_generation.py::test_ui_generator_reproduces_owned_raw_output_without_reformatting_peers",
@@ -1602,7 +1732,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_calculator_effect_ci_fields_fit_signed_precision",
+      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_calculator_effect_ci_fields_fit_valid_domain_samples",
       "reason": "Covers fast GUI/data-model behavior required by the verification lane.",
       "runtime_class": "subsecond",
       "size": "small"

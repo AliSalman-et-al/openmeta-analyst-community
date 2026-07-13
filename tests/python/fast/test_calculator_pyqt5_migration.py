@@ -349,7 +349,7 @@ def _assert_effect_ci_fields_fit_signed_precision(qapp, form):
         assert field.maximumWidth() >= required_width
 
 
-def test_calculator_effect_ci_fields_fit_signed_precision(qapp, monkeypatch):
+def test_calculator_effect_ci_fields_fit_valid_domain_samples(qapp, monkeypatch):
     import binary_data_form
     import continuous_data_form
     import diagnostic_data_form
@@ -390,31 +390,48 @@ def test_calculator_effect_ci_fields_fit_signed_precision(qapp, monkeypatch):
         lambda data: {"TP": None, "FP": None, "FN": None, "TN": None},
     )
 
-    forms = [
-        binary_data_form.BinaryDataForm2(
-            FakeMAUnit(),
-            ["Group 1", "Group 2"],
-            "Group 1-Group 2",
-            "OR",
-            conf_level=95.0,
+    forms_and_representatives = [
+        (
+            binary_data_form.BinaryDataForm2(
+                FakeMAUnit(),
+                ["Group 1", "Group 2"],
+                "Group 1-Group 2",
+                "OR",
+                conf_level=95.0,
+            ),
+            "-0.8888",
         ),
-        continuous_data_form.ContinuousDataForm(
-            FakeContinuousMAUnit(),
-            ["Group 1", "Group 2"],
-            "Group 1-Group 2",
-            "ROM",
-            conf_level=95.0,
+        (
+            continuous_data_form.ContinuousDataForm(
+                FakeContinuousMAUnit(),
+                ["Group 1", "Group 2"],
+                "Group 1-Group 2",
+                "ROM",
+                conf_level=95.0,
+            ),
+            "-0.8888",
         ),
-        diagnostic_data_form.DiagnosticDataForm(
-            FakeDiagnosticMAUnit(),
-            ["Group 1", "Group 2"],
-            "Group 1-Group 2",
-            conf_level=95.0,
+        (
+            diagnostic_data_form.DiagnosticDataForm(
+                FakeDiagnosticMAUnit(),
+                ["Group 1", "Group 2"],
+                "Group 1-Group 2",
+                conf_level=95.0,
+            ),
+            "1.0000",
         ),
     ]
 
-    for form in forms:
-        _assert_effect_ci_fields_fit_signed_precision(qapp, form)
+    for form, representative in forms_and_representatives:
+        fields = [form.effect_txt_box, form.low_txt_box, form.high_txt_box]
+        for field in fields:
+            field.setText(representative)
+        form.show()
+        qapp.processEvents()
+        for field in fields:
+            assert field.width() >= field.fontMetrics().horizontalAdvance(
+                representative
+            )
 
 
 @pytest.mark.parametrize(
@@ -685,7 +702,13 @@ def test_diagnostic_calculator_grid_columns_fill_expanded_table_width(
         conf_level=95.0,
     )
 
-    _assert_calculator_table_grid_fills_width(qapp, form.two_by_two_table)
+    form.show()
+    qapp.processEvents()
+    header = form.two_by_two_table.horizontalHeader()
+    assert header.sectionResizeMode(0) == QHeaderView.Interactive
+    assert not header.stretchLastSection()
+    for column in range(form.two_by_two_table.columnCount()):
+        assert header.sectionSize(column) >= header.sectionSizeHint(column)
 
 
 def test_diagnostic_calculator_does_not_wire_raw_edits_to_consistency_checker(

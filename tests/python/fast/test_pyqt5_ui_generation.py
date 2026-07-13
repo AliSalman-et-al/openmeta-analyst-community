@@ -19,6 +19,8 @@ def test_ui_generator_reproduces_owned_raw_output_without_reformatting_peers(
             "ui_continuous_back_calc_result_form.py",
         ),
         ("conf_level_dialog.ui", "ui_conf_level_dialog.py"),
+        ("diagnostic_data_form.ui", "ui_diagnostic_data_form.py"),
+        ("diagnostic_metrics.ui", "ui_diagnostic_metrics.py"),
     ):
         generated = tmp_path / target_name
         compile_ui(FORMS / source_name, generated)
