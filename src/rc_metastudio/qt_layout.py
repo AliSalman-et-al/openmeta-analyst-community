@@ -48,12 +48,16 @@ def configure_navigation_tool_buttons(buttons):
 
 def exec_centered(dialog):
     """Center a modal child dialog over its parent before executing it."""
+    if getattr(dialog, "_adaptive_window_controller", None) is not None:
+        return dialog.exec()
     center_dialog_over_parent(dialog)
     return dialog.exec()
 
 
 def show_centered(dialog):
     """Center a child dialog over its parent before showing it."""
+    if getattr(dialog, "_adaptive_window_controller", None) is not None:
+        return dialog.show()
     center_dialog_over_parent(dialog)
     return dialog.show()
 

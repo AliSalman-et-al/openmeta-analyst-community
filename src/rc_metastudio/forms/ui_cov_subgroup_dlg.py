@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'src\rc_metastudio\forms\cov_subgroup_dlg.ui'
+# Form implementation generated from reading ui file 'src/rc_metastudio/forms/cov_subgroup_dlg.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -14,47 +14,34 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_cov_subgroup_dialog(object):
     def setupUi(self, cov_subgroup_dialog):
         cov_subgroup_dialog.setObjectName("cov_subgroup_dialog")
-        cov_subgroup_dialog.resize(301, 132)
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        cov_subgroup_dialog.setFont(font)
+        cov_subgroup_dialog.resize(0, 0)
         icon = QtGui.QIcon()
-        icon.addPixmap(
-            QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
-        )
+        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         cov_subgroup_dialog.setWindowIcon(icon)
-        self.buttonBox = QtWidgets.QDialogButtonBox(cov_subgroup_dialog)
-        self.buttonBox.setGeometry(QtCore.QRect(10, 100, 281, 32))
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        self.buttonBox.setFont(font)
-        self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(
-            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
-        )
-        self.buttonBox.setObjectName("buttonBox")
+        self.verticalLayout = QtWidgets.QVBoxLayout(cov_subgroup_dialog)
+        self.verticalLayout.setObjectName("verticalLayout")
+        self.formLayout = QtWidgets.QFormLayout()
+        self.formLayout.setFieldGrowthPolicy(QtWidgets.QFormLayout.AllNonFixedFieldsGrow)
+        self.formLayout.setObjectName("formLayout")
         self.label = QtWidgets.QLabel(cov_subgroup_dialog)
-        self.label.setGeometry(QtCore.QRect(20, 30, 121, 41))
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        font.setPointSize(10)
-        self.label.setFont(font)
         self.label.setObjectName("label")
-        self.cov_subgroup_cbo_box = QtWidgets.QComboBox(cov_subgroup_dialog)
-        self.cov_subgroup_cbo_box.setGeometry(QtCore.QRect(130, 40, 152, 20))
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        self.cov_subgroup_cbo_box.setFont(font)
+        self.formLayout.setWidget(0, QtWidgets.QFormLayout.LabelRole, self.label)
+        self.cov_subgroup_cbo_box = AdaptiveComboBox(cov_subgroup_dialog)
         self.cov_subgroup_cbo_box.setObjectName("cov_subgroup_cbo_box")
+        self.formLayout.setWidget(0, QtWidgets.QFormLayout.FieldRole, self.cov_subgroup_cbo_box)
+        self.verticalLayout.addLayout(self.formLayout)
+        self.buttonBox = QtWidgets.QDialogButtonBox(cov_subgroup_dialog)
+        self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setObjectName("buttonBox")
+        self.verticalLayout.addWidget(self.buttonBox)
+        self.label.setBuddy(self.cov_subgroup_cbo_box)
 
         self.retranslateUi(cov_subgroup_dialog)
         QtCore.QMetaObject.connectSlotsByName(cov_subgroup_dialog)
 
     def retranslateUi(self, cov_subgroup_dialog):
         _translate = QtCore.QCoreApplication.translate
-        cov_subgroup_dialog.setWindowTitle(
-            _translate("cov_subgroup_dialog", "Select Covariate")
-        )
-        self.label.setText(
-            _translate("cov_subgroup_dialog", "Covariate for\nsubgroups:")
-        )
+        cov_subgroup_dialog.setWindowTitle(_translate("cov_subgroup_dialog", "Select Covariate"))
+        self.label.setText(_translate("cov_subgroup_dialog", "Covariate for subgroups:"))
+from adaptive_controls import AdaptiveComboBox

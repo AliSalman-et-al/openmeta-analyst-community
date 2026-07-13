@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'src\rc_metastudio\forms\cov_reg_dlg2.ui'
+# Form implementation generated from reading ui file 'src/rc_metastudio/forms/cov_reg_dlg2.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -14,32 +14,32 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_cov_reg_dialog(object):
     def setupUi(self, cov_reg_dialog):
         cov_reg_dialog.setObjectName("cov_reg_dialog")
-        cov_reg_dialog.resize(401, 323)
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        cov_reg_dialog.setFont(font)
+        cov_reg_dialog.resize(0, 0)
         icon = QtGui.QIcon()
-        icon.addPixmap(
-            QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
-        )
+        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         cov_reg_dialog.setWindowIcon(icon)
         self.verticalLayout = QtWidgets.QVBoxLayout(cov_reg_dialog)
         self.verticalLayout.setObjectName("verticalLayout")
-        self.label = QtWidgets.QLabel(cov_reg_dialog)
+        self.content_scroll_area = QtWidgets.QScrollArea(cov_reg_dialog)
+        self.content_scroll_area.setFrameShape(QtWidgets.QFrame.NoFrame)
+        self.content_scroll_area.setWidgetResizable(True)
+        self.content_scroll_area.setObjectName("content_scroll_area")
+        self.content_scroll_area_widget = QtWidgets.QWidget()
+        self.content_scroll_area_widget.setObjectName("content_scroll_area_widget")
+        self.content_scroll_layout = QtWidgets.QVBoxLayout(self.content_scroll_area_widget)
+        self.content_scroll_layout.setContentsMargins(0, 0, 0, 0)
+        self.content_scroll_layout.setObjectName("content_scroll_layout")
+        self.label = QtWidgets.QLabel(self.content_scroll_area_widget)
         self.label.setObjectName("label")
-        self.verticalLayout.addWidget(self.label)
-        spacerItem = QtWidgets.QSpacerItem(
-            20, 10, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed
-        )
-        self.verticalLayout.addItem(spacerItem)
-        self.cov_grp_box = QtWidgets.QGroupBox(cov_reg_dialog)
+        self.content_scroll_layout.addWidget(self.label)
+        spacerItem = QtWidgets.QSpacerItem(20, 10, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        self.content_scroll_layout.addItem(spacerItem)
+        self.cov_grp_box = QtWidgets.QGroupBox(self.content_scroll_area_widget)
         self.cov_grp_box.setObjectName("cov_grp_box")
-        self.verticalLayout.addWidget(self.cov_grp_box)
-        spacerItem1 = QtWidgets.QSpacerItem(
-            20, 30, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding
-        )
-        self.verticalLayout.addItem(spacerItem1)
-        self.diagnostic_group_box = QtWidgets.QGroupBox(cov_reg_dialog)
+        self.content_scroll_layout.addWidget(self.cov_grp_box)
+        spacerItem1 = QtWidgets.QSpacerItem(20, 30, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        self.content_scroll_layout.addItem(spacerItem1)
+        self.diagnostic_group_box = QtWidgets.QGroupBox(self.content_scroll_area_widget)
         self.diagnostic_group_box.setObjectName("diagnostic_group_box")
         self.verticalLayout_3 = QtWidgets.QVBoxLayout(self.diagnostic_group_box)
         self.verticalLayout_3.setObjectName("verticalLayout_3")
@@ -54,8 +54,8 @@ class Ui_cov_reg_dialog(object):
         self.fixed_radio = QtWidgets.QRadioButton(self.diagnostic_group_box)
         self.fixed_radio.setObjectName("fixed_radio")
         self.verticalLayout_3.addWidget(self.fixed_radio)
-        self.verticalLayout.addWidget(self.diagnostic_group_box)
-        self.groupBox = QtWidgets.QGroupBox(cov_reg_dialog)
+        self.content_scroll_layout.addWidget(self.diagnostic_group_box)
+        self.groupBox = QtWidgets.QGroupBox(self.content_scroll_area_widget)
         self.groupBox.setObjectName("groupBox")
         self.verticalLayout_2 = QtWidgets.QVBoxLayout(self.groupBox)
         self.verticalLayout_2.setObjectName("verticalLayout_2")
@@ -66,15 +66,14 @@ class Ui_cov_reg_dialog(object):
         self.fixed_effects_radio = QtWidgets.QRadioButton(self.groupBox)
         self.fixed_effects_radio.setObjectName("fixed_effects_radio")
         self.verticalLayout_2.addWidget(self.fixed_effects_radio)
-        self.verticalLayout.addWidget(self.groupBox)
+        self.content_scroll_layout.addWidget(self.groupBox)
+        spacerItem2 = QtWidgets.QSpacerItem(0, 0, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        self.content_scroll_layout.addItem(spacerItem2)
+        self.content_scroll_area.setWidget(self.content_scroll_area_widget)
+        self.verticalLayout.addWidget(self.content_scroll_area)
         self.buttonBox = QtWidgets.QDialogButtonBox(cov_reg_dialog)
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        self.buttonBox.setFont(font)
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(
-            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
-        )
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
         self.buttonBox.setObjectName("buttonBox")
         self.verticalLayout.addWidget(self.buttonBox)
 
@@ -84,19 +83,13 @@ class Ui_cov_reg_dialog(object):
     def retranslateUi(self, cov_reg_dialog):
         _translate = QtCore.QCoreApplication.translate
         cov_reg_dialog.setWindowTitle(_translate("cov_reg_dialog", "Select Covariates"))
-        self.label.setText(
-            _translate("cov_reg_dialog", "Select covariates for regression:")
-        )
+        self.label.setText(_translate("cov_reg_dialog", "Select covariates for regression:"))
         self.cov_grp_box.setTitle(_translate("cov_reg_dialog", "Available Covariates"))
         self.diagnostic_group_box.setTitle(_translate("cov_reg_dialog", "Metric"))
         self.dor_radio.setText(_translate("cov_reg_dialog", "Diagnostic Odds Ratio"))
         self.sensitivity_radio.setText(_translate("cov_reg_dialog", "Sensitivity"))
         self.fixed_radio.setText(_translate("cov_reg_dialog", "Specificity"))
         self.groupBox.setTitle(_translate("cov_reg_dialog", "Model Type"))
-        self.random_effects_radio.setText(
-            _translate("cov_reg_dialog", "Random Effects")
-        )
+        self.random_effects_radio.setText(_translate("cov_reg_dialog", "Random Effects"))
         self.fixed_effects_radio.setText(_translate("cov_reg_dialog", "Fixed Effects"))
-
-
 import icons_rc

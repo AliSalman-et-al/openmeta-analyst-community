@@ -1064,7 +1064,6 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
     app, window = launch.start_automation()
     meta_form = sys.modules["meta_form"]
     meta_py_r = sys.modules["meta_py_r"]
-    qt_layout = sys.modules["qt_layout"]
 
     params = {
         "rm.method": ["HE", "DL", "SJ", "ML", "REML", "EB"],
@@ -1160,7 +1159,7 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         window.action_go.trigger()
         specs = window.findChildren(meta_form.ma_specs.MA_Specs)
         assert len(specs) == 1
-        assert specs[0].minimumWidth() >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
+        assert specs[0].property("RCMS_window_archetype") == "transactional"
 
         enum_combos = [
             combo
@@ -1172,7 +1171,9 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
             "Only zero-event studies",
         ]
         method_combo = specs[0].method_cbo_box
-        assert method_combo.sizeAdjustPolicy() == QtWidgets.QComboBox.AdjustToContents
+        assert method_combo.sizeAdjustPolicy() == (
+            QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon
+        )
         widest_method_label = (
             max(
                 method_combo.fontMetrics().horizontalAdvance(
@@ -1180,45 +1181,29 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
                 )
                 for index in range(method_combo.count())
             )
-            + 48
         )
-        assert (
-            widest_method_label > qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
-        )
-        assert method_combo.minimumWidth() == min(
-            widest_method_label,
-            qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH,
-        )
-        assert (
-            method_combo.maximumWidth()
-            == qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH
-        )
+        assert method_combo.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
         assert method_combo.view().minimumWidth() >= widest_method_label
         assert method_combo.width() <= method_combo.maximumWidth()
         assert (
             method_combo.sizePolicy().horizontalPolicy()
-            != QtWidgets.QSizePolicy.Expanding
+            == QtWidgets.QSizePolicy.Expanding
         )
 
         for combo in enum_combos:
-            assert combo.sizeAdjustPolicy() == QtWidgets.QComboBox.AdjustToContents
+            assert combo.sizeAdjustPolicy() == (
+                QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon
+            )
             widest_enum_label = (
                 max(
                     combo.fontMetrics().horizontalAdvance(str(combo.itemText(index)))
                     for index in range(combo.count())
                 )
-                + 48
             )
-            assert combo.minimumWidth() == min(
-                widest_enum_label,
-                qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH,
-            )
+            assert combo.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
+            assert combo.view().minimumWidth() >= widest_enum_label
             assert (
-                combo.maximumWidth()
-                == qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
-            )
-            assert (
-                combo.sizePolicy().horizontalPolicy() != QtWidgets.QSizePolicy.Expanding
+                combo.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Expanding
             )
 
         confidence_spinboxes = specs[0].parameter_grp_box.findChildren(
@@ -1378,7 +1363,6 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
     app, window = launch.start_automation()
     meta_form = sys.modules["meta_form"]
     meta_py_r = sys.modules["meta_py_r"]
-    qt_layout = sys.modules["qt_layout"]
 
     method_map = {
         "binary.random": "binary.random",
@@ -1463,18 +1447,19 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
 
         stable_width = specs.width()
         stable_height = specs.height()
-        stable_minimum_width = specs.minimumWidth()
-        assert stable_minimum_width >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
-        assert specs.layout().sizeConstraint() == QtWidgets.QLayout.SetFixedSize
-        assert specs.maximumSize() == specs.minimumSize()
-        assert specs.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Fixed
-        assert specs.sizePolicy().verticalPolicy() == QtWidgets.QSizePolicy.Fixed
+        assert specs.property("RCMS_window_archetype") == "transactional"
+        assert specs.layout().sizeConstraint() == QtWidgets.QLayout.SetMinimumSize
+        assert specs.maximumSize() == QtCore.QSize(16777215, 16777215)
+        assert specs.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Preferred
+        assert specs.sizePolicy().verticalPolicy() == QtWidgets.QSizePolicy.Preferred
         assert specs.isSizeGripEnabled() is False
 
         specs.resize(stable_width + 300, stable_height + 200)
         app.processEvents()
-        assert specs.width() == stable_width
-        assert specs.height() == stable_height
+        assert specs.width() == stable_width + 300
+        assert specs.height() == stable_height + 200
+        stable_width = specs.width()
+        stable_height = specs.height()
 
         long_method_index = specs.method_cbo_box.findText(
             "Binary Fixed-Effect Mantel-Haenszel"
@@ -1491,7 +1476,6 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
         assert specs.parameter_grp_box.title() != "binary.random"
 
         assert specs.width() == stable_width
-        assert specs.minimumWidth() == stable_minimum_width
         assert (
             specs.parameter_grp_box.layout().alignment() & QtCore.Qt.AlignTop
         ) == QtCore.Qt.AlignTop
@@ -1514,14 +1498,7 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
             value_controls.extend(specs.parameter_grp_box.findChildren(control_type))
 
         for value_control in value_controls:
-            assert (
-                value_control.maximumWidth()
-                <= qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
-            )
-            assert (
-                value_control.sizePolicy().horizontalPolicy()
-                != QtWidgets.QSizePolicy.Expanding
-            )
+            assert value_control.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
     finally:
         window.close()
         app.processEvents()
@@ -5117,7 +5094,7 @@ def test_csv_required_format_table_expands_and_shows_all_rows(monkeypatch):
     app.processEvents()
 
 
-def test_analysis_dialog_family_uses_shared_base_size(monkeypatch):
+def test_analysis_dialog_family_declares_migrated_transactional_surfaces(monkeypatch):
     import copy
     import launch
     import binary_data_form
@@ -5125,7 +5102,6 @@ def test_analysis_dialog_family_uses_shared_base_size(monkeypatch):
     import diagnostic_data_form
     import meta_reg_form
     import meta_subgroup_form
-    import qt_layout
 
     app, window = launch.start_automation()
     dialogs = []
@@ -5195,8 +5171,8 @@ def test_analysis_dialog_family_uses_shared_base_size(monkeypatch):
         for dialog in dialogs:
             dialog.show()
             app.processEvents()
-            assert dialog.minimumWidth() >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
-            assert dialog.minimumHeight() >= qt_layout.ANALYSIS_DIALOG_MINIMUM_HEIGHT
+            assert dialog.property("RCMS_window_archetype") == "transactional"
+            assert dialog.maximumSize() == QtCore.QSize(16777215, 16777215)
     finally:
         for dialog in dialogs:
             dialog.close()

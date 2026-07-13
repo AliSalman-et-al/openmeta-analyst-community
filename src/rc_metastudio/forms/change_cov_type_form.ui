@@ -2,31 +2,7 @@
 <ui version="4.0">
  <class>ChangeCovTypeForm</class>
  <widget class="QDialog" name="ChangeCovTypeForm">
-  <property name="geometry">
-   <rect>
-    <x>0</x>
-    <y>0</y>
-    <width>484</width>
-    <height>428</height>
-   </rect>
-  </property>
-  <property name="minimumSize">
-   <size>
-    <width>400</width>
-    <height>0</height>
-   </size>
-  </property>
-  <property name="maximumSize">
-   <size>
-    <width>100000</width>
-    <height>555</height>
-   </size>
-  </property>
-  <property name="font">
-   <font>
-    <family>Verdana</family>
-   </font>
-  </property>
+  <property name="geometry"><rect><x>0</x><y>0</y><width>0</width><height>0</height></rect></property>
   <property name="windowTitle">
    <string>Change Covariate Type</string>
   </property>
@@ -42,14 +18,7 @@
      </property>
      <layout class="QVBoxLayout" name="verticalLayout">
       <item>
-       <widget class="QTableView" name="cov_prev_table">
-        <property name="maximumSize">
-         <size>
-          <width>16777215</width>
-          <height>16777215</height>
-         </size>
-        </property>
-       </widget>
+       <widget class="QTableView" name="cov_prev_table"/>
       </item>
      </layout>
     </widget>

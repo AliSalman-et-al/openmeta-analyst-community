@@ -9,6 +9,76 @@
       "evidence": ["gui_compatibility"],
       "external_dependencies": ["qt"],
       "lane": "gui",
+      "nodeid": "tests/python/gui/test_analysis_configuration_layout.py::test_method_parameters_declares_scroll_body_with_actions_outside",
+      "reason": "Guards the Method and Parameters Overflow Boundary and reachable primary actions.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_analysis_configuration_layout.py::test_method_parameters_variants_stay_bounded_and_stable",
+      "reason": "Guards binary, continuous, diagnostic, and Meta-Regression dynamic analysis configuration with long content and enlarged fonts.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_analysis_configuration_layout.py::test_regression_and_subgroup_selectors_use_transactional_layouts",
+      "reason": "Guards screen-bounded Meta-Regression and Subgroup selectors with complete long covariate choices.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_analysis_configuration_layout.py::test_choice_control_remeasures_font_and_style_before_bounded_popup",
+      "reason": "Guards live font and style metric remeasurement before a screen-bounded complete-value popup opens.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_analysis_configuration_layout.py::test_choice_popup_show_burst_coalesces_measurement_tooltips_and_clamp",
+      "reason": "Guards one popup measurement and tooltip scan plus one coalesced frame clamp per show burst.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "subprocess"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_analysis_configuration_layout.py::test_native_windows_promoted_choice_popup_is_bounded_at_real_right_edge",
+      "reason": "Guards the promoted AdaptiveComboBox opening seam and outer-frame containment on the native Windows Qt platform.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_analysis_configuration_layout.py::test_method_parameters_default_and_cancel_keyboard_actions",
+      "reason": "Guards standard Enter acceptance and Escape cancellation after the Method and Parameters layout rewrite.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
       "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_diagnostic_data_declares_transactional_overflow_and_reachable_actions",
       "reason": "Guards the Diagnostic Data declarative Transactional layout and internal table overflow.",
       "runtime_class": "seconds",
@@ -4026,7 +4096,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_diagnostic_analysis_workflow.py::test_diagnostic_method_selector_uses_combo_width_policy",
+      "nodeid": "tests/python/gui/test_diagnostic_analysis_workflow.py::test_diagnostic_method_selector_exposes_full_choices_without_root_cap",
       "reason": "Covers GUI compatibility behavior required by the verification lane.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -4247,7 +4317,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_analysis_dialog_family_uses_shared_base_size",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_analysis_dialog_family_declares_migrated_transactional_surfaces",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -6442,7 +6512,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_generated_fixed_position_dialog_rows_fill_fitted_width",
+      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_generated_dialogs_do_not_depend_on_fixed_position_content",
       "reason": "Covers GUI compatibility behavior required by the verification lane.",
       "runtime_class": "seconds",
       "size": "medium"

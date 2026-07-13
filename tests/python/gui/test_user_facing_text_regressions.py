@@ -305,13 +305,10 @@ def test_application_dialog_fit_configures_wizard_navigation_chrome():
     app.processEvents()
 
 
-def test_generated_fixed_position_dialog_rows_fill_fitted_width():
+def test_generated_dialogs_do_not_depend_on_fixed_position_content():
     sys.path.insert(0, str(ROOT / "src"))
     sys.path.insert(0, str(ROOT / "src" / "forms"))
-    import qt_layout
-
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-    fixed_position_dialogs = 0
+    unmanaged_dialogs = []
 
     for module_name in GENERATED_UI_MODULE_NAMES:
         module = importlib.import_module(module_name)
@@ -329,44 +326,15 @@ def test_generated_fixed_position_dialog_rows_fill_fitted_width():
             )
             if not child.isHidden() and not child.isWindow()
         ]
-        if not isinstance(root, QtWidgets.QDialog) or root.layout() is not None:
-            root.deleteLater()
-            continue
-        if not direct_children:
-            root.deleteLater()
-            continue
+        if (
+            isinstance(root, QtWidgets.QDialog)
+            and root.layout() is None
+            and direct_children
+        ):
+            unmanaged_dialogs.append(module_name)
+        root.deleteLater()
 
-        fixed_position_dialogs += 1
-        rows = _geometry_rows(direct_children)
-        qt_layout.fit_application_dialog_to_contents(root)
-        root.show()
-        app.processEvents()
-        root.layout().activate()
-        app.processEvents()
-
-        try:
-            layout_margins = root.layout().contentsMargins()
-            expected_left = root.contentsRect().left() + layout_margins.left()
-            expected_right = root.contentsRect().right() - layout_margins.right()
-
-            for row in rows:
-                visible_row_children = [
-                    child for child in row if not _hidden_for_fit(child, root)
-                ]
-                if not visible_row_children:
-                    continue
-                row_rect = visible_row_children[0].geometry()
-                for child in visible_row_children[1:]:
-                    row_rect = row_rect.united(child.geometry())
-
-                assert row_rect.left() <= expected_left + 1, module_name
-                assert row_rect.right() >= expected_right - 1, module_name
-        finally:
-            root.close()
-            root.deleteLater()
-
-    assert fixed_position_dialogs > 0
-    app.processEvents()
+    assert unmanaged_dialogs == []
 
 
 def test_generated_ui_combo_boxes_do_not_stretch_to_wide_parent_geometry():

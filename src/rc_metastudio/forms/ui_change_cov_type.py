@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'src\rc_metastudio\forms\change_cov_type_form.ui'
+# Form implementation generated from reading ui file 'src/rc_metastudio/forms/change_cov_type_form.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -14,16 +14,9 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_ChangeCovTypeForm(object):
     def setupUi(self, ChangeCovTypeForm):
         ChangeCovTypeForm.setObjectName("ChangeCovTypeForm")
-        ChangeCovTypeForm.resize(484, 428)
-        ChangeCovTypeForm.setMinimumSize(QtCore.QSize(400, 0))
-        ChangeCovTypeForm.setMaximumSize(QtCore.QSize(100000, 555))
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        ChangeCovTypeForm.setFont(font)
+        ChangeCovTypeForm.resize(0, 0)
         icon = QtGui.QIcon()
-        icon.addPixmap(
-            QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
-        )
+        icon.addPixmap(QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         ChangeCovTypeForm.setWindowIcon(icon)
         self.verticalLayout_2 = QtWidgets.QVBoxLayout(ChangeCovTypeForm)
         self.verticalLayout_2.setObjectName("verticalLayout_2")
@@ -32,31 +25,22 @@ class Ui_ChangeCovTypeForm(object):
         self.verticalLayout = QtWidgets.QVBoxLayout(self.grp_box_preview)
         self.verticalLayout.setObjectName("verticalLayout")
         self.cov_prev_table = QtWidgets.QTableView(self.grp_box_preview)
-        self.cov_prev_table.setMaximumSize(QtCore.QSize(16777215, 16777215))
         self.cov_prev_table.setObjectName("cov_prev_table")
         self.verticalLayout.addWidget(self.cov_prev_table)
         self.verticalLayout_2.addWidget(self.grp_box_preview)
         self.buttonBox = QtWidgets.QDialogButtonBox(ChangeCovTypeForm)
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(
-            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
-        )
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
         self.buttonBox.setObjectName("buttonBox")
         self.verticalLayout_2.addWidget(self.buttonBox)
 
         self.retranslateUi(ChangeCovTypeForm)
-        self.buttonBox.accepted.connect(ChangeCovTypeForm.accept)  # type: ignore
-        self.buttonBox.rejected.connect(ChangeCovTypeForm.reject)  # type: ignore
+        self.buttonBox.accepted.connect(ChangeCovTypeForm.accept) # type: ignore
+        self.buttonBox.rejected.connect(ChangeCovTypeForm.reject) # type: ignore
         QtCore.QMetaObject.connectSlotsByName(ChangeCovTypeForm)
 
     def retranslateUi(self, ChangeCovTypeForm):
         _translate = QtCore.QCoreApplication.translate
-        ChangeCovTypeForm.setWindowTitle(
-            _translate("ChangeCovTypeForm", "Change Covariate Type")
-        )
-        self.grp_box_preview.setTitle(
-            _translate("ChangeCovTypeForm", "Values for New Covariate")
-        )
-
-
+        ChangeCovTypeForm.setWindowTitle(_translate("ChangeCovTypeForm", "Change Covariate Type"))
+        self.grp_box_preview.setTitle(_translate("ChangeCovTypeForm", "Values for New Covariate"))
 import icons_rc
