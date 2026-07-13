@@ -4,7 +4,7 @@ import sys
 import traceback
 from datetime import datetime
 
-from PyQt5.QtCore import QEvent
+from PyQt5.QtCore import QEvent, Qt
 from PyQt5.QtWidgets import QApplication, QMenu, QMessageBox
 
 import settings
@@ -19,6 +19,17 @@ UNEXPECTED_ERROR_MESSAGE = (
 _previous_excepthook = None
 _handling_exception = False
 _active_context_menu = None
+
+
+def enable_qt_native_high_dpi():
+    """Enable Qt's logical-pixel scaling before constructing an application."""
+    if QApplication.instance() is not None:
+        return
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+
+
+enable_qt_native_high_dpi()
 
 
 def exception_log_path():

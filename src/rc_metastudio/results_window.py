@@ -1147,7 +1147,7 @@ if __name__ == "__main__":
     }  # change this number as necessary
     test_results["image_order"] = None
 
-    app = QApplication(sys.argv)
+    app = app_error_handler.get_or_create_application(sys.argv)
     resultswindow = ResultsWindow(test_results)
     resultswindow.show()
     sys.exit(app.exec())

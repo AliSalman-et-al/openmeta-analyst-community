@@ -1307,10 +1307,9 @@ def test_analysis_dialog_refit_tracks_revealed_content_without_stable_ratchet():
     app.processEvents()
 
 
-def test_change_confidence_level_dialog_uses_fixed_analysis_layout_policy():
+def test_change_confidence_level_dialog_does_not_use_legacy_fixed_layout_policy():
     sys.path.insert(0, str(ROOT / "src"))
     import conf_level_dialog
-    import qt_layout
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     dialog = conf_level_dialog.ChangeConfLevelDlg(95.0)
@@ -1318,8 +1317,9 @@ def test_change_confidence_level_dialog_uses_fixed_analysis_layout_policy():
     app.processEvents()
 
     try:
-        assert dialog.layout().sizeConstraint() == QtWidgets.QLayout.SetFixedSize
-        assert dialog.minimumWidth() >= dialog.sizeHint().width()
+        assert dialog.layout().sizeConstraint() == QtWidgets.QLayout.SetMinimumSize
+        assert dialog.property("RCMS_window_archetype") == "transactional"
+        assert dialog.minimumWidth() < dialog.sizeHint().width()
     finally:
         dialog.close()
         dialog.deleteLater()

@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 UI_MODULES = {
     "src/rc_metastudio/forms/binary_data_form2.ui": "src/rc_metastudio/forms/ui_binary_data_form.py",
     "src/rc_metastudio/forms/change_cov_type_form.ui": "src/rc_metastudio/forms/ui_change_cov_type.py",
+    "src/rc_metastudio/forms/conf_level_dialog.ui": "src/rc_metastudio/forms/ui_conf_level_dialog.py",
     "src/rc_metastudio/forms/change_group_name_dlg.ui": "src/rc_metastudio/forms/ui_edit_group_name.py",
     "src/rc_metastudio/forms/choose_back_calc_result_form.ui": "src/rc_metastudio/forms/ui_choose_back_calc_result_form.py",
     "src/rc_metastudio/forms/choose_metric_page.ui": "src/rc_metastudio/forms/ui_choose_metric_page.py",

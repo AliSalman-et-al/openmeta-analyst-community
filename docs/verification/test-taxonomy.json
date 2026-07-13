@@ -7,6 +7,165 @@
     {
       "decision": "keep",
       "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem",
+        "subprocess"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_window_policy.py::test_application_bootstrap_enables_qt_high_dpi_before_construction",
+      "reason": "Proves maintained application construction enables Qt-native high-DPI behavior before QApplication exists.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_window_policy.py::test_geometry_helpers_bound_the_outer_frame_in_logical_space",
+      "reason": "Guards pure Logical Layout Space sizing and decorated outer-frame bounds.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_window_policy.py::test_unparented_workspace_uses_active_screen_before_maximizing",
+      "reason": "Guards active-application screen ownership and placement before first-use Workspace maximization.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_window_policy.py::test_workspace_roles_apply_maximized_or_eighty_percent_first_use",
+      "reason": "Proves Workspace roles distinguish maximized Main and Results from eighty-percent Edit Dataset and Network windows.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_window_policy.py::test_visible_transactional_content_refit_preserves_placement",
+      "reason": "Proves application-owned content refitting preserves visible placement instead of replaying first-use centering.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_window_policy.py::test_visible_user_owned_windows_do_not_reclaim_geometry",
+      "reason": "Guards Geometry Ownership for visible Workspace and Workflow windows during content changes.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_window_policy.py::test_content_refit_requests_are_local_and_coalesced",
+      "reason": "Guards deterministic one-per-event-loop refitting on one explicitly registered window.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_window_policy.py::test_runtime_clamp_preserves_user_geometry_without_recentering",
+      "reason": "Proves runtime reachability checks preserve user geometry and clamp only when required.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_window_policy.py::test_screen_metric_changes_clamp_and_reconnect_to_new_screen",
+      "reason": "Guards clamp-only screen assignment, DPI, available-geometry, and signal reconnection behavior.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_window_policy.py::test_confidence_level_is_a_compact_transactional_dialog",
+      "reason": "Covers the first compact Transactional Dialog migrated without an unnecessary overflow boundary.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_window_policy.py::test_confidence_level_handles_representative_long_text_and_enlarged_font",
+      "reason": "Guards representative text wrapping and platform-font scaling on the compact Confidence Level dialog.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
         "r_stack",
         "release_readiness"
       ],
@@ -5215,8 +5374,8 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_change_confidence_level_dialog_uses_fixed_analysis_layout_policy",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_change_confidence_level_dialog_does_not_use_legacy_fixed_layout_policy",
+      "reason": "Guards the Confidence Level dialog against regression to the legacy fixed-root sizing helper.",
       "runtime_class": "seconds",
       "size": "medium"
     },

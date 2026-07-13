@@ -11,7 +11,6 @@ from PyQt5.QtCore import QSize, Qt
 from PyQt5.QtGui import QIcon, QPainter, QPixmap
 from PyQt5.QtWidgets import (
     QAction,
-    QApplication,
     QFileDialog,
     QAbstractButton,
     QMenu,
@@ -788,7 +787,7 @@ class MainWizard(QWizard):
 if __name__ == "__main__":
     import sys
 
-    app = QApplication(sys.argv)
+    app = app_error_handler.get_or_create_application(sys.argv)
     wizard = MainWizard()
     wizard.show()
     sys.exit(app.exec())
