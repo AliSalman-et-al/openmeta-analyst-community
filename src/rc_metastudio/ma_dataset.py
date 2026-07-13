@@ -5,6 +5,7 @@
 import pdb
 from PyQt5.QtCore import pyqtRemoveInputHook
 import copy
+import uuid
 
 import two_way_dict
 import meta_globals
@@ -204,12 +205,17 @@ class Dataset:
     def change_covariate_name(self, old_covariate, new_covariate_name):
         # get the values for this covariate for all studies
         cov_val_dict = copy.deepcopy(self.get_values_for_cov(old_covariate.name))
+        stable_id = getattr(old_covariate, "stable_id", None)
         cov_index = self.remove_covariate(old_covariate)
         # now add a covariate with the same values, but new name
         # note that we also insert the covariate into the same place that
         # it previously occupied!
         self.add_covariate(
-            Covariate(new_covariate_name, TYPE_TO_STR_DICT[old_covariate.data_type]),
+            Covariate(
+                new_covariate_name,
+                TYPE_TO_STR_DICT[old_covariate.data_type],
+                stable_id=stable_id,
+            ),
             cov_values=cov_val_dict,
             cov_index=cov_index,
         )
@@ -1191,7 +1197,7 @@ class Outcome:
 class Covariate:
     """Meta-data about covariates."""
 
-    def __init__(self, name, data_type):
+    def __init__(self, name, data_type, stable_id=None):
         if not data_type in ("factor", "continuous"):
             raise Exception(
                 "covariates need to have associated type factor or continuous; %s was given"
@@ -1199,6 +1205,7 @@ class Covariate:
             )
         self.name = name
         self.data_type = CONTINUOUS if data_type == "continuous" else FACTOR
+        self.stable_id = stable_id or uuid.uuid4().hex
 
     def get_type_str(self):
         return {CONTINUOUS: "continuous", FACTOR: "factor"}[self.data_type]

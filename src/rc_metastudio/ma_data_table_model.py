@@ -17,6 +17,11 @@ import calculator_routines as calc_fncs
 import meta_py_r
 import qt_text
 import name_validation
+from workspace_column_identity import (
+    WORKSPACE_COLUMN_IDENTITY_ROLE,
+    WorkspaceColumnIdentity,
+    stable_covariate_identity,
+)
 
 # number of (empty) rows in the spreadsheet to show
 # following the last study.
@@ -1218,6 +1223,9 @@ class DatasetModel(QAbstractTableModel):
         model class. This is responsible for providing header data for the
         respective columns.
         """
+        if orientation == Qt.Horizontal and role == WORKSPACE_COLUMN_IDENTITY_ROLE:
+            return self.workspace_column_identity(section)
+
         outcome_type = self.dataset.get_outcome_type(self.current_outcome)
         outcome_subtype = self.dataset.get_outcome_subtype(self.current_outcome)
         length_dataset = len(self.dataset)
@@ -1392,6 +1400,38 @@ class DatasetModel(QAbstractTableModel):
 
         return _item_data()
 
+    def workspace_column_identity(self, section):
+        """Return identity independent of mutable labels and column position."""
+        fixed = {
+            self.INCLUDE_STUDY: "include",
+            self.NAME: "study-name",
+            self.YEAR: "year",
+        }
+        if section in fixed:
+            return WorkspaceColumnIdentity("fixed", (fixed[section],))
+
+        outcome_type = self.dataset.get_outcome_type(self.current_outcome) or "none"
+        outcome_subtype = (
+            self.dataset.get_outcome_subtype(self.current_outcome) or "none"
+        )
+        if self.current_outcome is not None and section in self.RAW_DATA:
+            return WorkspaceColumnIdentity(
+                "raw", (outcome_type, outcome_subtype, self.RAW_DATA.index(section))
+            )
+        if self.current_outcome is not None and section in self.OUTCOMES:
+            return WorkspaceColumnIdentity(
+                "outcome",
+                (outcome_type, outcome_subtype, self.OUTCOMES.index(section)),
+            )
+
+        covariate = self.get_cov(section)
+        if covariate is not None:
+            return WorkspaceColumnIdentity(
+                "covariate",
+                (stable_covariate_identity(self.dataset, covariate),),
+            )
+        return WorkspaceColumnIdentity("dataset-column", (section,))
+
     def flags(self, index):
         if not index.isValid():
             return Qt.ItemIsEnabled
@@ -1499,12 +1539,14 @@ class DatasetModel(QAbstractTableModel):
     def remove_follow_up_from_outcome(self, follow_up_name, outcome_name):
         self.dataset.remove_follow_up_from_outcome(follow_up_name, outcome_name)
 
-    def add_covariate(self, covariate_name, covariate_type, cov_values=None):
+    def add_covariate(
+        self, covariate_name, covariate_type, cov_values=None, stable_id=None
+    ):
         covariate_name = validate_new_covariate_name(self.dataset, covariate_name)
-        self.dataset.add_covariate(
-            Covariate(covariate_name, covariate_type), cov_values=cov_values
-        )
+        covariate = Covariate(covariate_name, covariate_type, stable_id=stable_id)
+        self.dataset.add_covariate(covariate, cov_values=cov_values)
         self.reset_model()
+        return covariate
 
     def remove_covariate(self, covariate_name):
         self.dataset.remove_covariate(covariate_name)

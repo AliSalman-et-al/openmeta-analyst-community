@@ -10,11 +10,6 @@
     <height>618</height>
    </rect>
   </property>
-  <property name="font">
-   <font>
-    <family>Verdana</family>
-   </font>
-  </property>
   <property name="windowTitle">
    <string>RCMetaStudio</string>
   </property>
@@ -23,11 +18,6 @@
     <normaloff>:/misc/meta.png</normaloff>:/misc/meta.png</iconset>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <property name="font">
-    <font>
-     <family>Verdana</family>
-    </font>
-   </property>
    <property name="cursor">
     <cursorShape>ArrowCursor</cursorShape>
    </property>
@@ -91,12 +81,6 @@
          </item>
          <item>
           <widget class="QFrame" name="frame">
-           <property name="minimumSize">
-            <size>
-             <width>0</width>
-             <height>65</height>
-            </size>
-           </property>
            <property name="frameShape">
             <enum>QFrame::StyledPanel</enum>
            </property>
@@ -117,39 +101,21 @@
               </property>
               <item>
                <widget class="QFrame" name="frame_2">
-                <property name="sizePolicy">
-                 <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                  <horstretch>0</horstretch>
-                  <verstretch>0</verstretch>
-                 </sizepolicy>
-                </property>
-                <property name="minimumSize">
-                 <size>
-                  <width>181</width>
-                  <height>61</height>
-                 </size>
-                </property>
-                <property name="maximumSize">
-                 <size>
-                  <width>181</width>
-                  <height>61</height>
-                 </size>
-                </property>
                 <property name="frameShape">
                  <enum>QFrame::StyledPanel</enum>
                 </property>
                 <property name="frameShadow">
                  <enum>QFrame::Raised</enum>
                 </property>
-                <widget class="QToolButton" name="nav_left_btn">
-                 <property name="geometry">
-                  <rect>
-                   <x>0</x>
-                   <y>10</y>
-                   <width>20</width>
-                   <height>41</height>
-                  </rect>
+                <layout class="QGridLayout" name="navigationLayout">
+                 <property name="spacing">
+                  <number>0</number>
                  </property>
+                 <property name="margin">
+                  <number>0</number>
+                 </property>
+                 <item row="1" column="0">
+                <widget class="QToolButton" name="nav_left_btn">
                  <property name="text">
                   <string/>
                  </property>
@@ -157,25 +123,13 @@
                   <iconset resource="../images/icons.qrc">
                    <normaloff>:/misc/left_arrow.png</normaloff>:/misc/left_arrow.png</iconset>
                  </property>
-                 <property name="iconSize">
-                  <size>
-                   <width>64</width>
-                   <height>64</height>
-                  </size>
-                 </property>
                  <property name="autoRaise">
                   <bool>true</bool>
                  </property>
                 </widget>
+                 </item>
+                 <item row="0" column="1">
                 <widget class="QToolButton" name="nav_up_btn">
-                 <property name="geometry">
-                  <rect>
-                   <x>40</x>
-                   <y>0</y>
-                   <width>51</width>
-                   <height>20</height>
-                  </rect>
-                 </property>
                  <property name="text">
                   <string/>
                  </property>
@@ -183,37 +137,19 @@
                   <iconset resource="../images/icons.qrc">
                    <normaloff>:/misc/up_arrow.png</normaloff>:/misc/up_arrow.png</iconset>
                  </property>
-                 <property name="iconSize">
-                  <size>
-                   <width>64</width>
-                   <height>64</height>
-                  </size>
-                 </property>
                  <property name="autoRaise">
                   <bool>true</bool>
                  </property>
                 </widget>
+                 </item>
+                 <item row="2" column="1">
                 <widget class="QToolButton" name="nav_down_btn">
-                 <property name="geometry">
-                  <rect>
-                   <x>40</x>
-                   <y>40</y>
-                   <width>51</width>
-                   <height>20</height>
-                  </rect>
-                 </property>
                  <property name="text">
                   <string/>
                  </property>
                  <property name="icon">
                   <iconset resource="../images/icons.qrc">
                    <normaloff>:/misc/down_arrow.png</normaloff>:/misc/down_arrow.png</iconset>
-                 </property>
-                 <property name="iconSize">
-                  <size>
-                   <width>64</width>
-                   <height>64</height>
-                  </size>
                  </property>
                  <property name="toolButtonStyle">
                   <enum>Qt::ToolButtonIconOnly</enum>
@@ -225,22 +161,9 @@
                   <enum>Qt::NoArrow</enum>
                  </property>
                 </widget>
+                 </item>
+                 <item row="1" column="1">
                 <widget class="QLabel" name="nav_lbl">
-                 <property name="geometry">
-                  <rect>
-                   <x>20</x>
-                   <y>20</y>
-                   <width>91</width>
-                   <height>21</height>
-                  </rect>
-                 </property>
-                 <property name="font">
-                  <font>
-                   <pointsize>10</pointsize>
-                   <weight>50</weight>
-                   <bold>false</bold>
-                  </font>
-                 </property>
                  <property name="text">
                   <string/>
                  </property>
@@ -248,15 +171,9 @@
                   <set>Qt::AlignCenter</set>
                  </property>
                 </widget>
+                 </item>
+                 <item row="1" column="2">
                 <widget class="QToolButton" name="nav_right_btn">
-                 <property name="geometry">
-                  <rect>
-                   <x>110</x>
-                   <y>10</y>
-                   <width>20</width>
-                   <height>41</height>
-                  </rect>
-                 </property>
                  <property name="text">
                   <string/>
                  </property>
@@ -264,25 +181,13 @@
                   <iconset resource="../images/icons.qrc">
                    <normaloff>:/misc/right_arrow.png</normaloff>:/misc/right_arrow.png</iconset>
                  </property>
-                 <property name="iconSize">
-                  <size>
-                   <width>64</width>
-                   <height>64</height>
-                  </size>
-                 </property>
                  <property name="autoRaise">
                   <bool>true</bool>
                  </property>
                 </widget>
+                 </item>
+                 <item row="1" column="3">
                 <widget class="QToolButton" name="nav_add_btn">
-                 <property name="geometry">
-                  <rect>
-                   <x>130</x>
-                   <y>10</y>
-                   <width>51</width>
-                   <height>41</height>
-                  </rect>
-                 </property>
                  <property name="text">
                   <string/>
                  </property>
@@ -290,45 +195,18 @@
                   <iconset resource="../images/icons.qrc">
                    <normaloff>:/function_icon_set/function_icon_set/add_48.png</normaloff>:/function_icon_set/function_icon_set/add_48.png</iconset>
                  </property>
-                 <property name="iconSize">
-                  <size>
-                   <width>64</width>
-                   <height>64</height>
-                  </size>
-                 </property>
                  <property name="autoRaise">
                   <bool>true</bool>
                  </property>
                 </widget>
+                 </item>
+                </layout>
                </widget>
               </item>
               <item>
                <layout class="QGridLayout" name="gridLayout">
                 <item row="0" column="0">
                  <widget class="QLabel" name="label">
-                  <property name="sizePolicy">
-                   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                    <horstretch>0</horstretch>
-                    <verstretch>0</verstretch>
-                   </sizepolicy>
-                  </property>
-                  <property name="minimumSize">
-                   <size>
-                    <width>80</width>
-                    <height>25</height>
-                   </size>
-                  </property>
-                  <property name="maximumSize">
-                   <size>
-                    <width>80</width>
-                    <height>25</height>
-                   </size>
-                  </property>
-                  <property name="font">
-                   <font>
-                    <pointsize>9</pointsize>
-                   </font>
-                  </property>
                   <property name="text">
                    <string>Outcome:</string>
                   </property>
@@ -336,29 +214,6 @@
                 </item>
                 <item row="1" column="0">
                  <widget class="QLabel" name="label_3">
-                  <property name="sizePolicy">
-                   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                    <horstretch>0</horstretch>
-                    <verstretch>0</verstretch>
-                   </sizepolicy>
-                  </property>
-                  <property name="minimumSize">
-                   <size>
-                    <width>80</width>
-                    <height>25</height>
-                   </size>
-                  </property>
-                  <property name="maximumSize">
-                   <size>
-                    <width>80</width>
-                    <height>25</height>
-                   </size>
-                  </property>
-                  <property name="font">
-                   <font>
-                    <pointsize>9</pointsize>
-                   </font>
-                  </property>
                   <property name="text">
                    <string>Follow-up:</string>
                   </property>
@@ -372,17 +227,6 @@
                     <verstretch>0</verstretch>
                    </sizepolicy>
                   </property>
-                  <property name="minimumSize">
-                   <size>
-                    <width>80</width>
-                    <height>25</height>
-                   </size>
-                  </property>
-                  <property name="font">
-                   <font>
-                    <pointsize>9</pointsize>
-                   </font>
-                  </property>
                   <property name="text">
                    <string/>
                   </property>
@@ -395,17 +239,6 @@
                     <horstretch>0</horstretch>
                     <verstretch>0</verstretch>
                    </sizepolicy>
-                  </property>
-                  <property name="minimumSize">
-                   <size>
-                    <width>80</width>
-                    <height>25</height>
-                   </size>
-                  </property>
-                  <property name="font">
-                   <font>
-                    <pointsize>9</pointsize>
-                   </font>
                   </property>
                   <property name="text">
                    <string/>
@@ -459,11 +292,6 @@
     </rect>
    </property>
    <widget class="QMenu" name="menu_file">
-    <property name="font">
-     <font>
-      <family>Verdana</family>
-     </font>
-    </property>
     <property name="title">
      <string>File</string>
     </property>
@@ -524,8 +352,15 @@
     </property>
     <addaction name="action_about_legal"/>
    </widget>
+   <widget class="QMenu" name="menuView">
+    <property name="title">
+     <string>View</string>
+    </property>
+    <addaction name="action_auto_fit_columns"/>
+   </widget>
    <addaction name="menu_file"/>
    <addaction name="menuEdit"/>
+   <addaction name="menuView"/>
    <addaction name="menuAnalysis"/>
    <addaction name="menuDataset"/>
    <addaction name="menuHelp"/>
@@ -731,6 +566,11 @@
    </property>
    <property name="text">
     <string>Import CSV</string>
+   </property>
+  </action>
+  <action name="action_auto_fit_columns">
+   <property name="text">
+    <string>Auto-Fit Columns</string>
    </property>
   </action>
  </widget>

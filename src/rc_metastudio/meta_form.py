@@ -7,6 +7,7 @@ import os
 from functools import cmp_to_key
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QTextDocument
 from PyQt5.QtWidgets import (
     QAction,
     QApplication,
@@ -30,6 +31,7 @@ import app_error_handler
 import meta_py_r_backend
 import progress_bar as progress_dialog
 import qt_layout
+import adaptive_window
 import qt_text
 import name_validation
 import project_pickle
@@ -131,6 +133,38 @@ def _format_confidence_level_status(conf_level):
     return "Confidence Level: {:.1%}".format(float(conf_level) / 100.0)
 
 
+class ElidingStatusLabel(QLabel):
+    """A status label whose content cannot claim window geometry."""
+
+    def __init__(self, text="", parent=None):
+        super(ElidingStatusLabel, self).__init__(parent)
+        self._full_text = ""
+        self.setMinimumWidth(0)
+        self.setSizePolicy(
+            QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Preferred
+        )
+        self.setText(text)
+
+    def setText(self, text):
+        text = qt_text.to_native_text(text)
+        if "<" in text and ">" in text:
+            document = QTextDocument()
+            document.setHtml(text)
+            text = document.toPlainText()
+        self._full_text = text
+        self.setToolTip(self._full_text)
+        self._refresh_elision()
+
+    def resizeEvent(self, event):
+        super(ElidingStatusLabel, self).resizeEvent(event)
+        self._refresh_elision()
+
+    def _refresh_elision(self):
+        width = max(0, self.contentsRect().width())
+        elided = self.fontMetrics().elidedText(self._full_text, Qt.ElideRight, width)
+        QLabel.setText(self, elided)
+
+
 class ImportProgress(QDialog, forms.ui_running.Ui_running):
     def __init__(self, parent=None, min_=0, max_=10):
         super(ImportProgress, self).__init__(parent)
@@ -164,18 +198,33 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         # this approach throughout the application.
         super(MetaForm, self).__init__(parent)
         self.setupUi(self)
-        qt_layout.fit_text_to_contents(self)
+        dataset_file_label = ElidingStatusLabel(
+            self.dataset_file_lbl.text(), self.centralwidget
+        )
+        self.verticalLayout_3.replaceWidget(self.dataset_file_lbl, dataset_file_label)
+        self.dataset_file_lbl.deleteLater()
+        self.dataset_file_lbl = dataset_file_label
+        qt_layout.configure_navigation_tool_buttons(
+            (
+                self.nav_left_btn,
+                self.nav_up_btn,
+                self.nav_down_btn,
+                self.nav_right_btn,
+                self.nav_add_btn,
+            )
+        )
+        adaptive_window.register_adaptive_window(self, adaptive_window.WindowRole.MAIN)
         table_view = ma_data_table_view.MADataTable(self.nav_frame)
         self.verticalLayout.replaceWidget(self.tableView, table_view)
         self.tableView.deleteLater()
         self.tableView = table_view
+        self.tableView.restore_column_widths(load_main_column_widths())
 
-        self.cl_label = QLabel(
+        self.cl_label = ElidingStatusLabel(
             _format_confidence_level_status(meta_globals.DEFAULT_CONF_LEVEL)
         )
         self.cl_label.setAlignment(Qt.AlignRight)
         self.statusbar.addWidget(self.cl_label, 1)
-        qt_layout.fit_text_to_contents(self)
 
         # Command-line dataset loading can be added here if headless startup
         # needs to open a project directly in the GUI.
@@ -207,7 +256,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         # so that it can do things like pass suitable events 'up'
         # to the main form
         self.tableView.main_gui = self
-        self.tableView.resizeColumnsToContents()
+        self.tableView.synchronize_column_widths()
 
         self.out_path = None  # path to output file
         self.metric_menu_is_set_for = None  # BINARY, CONTINUOUS, or DIAGNOSTIC
@@ -238,21 +287,6 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
     def closeEvent(self, event):
         self.quit()
-
-    def _capture_window_placement(self):
-        return {
-            "geometry": self.saveGeometry(),
-            "maximized": self.isMaximized(),
-            "full_screen": self.isFullScreen(),
-        }
-
-    def _restore_window_placement(self, placement):
-        if placement["full_screen"]:
-            self.showFullScreen()
-        elif placement["maximized"]:
-            self.showMaximized()
-        else:
-            self.restoreGeometry(placement["geometry"])
 
     def _model_about_to_be_reset(self):
         """Call all the functions here that should be called when the model is
@@ -311,7 +345,6 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             self.dataset_file_lbl.setText(
                 "Open Project: <font color='red'>%s</font>" % self.out_path
             )
-        qt_layout.fit_text_to_contents(self)
 
     def toggle_menu_options_that_require_dataset(self, enable):
         self.action_go.setEnabled(enable)
@@ -511,6 +544,9 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             _connect_action(self.action_redo, self.redo)
             _connect_action(self.action_copy, self.tableView.copy)
             _connect_action(self.action_paste, self.tableView.paste)
+            _connect_action(
+                self.action_auto_fit_columns, self.tableView.auto_fit_columns
+            )
 
             _connect_action(self.action_edit, self.edit_dataset)
             _connect_action(self.action_view_network, self.view_network)
@@ -526,7 +562,6 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def _change_conf_level_label(self):
         conf_level = self.model.get_global_conf_level()
         self.cl_label.setText(_format_confidence_level_status(conf_level))
-        qt_layout.fit_text_to_contents(self)
 
     def go(self):
         form = None
@@ -884,7 +919,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.tableView.model().set_current_metric(metric_name)
         self.model.try_to_update_outcomes()
         self.model.reset_model()
-        self.tableView.resizeColumnsToContents()
+        self.tableView.synchronize_column_widths()
 
     def view_network(self):
         view_window = network_view.ViewDialog(self.model, parent=self)
@@ -945,23 +980,40 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             # fix for issue #59; do not allow the user to create two covariates with
             # the same name!
             new_covariate_type = str(form.datatype_cbo_box.currentText()).lower()
-            redo_f = lambda: self._add_new_covariate(
-                new_covariate_name, new_covariate_type
+            self.tableView.undoStack.push(
+                self._make_add_covariate_command(
+                    new_covariate_name, new_covariate_type
+                )
             )
-            undo_f = lambda: self._undo_add_new_covariate(new_covariate_name)
 
-            add_cov_command = meta_globals.CommandGenericDo(redo_f, undo_f)
-            self.tableView.undoStack.push(add_cov_command)
+    def _make_add_covariate_command(self, cov_name, cov_type):
+        state = {"stable_id": None}
 
-    def _add_new_covariate(self, cov_name, cov_type):
-        self.model.add_covariate(cov_name, cov_type)
+        def redo():
+            covariate = self._add_new_covariate(
+                cov_name, cov_type, stable_id=state["stable_id"]
+            )
+            state["stable_id"] = covariate.stable_id
+
+        def undo():
+            self._undo_add_new_covariate(cov_name)
+
+        return meta_globals.CommandGenericDo(
+            redo, undo, description="Add covariate %s" % cov_name
+        )
+
+    def _add_new_covariate(self, cov_name, cov_type, stable_id=None):
+        covariate = self.model.add_covariate(
+            cov_name, cov_type, stable_id=stable_id
+        )
         print("New Covariate Name: %s with type %s" % (cov_name, cov_type))
-        self.tableView.resizeColumnsToContents()
+        self.tableView.synchronize_column_widths()
         self._refresh_advanced_analysis_actions()
+        return covariate
 
     def _undo_add_new_covariate(self, cov_name):
         self.model.remove_covariate(cov_name)
-        self.tableView.resizeColumnsToContents()
+        self.tableView.synchronize_column_widths()
         self._refresh_advanced_analysis_actions()
 
     def add_new(self, startup_outcome=None):
@@ -1174,14 +1226,13 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def update_dimension(self):
         self.cur_dimension = self.dimensions[self.cur_dimension_index]
         self.nav_lbl.setText(self.cur_dimension)
-        qt_layout.fit_text_to_contents(self)
 
     def display_groups(self, groups):
         print("displaying groups: %s" % groups)
         self.model.set_current_groups(groups)
         self.model.try_to_update_outcomes()
         self.model.reset_model()
-        self.tableView.resizeColumnsToContents()
+        self.tableView.synchronize_column_widths()
 
     def display_outcome(self, outcome_name, group_names=None, follow_up_name=None):
         print("displaying outcome: %s" % outcome_name)
@@ -1229,22 +1280,20 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.cur_time_lbl.setText(
             "<font color='Blue'>%s</font>" % self.model.get_current_follow_up_name()
         )
-        qt_layout.fit_text_to_contents(self)
         self.model.reset_model()
-        self.tableView.resizeColumnsToContents()
+        self.tableView.synchronize_column_widths()
 
     def display_follow_up(self, time_point):
         print("follow up")
         self.model.current_time_point = time_point
         self.update_follow_up_label()
         self.model.reset_model()
-        self.tableView.resizeColumnsToContents()
+        self.tableView.synchronize_column_widths()
 
     def update_follow_up_label(self):
         self.cur_time_lbl.setText(
             "<font color='Blue'>%s</font>" % self.model.get_current_follow_up_name()
         )
-        qt_layout.fit_text_to_contents(self)
 
     def open(self, file_path=None):
         """
@@ -1309,15 +1358,10 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             )
             print("made state dictionary: \n%s" % state_dict)
 
-        placement = self._capture_window_placement()
-        try:
-            self.set_model(data_model, state_dict, check_for_appropriate_metric=True)
-            self.model.analysis_source_path = file_path
-            self.tableView.undoStack.clear()
-            self.dataset_file_lbl.setText("Open Project: %s" % file_path)
-            qt_layout.fit_text_to_contents(self)
-        finally:
-            self._restore_window_placement(placement)
+        self.set_model(data_model, state_dict, check_for_appropriate_metric=True)
+        self.model.analysis_source_path = file_path
+        self.tableView.undoStack.clear()
+        self.dataset_file_lbl.setText("Open Project: %s" % file_path)
 
         # we just opened it, so it's 'saved'
         self.current_data_unsaved = False
@@ -1396,12 +1440,14 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
     def delete_covariate(self, covariate):
         cov_vals_d = self.model.dataset.get_values_for_cov(covariate.name)
+        stable_id = getattr(covariate, "stable_id", None)
 
         def undo_f():
             self.model.add_covariate(
                 covariate.name,
                 meta_globals.COV_INTS_TO_STRS[covariate.data_type],
                 cov_values=cov_vals_d,
+                stable_id=stable_id,
             )
             self._refresh_advanced_analysis_actions()
 
@@ -1431,8 +1477,6 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def set_model(
         self, data_model, state_dict=None, check_for_appropriate_metric=False
     ):
-        placement = self._capture_window_placement() if self.isVisible() else None
-
         ##
         # we explicitly append a blank study to the
         # dataset iff there is fewer than 1 study
@@ -1461,7 +1505,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
         print("calling update col indices from meta form set_model()")
         self.tableView.model().update_column_indices()
-        self.tableView.resizeColumnsToContents()
+        self.tableView.synchronize_column_widths()
 
         if check_for_appropriate_metric:
             self.tableView.change_metric_if_appropriate()
@@ -1474,8 +1518,6 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
         self.model_updated()
         self.data_dirtied()
-        if placement is not None:
-            self._restore_window_placement(placement)
         print("ok -- model set.")
 
     def model_updated(self):
@@ -1496,7 +1538,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         # methods to be called x times! (x being the number of times
         # _setup_connections is invoked)
         self._setup_connections(menu_actions=False)
-        self.tableView.resizeColumnsToContents()
+        self.tableView.synchronize_column_widths()
         self.update_outcome_lbl()
         self.update_follow_up_label()
 
@@ -1516,7 +1558,6 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.cur_outcome_lbl.setText(
             "<font color='Blue'>%s</font>" % self.model.current_outcome
         )
-        qt_layout.fit_text_to_contents(self)
 
     def quit(self):
         if self.current_data_unsaved:
@@ -1529,7 +1570,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             else:  # Cancel
                 return
 
-        save_main_window_placement(self)
+        save_main_window_placement(self, self.tableView.column_width_state())
         save_settings()
         QApplication.quit()
 
@@ -1591,7 +1632,6 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             add_file_to_recent_files(self.out_path)
 
             self.dataset_file_lbl.setText("Open Project: %s" % self.out_path)
-            qt_layout.fit_text_to_contents(self)
             self.current_data_unsaved = False
             return True
         except Exception as e:
@@ -1807,7 +1847,6 @@ class Command_Change_Conf_Level(QUndoCommand):
     def _set_conf_level(self, conf_level):
         self.mainform.model.set_conf_level(conf_level)
         self.mainform.cl_label.setText(_format_confidence_level_status(conf_level))
-        qt_layout.fit_text_to_contents(self.mainform)
         self.mainform.model.reset_model()
         print(
             (

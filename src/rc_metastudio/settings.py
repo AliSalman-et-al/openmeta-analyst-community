@@ -7,6 +7,7 @@ import sys
 from PyQt5 import QtCore, QtGui
 import meta_py_r
 import qt_text
+from workspace_column_identity import WorkspaceColumnWidthState
 
 QColor = QtGui.QColor
 QDir = QtCore.QDir
@@ -16,7 +17,10 @@ ANALYSIS_SCRATCH_ENV_VAR = "RCMS_ANALYSIS_SCRATCH_DIR"
 ##################### HANDLE SETTINGS #####################
 
 MAX_RECENT_FILES = 10
-MAIN_WINDOW_GROUP = "main_window"
+LEGACY_MAIN_WINDOW_GROUP = "main_window"
+WORKSPACE_LAYOUT_GROUP = "workspace_layout"
+WORKSPACE_LAYOUT_SCHEMA_VERSION = 1
+MAIN_WORKSPACE_GROUP = WORKSPACE_LAYOUT_GROUP + "/main"
 DEFAULT_SETTINGS = {
     "splash": True,
     "digits": 2,
@@ -127,40 +131,123 @@ def save_settings():
     settings.sync()  # writes to permanent storage
 
 
-def save_main_window_placement(window):
+def migrate_workspace_layout_settings():
+    """Delete pre-rewrite geometry without disturbing unrelated settings."""
     settings = QSettings()
-    settings.beginGroup(MAIN_WINDOW_GROUP)
-    settings.setValue("geometry", window.saveGeometry())
-    settings.setValue("maximized", window.isMaximized())
-    settings.setValue("full_screen", window.isFullScreen())
-    settings.endGroup()
+    version = settings.value(WORKSPACE_LAYOUT_GROUP + "/schema_version", 0, type=int)
+    if version != WORKSPACE_LAYOUT_SCHEMA_VERSION:
+        settings.remove(WORKSPACE_LAYOUT_GROUP)
+        settings.remove(LEGACY_MAIN_WINDOW_GROUP)
+        settings.setValue(
+            WORKSPACE_LAYOUT_GROUP + "/schema_version",
+            WORKSPACE_LAYOUT_SCHEMA_VERSION,
+        )
+        settings.sync()
+
+
+def _available_screen_geometries():
+    app = QtGui.QGuiApplication.instance()
+    if app is None:
+        return []
+    return [QtCore.QRect(screen.availableGeometry()) for screen in app.screens()]
+
+
+def _screen_safe_geometry(frame_geometry, available_geometries):
+    from adaptive_window import clamp_frame_geometry
+
+    frame = QtCore.QRect(frame_geometry)
+    screens = [QtCore.QRect(rect) for rect in available_geometries if rect.isValid()]
+    if not frame.isValid() or not screens:
+        return None
+    target = next(
+        (rect for rect in screens if rect.contains(frame.center())), screens[0]
+    )
+    return clamp_frame_geometry(frame, target)
+
+
+def load_main_window_placement(available_geometries=None):
+    migrate_workspace_layout_settings()
+    settings = QSettings()
+    geometry = settings.value(MAIN_WORKSPACE_GROUP + "/frame_geometry")
+    geometry = (
+        _screen_safe_geometry(
+            geometry,
+            _available_screen_geometries()
+            if available_geometries is None
+            else available_geometries,
+        )
+        if geometry is not None
+        else None
+    )
+    return {
+        "frame_geometry": geometry,
+        "maximized": settings.value(
+            MAIN_WORKSPACE_GROUP + "/maximized", geometry is None, type=bool
+        ),
+        "full_screen": settings.value(
+            MAIN_WORKSPACE_GROUP + "/full_screen", False, type=bool
+        ),
+    }
+
+
+def save_main_window_placement(window, column_widths=None):
+    migrate_workspace_layout_settings()
+    settings = QSettings()
+    frame = window.frameGeometry()
+    if window.isMaximized() or window.isFullScreen():
+        controller = getattr(window, "_adaptive_window_controller", None)
+        normal = (
+            controller.normal_frame_geometry()
+            if controller is not None
+            else QtCore.QRect()
+        )
+        if not normal.isValid():
+            normal = window.normalGeometry()
+        if normal.isValid():
+            frame = normal
+    settings.setValue(MAIN_WORKSPACE_GROUP + "/frame_geometry", frame)
+    settings.setValue(MAIN_WORKSPACE_GROUP + "/maximized", window.isMaximized())
+    settings.setValue(MAIN_WORKSPACE_GROUP + "/full_screen", window.isFullScreen())
+    if column_widths is not None:
+        settings.setValue(
+            MAIN_WORKSPACE_GROUP + "/column_widths",
+            column_widths.to_json(),
+        )
     settings.sync()
 
 
 def restore_main_window_placement(window, default_maximized=True):
-    settings = QSettings()
-    settings.beginGroup(MAIN_WINDOW_GROUP)
-    has_geometry = settings.contains("geometry")
-    geometry = settings.value("geometry") if has_geometry else None
-    maximized = settings.value("maximized", default_maximized, type=bool)
-    full_screen = settings.value("full_screen", False, type=bool)
-    settings.endGroup()
+    placement = load_main_window_placement()
+    geometry = placement["frame_geometry"]
+    if geometry is not None:
+        controller = getattr(window, "_adaptive_window_controller", None)
+        if controller is not None:
+            controller.consume_first_use()
+        window.showNormal()
+        if controller is not None:
+            controller.restore_frame_geometry(geometry)
+        else:
+            window.setGeometry(geometry)
 
-    if has_geometry and geometry is not None:
-        window.restoreGeometry(geometry)
-
-    if full_screen:
+    if placement["full_screen"]:
         window.showFullScreen()
-    elif maximized or (default_maximized and not has_geometry):
+    elif placement["maximized"] or (default_maximized and geometry is None):
         window.showMaximized()
     else:
         window.show()
+
+
+def load_main_column_widths():
+    migrate_workspace_layout_settings()
+    raw = QSettings().value(MAIN_WORKSPACE_GROUP + "/column_widths", "")
+    return WorkspaceColumnWidthState.from_json(raw)
 
 
 def load_settings():
     """loads settings from QSettings object, setting suitable defaults if
     there are missing fields"""
 
+    migrate_workspace_layout_settings()
     settings = QSettings()
 
     def field_is_toplevel_child_group_keys(field_name):

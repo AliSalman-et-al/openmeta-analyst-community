@@ -13,6 +13,7 @@ from PyQt5.QtWidgets import (
     QMainWindow,
     QToolButton,
     QRadioButton,
+    QStyle,
     QSizePolicy,
     QStackedWidget,
     QTabWidget,
@@ -34,6 +35,15 @@ ANALYSIS_DIALOG_COMBO_MAXIMUM_WIDTH = APPLICATION_DIALOG_COMBO_MAXIMUM_WIDTH
 ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH = 760
 ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH = 220
 COMBO_CONTENT_HORIZONTAL_PADDING = 48
+
+
+def configure_navigation_tool_buttons(buttons):
+    """Apply the active style's intrinsic small-icon metric to navigation."""
+    for button in buttons:
+        icon_extent = button.style().pixelMetric(QStyle.PM_SmallIconSize, None, button)
+        button.setIconSize(QSize(icon_extent, icon_extent))
+        button.setMinimumSize(QSize(0, 0))
+        button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
 
 
 def exec_centered(dialog):

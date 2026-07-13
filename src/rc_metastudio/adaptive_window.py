@@ -233,16 +233,14 @@ class AdaptiveWindowController(QObject):
         self._available_geometry_provider = (
             available_geometry_provider or available_geometry_for_window
         )
-        self._first_use_screen_provider = (
-            first_use_screen_provider
-            or (
-                lambda target, archetype: first_use_screen(target, archetype)
-            )
+        self._first_use_screen_provider = first_use_screen_provider or (
+            lambda target, archetype: first_use_screen(target, archetype)
         )
         self._screen_placer = screen_placer or place_window_on_screen
         self._content_refit_pending = False
         self._runtime_clamp_pending = False
         self._first_show_pending = True
+        self._normal_frame_geometry = QRect()
         self._window_handle = None
         self._runtime_screen = None
 
@@ -260,6 +258,13 @@ class AdaptiveWindowController(QObject):
         window.installEventFilter(self)
 
     def eventFilter(self, watched, event):
+        if (
+            watched is self.window
+            and event.type() in (QEvent.Move, QEvent.Resize)
+            and not self.window.isMaximized()
+            and not self.window.isFullScreen()
+        ):
+            self._normal_frame_geometry = QRect(self.window.frameGeometry())
         if watched is self.window and event.type() == QEvent.Show:
             if self._first_show_pending:
                 self._first_show_pending = False
@@ -270,9 +275,7 @@ class AdaptiveWindowController(QObject):
 
     def apply_first_use_geometry(self):
         """Apply the registered role's sizing behavior before user ownership."""
-        screen = self._first_use_screen_provider(
-            self.window, self.policy.archetype
-        )
+        screen = self._first_use_screen_provider(self.window, self.policy.archetype)
         if (
             self.window.parentWidget() is None
             and self.policy.archetype == WindowArchetype.WORKSPACE
@@ -315,6 +318,21 @@ class AdaptiveWindowController(QObject):
             return
         self._runtime_clamp_pending = True
         QTimer.singleShot(0, self._run_runtime_clamp)
+
+    def restore_frame_geometry(self, frame_geometry):
+        """Restore a validated outer-frame rectangle for a workspace window."""
+        target = QRect(frame_geometry)
+        self._first_show_pending = False
+        self._set_outer_frame_geometry(target)
+        self._normal_frame_geometry = target
+
+    def consume_first_use(self):
+        """Suppress first-use sizing when a valid persisted state will restore."""
+        self._first_show_pending = False
+
+    def normal_frame_geometry(self):
+        """Return the last user-owned non-maximized outer-frame rectangle."""
+        return QRect(self._normal_frame_geometry)
 
     def handle_screen_assignment_change(self, screen):
         """Adopt a new runtime screen and reconnect its metric signals."""

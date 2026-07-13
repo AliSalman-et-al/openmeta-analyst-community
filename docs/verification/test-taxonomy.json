@@ -6,6 +6,166 @@
   "tests": [
     {
       "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_dataset_model_covariate_identity_survives_rename",
+      "reason": "Guards semantic workspace column identity across a covariate display-name change.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_workspace_window.py::test_added_covariate_keeps_identity_and_width_through_undo_redo",
+      "reason": "Guards stable covariate identity and user-owned width through the real add-covariate undo/redo lifecycle.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_workspace_window.py::test_deleted_covariate_keeps_identity_and_width_through_undo_redo",
+      "reason": "Guards stable covariate identity and user-owned width through repeated delete and undo operations.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_explicit_auto_fit_transfers_new_widths_to_user_ownership",
+      "reason": "Proves explicit auto-fit establishes a new user-owned column width.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_fresh_main_placement_defaults_to_maximized",
+      "reason": "Guards maximized first use when no valid Main placement exists.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_layout_settings_migration_deletes_only_legacy_main_geometry",
+      "reason": "Guards one-time deletion of obsolete geometry without removing unrelated settings.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_legacy_covariate_identity_and_widths_are_deterministic_across_loads",
+      "reason": "Proves untouched legacy schemas derive repeatable covariate identities and restore widths across loads.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_main_column_widths_round_trip_in_versioned_workspace_state",
+      "reason": "Guards versioned semantic column-width serialization through QSettings.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_stale_main_placement_is_clamped_to_available_screen",
+      "reason": "Guards stale-screen Main placement clamping to reachable logical geometry.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_workspace_columns_keep_width_when_display_header_is_renamed",
+      "reason": "Proves mutable display headers do not change user-owned widths.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_workspace_columns_preserve_user_widths_and_initialize_only_new_columns",
+      "reason": "Guards existing width ownership while content-fitting only a genuinely new schema column.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_workspace_columns_survive_middle_insertion_and_removal_by_identity",
+      "reason": "Guards semantic width ownership across middle insertion and removal.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_workspace_window.py::test_main_inherits_fonts_and_navigation_icons_from_active_style",
+      "reason": "Guards platform font inheritance and style-metric navigation icon sizing.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_workspace_window.py::test_main_is_a_managed_workspace_with_expanding_table_and_layouted_navigation",
+      "reason": "Guards Main workspace registration and fully managed canonical layout.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_workspace_window.py::test_returning_normal_workspace_is_not_remaximized_on_first_show",
+      "reason": "Guards restoration of a returning normal workspace without replaying first-use maximization.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_workspace_window.py::test_runtime_content_changes_do_not_resize_or_reposition_visible_main",
+      "reason": "Guards stable Main geometry and readable plain-text tooltips during runtime content growth.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
       "evidence": [
         "gui_compatibility",
         "release_readiness"
