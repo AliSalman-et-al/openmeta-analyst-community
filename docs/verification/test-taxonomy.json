@@ -7,6 +7,86 @@
     {
       "decision": "keep",
       "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_edit_dataset_workspace_layout.py::test_edit_dataset_is_modal_workspace_with_persisted_placement_and_panes",
+      "reason": "Guards Edit Dataset's modal Workspace contract, first-use sizing, independent screen-safe placement, adjustable pane persistence, and expanding collections.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_edit_dataset_workspace_layout.py::test_edit_dataset_first_use_tracks_logical_screen_contract[screen_size0]",
+      "reason": "Guards Edit Dataset's approximately 80 percent first-use geometry on a constrained 800 by 600 logical screen.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_edit_dataset_workspace_layout.py::test_edit_dataset_first_use_tracks_logical_screen_contract[screen_size1]",
+      "reason": "Guards Edit Dataset's approximately 80 percent first-use geometry at the 1024 by 640 full-usability floor.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_edit_dataset_workspace_layout.py::test_edit_dataset_first_use_tracks_logical_screen_contract[screen_size2]",
+      "reason": "Guards Edit Dataset's approximately 80 percent first-use geometry on a large logical screen.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_edit_dataset_workspace_layout.py::test_dataset_nested_actions_keep_long_required_content_and_keyboard_access",
+      "reason": "Guards enlarged-font Transactional actions, long editable Required Content, visible actions, and logical keyboard traversal.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_edit_dataset_workspace_layout.py::test_dataset_path_canonical_forms_are_declarative_and_platform_native",
+      "reason": "Rejects platform fonts, historical nonzero root geometry, absolute child geometry, fixed roots, and unmanaged Dataset-path form content.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["analysis_behavior", "gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_edit_dataset_rejection_leaves_main_dataset_unchanged",
+      "reason": "Guards the real Edit Dataset rejection path so edits to the dialog copy cannot mutate the main dataset or undo history.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["analysis_behavior", "gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_edit_dataset_acceptance_propagates_copied_dataset_mutation",
+      "reason": "Guards accepted Edit Dataset propagation through the real dialog seam, including copied-dataset isolation and undo restoration.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
       "external_dependencies": ["qt"],
       "lane": "gui",
       "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_dpr_raster_uses_device_independent_dimensions_for_viewport_fit",

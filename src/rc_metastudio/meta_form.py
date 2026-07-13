@@ -756,7 +756,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         cur_dataset = copy.deepcopy(self.model.dataset)
         edit_window = edit_dialog.EditDialog(cur_dataset, parent=self)
 
-        if qt_layout.exec_centered(edit_window):
+        if edit_window.exec():
             # if we edited the current dataset when there was no
             # outcome yet, then we want to default to an outcome
             # that was added.
@@ -946,7 +946,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         edit_group_form = edit_group_name_form.EditGroupName(
             cur_group_name, parent=self
         )
-        if qt_layout.exec_centered(edit_group_form):
+        if edit_group_form.exec():
             try:
                 existing_groups = list(self.model.dataset.get_group_names())
                 if orig_group_name in existing_groups:
@@ -967,7 +967,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def add_covariate(self):
         form = add_new_dialogs.AddNewCovariateForm(self)
         form.covariate_name_le.setFocus()
-        if qt_layout.exec_centered(form):
+        if form.exec():
             # then the user clicked 'ok'.
             try:
                 new_covariate_name = ma_data_table_model.validate_new_covariate_name(
@@ -1023,7 +1023,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                 parent=self, is_diag=self.model.is_diag()
             )
             form.outcome_name_le.setFocus()
-            if qt_layout.exec_centered(form):
+            if form.exec():
                 # then the user clicked ok and has added a new outcome.
                 # here we want to add the outcome to the dataset, and then
                 # display it
@@ -1064,7 +1064,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         elif self.cur_dimension == "group":
             form = add_new_dialogs.AddNewGroupForm(self)
             form.group_name_le.setFocus()
-            if qt_layout.exec_centered(form):
+            if form.exec():
                 try:
                     new_group_name = ma_data_table_model.validate_new_group_name(
                         self.model.dataset, form.group_name_le.text()
@@ -1079,7 +1079,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             # then the dimension is follow-up
             form = add_new_dialogs.AddNewFollowUpForm(self)
             form.follow_up_name_le.setFocus()
-            if qt_layout.exec_centered(form):
+            if form.exec():
                 try:
                     follow_up_lbl = ma_data_table_model.validate_new_follow_up_name(
                         self.model.dataset,
@@ -1414,7 +1414,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         edit_cov_form = edit_group_name_form.EditCovariateName(
             orig_cov_name, parent=self
         )
-        if qt_layout.exec_centered(edit_cov_form):
+        if edit_cov_form.exec():
             # the field names are also poorly named, in this case. here we mean the
             # **covariate name**, of course.
             try:

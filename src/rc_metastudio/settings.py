@@ -24,7 +24,9 @@ WORKSPACE_LAYOUT_GROUP = "workspace_layout"
 WORKSPACE_LAYOUT_SCHEMA_VERSION = 1
 MAIN_WORKSPACE_GROUP = WORKSPACE_LAYOUT_GROUP + "/main"
 RESULTS_WORKSPACE_GROUP = WORKSPACE_LAYOUT_GROUP + "/results"
+EDIT_DATASET_WORKSPACE_GROUP = WORKSPACE_LAYOUT_GROUP + "/edit_dataset"
 DEFAULT_RESULTS_SPLITTER_PROPORTIONS = (0.30, 0.70)
+DEFAULT_EDIT_DATASET_SPLITTER_PROPORTIONS = (1.0 / 3.0,) * 3
 DEFAULT_SETTINGS = {
     "splash": True,
     "digits": 2,
@@ -60,12 +62,8 @@ class WorkspacePlacement(Mapping):
         return NotImplemented
 
 
-@dataclass(frozen=True, eq=False)
-class ResultsWorkspaceState(Mapping):
-    """Results placement plus its independently owned pane proportions."""
-
-    placement: WorkspacePlacement
-    splitter_proportions: tuple
+class WorkspacePaneState(Mapping):
+    """Mapping-compatible placement and proportions shared by pane workspaces."""
 
     _FIELDS = (
         "frame_geometry",
@@ -101,6 +99,22 @@ class ResultsWorkspaceState(Mapping):
         if isinstance(other, Mapping):
             return dict(self.items()) == dict(other.items())
         return NotImplemented
+
+
+@dataclass(frozen=True, eq=False)
+class ResultsWorkspaceState(WorkspacePaneState):
+    """Results placement plus its independently owned pane proportions."""
+
+    placement: WorkspacePlacement
+    splitter_proportions: tuple
+
+
+@dataclass(frozen=True, eq=False)
+class EditDatasetWorkspaceState(WorkspacePaneState):
+    """Edit Dataset placement plus independently useful collection panes."""
+
+    placement: WorkspacePlacement
+    splitter_proportions: tuple[float, float, float]
 
 
 def update_setting(field, value):
@@ -279,7 +293,7 @@ def _splitter_proportions(sizes, default=DEFAULT_RESULTS_SPLITTER_PROPORTIONS):
     except (TypeError, ValueError):
         return list(default)
     total = sum(values)
-    if len(values) != 2 or total <= 0 or any(value <= 0 for value in values):
+    if len(values) != len(default) or total <= 0 or any(value <= 0 for value in values):
         return list(default)
     return [value / total for value in values]
 
@@ -384,6 +398,53 @@ def restore_results_window_state(window):
         window,
         state.placement,
         default_maximized=True,
+        show_window=False,
+    )
+    return state
+
+
+def load_edit_dataset_window_state(available_geometries=None):
+    """Load independent Edit Dataset placement and collection pane shares."""
+    placement = load_workspace_placement(
+        EDIT_DATASET_WORKSPACE_GROUP,
+        available_geometries=available_geometries,
+        default_maximized=False,
+    )
+    proportions = QSettings().value(
+        EDIT_DATASET_WORKSPACE_GROUP + "/splitter_proportions",
+        list(DEFAULT_EDIT_DATASET_SPLITTER_PROPORTIONS),
+    )
+    return EditDatasetWorkspaceState(
+        placement=placement,
+        splitter_proportions=tuple(
+            _splitter_proportions(
+                proportions,
+                default=DEFAULT_EDIT_DATASET_SPLITTER_PROPORTIONS,
+            )
+        ),
+    )
+
+
+def save_edit_dataset_window_state(window):
+    """Persist user-owned Edit Dataset geometry and collection pane shares."""
+    settings = save_workspace_placement(EDIT_DATASET_WORKSPACE_GROUP, window)
+    settings.setValue(
+        EDIT_DATASET_WORKSPACE_GROUP + "/splitter_proportions",
+        _splitter_proportions(
+            window.dataset_structure_splitter.sizes(),
+            default=DEFAULT_EDIT_DATASET_SPLITTER_PROPORTIONS,
+        ),
+    )
+    settings.sync()
+
+
+def restore_edit_dataset_window_state(window):
+    """Restore Edit Dataset placement without displaying the modal dialog."""
+    state = load_edit_dataset_window_state()
+    restore_workspace_placement(
+        window,
+        state.placement,
+        default_maximized=False,
         show_window=False,
     )
     return state

@@ -997,6 +997,65 @@ def test_metaform_dialog_text_slots_accept_pyqt5_line_edit_strings(monkeypatch):
         _close_without_prompt(app, window)
 
 
+def test_edit_dataset_rejection_leaves_main_dataset_unchanged(monkeypatch):
+    import launch
+    import edit_dialog
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        original_dataset = window.model.dataset
+        original_names = [study.name for study in original_dataset.studies]
+        original_undo_count = window.tableView.undoStack.count()
+
+        def reject_after_editing_copy(dialog):
+            dialog.dataset.studies[0].name = "Rejected dataset edit"
+            return dialog.Rejected
+
+        monkeypatch.setattr(edit_dialog.EditDialog, "exec", reject_after_editing_copy)
+
+        window.edit_dataset()
+
+        assert window.model.dataset is original_dataset
+        assert [study.name for study in window.model.dataset.studies] == original_names
+        assert window.tableView.undoStack.count() == original_undo_count
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_edit_dataset_acceptance_propagates_copied_dataset_mutation(monkeypatch):
+    import launch
+    import edit_dialog
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        original_dataset = window.model.dataset
+        original_name = original_dataset.studies[0].name
+        renamed_study = "Renamed through Edit Dataset"
+        original_undo_count = window.tableView.undoStack.count()
+
+        def accept_after_renaming_study(dialog):
+            dialog.dataset.studies[0].name = renamed_study
+            return dialog.Accepted
+
+        monkeypatch.setattr(
+            edit_dialog.EditDialog, "exec", accept_after_renaming_study
+        )
+
+        window.edit_dataset()
+
+        assert window.model.dataset is not original_dataset
+        assert window.model.dataset.studies[0].name == renamed_study
+        assert original_dataset.studies[0].name == original_name
+        assert window.tableView.undoStack.count() == original_undo_count + 1
+
+        window.tableView.undoStack.undo()
+        assert window.model.dataset.studies[0].name == original_name
+    finally:
+        _close_without_prompt(app, window)
+
+
 def test_metric_selection_and_confidence_level_are_preserved_in_model_state():
     import launch
 

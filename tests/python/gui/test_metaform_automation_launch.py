@@ -5145,7 +5145,6 @@ def test_csv_required_format_table_expands_and_shows_all_rows(monkeypatch):
 def test_analysis_dialog_family_uses_shared_base_size(monkeypatch):
     import copy
     import launch
-    import add_new_dialogs
     import binary_data_form
     import continuous_data_form
     import diagnostic_data_form
@@ -5174,7 +5173,6 @@ def test_analysis_dialog_family_uses_shared_base_size(monkeypatch):
             [
                 meta_reg_form.MetaRegForm(model, parent=window),
                 meta_subgroup_form.MetaSubgroupForm(model, parent=window),
-                add_new_dialogs.AddNewCovariateForm(parent=window),
                 binary_data_form.BinaryDataForm2(
                     copy.deepcopy(model.get_current_ma_unit_for_study(0)),
                     model.current_txs,
@@ -5235,31 +5233,26 @@ def test_analysis_dialog_family_uses_shared_base_size(monkeypatch):
 def test_add_covariate_dialog_fields_and_buttons_fill_fitted_width():
     import launch
     import add_new_dialogs
-    import qt_layout
 
     app, window = launch.start_automation()
     dialog = add_new_dialogs.AddNewCovariateForm(parent=window)
 
     try:
+        enlarged_font = dialog.font()
+        enlarged_font.setPointSize(enlarged_font.pointSize() + 4)
+        dialog.setFont(enlarged_font)
         dialog.show()
         app.processEvents()
-        if dialog.layout() is not None:
-            dialog.layout().activate()
-        app.processEvents()
 
-        contents = dialog.contentsRect()
-        dialog_layout = dialog.layout()
-        assert dialog_layout is not None
-        left_margin = dialog_layout.contentsMargins().left()
-        right_margin = dialog_layout.contentsMargins().right()
-        expected_content_width = contents.width() - left_margin - right_margin
-
-        assert dialog.minimumWidth() >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
-        assert dialog.layoutWidget.width() >= expected_content_width
-        assert dialog.buttonBox.width() >= expected_content_width
-        assert (
-            dialog.buttonBox.geometry().right() >= contents.right() - right_margin - 1
+        assert dialog.property("RCMS_window_archetype") == "transactional"
+        assert dialog.layout() is not None
+        assert dialog.minimumSize() == dialog.minimumSizeHint()
+        assert dialog.maximumSize() == QtCore.QSize(16777215, 16777215)
+        assert dialog.covariate_name_le.sizePolicy().horizontalPolicy() == (
+            QtWidgets.QSizePolicy.Expanding
         )
+        assert dialog.buttonBox.isVisible()
+        assert dialog.contentsRect().contains(dialog.buttonBox.geometry().center())
     finally:
         dialog.close()
         window.close()

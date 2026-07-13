@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'src\rc_metastudio\forms\new_group_dlg.ui'
+# Form implementation generated from reading ui file 'new_group_dlg.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -14,60 +14,34 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_new_group_dialog(object):
     def setupUi(self, new_group_dialog):
         new_group_dialog.setObjectName("new_group_dialog")
-        new_group_dialog.setEnabled(True)
-        new_group_dialog.resize(301, 132)
-        new_group_dialog.setMinimumSize(QtCore.QSize(301, 132))
-        new_group_dialog.setMaximumSize(QtCore.QSize(301, 132))
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        new_group_dialog.setFont(font)
-        icon = QtGui.QIcon()
-        icon.addPixmap(
-            QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
-        )
-        new_group_dialog.setWindowIcon(icon)
-        self.buttonBox = QtWidgets.QDialogButtonBox(new_group_dialog)
-        self.buttonBox.setGeometry(QtCore.QRect(10, 90, 281, 32))
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        self.buttonBox.setFont(font)
-        self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(
-            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
-        )
-        self.buttonBox.setObjectName("buttonBox")
-        self.layoutWidget = QtWidgets.QWidget(new_group_dialog)
-        self.layoutWidget.setGeometry(QtCore.QRect(10, 10, 281, 71))
-        self.layoutWidget.setObjectName("layoutWidget")
-        self.gridLayout = QtWidgets.QGridLayout(self.layoutWidget)
-        self.gridLayout.setContentsMargins(0, 0, 0, 0)
-        self.gridLayout.setObjectName("gridLayout")
-        self.label_2 = QtWidgets.QLabel(self.layoutWidget)
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        font.setPointSize(10)
-        self.label_2.setFont(font)
+        new_group_dialog.resize(0, 0)
+        self.verticalLayout = QtWidgets.QVBoxLayout(new_group_dialog)
+        self.verticalLayout.setObjectName("verticalLayout")
+        self.formLayout = QtWidgets.QFormLayout()
+        self.formLayout.setFieldGrowthPolicy(QtWidgets.QFormLayout.AllNonFixedFieldsGrow)
+        self.formLayout.setObjectName("formLayout")
+        self.label_2 = QtWidgets.QLabel(new_group_dialog)
         self.label_2.setObjectName("label_2")
-        self.gridLayout.addWidget(self.label_2, 0, 0, 1, 1)
-        self.group_name_le = QtWidgets.QLineEdit(self.layoutWidget)
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        self.group_name_le.setFont(font)
+        self.formLayout.setWidget(0, QtWidgets.QFormLayout.LabelRole, self.label_2)
+        self.group_name_le = QtWidgets.QLineEdit(new_group_dialog)
         self.group_name_le.setAlignment(QtCore.Qt.AlignCenter)
         self.group_name_le.setObjectName("group_name_le")
-        self.gridLayout.addWidget(self.group_name_le, 0, 1, 1, 1)
+        self.formLayout.setWidget(0, QtWidgets.QFormLayout.FieldRole, self.group_name_le)
+        self.verticalLayout.addLayout(self.formLayout)
+        self.buttonBox = QtWidgets.QDialogButtonBox(new_group_dialog)
+        self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setObjectName("buttonBox")
+        self.verticalLayout.addWidget(self.buttonBox)
+        self.label_2.setBuddy(self.group_name_le)
 
         self.retranslateUi(new_group_dialog)
-        self.buttonBox.accepted.connect(new_group_dialog.accept)  # type: ignore
-        self.buttonBox.rejected.connect(new_group_dialog.reject)  # type: ignore
+        self.buttonBox.accepted.connect(new_group_dialog.accept) # type: ignore
+        self.buttonBox.rejected.connect(new_group_dialog.reject) # type: ignore
         QtCore.QMetaObject.connectSlotsByName(new_group_dialog)
 
     def retranslateUi(self, new_group_dialog):
         _translate = QtCore.QCoreApplication.translate
-        new_group_dialog.setWindowTitle(
-            _translate("new_group_dialog", "Add Treatment Group (Arm)")
-        )
+        new_group_dialog.setWindowTitle(_translate("new_group_dialog", "Add Treatment Group (Arm)"))
         self.label_2.setText(_translate("new_group_dialog", "Treatment group name:"))
-
-
 import icons_rc

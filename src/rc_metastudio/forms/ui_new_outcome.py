@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'src\rc_metastudio\forms\new_outcome_dlg.ui'
+# Form implementation generated from reading ui file 'new_outcome_dlg.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -14,72 +14,45 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_Dialog(object):
     def setupUi(self, Dialog):
         Dialog.setObjectName("Dialog")
-        Dialog.setEnabled(True)
-        Dialog.resize(301, 132)
-        Dialog.setMinimumSize(QtCore.QSize(301, 132))
-        Dialog.setMaximumSize(QtCore.QSize(301, 132))
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        Dialog.setFont(font)
-        icon = QtGui.QIcon()
-        icon.addPixmap(
-            QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
-        )
-        Dialog.setWindowIcon(icon)
-        self.buttonBox = QtWidgets.QDialogButtonBox(Dialog)
-        self.buttonBox.setGeometry(QtCore.QRect(10, 90, 281, 32))
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        self.buttonBox.setFont(font)
-        self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(
-            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
-        )
-        self.buttonBox.setObjectName("buttonBox")
-        self.layoutWidget = QtWidgets.QWidget(Dialog)
-        self.layoutWidget.setGeometry(QtCore.QRect(10, 10, 281, 71))
-        self.layoutWidget.setObjectName("layoutWidget")
-        self.gridLayout = QtWidgets.QGridLayout(self.layoutWidget)
-        self.gridLayout.setContentsMargins(0, 0, 0, 0)
-        self.gridLayout.setObjectName("gridLayout")
-        self.label_2 = QtWidgets.QLabel(self.layoutWidget)
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        font.setPointSize(10)
-        self.label_2.setFont(font)
+        Dialog.resize(0, 0)
+        self.verticalLayout = QtWidgets.QVBoxLayout(Dialog)
+        self.verticalLayout.setObjectName("verticalLayout")
+        self.formLayout = QtWidgets.QFormLayout()
+        self.formLayout.setFieldGrowthPolicy(QtWidgets.QFormLayout.AllNonFixedFieldsGrow)
+        self.formLayout.setObjectName("formLayout")
+        self.label_2 = QtWidgets.QLabel(Dialog)
         self.label_2.setObjectName("label_2")
-        self.gridLayout.addWidget(self.label_2, 0, 0, 1, 1)
-        self.outcome_name_le = QtWidgets.QLineEdit(self.layoutWidget)
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        self.outcome_name_le.setFont(font)
+        self.formLayout.setWidget(0, QtWidgets.QFormLayout.LabelRole, self.label_2)
+        self.outcome_name_le = QtWidgets.QLineEdit(Dialog)
         self.outcome_name_le.setAlignment(QtCore.Qt.AlignCenter)
         self.outcome_name_le.setObjectName("outcome_name_le")
-        self.gridLayout.addWidget(self.outcome_name_le, 0, 1, 1, 1)
-        self.label = QtWidgets.QLabel(self.layoutWidget)
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        font.setPointSize(10)
-        self.label.setFont(font)
+        self.formLayout.setWidget(0, QtWidgets.QFormLayout.FieldRole, self.outcome_name_le)
+        self.label = QtWidgets.QLabel(Dialog)
         self.label.setObjectName("label")
-        self.gridLayout.addWidget(self.label, 1, 0, 1, 1)
-        self.datatype_cbo_box = QtWidgets.QComboBox(self.layoutWidget)
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        self.datatype_cbo_box.setFont(font)
+        self.formLayout.setWidget(1, QtWidgets.QFormLayout.LabelRole, self.label)
+        self.datatype_cbo_box = QtWidgets.QComboBox(Dialog)
+        self.datatype_cbo_box.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self.datatype_cbo_box.setMinimumContentsLength(12)
         self.datatype_cbo_box.setObjectName("datatype_cbo_box")
-        self.gridLayout.addWidget(self.datatype_cbo_box, 1, 1, 1, 1)
+        self.formLayout.setWidget(1, QtWidgets.QFormLayout.FieldRole, self.datatype_cbo_box)
+        self.verticalLayout.addLayout(self.formLayout)
+        self.buttonBox = QtWidgets.QDialogButtonBox(Dialog)
+        self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setObjectName("buttonBox")
+        self.verticalLayout.addWidget(self.buttonBox)
+        self.label_2.setBuddy(self.outcome_name_le)
+        self.label.setBuddy(self.datatype_cbo_box)
 
         self.retranslateUi(Dialog)
-        self.buttonBox.accepted.connect(Dialog.accept)  # type: ignore
-        self.buttonBox.rejected.connect(Dialog.reject)  # type: ignore
+        self.buttonBox.accepted.connect(Dialog.accept) # type: ignore
+        self.buttonBox.rejected.connect(Dialog.reject) # type: ignore
         QtCore.QMetaObject.connectSlotsByName(Dialog)
+        Dialog.setTabOrder(self.outcome_name_le, self.datatype_cbo_box)
 
     def retranslateUi(self, Dialog):
         _translate = QtCore.QCoreApplication.translate
         Dialog.setWindowTitle(_translate("Dialog", "Add Outcome"))
         self.label_2.setText(_translate("Dialog", "Outcome name:"))
         self.label.setText(_translate("Dialog", "Type of outcome:"))
-
-
 import icons_rc

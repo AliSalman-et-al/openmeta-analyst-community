@@ -14,7 +14,8 @@
 
 # import pdb
 
-from PyQt5.QtWidgets import QDialog, QMessageBox
+from PyQt5.QtCore import QSize
+from PyQt5.QtWidgets import QDialog, QMessageBox, QStyle, QStyleOptionButton
 
 import forms.ui_edit_dialog
 import edit_list_models
@@ -23,13 +24,28 @@ import app_error_handler
 import meta_globals
 import ma_dataset
 import ma_data_table_model
-import qt_layout
+import adaptive_window
+from settings import (
+    restore_edit_dataset_window_state,
+    save_edit_dataset_window_state,
+)
 
 
 class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
     def __init__(self, dataset, parent=None):
         super(EditDialog, self).__init__(parent)
         self.setupUi(self)
+        self._size_icon_actions_from_style()
+        self.setModal(True)
+        adaptive_window.register_adaptive_window(
+            self, adaptive_window.WindowRole.EDIT_DATASET
+        )
+        restored_state = restore_edit_dataset_window_state(self)
+        self._pending_restored_frame_geometry = restored_state.frame_geometry
+        self._pending_splitter_proportions = restored_state.splitter_proportions
+        self.dataset_structure_splitter.setStretchFactor(0, 1)
+        self.dataset_structure_splitter.setStretchFactor(1, 1)
+        self.dataset_structure_splitter.setStretchFactor(2, 1)
 
         ### outcomes
         self.outcomes_model = edit_list_models.OutcomesModel(dataset=dataset)
@@ -89,7 +105,60 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
 
         self._setup_connections()
         self.dataset = dataset
-        qt_layout.fit_application_dialog_to_contents(self)
+
+    def _size_icon_actions_from_style(self):
+        icon_extent = self.style().pixelMetric(QStyle.PM_ButtonIconSize)
+        icon_size = QSize(icon_extent, icon_extent)
+        for button in (
+            self.add_outcome_btn,
+            self.remove_outcome_btn,
+            self.add_follow_up_btn,
+            self.remove_follow_up_btn,
+            self.add_group_btn,
+            self.remove_group_btn,
+            self.add_study_btn,
+            self.remove_study_btn,
+            self.add_covariate_btn,
+            self.remove_covariate_btn,
+        ):
+            option = QStyleOptionButton()
+            option.initFrom(button)
+            button.setIconSize(icon_size)
+            button.setFixedSize(
+                self.style().sizeFromContents(
+                    QStyle.CT_PushButton,
+                    option,
+                    icon_size,
+                    button,
+                )
+            )
+
+    def showEvent(self, event):
+        super(EditDialog, self).showEvent(event)
+        if self._pending_restored_frame_geometry is not None:
+            self._adaptive_window_controller.restore_frame_geometry(
+                self._pending_restored_frame_geometry
+            )
+            self._pending_restored_frame_geometry = None
+        if self._pending_splitter_proportions is not None:
+            self.structureTabLayout.activate()
+            self.dataset_structure_splitter.refresh()
+            self._apply_pending_splitter_proportions()
+
+    def _apply_pending_splitter_proportions(self):
+        if self._pending_splitter_proportions is None:
+            return
+        self.dataset_structure_splitter.setSizes(
+            [
+                max(1, int(proportion * 1000))
+                for proportion in self._pending_splitter_proportions
+            ]
+        )
+        self._pending_splitter_proportions = None
+
+    def done(self, result):
+        save_edit_dataset_window_state(self)
+        super(EditDialog, self).done(result)
 
     def _setup_connections(self):
         for model in [
