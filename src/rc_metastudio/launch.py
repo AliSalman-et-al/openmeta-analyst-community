@@ -25,6 +25,7 @@ import icons_rc  # noqa: F401 - registers canonical Qt image resources
 SPLASH_DISPLAY_TIME = 0  # Keep startup smoke tests fast; packaged builds may override.
 APPLICATION_ICON_PATH = ":/misc/meta.png"
 AUTOMATION_SMOKE_LOG_ENV = "RCMS_AUTOMATION_SMOKE_LOG"
+ADAPTIVE_LAYOUT_EVIDENCE_LOG_ENV = "RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG"
 
 
 def screen_bounded_splash_pixmap(source, available_logical_size):
@@ -78,7 +79,9 @@ def create_startup_splash():
 
 
 def _write_automation_smoke_log(message):
-    log_path = os.environ.get(AUTOMATION_SMOKE_LOG_ENV)
+    log_path = os.environ.get(ADAPTIVE_LAYOUT_EVIDENCE_LOG_ENV) or os.environ.get(
+        AUTOMATION_SMOKE_LOG_ENV
+    )
     if not log_path:
         return
     try:
@@ -207,6 +210,23 @@ def start():
         return start_automation_smoke(sample_path)
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-wizard-layout-smoke":
         return _run_automation_smoke(start_wizard_layout_smoke)
+    if (
+        len(startup_argv) > 1
+        and startup_argv[1] == "--automation-adaptive-layout-evidence"
+    ):
+        if len(startup_argv) < 3:
+            raise SystemExit(
+                "--automation-adaptive-layout-evidence requires an output directory."
+            )
+        output_dir = startup_argv[2]
+        sample_path = (
+            startup_argv[3]
+            if len(startup_argv) > 3
+            else os.path.join("sample_projects", "amino.rcms")
+        )
+        return _run_automation_smoke(
+            lambda: start_adaptive_layout_evidence(output_dir, sample_path)
+        )
 
     startup_project_path = _startup_project_path(startup_argv)
     meta_form = _import_meta_form()
@@ -305,6 +325,21 @@ def start_automation_smoke(sample_path):
     finally:
         meta.close()
         app.processEvents()
+    return 0
+
+
+def start_adaptive_layout_evidence(output_dir, sample_path):
+    """Run the packaged native adaptive-layout evidence workflow."""
+    import adaptive_layout_evidence
+
+    adaptive_layout_evidence.configure_isolated_evidence_settings(output_dir)
+    app, meta = start_automation()
+    adaptive_layout_evidence.run_native_adaptive_layout_evidence(
+        app,
+        meta,
+        sample_path,
+        output_dir,
+    )
     return 0
 
 

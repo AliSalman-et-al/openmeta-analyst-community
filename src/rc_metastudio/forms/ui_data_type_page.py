@@ -36,6 +36,7 @@ class Ui_DataTypePage(object):
         self.pageScrollContent.setSizePolicy(sizePolicy)
         self.pageScrollContent.setObjectName("pageScrollContent")
         self.verticalLayout = QtWidgets.QVBoxLayout(self.pageScrollContent)
+        self.verticalLayout.setSizeConstraint(QtWidgets.QLayout.SetMinimumSize)
         self.verticalLayout.setObjectName("verticalLayout")
         self.label_2 = QtWidgets.QLabel(self.pageScrollContent)
         font = QtGui.QFont()

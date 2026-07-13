@@ -93,6 +93,14 @@ jobs:
       - name: Build Windows package
         run: .\scripts\package-windows.ps1 -ArtifactName RCMetaStudio-windows-x64 -ArchiveRootName "RCMetaStudio-${{ steps.package-version.outputs.version }}-windows-x64" -RRuntimeRoot "${{ steps.r-cache-key.outputs.runtime-root }}"
 
+      - name: Upload Windows adaptive-layout evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: RCMetaStudio-windows-x64-adaptive-layout-evidence
+          path: build\windows-package\adaptive-layout-evidence\windows-x64
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Upload Windows package artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -111,6 +119,7 @@ jobs:
             build\windows-package\work\RCMetaStudio\warn-RCMetaStudio.txt
             build\windows-package\work\RCMetaStudio\xref-RCMetaStudio.html
             build\windows-package\dist\RCMetaStudio\automation-wizard-layout-smoke.log
+            build\windows-package\adaptive-layout-evidence\windows-x64
           if-no-files-found: ignore
           retention-days: 14
           compression-level: 0
@@ -168,6 +177,14 @@ jobs:
       - name: Build macOS package
         run: bash scripts/package-macos.sh --architecture x64 --artifact-name RCMetaStudio-macos-x64 --archive-root-name "RCMetaStudio-${{ steps.package-version.outputs.version }}-macos-x64" --r-runtime-root "${{ steps.r-cache-key.outputs.runtime-root }}"
 
+      - name: Upload macOS Intel adaptive-layout evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: RCMetaStudio-macos-x64-adaptive-layout-evidence
+          path: build/macos-package/x64/adaptive-layout-evidence/macos-x64
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Upload macOS package artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -185,6 +202,7 @@ jobs:
           path: |
             build/macos-package/x64/work/RCMetaStudio/warn-RCMetaStudio.txt
             build/macos-package/x64/work/RCMetaStudio/xref-RCMetaStudio.html
+            build/macos-package/x64/adaptive-layout-evidence/macos-x64
           if-no-files-found: ignore
           retention-days: 14
           compression-level: 0

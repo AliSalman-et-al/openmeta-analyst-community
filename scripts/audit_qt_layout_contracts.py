@@ -180,12 +180,12 @@ SOURCE_EXCEPTION_RULES = {
         "methods": {"setGeometry"},
     },
     "style-metric-control": {
-        "paths": {"edit_dialog.py", "qt_layout.py"},
+        "paths": {"edit_dialog.py", "main_wizard.py", "qt_layout.py"},
         "methods": {"setFixedSize", "setIconSize", "setMinimumSize"},
     },
     "verification-layout-fixture": {
-        "paths": {"launch.py"},
-        "methods": {"resize"},
+        "paths": {"adaptive_layout_evidence.py", "launch.py"},
+        "methods": {"adjustSize", "move", "resize"},
     },
 }
 

@@ -34,6 +34,30 @@ def _assert_page_contract(wizard, expected_buttons):
         assert not overflow.isAncestorOf(button)
 
 
+def _assert_multiline_data_type_labels_fit(page):
+    for button in page._data_type_buttons():
+        line_count = max(1, len(button.text().splitlines()))
+        margin = max(
+            0,
+            button.style().pixelMetric(
+                QtWidgets.QStyle.PM_ButtonMargin, None, button
+            ),
+        )
+        frame = max(
+            0,
+            button.style().pixelMetric(
+                QtWidgets.QStyle.PM_DefaultFrameWidth, None, button
+            ),
+        )
+        required_height = (
+            button.iconSize().height()
+            + line_count * button.fontMetrics().lineSpacing()
+            + 2 * margin
+            + 2 * frame
+        )
+        assert button.height() >= required_height, button.objectName()
+
+
 def test_main_wizard_is_a_stable_workflow_window(qapp):
     import main_wizard
 
@@ -138,6 +162,7 @@ def test_workflow_path_matrix_is_bounded_stable_and_scrollable(
             wizard,
             [main_wizard.QWizard.NextButton, main_wizard.QWizard.CancelButton],
         )
+        _assert_multiline_data_type_labels_fit(wizard.currentPage())
         wizard.currentPage().twoarm_proportions_Button.click()
         wizard.next()
         qapp.processEvents()

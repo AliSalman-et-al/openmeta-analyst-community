@@ -35,6 +35,7 @@
      <widget class="QWidget" name="pageScrollContent">
       <property name="sizePolicy"><sizepolicy hsizetype="Ignored" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
       <layout class="QVBoxLayout" name="verticalLayout">
+       <property name="sizeConstraint"><enum>QLayout::SetMinimumSize</enum></property>
        <item>
         <widget class="QLabel" name="label_2">
      <property name="font">

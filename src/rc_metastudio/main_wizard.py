@@ -7,7 +7,7 @@ import forms.ui_data_type_page
 import forms.ui_outcome_name_page
 import forms.ui_welcome_page
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QSize, Qt
 from PyQt5.QtGui import QIcon, QPainter, QPixmap
 from PyQt5.QtWidgets import (
     QAction,
@@ -18,6 +18,7 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QSizePolicy,
     QScrollArea,
+    QStyle,
     QTableWidgetItem,
     QWizard,
     QWizardPage,
@@ -181,9 +182,29 @@ class DataTypePage(QWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
         for button in buttons:
             self._center_button_icon_in_declared_slot(button)
             button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+            self._reserve_button_icon_and_text_height(button)
             button.setFocusPolicy(Qt.StrongFocus)
         for current, following in zip(buttons, buttons[1:]):
             self.setTabOrder(current, following)
+
+    def _reserve_button_icon_and_text_height(self, button):
+        """Keep multiline Required Content below the icon at native font scales."""
+        line_count = max(1, len(button.text().splitlines()))
+        text_height = line_count * button.fontMetrics().lineSpacing()
+        margin = max(
+            0,
+            button.style().pixelMetric(QStyle.PM_ButtonMargin, None, button),
+        )
+        frame = max(
+            0,
+            button.style().pixelMetric(QStyle.PM_DefaultFrameWidth, None, button),
+        )
+        required = QSize(
+            button.sizeHint().width(),
+            button.iconSize().height() + text_height + (2 * margin) + (2 * frame),
+        )
+        # layout-audit: allow=style-metric-control; reason=icon and multiline Required Content need a native-metric minimum
+        button.setMinimumSize(button.minimumSizeHint().expandedTo(required))
 
     def _center_button_icon_in_declared_slot(self, button):
         icon_size = button.iconSize()

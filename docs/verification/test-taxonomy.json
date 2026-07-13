@@ -7007,6 +7007,146 @@
       "reason": "Proves the layout audit distinguishes Qt chrome and scroll-area canvas geometry from unmanaged content.",
       "runtime_class": "subsecond",
       "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_packagers_run_fail_closed_native_adaptive_layout_evidence",
+      "reason": "Guards fail-closed native adaptive-layout evidence in both supported package builders.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_package_workflow_publishes_supported_platform_evidence",
+      "reason": "Guards durable Windows x64 and macOS Intel x64 screenshot evidence artifacts.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_native_evidence_runner_covers_the_release_review_contract",
+      "reason": "Guards the metadata and human-review contract required by PRD 293.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_native_evidence_validator_is_exact_and_checks_png_integrity",
+      "reason": "Guards fail-closed exact artifact membership and independent native PNG integrity validation.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_native_evidence_validator_rejects_semantic_contract_mutations[wrong-request-exact client viewport]",
+      "reason": "Guards exact viewport, archetype, owner, screen-containment, and frame-capture semantics against manifest mutations.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_native_evidence_validator_rejects_semantic_contract_mutations[wrong-actual-exact client viewport]",
+      "reason": "Guards exact reached Workspace client dimensions against manifest mutation.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_native_evidence_validator_rejects_semantic_contract_mutations[wrong-owner-owning Workspace contract]",
+      "reason": "Guards constrained owner relationships for content-driven surfaces.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_native_evidence_validator_rejects_semantic_contract_mutations[off-screen-outside its recorded available screen]",
+      "reason": "Guards full frame containment within the recorded owning screen.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_native_evidence_validator_rejects_semantic_contract_mutations[wrong-archetype-wrong archetype]",
+      "reason": "Guards exact scenario archetype classification.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_native_evidence_validator_rejects_semantic_contract_mutations[tiny-workspace-exact client viewport]",
+      "reason": "Guards against placeholder-sized evidence fixtures masquerading as release viewports.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_native_evidence_validator_rejects_semantic_contract_mutations[client-only-capture-not a native-frame capture]",
+      "reason": "Guards frame-inclusive native chrome evidence against client-only captures.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_launch_exposes_native_evidence_as_an_explicit_automation_mode",
+      "reason": "Guards the explicit packaged automation entry point and failure log seam.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_layout_native_evidence.py::test_native_evidence_rejects_non_native_and_wrong_platform_plugins",
+      "reason": "Proves native evidence fails closed on offscreen, wrong-platform, and non-x64 Qt runtimes.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_layout_native_evidence.py::test_evidence_runner_captures_all_archetypes_and_runtime_contracts",
+      "reason": "Exercises screenshot capture, metadata, remembered geometry, tables, splitters, and runtime resize across all archetypes.",
+      "runtime_class": "seconds",
+      "size": "medium"
     }
 
   ]
