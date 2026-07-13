@@ -438,7 +438,6 @@ def test_generated_qdialog_surfaces_use_declarative_fixed_size_and_fit_combos():
         "forms.ui_edit_group_name",
         "forms.ui_ma_specs",
         "forms.ui_meta_reg",
-        "forms.ui_network_view",
         "forms.ui_new_covariate",
         "forms.ui_new_follow_up",
         "forms.ui_new_group",

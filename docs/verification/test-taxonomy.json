@@ -76,6 +76,136 @@
     },
     {
       "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_view_first_use_tracks_owning_screen[screen_size0]",
+      "reason": "Guards Network View's eighty-percent first-use Workspace geometry on a constrained 800 by 600 logical screen.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_view_first_use_tracks_owning_screen[screen_size1]",
+      "reason": "Guards Network View's eighty-percent first-use Workspace geometry at the Full-Usability Floor.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_view_first_use_tracks_owning_screen[screen_size2]",
+      "reason": "Guards Network View's eighty-percent first-use Workspace geometry on a large logical screen.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_viewport_owns_surplus_space_and_preserves_image_ratio",
+      "reason": "Guards graph viewport expansion, content-sized controls, high-DPI source preservation, and undistorted intrinsic-ratio fitting.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["analysis_behavior", "gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_selectors_keep_content_and_refresh_only_the_graph",
+      "reason": "Guards complete selector content, single-artifact replacement, and stable user-owned root geometry during graph refresh.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_selectors_are_usable_with_large_font_on_constrained_screen",
+      "reason": "Guards wide stacked selectors, content-sized controls, and full selected and popup values through tooltips at 800 by 600 with an enlarged application font.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_view_restores_independent_placement",
+      "reason": "Guards independent returning-use Network View placement persistence.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_workspace_policy_uses_injected_owning_screen[parent]",
+      "reason": "Exercises the public adaptive registration seam to prove parent-owned Network first-use sizing uses the injected owning screen without unparented placement.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_workspace_policy_uses_injected_owning_screen[active_workspace]",
+      "reason": "Exercises the public adaptive registration seam to prove unparented Network first-use sizing and placement use the injected active Workspace screen.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_workspace_screen_transition_preserves_valid_and_clamps_invalid",
+      "reason": "Exercises the public screen-assignment handler to prove valid moves do not recenter and invalid frames clamp minimally.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_viewport_refit_is_local_and_coalesced",
+      "reason": "Observes the public refit signal to guard one local graph fit per event-loop turn for viewport resize bursts.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_repeated_network_view_close_releases_owned_qt_objects",
+      "reason": "Guards delete-on-close lifecycle ownership by observing each repeated child window and scene destruction without accumulation.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_view_canonical_form_is_managed_and_platform_native",
+      "reason": "Rejects historical Network View geometry, fixed roots, platform fonts, and absolute child positioning.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
       "evidence": ["analysis_behavior", "gui_compatibility"],
       "external_dependencies": ["qt"],
       "lane": "gui",
