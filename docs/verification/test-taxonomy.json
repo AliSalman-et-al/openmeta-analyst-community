@@ -9,6 +9,76 @@
       "evidence": ["gui_compatibility"],
       "external_dependencies": ["qt"],
       "lane": "gui",
+      "nodeid": "tests/python/gui/test_binary_data_transactional_layout.py::test_binary_data_declares_transactional_overflow_and_reachable_actions",
+      "reason": "Guards the Binary Data Transactional Dialog overflow boundary, native table overflow, and actions outside scrolling content.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_binary_data_transactional_layout.py::test_binary_data_is_screen_bounded_with_large_font_and_long_metric",
+      "reason": "Guards screen-bounded first display with enlarged platform text and a representative long binary metric.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_binary_data_transactional_layout.py::test_binary_back_calculation_choices_are_scrollable_and_screen_bounded",
+      "reason": "Guards long back-calculation instructions and choices within a screen-bounded Transactional Dialog.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_binary_data_transactional_layout.py::test_binary_data_focus_reveals_offscreen_controls_without_moving_actions",
+      "reason": "Guards keyboard focus revelation inside the Binary Data overflow boundary while primary actions remain fixed and reachable.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_binary_data_transactional_layout.py::test_binary_table_long_count_overflows_inside_table_and_remains_accessible",
+      "reason": "Guards real internal table overflow and access to long count data in a constrained Binary Data dialog.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_binary_data_transactional_layout.py::test_binary_validation_message_wraps_and_is_revealed",
+      "reason": "Guards readable, wrapped, reachable validation feedback after a real invalid count edit.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_binary_data_transactional_layout.py::test_binary_calculator_refits_are_local_and_coalesced",
+      "reason": "Guards coalesced local calculator relayout and preserved binary effect data behavior.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
       "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_main_wizard_is_a_stable_workflow_window",
       "reason": "Guards Workflow Window registration and stable user-owned geometry across page and content changes.",
       "runtime_class": "seconds",
@@ -1274,6 +1344,21 @@
       "lane": "fast",
       "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_binary_calculator_grid_columns_fill_expanded_table_width",
       "reason": "Covers fast GUI/data-model behavior required by the verification lane.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_binary_effect_fields_follow_metric_display_domains",
+      "reason": "Guards metric-specific semantic widths for ratios, bounded effects, proportions, and transformed binary metrics.",
       "runtime_class": "subsecond",
       "size": "small"
     },

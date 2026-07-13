@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (
     QHeaderView,
     QLineEdit,
     QSizePolicy,
+    QStyle,
     QTableWidget,
     QTableWidgetItem,
 )
@@ -436,7 +437,69 @@ def test_binary_calculator_grid_columns_fill_expanded_table_width(qapp, monkeypa
         conf_level=95.0,
     )
 
-    _assert_calculator_table_grid_fills_width(qapp, form.raw_data_table)
+    form.show()
+    qapp.processEvents()
+    header = form.raw_data_table.horizontalHeader()
+    assert header.sectionResizeMode(0) == QHeaderView.Interactive
+    assert not header.stretchLastSection()
+    for column in range(form.raw_data_table.columnCount()):
+        assert header.sectionSize(column) >= header.sectionSizeHint(column)
+
+
+def test_binary_effect_fields_follow_metric_display_domains(qapp, monkeypatch):
+    import calculator_routines
+
+    monkeypatch.setattr(
+        calculator_routines.meta_py_r,
+        "binary_convert_scale",
+        lambda value, *args, **kwargs: value,
+    )
+
+    widths = {}
+    for metric in ("OR", "RD", "PR", "PLO", "AS"):
+        fields = {name: QLineEdit() for name in ("effect", "lower", "upper")}
+        calculator_routines.helper_set_current_effect(
+            FakeMAUnit(), fields, metric, "Group 1-Group 2", "binary", mult=1.96
+        )
+        widths[metric] = fields["effect"].width()
+
+    assert widths["OR"] > widths["RD"]
+    assert widths["OR"] > widths["PR"]
+    assert widths["PR"] == widths["PLO"]
+    assert widths["AS"] >= widths["RD"]
+
+    maximum_rendered_ratio = str(round(sys.float_info.max, 4))
+    assert (
+        calculator_routines.format_calculator_display_value(sys.float_info.max)
+        == maximum_rendered_ratio
+    )
+    assert maximum_rendered_ratio in calculator_routines.binary_effect_display_samples(
+        "OR"
+    )
+    ratio_field = QLineEdit()
+    ratio_fields = {
+        name: ratio_field if name == "effect" else QLineEdit()
+        for name in ("effect", "lower", "upper")
+    }
+    calculator_routines.helper_set_current_effect(
+        FakeMAUnit(),
+        ratio_fields,
+        "OR",
+        "Group 1-Group 2",
+        "binary",
+        mult=1.96,
+    )
+    text_margins = ratio_field.textMargins()
+    frame_width = ratio_field.style().pixelMetric(
+        QStyle.PM_DefaultFrameWidth, None, ratio_field
+    )
+    required_rendered_width = (
+        ratio_field.fontMetrics().horizontalAdvance(maximum_rendered_ratio)
+        + text_margins.left()
+        + text_margins.right()
+        + (2 * frame_width)
+    )
+    assert ratio_field.minimumWidth() >= required_rendered_width
 
 
 def test_binary_calculator_does_not_wire_raw_edits_to_consistency_checker(

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'src\rc_metastudio\forms\choose_back_calc_result_form.ui'
+# Form implementation generated from reading ui file 'src/rc_metastudio/forms/choose_back_calc_result_form.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -14,71 +14,65 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_ChooseBackCalcResultForm(object):
     def setupUi(self, ChooseBackCalcResultForm):
         ChooseBackCalcResultForm.setObjectName("ChooseBackCalcResultForm")
-        ChooseBackCalcResultForm.resize(482, 221)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.MinimumExpanding,
-            QtWidgets.QSizePolicy.MinimumExpanding,
-        )
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(
-            ChooseBackCalcResultForm.sizePolicy().hasHeightForWidth()
-        )
-        ChooseBackCalcResultForm.setSizePolicy(sizePolicy)
-        ChooseBackCalcResultForm.setMinimumSize(QtCore.QSize(480, 0))
-        self.verticalLayout = QtWidgets.QVBoxLayout(ChooseBackCalcResultForm)
-        self.verticalLayout.setObjectName("verticalLayout")
-        self.info_label = QtWidgets.QLabel(ChooseBackCalcResultForm)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Preferred
-        )
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.info_label.sizePolicy().hasHeightForWidth())
-        self.info_label.setSizePolicy(sizePolicy)
+        ChooseBackCalcResultForm.resize(0, 0)
+        self.dialog_layout = QtWidgets.QVBoxLayout(ChooseBackCalcResultForm)
+        self.dialog_layout.setObjectName("dialog_layout")
+        self.content_scroll = QtWidgets.QScrollArea(ChooseBackCalcResultForm)
+        self.content_scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
+        self.content_scroll.setWidgetResizable(True)
+        self.content_scroll.setObjectName("content_scroll")
+        self.content_widget = QtWidgets.QWidget()
+        self.content_widget.setGeometry(QtCore.QRect(0, 0, 0, 0))
+        self.content_widget.setObjectName("content_widget")
+        self.content_layout = QtWidgets.QVBoxLayout(self.content_widget)
+        self.content_layout.setObjectName("content_layout")
+        self.info_label = QtWidgets.QLabel(self.content_widget)
         self.info_label.setWordWrap(True)
         self.info_label.setObjectName("info_label")
-        self.verticalLayout.addWidget(self.info_label)
-        self.line_2 = QtWidgets.QFrame(ChooseBackCalcResultForm)
+        self.content_layout.addWidget(self.info_label)
+        self.line_2 = QtWidgets.QFrame(self.content_widget)
         self.line_2.setFrameShape(QtWidgets.QFrame.HLine)
         self.line_2.setFrameShadow(QtWidgets.QFrame.Sunken)
         self.line_2.setObjectName("line_2")
-        self.verticalLayout.addWidget(self.line_2)
-        self.horizontalLayout = QtWidgets.QHBoxLayout()
-        self.horizontalLayout.setObjectName("horizontalLayout")
-        self.choice1_btn = QtWidgets.QRadioButton(ChooseBackCalcResultForm)
+        self.content_layout.addWidget(self.line_2)
+        self.choices_layout = QtWidgets.QHBoxLayout()
+        self.choices_layout.setObjectName("choices_layout")
+        self.choice1_btn = QtWidgets.QRadioButton(self.content_widget)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
+        sizePolicy.setHorizontalStretch(1)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.choice1_btn.sizePolicy().hasHeightForWidth())
+        self.choice1_btn.setSizePolicy(sizePolicy)
         self.choice1_btn.setChecked(True)
         self.choice1_btn.setObjectName("choice1_btn")
-        self.horizontalLayout.addWidget(self.choice1_btn)
-        self.choice2_btn = QtWidgets.QRadioButton(ChooseBackCalcResultForm)
+        self.choices_layout.addWidget(self.choice1_btn)
+        self.choice2_btn = QtWidgets.QRadioButton(self.content_widget)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
+        sizePolicy.setHorizontalStretch(1)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.choice2_btn.sizePolicy().hasHeightForWidth())
+        self.choice2_btn.setSizePolicy(sizePolicy)
         self.choice2_btn.setObjectName("choice2_btn")
-        self.horizontalLayout.addWidget(self.choice2_btn)
-        self.verticalLayout.addLayout(self.horizontalLayout)
+        self.choices_layout.addWidget(self.choice2_btn)
+        self.content_layout.addLayout(self.choices_layout)
+        self.content_scroll.setWidget(self.content_widget)
+        self.dialog_layout.addWidget(self.content_scroll)
         self.buttonBox = QtWidgets.QDialogButtonBox(ChooseBackCalcResultForm)
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(
-            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
-        )
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
         self.buttonBox.setObjectName("buttonBox")
-        self.verticalLayout.addWidget(self.buttonBox)
+        self.dialog_layout.addWidget(self.buttonBox)
 
         self.retranslateUi(ChooseBackCalcResultForm)
-        self.buttonBox.accepted.connect(ChooseBackCalcResultForm.accept)  # type: ignore
-        self.buttonBox.rejected.connect(ChooseBackCalcResultForm.reject)  # type: ignore
+        self.buttonBox.accepted.connect(ChooseBackCalcResultForm.accept) # type: ignore
+        self.buttonBox.rejected.connect(ChooseBackCalcResultForm.reject) # type: ignore
         QtCore.QMetaObject.connectSlotsByName(ChooseBackCalcResultForm)
+        ChooseBackCalcResultForm.setTabOrder(self.choice1_btn, self.choice2_btn)
+        ChooseBackCalcResultForm.setTabOrder(self.choice2_btn, self.buttonBox)
 
     def retranslateUi(self, ChooseBackCalcResultForm):
         _translate = QtCore.QCoreApplication.translate
-        ChooseBackCalcResultForm.setWindowTitle(
-            _translate("ChooseBackCalcResultForm", "Choose Back Calculation Result")
-        )
-        self.info_label.setText(
-            _translate(
-                "ChooseBackCalcResultForm",
-                "The back-calculation has resulted in two possible sets of choices for the counts.\n"
-                "\n"
-                "Please choose one from below:",
-            )
-        )
+        ChooseBackCalcResultForm.setWindowTitle(_translate("ChooseBackCalcResultForm", "Choose Back Calculation Result"))
+        self.info_label.setText(_translate("ChooseBackCalcResultForm", "The back-calculation has resulted in two possible sets of counts. Choose one below."))
         self.choice1_btn.setText(_translate("ChooseBackCalcResultForm", "Choice 1"))
         self.choice2_btn.setText(_translate("ChooseBackCalcResultForm", "Choice 2"))
