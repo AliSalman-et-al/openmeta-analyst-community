@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.abspath("src"))
 sys.path.insert(0, os.path.abspath(os.path.join("src", "forms")))
 
 import pytest
-from PyQt5 import QtWidgets
+from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtWidgets import QHeaderView
 
 REPO_ROOT = os.getcwd()
@@ -990,8 +990,8 @@ def test_standard_meta_analysis_opens_specs_and_runs_through_backend(monkeypatch
             def __init__(self, result, parent=None):
                 shown.append((result, parent))
 
-            def showMaximized(self):
-                shown.append("maximized")
+            def show(self):
+                shown.append("shown")
 
         def run(method, params, _method=method_name):
             calls.append(method)
@@ -1049,7 +1049,7 @@ def test_standard_meta_analysis_opens_specs_and_runs_through_backend(monkeypatch
                     {"texts": {"Summary": "%s model" % method_name}, "images": {}},
                     window,
                 ),
-                "maximized",
+                "shown",
             ]
         finally:
             window.close()
@@ -1865,8 +1865,8 @@ def test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe(monke
         def __init__(self, result, parent=None):
             shown.append((result, parent))
 
-        def showMaximized(self):
-            shown.append("maximized")
+        def show(self):
+            shown.append("shown")
 
     def run_meta_regression(dataset, studies, covariates, metric, **kwargs):
         shown.append(
@@ -1930,7 +1930,7 @@ def test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe(monke
                 },
                 window,
             ),
-            "maximized",
+            "shown",
         ]
 
         factor_column = window.model.columnCount() - 1
@@ -2002,15 +2002,15 @@ def test_sequential_analysis_results_use_results_window(monkeypatch):
         def __init__(self, result, parent=None):
             shown.append((result, parent))
 
-        def showMaximized(self):
-            shown.append("maximized")
+        def show(self):
+            shown.append("shown")
 
     monkeypatch.setattr(meta_form.results_window, "ResultsWindow", ResultDialog)
 
     try:
         window.analysis(results)
 
-        assert shown == [(results, window), "maximized"]
+        assert shown == [(results, window), "shown"]
     finally:
         window.close()
         app.processEvents()
@@ -2020,6 +2020,9 @@ def test_sequential_analysis_results_use_results_window(monkeypatch):
 def test_analysis_opens_results_window_maximized_and_fits_svg_plot(tmp_path):
     import launch
     import results_window
+    import settings
+
+    QtCore.QSettings().remove(settings.RESULTS_WORKSPACE_GROUP)
 
     plot_path = tmp_path / "forest.svg"
     plot_path.write_text(
@@ -4112,7 +4115,8 @@ def test_results_window_uses_reader_oriented_section_names_and_order(tmp_path):
         ]
 
         assert nav_titles == ["Meta-Analysis Summary", "Forest Plot", "Weights"]
-        assert standard_window.nav_tree.minimumWidth() >= 250
+        assert standard_window.nav_tree.minimumWidth() == 0
+        assert not standard_window.results_nav_splitter.childrenCollapsible()
     finally:
         standard_window.close()
         app.processEvents()

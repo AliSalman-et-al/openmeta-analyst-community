@@ -84,6 +84,34 @@ def test_fresh_main_placement_defaults_to_maximized(tmp_path):
     }
 
 
+def test_main_and_results_share_typed_workspace_placement_policy(tmp_path):
+    import settings
+
+    QtCore.QSettings.setPath(
+        QtCore.QSettings.IniFormat, QtCore.QSettings.UserScope, str(tmp_path)
+    )
+    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.IniFormat)
+    store = QtCore.QSettings()
+    store.clear()
+    store.setValue("workspace_layout/schema_version", 1)
+    store.setValue(
+        "workspace_layout/main/frame_geometry", QtCore.QRect(20, 30, 900, 600)
+    )
+    store.setValue(
+        "workspace_layout/results/frame_geometry", QtCore.QRect(40, 50, 700, 500)
+    )
+
+    main = settings.load_main_window_placement([QtCore.QRect(0, 0, 1200, 800)])
+    results = settings.load_results_window_state(
+        available_geometries=[QtCore.QRect(0, 0, 1200, 800)]
+    )
+
+    assert isinstance(main, settings.WorkspacePlacement)
+    assert isinstance(results.placement, settings.WorkspacePlacement)
+    assert main.frame_geometry == QtCore.QRect(20, 30, 900, 600)
+    assert results.placement.frame_geometry == QtCore.QRect(40, 50, 700, 500)
+
+
 def test_main_column_widths_round_trip_in_versioned_workspace_state(tmp_path, qapp):
     import settings
     from workspace_column_identity import (

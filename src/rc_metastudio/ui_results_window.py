@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'src\rc_metastudio\forms\results_window.ui'
+# Form implementation generated from reading ui file 'src/rc_metastudio/forms/results_window.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -15,18 +15,11 @@ class Ui_ResultsWindow(object):
     def setupUi(self, ResultsWindow):
         ResultsWindow.setObjectName("ResultsWindow")
         ResultsWindow.resize(799, 544)
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        ResultsWindow.setFont(font)
         self.centralwidget = QtWidgets.QWidget(ResultsWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.verticalLayout = QtWidgets.QVBoxLayout(self.centralwidget)
         self.verticalLayout.setObjectName("verticalLayout")
         self.frame = QtWidgets.QFrame(self.centralwidget)
-        self.frame.setMinimumSize(QtCore.QSize(733, 0))
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        self.frame.setFont(font)
         self.frame.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.frame.setFrameShadow(QtWidgets.QFrame.Raised)
         self.frame.setObjectName("frame")
@@ -36,10 +29,6 @@ class Ui_ResultsWindow(object):
         self.results_nav_splitter.setOrientation(QtCore.Qt.Horizontal)
         self.results_nav_splitter.setObjectName("results_nav_splitter")
         self.nav_tree = QtWidgets.QTreeWidget(self.results_nav_splitter)
-        self.nav_tree.setMaximumSize(QtCore.QSize(16777215, 16777215))
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        self.nav_tree.setFont(font)
         self.nav_tree.setObjectName("nav_tree")
         self.nav_tree.headerItem().setText(0, "1")
         self.graphics_view = QtWidgets.QGraphicsView(self.results_nav_splitter)

@@ -4,6 +4,8 @@
 
 import os
 import sys
+from collections.abc import Mapping
+from dataclasses import dataclass
 from PyQt5 import QtCore, QtGui
 import meta_py_r
 import qt_text
@@ -21,12 +23,84 @@ LEGACY_MAIN_WINDOW_GROUP = "main_window"
 WORKSPACE_LAYOUT_GROUP = "workspace_layout"
 WORKSPACE_LAYOUT_SCHEMA_VERSION = 1
 MAIN_WORKSPACE_GROUP = WORKSPACE_LAYOUT_GROUP + "/main"
+RESULTS_WORKSPACE_GROUP = WORKSPACE_LAYOUT_GROUP + "/results"
+DEFAULT_RESULTS_SPLITTER_PROPORTIONS = (0.30, 0.70)
 DEFAULT_SETTINGS = {
     "splash": True,
     "digits": 2,
     "recent_files": [],
     # "method_params":{},
 }
+
+
+@dataclass(frozen=True, eq=False)
+class WorkspacePlacement(Mapping):
+    """Typed screen-safe placement shared by every Workspace role."""
+
+    frame_geometry: QtCore.QRect | None
+    maximized: bool
+    full_screen: bool
+
+    _FIELDS = ("frame_geometry", "maximized", "full_screen")
+
+    def __getitem__(self, key):
+        if key not in self._FIELDS:
+            raise KeyError(key)
+        return getattr(self, key)
+
+    def __iter__(self):
+        return iter(self._FIELDS)
+
+    def __len__(self):
+        return len(self._FIELDS)
+
+    def __eq__(self, other):
+        if isinstance(other, Mapping):
+            return dict(self.items()) == dict(other.items())
+        return NotImplemented
+
+
+@dataclass(frozen=True, eq=False)
+class ResultsWorkspaceState(Mapping):
+    """Results placement plus its independently owned pane proportions."""
+
+    placement: WorkspacePlacement
+    splitter_proportions: tuple
+
+    _FIELDS = (
+        "frame_geometry",
+        "maximized",
+        "full_screen",
+        "splitter_proportions",
+    )
+
+    @property
+    def frame_geometry(self):
+        return self.placement.frame_geometry
+
+    @property
+    def maximized(self):
+        return self.placement.maximized
+
+    @property
+    def full_screen(self):
+        return self.placement.full_screen
+
+    def __getitem__(self, key):
+        if key not in self._FIELDS:
+            raise KeyError(key)
+        return getattr(self, key)
+
+    def __iter__(self):
+        return iter(self._FIELDS)
+
+    def __len__(self):
+        return len(self._FIELDS)
+
+    def __eq__(self, other):
+        if isinstance(other, Mapping):
+            return dict(self.items()) == dict(other.items())
+        return NotImplemented
 
 
 def update_setting(field, value):
@@ -165,10 +239,11 @@ def _screen_safe_geometry(frame_geometry, available_geometries):
     return clamp_frame_geometry(frame, target)
 
 
-def load_main_window_placement(available_geometries=None):
+def load_workspace_placement(group, available_geometries=None, default_maximized=True):
+    """Load one Workspace role through the shared ADR 0196 policy."""
     migrate_workspace_layout_settings()
     settings = QSettings()
-    geometry = settings.value(MAIN_WORKSPACE_GROUP + "/frame_geometry")
+    geometry = settings.value(group + "/frame_geometry")
     geometry = (
         _screen_safe_geometry(
             geometry,
@@ -179,20 +254,55 @@ def load_main_window_placement(available_geometries=None):
         if geometry is not None
         else None
     )
-    return {
-        "frame_geometry": geometry,
-        "maximized": settings.value(
-            MAIN_WORKSPACE_GROUP + "/maximized", geometry is None, type=bool
+    return WorkspacePlacement(
+        frame_geometry=geometry,
+        maximized=settings.value(
+            group + "/maximized",
+            bool(default_maximized and geometry is None),
+            type=bool,
         ),
-        "full_screen": settings.value(
-            MAIN_WORKSPACE_GROUP + "/full_screen", False, type=bool
-        ),
-    }
+        full_screen=settings.value(group + "/full_screen", False, type=bool),
+    )
 
 
-def save_main_window_placement(window, column_widths=None):
-    migrate_workspace_layout_settings()
+def load_main_window_placement(available_geometries=None):
+    return load_workspace_placement(
+        MAIN_WORKSPACE_GROUP,
+        available_geometries=available_geometries,
+        default_maximized=True,
+    )
+
+
+def _splitter_proportions(sizes, default=DEFAULT_RESULTS_SPLITTER_PROPORTIONS):
+    try:
+        values = [max(0.0, float(value)) for value in sizes]
+    except (TypeError, ValueError):
+        return list(default)
+    total = sum(values)
+    if len(values) != 2 or total <= 0 or any(value <= 0 for value in values):
+        return list(default)
+    return [value / total for value in values]
+
+
+def load_results_window_state(available_geometries=None):
+    """Load Results placement and its independently persisted pane ratio."""
+    placement = load_workspace_placement(
+        RESULTS_WORKSPACE_GROUP,
+        available_geometries=available_geometries,
+        default_maximized=True,
+    )
     settings = QSettings()
+    proportions = settings.value(
+        RESULTS_WORKSPACE_GROUP + "/splitter_proportions",
+        list(DEFAULT_RESULTS_SPLITTER_PROPORTIONS),
+    )
+    return ResultsWorkspaceState(
+        placement=placement,
+        splitter_proportions=tuple(_splitter_proportions(proportions)),
+    )
+
+
+def _workspace_normal_frame(window):
     frame = window.frameGeometry()
     if window.isMaximized() or window.isFullScreen():
         controller = getattr(window, "_adaptive_window_controller", None)
@@ -205,9 +315,82 @@ def save_main_window_placement(window, column_widths=None):
             normal = window.normalGeometry()
         if normal.isValid():
             frame = normal
-    settings.setValue(MAIN_WORKSPACE_GROUP + "/frame_geometry", frame)
-    settings.setValue(MAIN_WORKSPACE_GROUP + "/maximized", window.isMaximized())
-    settings.setValue(MAIN_WORKSPACE_GROUP + "/full_screen", window.isFullScreen())
+    return frame
+
+
+def save_workspace_placement(group, window):
+    """Persist the shared typed portion of one Workspace role's state."""
+    migrate_workspace_layout_settings()
+    settings = QSettings()
+    settings.setValue(group + "/frame_geometry", _workspace_normal_frame(window))
+    settings.setValue(group + "/maximized", window.isMaximized())
+    settings.setValue(group + "/full_screen", window.isFullScreen())
+    return settings
+
+
+def restore_workspace_placement(
+    window, placement, default_maximized=True, show_window=True
+):
+    """Restore one validated Workspace placement without role-specific state."""
+    geometry = placement.frame_geometry
+    controller = getattr(window, "_adaptive_window_controller", None)
+    if geometry is not None:
+        if controller is not None:
+            controller.consume_first_use()
+        window.setWindowState(
+            window.windowState()
+            & ~QtCore.Qt.WindowMaximized
+            & ~QtCore.Qt.WindowFullScreen
+        )
+        if controller is not None:
+            controller.restore_frame_geometry(geometry)
+        else:
+            window.setGeometry(geometry)
+
+    if placement.full_screen:
+        if show_window:
+            window.showFullScreen()
+        else:
+            window.setWindowState(window.windowState() | QtCore.Qt.WindowFullScreen)
+    elif placement.maximized or (default_maximized and geometry is None):
+        if show_window:
+            window.showMaximized()
+        else:
+            window.setWindowState(window.windowState() | QtCore.Qt.WindowMaximized)
+    elif show_window:
+        window.show()
+    else:
+        window.setWindowState(
+            window.windowState()
+            & ~QtCore.Qt.WindowMaximized
+            & ~QtCore.Qt.WindowFullScreen
+        )
+
+
+def save_results_window_state(window):
+    """Persist Results geometry and meaningful splitter proportions."""
+    settings = save_workspace_placement(RESULTS_WORKSPACE_GROUP, window)
+    settings.setValue(
+        RESULTS_WORKSPACE_GROUP + "/splitter_proportions",
+        _splitter_proportions(window.results_nav_splitter.sizes()),
+    )
+    settings.sync()
+
+
+def restore_results_window_state(window):
+    """Restore valid Results placement or retain its fresh maximized state."""
+    state = load_results_window_state()
+    restore_workspace_placement(
+        window,
+        state.placement,
+        default_maximized=True,
+        show_window=False,
+    )
+    return state
+
+
+def save_main_window_placement(window, column_widths=None):
+    settings = save_workspace_placement(MAIN_WORKSPACE_GROUP, window)
     if column_widths is not None:
         settings.setValue(
             MAIN_WORKSPACE_GROUP + "/column_widths",
@@ -218,23 +401,12 @@ def save_main_window_placement(window, column_widths=None):
 
 def restore_main_window_placement(window, default_maximized=True):
     placement = load_main_window_placement()
-    geometry = placement["frame_geometry"]
-    if geometry is not None:
-        controller = getattr(window, "_adaptive_window_controller", None)
-        if controller is not None:
-            controller.consume_first_use()
-        window.showNormal()
-        if controller is not None:
-            controller.restore_frame_geometry(geometry)
-        else:
-            window.setGeometry(geometry)
-
-    if placement["full_screen"]:
-        window.showFullScreen()
-    elif placement["maximized"] or (default_maximized and geometry is None):
-        window.showMaximized()
-    else:
-        window.show()
+    restore_workspace_placement(
+        window,
+        placement,
+        default_maximized=default_maximized,
+        show_window=True,
+    )
 
 
 def load_main_column_widths():

@@ -8,6 +8,106 @@
       "decision": "keep",
       "evidence": ["gui_compatibility"],
       "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_dpr_raster_uses_device_independent_dimensions_for_viewport_fit",
+      "reason": "Guards device-independent raster fitting, aspect ratio, and physical source preservation at high DPI.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_first_show_runs_one_scheduled_expensive_reflow",
+      "reason": "Guards a single scheduled expensive reflow when first-show setup and splitter restoration coincide.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_refit_does_not_dispatch_unrelated_layout_requests",
+      "reason": "Guards local deterministic Results relayout without dispatching another widget's pending layout work.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_regeneration_burst_runs_one_scheduled_expensive_reflow",
+      "reason": "Guards coalescing of plot regeneration bursts through the shared viewport-refit scheduler.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_main_and_results_share_typed_workspace_placement_policy",
+      "reason": "Guards the shared typed placement policy and unchanged persisted geometry schema for Main and Results workspaces.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_plot_editor_is_screen_bounded_transactional_dialog_with_fixed_actions",
+      "reason": "Guards the plot editor's screen-bounded transactional overflow contract and always-reachable actions.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_long_text_reflows_inside_constrained_viewport_without_window_growth",
+      "reason": "Guards local long-summary reflow within a constrained viewport without changing user-owned outer geometry.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_resize_burst_runs_one_expensive_reflow_per_event_loop_turn",
+      "reason": "Guards the deterministic one-expensive-reflow-per-event-loop-turn work bound.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_splitter_proportions_persist_independently_of_outer_geometry",
+      "reason": "Guards meaningful navigation/content proportions independently from screen-clamped outer geometry.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_workspace_defaults_maximized_and_restores_screen_safe_state",
+      "reason": "Guards fresh maximization and valid returning Results workspace placement with restored pane preference.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
       "lane": "fast",
       "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_dataset_model_covariate_identity_survives_rename",
       "reason": "Guards semantic workspace column identity across a covariate display-name change.",
