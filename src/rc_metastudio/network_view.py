@@ -101,6 +101,7 @@ class ViewDialog(QDialog, forms.ui_network_view.Ui_network_view_dialog):
             self._network_pixmap_item.setTransformationMode(
                 Qt.SmoothTransformation
             )
+            # layout-audit: allow=intrinsic-ratio; reason=scene follows its intrinsic-ratio visual artifact
             self.scene.setSceneRect(self._network_pixmap_item.boundingRect())
         self.schedule_viewport_refit()
 
@@ -128,6 +129,7 @@ class ViewDialog(QDialog, forms.ui_network_view.Ui_network_view_dialog):
         ):
             return
         self.network_viewer.resetTransform()
+        # layout-audit: allow=intrinsic-ratio; reason=scene follows its intrinsic-ratio visual artifact
         self.network_viewer.fitInView(item, Qt.KeepAspectRatio)
         self.viewportRefitApplied.emit()
 

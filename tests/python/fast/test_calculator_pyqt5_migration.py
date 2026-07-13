@@ -887,7 +887,6 @@ def test_continuous_calculator_grid_columns_keep_internal_overflow(qapp, monkeyp
 
 def test_continuous_calculator_keeps_long_imputed_values_compact(qapp, monkeypatch):
     import continuous_data_form
-    import qt_layout
 
     long_imputed = {
         "n": 10,
@@ -941,4 +940,6 @@ def test_continuous_calculator_keeps_long_imputed_values_compact(qapp, monkeypat
         for column in range(form.simple_table.columnCount())
     )
     assert form.simple_table.minimumWidth() < natural_width * 2
-    assert form.minimumWidth() < qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH * 2
+    assert (
+        form.frameGeometry().width() < qapp.primaryScreen().availableGeometry().width()
+    )

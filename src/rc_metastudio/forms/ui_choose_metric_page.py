@@ -14,7 +14,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_WizardPage(object):
     def setupUi(self, WizardPage):
         WizardPage.setObjectName("WizardPage")
-        WizardPage.resize(400, 220)
+        WizardPage.resize(0, 0)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)

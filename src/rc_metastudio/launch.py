@@ -319,6 +319,7 @@ def start_wizard_layout_smoke():
     import main_wizard
 
     parent_shell = QtWidgets.QMainWindow()
+    # layout-audit: allow=verification-layout-fixture; reason=automation smoke fixture exercises a representative viewport
     parent_shell.resize(1600, 900)
     parent_shell.show()
     _flush_gui_events(app)
@@ -568,6 +569,7 @@ def _assert_standard_binary_summary_is_formatted(meta):
 def _force_table_paint(app, meta):
     """Renders every cell and both headers so paint-time data() bugs surface here."""
     view = meta.tableView
+    # layout-audit: allow=verification-layout-fixture; reason=automation smoke fixture exercises a representative viewport
     view.resize(1400, 900)
     app.processEvents()
     model = view.model()

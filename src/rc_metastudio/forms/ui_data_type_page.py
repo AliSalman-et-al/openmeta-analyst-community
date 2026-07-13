@@ -14,7 +14,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_DataTypePage(object):
     def setupUi(self, DataTypePage):
         DataTypePage.setObjectName("DataTypePage")
-        DataTypePage.resize(450, 400)
+        DataTypePage.resize(0, 0)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)

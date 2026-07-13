@@ -2,7 +2,7 @@
 <ui version="4.0">
  <class>DiagnosticDataForm</class>
  <widget class="QDialog" name="DiagnosticDataForm">
-  <property name="geometry"><rect><x>0</x><y>0</y><width>560</width><height>520</height></rect></property>
+  <property name="geometry"><rect><x>0</x><y>0</y><width>0</width><height>0</height></rect></property>
   <property name="windowTitle"><string>Diagnostic Data</string></property>
   <property name="windowIcon"><iconset><normaloff>:/misc/meta.png</normaloff>:/misc/meta.png</iconset></property>
   <layout class="QVBoxLayout" name="dialog_layout">

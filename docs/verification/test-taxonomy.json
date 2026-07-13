@@ -4013,21 +4013,6 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_declarative_dialog_sizing.py::test_analysis_dialog_uses_fixed_layout_constraint_without_refit_filter",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
       "nodeid": "tests/python/gui/test_declarative_dialog_sizing.py::test_application_wizard_modern_style_renders_sized_nonblank_pages",
       "reason": "Guards ModernStyle wizard rendering with real Qt screenshots for the app-owned wizard entry paths.",
       "runtime_class": "seconds",
@@ -4061,21 +4046,6 @@
       "lane": "gui",
       "nodeid": "tests/python/gui/test_declarative_dialog_sizing.py::test_application_wizard_uses_workflow_policy_without_legacy_refit",
       "reason": "Guards the replacement Workflow Window policy and canonical overflow without legacy refit behavior.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_declarative_dialog_sizing.py::test_combo_policy_caps_closed_control_but_keeps_popup_full_width",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "seconds",
       "size": "medium"
     },
@@ -5960,22 +5930,6 @@
     {
       "decision": "keep",
       "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_content_fit_does_not_resize_visible_main_window",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
         "gui_compatibility"
       ],
       "external_dependencies": [
@@ -6351,164 +6305,6 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_analysis_dialog_combo_widths_fit_long_selectable_items",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "analysis_behavior"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_analysis_dialog_refit_tracks_revealed_content_without_stable_ratchet",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_application_dialog_fit_collapses_expanding_vertical_spacers",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_application_dialog_fit_configures_wizard_navigation_chrome",
-      "reason": "Guards the shared application wizard chrome policy, including the selected Qt wizard style and explicit back navigation.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_application_dialog_refit_expands_for_new_combo_choices",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_application_dialog_refit_shrinks_to_current_contents",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_application_dialog_refits_after_first_show_content_changes",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_application_fit_allows_embedded_pages_to_fill_page_containers",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_application_fit_propagates_root_width_floor_to_embedded_pages_before_reflow",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_application_fit_wraps_embedded_page_text_inside_container_width",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "analysis_behavior"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
       "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_change_confidence_level_dialog_does_not_use_legacy_fixed_layout_policy",
       "reason": "Guards the Confidence Level dialog against regression to the legacy fixed-root sizing helper.",
       "runtime_class": "seconds",
@@ -6525,130 +6321,8 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_content_fit_resizes_dialog_roots_only",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_dialog_width_fit_does_not_lock_stretched_combo_geometry",
-      "reason": "Guards analysis dialog combo boxes against inheriting stretched parent layout geometry instead of content-based widths.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_dialog_width_fit_includes_hidden_tab_contents_and_late_content",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_dialog_width_fit_includes_labels_combos_and_window_title",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_generated_dialog_and_wizard_surfaces_fit_root_to_contents",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
       "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_generated_dialogs_do_not_depend_on_fixed_position_content",
       "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_generated_qdialog_surfaces_use_declarative_fixed_size_and_fit_combos",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_generated_ui_combo_boxes_do_not_stretch_to_wide_parent_geometry",
-      "reason": "Guards every generated UI surface with combo boxes against inheriting stretched parent layout geometry.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_generated_ui_surfaces_do_not_cap_visible_text_widgets_below_contents",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "seconds",
       "size": "medium"
     },
@@ -6725,132 +6399,6 @@
       "lane": "gui",
       "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_issue_94_current_outcome_and_follow_up_labels_can_expand",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_layout_fitters_ignore_missing_or_deleted_roots",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_maximized_roots_fit_child_text_without_resizing_root",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_option_group_forms_fit_checkbox_and_radio_labels",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_wizard_body_sync_repairs_late_fixed_width_page_constraints",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_wizard_refit_allows_current_page_to_fill_page_container",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_wizard_refit_expands_stale_fixed_width_current_page_to_page_container",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_wizard_refit_propagates_root_width_floor_to_current_page_before_reflow",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_wizard_refit_shrinks_to_current_page_contents",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
       "runtime_class": "seconds",
       "size": "medium"
     },
@@ -7429,6 +6977,37 @@
       "reason": "Locks the third-party inventory boundary that notices are created only when bundled components remain.",
       "runtime_class": "subsecond",
       "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt_layout_contract_audit.py::test_repository_satisfies_canonical_qt_layout_contract",
+      "reason": "Guards the application-wide canonical-form inventory, declarative root contract, and retired sizing surface.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt_layout_contract_audit.py::test_audit_rejects_unmanaged_content_geometry_and_legacy_helpers",
+      "reason": "Proves the layout audit fails closed on historical root sizes, absolute content geometry, and retired sizing helpers.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt_layout_contract_audit.py::test_audit_allows_qt_chrome_and_scroll_area_content_geometry",
+      "reason": "Proves the layout audit distinguishes Qt chrome and scroll-area canvas geometry from unmanaged content.",
+      "runtime_class": "subsecond",
+      "size": "small"
     }
+
   ]
 }

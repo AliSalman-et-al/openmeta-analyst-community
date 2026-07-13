@@ -1577,15 +1577,14 @@ def test_meta_regression_uses_shared_method_covariates_and_plots_dialog(monkeypa
     shown = []
 
     class SharedSpecsDialog(object):
-        pass
+        def show(self):
+            shown.append(self)
 
     def build_specs(**kwargs):
         built.append(kwargs)
         return SharedSpecsDialog()
 
     monkeypatch.setattr(window, "_build_analysis_specs_dialog", build_specs)
-    monkeypatch.setattr(meta_form.qt_layout, "show_centered", shown.append)
-
     try:
         window.meta_reg()
 
@@ -4287,7 +4286,6 @@ def test_modal_dialogs_center_over_parent_window():
     import launch
     from PyQt5 import QtWidgets
     import main_wizard
-    import qt_layout
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     parent = QtWidgets.QMainWindow()
@@ -4297,7 +4295,9 @@ def test_modal_dialogs_center_over_parent_window():
 
     wizard = main_wizard.MainWizard(parent=parent)
     try:
-        qt_layout.center_dialog_over_parent(wizard)
+        wizard.show()
+        app.processEvents()
+        app.processEvents()
 
         parent_center = parent.frameGeometry().center()
         wizard_center = wizard.frameGeometry().center()

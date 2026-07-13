@@ -1183,6 +1183,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
     def add_method_description(self, layout, cur_grid_row, text):
         lbl = QLabel(text, self.parameter_grp_box)
         lbl.setWordWrap(True)
+        # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
         lbl.setMinimumWidth(0)
         lbl.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.current_widgets.append(lbl)

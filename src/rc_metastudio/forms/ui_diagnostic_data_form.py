@@ -14,7 +14,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_DiagnosticDataForm(object):
     def setupUi(self, DiagnosticDataForm):
         DiagnosticDataForm.setObjectName("DiagnosticDataForm")
-        DiagnosticDataForm.resize(560, 520)
+        DiagnosticDataForm.resize(0, 0)
         self.dialog_layout = QtWidgets.QVBoxLayout(DiagnosticDataForm)
         self.dialog_layout.setObjectName("dialog_layout")
         self.content_scroll = QtWidgets.QScrollArea(DiagnosticDataForm)

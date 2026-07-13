@@ -94,6 +94,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         table.horizontalHeader().setHighlightSections(False)
         table.verticalHeader().setHighlightSections(False)
         table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        # layout-audit: allow=compact-table-overflow; reason=compact table keeps rows visible and owns excess overflow
         table.setMinimumWidth(0)
         table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         table.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
@@ -106,7 +107,9 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             + sum(table.rowHeight(row) for row in range(table.rowCount()))
             + 2 * table.frameWidth()
         )
+        # layout-audit: allow=compact-table-overflow; reason=compact table keeps rows visible and owns excess overflow
         table.setMinimumHeight(table_height)
+        # layout-audit: allow=compact-table-overflow; reason=compact table keeps rows visible and owns excess overflow
         table.setMaximumHeight(table_height)
         for label in (
             self.event_lbl_3,
@@ -432,7 +435,9 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             self.effect_cbo_box.addItem(
                 self._effect_display_label(effect), userData=effect
             )
+        # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
         self.effect_cbo_box.setMinimumWidth(0)
+        # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
         self.effect_cbo_box.setMaximumWidth(QWIDGETSIZE_MAX)
         self.effect_cbo_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.effect_cbo_box.setCurrentIndex(q_effects.index(str(self.cur_effect)))
@@ -453,6 +458,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         scrollbar_width = combo.style().pixelMetric(
             QStyle.PM_ScrollBarExtent, None, combo
         )
+        # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
         combo.view().setMinimumWidth(text_width + scrollbar_width + 24)
 
     def get_effect_names(self):

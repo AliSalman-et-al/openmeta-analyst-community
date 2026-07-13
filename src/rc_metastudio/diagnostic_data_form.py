@@ -91,6 +91,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
     def _configure_raw_data_table(self):
         """Give the diagnostic grid internal overflow and semantic row height."""
         table = self.two_by_two_table
+        # layout-audit: allow=compact-table-overflow; reason=compact table keeps rows visible and owns excess overflow
         table.setMinimumWidth(0)
         table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
@@ -105,11 +106,15 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             + 2 * table.frameWidth()
             + table.horizontalScrollBar().sizeHint().height()
         )
+        # layout-audit: allow=compact-table-overflow; reason=compact table keeps rows visible and owns excess overflow
         table.setMinimumHeight(height)
+        # layout-audit: allow=compact-table-overflow; reason=compact table keeps rows visible and owns excess overflow
         table.setMaximumHeight(height)
 
     def _configure_semantic_fields(self):
+        # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
         self.effect_cbo_box.setMinimumWidth(0)
+        # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
         self.effect_cbo_box.setMaximumWidth(QWIDGETSIZE_MAX)
         self.effect_cbo_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self._size_line_edit_for_samples(
@@ -129,7 +134,9 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             + 2 * frame
             + 12
         )
+        # layout-audit: allow=numeric-domain-control; reason=editor width follows representative values from its numeric domain
         line_edit.setMinimumWidth(required)
+        # layout-audit: allow=numeric-domain-control; reason=editor width follows representative values from its numeric domain
         line_edit.setMaximumWidth(required)
         line_edit.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 

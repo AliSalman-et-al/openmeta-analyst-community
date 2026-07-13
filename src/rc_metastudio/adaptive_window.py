@@ -170,6 +170,7 @@ def place_window_on_screen(window, screen):
     handle = window.windowHandle()
     if handle is not None and handle.screen() is not screen:
         handle.setScreen(screen)
+    # layout-audit: allow=adaptive-window-policy; reason=central adaptive policy owns screen-safe outer geometry
     window.move(screen.availableGeometry().topLeft())
 
 
@@ -246,6 +247,7 @@ class AdaptiveWindowController(QObject):
 
         window.setProperty("RCMS_window_archetype", self.policy.archetype.value)
         window.setProperty("RCMS_window_role", self.role.value)
+        # layout-audit: allow=adaptive-window-policy; reason=central adaptive policy owns screen-safe outer geometry
         window.setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX)
         window.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         if window.layout() is not None:
@@ -435,13 +437,16 @@ class AdaptiveWindowController(QObject):
 
     def _set_outer_frame_geometry(self, target):
         target = QRect(target)
+        # layout-audit: allow=adaptive-window-policy; reason=central adaptive policy owns screen-safe outer geometry
         self.window.resize(
             client_size_for_frame_size(target.size(), self._frame_margins())
         )
+        # layout-audit: allow=adaptive-window-policy; reason=central adaptive policy owns screen-safe outer geometry
         self.window.move(target.topLeft())
         actual_top_left = self.window.frameGeometry().topLeft()
         if actual_top_left != target.topLeft():
             correction = target.topLeft() - actual_top_left
+            # layout-audit: allow=adaptive-window-policy; reason=central adaptive policy owns screen-safe outer geometry
             self.window.move(self.window.pos() + correction)
 
     def _connect_window_handle(self):

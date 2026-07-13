@@ -208,26 +208,6 @@ def test_new_dataset_preserves_main_window_state(show_method, state_method):
         _close_without_prompt(app, window)
 
 
-def test_content_fit_does_not_resize_visible_main_window(monkeypatch):
-    import launch
-    import qt_layout
-
-    app, window = launch.start_automation()
-    try:
-        window.showMaximized()
-        app.processEvents()
-
-        adjust_calls = []
-        monkeypatch.setattr(window, "adjustSize", lambda: adjust_calls.append(True))
-
-        qt_layout.fit_text_to_contents(window)
-
-        assert adjust_calls == []
-        assert window.isMaximized()
-    finally:
-        _close_without_prompt(app, window)
-
-
 def test_data_table_editing_preserves_maximized_main_window_state():
     import launch
 

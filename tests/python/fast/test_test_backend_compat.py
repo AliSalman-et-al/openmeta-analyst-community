@@ -1,6 +1,8 @@
 import os
 import sys
 
+import pytest
+
 
 sys.path.insert(0, os.path.abspath("src"))
 
@@ -18,5 +20,8 @@ def test_test_backend_compat_installs_stub_backend(monkeypatch):
 
     assert meta_py_r is sys.modules["meta_py_r"]
     assert hasattr(meta_py_r, "get_R_libpaths")
+    assert hasattr(meta_py_r, "ma_dataset_to_simple_network")
+    with pytest.raises(meta_py_r.AnalysisBackendUnavailableError):
+        meta_py_r.ma_dataset_to_simple_network(object())
     assert meta_py_r.set_global_conf_level(95) == 95.0
     assert legacy_qt4_name not in sys.modules

@@ -15,7 +15,7 @@ class Ui_diag_metric(object):
     def setupUi(self, diag_metric):
         diag_metric.setObjectName("diag_metric")
         diag_metric.setWindowModality(QtCore.Qt.ApplicationModal)
-        diag_metric.resize(460, 300)
+        diag_metric.resize(0, 0)
         self.dialog_layout = QtWidgets.QVBoxLayout(diag_metric)
         self.dialog_layout.setObjectName("dialog_layout")
         self.content_scroll = QtWidgets.QScrollArea(diag_metric)

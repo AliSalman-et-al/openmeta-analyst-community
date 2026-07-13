@@ -660,7 +660,17 @@ Page_Welcome, Page_DataType, Page_ChooseMetric, Page_OutcomeName, Page_CsvImport
 class MainWizard(QWizard):
     def __init__(self, parent=None, path=None, recent_datasets=[]):
         super(MainWizard, self).__init__(parent)
-        qt_layout.configure_application_wizard(self)
+        self.setWizardStyle(QWizard.ModernStyle)
+        self.setOption(QWizard.NoBackButtonOnStartPage, True)
+        self.setButtonLayout(
+            [
+                QWizard.Stretch,
+                QWizard.BackButton,
+                QWizard.NextButton,
+                QWizard.FinishButton,
+                QWizard.CancelButton,
+            ]
+        )
 
         self.info_d = {}
         self.info_d["path"] = path

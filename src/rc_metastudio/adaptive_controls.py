@@ -122,6 +122,7 @@ class ChoiceControlController(QObject):
         self._measurement_dirty = False
         self.measurement_applied_count += 1
         combo = self.combo
+        # layout-audit: allow=content-overflow-control; reason=required choice content may consume available layout width
         combo.setMaximumWidth(QWIDGETSIZE_MAX)
         combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
         combo.setMinimumContentsLength(max(1, int(self.visible_characters)))
@@ -143,15 +144,24 @@ class ChoiceControlController(QObject):
             client_width = max(1, available.width() - frame_extent)
             client_height = max(1, available.height() - frame_extent)
             requested_width = min(requested_width, client_width)
+            # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
             view.setMaximumWidth(client_width)
+            # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
             view.setMaximumHeight(client_height)
+            # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
             self._popup.setMaximumWidth(client_width)
+            # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
             self._popup.setMaximumHeight(client_height)
         else:
+            # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
             view.setMaximumWidth(QWIDGETSIZE_MAX)
+            # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
             view.setMaximumHeight(QWIDGETSIZE_MAX)
+            # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
             self._popup.setMaximumWidth(QWIDGETSIZE_MAX)
+            # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
             self._popup.setMaximumHeight(QWIDGETSIZE_MAX)
+        # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
         view.setMinimumWidth(max(1, requested_width))
         self._connect_screen()
 
@@ -266,8 +276,11 @@ class ChoiceControlController(QObject):
         view = self.combo.view()
         client_width = max(1, width - frame_extra_width)
         client_height = max(1, height - frame_extra_height)
+        # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
         view.setMinimumWidth(min(view.minimumWidth(), client_width))
+        # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
         popup.setMinimumSize(0, 0)
+        # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
         popup.resize(
             client_width,
             client_height,
@@ -281,6 +294,7 @@ class ChoiceControlController(QObject):
             available.top(),
             min(frame.top(), available.bottom() - frame.height() + 1),
         )
+        # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
         popup.move(popup.pos() + QPoint(left, top) - frame.topLeft())
         final_frame = popup.frameGeometry()
         left_excess = max(0, available.left() - final_frame.left())
@@ -290,7 +304,9 @@ class ChoiceControlController(QObject):
         if left_excess or right_excess or top_excess or bottom_excess:
             corrected_width = max(1, popup.width() - left_excess - right_excess)
             corrected_height = max(1, popup.height() - top_excess - bottom_excess)
+            # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
             view.setMinimumWidth(min(view.minimumWidth(), corrected_width))
+            # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
             popup.resize(corrected_width, corrected_height)
             realized = popup.frameGeometry()
             corrected_left = max(
@@ -307,6 +323,7 @@ class ChoiceControlController(QObject):
                     available.bottom() - realized.height() + 1,
                 ),
             )
+            # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
             popup.move(
                 popup.pos()
                 + QPoint(corrected_left, corrected_top)
@@ -343,11 +360,13 @@ def refresh_choice_popup_width(combo):
 
 def configure_numeric_value_control(control):
     """Use the editor's value range as its Semantic Size Invariant."""
+    # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
     control.setMaximumWidth(QWIDGETSIZE_MAX)
     control.setSizePolicy(QSizePolicy.Minimum, control.sizePolicy().verticalPolicy())
 
 
 def configure_text_value_control(control):
     """Allow editable Required Content to consume the available row width."""
+    # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
     control.setMaximumWidth(QWIDGETSIZE_MAX)
     control.setSizePolicy(QSizePolicy.Expanding, control.sizePolicy().verticalPolicy())

@@ -360,6 +360,7 @@ def restore_workspace_placement(
         if controller is not None:
             controller.restore_frame_geometry(geometry)
         else:
+            # layout-audit: allow=persisted-workspace-placement; reason=validated remembered Workspace placement is restored
             window.setGeometry(geometry)
 
     if placement.full_screen:

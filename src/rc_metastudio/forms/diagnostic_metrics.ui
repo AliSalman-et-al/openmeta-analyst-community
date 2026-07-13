@@ -3,7 +3,7 @@
  <class>diag_metric</class>
  <widget class="QDialog" name="diag_metric">
   <property name="windowModality"><enum>Qt::ApplicationModal</enum></property>
-  <property name="geometry"><rect><x>0</x><y>0</y><width>460</width><height>300</height></rect></property>
+  <property name="geometry"><rect><x>0</x><y>0</y><width>0</width><height>0</height></rect></property>
   <property name="windowTitle"><string>Diagnostic Metrics</string></property>
   <property name="windowIcon"><iconset><normaloff>:/misc/meta.png</normaloff>:/misc/meta.png</iconset></property>
   <layout class="QVBoxLayout" name="dialog_layout">

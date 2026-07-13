@@ -140,6 +140,7 @@ class ElidingStatusLabel(QLabel):
     def __init__(self, text="", parent=None):
         super(ElidingStatusLabel, self).__init__(parent)
         self._full_text = ""
+        # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
         self.setMinimumWidth(0)
         self.setSizePolicy(
             QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Preferred
@@ -441,7 +442,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         prev_conf_level = self.model.get_global_conf_level()
 
         dialog = conf_level_dialog.ChangeConfLevelDlg(prev_conf_level, self)
-        if qt_layout.exec_centered(dialog):
+        if dialog.exec():
             new_conf_level = dialog.get_value()
             change_cl_command = Command_Change_Conf_Level(
                 prev_conf_level, new_conf_level, mainform=self
@@ -584,7 +585,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             form = diag_metrics.Diag_Metrics(self.model, parent=self)
         if form is None:
             return
-        qt_layout.show_centered(form)
+        form.show()
 
     def meta_reg(self):
         form = self._build_analysis_specs_dialog(
@@ -593,7 +594,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         )
         if form is None:
             return
-        qt_layout.show_centered(form)
+        form.show()
 
     def data_dirtied(self):
         self._notify_user_that_data_is_unsaved()
@@ -601,7 +602,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
     def meta_subgroup_get_cov(self):
         form = meta_subgroup_form.MetaSubgroupForm(self.model, parent=self)
-        qt_layout.show_centered(form)
+        form.show()
 
     ####
     # Here are the calls to ma_specs with so-called `meta-methods`
@@ -637,7 +638,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
         if form is None:
             return
-        qt_layout.show_centered(form)
+        form.show()
 
     def loo_ma(self):
         form = None
@@ -661,7 +662,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
         if form is None:
             return
-        qt_layout.show_centered(form)
+        form.show()
 
     def show_about_legal(self):
         return about_legal_dialog.AboutLegalDialog(self).exec()
@@ -692,7 +693,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
         if form is None:
             return
-        qt_layout.show_centered(form)
+        form.show()
 
     def _build_analysis_specs_dialog(
         self, meta_f_str=None, external_params=None, diag_metrics=None, conf_level=None
@@ -1373,7 +1374,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             cur_dataset, covariate, parent=self
         )
 
-        if qt_layout.exec_centered(change_type_form):
+        if change_type_form.exec():
             modified_dataset = change_type_form.dataset
             # revert to original study ordering
             modified_dataset.studies.sort(

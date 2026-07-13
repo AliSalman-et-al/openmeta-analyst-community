@@ -14,7 +14,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_WizardPage(object):
     def setupUi(self, WizardPage):
         WizardPage.setObjectName("WizardPage")
-        WizardPage.resize(285, 46)
+        WizardPage.resize(0, 0)
         WizardPage.setSubTitle("")
         self.workflowPageLayout = QtWidgets.QVBoxLayout(WizardPage)
         self.workflowPageLayout.setContentsMargins(0, 0, 0, 0)

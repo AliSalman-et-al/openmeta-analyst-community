@@ -123,7 +123,9 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         ):
             option = QStyleOptionButton()
             option.initFrom(button)
+            # layout-audit: allow=style-metric-control; reason=icon control dimensions follow the active Qt style metric
             button.setIconSize(icon_size)
+            # layout-audit: allow=style-metric-control; reason=icon control dimensions follow the active Qt style metric
             button.setFixedSize(
                 self.style().sizeFromContents(
                     QStyle.CT_PushButton,

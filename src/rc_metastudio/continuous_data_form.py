@@ -163,6 +163,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             self.g1_pre_post_table,
             self.g2_pre_post_table,
         ):
+            # layout-audit: allow=compact-table-overflow; reason=compact table keeps rows visible and owns excess overflow
             table.setMinimumWidth(0)
             table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
@@ -178,11 +179,15 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                 + 2 * table.frameWidth()
                 + table.horizontalScrollBar().sizeHint().height()
             )
+            # layout-audit: allow=compact-table-overflow; reason=compact table keeps rows visible and owns excess overflow
             table.setMinimumHeight(height)
+            # layout-audit: allow=compact-table-overflow; reason=compact table keeps rows visible and owns excess overflow
             table.setMaximumHeight(height)
 
     def _configure_semantic_fields(self):
+        # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
         self.effect_cbo_box.setMinimumWidth(0)
+        # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
         self.effect_cbo_box.setMaximumWidth(QWIDGETSIZE_MAX)
         self.effect_cbo_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         effect_view = QTreeView(self.effect_cbo_box)
@@ -202,7 +207,9 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             )
             + 12
         )
+        # layout-audit: allow=numeric-domain-control; reason=editor width follows representative values from its numeric domain
         self.correlation_pre_post.setMinimumWidth(correlation_width)
+        # layout-audit: allow=numeric-domain-control; reason=editor width follows representative values from its numeric domain
         self.correlation_pre_post.setMaximumWidth(QWIDGETSIZE_MAX)
         self.correlation_pre_post.setSizePolicy(
             QSizePolicy.MinimumExpanding, QSizePolicy.Fixed
@@ -270,7 +277,9 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                 available.width(), max(combo.width(), content_width)
             )
             popup_height = min(available.height(), popup.height())
+            # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
             popup.setMaximumSize(available.size())
+            # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
             popup.resize(popup_width, popup_height)
 
             frame = popup.frameGeometry()
@@ -282,6 +291,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                 max(frame.y(), available.top()),
                 available.bottom() - frame.height() + 1,
             )
+            # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
             popup.move(bounded_x, bounded_y)
         except RuntimeError:
             pass

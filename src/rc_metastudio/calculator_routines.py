@@ -302,7 +302,9 @@ def fit_effect_ci_line_edits_to_contents(
                 for value in (signed_precision_sample, str(line_edit.text()))
             )
             required_width = max(base_minimum_width, content_width + 12)
+        # layout-audit: allow=numeric-domain-control; reason=editor width follows representative values from its numeric domain
         line_edit.setMinimumWidth(required_width)
+        # layout-audit: allow=numeric-domain-control; reason=editor width follows representative values from its numeric domain
         line_edit.setMaximumWidth(required_width)
 
 
