@@ -14,8 +14,7 @@
 
 # import pdb
 
-from PyQt5.QtCore import QSize
-from PyQt5.QtWidgets import QDialog, QMessageBox, QStyle, QStyleOptionButton
+from PyQt5.QtWidgets import QDialog, QMessageBox
 
 import forms.ui_edit_dialog
 import edit_list_models
@@ -25,6 +24,7 @@ import meta_globals
 import ma_dataset
 import ma_data_table_model
 import adaptive_window
+import qt_layout
 from settings import (
     restore_edit_dataset_window_state,
     save_edit_dataset_window_state,
@@ -35,7 +35,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
     def __init__(self, dataset, parent=None):
         super(EditDialog, self).__init__(parent)
         self.setupUi(self)
-        self._size_icon_actions_from_style()
+        self._configure_icon_actions()
         self.setModal(True)
         adaptive_window.register_adaptive_window(
             self, adaptive_window.WindowRole.EDIT_DATASET
@@ -106,34 +106,27 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         self._setup_connections()
         self.dataset = dataset
 
-    def _size_icon_actions_from_style(self):
-        icon_extent = self.style().pixelMetric(QStyle.PM_ButtonIconSize)
-        icon_size = QSize(icon_extent, icon_extent)
-        for button in (
-            self.add_outcome_btn,
-            self.remove_outcome_btn,
-            self.add_follow_up_btn,
-            self.remove_follow_up_btn,
-            self.add_group_btn,
-            self.remove_group_btn,
-            self.add_study_btn,
-            self.remove_study_btn,
-            self.add_covariate_btn,
-            self.remove_covariate_btn,
-        ):
-            option = QStyleOptionButton()
-            option.initFrom(button)
-            # layout-audit: allow=style-metric-control; reason=icon control dimensions follow the active Qt style metric
-            button.setIconSize(icon_size)
-            # layout-audit: allow=style-metric-control; reason=icon control dimensions follow the active Qt style metric
-            button.setFixedSize(
-                self.style().sizeFromContents(
-                    QStyle.CT_PushButton,
-                    option,
-                    icon_size,
-                    button,
-                )
-            )
+    def _configure_icon_actions(self):
+        qt_layout.configure_icon_only_action_buttons(
+            (
+                self.add_outcome_btn,
+                self.add_follow_up_btn,
+                self.add_group_btn,
+                self.add_study_btn,
+                self.add_covariate_btn,
+            ),
+            "add",
+        )
+        qt_layout.configure_icon_only_action_buttons(
+            (
+                self.remove_outcome_btn,
+                self.remove_follow_up_btn,
+                self.remove_group_btn,
+                self.remove_study_btn,
+                self.remove_covariate_btn,
+            ),
+            "remove",
+        )
 
     def showEvent(self, event):
         super(EditDialog, self).showEvent(event)

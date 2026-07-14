@@ -211,6 +211,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             (self.action_meta_regression, "meta-regression"),
         ):
             qt_layout.configure_analysis_action_icon(action, icon_name)
+        qt_layout.configure_main_toolbar(self.toolBar)
         dataset_file_label = ElidingStatusLabel(
             self.dataset_file_lbl.text(), self.centralwidget
         )

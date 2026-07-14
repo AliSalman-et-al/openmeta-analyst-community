@@ -28,8 +28,8 @@ ACTIONS = {
   <path d="M36 29v12M30 35h12" stroke="#168A56" stroke-width="3" stroke-linecap="round"/>
 """,
     "add.svg": """
-  <circle cx="24" cy="24" r="16.5" fill="#168A56"/>
-  <path d="M24 15v18M15 24h18" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="24" cy="24" r="18.5" fill="#168A56"/>
+  <path d="M24 13.5v21M13.5 24h21" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
 """,
     "auto-fit-columns.svg": """
   <rect x="10" y="7" width="28" height="34" rx="2" fill="#EAF4F8" stroke="#526B78" stroke-width="2"/>
@@ -64,16 +64,16 @@ ACTIONS = {
   <path d="M36 24v14M31 33l5 5 5-5" fill="none" stroke="#168A56" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
 """,
     "navigation-down.svg": """
-  <path d="M24 8v27M14 26l10 10 10-10" fill="none" stroke="#2B88D8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M6 10h36L24 43 6 10Z" fill="#2B88D8"/>
 """,
     "navigation-left.svg": """
-  <path d="M40 24H13M22 14 12 24l10 10" fill="none" stroke="#2B88D8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M5 24 38 6v36L5 24Z" fill="#2B88D8"/>
 """,
     "navigation-right.svg": """
-  <path d="M8 24h27M26 14l10 10-10 10" fill="none" stroke="#2B88D8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M43 24 10 42V6l33 18Z" fill="#2B88D8"/>
 """,
     "navigation-up.svg": """
-  <path d="M24 40V13M14 22l10-10 10 10" fill="none" stroke="#2B88D8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M24 5 42 38H6L24 5Z" fill="#2B88D8"/>
 """,
     "new-dataset.svg": """
   <path d="M8 5h22l8 8v28a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" fill="#E4F3FA" stroke="#1769AA" stroke-width="2" stroke-linejoin="round"/>
@@ -99,8 +99,8 @@ ACTIONS = {
   <path d="M10 35c1-12 7-18 18-18h9M30 10l8 7-8 7" fill="none" stroke="#2B88D8" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
 """,
     "remove.svg": """
-  <circle cx="24" cy="24" r="16.5" fill="#C43D45"/>
-  <path d="M15 24h18" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="24" cy="24" r="18.5" fill="#C43D45"/>
+  <path d="M13.5 24h21" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
 """,
     "save-as.svg": """
   <path d="M7 5h27l7 7v29a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" fill="#2B78B8" stroke="#174F7A" stroke-width="1.5" stroke-linejoin="round"/>

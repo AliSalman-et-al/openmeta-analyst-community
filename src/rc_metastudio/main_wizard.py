@@ -40,6 +40,14 @@ class WelcomePage(QWizardPage, forms.ui_welcome_page.Ui_WizardPage):
 
         self.recent_datasets = recent_datasets
         self.selected_dataset = None
+        qt_layout.configure_primary_action_buttons(
+            (
+                self.create_new_btn,
+                self.import_csv_btn,
+                self.open_recent_btn,
+                self.open_btn,
+            )
+        )
         self._setup_connections()
 
     def initializePage(self):

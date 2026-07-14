@@ -107,6 +107,22 @@ def test_edit_dataset_is_modal_workspace_with_persisted_placement_and_panes(
             assert view.horizontalScrollBarPolicy() == QtCore.Qt.ScrollBarAsNeeded
             assert view.verticalScrollBarPolicy() == QtCore.Qt.ScrollBarAsNeeded
 
+        for button in (
+            first.add_outcome_btn,
+            first.remove_outcome_btn,
+            first.add_follow_up_btn,
+            first.remove_follow_up_btn,
+            first.add_group_btn,
+            first.remove_group_btn,
+            first.add_study_btn,
+            first.remove_study_btn,
+            first.add_covariate_btn,
+            first.remove_covariate_btn,
+        ):
+            assert button.iconSize() == QtCore.QSize(24, 24)
+            assert button.size() == QtCore.QSize(32, 32)
+            assert not button.icon().isNull()
+
         original_font = QtGui.QFont(first.font())
         enlarged = QtGui.QFont(original_font)
         enlarged.setPointSize(max(16, enlarged.pointSize() + 6))

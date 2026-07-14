@@ -183,6 +183,15 @@ SOURCE_EXCEPTION_RULES = {
         "paths": {"edit_dialog.py", "main_wizard.py", "qt_layout.py"},
         "methods": {"setFixedSize", "setIconSize", "setMinimumSize"},
     },
+    "semantic-icon-control": {
+        "paths": {"qt_layout.py"},
+        "methods": {
+            "setFixedSize",
+            "setIconSize",
+            "setMinimumHeight",
+            "setMinimumSize",
+        },
+    },
     "verification-layout-fixture": {
         "paths": {"adaptive_layout_evidence.py", "launch.py"},
         "methods": {"adjustSize", "move", "resize"},
@@ -192,6 +201,7 @@ SOURCE_EXCEPTION_RULES = {
 UI_SEMANTIC_SIZE_CATEGORIES = {
     "intrinsic-ratio",
     "numeric-domain-control",
+    "semantic-icon-control",
     "style-metric-control",
 }
 

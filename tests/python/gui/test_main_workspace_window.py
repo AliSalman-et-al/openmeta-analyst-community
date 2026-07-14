@@ -107,8 +107,28 @@ def test_main_inherits_fonts_and_navigation_icons_from_active_style(qapp):
         ):
             expected = qt_layout.OUTCOME_NAVIGATION_ICON_EXTENT
             assert button.iconSize() == QtCore.QSize(expected, expected)
+            assert button.minimumSize() == QtCore.QSize(
+                qt_layout.OUTCOME_NAVIGATION_CONTROL_EXTENT,
+                qt_layout.OUTCOME_NAVIGATION_CONTROL_EXTENT,
+            )
             assert button.iconSize() != QtCore.QSize(64, 64)
-        assert window.toolBar.iconSize() == QtCore.QSize(28, 28)
+        assert window.toolBar.iconSize() == QtCore.QSize(
+            qt_layout.TOOLBAR_ICON_EXTENT, qt_layout.TOOLBAR_ICON_EXTENT
+        )
+        toolbar_buttons = [
+            button
+            for button in window.toolBar.findChildren(QtWidgets.QToolButton)
+            if button.defaultAction() is not None
+        ]
+        assert toolbar_buttons
+        assert all(
+            button.minimumSize()
+            == QtCore.QSize(
+                qt_layout.TOOLBAR_CONTROL_EXTENT,
+                qt_layout.TOOLBAR_CONTROL_EXTENT,
+            )
+            for button in toolbar_buttons
+        )
         assert (
             window.menuAnalysis.style().pixelMetric(
                 QtWidgets.QStyle.PM_SmallIconSize, None, window.menuAnalysis

@@ -69,6 +69,16 @@ def test_main_wizard_is_a_stable_workflow_window(qapp):
         assert wizard.property("RCMS_window_archetype") == "workflow"
         assert wizard.property("RCMS_window_role") == "workflow"
 
+        welcome_page = wizard.page(main_wizard.Page_Welcome)
+        for button in (
+            welcome_page.create_new_btn,
+            welcome_page.import_csv_btn,
+            welcome_page.open_recent_btn,
+            welcome_page.open_btn,
+        ):
+            assert button.iconSize() == QtCore.QSize(24, 24)
+            assert button.minimumHeight() == 36
+
         data_type_page = wizard.page(main_wizard.Page_DataType)
         data_type_page.twoarm_proportions_Button.click()
         wizard.next()

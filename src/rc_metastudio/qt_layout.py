@@ -7,10 +7,17 @@ no root-fitting, coordinate inference, or descendant-repair surface.
 
 from PyQt5.QtCore import QSize
 from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QHeaderView, QProxyStyle, QSizePolicy, QStyle
+from PyQt5.QtWidgets import QHeaderView, QProxyStyle, QSizePolicy, QStyle, QToolButton
 
 
-OUTCOME_NAVIGATION_ICON_EXTENT = 20
+OUTCOME_NAVIGATION_ICON_EXTENT = 24
+OUTCOME_NAVIGATION_CONTROL_EXTENT = 32
+ICON_ONLY_ACTION_ICON_EXTENT = 24
+ICON_ONLY_ACTION_CONTROL_EXTENT = 32
+PRIMARY_ACTION_ICON_EXTENT = 24
+PRIMARY_ACTION_CONTROL_HEIGHT = 36
+TOOLBAR_ICON_EXTENT = 28
+TOOLBAR_CONTROL_EXTENT = 36
 COMPACT_ANALYSIS_ICON_EXTENT = 18
 STANDARD_ANALYSIS_ICON_EXTENT = 28
 
@@ -53,12 +60,49 @@ def configure_analysis_action_icon(action, icon_name):
 def configure_navigation_tool_buttons(buttons):
     """Give outcome-navigation controls a coherent cross-platform scale."""
     for button in buttons:
+        # layout-audit: allow=semantic-icon-control; reason=outcome navigation uses a surface-specific optical icon size
         button.setIconSize(
             QSize(OUTCOME_NAVIGATION_ICON_EXTENT, OUTCOME_NAVIGATION_ICON_EXTENT)
         )
-        # layout-audit: allow=style-metric-control; reason=compact icon control leaves button chrome to the active Qt style
-        button.setMinimumSize(QSize(0, 0))
+        # layout-audit: allow=semantic-icon-control; reason=outcome navigation requires a reliable compact click target
+        button.setMinimumSize(
+            QSize(OUTCOME_NAVIGATION_CONTROL_EXTENT, OUTCOME_NAVIGATION_CONTROL_EXTENT)
+        )
         button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+
+
+def configure_icon_only_action_buttons(buttons, icon_name):
+    """Keep small add/remove actions legible and reliably clickable."""
+    for button in buttons:
+        button.setIcon(QIcon(":/icons/actions/{}.svg".format(icon_name)))
+        # layout-audit: allow=semantic-icon-control; reason=icon-only dataset actions use a surface-specific optical icon size
+        button.setIconSize(
+            QSize(ICON_ONLY_ACTION_ICON_EXTENT, ICON_ONLY_ACTION_ICON_EXTENT)
+        )
+        # layout-audit: allow=semantic-icon-control; reason=icon-only dataset actions need a reliable compact click target
+        button.setFixedSize(
+            QSize(ICON_ONLY_ACTION_CONTROL_EXTENT, ICON_ONLY_ACTION_CONTROL_EXTENT)
+        )
+
+
+def configure_primary_action_buttons(buttons):
+    """Give text-and-icon workflow actions an optically useful icon size."""
+    for button in buttons:
+        # layout-audit: allow=semantic-icon-control; reason=primary workflow actions use a surface-specific optical icon size
+        button.setIconSize(QSize(PRIMARY_ACTION_ICON_EXTENT, PRIMARY_ACTION_ICON_EXTENT))
+        # layout-audit: allow=semantic-icon-control; reason=primary workflow actions need a dependable desktop click target
+        button.setMinimumHeight(PRIMARY_ACTION_CONTROL_HEIGHT)
+
+
+def configure_main_toolbar(toolbar):
+    """Separate toolbar artwork scale from its interactive hit target."""
+    # layout-audit: allow=semantic-icon-control; reason=the main toolbar uses its documented optical icon size
+    toolbar.setIconSize(QSize(TOOLBAR_ICON_EXTENT, TOOLBAR_ICON_EXTENT))
+    for button in toolbar.findChildren(QToolButton):
+        if button.defaultAction() is None:
+            continue
+        # layout-audit: allow=semantic-icon-control; reason=toolbar actions need consistent cross-platform click targets
+        button.setMinimumSize(QSize(TOOLBAR_CONTROL_EXTENT, TOOLBAR_CONTROL_EXTENT))
 
 
 def configure_compact_table(table, stretch_columns=False, fill_available_width=False):
