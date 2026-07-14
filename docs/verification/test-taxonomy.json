@@ -5262,6 +5262,21 @@
         "filesystem"
       ],
       "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_functional_icon_set_is_embedded_and_renders_at_supported_sizes",
+      "reason": "Protects the complete cross-platform Functional Icon package, semantic families, Qt embedding, and small-size SVG rendering.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
       "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_rc_metastudio_logo_resource_is_valid_and_used_consistently",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "seconds",

@@ -175,7 +175,7 @@ Additional columns will be treated as covariates.</string>
           </property>
           <property name="icon">
            <iconset resource="../images/icons.qrc">
-            <normaloff>:/function_icon_set/function_icon_set/folder_48.png</normaloff>:/function_icon_set/function_icon_set/folder_48.png</iconset>
+            <normaloff>:/icons/actions/open.svg</normaloff>:/icons/actions/open.svg</iconset>
           </property>
          </widget>
         </item>

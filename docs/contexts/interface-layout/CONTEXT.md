@@ -71,3 +71,59 @@ _Avoid_: Preferred pixel size, visual tweak
 **Column-Width Ownership**:
 The authority to change a user-adjustable table's displayed column widths. Workspace tables transfer this authority to the user after initial schema fitting; compact Transactional tables retain content-driven ownership.
 _Avoid_: Resize mode, automatic columns
+
+**Functional Icon**:
+A non-branding visual symbol that identifies an application action, navigation direction, analysis, dataset type, or other interface function. The RC MetaStudio app icon, its source and packaging variants, and splash artwork are Brand Assets rather than Functional Icons.
+_Avoid_: App artwork, branding icon
+
+**Brand Asset**:
+Artwork whose primary purpose is to identify RC MetaStudio as a product, including the app icon and splash screen. Brand Assets are governed separately from the Functional Icon system.
+_Avoid_: Functional icon, toolbar icon
+
+**Action Icon**:
+A Functional Icon for a familiar application command or navigation direction, expressed as a compact filled symbol with clear geometry and restrained Fluent Color layering.
+_Avoid_: Outline-only glyph, monochrome system font
+
+**Statistical Concept Icon**:
+A Functional Icon for an analysis, data type, or statistical concept whose metaphor may use a restrained two- or three-color palette to distinguish meaning.
+_Avoid_: Analysis logo, decorative chart
+
+**Portable Icon Set**:
+The complete collection of self-contained Functional Icon assets checked into and bundled with RC MetaStudio so the same symbols are available on every supported operating system.
+_Avoid_: System icon font, remotely loaded icon set
+
+**Functional Icon Package**:
+The semantic `images/icons` resource hierarchy that groups Functional Icon Masters into actions, analyses, and dataset types and exposes matching stable Qt resource paths.
+_Avoid_: Function icon set, toolbar icons, miscellaneous images
+
+**Functional Icon Master**:
+The canonical SVG representation of a Functional Icon from which RC MetaStudio loads or derives every packaged rendering of that symbol.
+_Avoid_: Source bitmap, generated preview
+
+**Fluent-Inspired Icon**:
+An original RC MetaStudio Functional Icon that follows Windows 11 color-icon principles such as filled geometric shapes, soft corners, bright layered color, restrained gradients, minimal detail, and a strong small-size silhouette without copying or redistributing Microsoft glyph artwork.
+_Avoid_: Microsoft Fluent icon, Segoe glyph
+
+**Theme-Neutral Icon**:
+A Functional Icon whose transparent SVG and restrained palette remain legible on both light and dark neutral interface backgrounds without a separate theme-specific asset.
+_Avoid_: Light icon, dark icon
+
+**Icon Color Vocabulary**:
+The stable semantic palette shared by Statistical Concept Icons: blue for primary analysis, teal for observations and measurement, violet for moderators and grouping, amber for ordered or iterative analysis, red for destructive or cautionary meaning, and neutral graphite for Action Icons and structure.
+_Avoid_: Decorative palette, per-icon colors
+
+**Analysis Icon Family**:
+The Statistical Concept Icons that retain a recognizable forest plot as their common anchor, using estimate squares, confidence-interval lines, and a reference line while grouping, ordering, omission, or a fitted trend distinguishes each analysis variant.
+_Avoid_: Unrelated analysis illustrations, per-analysis metaphor
+
+**Dataset-Type Icon Family**:
+The monochrome Statistical Concept Icons that use conventional path-rendered notation to distinguish one-arm and two-arm measures, with a 2-by-2 matrix for diagnostic data.
+_Avoid_: Unrelated dataset illustrations, decorative color, runtime font dependency
+
+**Icon-Bearing Command**:
+A reusable main-window command or selection control whose recognition and cross-surface consistency benefit from a Functional Icon. Routine dialog and workflow actions such as OK, Cancel, Back, and Next remain text-led unless their meaning cannot be communicated clearly by text alone.
+_Avoid_: Every button, decorated dialog action
+
+**Icon-Language Pair**:
+A specialized Functional Icon presented with an adjacent label, menu text, or accessible tooltip so its meaning is never carried by an unfamiliar statistical symbol alone. A conventional Action Icon may appear without visible text only when it retains an accessible name.
+_Avoid_: Self-explanatory statistical icon, unlabeled symbol

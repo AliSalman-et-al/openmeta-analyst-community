@@ -58,7 +58,7 @@
        </property>
        <property name="icon">
         <iconset resource="../images/icons.qrc">
-         <normaloff>:/new_dataset/startscreens/proportion.png</normaloff>:/new_dataset/startscreens/proportion.png</iconset>
+         <normaloff>:/icons/dataset-types/one-arm-proportion.svg</normaloff>:/icons/dataset-types/one-arm-proportion.svg</iconset>
        </property>
        <property name="iconSize">
         <size>
@@ -91,7 +91,7 @@
        </property>
        <property name="icon">
         <iconset resource="../images/icons.qrc">
-         <normaloff>:/new_dataset/startscreens/mean.png</normaloff>:/new_dataset/startscreens/mean.png</iconset>
+         <normaloff>:/icons/dataset-types/one-arm-mean.svg</normaloff>:/icons/dataset-types/one-arm-mean.svg</iconset>
        </property>
        <property name="iconSize">
         <size>
@@ -125,7 +125,7 @@ Coefficient</string>
        </property>
        <property name="icon">
         <iconset resource="../images/icons.qrc">
-         <normaloff>:/new_dataset/startscreens/single_reg_coef.png</normaloff>:/new_dataset/startscreens/single_reg_coef.png</iconset>
+         <normaloff>:/icons/dataset-types/single-regression-coefficient.svg</normaloff>:/icons/dataset-types/single-regression-coefficient.svg</iconset>
        </property>
        <property name="iconSize">
         <size>
@@ -159,11 +159,11 @@ Effect Size</string>
        </property>
        <property name="icon">
         <iconset resource="../images/icons.qrc">
-         <normaloff>:/new_dataset/startscreens/gen_eff_size.png</normaloff>:/new_dataset/startscreens/gen_eff_size.png</iconset>
+         <normaloff>:/icons/dataset-types/generic-effect-size.svg</normaloff>:/icons/dataset-types/generic-effect-size.svg</iconset>
        </property>
        <property name="iconSize">
         <size>
-         <width>40</width>
+         <width>54</width>
          <height>40</height>
         </size>
        </property>
@@ -213,7 +213,7 @@ Effect Size</string>
        </property>
        <property name="icon">
         <iconset resource="../images/icons.qrc">
-         <normaloff>:/new_dataset/startscreens/proportions.png</normaloff>:/new_dataset/startscreens/proportions.png</iconset>
+         <normaloff>:/icons/dataset-types/two-arm-proportions.svg</normaloff>:/icons/dataset-types/two-arm-proportions.svg</iconset>
        </property>
        <property name="iconSize">
         <size>
@@ -246,7 +246,7 @@ Effect Size</string>
        </property>
        <property name="icon">
         <iconset resource="../images/icons.qrc">
-         <normaloff>:/new_dataset/startscreens/means.png</normaloff>:/new_dataset/startscreens/means.png</iconset>
+         <normaloff>:/icons/dataset-types/two-arm-means.svg</normaloff>:/icons/dataset-types/two-arm-means.svg</iconset>
        </property>
        <property name="iconSize">
         <size>
@@ -279,7 +279,7 @@ Effect Size</string>
        </property>
        <property name="icon">
         <iconset resource="../images/icons.qrc">
-         <normaloff>:/new_dataset/startscreens/smd.png</normaloff>:/new_dataset/startscreens/smd.png</iconset>
+         <normaloff>:/icons/dataset-types/standardized-mean-difference.svg</normaloff>:/icons/dataset-types/standardized-mean-difference.svg</iconset>
        </property>
        <property name="iconSize">
         <size>
@@ -330,12 +330,12 @@ Effect Size</string>
        </property>
        <property name="icon">
         <iconset resource="../images/icons.qrc">
-         <normaloff>:/new_dataset/startscreens/diagnostic.png</normaloff>:/new_dataset/startscreens/diagnostic.png</iconset>
+         <normaloff>:/icons/dataset-types/diagnostic-data.svg</normaloff>:/icons/dataset-types/diagnostic-data.svg</iconset>
        </property>
        <property name="iconSize">
         <size>
-         <width>85</width>
-         <height>44</height>
+         <width>40</width>
+         <height>40</height>
         </size>
        </property>
        <property name="checkable">

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <defs>
+    <linearGradient id="page" x1="8" y1="4" x2="40" y2="44" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#64E5F8"/>
+      <stop offset="1" stop-color="#25A7E8"/>
+    </linearGradient>
+    <linearGradient id="badge" x1="28" y1="28" x2="45" y2="45" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#33C481"/>
+      <stop offset="1" stop-color="#0B8F5A"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#page)" d="M10 4h20l10 10v26a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4Z"/>
+  <path fill="#0878C9" d="M30 4v8a4 4 0 0 0 4 4h6L30 4Z"/>
+  <rect x="12" y="18" width="20" height="4" rx="2" fill="#0560A8"/>
+  <rect x="12" y="25" width="8" height="6" rx="2" fill="#E8F8FF"/>
+  <rect x="23" y="25" width="9" height="6" rx="2" fill="#B9EEFF"/>
+  <rect x="12" y="34" width="8" height="6" rx="2" fill="#B9EEFF"/>
+  <circle cx="36.5" cy="36.5" r="9.5" fill="url(#badge)"/>
+  <path fill="#fff" d="M34.7 30.8h3.6v3.9h3.9v3.6h-3.9v3.9h-3.6v-3.9h-3.9v-3.6h3.9v-3.9Z"/>
+</svg>

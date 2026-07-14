@@ -59,7 +59,7 @@
          </property>
          <property name="icon">
           <iconset resource="../images/icons.qrc">
-           <normaloff>:/function_icon_set/function_icon_set/add_48.png</normaloff>:/function_icon_set/function_icon_set/add_48.png</iconset>
+           <normaloff>:/icons/actions/new-dataset.svg</normaloff>:/icons/actions/new-dataset.svg</iconset>
          </property>
         </widget>
        </item>
@@ -70,7 +70,7 @@
          </property>
          <property name="icon">
           <iconset resource="../images/icons.qrc">
-           <normaloff>:/function_icon_set/function_icon_set/box_download_48.png</normaloff>:/function_icon_set/function_icon_set/box_download_48.png</iconset>
+           <normaloff>:/icons/actions/import-csv.svg</normaloff>:/icons/actions/import-csv.svg</iconset>
          </property>
         </widget>
        </item>
@@ -81,7 +81,7 @@
          </property>
          <property name="icon">
           <iconset resource="../images/icons.qrc">
-           <normaloff>:/function_icon_set/function_icon_set/folder_48.png</normaloff>:/function_icon_set/function_icon_set/folder_48.png</iconset>
+           <normaloff>:/icons/actions/open.svg</normaloff>:/icons/actions/open.svg</iconset>
          </property>
         </widget>
        </item>
@@ -92,7 +92,7 @@
          </property>
          <property name="icon">
           <iconset resource="../images/icons.qrc">
-           <normaloff>:/function_icon_set/function_icon_set/folder_48.png</normaloff>:/function_icon_set/function_icon_set/folder_48.png</iconset>
+           <normaloff>:/icons/actions/open.svg</normaloff>:/icons/actions/open.svg</iconset>
          </property>
         </widget>
        </item>

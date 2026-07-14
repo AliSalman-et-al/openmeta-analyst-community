@@ -94,7 +94,7 @@ class Ui_WizardPage(object):
         self.horizontalLayout_2.addWidget(self.file_path_lbl)
         self.select_file_btn = QtWidgets.QPushButton(self.groupBox)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/function_icon_set/function_icon_set/folder_48.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(QtGui.QPixmap(":/icons/actions/open.svg"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.select_file_btn.setIcon(icon)
         self.select_file_btn.setObjectName("select_file_btn")
         self.horizontalLayout_2.addWidget(self.select_file_btn)

@@ -351,6 +351,147 @@ def test_rc_metastudio_logo_resource_is_valid_and_used_consistently():
     assert low_resolution_icon_refs == []
 
 
+def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
+    import xml.etree.ElementTree as ET
+
+    import icons_rc  # noqa: F401
+    from PyQt5 import QtGui
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    qrc_path = Path("src", "rc_metastudio", "images", "icons.qrc")
+    qrc_root = ET.parse(qrc_path).getroot()
+    resources = {}
+    family_counts = {}
+    for resource_group in qrc_root.findall("qresource"):
+        prefix = resource_group.attrib["prefix"].lstrip("/")
+        if not prefix.startswith("icons/"):
+            continue
+        family_counts[prefix] = len(resource_group.findall("file"))
+        for file_node in resource_group.findall("file"):
+            alias = file_node.attrib["alias"]
+            resources[f":/{prefix}/{alias}"] = qrc_path.parent / file_node.text
+
+    assert family_counts == {
+        "icons/actions": 23,
+        "icons/analyses": 5,
+        "icons/dataset-types": 8,
+    }
+    assert len(resources) == 36
+
+    wide_dataset_icon_sizes = {
+        ":/icons/dataset-types/generic-effect-size.svg": (54, 40),
+        ":/icons/dataset-types/two-arm-means.svg": (54, 40),
+        ":/icons/dataset-types/two-arm-proportions.svg": (72, 44),
+    }
+
+    for resource_path, source_path in resources.items():
+        root = ET.parse(source_path).getroot()
+        assert root.tag == "{http://www.w3.org/2000/svg}svg"
+        expected_width, expected_height = wide_dataset_icon_sizes.get(
+            resource_path, (48, 48)
+        )
+        assert root.attrib["viewBox"] == (
+            f"0 0 {expected_width} {expected_height}"
+        )
+        assert not root.findall(".//{http://www.w3.org/2000/svg}text")
+
+        embedded_file = QtCore.QFile(resource_path)
+        assert embedded_file.open(QtCore.QIODevice.ReadOnly)
+        assert bytes(embedded_file.readAll()) == source_path.read_bytes(), (
+            f"{resource_path} is stale; regenerate the checked-in Qt resources"
+        )
+
+        icon = QtGui.QIcon(resource_path)
+        assert icon.isNull() is False
+        for extent in (16, 24, 40, 48):
+            pixmap = icon.pixmap(extent, extent)
+            assert pixmap.isNull() is False
+            assert 0 < pixmap.width() <= extent
+            assert 0 < pixmap.height() <= extent
+            assert extent in (pixmap.width(), pixmap.height())
+            assert pixmap.toImage().hasAlphaChannel()
+
+            family = resource_path.split("/")[2]
+            ui_extent = 40 if family == "dataset-types" else 24
+            if extent == ui_extent:
+                image = pixmap.toImage()
+                rendered_width = image.width()
+                rendered_height = image.height()
+                perimeter_alpha = [
+                    QtGui.qAlpha(image.pixel(x, y))
+                    for x, y in (
+                        *((x, 0) for x in range(rendered_width)),
+                        *((x, rendered_height - 1) for x in range(rendered_width)),
+                        *((0, y) for y in range(rendered_height)),
+                        *((rendered_width - 1, y) for y in range(rendered_height)),
+                    )
+                ]
+                assert max(perimeter_alpha) <= 4, (
+                    f"{resource_path} paints into its {extent}px UI pixmap boundary"
+                )
+
+                visible_pixels = [
+                    (x, y)
+                    for y in range(rendered_height)
+                    for x in range(rendered_width)
+                    if QtGui.qAlpha(image.pixel(x, y)) > 4
+                ]
+                visible_height = (
+                    max(y for _, y in visible_pixels)
+                    - min(y for _, y in visible_pixels)
+                    + 1
+                )
+                if family == "actions":
+                    assert visible_height >= 14, (
+                        f"{resource_path} is optically undersized beside toolbar actions"
+                    )
+                elif (
+                    family == "dataset-types"
+                    and resource_path not in wide_dataset_icon_sizes
+                ):
+                    assert 13 <= visible_height <= 24, (
+                        f"{resource_path} is outside the dataset icon optical-size range"
+                    )
+
+                if family == "analyses":
+                    alpha_mass = sum(
+                        QtGui.qAlpha(image.pixel(x, y))
+                        for y in range(rendered_height)
+                        for x in range(rendered_width)
+                    ) / (255 * rendered_width * rendered_height)
+                    assert alpha_mass >= 0.15, (
+                        f"{resource_path} is visually too light beside toolbar actions"
+                    )
+
+        if resource_path in wide_dataset_icon_sizes:
+            requested_width, requested_height = wide_dataset_icon_sizes[resource_path]
+            ui_pixmap = icon.pixmap(requested_width, requested_height)
+            assert ui_pixmap.width() == requested_width
+            assert ui_pixmap.height() == requested_height
+            ui_image = ui_pixmap.toImage()
+            ui_visible_pixels = [
+                (x, y)
+                for y in range(ui_image.height())
+                for x in range(ui_image.width())
+                if QtGui.qAlpha(ui_image.pixel(x, y)) > 4
+            ]
+            ui_visible_height = (
+                max(y for _, y in ui_visible_pixels)
+                - min(y for _, y in ui_visible_pixels)
+                + 1
+            )
+            assert 13 <= ui_visible_height <= 24, (
+                f"{resource_path} is outside the dataset icon optical-size range"
+            )
+
+    canonical_ui = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in Path("src", "rc_metastudio", "forms").glob("*.ui")
+    )
+    for legacy_prefix in (":/function_icon_set/", ":/toolbar-icons/", ":/new_dataset/"):
+        assert legacy_prefix not in canonical_ui
+
+
 def test_automation_launch_shows_default_confidence_level_at_startup():
     import launch
 

@@ -1,42 +1,49 @@
 <RCC>
   <qresource prefix="misc">
-    <file>copy.png</file>
-    <file>leave_one_out.png</file>
-    <file>meta_reg.png</file>
-    <file>subgroup_ma.png</file>
-    <file>cum_meta_analysis.png</file>
-    <file>meta_analysis.png</file>
     <file alias="splash.png">rc-metastudio-splash.png</file>
-    <file>calculator-34.png</file>
-    <file>down_arrow.png</file>
-    <file>left_arrow.png</file>
-    <file>ci_icon.png</file>
     <file alias="meta.ico">rc-metastudio-app-icon.ico</file>
     <file alias="meta.png">rc-metastudio-app-icon.png</file>
-    <file>right_arrow.png</file>
-    <file>up_arrow.png</file>
   </qresource>
-  <qresource prefix="toolbar-icons">
-    <file>toolbar-icons/back.png</file>
-    <file>toolbar-icons/forward.png</file>
-    <file>toolbar-icons/paste.png</file>
-    <file>toolbar-icons/quit.png</file>
+  <qresource prefix="icons/actions">
+    <file alias="about-legal.svg">icons/actions/about-legal.svg</file>
+    <file alias="add-covariate.svg">icons/actions/add-covariate.svg</file>
+    <file alias="add.svg">icons/actions/add.svg</file>
+    <file alias="auto-fit-columns.svg">icons/actions/auto-fit-columns.svg</file>
+    <file alias="calculator.svg">icons/actions/calculator.svg</file>
+    <file alias="confidence-level.svg">icons/actions/confidence-level.svg</file>
+    <file alias="copy.svg">icons/actions/copy.svg</file>
+    <file alias="edit-dataset.svg">icons/actions/edit-dataset.svg</file>
+    <file alias="import-csv.svg">icons/actions/import-csv.svg</file>
+    <file alias="navigation-down.svg">icons/actions/navigation-down.svg</file>
+    <file alias="navigation-left.svg">icons/actions/navigation-left.svg</file>
+    <file alias="navigation-right.svg">icons/actions/navigation-right.svg</file>
+    <file alias="navigation-up.svg">icons/actions/navigation-up.svg</file>
+    <file alias="new-dataset.svg">icons/actions/new-dataset.svg</file>
+    <file alias="open.svg">icons/actions/open.svg</file>
+    <file alias="paste.svg">icons/actions/paste.svg</file>
+    <file alias="quit.svg">icons/actions/quit.svg</file>
+    <file alias="redo.svg">icons/actions/redo.svg</file>
+    <file alias="remove.svg">icons/actions/remove.svg</file>
+    <file alias="save-as.svg">icons/actions/save-as.svg</file>
+    <file alias="save.svg">icons/actions/save.svg</file>
+    <file alias="undo.svg">icons/actions/undo.svg</file>
+    <file alias="view-network.svg">icons/actions/view-network.svg</file>
   </qresource>
-  <qresource prefix="new_dataset">
-    <file>startscreens/diagnostic.png</file>
-    <file>startscreens/gen_eff_size.png</file>
-    <file>startscreens/mean.png</file>
-    <file>startscreens/means.png</file>
-    <file>startscreens/proportion.png</file>
-    <file>startscreens/proportions.png</file>
-    <file>startscreens/single_reg_coef.png</file>
-    <file>startscreens/smd.png</file>
+  <qresource prefix="icons/analyses">
+    <file alias="cumulative-analysis.svg">icons/analyses/cumulative-analysis.svg</file>
+    <file alias="leave-one-out-analysis.svg">icons/analyses/leave-one-out-analysis.svg</file>
+    <file alias="meta-analysis.svg">icons/analyses/meta-analysis.svg</file>
+    <file alias="meta-regression.svg">icons/analyses/meta-regression.svg</file>
+    <file alias="subgroup-analysis.svg">icons/analyses/subgroup-analysis.svg</file>
   </qresource>
-  <qresource prefix="function_icon_set">
-    <file>function_icon_set/add_48.png</file>
-    <file>function_icon_set/box_download_48.png</file>
-    <file>function_icon_set/cancel_48.png</file>
-    <file>function_icon_set/floppy_disk_48.png</file>
-    <file>function_icon_set/folder_48.png</file>
+  <qresource prefix="icons/dataset-types">
+    <file alias="diagnostic-data.svg">icons/dataset-types/diagnostic-data.svg</file>
+    <file alias="generic-effect-size.svg">icons/dataset-types/generic-effect-size.svg</file>
+    <file alias="one-arm-mean.svg">icons/dataset-types/one-arm-mean.svg</file>
+    <file alias="one-arm-proportion.svg">icons/dataset-types/one-arm-proportion.svg</file>
+    <file alias="single-regression-coefficient.svg">icons/dataset-types/single-regression-coefficient.svg</file>
+    <file alias="standardized-mean-difference.svg">icons/dataset-types/standardized-mean-difference.svg</file>
+    <file alias="two-arm-means.svg">icons/dataset-types/two-arm-means.svg</file>
+    <file alias="two-arm-proportions.svg">icons/dataset-types/two-arm-proportions.svg</file>
   </qresource>
 </RCC>

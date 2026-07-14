@@ -121,7 +121,7 @@
                  </property>
                  <property name="icon">
                   <iconset resource="../images/icons.qrc">
-                   <normaloff>:/misc/left_arrow.png</normaloff>:/misc/left_arrow.png</iconset>
+                   <normaloff>:/icons/actions/navigation-left.svg</normaloff>:/icons/actions/navigation-left.svg</iconset>
                  </property>
                  <property name="autoRaise">
                   <bool>true</bool>
@@ -135,7 +135,7 @@
                  </property>
                  <property name="icon">
                   <iconset resource="../images/icons.qrc">
-                   <normaloff>:/misc/up_arrow.png</normaloff>:/misc/up_arrow.png</iconset>
+                   <normaloff>:/icons/actions/navigation-up.svg</normaloff>:/icons/actions/navigation-up.svg</iconset>
                  </property>
                  <property name="autoRaise">
                   <bool>true</bool>
@@ -149,7 +149,7 @@
                  </property>
                  <property name="icon">
                   <iconset resource="../images/icons.qrc">
-                   <normaloff>:/misc/down_arrow.png</normaloff>:/misc/down_arrow.png</iconset>
+                   <normaloff>:/icons/actions/navigation-down.svg</normaloff>:/icons/actions/navigation-down.svg</iconset>
                  </property>
                  <property name="toolButtonStyle">
                   <enum>Qt::ToolButtonIconOnly</enum>
@@ -179,7 +179,7 @@
                  </property>
                  <property name="icon">
                   <iconset resource="../images/icons.qrc">
-                   <normaloff>:/misc/right_arrow.png</normaloff>:/misc/right_arrow.png</iconset>
+                   <normaloff>:/icons/actions/navigation-right.svg</normaloff>:/icons/actions/navigation-right.svg</iconset>
                  </property>
                  <property name="autoRaise">
                   <bool>true</bool>
@@ -193,7 +193,7 @@
                  </property>
                  <property name="icon">
                   <iconset resource="../images/icons.qrc">
-                   <normaloff>:/function_icon_set/function_icon_set/add_48.png</normaloff>:/function_icon_set/function_icon_set/add_48.png</iconset>
+                   <normaloff>:/icons/actions/add.svg</normaloff>:/icons/actions/add.svg</iconset>
                  </property>
                  <property name="autoRaise">
                   <bool>true</bool>
@@ -399,7 +399,7 @@
   <action name="action_save">
    <property name="icon">
     <iconset resource="../images/icons.qrc">
-     <normaloff>:/function_icon_set/function_icon_set/floppy_disk_48.png</normaloff>:/function_icon_set/function_icon_set/floppy_disk_48.png</iconset>
+     <normaloff>:/icons/actions/save.svg</normaloff>:/icons/actions/save.svg</iconset>
    </property>
    <property name="text">
     <string>Save</string>
@@ -408,7 +408,7 @@
   <action name="action_open">
    <property name="icon">
     <iconset resource="../images/icons.qrc">
-     <normaloff>:/function_icon_set/function_icon_set/folder_48.png</normaloff>:/function_icon_set/function_icon_set/folder_48.png</iconset>
+     <normaloff>:/icons/actions/open.svg</normaloff>:/icons/actions/open.svg</iconset>
    </property>
    <property name="text">
     <string>Open</string>
@@ -417,7 +417,7 @@
   <action name="action_quit">
    <property name="icon">
     <iconset resource="../images/icons.qrc">
-     <normaloff>:/toolbar-icons/toolbar-icons/quit.png</normaloff>:/toolbar-icons/toolbar-icons/quit.png</iconset>
+     <normaloff>:/icons/actions/quit.svg</normaloff>:/icons/actions/quit.svg</iconset>
    </property>
    <property name="text">
     <string>Quit</string>
@@ -426,23 +426,35 @@
   <action name="action_go">
    <property name="icon">
     <iconset resource="../images/icons.qrc">
-     <normaloff>:/misc/meta_analysis.png</normaloff>:/misc/meta_analysis.png</iconset>
+     <normaloff>:/icons/analyses/meta-analysis.svg</normaloff>:/icons/analyses/meta-analysis.svg</iconset>
    </property>
    <property name="text">
     <string>Meta-Analysis</string>
    </property>
   </action>
   <action name="action_edit">
+   <property name="icon">
+    <iconset resource="../images/icons.qrc">
+     <normaloff>:/icons/actions/edit-dataset.svg</normaloff>:/icons/actions/edit-dataset.svg</iconset>
+   </property>
    <property name="text">
     <string>Edit</string>
    </property>
   </action>
   <action name="action_view_network">
+   <property name="icon">
+    <iconset resource="../images/icons.qrc">
+     <normaloff>:/icons/actions/view-network.svg</normaloff>:/icons/actions/view-network.svg</iconset>
+   </property>
    <property name="text">
     <string>View Network</string>
    </property>
   </action>
   <action name="action_add_covariate">
+   <property name="icon">
+    <iconset resource="../images/icons.qrc">
+     <normaloff>:/icons/actions/add-covariate.svg</normaloff>:/icons/actions/add-covariate.svg</iconset>
+   </property>
    <property name="text">
     <string>Add Covariate</string>
    </property>
@@ -450,7 +462,7 @@
   <action name="action_cum_ma">
    <property name="icon">
     <iconset resource="../images/icons.qrc">
-     <normaloff>:/misc/cum_meta_analysis.png</normaloff>:/misc/cum_meta_analysis.png</iconset>
+     <normaloff>:/icons/analyses/cumulative-analysis.svg</normaloff>:/icons/analyses/cumulative-analysis.svg</iconset>
    </property>
    <property name="text">
     <string>Cumulative Meta-Analysis</string>
@@ -459,7 +471,7 @@
   <action name="action_loo_ma">
    <property name="icon">
     <iconset resource="../images/icons.qrc">
-     <normaloff>:/misc/leave_one_out.png</normaloff>:/misc/leave_one_out.png</iconset>
+     <normaloff>:/icons/analyses/leave-one-out-analysis.svg</normaloff>:/icons/analyses/leave-one-out-analysis.svg</iconset>
    </property>
    <property name="text">
     <string>Leave-One-Out Meta-Analysis</string>
@@ -468,7 +480,7 @@
   <action name="action_new_dataset">
    <property name="icon">
     <iconset resource="../images/icons.qrc">
-     <normaloff>:/function_icon_set/function_icon_set/add_48.png</normaloff>:/function_icon_set/function_icon_set/add_48.png</iconset>
+     <normaloff>:/icons/actions/new-dataset.svg</normaloff>:/icons/actions/new-dataset.svg</iconset>
    </property>
    <property name="text">
     <string>New Dataset</string>
@@ -477,7 +489,7 @@
   <action name="action_meta_regression">
    <property name="icon">
     <iconset resource="../images/icons.qrc">
-     <normaloff>:/misc/meta_reg.png</normaloff>:/misc/meta_reg.png</iconset>
+     <normaloff>:/icons/analyses/meta-regression.svg</normaloff>:/icons/analyses/meta-regression.svg</iconset>
    </property>
    <property name="text">
     <string>Meta-Regression</string>
@@ -486,7 +498,7 @@
   <action name="action_undo">
    <property name="icon">
     <iconset resource="../images/icons.qrc">
-     <normaloff>:/toolbar-icons/toolbar-icons/back.png</normaloff>:/toolbar-icons/toolbar-icons/back.png</iconset>
+     <normaloff>:/icons/actions/undo.svg</normaloff>:/icons/actions/undo.svg</iconset>
    </property>
    <property name="text">
     <string>Undo</string>
@@ -498,7 +510,7 @@
   <action name="action_redo">
    <property name="icon">
     <iconset resource="../images/icons.qrc">
-     <normaloff>:/toolbar-icons/toolbar-icons/forward.png</normaloff>:/toolbar-icons/toolbar-icons/forward.png</iconset>
+     <normaloff>:/icons/actions/redo.svg</normaloff>:/icons/actions/redo.svg</iconset>
    </property>
    <property name="text">
     <string>Redo</string>
@@ -510,7 +522,7 @@
   <action name="action_copy">
    <property name="icon">
     <iconset resource="../images/icons.qrc">
-     <normaloff>:/misc/copy.png</normaloff>:/misc/copy.png</iconset>
+     <normaloff>:/icons/actions/copy.svg</normaloff>:/icons/actions/copy.svg</iconset>
    </property>
    <property name="text">
     <string>Copy</string>
@@ -522,7 +534,7 @@
   <action name="action_paste">
    <property name="icon">
     <iconset resource="../images/icons.qrc">
-     <normaloff>:/toolbar-icons/toolbar-icons/paste.png</normaloff>:/toolbar-icons/toolbar-icons/paste.png</iconset>
+     <normaloff>:/icons/actions/paste.svg</normaloff>:/icons/actions/paste.svg</iconset>
    </property>
    <property name="text">
     <string>Paste</string>
@@ -534,18 +546,26 @@
   <action name="action_subgroup_ma">
    <property name="icon">
     <iconset resource="../images/icons.qrc">
-     <normaloff>:/misc/subgroup_ma.png</normaloff>:/misc/subgroup_ma.png</iconset>
+     <normaloff>:/icons/analyses/subgroup-analysis.svg</normaloff>:/icons/analyses/subgroup-analysis.svg</iconset>
    </property>
    <property name="text">
     <string>Subgroup Meta-Analysis</string>
    </property>
   </action>
   <action name="action_save_as">
+   <property name="icon">
+    <iconset resource="../images/icons.qrc">
+     <normaloff>:/icons/actions/save-as.svg</normaloff>:/icons/actions/save-as.svg</iconset>
+   </property>
    <property name="text">
     <string>Save As</string>
    </property>
   </action>
   <action name="action_about_legal">
+   <property name="icon">
+    <iconset resource="../images/icons.qrc">
+     <normaloff>:/icons/actions/about-legal.svg</normaloff>:/icons/actions/about-legal.svg</iconset>
+   </property>
    <property name="text">
     <string>About/Legal</string>
    </property>
@@ -553,7 +573,7 @@
   <action name="action_change_conf_level">
    <property name="icon">
     <iconset resource="../images/icons.qrc">
-     <normaloff>:/misc/ci_icon.png</normaloff>:/misc/ci_icon.png</iconset>
+     <normaloff>:/icons/actions/confidence-level.svg</normaloff>:/icons/actions/confidence-level.svg</iconset>
    </property>
    <property name="text">
     <string>Change Confidence Level</string>
@@ -562,13 +582,17 @@
   <action name="action_import_csv">
    <property name="icon">
     <iconset resource="../images/icons.qrc">
-     <normaloff>:/function_icon_set/function_icon_set/box_download_48.png</normaloff>:/function_icon_set/function_icon_set/box_download_48.png</iconset>
+     <normaloff>:/icons/actions/import-csv.svg</normaloff>:/icons/actions/import-csv.svg</iconset>
    </property>
    <property name="text">
     <string>Import CSV</string>
    </property>
   </action>
   <action name="action_auto_fit_columns">
+   <property name="icon">
+    <iconset resource="../images/icons.qrc">
+     <normaloff>:/icons/actions/auto-fit-columns.svg</normaloff>:/icons/actions/auto-fit-columns.svg</iconset>
+   </property>
    <property name="text">
     <string>Auto-Fit Columns</string>
    </property>

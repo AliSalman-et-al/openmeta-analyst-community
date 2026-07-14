@@ -1347,7 +1347,7 @@ class DatasetModel(QAbstractTableModel):
         if role == Qt.DecorationRole:
             if orientation == Qt.Vertical:
                 if sectionOK and self._study_has_entered_data(section):
-                    return QIcon(":/misc/calculator-34.png")
+                    return QIcon(":/icons/actions/calculator.svg")
                 else:
                     # print "\n\n----\n\n"
                     # print section
