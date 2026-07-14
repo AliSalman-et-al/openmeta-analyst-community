@@ -1,1 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><linearGradient id="p" x1="7" y1="4" x2="37" y2="42" gradientUnits="userSpaceOnUse"><stop stop-color="#64E5F8"/><stop offset="1" stop-color="#25A7E8"/></linearGradient><linearGradient id="a" x1="27" y1="23" x2="44" y2="43" gradientUnits="userSpaceOnUse"><stop stop-color="#33C481"/><stop offset="1" stop-color="#0B8F5A"/></linearGradient></defs><path d="M9 4h20l9 9v27a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4Z" fill="url(#p)"/><path d="M29 4v7a4 4 0 0 0 4 4h5L29 4Z" fill="#0878C9"/><g fill="#EAF8FF"><rect x="11" y="19" width="8" height="6" rx="2"/><rect x="22" y="19" width="8" height="6" rx="2"/><rect x="11" y="28" width="8" height="6" rx="2"/><rect x="22" y="28" width="8" height="6" rx="2"/></g><circle cx="37" cy="36" r="9" fill="url(#a)"/><path d="M34 28h6v7h4l-7 7-7-7h4v-7Z" fill="#fff"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+<path d="M8 5h22l8 8v28a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" fill="#E4F3FA" stroke="#1769AA" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M30 5v8h8M12 20h18M12 27h18M19 18v16M27 18v16" stroke="#6B8794" stroke-width="1.5"/>
+  <path d="M36 24v14M31 33l5 5 5-5" fill="none" stroke="#168A56" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

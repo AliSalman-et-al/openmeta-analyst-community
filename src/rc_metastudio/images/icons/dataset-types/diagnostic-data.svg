@@ -40,7 +40,7 @@ Q 10.56 25.92 10.56 27.84
 L 10.56 35.52
 Q 10.56 37.44 12.48 37.44
 z
-" clip-path="url(#p39ef82bd67)" style="fill: #60798d"/>
+" clip-path="url(#p39ef82bd67)" style="fill: #7a909c"/>
    </g>
    <g id="patch_3">
     <path d="M 12.48 22.08
@@ -53,7 +53,7 @@ Q 10.56 10.56 10.56 12.48
 L 10.56 20.16
 Q 10.56 22.08 12.48 22.08
 z
-" clip-path="url(#p39ef82bd67)" style="fill: #243746"/>
+" clip-path="url(#p39ef82bd67)" style="fill: #60798d"/>
    </g>
    <g id="patch_4">
     <path d="M 27.84 37.44
@@ -66,7 +66,7 @@ Q 25.92 25.92 25.92 27.84
 L 25.92 35.52
 Q 25.92 37.44 27.84 37.44
 z
-" clip-path="url(#p39ef82bd67)" style="fill: #243746"/>
+" clip-path="url(#p39ef82bd67)" style="fill: #60798d"/>
    </g>
    <g id="patch_5">
     <path d="M 27.84 22.08
@@ -79,7 +79,7 @@ Q 25.92 10.56 25.92 12.48
 L 25.92 20.16
 Q 25.92 22.08 27.84 22.08
 z
-" clip-path="url(#p39ef82bd67)" style="fill: #60798d"/>
+" clip-path="url(#p39ef82bd67)" style="fill: #7a909c"/>
    </g>
    <g id="line2d_1">
     <path d="M 12.96 15.36

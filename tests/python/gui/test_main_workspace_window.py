@@ -82,8 +82,8 @@ def test_runtime_content_changes_do_not_resize_or_reposition_visible_main(qapp):
 
 
 def test_main_inherits_fonts_and_navigation_icons_from_active_style(qapp):
-    from PyQt5.QtWidgets import QStyle
     import meta_form
+    import qt_layout
 
     window = meta_form.MetaForm()
     try:
@@ -105,9 +105,25 @@ def test_main_inherits_fonts_and_navigation_icons_from_active_style(qapp):
             window.nav_right_btn,
             window.nav_add_btn,
         ):
-            expected = button.style().pixelMetric(QStyle.PM_SmallIconSize, None, button)
+            expected = qt_layout.OUTCOME_NAVIGATION_ICON_EXTENT
             assert button.iconSize() == QtCore.QSize(expected, expected)
             assert button.iconSize() != QtCore.QSize(64, 64)
+        assert window.toolBar.iconSize() == QtCore.QSize(28, 28)
+        assert (
+            window.menuAnalysis.style().pixelMetric(
+                QtWidgets.QStyle.PM_SmallIconSize, None, window.menuAnalysis
+            )
+            == 18
+        )
+        for action in (
+            window.action_go,
+            window.action_cum_ma,
+            window.action_loo_ma,
+            window.action_subgroup_ma,
+            window.action_meta_regression,
+        ):
+            assert action.icon().pixmap(18, 18).isNull() is False
+            assert action.icon().pixmap(28, 28).isNull() is False
     finally:
         window.hide()
         window.deleteLater()

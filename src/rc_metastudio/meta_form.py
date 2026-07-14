@@ -202,6 +202,15 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         # this approach throughout the application.
         super(MetaForm, self).__init__(parent)
         self.setupUi(self)
+        qt_layout.configure_analysis_menu(self.menuAnalysis)
+        for action, icon_name in (
+            (self.action_go, "meta-analysis"),
+            (self.action_cum_ma, "cumulative-analysis"),
+            (self.action_loo_ma, "leave-one-out-analysis"),
+            (self.action_subgroup_ma, "subgroup-analysis"),
+            (self.action_meta_regression, "meta-regression"),
+        ):
+            qt_layout.configure_analysis_action_icon(action, icon_name)
         dataset_file_label = ElidingStatusLabel(
             self.dataset_file_lbl.text(), self.centralwidget
         )

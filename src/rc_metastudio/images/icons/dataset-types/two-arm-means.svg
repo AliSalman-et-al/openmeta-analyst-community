@@ -31,7 +31,7 @@ z
   <g id="axes_1">
    <g id="text_1">
     <!-- $\mu_1$ -->
-    <g style="fill: #243746" transform="translate(2.185 22.535547) scale(0.19 -0.19)">
+    <g style="fill: #60798d" transform="translate(2.185 22.535547) scale(0.19 -0.19)">
      <defs>
       <path id="STIXGeneral-Italic-20b" d="M 3002 749
 L 3091 691
@@ -93,7 +93,7 @@ z
    </g>
    <g id="text_2">
     <!-- $\mu_2$ -->
-    <g style="fill: #243746" transform="translate(38.145 22.535547) scale(0.19 -0.19)">
+    <g style="fill: #60798d" transform="translate(38.145 22.535547) scale(0.19 -0.19)">
      <defs>
       <path id="STIXGeneral-Regular-15" d="M 3034 877
 L 2688 0
@@ -126,7 +126,7 @@ z
    </g>
    <g id="text_3">
     <!-- $\mathrm{vs}$ -->
-    <g style="fill: #60798d" transform="translate(24.7725 20.467773) scale(0.095 -0.095)">
+    <g style="fill: #7a909c" transform="translate(24.7725 20.467773) scale(0.095 -0.095)">
      <defs>
       <path id="STIXGeneral-Regular-59" d="M 3053 2880
 L 3053 2784

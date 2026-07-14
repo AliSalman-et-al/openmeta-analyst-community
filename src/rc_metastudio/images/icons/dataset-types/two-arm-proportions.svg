@@ -31,7 +31,7 @@ z
   <g id="axes_1">
    <g id="text_1">
     <!-- $\frac{x_1}{N_1}$ -->
-    <g style="fill: #243746" transform="translate(11.61 25.15) scale(0.18 -0.18)">
+    <g style="fill: #60798d" transform="translate(11.61 25.15) scale(0.18 -0.18)">
      <defs>
       <path id="STIXGeneral-Italic-5b" d="M 1555 2272
 L 1632 1907
@@ -145,7 +145,7 @@ z
    </g>
    <g id="text_2">
     <!-- $\frac{x_2}{N_2}$ -->
-    <g style="fill: #243746" transform="translate(44.73 25.15) scale(0.18 -0.18)">
+    <g style="fill: #60798d" transform="translate(44.73 25.15) scale(0.18 -0.18)">
      <defs>
       <path id="STIXGeneral-Regular-15" d="M 3034 877
 L 2688 0
@@ -187,7 +187,7 @@ z
    </g>
    <g id="text_3">
     <!-- $\mathrm{vs}$ -->
-    <g style="fill: #60798d" transform="translate(31.995 24.777891) scale(0.09 -0.09)">
+    <g style="fill: #7a909c" transform="translate(31.995 24.777891) scale(0.09 -0.09)">
      <defs>
       <path id="STIXGeneral-Regular-59" d="M 3053 2880
 L 3053 2784

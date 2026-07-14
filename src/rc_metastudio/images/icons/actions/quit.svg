@@ -1,1 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><linearGradient id="d" x1="6" y1="5" x2="32" y2="43" gradientUnits="userSpaceOnUse"><stop stop-color="#64E5F8"/><stop offset="1" stop-color="#0878C9"/></linearGradient><linearGradient id="a" x1="20" y1="24" x2="45" y2="24" gradientUnits="userSpaceOnUse"><stop stop-color="#B26DFF"/><stop offset="1" stop-color="#6B4EFF"/></linearGradient></defs><path d="M7 5h25v38H7a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3Z" fill="url(#d)"/><rect x="10" y="10" width="15" height="28" rx="3" fill="#EAF8FF"/><circle cx="22" cy="24" r="2" fill="#0F6CBD"/><path d="M27 18h8v-6l10 12-10 12v-6h-8V18Z" fill="url(#a)"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+<path d="M24 6v18" stroke="#C43D45" stroke-width="4" stroke-linecap="round"/>
+  <path d="M15 11a16 16 0 1 0 18 0" fill="none" stroke="#526B78" stroke-width="4" stroke-linecap="round"/>
+</svg>

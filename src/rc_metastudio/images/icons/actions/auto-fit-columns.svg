@@ -1,1 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><linearGradient id="t" x1="8" y1="6" x2="40" y2="42" gradientUnits="userSpaceOnUse"><stop stop-color="#64E5F8"/><stop offset="1" stop-color="#25A7E8"/></linearGradient><linearGradient id="a" x1="4" y1="24" x2="44" y2="24" gradientUnits="userSpaceOnUse"><stop stop-color="#8B5CF6"/><stop offset=".5" stop-color="#1975E8"/><stop offset="1" stop-color="#8B5CF6"/></linearGradient></defs><rect x="8" y="6" width="32" height="36" rx="6" fill="url(#t)"/><path d="M18 6v36M30 6v36M8 18h32M8 30h32" stroke="#EAF8FF" stroke-width="2.5"/><path d="M4 24h12m-12 0 5-5m-5 5 5 5m35-5H32m12 0-5-5m5 5-5 5" fill="none" stroke="url(#a)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+<rect x="10" y="7" width="28" height="34" rx="2" fill="#EAF4F8" stroke="#526B78" stroke-width="2"/>
+  <path d="M19 8v32M29 8v32M11 18h26M11 30h26" stroke="#9AAEB8" stroke-width="1.5"/>
+  <path d="M4 24h11M4 24l4-4M4 24l4 4M44 24H33M44 24l-4-4M44 24l-4 4" fill="none" stroke="#2B88D8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

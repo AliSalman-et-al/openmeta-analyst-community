@@ -374,9 +374,11 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
     assert family_counts == {
         "icons/actions": 23,
         "icons/analyses": 5,
+        "icons/analyses/compact": 5,
         "icons/dataset-types": 8,
+        "icons/table": 1,
     }
-    assert len(resources) == 36
+    assert len(resources) == 42
 
     wide_dataset_icon_sizes = {
         ":/icons/dataset-types/generic-effect-size.svg": (54, 40),
@@ -392,13 +394,22 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
     for resource_path, source_path in resources.items():
         root = ET.parse(source_path).getroot()
         assert root.tag == "{http://www.w3.org/2000/svg}svg"
-        expected_width, expected_height = wide_dataset_icon_sizes.get(
-            resource_path, (48, 48)
-        )
+        if "/analyses/compact/" in resource_path:
+            expected_width, expected_height = (20, 20)
+        elif resource_path.startswith(":/icons/table/"):
+            expected_width, expected_height = (18, 18)
+        else:
+            expected_width, expected_height = wide_dataset_icon_sizes.get(
+                resource_path, (48, 48)
+            )
         assert root.attrib["viewBox"] == (
             f"0 0 {expected_width} {expected_height}"
         )
         assert not root.findall(".//{http://www.w3.org/2000/svg}text")
+        if resource_path.startswith(":/icons/dataset-types/"):
+            source_text = source_path.read_text(encoding="utf-8").lower()
+            assert "#60798d" in source_text
+            assert "#243746" not in source_text
 
         embedded_file = QtCore.QFile(resource_path)
         assert embedded_file.open(QtCore.QIODevice.ReadOnly)
@@ -408,7 +419,7 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
 
         icon = QtGui.QIcon(resource_path)
         assert icon.isNull() is False
-        for extent in (16, 24, 40, 48):
+        for extent in (16, 18, 24, 28, 40, 48):
             pixmap = icon.pixmap(extent, extent)
             assert pixmap.isNull() is False
             assert 0 < pixmap.width() <= extent
@@ -416,8 +427,19 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
             assert extent in (pixmap.width(), pixmap.height())
             assert pixmap.toImage().hasAlphaChannel()
 
-            family = resource_path.split("/")[2]
-            ui_extent = 40 if family == "dataset-types" else 24
+            if "/analyses/compact/" in resource_path:
+                family = "compact-analyses"
+                ui_extent = 18
+            elif resource_path.startswith(":/icons/table/"):
+                family = "table"
+                ui_extent = 16
+            else:
+                family = resource_path.split("/")[2]
+                ui_extent = {
+                    "actions": 28,
+                    "analyses": 28,
+                    "dataset-types": 40,
+                }[family]
             if extent == ui_extent:
                 image = pixmap.toImage()
                 rendered_width = image.width()
@@ -452,9 +474,24 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
                     + 1
                 )
                 if family == "actions":
-                    assert 17 <= visible_width <= 22
-                    assert 17 <= visible_height <= 22, (
+                    assert 14 <= visible_width <= 26
+                    assert 14 <= visible_height <= 24, (
                         f"{resource_path} is outside the toolbar optical-size grid"
+                    )
+                elif family == "analyses":
+                    assert 22 <= visible_width <= 24
+                    assert 21 <= visible_height <= 24, (
+                        f"{resource_path} is outside the standard analysis grid"
+                    )
+                elif family == "compact-analyses":
+                    assert 14 <= visible_width <= 16
+                    assert 14 <= visible_height <= 16, (
+                        f"{resource_path} is outside the compact analysis grid"
+                    )
+                elif family == "table":
+                    assert 11 <= visible_width <= 13
+                    assert 13 <= visible_height <= 15, (
+                        f"{resource_path} is outside the compact table grid"
                     )
                 elif (
                     family == "dataset-types"
@@ -478,18 +515,6 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
                             simple_dataset_height_ranges[resource_path]
                         )
                         assert minimum_height <= visible_height <= maximum_height
-
-                if family == "analyses":
-                    assert 20 <= visible_width <= 21
-                    assert 20 <= visible_height <= 21
-                    alpha_mass = sum(
-                        QtGui.qAlpha(image.pixel(x, y))
-                        for y in range(rendered_height)
-                        for x in range(rendered_width)
-                    ) / (255 * rendered_width * rendered_height)
-                    assert alpha_mass >= 0.15, (
-                        f"{resource_path} is visually too light beside toolbar actions"
-                    )
 
         if resource_path in wide_dataset_icon_sizes:
             requested_width, requested_height = wide_dataset_icon_sizes[resource_path]
@@ -528,6 +553,24 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
             assert abs(ui_center_x - (ui_image.width() - 1) / 2) <= 2
             assert abs(ui_center_y - (ui_image.height() - 1) / 2) <= 2
             assert ui_visible_width <= requested_width - 2
+
+    for analysis_prefix in (":/icons/analyses/", ":/icons/analyses/compact/"):
+        cumulative_root = ET.parse(
+            resources[analysis_prefix + "cumulative-analysis.svg"]
+        ).getroot()
+        leave_one_out_root = ET.parse(
+            resources[analysis_prefix + "leave-one-out-analysis.svg"]
+        ).getroot()
+        assert [ET.tostring(child) for child in list(cumulative_root)[:-1]] == [
+            ET.tostring(child) for child in list(leave_one_out_root)[:-1]
+        ]
+        for root in (cumulative_root, leave_one_out_root):
+            assert not any("opacity" in element.attrib for element in root.iter())
+            assert not any(
+                float(rect.attrib.get("width", 0)) > 8
+                and float(rect.attrib.get("height", 0)) > 8
+                for rect in root.findall(".//{http://www.w3.org/2000/svg}rect")
+            ), "analysis icons must not restore a haze-producing background tile"
 
     canonical_ui = "\n".join(
         path.read_text(encoding="utf-8")

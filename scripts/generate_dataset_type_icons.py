@@ -17,8 +17,8 @@ from matplotlib.patches import FancyBboxPatch
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = ROOT / "src" / "rc_metastudio" / "images" / "icons" / "dataset-types"
 
-INK = "#243746"
-MID_INK = "#60798D"
+INK = "#60798D"
+MID_INK = "#7A909C"
 
 
 def _new_figure(
