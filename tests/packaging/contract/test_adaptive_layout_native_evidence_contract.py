@@ -100,6 +100,12 @@ def _load_validator():
     return validator
 
 
+def test_native_evidence_validator_matches_qt_half_up_pixel_rounding():
+    validator = _load_validator()
+
+    assert validator._physical_pixel_extent(515, 1.5) == 773
+
+
 def _write_validator_fixture(tmp_path, validator):
     screenshots = tmp_path / "screenshots"
     screenshots.mkdir()

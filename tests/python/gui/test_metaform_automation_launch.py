@@ -2288,22 +2288,25 @@ def test_results_window_refits_svg_after_viewport_geometry_settles(tmp_path):
     )
 
     try:
-        window.showMaximized()
-        app.processEvents()
+        window.resize(700, 500)
+        window.show()
+        for _ in range(3):
+            app.processEvents()
         plot_item = next(
             item
             for item in window.scene.items()
             if isinstance(item, results_window.QGraphicsSvgItem)
         )
         initial_width = plot_item.sceneBoundingRect().width()
-        initial_view_width = window.graphics_view.width()
+        initial_window_width = window.width()
         initial_viewport_width = window.graphics_view.viewport().width()
         assert initial_width >= initial_viewport_width * 0.9
         assert initial_width <= initial_viewport_width
 
-        settled_width = initial_view_width - 300
-        window.graphics_view.resize(settled_width, window.graphics_view.height())
-        app.processEvents()
+        settled_width = initial_window_width - 200
+        window.resize(settled_width, window.height())
+        for _ in range(3):
+            app.processEvents()
 
         viewport_width = window.graphics_view.viewport().width()
         assert viewport_width < initial_width
@@ -2311,8 +2314,9 @@ def test_results_window_refits_svg_after_viewport_geometry_settles(tmp_path):
         assert plot_item.sceneBoundingRect().width() == pytest.approx(available_width)
 
         shrunken_width = plot_item.sceneBoundingRect().width()
-        window.graphics_view.resize(initial_view_width, window.graphics_view.height())
-        app.processEvents()
+        window.resize(initial_window_width, window.height())
+        for _ in range(3):
+            app.processEvents()
 
         grown_viewport_width = window.graphics_view.viewport().width()
         grown_available_width = (
@@ -2324,7 +2328,8 @@ def test_results_window_refits_svg_after_viewport_geometry_settles(tmp_path):
         )
     finally:
         window.close()
-        app.processEvents()
+        for _ in range(3):
+            app.processEvents()
 
 
 def test_results_window_refits_raster_fallback_from_original_source(tmp_path):
@@ -2357,15 +2362,17 @@ def test_results_window_refits_raster_fallback_from_original_source(tmp_path):
     )
 
     try:
-        window.showMaximized()
-        app.processEvents()
+        window.resize(700, 500)
+        window.show()
+        for _ in range(3):
+            app.processEvents()
         plot_item = next(
             item
             for item in window.scene.items()
             if isinstance(item, results_window.QGraphicsPixmapItem)
         )
         initial_width = plot_item.sceneBoundingRect().width()
-        initial_view_width = window.graphics_view.width()
+        initial_window_width = window.width()
         initial_available_width = (
             window.graphics_view.viewport().width()
             - window.x_coord
@@ -2373,10 +2380,9 @@ def test_results_window_refits_raster_fallback_from_original_source(tmp_path):
         )
         assert initial_width == pytest.approx(initial_available_width, abs=5)
 
-        window.graphics_view.resize(
-            initial_view_width - 300, window.graphics_view.height()
-        )
-        app.processEvents()
+        window.resize(initial_window_width - 200, window.height())
+        for _ in range(3):
+            app.processEvents()
         shrunken_width = plot_item.sceneBoundingRect().width()
         shrunken_available_width = (
             window.graphics_view.viewport().width()
@@ -2386,7 +2392,7 @@ def test_results_window_refits_raster_fallback_from_original_source(tmp_path):
         assert shrunken_width < initial_width
         assert shrunken_width == pytest.approx(shrunken_available_width, abs=5)
 
-        window.graphics_view.resize(initial_view_width, window.graphics_view.height())
+        window.resize(initial_window_width, window.height())
         app.processEvents()
         assert plot_item.sceneBoundingRect().width() == pytest.approx(
             initial_width, abs=5
@@ -3515,11 +3521,11 @@ def test_apply_regression_plot_edits_rebuilds_and_redraws_bubble_plot(
         assert plot_item.boundingRect().height() == pytest.approx(500)
 
         initial_width = plot_item.sceneBoundingRect().width()
-        view_width = window.graphics_view.width()
-        window.graphics_view.resize(view_width - 200, window.graphics_view.height())
+        window_width = window.width()
+        window.resize(window_width - 200, window.height())
         app.processEvents()
         assert plot_item.sceneBoundingRect().width() < initial_width
-        window.graphics_view.resize(view_width, window.graphics_view.height())
+        window.resize(window_width, window.height())
         app.processEvents()
         assert plot_item.sceneBoundingRect().width() > initial_width - 5
     finally:
@@ -4009,11 +4015,11 @@ def test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog(
         )
 
         initial_width = plot_item.sceneBoundingRect().width()
-        view_width = window.graphics_view.width()
-        window.graphics_view.resize(view_width - 200, window.graphics_view.height())
+        window_width = window.width()
+        window.resize(window_width - 200, window.height())
         app.processEvents()
         assert plot_item.sceneBoundingRect().width() < initial_width
-        window.graphics_view.resize(view_width, window.graphics_view.height())
+        window.resize(window_width, window.height())
         app.processEvents()
         assert plot_item.sceneBoundingRect().width() > initial_width - 5
     finally:

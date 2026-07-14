@@ -245,14 +245,15 @@ _DRIVER = textwrap.dedent(
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     result_window = results_window.ResultsWindow(continuous_result)
-    result_window.showMaximized()
+    result_window.resize(700, 500)
+    result_window.show()
     for _ in range(5):
         app.processEvents()
     plot_item = next(
         item for item in result_window.scene.items()
         if isinstance(item, results_window.QGraphicsSvgItem)
     )
-    initial_view_width = result_window.graphics_view.width()
+    initial_window_width = result_window.width()
     initial_plot_width = plot_item.sceneBoundingRect().width()
     initial_available_width = (
         result_window.graphics_view.viewport().width()
@@ -261,18 +262,18 @@ _DRIVER = textwrap.dedent(
     )
     assert initial_plot_width >= initial_available_width * 0.9
 
-    result_window.graphics_view.resize(
-        initial_view_width - 200,
-        result_window.graphics_view.height(),
+    result_window.resize(
+        initial_window_width - 200,
+        result_window.height(),
     )
     for _ in range(3):
         app.processEvents()
     shrunken_width = plot_item.sceneBoundingRect().width()
     assert shrunken_width < initial_plot_width
 
-    result_window.graphics_view.resize(
-        initial_view_width,
-        result_window.graphics_view.height(),
+    result_window.resize(
+        initial_window_width,
+        result_window.height(),
     )
     for _ in range(3):
         app.processEvents()

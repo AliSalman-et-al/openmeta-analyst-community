@@ -41,6 +41,32 @@ def test_native_evidence_rejects_non_native_and_wrong_platform_plugins():
     )
 
 
+def test_exact_client_size_repositions_the_outer_frame_inside_the_screen(qapp):
+    import adaptive_layout_evidence
+
+    window = adaptive_layout_evidence.QtWidgets.QMainWindow()
+    window.show()
+    qapp.processEvents()
+    screen = window.screen() or qapp.primaryScreen()
+    available = screen.availableGeometry()
+    margins = window.windowHandle().frameMargins()
+    requested = adaptive_layout_evidence.QtCore.QSize(
+        available.width() - margins.left() - margins.right() - 1,
+        available.height() - margins.top() - margins.bottom() - 1,
+    )
+    window.move(available.bottomRight())
+
+    try:
+        adaptive_layout_evidence._show_at_exact_client_size(
+            qapp, window, requested
+        )
+
+        assert available.contains(window.frameGeometry())
+    finally:
+        window.close()
+        qapp.processEvents()
+
+
 def test_evidence_runner_captures_all_archetypes_and_runtime_contracts(
     qapp, monkeypatch, tmp_path
 ):

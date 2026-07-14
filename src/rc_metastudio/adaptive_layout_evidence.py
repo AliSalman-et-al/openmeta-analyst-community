@@ -255,10 +255,7 @@ def _show_at_exact_client_size(app, window, requested):
         target_frame = QtCore.QRect(frame)
         target_frame.moveTopLeft(available.topLeft())
         # layout-audit: allow=verification-layout-fixture; reason=native evidence positions an exact viewport fully within the owning display
-        window.move(
-            target_frame.left() + margins.left(),
-            target_frame.top() + margins.top(),
-        )
+        window.move(target_frame.topLeft())
         _flush(app)
     if window.size() != requested:
         raise RuntimeError(

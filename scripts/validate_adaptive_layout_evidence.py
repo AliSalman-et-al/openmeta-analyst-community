@@ -40,6 +40,11 @@ def _sha256(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _physical_pixel_extent(logical_extent, device_pixel_ratio):
+    """Match Qt's half-up conversion from positive logical to physical pixels."""
+    return int((logical_extent * device_pixel_ratio) + 0.5)
+
+
 def _read_nonblank_png(path, expected_size=None):
     image = QtGui.QImage(str(path))
     if image.isNull():
@@ -162,8 +167,8 @@ def validate_evidence(root, expected_platform, expected_scale):
         if dpr <= 0:
             _fail("invalid device pixel ratio for %s" % relative)
         expected_pixels = [
-            round(frame[2] * dpr),
-            round(frame[3] * dpr),
+            _physical_pixel_extent(frame[2], dpr),
+            _physical_pixel_extent(frame[3], dpr),
         ]
         if expected_pixels != record.get("capture_pixel_size"):
             _fail("capture geometry/DPR metadata is inconsistent for %s" % relative)
