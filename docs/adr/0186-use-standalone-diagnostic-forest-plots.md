@@ -1,13 +1,13 @@
 # Use Standalone Diagnostic Forest Plots
 
-Status: accepted - supersedes ADR 0181.
+Status: accepted.
 
 Diagnostic analyses should emit one standalone Forest Plot Artifact per metric.
 Sensitivity, Specificity, Positive Likelihood Ratio, and Negative Likelihood
 Ratio therefore each own a Forest Render Bundle, output path, result title, and
 plot-parameter path.
 
-The twin-panel composition from ADR 0181 made two metrics share one render
+The former twin-panel composition made two metrics share one render
 contract. That special case prevented ordinary Edit Plot behavior and required
 separate rendering, persistence, and export paths. Independent artifacts use
 the same metafor Forest Renderer and Plot Options Surface as other forest plots

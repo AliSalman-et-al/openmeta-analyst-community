@@ -1,6 +1,6 @@
 # Consolidate on the In-Process rpy2 Backend
 
-The modern Python 3.11 / PyQt5 build runs meta-analyses through the in-process `meta_py_r` (rpy2) backend only. The out-of-process R bridge (`r_bridge.py`) and its adapter (`analysis_backend.py`) are removed. This supersedes ADR 0028, whose out-of-process bridge was an explicit fallback "if the dependency feasibility spike shows that the Python 3 runtime cannot use the pinned reference R stack through in-process rpy2."
+The modern Python 3.11 / PyQt5 build runs meta-analyses through the in-process `meta_py_r` (rpy2) backend only. The out-of-process R bridge (`r_bridge.py`) and its adapter (`analysis_backend.py`) are removed. An out-of-process fallback is not part of the maintained architecture because in-process rpy2 was shown to run all analysis types against the bundled R stack.
 
 That premise no longer holds. In-process rpy2 (rpy2 3.6.7 against R 4.6.0 with the bundled openmetar/HSROC packages) runs binary, continuous, and diagnostic analyses end to end, verified against the sample datasets - for example the `lymph.oma` diagnostic workflow reproduces Sensitivity 0.666 [0.594, 0.732] at k = 17. Python-3 / rpy2-3.x porting defects had previously masked this, including a `bytes`-vs-`str` sanitization bug and NULL detection via `str(x) == "NULL"`; with those fixed the in-process path is the simplest backend that actually works.
 

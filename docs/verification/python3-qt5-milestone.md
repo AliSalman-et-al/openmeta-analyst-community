@@ -69,8 +69,8 @@ This checklist defines the first modernization milestone for RC MetaStudio Commu
 
 ## Project Files
 
-- Existing `.rcms` files must open without user-visible migration steps. See [ADR 0009](../adr/0009-require-oma-read-compatibility-before-byte-perfect-writes.md).
-- Save compatibility is initially proven through representative round-trip tests rather than byte-for-byte identical output. See [ADR 0009](../adr/0009-require-oma-read-compatibility-before-byte-perfect-writes.md).
+- Existing `.rcms` files must open without user-visible migration steps. See [ADR 0084](../adr/0084-adopt-rcms-project-files-and-retire-oma-compatibility.md).
+- Save compatibility is initially proven through representative round-trip tests rather than byte-for-byte identical output. See [ADR 0084](../adr/0084-adopt-rcms-project-files-and-retire-oma-compatibility.md).
 - Defer project file format evolution until after the port is stable. See [ADR 0019](../adr/0019-defer-project-file-format-evolution.md).
 
 ## Porting Rules
@@ -91,7 +91,7 @@ This checklist defines the first modernization milestone for RC MetaStudio Commu
 - Keep dependency management changes minimal and milestone-driven. See [ADR 0020](../adr/0020-keep-dependency-management-minimal-and-milestone-driven.md).
 - Use `uv` as the Modern Python Environment and command runner: `pyproject.toml`, a committed `uv.lock`, `uv sync --locked` for reproducible installs, and `uv run` for tests and developer commands. PyInstaller remains the Windows distributable builder. See [ADR 0020](../adr/0020-keep-dependency-management-minimal-and-milestone-driven.md) and [ADR 0041](../adr/0041-use-pyinstaller-as-the-default-windows-packaging-candidate.md).
 - The dependency feasibility spike has produced the first viable dependency set; keep the Modern Python Environment in `pyproject.toml` and the committed `uv.lock`.
-- If in-process rpy2 cannot support the pinned R stack, use an out-of-process R bridge before R-stack modernization. See [ADR 0028](../adr/0028-prefer-an-out-of-process-r-bridge-before-r-stack-modernization.md).
+- Use the maintained in-process rpy2 backend for R-backed analysis. See [ADR 0052](../adr/0052-consolidate-on-the-in-process-rpy2-backend.md).
 - Include a Windows distributable in the first modernization milestone, after the headless harness and first GUI slice. See [ADR 0010](../adr/0010-include-windows-packaging-in-the-first-modernization-milestone.md).
 - Use PyInstaller as the default Windows packaging candidate unless feasibility work proves it unsuitable. See [ADR 0041](../adr/0041-use-pyinstaller-as-the-default-windows-packaging-candidate.md).
 - Include minimal user-facing release documentation for the Python 3 and Qt 5 Windows build. See [ADR 0025](../adr/0025-include-minimal-user-docs-in-the-first-modernization-release.md).
