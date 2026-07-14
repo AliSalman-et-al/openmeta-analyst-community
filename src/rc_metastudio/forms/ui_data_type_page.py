@@ -149,7 +149,7 @@ class Ui_DataTypePage(object):
         icon5 = QtGui.QIcon()
         icon5.addPixmap(QtGui.QPixmap(":/icons/dataset-types/two-arm-means.svg"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.twoarm_means_Button.setIcon(icon5)
-        self.twoarm_means_Button.setIconSize(QtCore.QSize(54, 40))
+        self.twoarm_means_Button.setIconSize(QtCore.QSize(58, 40))
         self.twoarm_means_Button.setCheckable(True)
         self.twoarm_means_Button.setToolButtonStyle(QtCore.Qt.ToolButtonTextUnderIcon)
         self.twoarm_means_Button.setObjectName("twoarm_means_Button")

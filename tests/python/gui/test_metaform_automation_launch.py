@@ -380,8 +380,13 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
 
     wide_dataset_icon_sizes = {
         ":/icons/dataset-types/generic-effect-size.svg": (54, 40),
-        ":/icons/dataset-types/two-arm-means.svg": (54, 40),
+        ":/icons/dataset-types/two-arm-means.svg": (58, 40),
         ":/icons/dataset-types/two-arm-proportions.svg": (72, 44),
+    }
+    simple_dataset_height_ranges = {
+        ":/icons/dataset-types/one-arm-mean.svg": (18, 21),
+        ":/icons/dataset-types/single-regression-coefficient.svg": (20, 22),
+        ":/icons/dataset-types/standardized-mean-difference.svg": (19, 21),
     }
 
     for resource_path, source_path in resources.items():
@@ -441,9 +446,15 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
                     - min(y for _, y in visible_pixels)
                     + 1
                 )
+                visible_width = (
+                    max(x for x, _ in visible_pixels)
+                    - min(x for x, _ in visible_pixels)
+                    + 1
+                )
                 if family == "actions":
-                    assert visible_height >= 14, (
-                        f"{resource_path} is optically undersized beside toolbar actions"
+                    assert 17 <= visible_width <= 22
+                    assert 17 <= visible_height <= 22, (
+                        f"{resource_path} is outside the toolbar optical-size grid"
                     )
                 elif (
                     family == "dataset-types"
@@ -452,8 +463,25 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
                     assert 13 <= visible_height <= 24, (
                         f"{resource_path} is outside the dataset icon optical-size range"
                     )
+                    center_x = (
+                        min(x for x, _ in visible_pixels)
+                        + max(x for x, _ in visible_pixels)
+                    ) / 2
+                    center_y = (
+                        min(y for _, y in visible_pixels)
+                        + max(y for _, y in visible_pixels)
+                    ) / 2
+                    assert abs(center_x - (rendered_width - 1) / 2) <= 2
+                    assert abs(center_y - (rendered_height - 1) / 2) <= 2
+                    if resource_path in simple_dataset_height_ranges:
+                        minimum_height, maximum_height = (
+                            simple_dataset_height_ranges[resource_path]
+                        )
+                        assert minimum_height <= visible_height <= maximum_height
 
                 if family == "analyses":
+                    assert 20 <= visible_width <= 21
+                    assert 20 <= visible_height <= 21
                     alpha_mass = sum(
                         QtGui.qAlpha(image.pixel(x, y))
                         for y in range(rendered_height)
@@ -483,6 +511,23 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
             assert 13 <= ui_visible_height <= 24, (
                 f"{resource_path} is outside the dataset icon optical-size range"
             )
+
+            ui_visible_width = (
+                max(x for x, _ in ui_visible_pixels)
+                - min(x for x, _ in ui_visible_pixels)
+                + 1
+            )
+            ui_center_x = (
+                min(x for x, _ in ui_visible_pixels)
+                + max(x for x, _ in ui_visible_pixels)
+            ) / 2
+            ui_center_y = (
+                min(y for _, y in ui_visible_pixels)
+                + max(y for _, y in ui_visible_pixels)
+            ) / 2
+            assert abs(ui_center_x - (ui_image.width() - 1) / 2) <= 2
+            assert abs(ui_center_y - (ui_image.height() - 1) / 2) <= 2
+            assert ui_visible_width <= requested_width - 2
 
     canonical_ui = "\n".join(
         path.read_text(encoding="utf-8")

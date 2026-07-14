@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
   <defs><linearGradient id="blue" x1="8" y1="8" x2="40" y2="22" gradientUnits="userSpaceOnUse"><stop stop-color="#35D3F3"/><stop offset="1" stop-color="#1975E8"/></linearGradient><linearGradient id="violet" x1="8" y1="27" x2="40" y2="41" gradientUnits="userSpaceOnUse"><stop stop-color="#B45AF2"/><stop offset="1" stop-color="#7252D3"/></linearGradient></defs>
-  <rect x="3" y="3" width="42" height="42" rx="9" fill="#E7F8FF"/>
+  <rect x="4" y="4" width="40" height="40" rx="8.5" fill="#E7F8FF"/>
   <path d="M24 5v38" stroke="#0F5EA8" stroke-width="1.5" stroke-linecap="round"/>
   <g stroke="url(#blue)" stroke-width="1.5" stroke-linecap="round" fill="#1975E8"><path d="M10 10h27"/><rect x="17.75" y="7.75" width="4.5" height="4.5" rx="1" stroke="none"/><path d="M13 19h28"/><rect x="28.75" y="16.75" width="4.5" height="4.5" rx="1" stroke="none"/></g>
   <g stroke="url(#violet)" stroke-width="1.5" stroke-linecap="round" fill="#805AD5"><path d="M8 29h29"/><rect x="18.75" y="26.75" width="4.5" height="4.5" rx="1" stroke="none"/><path d="M14 38h27"/><rect x="29.75" y="35.75" width="4.5" height="4.5" rx="1" stroke="none"/></g>

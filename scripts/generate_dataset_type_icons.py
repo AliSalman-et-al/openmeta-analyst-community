@@ -34,12 +34,17 @@ def _new_figure(
 
 def _save(figure: Figure, name: str) -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = OUTPUT_DIR / name
     figure.savefig(
-        OUTPUT_DIR / name,
+        output_path,
         format="svg",
         transparent=True,
         metadata={"Date": None, "Creator": "RC MetaStudio icon generator"},
     )
+    normalized_svg = "\n".join(
+        line.rstrip() for line in output_path.read_text(encoding="utf-8").splitlines()
+    )
+    output_path.write_text(f"{normalized_svg}\n", encoding="utf-8")
 
 
 def _single_formula(
@@ -48,11 +53,12 @@ def _single_formula(
     *,
     size: float,
     canvas: tuple[float, float] = (48, 48),
+    y_center: float = 0.5,
 ) -> None:
     figure, axes = _new_figure(width=canvas[0], height=canvas[1])
     axes.text(
         0.5,
-        0.50,
+        y_center,
         formula,
         color=INK,
         fontsize=size,
@@ -71,11 +77,12 @@ def _paired_formula(
     arm_center: float = 0.18,
     separator_size: float = 8.5,
     canvas: tuple[float, float] = (48, 48),
+    y_center: float = 0.5,
 ) -> None:
     figure, axes = _new_figure(width=canvas[0], height=canvas[1])
     axes.text(
         arm_center,
-        0.50,
+        y_center,
         left,
         color=INK,
         fontsize=size,
@@ -84,7 +91,7 @@ def _paired_formula(
     )
     axes.text(
         1 - arm_center,
-        0.50,
+        y_center,
         right,
         color=INK,
         fontsize=size,
@@ -93,7 +100,7 @@ def _paired_formula(
     )
     axes.text(
         0.5,
-        0.49,
+        y_center - 0.01,
         r"$\mathrm{vs}$",
         color=MID_INK,
         fontsize=separator_size,
@@ -133,8 +140,8 @@ def main() -> None:
         }
     )
     _single_formula("one-arm-proportion.svg", r"$\frac{x}{N}$", size=27)
-    _single_formula("one-arm-mean.svg", r"$\mu$", size=31)
-    _single_formula("single-regression-coefficient.svg", r"$\beta$", size=31)
+    _single_formula("one-arm-mean.svg", r"$\mu$", size=34, y_center=0.57)
+    _single_formula("single-regression-coefficient.svg", r"$\beta$", size=27)
     _single_formula(
         "generic-effect-size.svg",
         r"$(\theta,\,SE)$",
@@ -154,12 +161,18 @@ def main() -> None:
         "two-arm-means.svg",
         r"$\mu_1$",
         r"$\mu_2$",
-        size=18,
+        size=19,
         arm_center=0.19,
-        separator_size=9,
-        canvas=(54, 40),
+        separator_size=9.5,
+        canvas=(58, 40),
+        y_center=0.56,
     )
-    _single_formula("standardized-mean-difference.svg", r"$g$", size=32)
+    _single_formula(
+        "standardized-mean-difference.svg",
+        r"$g$",
+        size=34,
+        y_center=0.57,
+    )
     _diagnostic()
 
 
