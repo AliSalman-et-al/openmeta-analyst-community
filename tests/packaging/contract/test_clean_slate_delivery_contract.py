@@ -122,5 +122,5 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     assert "git push origin" not in community + sign + promote
     assert "UNSIGNED COMMUNITY BUILD" not in community + promote
     assert "SmartScreen and Gatekeeper warnings" not in community + promote
-    assert "Signing status: Unsigned community build." in community
-    assert "Signing status: Unsigned community build." in promote
+    assert "**Signing status:** Unsigned community build." in community
+    assert "**Signing status:** Unsigned community build." in promote
