@@ -428,6 +428,7 @@ def test_macos_distributable_contract_is_declared():
         "sha256_stdin_12",
         "test_r_dependency_packages",
         "copy_r_library_packages",
+        "relocate_bundled_r_runtime",
     } <= script["functions"]
     assert {"--windowed", "--target-architecture", "--osx-bundle-identifier"} <= script[
         "pyinstaller_options"
@@ -548,6 +549,22 @@ def test_macos_packager_copies_resolved_r_runtime_contents():
         'r_runtime_root="$(resolve_existing_dir "$r_runtime_root" "Source R runtime")"',
         'copy_tree "$r_runtime_root" "$app_root/R"',
         'if [ ! -x "$rscript" ] || [ ! -x "$r_binary" ]; then',
+    )
+
+
+def test_macos_packager_relocates_every_bundled_r_macho_before_use():
+    script = sh_contract("scripts", "build-macos-package.sh")["text"]
+
+    assert "find \"$r_home\" -type f -print0" in script
+    assert "file \"$binary\" | grep -q 'Mach-O'" in script
+    assert "otool -L \"$binary\"" in script
+    assert 'install_name_tool -change "$dependency" "@loader_path/$relative_target"' in script
+    assert "Bundled R runtime retains an absolute source-framework dependency" in script
+    assert relative_order(
+        script,
+        'copy_tree "$r_runtime_root" "$app_root/R"',
+        "relocate_bundled_r_runtime",
+        'r_version_cache_key="$("$rscript"',
     )
 
 

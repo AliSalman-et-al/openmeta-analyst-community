@@ -290,6 +290,53 @@ if [ ! -x "$rscript" ] || [ ! -x "$r_binary" ]; then
   exit 1
 fi
 
+relocate_bundled_r_runtime() {
+  local binary dependency source_relative target loader_dir relative_target
+  while IFS= read -r -d '' binary; do
+    file "$binary" | grep -q 'Mach-O' || continue
+    while IFS= read -r dependency; do
+      case "$dependency" in
+        "$r_runtime_root"/*)
+          source_relative="${dependency#"$r_runtime_root"/}"
+          ;;
+        /Library/Frameworks/R.framework/Versions/*/Resources/*)
+          source_relative="${dependency#*/Resources/}"
+          ;;
+        *)
+          continue
+          ;;
+      esac
+      target="$r_home/$source_relative"
+      if [ ! -e "$target" ]; then
+        echo "Bundled R dependency target is missing for $binary: $dependency" >&2
+        exit 1
+      fi
+      loader_dir="$(dirname "$binary")"
+      relative_target="$("$python_exe" - "$loader_dir" "$target" <<'PY'
+import os
+import sys
+print(os.path.relpath(sys.argv[2], sys.argv[1]))
+PY
+)"
+      install_name_tool -change "$dependency" "@loader_path/$relative_target" "$binary"
+    done < <(otool -L "$binary" | awk 'NR > 1 { print $1 }')
+  done < <(find "$r_home" -type f -print0)
+
+  local dependency_report
+  dependency_report="$(find "$r_home" -type f -print0 | while IFS= read -r -d '' binary; do
+    file "$binary" | grep -q 'Mach-O' || continue
+    otool -L "$binary"
+  done)"
+  if printf '%s\n' "$dependency_report" | grep -F "$r_runtime_root/" \
+    || printf '%s\n' "$dependency_report" | grep -E '/Library/Frameworks/R\.framework/.*/Resources|R\.framework/Resources'; then
+    echo "Bundled R runtime retains an absolute source-framework dependency." >&2
+    exit 1
+  fi
+}
+
+step "Relocating bundled R runtime dependencies"
+relocate_bundled_r_runtime
+
 r_version_cache_key="$("$rscript" -e "cat(paste0('R-', getRversion()))")"
 sha256_file() {
   if command -v sha256sum >/dev/null 2>&1; then
