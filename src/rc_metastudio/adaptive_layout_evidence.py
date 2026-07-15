@@ -229,6 +229,11 @@ def run_native_adaptive_layout_evidence(app, main_window, sample_path, output_di
 def _show_at_exact_client_size(app, window, requested):
     screen = window.screen() or app.primaryScreen()
     available = screen.availableGeometry()
+    window.setWindowState(
+        window.windowState()
+        & ~QtCore.Qt.WindowMaximized
+        & ~QtCore.Qt.WindowFullScreen
+    )
     window.showNormal()
     window.show()
     _flush(app)

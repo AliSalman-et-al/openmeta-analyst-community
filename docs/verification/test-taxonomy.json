@@ -7242,6 +7242,16 @@
       "reason": "Guards the main table Copy command when no cells are selected.",
       "runtime_class": "subsecond",
       "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_layout_native_evidence.py::test_exact_client_size_clears_sticky_maximized_state",
+      "reason": "Guards exact native evidence sizing when a platform retains maximized state during showNormal.",
+      "runtime_class": "subsecond",
+      "size": "small"
     }
 
   ]
