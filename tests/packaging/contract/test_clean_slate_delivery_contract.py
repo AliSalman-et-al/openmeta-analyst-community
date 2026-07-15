@@ -109,3 +109,7 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     assert "push:\n    tags:" not in legacy
     assert "refusing overwrite" in sign.lower() and "refusing overwrite" in promote.lower()
     assert "sha256sum --check SHA256SUMS" in promote
+    for publisher in (community, sign, promote):
+        assert publisher.index('git config user.name "github-actions[bot]"') < publisher.index(
+            "git tag -a"
+        )
