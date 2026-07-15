@@ -59,6 +59,7 @@ jobs:
           if (-not $manifest) { throw "Initial release set is missing." }
           $profile = (Get-Content $manifest.FullName -Raw | ConvertFrom-Json).trust_profile
           if ($profile -ne 'trusted-signed') { throw "Candidate trust profile is $profile, expected trusted-signed." }
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
       - run: uv python install 3.11.9
       - name: Expand Windows candidate
         if: matrix.target == 'windows-x64'

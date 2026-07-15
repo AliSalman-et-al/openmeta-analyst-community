@@ -90,15 +90,20 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
 
     candidate = (ROOT / ".github/workflows/candidate.yml").read_text(encoding="utf-8")
     sign = (ROOT / ".github/workflows/release-candidate.yml").read_text(encoding="utf-8")
+    community = (
+        ROOT / ".github/workflows/community-release-candidate.yml"
+    ).read_text(encoding="utf-8")
     promote = (ROOT / ".github/workflows/promote.yml").read_text(encoding="utf-8")
     legacy = (ROOT / ".github/workflows/package-verification.yml").read_text(encoding="utf-8")
     assert "contents: write" not in candidate
     assert "environment: ${{ matrix.environment }}" in sign
     assert "attestations: write" in sign
     assert "--automation-native-smoke" in sign
-    assert "--automation-native-smoke" in (
-        ROOT / ".github/workflows/community-release-candidate.yml"
-    ).read_text(encoding="utf-8")
+    assert "--automation-native-smoke" in community
+    for qualification in (sign, community):
+        assert qualification.index("astral-sh/setup-uv@") < qualification.index(
+            "uv python install 3.11.9"
+        )
     assert "automation-adaptive-layout-evidence" not in sign
     assert "--clobber" not in sign + promote + legacy
     assert "push:\n    tags:" not in legacy
