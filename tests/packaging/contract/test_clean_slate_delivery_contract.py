@@ -109,6 +109,8 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     assert "push:\n    tags:" not in legacy
     assert "refusing overwrite" in sign.lower() and "refusing overwrite" in promote.lower()
     assert "sha256sum --check SHA256SUMS" in promote
+    verification_step = promote[promote.index("Verify RC release set") : promote.index("Publish stable release")]
+    assert "GH_TOKEN: ${{ github.token }}" in verification_step
     for publisher in (community, sign, promote):
         assert "git ls-remote --exit-code --tags origin" in publisher
         assert "tag_args=(--verify-tag)" in publisher
