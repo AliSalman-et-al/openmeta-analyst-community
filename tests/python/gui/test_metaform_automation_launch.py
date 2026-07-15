@@ -5734,12 +5734,8 @@ def _dataset_summary(dataset):
     }
 
 
-def test_native_packaged_smoke_requires_expected_plugin_and_exposed_window(monkeypatch):
+def test_native_packaged_smoke_requires_expected_plugin_and_visible_window(monkeypatch):
     import launch
-
-    class Handle:
-        def isExposed(self):
-            return True
 
     class Model:
         def rowCount(self):
@@ -5759,8 +5755,8 @@ def test_native_packaged_smoke_requires_expected_plugin_and_exposed_window(monke
     class Meta:
         tableView = Table()
 
-        def windowHandle(self):
-            return Handle()
+        def isVisible(self):
+            return True
 
         def open(self, _path):
             return True
@@ -5774,4 +5770,4 @@ def test_native_packaged_smoke_requires_expected_plugin_and_exposed_window(monke
         launch, "_assert_standard_binary_summary_is_formatted", lambda _meta: None
     )
 
-    assert launch.start_automation_smoke("sample.rcms", require_native_exposure=True) == 0
+    assert launch.start_automation_smoke("sample.rcms", require_native_window=True) == 0

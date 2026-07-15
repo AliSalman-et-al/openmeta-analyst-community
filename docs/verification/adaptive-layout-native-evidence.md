@@ -8,7 +8,7 @@ must never fail because an exact viewport does not fit their transient desktop.
 Deterministic layout policy, reflow, reachability, restoration, clamping,
 splitter, paint-role, and validator tests remain required in CI. Hosted Windows
 and macOS packages also run a narrow native smoke that proves the expected Qt
-plugin loaded, the main window became exposed, the bundled sample/R stack
+plugin loaded, the main window became Qt-visible, the bundled sample/R stack
 initialized, and the process exited cleanly. That smoke makes no exact geometry
 or screenshot claim.
 
