@@ -169,7 +169,7 @@ def _write_validator_fixture(tmp_path, validator):
                 "client_paint_probe_pixel_size": client_size,
                 "client_paint_probe_device_pixel_ratio": 1.0,
                 "capture_region": "native-frame",
-                "capture_method": "QScreen.grabWindow(desktop, frameGeometry)",
+                "capture_method": "QScreen.grabWindow(desktop); physical frame crop",
             }
         )
     artifact = tmp_path / "intrinsic-ratio-evidence.png"

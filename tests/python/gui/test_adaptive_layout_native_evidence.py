@@ -67,6 +67,35 @@ def test_exact_client_size_repositions_the_outer_frame_inside_the_screen(qapp):
         qapp.processEvents()
 
 
+def test_native_frame_capture_retries_until_compositor_pixels_are_visible(
+    qapp, monkeypatch
+):
+    import adaptive_layout_evidence
+
+    blank = adaptive_layout_evidence.QtGui.QPixmap(140, 89)
+    blank.fill(adaptive_layout_evidence.QtGui.QColor("white"))
+    painted = adaptive_layout_evidence.QtGui.QPixmap(blank.size())
+    painted.fill(adaptive_layout_evidence.QtGui.QColor("white"))
+    painter = adaptive_layout_evidence.QtGui.QPainter(painted)
+    painter.fillRect(20, 20, 100, 40, adaptive_layout_evidence.QtGui.QColor("blue"))
+    painter.end()
+    grabs = iter((blank, blank, painted))
+    calls = []
+
+    def grab(_screen, _window):
+        calls.append(True)
+        return next(grabs)
+
+    monkeypatch.setattr(adaptive_layout_evidence, "_grab_native_frame", grab)
+
+    result = adaptive_layout_evidence._grab_painted_native_frame(
+        qapp, object(), adaptive_layout_evidence.QtWidgets.QWidget()
+    )
+
+    assert result.cacheKey() == painted.cacheKey()
+    assert len(calls) == 3
+
+
 def test_evidence_runner_captures_all_archetypes_and_runtime_contracts(
     qapp, monkeypatch, tmp_path
 ):
@@ -98,8 +127,8 @@ def test_evidence_runner_captures_all_archetypes_and_runtime_contracts(
         - adaptive_layout_evidence.QtCore.QSize(40, 40),
     )
 
-    def grab_test_frame(_screen, frame):
-        pixmap = adaptive_layout_evidence.QtGui.QPixmap(frame.size())
+    def grab_test_frame(_screen, window):
+        pixmap = adaptive_layout_evidence.QtGui.QPixmap(window.frameGeometry().size())
         pixmap.fill(adaptive_layout_evidence.QtGui.QColor("white"))
         painter = adaptive_layout_evidence.QtGui.QPainter(pixmap)
         painter.fillRect(

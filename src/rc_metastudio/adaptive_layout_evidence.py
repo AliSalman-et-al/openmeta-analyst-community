@@ -312,7 +312,7 @@ def _capture_surface(
     if paint_probe.isNull() or paint_probe.width() < 1 or paint_probe.height() < 1:
         raise RuntimeError("%s did not produce a painted client image." % name)
     frame = window.frameGeometry()
-    pixmap = _grab_native_frame(screen, frame)
+    pixmap = _grab_painted_native_frame(app, screen, window)
     if pixmap.isNull() or pixmap.width() < 1 or pixmap.height() < 1:
         raise RuntimeError("QScreen.grabWindow could not capture %s." % name)
     filename = "%s.png" % name
@@ -347,18 +347,58 @@ def _capture_surface(
         "screenshot": str(path.relative_to(screenshots.parent)).replace("\\", "/"),
         "sha256": hashlib.sha256(payload).hexdigest(),
         "capture_region": "native-frame",
-        "capture_method": "QScreen.grabWindow(desktop, frameGeometry)",
+        "capture_method": "QScreen.grabWindow(desktop); physical frame crop",
     }
 
 
-def _grab_native_frame(screen, frame):
-    return screen.grabWindow(
-        0,
-        frame.x(),
-        frame.y(),
-        frame.width(),
-        frame.height(),
+def _grab_native_frame(screen, window):
+    frame = window.frameGeometry()
+    desktop = screen.grabWindow(0)
+    if desktop.isNull():
+        return desktop
+    screen_geometry = screen.geometry()
+    dpr = desktop.devicePixelRatio()
+    physical = QtCore.QRect(
+        _physical_pixel_extent(frame.x() - screen_geometry.x(), dpr),
+        _physical_pixel_extent(frame.y() - screen_geometry.y(), dpr),
+        _physical_pixel_extent(frame.width(), dpr),
+        _physical_pixel_extent(frame.height(), dpr),
     )
+    captured = desktop.copy(physical)
+    captured.setDevicePixelRatio(dpr)
+    return captured
+
+
+def _physical_pixel_extent(logical_extent, device_pixel_ratio):
+    return int((logical_extent * device_pixel_ratio) + 0.5)
+
+
+def _grab_painted_native_frame(app, screen, window, attempts=5):
+    """Wait for the compositor to expose real frame pixels before accepting a grab."""
+    pixmap = QtGui.QPixmap()
+    for attempt in range(attempts):
+        pixmap = _grab_native_frame(screen, window)
+        if not pixmap.isNull() and _pixmap_has_pixel_variation(pixmap):
+            return pixmap
+        if attempt + 1 < attempts:
+            QtCore.QThread.msleep(50)
+            _flush(app)
+    raise RuntimeError(
+        "%s native frame remained blank after %s compositor capture attempts."
+        % (window.objectName() or window.windowTitle(), attempts)
+    )
+
+
+def _pixmap_has_pixel_variation(pixmap):
+    if pixmap.isNull() or pixmap.width() < 1 or pixmap.height() < 1:
+        return False
+    image = pixmap.toImage().convertToFormat(QtGui.QImage.Format_ARGB32)
+    first = image.pixel(0, 0)
+    for y in range(0, image.height(), max(1, image.height() // 32)):
+        for x in range(0, image.width(), max(1, image.width() // 32)):
+            if image.pixel(x, y) != first:
+                return True
+    return False
 
 
 def _exercise_main_workspace(window):

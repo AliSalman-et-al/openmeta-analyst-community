@@ -112,7 +112,7 @@ def _validate_scenario_semantics(record):
         _fail("%s frame is outside its recorded available screen" % name)
     if record.get("capture_region") != "native-frame":
         _fail("%s is not a native-frame capture" % name)
-    if record.get("capture_method") != "QScreen.grabWindow(desktop, frameGeometry)":
+    if record.get("capture_method") != "QScreen.grabWindow(desktop); physical frame crop":
         _fail("%s has an unexpected capture method" % name)
     probe = record.get("client_paint_probe_pixel_size")
     if not isinstance(probe, list) or len(probe) != 2 or min(probe) < 1:
