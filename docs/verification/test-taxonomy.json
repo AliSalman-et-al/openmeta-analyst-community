@@ -7172,6 +7172,76 @@
       "reason": "Exercises screenshot capture, metadata, remembered geometry, tables, splitters, and runtime resize across all archetypes.",
       "runtime_class": "seconds",
       "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_native_evidence_validator_matches_qt_half_up_pixel_rounding",
+      "reason": "Guards native screenshot dimension validation against Qt half-up device-pixel rounding.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_layout_native_evidence.py::test_exact_client_size_repositions_the_outer_frame_inside_the_screen",
+      "reason": "Guards exact client sizing while keeping the native outer frame reachable on its owning screen.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_layout_native_evidence.py::test_native_frame_capture_retries_until_compositor_pixels_are_visible",
+      "reason": "Guards native evidence capture against transient blank compositor frames.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_analysis_configuration_layout.py::test_method_parameters_opens_at_its_content_preferred_width",
+      "reason": "Guards first-show sizing of the Method and Parameters Transactional Dialog.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_edit_empty_dataset_acceptance_preserves_empty_outcome_state",
+      "reason": "Guards accepting the Edit Dataset workspace when the dataset has no outcomes.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_edit_empty_dataset_can_be_cancelled",
+      "reason": "Guards cancelling the Edit Dataset workspace when the dataset has no outcomes.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_toolbar_copy_without_a_selection_is_a_no_op",
+      "reason": "Guards the main table Copy command when no cells are selected.",
+      "runtime_class": "subsecond",
+      "size": "small"
     }
 
   ]
