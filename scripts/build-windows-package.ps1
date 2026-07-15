@@ -125,6 +125,63 @@ function Invoke-PackagedAppSmokeTest {
     }
 }
 
+function Invoke-PackagedAdaptiveLayoutEvidence {
+    param([string]$Root)
+    $exePath = Join-Path $Root "RCMetaStudio.exe"
+    $samplePath = Join-Path $Root "sample_projects\amino.rcms"
+    $evidenceRoot = Join-Path $repoRoot "build\windows-package\adaptive-layout-evidence\windows-x64"
+    if (Test-Path $evidenceRoot) { Remove-Item -LiteralPath $evidenceRoot -Recurse -Force }
+    $previousEnv = @{
+        QT_QPA_PLATFORM = $env:QT_QPA_PLATFORM
+        QT_SCALE_FACTOR = $env:QT_SCALE_FACTOR
+        RCMS_REQUIRE_IN_PROCESS_RPY2 = $env:RCMS_REQUIRE_IN_PROCESS_RPY2
+        RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG = $env:RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG
+        RPY2_CFFI_MODE = $env:RPY2_CFFI_MODE
+    }
+    try {
+        Remove-Item Env:\QT_QPA_PLATFORM -ErrorAction SilentlyContinue
+        $env:RCMS_REQUIRE_IN_PROCESS_RPY2 = "1"
+        $env:RPY2_CFFI_MODE = "ABI"
+        foreach ($scale in @(
+            @{ Value = "1.0"; Directory = "scale-100" },
+            @{ Value = "1.5"; Directory = "scale-150" }
+        )) {
+            $outputDir = Join-Path $evidenceRoot $scale.Directory
+            $logPath = Join-Path $outputDir "automation-adaptive-layout-evidence.log"
+            New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
+            $env:QT_SCALE_FACTOR = $scale.Value
+            $env:RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG = $logPath
+            $quotedOutputDir = '"{0}"' -f $outputDir
+            $quotedSamplePath = '"{0}"' -f $samplePath
+            $process = Start-Process -FilePath $exePath -ArgumentList @(
+                "--automation-adaptive-layout-evidence", $quotedOutputDir, $quotedSamplePath
+            ) -Wait -PassThru
+            if ($process.ExitCode -ne 0) {
+                $message = "Native adaptive-layout evidence failed at scale $($scale.Value) with exit code $($process.ExitCode)."
+                if (Test-Path $logPath) {
+                    $message = $message + " " + (Get-Content -Raw -LiteralPath $logPath).Trim()
+                }
+                throw $message
+            }
+            & $PythonExe (Join-Path $repoRoot "scripts\validate_adaptive_layout_evidence.py") `
+                --root $outputDir --platform-plugin windows --scale-factor $scale.Value
+            if ($LASTEXITCODE -ne 0) {
+                throw "Adaptive-layout evidence validation failed at scale $($scale.Value)."
+            }
+        }
+    }
+    finally {
+        foreach ($name in $previousEnv.Keys) {
+            if ($null -eq $previousEnv[$name]) {
+                Remove-Item "Env:\$name" -ErrorAction SilentlyContinue
+            }
+            else {
+                Set-Item "Env:\$name" $previousEnv[$name]
+            }
+        }
+    }
+}
+
 function Invoke-PackagedWizardLayoutSmokeTest {
     param([string]$Root)
     $exePath = Join-Path $Root "RCMetaStudio.exe"
@@ -247,7 +304,7 @@ function Get-RPackageCacheKey {
 function Test-RDependencyPackages {
     param([string]$RscriptExe, [string]$Library)
     if (-not (Test-Path $Library)) { return $false }
-    $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','metafor','lme4','pdftools','rsvg','svglite','tiff','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }; if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
+    $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','metafor','lme4','pdftools','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }; if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
     & $RscriptExe -e $verify
     return ($LASTEXITCODE -eq 0)
 }
@@ -255,7 +312,7 @@ function Test-RDependencyPackages {
 function Test-BundledRPackages {
     param([string]$RscriptExe, [string]$Library)
     if (-not (Test-Path $Library)) { return $false }
-    $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','RCMetaR','metafor','lme4','pdftools','rsvg','svglite','tiff','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }; if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
+    $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','RCMetaR','metafor','lme4','pdftools','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }; if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
     & $RscriptExe -e $verify
     return ($LASTEXITCODE -eq 0)
 }
@@ -372,7 +429,7 @@ function Install-BundledRPackages {
 
     Write-Step "Installing local RCMetaR package"
     Install-LocalRPackagesFromSource -Root $Root
-    & $rscriptExe -e "pkgs <- c('HSROC','RCMetaR','metafor','lme4','pdftools','rsvg','svglite','tiff','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
+    & $rscriptExe -e "pkgs <- c('HSROC','RCMetaR','metafor','lme4','pdftools','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
     if ($LASTEXITCODE -ne 0) { throw "Bundled R package verification failed." }
 
     if (-not (Test-BundledRPackages -RscriptExe $rscriptExe -Library $rLibrary)) { throw "Bundled R package verification failed after local RCMetaR install." }
@@ -464,6 +521,8 @@ Assert-AppLayout -Root $appDir
 if (-not $SkipSmoke) {
     Write-Step "Running packaged Windows smoke checks"
     Invoke-PackagedAppSmokeTest -Root $appDir
+    Write-Step "Capturing native Windows adaptive-layout evidence"
+    Invoke-PackagedAdaptiveLayoutEvidence -Root $appDir
     Invoke-PackagedWizardLayoutSmokeTest -Root $appDir
 }
 Compress-AppDirectory -SourceDirectory $appDir -ArchiveStagingRoot $archiveStagingRoot -ArchiveRootDirectory $archiveRootDir -DestinationPath $zipPath

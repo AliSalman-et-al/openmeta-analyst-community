@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'src\rc_metastudio\forms\welcome_page.ui'
+# Form implementation generated from reading ui file 'src/rc_metastudio/forms/welcome_page.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -14,107 +14,89 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_WizardPage(object):
     def setupUi(self, WizardPage):
         WizardPage.setObjectName("WizardPage")
-        WizardPage.resize(350, 230)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed
-        )
+        WizardPage.resize(0, 0)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(WizardPage.sizePolicy().hasHeightForWidth())
         WizardPage.setSizePolicy(sizePolicy)
-        WizardPage.setMinimumSize(QtCore.QSize(350, 230))
-        WizardPage.setMaximumSize(QtCore.QSize(350, 230))
-        self.verticalLayout_2 = QtWidgets.QVBoxLayout(WizardPage)
-        self.verticalLayout_2.setObjectName("verticalLayout_2")
-        self.horizontalLayout = QtWidgets.QHBoxLayout()
-        self.horizontalLayout.setObjectName("horizontalLayout")
-        spacerItem = QtWidgets.QSpacerItem(
-            40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
-        )
-        self.horizontalLayout.addItem(spacerItem)
+        self.workflowPageLayout = QtWidgets.QVBoxLayout(WizardPage)
+        self.workflowPageLayout.setContentsMargins(0, 0, 0, 0)
+        self.workflowPageLayout.setObjectName("workflowPageLayout")
+        self.pageScrollArea = QtWidgets.QScrollArea(WizardPage)
+        self.pageScrollArea.setFocusPolicy(QtCore.Qt.NoFocus)
+        self.pageScrollArea.setFrameShape(QtWidgets.QFrame.NoFrame)
+        self.pageScrollArea.setWidgetResizable(True)
+        self.pageScrollArea.setObjectName("pageScrollArea")
+        self.pageScrollContent = QtWidgets.QWidget()
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Preferred)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.pageScrollContent.sizePolicy().hasHeightForWidth())
+        self.pageScrollContent.setSizePolicy(sizePolicy)
+        self.pageScrollContent.setObjectName("pageScrollContent")
+        self.welcomeContentLayout = QtWidgets.QVBoxLayout(self.pageScrollContent)
+        self.welcomeContentLayout.setObjectName("welcomeContentLayout")
+        self.welcomeActionsLayout = QtWidgets.QHBoxLayout()
+        self.welcomeActionsLayout.setObjectName("welcomeActionsLayout")
+        spacerItem = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.welcomeActionsLayout.addItem(spacerItem)
         self.verticalLayout = QtWidgets.QVBoxLayout()
         self.verticalLayout.setObjectName("verticalLayout")
-        self.create_new_btn = QtWidgets.QPushButton(WizardPage)
+        self.create_new_btn = QtWidgets.QPushButton(self.pageScrollContent)
         icon = QtGui.QIcon()
-        icon.addPixmap(
-            QtGui.QPixmap(":/function_icon_set/function_icon_set/add_48.png"),
-            QtGui.QIcon.Normal,
-            QtGui.QIcon.Off,
-        )
+        icon.addPixmap(QtGui.QPixmap(":/icons/actions/new-dataset.svg"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.create_new_btn.setIcon(icon)
         self.create_new_btn.setObjectName("create_new_btn")
         self.verticalLayout.addWidget(self.create_new_btn)
-        self.import_csv_btn = QtWidgets.QPushButton(WizardPage)
+        self.import_csv_btn = QtWidgets.QPushButton(self.pageScrollContent)
         icon1 = QtGui.QIcon()
-        icon1.addPixmap(
-            QtGui.QPixmap(":/function_icon_set/function_icon_set/box_download_48.png"),
-            QtGui.QIcon.Normal,
-            QtGui.QIcon.Off,
-        )
+        icon1.addPixmap(QtGui.QPixmap(":/icons/actions/import-csv.svg"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.import_csv_btn.setIcon(icon1)
         self.import_csv_btn.setObjectName("import_csv_btn")
         self.verticalLayout.addWidget(self.import_csv_btn)
-        self.open_recent_btn = QtWidgets.QPushButton(WizardPage)
+        self.open_recent_btn = QtWidgets.QPushButton(self.pageScrollContent)
         icon2 = QtGui.QIcon()
-        icon2.addPixmap(
-            QtGui.QPixmap(":/function_icon_set/function_icon_set/folder_48.png"),
-            QtGui.QIcon.Normal,
-            QtGui.QIcon.Off,
-        )
+        icon2.addPixmap(QtGui.QPixmap(":/icons/actions/open.svg"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.open_recent_btn.setIcon(icon2)
         self.open_recent_btn.setObjectName("open_recent_btn")
         self.verticalLayout.addWidget(self.open_recent_btn)
-        self.open_btn = QtWidgets.QPushButton(WizardPage)
+        self.open_btn = QtWidgets.QPushButton(self.pageScrollContent)
         self.open_btn.setIcon(icon2)
         self.open_btn.setObjectName("open_btn")
         self.verticalLayout.addWidget(self.open_btn)
-        self.horizontalLayout.addLayout(self.verticalLayout)
-        spacerItem1 = QtWidgets.QSpacerItem(
-            40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
-        )
-        self.horizontalLayout.addItem(spacerItem1)
-        self.verticalLayout_2.addLayout(self.horizontalLayout)
-        spacerItem2 = QtWidgets.QSpacerItem(
-            20, 9, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding
-        )
-        self.verticalLayout_2.addItem(spacerItem2)
-        self.line = QtWidgets.QFrame(WizardPage)
+        self.welcomeActionsLayout.addLayout(self.verticalLayout)
+        spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.welcomeActionsLayout.addItem(spacerItem1)
+        self.welcomeContentLayout.addLayout(self.welcomeActionsLayout)
+        spacerItem2 = QtWidgets.QSpacerItem(20, 9, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        self.welcomeContentLayout.addItem(spacerItem2)
+        self.line = QtWidgets.QFrame(self.pageScrollContent)
         self.line.setFrameShape(QtWidgets.QFrame.HLine)
         self.line.setFrameShadow(QtWidgets.QFrame.Sunken)
         self.line.setObjectName("line")
-        self.verticalLayout_2.addWidget(self.line)
-        self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
-        self.horizontalLayout_2.setObjectName("horizontalLayout_2")
-        self.RCMS_onlineLabel = QtWidgets.QLabel(WizardPage)
-        self.RCMS_onlineLabel.setMinimumSize(QtCore.QSize(120, 0))
+        self.welcomeContentLayout.addWidget(self.line)
+        self.welcomeLinksLayout = QtWidgets.QVBoxLayout()
+        self.welcomeLinksLayout.setObjectName("welcomeLinksLayout")
+        self.RCMS_onlineLabel = QtWidgets.QLabel(self.pageScrollContent)
         self.RCMS_onlineLabel.setAlignment(QtCore.Qt.AlignCenter)
         self.RCMS_onlineLabel.setOpenExternalLinks(True)
         self.RCMS_onlineLabel.setObjectName("RCMS_onlineLabel")
-        self.horizontalLayout_2.addWidget(self.RCMS_onlineLabel)
-        self.line_3 = QtWidgets.QFrame(WizardPage)
-        self.line_3.setFrameShape(QtWidgets.QFrame.VLine)
-        self.line_3.setFrameShadow(QtWidgets.QFrame.Sunken)
-        self.line_3.setObjectName("line_3")
-        self.horizontalLayout_2.addWidget(self.line_3)
-        self.how_to_citeLabel = QtWidgets.QLabel(WizardPage)
+        self.welcomeLinksLayout.addWidget(self.RCMS_onlineLabel)
+        self.how_to_citeLabel = QtWidgets.QLabel(self.pageScrollContent)
         self.how_to_citeLabel.setEnabled(False)
-        self.how_to_citeLabel.setMinimumSize(QtCore.QSize(80, 0))
         self.how_to_citeLabel.setAlignment(QtCore.Qt.AlignCenter)
         self.how_to_citeLabel.setOpenExternalLinks(True)
         self.how_to_citeLabel.setObjectName("how_to_citeLabel")
-        self.horizontalLayout_2.addWidget(self.how_to_citeLabel)
-        self.line_4 = QtWidgets.QFrame(WizardPage)
-        self.line_4.setFrameShape(QtWidgets.QFrame.VLine)
-        self.line_4.setFrameShadow(QtWidgets.QFrame.Sunken)
-        self.line_4.setObjectName("line_4")
-        self.horizontalLayout_2.addWidget(self.line_4)
-        self.issue_feedback_label = QtWidgets.QLabel(WizardPage)
-        self.issue_feedback_label.setMinimumSize(QtCore.QSize(70, 0))
+        self.welcomeLinksLayout.addWidget(self.how_to_citeLabel)
+        self.issue_feedback_label = QtWidgets.QLabel(self.pageScrollContent)
         self.issue_feedback_label.setAlignment(QtCore.Qt.AlignCenter)
         self.issue_feedback_label.setOpenExternalLinks(True)
         self.issue_feedback_label.setObjectName("issue_feedback_label")
-        self.horizontalLayout_2.addWidget(self.issue_feedback_label)
-        self.verticalLayout_2.addLayout(self.horizontalLayout_2)
+        self.welcomeLinksLayout.addWidget(self.issue_feedback_label)
+        self.welcomeContentLayout.addLayout(self.welcomeLinksLayout)
+        self.pageScrollArea.setWidget(self.pageScrollContent)
+        self.workflowPageLayout.addWidget(self.pageScrollArea)
 
         self.retranslateUi(WizardPage)
         QtCore.QMetaObject.connectSlotsByName(WizardPage)
@@ -127,24 +109,7 @@ class Ui_WizardPage(object):
         self.import_csv_btn.setText(_translate("WizardPage", "Import CSV"))
         self.open_recent_btn.setText(_translate("WizardPage", "Open Recent..."))
         self.open_btn.setText(_translate("WizardPage", "Open Existing Dataset"))
-        self.RCMS_onlineLabel.setText(
-            _translate(
-                "WizardPage",
-                '<a href="https://github.com/AliSalman-et-al/rc-metastudio">Project Site</a>',
-            )
-        )
-        self.how_to_citeLabel.setText(
-            _translate(
-                "WizardPage",
-                '<a href="https://www.jstatsoft.org/article/view/v049i05">How to cite</a>',
-            )
-        )
-        self.issue_feedback_label.setText(
-            _translate(
-                "WizardPage",
-                '<a href="https://github.com/AliSalman-et-al/rc-metastudio/issues">Issues</a>',
-            )
-        )
-
-
+        self.RCMS_onlineLabel.setText(_translate("WizardPage", "<a href=\"https://github.com/AliSalman-et-al/rc-metastudio\">Project Site</a>"))
+        self.how_to_citeLabel.setText(_translate("WizardPage", "<a href=\"https://www.jstatsoft.org/article/view/v049i05\">How to cite</a>"))
+        self.issue_feedback_label.setText(_translate("WizardPage", "<a href=\"https://github.com/AliSalman-et-al/rc-metastudio/issues\">Issues</a>"))
 import icons_rc

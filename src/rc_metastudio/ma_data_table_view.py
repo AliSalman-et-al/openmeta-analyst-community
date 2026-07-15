@@ -23,6 +23,7 @@ import continuous_data_form
 import diagnostic_data_form
 import app_error_handler
 import qt_layout
+from workspace_columns import WorkspaceColumnWidthController
 
 # it's a questionable practice to import the
 # underlying model into the view, but sometimes
@@ -103,6 +104,69 @@ class MADataTable(QtWidgets.QTableView):
             app_error_handler.safe_slot(self.header_context_menu, parent=self)
         )
         qt_layout.configure_spreadsheet_table_view(self)
+        self._column_widths = WorkspaceColumnWidthController(self)
+        self._column_model = None
+
+    def setModel(self, model):
+        self._disconnect_column_model()
+        self._column_widths.begin_schema_change()
+        try:
+            super(MADataTable, self).setModel(model)
+        finally:
+            self._column_widths.end_schema_change()
+        self._column_model = model
+        if model is not None:
+            model.modelAboutToBeReset.connect(self._begin_column_schema_change)
+            model.modelReset.connect(self._end_column_schema_change)
+            model.columnsAboutToBeInserted.connect(self._begin_column_schema_change)
+            model.columnsInserted.connect(self._end_column_schema_change)
+            model.columnsAboutToBeRemoved.connect(self._begin_column_schema_change)
+            model.columnsRemoved.connect(self._end_column_schema_change)
+            model.headerDataChanged.connect(self.synchronize_column_widths)
+        self.synchronize_column_widths()
+
+    def _disconnect_column_model(self):
+        if self._column_model is None:
+            return
+        connections = (
+            (self._column_model.modelAboutToBeReset, self._begin_column_schema_change),
+            (self._column_model.modelReset, self._end_column_schema_change),
+            (
+                self._column_model.columnsAboutToBeInserted,
+                self._begin_column_schema_change,
+            ),
+            (self._column_model.columnsInserted, self._end_column_schema_change),
+            (
+                self._column_model.columnsAboutToBeRemoved,
+                self._begin_column_schema_change,
+            ),
+            (self._column_model.columnsRemoved, self._end_column_schema_change),
+            (self._column_model.headerDataChanged, self.synchronize_column_widths),
+        )
+        for signal, callback in connections:
+            try:
+                signal.disconnect(callback)
+            except (TypeError, RuntimeError):
+                pass
+        self._column_model = None
+
+    def _begin_column_schema_change(self, *_args):
+        self._column_widths.begin_schema_change()
+
+    def _end_column_schema_change(self, *_args):
+        self._column_widths.end_schema_change()
+
+    def synchronize_column_widths(self, *_args):
+        self._column_widths.synchronize_schema()
+
+    def auto_fit_columns(self):
+        self._column_widths.auto_fit_all()
+
+    def restore_column_widths(self, widths):
+        self._column_widths.restore(widths)
+
+    def column_width_state(self):
+        return self._column_widths.state()
 
     def _make_context_menu(self):
         def _context_menu(event):
@@ -349,8 +413,9 @@ class MADataTable(QtWidgets.QTableView):
             self.scrollTo(target)
 
     def copy(self):
-        # copy/paste: these only happen if at least one cell is selected
         selected_indexes = self.selectionModel().selectedIndexes()
+        if not selected_indexes:
+            return
         upper_left_index = self._upper_left(selected_indexes)
         lower_right_index = self._lower_right(selected_indexes)
         self.copy_contents_in_range(
@@ -358,8 +423,9 @@ class MADataTable(QtWidgets.QTableView):
         )
 
     def paste(self):
-        # copy/paste: these only happen if at least one cell is selected
         selected_indexes = self.selectionModel().selectedIndexes()
+        if not selected_indexes:
+            return
         upper_left_index = self._upper_left(selected_indexes)
         lower_right_index = self._lower_right(selected_indexes)
 
@@ -925,7 +991,7 @@ class CommandCellEdit(QUndoCommand):
             self.ma_data_table_view.model().reset_model()
 
         self.ma_data_table_view._enable_analysis_menus_if_appropriate()
-        self.ma_data_table_view.resizeColumnsToContents()
+        self.ma_data_table_view.synchronize_column_widths()
 
         # let everyone know that the data is dirty
         self.ma_data_table_view.dataDirtied.emit()
@@ -956,7 +1022,7 @@ class CommandCellEdit(QUndoCommand):
         # here is where we check if there are enough studies to actually
         # perform an analysis.
         self.ma_data_table_view._enable_analysis_menus_if_appropriate()
-        self.ma_data_table_view.resizeColumnsToContents()
+        self.ma_data_table_view.synchronize_column_widths()
         self.ma_data_table_view.dataDirtied.emit()
 
     def _get_index(self):
@@ -1028,7 +1094,7 @@ class CommandPaste(QUndoCommand):
         self.ma_data_table_view.model().reset_model()
         self.ma_data_table_view._enable_analysis_menus_if_appropriate()
         self.ma_data_table_view.dataDirtied.emit()
-        self.ma_data_table_view.resizeColumnsToContents()
+        self.ma_data_table_view.synchronize_column_widths()
 
     @DebugHelper
     def undo(self):
@@ -1072,7 +1138,7 @@ class CommandEditMAUnit(QUndoCommand):
     def undo(self):
         self.model.set_current_ma_unit_for_study(self.study_index, self.old_ma_unit)
         self.model.reset_model()
-        self.table_view.resizeColumnsToContents()
+        self.table_view.synchronize_column_widths()
         self.ma_data_table_view.dataDirtied.emit()
 
     @DebugHelper
@@ -1082,7 +1148,7 @@ class CommandEditMAUnit(QUndoCommand):
         self.model.try_to_update_outcomes()
 
         # self.table_view.model().reset_model()
-        self.table_view.resizeColumnsToContents()
+        self.table_view.synchronize_column_widths()
         self.ma_data_table_view.dataDirtied.emit()
 
 

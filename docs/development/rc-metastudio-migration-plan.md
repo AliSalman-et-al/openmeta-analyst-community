@@ -35,7 +35,6 @@ Identity and provenance:
 
 - [ADR 0082](../adr/0082-use-rcmetar-as-the-final-r-package-identity.md): Use RCMetaR as the final R package identity.
 - [ADR 0083](../adr/0083-use-derived-maintained-file-copyright-notices.md): Treat rewritten original-source descendants as Derived Maintained Files.
-- [ADR 0087](../adr/0087-keep-historical-adrs-and-rename-active-surfaces.md): Keep historical ADRs, rename active surfaces.
 - [ADR 0088](../adr/0088-centralize-project-provenance-in-notice.md): Centralize provenance in `NOTICE.md`.
 - [ADR 0089](../adr/0089-use-gplv3-license-file-and-spdx-headers.md): Use GPLv3 license file and SPDX headers.
 - [ADR 0120](../adr/0120-preserve-scholarly-and-copyright-attribution-only.md): Preserve scholarly and copyright attribution only.
@@ -99,7 +98,6 @@ Docs, tests, CI, packaging, and cleanup:
 - [ADR 0117](../adr/0117-organize-tests-by-runtime-and-evidence-type.md): Organize tests by runtime and evidence type.
 - [ADR 0119](../adr/0119-use-rc-metastudio-names-for-product-branded-outputs.md): Use RC MetaStudio names for outputs.
 - [ADR 0123](../adr/0123-do-not-open-a-public-contribution-workflow.md), [ADR 0124](../adr/0124-state-contribution-policy-in-readme.md), and [ADR 0125](../adr/0125-allow-public-issue-feedback-without-public-code-contributions.md): Document contribution and issue policies.
-- [ADR 0130](../adr/0130-add-targeted-supersession-notes-to-conflicting-adrs.md): Add targeted supersession notes.
 - [ADR 0131](../adr/0131-add-an-identity-migration-audit-script.md) and [ADR 0132](../adr/0132-test-high-risk-identity-boundaries-first.md): Add identity audit and high-risk tests.
 - [ADR 0134](../adr/0134-reset-rc-metastudio-and-rcmetar-versioning.md), [ADR 0135](../adr/0135-lock-rcmetar-version-to-rc-metastudio.md), and [ADR 0136](../adr/0136-start-an-rc-metastudio-changelog.md): Reset versioning and start changelog.
 - [ADR 0139](../adr/0139-use-a-specific-repository-url-when-available.md), [ADR 0140](../adr/0140-use-rc-metastudio-as-the-repository-name.md), and [ADR 0141](../adr/0141-review-git-attributes-during-artifact-cleanup.md): Set repository URL/name and review git attributes.

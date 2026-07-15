@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'src\rc_metastudio\forms\outcome_name_page.ui'
+# Form implementation generated from reading ui file 'src/rc_metastudio/forms/outcome_name_page.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -14,27 +14,40 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_WizardPage(object):
     def setupUi(self, WizardPage):
         WizardPage.setObjectName("WizardPage")
-        WizardPage.resize(285, 46)
-        WizardPage.setMinimumSize(QtCore.QSize(285, 45))
-        WizardPage.setMaximumSize(QtCore.QSize(300, 50))
+        WizardPage.resize(0, 0)
         WizardPage.setSubTitle("")
-        self.horizontalLayout = QtWidgets.QHBoxLayout(WizardPage)
+        self.workflowPageLayout = QtWidgets.QVBoxLayout(WizardPage)
+        self.workflowPageLayout.setContentsMargins(0, 0, 0, 0)
+        self.workflowPageLayout.setObjectName("workflowPageLayout")
+        self.pageScrollArea = QtWidgets.QScrollArea(WizardPage)
+        self.pageScrollArea.setFocusPolicy(QtCore.Qt.NoFocus)
+        self.pageScrollArea.setFrameShape(QtWidgets.QFrame.NoFrame)
+        self.pageScrollArea.setWidgetResizable(True)
+        self.pageScrollArea.setObjectName("pageScrollArea")
+        self.pageScrollContent = QtWidgets.QWidget()
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Preferred)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.pageScrollContent.sizePolicy().hasHeightForWidth())
+        self.pageScrollContent.setSizePolicy(sizePolicy)
+        self.pageScrollContent.setObjectName("pageScrollContent")
+        self.horizontalLayout = QtWidgets.QHBoxLayout(self.pageScrollContent)
         self.horizontalLayout.setObjectName("horizontalLayout")
-        self.label = QtWidgets.QLabel(WizardPage)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed
-        )
+        self.label = QtWidgets.QLabel(self.pageScrollContent)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.label.sizePolicy().hasHeightForWidth())
         self.label.setSizePolicy(sizePolicy)
         self.label.setObjectName("label")
         self.horizontalLayout.addWidget(self.label)
-        self.outcome_name_LineEdit = QtWidgets.QLineEdit(WizardPage)
+        self.outcome_name_LineEdit = QtWidgets.QLineEdit(self.pageScrollContent)
         self.outcome_name_LineEdit.setEnabled(True)
         self.outcome_name_LineEdit.setText("")
         self.outcome_name_LineEdit.setObjectName("outcome_name_LineEdit")
         self.horizontalLayout.addWidget(self.outcome_name_LineEdit)
+        self.pageScrollArea.setWidget(self.pageScrollContent)
+        self.workflowPageLayout.addWidget(self.pageScrollArea)
         self.label.setBuddy(self.outcome_name_LineEdit)
 
         self.retranslateUi(WizardPage)
@@ -43,7 +56,5 @@ class Ui_WizardPage(object):
     def retranslateUi(self, WizardPage):
         _translate = QtCore.QCoreApplication.translate
         WizardPage.setWindowTitle(_translate("WizardPage", "WizardPage"))
-        WizardPage.setTitle(
-            _translate("WizardPage", "What is the name of your outcome?")
-        )
+        WizardPage.setTitle(_translate("WizardPage", "What is the name of your outcome?"))
         self.label.setText(_translate("WizardPage", "Outcome Name:"))

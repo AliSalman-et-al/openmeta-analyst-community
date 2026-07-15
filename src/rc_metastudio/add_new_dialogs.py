@@ -7,7 +7,8 @@ import forms.ui_new_follow_up
 import forms.ui_new_outcome
 import forms.ui_new_covariate
 import forms.ui_new_study
-import qt_layout
+import adaptive_controls
+import adaptive_window
 
 # import pdb
 
@@ -16,14 +17,18 @@ class AddNewGroupForm(QDialog, forms.ui_new_group.Ui_new_group_dialog):
     def __init__(self, parent=None):
         super(AddNewGroupForm, self).__init__(parent)
         self.setupUi(self)
-        qt_layout.fit_analysis_dialog_to_contents(self)
+        adaptive_window.register_adaptive_window(
+            self, adaptive_window.WindowRole.TRANSACTIONAL
+        )
 
 
 class AddNewFollowUpForm(QDialog, forms.ui_new_follow_up.Ui_new_follow_up_dialog):
     def __init__(self, parent=None):
         super(AddNewFollowUpForm, self).__init__(parent)
         self.setupUi(self)
-        qt_layout.fit_analysis_dialog_to_contents(self)
+        adaptive_window.register_adaptive_window(
+            self, adaptive_window.WindowRole.TRANSACTIONAL
+        )
 
 
 class AddNewOutcomeForm(QDialog, forms.ui_new_outcome.Ui_Dialog):
@@ -36,7 +41,10 @@ class AddNewOutcomeForm(QDialog, forms.ui_new_outcome.Ui_Dialog):
 
         self.setupUi(self)
         self._populate_combo_box()
-        qt_layout.fit_analysis_dialog_to_contents(self)
+        adaptive_controls.configure_choice_control(self.datatype_cbo_box)
+        adaptive_window.register_adaptive_window(
+            self, adaptive_window.WindowRole.TRANSACTIONAL
+        )
 
     def _populate_combo_box(self):
         # diagnostic datasets can have only diagnostic outcomes
@@ -51,7 +59,9 @@ class AddNewStudyForm(QDialog, forms.ui_new_study.Ui_new_study_dialog):
     def __init__(self, parent=None):
         super(AddNewStudyForm, self).__init__(parent)
         self.setupUi(self)
-        qt_layout.fit_analysis_dialog_to_contents(self)
+        adaptive_window.register_adaptive_window(
+            self, adaptive_window.WindowRole.TRANSACTIONAL
+        )
 
 
 class AddNewCovariateForm(QDialog, forms.ui_new_covariate.Ui_new_covariate_dialog):
@@ -59,7 +69,10 @@ class AddNewCovariateForm(QDialog, forms.ui_new_covariate.Ui_new_covariate_dialo
         super(AddNewCovariateForm, self).__init__(parent)
         self.setupUi(self)
         self._populate_combo_box()
-        qt_layout.fit_analysis_dialog_to_contents(self)
+        adaptive_controls.configure_choice_control(self.datatype_cbo_box)
+        adaptive_window.register_adaptive_window(
+            self, adaptive_window.WindowRole.TRANSACTIONAL
+        )
 
     def _populate_combo_box(self):
         for name, type_id in zip(["continuous", "factor"], range(2)):

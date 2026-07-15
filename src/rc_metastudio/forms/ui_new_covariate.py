@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'src\rc_metastudio\forms\new_covariate_dlg.ui'
+# Form implementation generated from reading ui file 'src/rc_metastudio/forms/new_covariate_dlg.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -14,74 +14,45 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_new_covariate_dialog(object):
     def setupUi(self, new_covariate_dialog):
         new_covariate_dialog.setObjectName("new_covariate_dialog")
-        new_covariate_dialog.setEnabled(True)
-        new_covariate_dialog.resize(301, 132)
-        new_covariate_dialog.setMinimumSize(QtCore.QSize(301, 132))
-        new_covariate_dialog.setMaximumSize(QtCore.QSize(301, 132))
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        new_covariate_dialog.setFont(font)
-        icon = QtGui.QIcon()
-        icon.addPixmap(
-            QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
-        )
-        new_covariate_dialog.setWindowIcon(icon)
-        self.buttonBox = QtWidgets.QDialogButtonBox(new_covariate_dialog)
-        self.buttonBox.setGeometry(QtCore.QRect(10, 90, 281, 32))
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        self.buttonBox.setFont(font)
-        self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(
-            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
-        )
-        self.buttonBox.setObjectName("buttonBox")
-        self.layoutWidget = QtWidgets.QWidget(new_covariate_dialog)
-        self.layoutWidget.setGeometry(QtCore.QRect(10, 10, 281, 71))
-        self.layoutWidget.setObjectName("layoutWidget")
-        self.gridLayout = QtWidgets.QGridLayout(self.layoutWidget)
-        self.gridLayout.setContentsMargins(0, 0, 0, 0)
-        self.gridLayout.setObjectName("gridLayout")
-        self.label_2 = QtWidgets.QLabel(self.layoutWidget)
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        font.setPointSize(10)
-        self.label_2.setFont(font)
+        new_covariate_dialog.resize(0, 0)
+        self.verticalLayout = QtWidgets.QVBoxLayout(new_covariate_dialog)
+        self.verticalLayout.setObjectName("verticalLayout")
+        self.formLayout = QtWidgets.QFormLayout()
+        self.formLayout.setFieldGrowthPolicy(QtWidgets.QFormLayout.AllNonFixedFieldsGrow)
+        self.formLayout.setRowWrapPolicy(QtWidgets.QFormLayout.WrapAllRows)
+        self.formLayout.setObjectName("formLayout")
+        self.label_2 = QtWidgets.QLabel(new_covariate_dialog)
         self.label_2.setObjectName("label_2")
-        self.gridLayout.addWidget(self.label_2, 0, 0, 1, 1)
-        self.covariate_name_le = QtWidgets.QLineEdit(self.layoutWidget)
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        self.covariate_name_le.setFont(font)
+        self.formLayout.setWidget(0, QtWidgets.QFormLayout.LabelRole, self.label_2)
+        self.covariate_name_le = QtWidgets.QLineEdit(new_covariate_dialog)
         self.covariate_name_le.setAlignment(QtCore.Qt.AlignCenter)
         self.covariate_name_le.setObjectName("covariate_name_le")
-        self.gridLayout.addWidget(self.covariate_name_le, 0, 1, 1, 1)
-        self.label = QtWidgets.QLabel(self.layoutWidget)
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        font.setPointSize(10)
-        self.label.setFont(font)
+        self.formLayout.setWidget(0, QtWidgets.QFormLayout.FieldRole, self.covariate_name_le)
+        self.label = QtWidgets.QLabel(new_covariate_dialog)
         self.label.setObjectName("label")
-        self.gridLayout.addWidget(self.label, 1, 0, 1, 1)
-        self.datatype_cbo_box = QtWidgets.QComboBox(self.layoutWidget)
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        self.datatype_cbo_box.setFont(font)
+        self.formLayout.setWidget(1, QtWidgets.QFormLayout.LabelRole, self.label)
+        self.datatype_cbo_box = AdaptiveComboBox(new_covariate_dialog)
         self.datatype_cbo_box.setObjectName("datatype_cbo_box")
-        self.gridLayout.addWidget(self.datatype_cbo_box, 1, 1, 1, 1)
+        self.formLayout.setWidget(1, QtWidgets.QFormLayout.FieldRole, self.datatype_cbo_box)
+        self.verticalLayout.addLayout(self.formLayout)
+        self.buttonBox = QtWidgets.QDialogButtonBox(new_covariate_dialog)
+        self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setObjectName("buttonBox")
+        self.verticalLayout.addWidget(self.buttonBox)
+        self.label_2.setBuddy(self.covariate_name_le)
+        self.label.setBuddy(self.datatype_cbo_box)
 
         self.retranslateUi(new_covariate_dialog)
-        self.buttonBox.accepted.connect(new_covariate_dialog.accept)  # type: ignore
-        self.buttonBox.rejected.connect(new_covariate_dialog.reject)  # type: ignore
+        self.buttonBox.accepted.connect(new_covariate_dialog.accept) # type: ignore
+        self.buttonBox.rejected.connect(new_covariate_dialog.reject) # type: ignore
         QtCore.QMetaObject.connectSlotsByName(new_covariate_dialog)
+        new_covariate_dialog.setTabOrder(self.covariate_name_le, self.datatype_cbo_box)
 
     def retranslateUi(self, new_covariate_dialog):
         _translate = QtCore.QCoreApplication.translate
-        new_covariate_dialog.setWindowTitle(
-            _translate("new_covariate_dialog", "Add Covariate")
-        )
+        new_covariate_dialog.setWindowTitle(_translate("new_covariate_dialog", "Add Covariate"))
         self.label_2.setText(_translate("new_covariate_dialog", "Covariate name:"))
         self.label.setText(_translate("new_covariate_dialog", "Type of covariate:"))
-
-
+from adaptive_controls import AdaptiveComboBox
 import icons_rc

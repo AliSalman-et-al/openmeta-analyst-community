@@ -8,6 +8,7 @@ from PyQt5.QtCore import QByteArray, QEvent, QPoint, QRectF, QTimer, Qt, pyqtSig
 from PyQt5.QtGui import (
     QColor,
     QFont,
+    QFontDatabase,
     QFontMetricsF,
     QImage,
     QPixmap,
@@ -28,6 +29,7 @@ from PyQt5.QtWidgets import (
     QGraphicsTextItem,
     QMainWindow,
     QMenu,
+    QSizePolicy,
     QTreeWidgetItem,
 )
 import os
@@ -39,9 +41,13 @@ import meta_py_r
 from plot_defaults import FOREST_ARM_LABELS
 import plot_capabilities
 from plot_text import apply_plot_text_input_limits, plot_text_value, set_plot_text_value
-import qt_layout
 import qt_text
 import result_sections
+import adaptive_window
+from settings import (
+    restore_results_window_state,
+    save_results_window_state,
+)
 # import shutil
 
 PageSize = (612, 792)
@@ -172,6 +178,12 @@ class ResponsivePixmapItem(QGraphicsPixmapItem):
         self.source_pixmap = QPixmap(source_pixmap)
 
 
+def _pixmap_device_independent_size(pixmap):
+    """Return a pixmap's logical dimensions without discarding its DPR."""
+    dpr = max(1.0, float(pixmap.devicePixelRatioF()))
+    return (float(pixmap.width()) / dpr, float(pixmap.height()) / dpr)
+
+
 class EditPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg):
     applied = pyqtSignal()
 
@@ -199,7 +211,9 @@ class EditPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
 
         self._load_params(image_path)
         self._configure_option_groups()
-        qt_layout.fit_application_dialog_to_contents(self)
+        adaptive_window.register_adaptive_window(
+            self, adaptive_window.WindowRole.TRANSACTIONAL
+        )
 
     def _configure_option_groups(self):
         self.groupBox.setVisible("columns" in self._option_groups)
@@ -386,11 +400,16 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self._raster_plot_items = []
         self._refitting_svg_plots = False
         self._viewport_refit_pending = False
+        self._viewport_width_override = None
+        self._first_show_refit_pending = True
         self._layout_items = []
         self._nav_items_to_sections = {}
         self.setupUi(self)
         self.graphics_view.viewport().installEventFilter(self)
-        qt_layout.configure_resizable_window(self)
+        adaptive_window.register_adaptive_window(
+            self, adaptive_window.WindowRole.RESULTS
+        )
+        restored_state = restore_results_window_state(self)
         self.copied_item = QByteArray()
         self.paste_offset = 5
         self.add_offset = 5
@@ -404,18 +423,24 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         )
         self.results_nav_splitter.splitterMoved.connect(
             app_error_handler.safe_slot(
-                lambda _pos, _index: self._refit_viewport_items(), parent=self
+                lambda _pos, _index: self._schedule_viewport_refit(), parent=self
             )
         )
 
         self.nav_tree.setHeaderLabels(["Results"])
         self.nav_tree.setItemsExpandable(True)
-        self.nav_tree.setMinimumWidth(250)
+        # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
+        self.nav_tree.setMinimumWidth(0)
+        self.nav_tree.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        self.graphics_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.results_nav_splitter.setChildrenCollapsible(False)
+        self.results_nav_splitter.setStretchFactor(0, 1)
+        self.results_nav_splitter.setStretchFactor(1, 1)
         self.x_coord = 5
         self.y_coord = 5
 
-        # set (default) splitter sizes
-        self.results_nav_splitter.setSizes([260, 440])
+        self._restored_splitter_proportions = restored_state["splitter_proportions"]
+        self._splitter_restore_pending = True
 
         self.scene = QGraphicsScene(self)
 
@@ -448,6 +473,10 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         # reset the scene
         self.graphics_view.setScene(self.scene)
         self.graphics_view.ensureVisible(QRectF(0, 0, 0, 0))
+        # Establish the restored ratio before the first native show/layout pass.
+        # QSplitter then preserves that ratio as the window receives its final
+        # screen-safe geometry, and the queued refit sees a stable viewport.
+        self._apply_restored_splitter_proportions()
 
     def add_result_sections(self):
         ordered_sections = result_sections.order_display_sections(
@@ -478,9 +507,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             return
 
         qt_item = self.add_title(display_title)
-        img_shape, pos, plot_item = self.create_plot_item(
-            artifact, self.position()
-        )
+        img_shape, pos, plot_item = self.create_plot_item(artifact, self.position())
 
         self.items_to_coords[id(qt_item)] = pos
         self._nav_items_to_sections[id(qt_item)] = plot_item
@@ -503,7 +530,9 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             qt_item = self.add_title(display_title)
 
             # now the text
-            text_item_rect, pos = self.create_text_item(str(text), self.position())
+            text_item_rect, pos = self.create_text_item(
+                str(text), self.position(), wrap=True
+            )
             self.items_to_coords[id(qt_item)] = pos
             self._nav_items_to_sections[id(qt_item)] = self._layout_items[-1]
         except:
@@ -515,18 +544,24 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         if pixmap.isNull():
             return pixmap
 
+        logical_width, logical_height = _pixmap_device_independent_size(pixmap)
         scaled_width, scaled_height = self._fit_size_to_viewport(
-            pixmap.width(), pixmap.height()
+            logical_width, logical_height
         )
 
         if scaled_width > self.scene.width():
+            # layout-audit: allow=intrinsic-ratio; reason=scene follows its intrinsic-ratio visual artifact
             self.scene.setSceneRect(
                 0, 0, scaled_width + horizontal_padding, self.scene.height()
             )
 
+        dpr = max(1.0, float(pixmap.devicePixelRatioF()))
         pixmap = pixmap.scaled(
-            scaled_width, scaled_height, transformMode=Qt.SmoothTransformation
+            max(1, int(round(scaled_width * dpr))),
+            max(1, int(round(scaled_height * dpr))),
+            transformMode=Qt.SmoothTransformation,
         )
+        pixmap.setDevicePixelRatio(dpr)
 
         return pixmap
 
@@ -559,12 +594,18 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         return scaled_width, scaled_height
 
     def _plot_viewport_width(self):
+        viewport_width = self._layout_viewport_width()
+        return max(1, viewport_width - self.x_coord - padding)
+
+    def _layout_viewport_width(self):
+        if self._viewport_width_override is not None:
+            return self._viewport_width_override
         viewport_width = self.graphics_view.viewport().width()
         if viewport_width <= horizontal_padding:
             viewport_width = self.graphics_view.width()
         if viewport_width <= horizontal_padding:
             viewport_width = max(self.results_nav_splitter.width(), self.width())
-        return max(1, viewport_width - self.x_coord - padding)
+        return viewport_width
 
     def add_references(self):
         if self.references_text is None:
@@ -579,18 +620,20 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
     def add_title(self, title):
         print("Adding title")
-        text = QGraphicsTextItem()
-        # I guess we should use a style sheet here,
-        # but it seems like it'd be overkill.
-        html_str = (
-            '<p style="font-size: 14pt; color: black; face:verdana">%s</p>' % title
-        )
-        text.setHtml(html_str)
-        # text.setPos(self.position())
+        text = QGraphicsTextItem(str(title))
+        title_font = QFont(self.font())
+        title_font.setBold(True)
+        text.setFont(title_font)
+        text_option = text.document().defaultTextOption()
+        text_option.setWrapMode(QTextOption.WordWrap)
+        text.document().setDefaultTextOption(text_option)
+        text.setTextWidth(self._text_wrap_width())
+        self._wrapped_text_items.append(text)
         print("  title at: %s" % self.y_coord)
         self.scene.addItem(text)
         self._layout_items.append(text)
         qt_item = QTreeWidgetItem(self.nav_tree, [title])
+        # layout-audit: allow=intrinsic-ratio; reason=scene follows its intrinsic-ratio visual artifact
         self.scene.setSceneRect(
             0,
             0,
@@ -619,7 +662,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
     def create_text_item(self, text, position, wrap=False):
         txt_item = SelectableResultsTextItem(text, self)
-        txt_item.setFont(QFont("courier", 12))
+        txt_item.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         if wrap:
             text_option = txt_item.document().defaultTextOption()
             text_option.setWrapMode(QTextOption.WordWrap)
@@ -640,6 +683,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
         # self.y_coord += txt_item.boundingRect.height()  #ROW_HEIGHT*text.count("\n")
         text_height = self._advance_past_text_item(txt_item, text)
+        # layout-audit: allow=intrinsic-ratio; reason=scene follows its intrinsic-ratio visual artifact
         self.scene.setSceneRect(
             0,
             0,
@@ -699,12 +743,8 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             QApplication.clipboard().setText(selected_text.replace("\u2029", "\n"))
 
     def _text_wrap_width(self):
-        viewport_width = max(
-            self.graphics_view.viewport().width(), self.graphics_view.width()
-        )
-        if viewport_width <= horizontal_padding:
-            viewport_width = max(self.results_nav_splitter.width(), self.width())
-        return max(300, viewport_width - self.x_coord - padding)
+        viewport_width = self._layout_viewport_width()
+        return max(1, viewport_width - self.x_coord - padding)
 
     def _update_wrapped_text_widths(self):
         if not self._wrapped_text_items:
@@ -718,6 +758,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             scene_rect = txt_item.sceneBoundingRect()
             scene_width = max(scene_width, scene_rect.right() + padding)
             scene_height = max(scene_height, scene_rect.bottom() + padding)
+        # layout-audit: allow=intrinsic-ratio; reason=scene follows its intrinsic-ratio visual artifact
         self.scene.setSceneRect(0, 0, scene_width, scene_height)
 
     def _refit_viewport_items(self):
@@ -735,13 +776,36 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
     def _run_scheduled_viewport_refit(self):
         self._viewport_refit_pending = False
         if self.isVisible():
-            self._refit_viewport_items()
+            if self._first_show_refit_pending:
+                self._first_show_refit_pending = False
+                self._set_restored_splitter_sizes()
+                splitter_extent = self.results_nav_splitter.width()
+                screen = self.screen()
+                if self.isMaximized() and screen is not None:
+                    window_chrome_width = max(0, self.width() - splitter_extent)
+                    splitter_extent = min(
+                        splitter_extent,
+                        screen.availableGeometry().width() - window_chrome_width,
+                    )
+                splitter_extent = max(
+                    2, splitter_extent - self.results_nav_splitter.handleWidth()
+                )
+                proportion_total = sum(self._restored_splitter_proportions)
+                content_proportion = (
+                    self._restored_splitter_proportions[1] / proportion_total
+                )
+                self._viewport_width_override = max(
+                    1,
+                    int(splitter_extent * content_proportion)
+                    - (2 * self.graphics_view.frameWidth()),
+                )
+            try:
+                self._refit_viewport_items()
+            finally:
+                self._viewport_width_override = None
 
     def eventFilter(self, watched, event):
-        if (
-            watched is self.graphics_view.viewport()
-            and event.type() == QEvent.Resize
-        ):
+        if watched is self.graphics_view.viewport() and event.type() == QEvent.Resize:
             self._schedule_viewport_refit()
         return super(ResultsWindow, self).eventFilter(watched, event)
 
@@ -765,11 +829,12 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             source = item.source_pixmap
             if source.isNull():
                 continue
+            logical_width, logical_height = _pixmap_device_independent_size(source)
             scaled_width, _scaled_height = self._fit_size_to_viewport(
-                source.width(), source.height()
+                logical_width, logical_height
             )
             item.setPixmap(source)
-            item.setScale(float(scaled_width) / float(source.width()))
+            item.setScale(float(scaled_width) / float(logical_width))
 
     def _relayout_sections(self):
         """Place every result item from its current measured size and stored order."""
@@ -791,6 +856,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             self.items_to_coords[nav_item_id] = section_item.scenePos()
 
         scene_bounds = self.scene.itemsBoundingRect()
+        # layout-audit: allow=intrinsic-ratio; reason=scene follows its intrinsic-ratio visual artifact
         self.scene.setSceneRect(
             0,
             0,
@@ -802,9 +868,32 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         super(ResultsWindow, self).showEvent(event)
         self._schedule_viewport_refit()
 
+    def _apply_restored_splitter_proportions(self):
+        if not self._splitter_restore_pending:
+            return
+        self._splitter_restore_pending = False
+        self._set_restored_splitter_sizes()
+        # QSplitter applies child geometry lazily on some Qt platforms.  Refresh
+        # it now so the one queued refit observes the final viewport dimensions.
+        self.results_nav_splitter.refresh()
+        self._schedule_viewport_refit()
+
+    def _set_restored_splitter_sizes(self):
+        splitter_extent = max(2, self.results_nav_splitter.width())
+        self.results_nav_splitter.setSizes(
+            [
+                max(1, int(splitter_extent * value))
+                for value in self._restored_splitter_proportions
+            ]
+        )
+
     def resizeEvent(self, event):
         super(ResultsWindow, self).resizeEvent(event)
         self._schedule_viewport_refit()
+
+    def closeEvent(self, event):
+        save_results_window_state(self)
+        super(ResultsWindow, self).closeEvent(event)
 
     def create_pixmap_item(
         self, pixmap, position, title, image_path, params_path=None, matrix=QTransform()
@@ -821,6 +910,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         #                      QGraphicsItem.ItemIsMovable)
         item.setFlags(QGraphicsItem.ItemIsSelectable)
 
+        # layout-audit: allow=intrinsic-ratio; reason=scene follows its intrinsic-ratio visual artifact
         self.scene.setSceneRect(
             0,
             0,
@@ -871,6 +961,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         scaled_width, scaled_height = self._fit_vector_plot_to_viewport(item)
 
         self.y_coord += scaled_height + SECTION_SPACING
+        # layout-audit: allow=intrinsic-ratio; reason=scene follows its intrinsic-ratio visual artifact
         self.scene.setSceneRect(
             0,
             0,
@@ -925,9 +1016,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                     action = QAction("Edit Plot", self)
                     action.triggered.connect(
                         app_error_handler.safe_slot(
-                            lambda _checked=False: self.edit_plot(
-                                artifact, plot_item
-                            ),
+                            lambda _checked=False: self.edit_plot(artifact, plot_item),
                             parent=self,
                         )
                     )
@@ -1019,27 +1108,26 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                 params_path=artifact.params_path,
                 display_path=artifact.display_image_path,
             )
-            if isinstance(
-                plot_item, _svg_item_class()
-            ) and refreshed_artifact.has_vector_display():
+            if (
+                isinstance(plot_item, _svg_item_class())
+                and refreshed_artifact.has_vector_display()
+            ):
                 renderer = _svg_renderer_class()(
                     refreshed_artifact.display_path(), self
                 )
                 if renderer.isValid():
                     plot_item.setSharedRenderer(renderer)
-                    self._refit_viewport_items()
+                    self._schedule_viewport_refit()
                     self.scene.update()
             elif isinstance(plot_item, ResponsivePixmapItem):
                 source_pixmap = QPixmap(outpath)
                 if not source_pixmap.isNull():
                     plot_item.replace_source(source_pixmap)
-                    self._refit_viewport_items()
+                    self._schedule_viewport_refit()
 
     def save_image_as(self, artifact, unscaled_image=None, format=None):
         if not isinstance(artifact, PlotArtifact):
-            artifact = self.create_plot_artifact(
-                "", artifact, params_path=None
-            )
+            artifact = self.create_plot_artifact("", artifact, params_path=None)
 
         if format not in PLOT_EXPORT_FORMATS_BY_EXTENSION:
             valid_formats = ", ".join(PLOT_EXPORT_FORMATS_BY_EXTENSION.keys())
@@ -1147,7 +1235,7 @@ if __name__ == "__main__":
     }  # change this number as necessary
     test_results["image_order"] = None
 
-    app = QApplication(sys.argv)
+    app = app_error_handler.get_or_create_application(sys.argv)
     resultswindow = ResultsWindow(test_results)
     resultswindow.show()
     sys.exit(app.exec())

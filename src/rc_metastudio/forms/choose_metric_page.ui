@@ -6,27 +6,15 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
-    <height>220</height>
+    <width>0</width>
+    <height>0</height>
    </rect>
   </property>
   <property name="sizePolicy">
-   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+   <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
     <horstretch>0</horstretch>
     <verstretch>0</verstretch>
    </sizepolicy>
-  </property>
-  <property name="minimumSize">
-   <size>
-    <width>400</width>
-    <height>220</height>
-   </size>
-  </property>
-  <property name="maximumSize">
-   <size>
-    <width>400</width>
-    <height>220</height>
-   </size>
   </property>
   <property name="windowTitle">
    <string>WizardPage</string>
@@ -37,9 +25,21 @@
   <property name="subTitle">
    <string/>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout">
+  <layout class="QVBoxLayout" name="workflowPageLayout">
+   <property name="leftMargin"><number>0</number></property>
+   <property name="topMargin"><number>0</number></property>
+   <property name="rightMargin"><number>0</number></property>
+   <property name="bottomMargin"><number>0</number></property>
    <item>
-    <widget class="QLabel" name="label_2">
+    <widget class="QScrollArea" name="pageScrollArea">
+     <property name="focusPolicy"><enum>Qt::NoFocus</enum></property>
+     <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+     <property name="widgetResizable"><bool>true</bool></property>
+     <widget class="QWidget" name="pageScrollContent">
+      <property name="sizePolicy"><sizepolicy hsizetype="Ignored" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
+      <layout class="QVBoxLayout" name="verticalLayout">
+       <item>
+        <widget class="QLabel" name="label_2">
      <property name="text">
       <string>Please choose the appropriate metric for the data type you just selected or just accept the listed default.
 
@@ -89,6 +89,10 @@ Note, however, that if you are importing data via a CSV and you have effect data
       </size>
      </property>
     </spacer>
+   </item>
+      </layout>
+     </widget>
+    </widget>
    </item>
   </layout>
  </widget>

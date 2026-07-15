@@ -10,9 +10,9 @@ from PyQt5.QtWidgets import (
 )
 
 import forms.ui_meta_reg
+import adaptive_window
 import app_error_handler
 import meta_py_r
-import qt_layout
 
 
 class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
@@ -30,7 +30,9 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
         if not self.is_diagnostic:
             self.diagnostic_group_box.hide()
 
-        qt_layout.fit_analysis_dialog_to_contents(self)
+        adaptive_window.register_adaptive_window(
+            self, adaptive_window.WindowRole.TRANSACTIONAL
+        )
 
         self.buttonBox.rejected.connect(
             app_error_handler.safe_slot(self.cancel, parent=self)

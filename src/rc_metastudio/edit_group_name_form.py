@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QDialog
 import forms.ui_edit_group_name
-import qt_layout
+import adaptive_window
 
 
 class EditGroupName(QDialog, forms.ui_edit_group_name.Ui_group_name_dialog):
@@ -8,7 +8,9 @@ class EditGroupName(QDialog, forms.ui_edit_group_name.Ui_group_name_dialog):
         super(EditGroupName, self).__init__(parent)
         self.setupUi(self)
         self.group_name_le.setText(cur_group_name)
-        qt_layout.fit_application_dialog_to_contents(self)
+        adaptive_window.register_adaptive_window(
+            self, adaptive_window.WindowRole.TRANSACTIONAL
+        )
 
 
 class EditCovariateName(QDialog, forms.ui_edit_group_name.Ui_group_name_dialog):
@@ -18,4 +20,6 @@ class EditCovariateName(QDialog, forms.ui_edit_group_name.Ui_group_name_dialog):
         self.group_name_le.setText(cur_cov_name)
         self.field_lbl.setText("Covariate name:")
         self.setWindowTitle("Edit Covariate Name")
-        qt_layout.fit_application_dialog_to_contents(self)
+        adaptive_window.register_adaptive_window(
+            self, adaptive_window.WindowRole.TRANSACTIONAL
+        )

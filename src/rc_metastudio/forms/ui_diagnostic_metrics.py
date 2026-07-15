@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'src\rc_metastudio\forms\diagnostic_metrics.ui'
+# Form implementation generated from reading ui file 'src/rc_metastudio/forms/diagnostic_metrics.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -15,73 +15,73 @@ class Ui_diag_metric(object):
     def setupUi(self, diag_metric):
         diag_metric.setObjectName("diag_metric")
         diag_metric.setWindowModality(QtCore.Qt.ApplicationModal)
-        diag_metric.resize(348, 160)
-        diag_metric.setMinimumSize(QtCore.QSize(250, 140))
-        diag_metric.setMaximumSize(QtCore.QSize(10000, 10000))
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        diag_metric.setFont(font)
-        icon = QtGui.QIcon()
-        icon.addPixmap(
-            QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
-        )
-        diag_metric.setWindowIcon(icon)
-        self.gridLayout_2 = QtWidgets.QGridLayout(diag_metric)
-        self.gridLayout_2.setObjectName("gridLayout_2")
-        self.metrics_grp_box = QtWidgets.QGroupBox(diag_metric)
+        diag_metric.resize(0, 0)
+        self.dialog_layout = QtWidgets.QVBoxLayout(diag_metric)
+        self.dialog_layout.setObjectName("dialog_layout")
+        self.content_scroll = QtWidgets.QScrollArea(diag_metric)
+        self.content_scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
+        self.content_scroll.setWidgetResizable(True)
+        self.content_scroll.setObjectName("content_scroll")
+        self.content_widget = QtWidgets.QWidget()
+        self.content_widget.setGeometry(QtCore.QRect(0, 0, 440, 240))
+        self.content_widget.setObjectName("content_widget")
+        self.content_layout = QtWidgets.QVBoxLayout(self.content_widget)
+        self.content_layout.setContentsMargins(0, 0, 0, 0)
+        self.content_layout.setObjectName("content_layout")
+        self.availability_label = QtWidgets.QLabel(self.content_widget)
+        self.availability_label.setWordWrap(True)
+        self.availability_label.setObjectName("availability_label")
+        self.content_layout.addWidget(self.availability_label)
+        self.metrics_grp_box = QtWidgets.QGroupBox(self.content_widget)
         self.metrics_grp_box.setObjectName("metrics_grp_box")
-        self.verticalLayout = QtWidgets.QVBoxLayout(self.metrics_grp_box)
-        self.verticalLayout.setObjectName("verticalLayout")
-        self.gridLayout = QtWidgets.QGridLayout()
-        self.gridLayout.setObjectName("gridLayout")
+        self.metrics_layout = QtWidgets.QVBoxLayout(self.metrics_grp_box)
+        self.metrics_layout.setObjectName("metrics_layout")
         self.chk_box_sens = QtWidgets.QCheckBox(self.metrics_grp_box)
         self.chk_box_sens.setChecked(True)
         self.chk_box_sens.setObjectName("chk_box_sens")
-        self.gridLayout.addWidget(self.chk_box_sens, 0, 0, 1, 1)
+        self.metrics_layout.addWidget(self.chk_box_sens)
         self.chk_box_spec = QtWidgets.QCheckBox(self.metrics_grp_box)
         self.chk_box_spec.setChecked(True)
         self.chk_box_spec.setObjectName("chk_box_spec")
-        self.gridLayout.addWidget(self.chk_box_spec, 0, 1, 1, 1)
+        self.metrics_layout.addWidget(self.chk_box_spec)
         self.chk_box_lr = QtWidgets.QCheckBox(self.metrics_grp_box)
         self.chk_box_lr.setChecked(True)
         self.chk_box_lr.setObjectName("chk_box_lr")
-        self.gridLayout.addWidget(self.chk_box_lr, 2, 0, 1, 1)
+        self.metrics_layout.addWidget(self.chk_box_lr)
         self.chk_box_dor = QtWidgets.QCheckBox(self.metrics_grp_box)
         self.chk_box_dor.setChecked(True)
         self.chk_box_dor.setObjectName("chk_box_dor")
-        self.gridLayout.addWidget(self.chk_box_dor, 2, 1, 1, 1)
-        spacerItem = QtWidgets.QSpacerItem(
-            20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding
-        )
-        self.gridLayout.addItem(spacerItem, 1, 0, 1, 1)
-        self.verticalLayout.addLayout(self.gridLayout)
-        self.gridLayout_2.addWidget(self.metrics_grp_box, 0, 0, 1, 1)
-        self.horizontalLayout = QtWidgets.QHBoxLayout()
-        self.horizontalLayout.setObjectName("horizontalLayout")
-        spacerItem1 = QtWidgets.QSpacerItem(
-            200, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
-        )
-        self.horizontalLayout.addItem(spacerItem1)
+        self.metrics_layout.addWidget(self.chk_box_dor)
+        self.content_layout.addWidget(self.metrics_grp_box)
+        spacerItem = QtWidgets.QSpacerItem(20, 0, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        self.content_layout.addItem(spacerItem)
+        self.content_scroll.setWidget(self.content_widget)
+        self.dialog_layout.addWidget(self.content_scroll)
+        self.actions_layout = QtWidgets.QHBoxLayout()
+        self.actions_layout.setObjectName("actions_layout")
+        spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.actions_layout.addItem(spacerItem1)
         self.btn_ok = QtWidgets.QPushButton(diag_metric)
-        self.btn_ok.setMaximumSize(QtCore.QSize(75, 23))
+        self.btn_ok.setDefault(True)
         self.btn_ok.setObjectName("btn_ok")
-        self.horizontalLayout.addWidget(self.btn_ok)
-        self.gridLayout_2.addLayout(self.horizontalLayout, 1, 0, 1, 1)
+        self.actions_layout.addWidget(self.btn_ok)
+        self.dialog_layout.addLayout(self.actions_layout)
 
         self.retranslateUi(diag_metric)
         QtCore.QMetaObject.connectSlotsByName(diag_metric)
+        diag_metric.setTabOrder(self.chk_box_sens, self.chk_box_spec)
+        diag_metric.setTabOrder(self.chk_box_spec, self.chk_box_lr)
+        diag_metric.setTabOrder(self.chk_box_lr, self.chk_box_dor)
+        diag_metric.setTabOrder(self.chk_box_dor, self.btn_ok)
 
     def retranslateUi(self, diag_metric):
         _translate = QtCore.QCoreApplication.translate
         diag_metric.setWindowTitle(_translate("diag_metric", "Diagnostic Metrics"))
-        self.metrics_grp_box.setTitle(
-            _translate("diag_metric", "Select Metrics for Analysis")
-        )
+        self.availability_label.setText(_translate("diag_metric", "Available metrics are based on complete raw counts or complete entered effect estimates and confidence intervals."))
+        self.metrics_grp_box.setTitle(_translate("diag_metric", "Select Metrics for Analysis"))
         self.chk_box_sens.setText(_translate("diag_metric", "Sensitivity"))
         self.chk_box_spec.setText(_translate("diag_metric", "Specificity"))
         self.chk_box_lr.setText(_translate("diag_metric", "Likelihood Ratio"))
         self.chk_box_dor.setText(_translate("diag_metric", "Diagnostic Odds Ratio"))
         self.btn_ok.setText(_translate("diag_metric", "Next >"))
-
-
 import icons_rc

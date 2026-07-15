@@ -6,21 +6,9 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>285</width>
-    <height>46</height>
+    <width>0</width>
+    <height>0</height>
    </rect>
-  </property>
-  <property name="minimumSize">
-   <size>
-    <width>285</width>
-    <height>45</height>
-   </size>
-  </property>
-  <property name="maximumSize">
-   <size>
-    <width>300</width>
-    <height>50</height>
-   </size>
   </property>
   <property name="windowTitle">
    <string>WizardPage</string>
@@ -31,9 +19,21 @@
   <property name="subTitle">
    <string/>
   </property>
-  <layout class="QHBoxLayout" name="horizontalLayout">
+  <layout class="QVBoxLayout" name="workflowPageLayout">
+   <property name="leftMargin"><number>0</number></property>
+   <property name="topMargin"><number>0</number></property>
+   <property name="rightMargin"><number>0</number></property>
+   <property name="bottomMargin"><number>0</number></property>
    <item>
-    <widget class="QLabel" name="label">
+    <widget class="QScrollArea" name="pageScrollArea">
+     <property name="focusPolicy"><enum>Qt::NoFocus</enum></property>
+     <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+     <property name="widgetResizable"><bool>true</bool></property>
+     <widget class="QWidget" name="pageScrollContent">
+      <property name="sizePolicy"><sizepolicy hsizetype="Ignored" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
+      <layout class="QHBoxLayout" name="horizontalLayout">
+       <item>
+        <widget class="QLabel" name="label">
      <property name="sizePolicy">
       <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
        <horstretch>0</horstretch>
@@ -56,6 +56,10 @@
      <property name="text">
       <string/>
      </property>
+    </widget>
+   </item>
+      </layout>
+     </widget>
     </widget>
    </item>
   </layout>

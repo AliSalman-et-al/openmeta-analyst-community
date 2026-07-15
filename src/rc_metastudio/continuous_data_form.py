@@ -15,19 +15,31 @@
 import sys
 import copy
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QBrush, QColor, QKeySequence, QPalette
-from PyQt5.QtWidgets import QAction, QDialog, QMessageBox, QTableWidgetItem, QUndoStack
+from PyQt5.QtCore import QEvent, QTimer, Qt
+from PyQt5.QtGui import QKeySequence, QPalette
+from PyQt5.QtWidgets import (
+    QAction,
+    QDialog,
+    QHeaderView,
+    QMessageBox,
+    QSizePolicy,
+    QStyle,
+    QTableWidgetItem,
+    QTreeView,
+    QUndoStack,
+    QWidget,
+    QWIDGETSIZE_MAX,
+)
 from functools import partial
 import calculator_routines as calc_fncs
 
 import app_error_handler
+import adaptive_window
 import meta_py_r
-import qt_layout
 import tabular_data
 from meta_globals import *
 import forms.ui_continuous_data_form
-import forms.ui_choose_back_calc_result_form
+import forms.ui_continuous_back_calc_result_form
 
 CONTINUOUS_IMPUTATION_FIELD_NAMES = {
     "n": "n",
@@ -75,6 +87,12 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
     ):
         super(ContinuousDataForm, self).__init__(parent)
         self.setupUi(self)
+        self._configure_tables()
+        self._configure_semantic_fields()
+        self._configure_focus_revelation()
+        self._layout_controller = adaptive_window.register_adaptive_window(
+            self, adaptive_window.WindowRole.TRANSACTIONAL
+        )
         self.setup_signals_and_slots()
 
         if conf_level is None:
@@ -117,9 +135,6 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             self.g1_pre_post_table,
             self.g2_pre_post_table,
         ]
-        for table in self.tables:
-            qt_layout.configure_compact_table(table, fill_available_width=True)
-
         self.grp_1_lbl.setText(str(self.cur_groups[0]))
         self.grp_2_lbl.setText(str(self.cur_groups[1]))
 
@@ -139,31 +154,176 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             self.grp_box_pre_post.setVisible(False)
 
         self.current_correlation = self._get_correlation_str()
-        qt_layout.fit_analysis_dialog_to_contents(self)
+        self._request_initial_content_refit()
+
+    def _configure_tables(self):
+        """Give each data grid its own overflow and user-adjustable columns."""
+        for table in (
+            self.simple_table,
+            self.g1_pre_post_table,
+            self.g2_pre_post_table,
+        ):
+            # layout-audit: allow=compact-table-overflow; reason=compact table keeps rows visible and owns excess overflow
+            table.setMinimumWidth(0)
+            table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            table.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            header = table.horizontalHeader()
+            header.setSectionResizeMode(QHeaderView.Interactive)
+            header.setStretchLastSection(False)
+            table.resizeColumnsToContents()
+            table.resizeRowsToContents()
+            height = (
+                header.sizeHint().height()
+                + sum(table.rowHeight(row) for row in range(table.rowCount()))
+                + 2 * table.frameWidth()
+                + table.horizontalScrollBar().sizeHint().height()
+            )
+            # layout-audit: allow=compact-table-overflow; reason=compact table keeps rows visible and owns excess overflow
+            table.setMinimumHeight(height)
+            # layout-audit: allow=compact-table-overflow; reason=compact table keeps rows visible and owns excess overflow
+            table.setMaximumHeight(height)
+
+    def _configure_semantic_fields(self):
+        # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
+        self.effect_cbo_box.setMinimumWidth(0)
+        # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
+        self.effect_cbo_box.setMaximumWidth(QWIDGETSIZE_MAX)
+        self.effect_cbo_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        effect_view = QTreeView(self.effect_cbo_box)
+        effect_view.setHeaderHidden(True)
+        effect_view.setRootIsDecorated(False)
+        self.effect_cbo_box.setView(effect_view)
+        effect_view.setTextElideMode(Qt.ElideNone)
+        effect_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        effect_view.window().installEventFilter(self)
+        correlation_width = (
+            self.correlation_pre_post.fontMetrics().horizontalAdvance("-1.0000")
+            + self.correlation_pre_post.textMargins().left()
+            + self.correlation_pre_post.textMargins().right()
+            + 2
+            * self.correlation_pre_post.style().pixelMetric(
+                QStyle.PM_DefaultFrameWidth, None, self.correlation_pre_post
+            )
+            + 12
+        )
+        # layout-audit: allow=numeric-domain-control; reason=editor width follows representative values from its numeric domain
+        self.correlation_pre_post.setMinimumWidth(correlation_width)
+        # layout-audit: allow=numeric-domain-control; reason=editor width follows representative values from its numeric domain
+        self.correlation_pre_post.setMaximumWidth(QWIDGETSIZE_MAX)
+        self.correlation_pre_post.setSizePolicy(
+            QSizePolicy.MinimumExpanding, QSizePolicy.Fixed
+        )
+
+    def _configure_focus_revelation(self):
+        for widget in self.content_widget.findChildren(QWidget):
+            widget.installEventFilter(self)
+
+    def eventFilter(self, watched, event):
+        if (
+            watched is self.effect_cbo_box.view().window()
+            and event.type() == QEvent.Show
+        ):
+            QTimer.singleShot(0, self._bound_effect_popup_to_screen)
+        if event.type() == QEvent.FocusIn and self.content_widget.isAncestorOf(watched):
+            self.content_scroll.ensureWidgetVisible(watched)
+            QTimer.singleShot(
+                0, lambda target=watched: self._ensure_content_widget_visible(target)
+            )
+        return super(ContinuousDataForm, self).eventFilter(watched, event)
+
+    def _ensure_content_widget_visible(self, widget):
+        try:
+            self.content_scroll.ensureWidgetVisible(widget)
+            center = widget.mapTo(self.content_widget, widget.rect().center())
+            self.content_scroll.ensureVisible(center.x(), center.y(), 12, 12)
+        except RuntimeError:
+            pass
+
+    def _request_initial_content_refit(self):
+        controller = self.__dict__.get("_layout_controller")
+        if controller is not None and not self.isVisible():
+            controller.request_content_refit()
+
+    def _content_layout_changed(self):
+        """Relayout dynamic content without taking visible root geometry ownership."""
+        content_layout = self.__dict__.get("content_layout")
+        content_widget = self.__dict__.get("content_widget")
+        if content_layout is not None:
+            content_layout.invalidate()
+        if content_widget is not None:
+            content_widget.updateGeometry()
+        self._request_initial_content_refit()
+
+    def _update_effect_choice_accessibility(self):
+        combo = self.effect_cbo_box
+        if combo.count() == 0:
+            return
+        full_text = combo.currentText()
+        combo.setToolTip(full_text)
+        for index in range(combo.count()):
+            combo.setItemData(index, combo.itemText(index), Qt.ToolTipRole)
+        combo.view().resizeColumnToContents(0)
+
+    def _bound_effect_popup_to_screen(self):
+        """Keep the native metric popup local to the dialog's owning screen."""
+        try:
+            combo = self.effect_cbo_box
+            view = combo.view()
+            popup = view.window()
+            available = adaptive_window.available_geometry_for_window(self)
+            content_width = view.columnWidth(0) + 2 * popup.frameWidth()
+            popup_width = min(
+                available.width(), max(combo.width(), content_width)
+            )
+            popup_height = min(available.height(), popup.height())
+            # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
+            popup.setMaximumSize(available.size())
+            # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
+            popup.resize(popup_width, popup_height)
+
+            frame = popup.frameGeometry()
+            bounded_x = min(
+                max(frame.x(), available.left()),
+                available.right() - frame.width() + 1,
+            )
+            bounded_y = min(
+                max(frame.y(), available.top()),
+                available.bottom() - frame.height() + 1,
+            )
+            # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
+            popup.move(bounded_x, bounded_y)
+        except RuntimeError:
+            pass
+
+    def _grow_table_column_to_contents(self, table, column):
+        header = table.horizontalHeader()
+        required = max(header.sectionSizeHint(column), table.sizeHintForColumn(column))
+        if required > table.columnWidth(column):
+            header.resizeSection(column, required)
 
     def _fit_tables_to_contents(self):
-        tables = self.__dict__.get("tables")
-        if tables is None:
-            tables = [self.__dict__.get("simple_table")]
-        for table in tables:
-            if table is None:
-                continue
-            qt_layout.configure_compact_table(table, fill_available_width=True)
-        qt_layout.fit_analysis_dialog_to_contents(self)
+        for table in self.__dict__.get("tables", (self.simple_table,)):
+            for column in range(table.columnCount()):
+                self._grow_table_column_to_contents(table, column)
+        self._content_layout_changed()
 
     def initialize_form(self, table=None):
         """Initialize all cells to empty items
         If table is specified, only clear that table, leave the others alone"""
 
         if table is None:
-            for row in range(2):
-                for col in range(self.simple_table.columnCount()):
-                    self._set_val(row, col, None)
-                    self._set_val(row, col, None, self.g1_pre_post_table)
-                    self._set_val(row, col, None, self.g2_pre_post_table)
+            for target in (
+                self.simple_table,
+                self.g1_pre_post_table,
+                self.g2_pre_post_table,
+            ):
+                for row in range(target.rowCount()):
+                    for col in range(target.columnCount()):
+                        self._set_val(row, col, None, target)
         else:
-            for row in range(2):
-                for col in range(self.table.columnCount()):
+            for row in range(table.rowCount()):
+                for col in range(table.columnCount()):
                     self._set_val(row, col, None, table)
 
         for txt_box in self.text_boxes:
@@ -253,10 +413,9 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             self.effect_cbo_box.addItem(
                 self._effect_display_label(effect), userData=effect
             )
-        self.effect_cbo_box.setMaximumWidth(300)
-        self.effect_cbo_box.setMinimumWidth(self.effect_cbo_box.sizeHint().width())
         self.effect_cbo_box.setCurrentIndex(q_effects.index(str(self.cur_effect)))
         self.effect_cbo_box.blockSignals(False)
+        self._update_effect_choice_accessibility()
 
     def effect_changed(self):
         self.cur_effect = self._selected_effect()
@@ -266,7 +425,8 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             self.grp_box_pre_post.setVisible(False)
         else:
             self.grp_box_pre_post.setVisible(True)
-        qt_layout.fit_analysis_dialog_to_contents(self)
+        self._update_effect_choice_accessibility()
+        self._content_layout_changed()
 
         self.group_str = self.get_cur_group_str()
 
@@ -437,21 +597,9 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         self.change_row_color_according_to_metric()
 
     def change_row_color_according_to_metric(self):
-        # Change color of bottom rows of table according one or two-arm metric
+        """Expose only the data rows that participate in the selected metric."""
         curr_effect_is_one_arm = self.cur_effect in CONTINUOUS_ONE_ARM_METRICS
-        row = 1
-        for col in range(len(self.get_column_header_strs(self.simple_table))):
-            item = self.simple_table.item(row, col)
-            if curr_effect_is_one_arm:
-                item.setBackground(QBrush(QColor(Qt.gray)))
-            else:
-                # just reset the item
-                text = item.text()
-                self.simple_table.blockSignals(True)
-                popped_item = self.simple_table.takeItem(row, col)
-                self.simple_table.blockSignals(False)
-                del popped_item
-                self._set_val(row, col, text, self.simple_table)
+        self.simple_table.setRowHidden(1, curr_effect_is_one_arm)
 
     def update_raw_data(self):
         """Updates table widget with data from ma_unit"""
@@ -1083,10 +1231,16 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             return changed
 
         if self.cur_effect not in ["MD", "SMD"]:
+            was_hidden = self.back_calc_btn.isHidden()
             self.back_calc_btn.setVisible(False)
+            if not was_hidden:
+                self._content_layout_changed()
             return None
         else:
+            was_hidden = self.back_calc_btn.isHidden()
             self.back_calc_btn.setVisible(True)
+            if was_hidden:
+                self._content_layout_changed()
 
         (group1_data, group2_data, effect_data) = build_data_dicts()
         imputed = meta_py_r.back_calc_cont_data(
@@ -1285,7 +1439,8 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
 
 ################################################################################
 class ChooseBackCalcResultForm(
-    QDialog, forms.ui_choose_back_calc_result_form.Ui_ChooseBackCalcResultForm
+    QDialog,
+    forms.ui_continuous_back_calc_result_form.Ui_ContinuousBackCalcResultForm,
 ):
     def __init__(
         self, info_text, op1_txt, op2_txt, parent=None, op3_txt=None, op4_txt=None
@@ -1293,14 +1448,43 @@ class ChooseBackCalcResultForm(
         super(ChooseBackCalcResultForm, self).__init__(parent)
         self.setupUi(self)
 
+        for widget in self.content_widget.findChildren(QWidget):
+            widget.installEventFilter(self)
+        self._layout_controller = adaptive_window.register_adaptive_window(
+            self, adaptive_window.WindowRole.TRANSACTIONAL
+        )
+
         ####self.choice1_lbl.setText(op1_txt)
         ####self.choice2_lbl.setText(op2_txt)
 
-        self.choice1_btn.setText(op1_txt)
-        self.choice2_btn.setText(op2_txt)
+        self.choice1_label.setText(op1_txt)
+        self.choice2_label.setText(op2_txt)
 
         self.info_label.setText(info_text)
-        qt_layout.fit_analysis_dialog_to_contents(self)
+        self._layout_controller.request_content_refit()
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.MouseButtonRelease:
+            if watched is self.choice1_label:
+                self.choice1_btn.setChecked(True)
+                return True
+            if watched is self.choice2_label:
+                self.choice2_btn.setChecked(True)
+                return True
+        if event.type() == QEvent.FocusIn and self.content_widget.isAncestorOf(watched):
+            self.content_scroll.ensureWidgetVisible(watched)
+            QTimer.singleShot(
+                0, lambda target=watched: self._ensure_content_widget_visible(target)
+            )
+        return super(ChooseBackCalcResultForm, self).eventFilter(watched, event)
+
+    def _ensure_content_widget_visible(self, widget):
+        try:
+            self.content_scroll.ensureWidgetVisible(widget)
+            center = widget.mapTo(self.content_widget, widget.rect().center())
+            self.content_scroll.ensureVisible(center.x(), center.y(), 12, 12)
+        except RuntimeError:
+            pass
 
     def getChoice(self):
         # Choice data to be returned is index of data item

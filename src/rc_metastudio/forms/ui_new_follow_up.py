@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'src\rc_metastudio\forms\new_follow_up_dlg.ui'
+# Form implementation generated from reading ui file 'src/rc_metastudio/forms/new_follow_up_dlg.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -14,60 +14,35 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_new_follow_up_dialog(object):
     def setupUi(self, new_follow_up_dialog):
         new_follow_up_dialog.setObjectName("new_follow_up_dialog")
-        new_follow_up_dialog.setEnabled(True)
-        new_follow_up_dialog.resize(301, 132)
-        new_follow_up_dialog.setMinimumSize(QtCore.QSize(301, 132))
-        new_follow_up_dialog.setMaximumSize(QtCore.QSize(301, 132))
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        new_follow_up_dialog.setFont(font)
-        icon = QtGui.QIcon()
-        icon.addPixmap(
-            QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
-        )
-        new_follow_up_dialog.setWindowIcon(icon)
-        self.buttonBox = QtWidgets.QDialogButtonBox(new_follow_up_dialog)
-        self.buttonBox.setGeometry(QtCore.QRect(10, 90, 281, 32))
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        self.buttonBox.setFont(font)
-        self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(
-            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
-        )
-        self.buttonBox.setObjectName("buttonBox")
-        self.layoutWidget = QtWidgets.QWidget(new_follow_up_dialog)
-        self.layoutWidget.setGeometry(QtCore.QRect(10, 10, 281, 71))
-        self.layoutWidget.setObjectName("layoutWidget")
-        self.gridLayout = QtWidgets.QGridLayout(self.layoutWidget)
-        self.gridLayout.setContentsMargins(0, 0, 0, 0)
-        self.gridLayout.setObjectName("gridLayout")
-        self.label_2 = QtWidgets.QLabel(self.layoutWidget)
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        font.setPointSize(10)
-        self.label_2.setFont(font)
+        new_follow_up_dialog.resize(0, 0)
+        self.verticalLayout = QtWidgets.QVBoxLayout(new_follow_up_dialog)
+        self.verticalLayout.setObjectName("verticalLayout")
+        self.formLayout = QtWidgets.QFormLayout()
+        self.formLayout.setFieldGrowthPolicy(QtWidgets.QFormLayout.AllNonFixedFieldsGrow)
+        self.formLayout.setRowWrapPolicy(QtWidgets.QFormLayout.WrapAllRows)
+        self.formLayout.setObjectName("formLayout")
+        self.label_2 = QtWidgets.QLabel(new_follow_up_dialog)
         self.label_2.setObjectName("label_2")
-        self.gridLayout.addWidget(self.label_2, 0, 0, 1, 1)
-        self.follow_up_name_le = QtWidgets.QLineEdit(self.layoutWidget)
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        self.follow_up_name_le.setFont(font)
+        self.formLayout.setWidget(0, QtWidgets.QFormLayout.LabelRole, self.label_2)
+        self.follow_up_name_le = QtWidgets.QLineEdit(new_follow_up_dialog)
         self.follow_up_name_le.setAlignment(QtCore.Qt.AlignCenter)
         self.follow_up_name_le.setObjectName("follow_up_name_le")
-        self.gridLayout.addWidget(self.follow_up_name_le, 0, 1, 1, 1)
+        self.formLayout.setWidget(0, QtWidgets.QFormLayout.FieldRole, self.follow_up_name_le)
+        self.verticalLayout.addLayout(self.formLayout)
+        self.buttonBox = QtWidgets.QDialogButtonBox(new_follow_up_dialog)
+        self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setObjectName("buttonBox")
+        self.verticalLayout.addWidget(self.buttonBox)
+        self.label_2.setBuddy(self.follow_up_name_le)
 
         self.retranslateUi(new_follow_up_dialog)
-        self.buttonBox.accepted.connect(new_follow_up_dialog.accept)  # type: ignore
-        self.buttonBox.rejected.connect(new_follow_up_dialog.reject)  # type: ignore
+        self.buttonBox.accepted.connect(new_follow_up_dialog.accept) # type: ignore
+        self.buttonBox.rejected.connect(new_follow_up_dialog.reject) # type: ignore
         QtCore.QMetaObject.connectSlotsByName(new_follow_up_dialog)
 
     def retranslateUi(self, new_follow_up_dialog):
         _translate = QtCore.QCoreApplication.translate
-        new_follow_up_dialog.setWindowTitle(
-            _translate("new_follow_up_dialog", "Add Follow-Up")
-        )
+        new_follow_up_dialog.setWindowTitle(_translate("new_follow_up_dialog", "Add Follow-Up"))
         self.label_2.setText(_translate("new_follow_up_dialog", "Follow-up label"))
-
-
 import icons_rc

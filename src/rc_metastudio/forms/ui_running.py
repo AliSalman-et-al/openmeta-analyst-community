@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'src\rc_metastudio\forms\running.ui'
+# Form implementation generated from reading ui file 'src/rc_metastudio/forms/running.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -15,15 +15,7 @@ class Ui_running(object):
     def setupUi(self, running):
         running.setObjectName("running")
         running.setWindowModality(QtCore.Qt.ApplicationModal)
-        running.resize(373, 70)
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        running.setFont(font)
-        icon = QtGui.QIcon()
-        icon.addPixmap(
-            QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
-        )
-        running.setWindowIcon(icon)
+        running.resize(0, 0)
         running.setSizeGripEnabled(False)
         running.setModal(True)
         self.verticalLayout = QtWidgets.QVBoxLayout(running)
@@ -41,6 +33,4 @@ class Ui_running(object):
     def retranslateUi(self, running):
         _translate = QtCore.QCoreApplication.translate
         running.setWindowTitle(_translate("running", "Running Analysis..."))
-
-
 import icons_rc

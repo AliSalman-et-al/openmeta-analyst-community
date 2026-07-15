@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'src\rc_metastudio\forms\new_study_dlg.ui'
+# Form implementation generated from reading ui file 'src/rc_metastudio/forms/new_study_dlg.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -14,58 +14,35 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_new_study_dialog(object):
     def setupUi(self, new_study_dialog):
         new_study_dialog.setObjectName("new_study_dialog")
-        new_study_dialog.setEnabled(True)
-        new_study_dialog.resize(301, 132)
-        new_study_dialog.setMinimumSize(QtCore.QSize(301, 132))
-        new_study_dialog.setMaximumSize(QtCore.QSize(301, 132))
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        new_study_dialog.setFont(font)
-        icon = QtGui.QIcon()
-        icon.addPixmap(
-            QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
-        )
-        new_study_dialog.setWindowIcon(icon)
-        self.buttonBox = QtWidgets.QDialogButtonBox(new_study_dialog)
-        self.buttonBox.setGeometry(QtCore.QRect(10, 90, 281, 32))
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        self.buttonBox.setFont(font)
-        self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(
-            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
-        )
-        self.buttonBox.setObjectName("buttonBox")
-        self.layoutWidget = QtWidgets.QWidget(new_study_dialog)
-        self.layoutWidget.setGeometry(QtCore.QRect(10, 10, 281, 71))
-        self.layoutWidget.setObjectName("layoutWidget")
-        self.gridLayout = QtWidgets.QGridLayout(self.layoutWidget)
-        self.gridLayout.setContentsMargins(0, 0, 0, 0)
-        self.gridLayout.setObjectName("gridLayout")
-        self.label_2 = QtWidgets.QLabel(self.layoutWidget)
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        font.setPointSize(10)
-        self.label_2.setFont(font)
+        new_study_dialog.resize(0, 0)
+        self.verticalLayout = QtWidgets.QVBoxLayout(new_study_dialog)
+        self.verticalLayout.setObjectName("verticalLayout")
+        self.formLayout = QtWidgets.QFormLayout()
+        self.formLayout.setFieldGrowthPolicy(QtWidgets.QFormLayout.AllNonFixedFieldsGrow)
+        self.formLayout.setRowWrapPolicy(QtWidgets.QFormLayout.WrapAllRows)
+        self.formLayout.setObjectName("formLayout")
+        self.label_2 = QtWidgets.QLabel(new_study_dialog)
         self.label_2.setObjectName("label_2")
-        self.gridLayout.addWidget(self.label_2, 0, 0, 1, 1)
-        self.study_lbl = QtWidgets.QLineEdit(self.layoutWidget)
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        self.study_lbl.setFont(font)
+        self.formLayout.setWidget(0, QtWidgets.QFormLayout.LabelRole, self.label_2)
+        self.study_lbl = QtWidgets.QLineEdit(new_study_dialog)
         self.study_lbl.setAlignment(QtCore.Qt.AlignCenter)
         self.study_lbl.setObjectName("study_lbl")
-        self.gridLayout.addWidget(self.study_lbl, 0, 1, 1, 1)
+        self.formLayout.setWidget(0, QtWidgets.QFormLayout.FieldRole, self.study_lbl)
+        self.verticalLayout.addLayout(self.formLayout)
+        self.buttonBox = QtWidgets.QDialogButtonBox(new_study_dialog)
+        self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setObjectName("buttonBox")
+        self.verticalLayout.addWidget(self.buttonBox)
+        self.label_2.setBuddy(self.study_lbl)
 
         self.retranslateUi(new_study_dialog)
-        self.buttonBox.accepted.connect(new_study_dialog.accept)  # type: ignore
-        self.buttonBox.rejected.connect(new_study_dialog.reject)  # type: ignore
+        self.buttonBox.accepted.connect(new_study_dialog.accept) # type: ignore
+        self.buttonBox.rejected.connect(new_study_dialog.reject) # type: ignore
         QtCore.QMetaObject.connectSlotsByName(new_study_dialog)
 
     def retranslateUi(self, new_study_dialog):
         _translate = QtCore.QCoreApplication.translate
         new_study_dialog.setWindowTitle(_translate("new_study_dialog", "Add Study"))
         self.label_2.setText(_translate("new_study_dialog", "Study"))
-
-
 import icons_rc

@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import QDialog, QMessageBox
 
 from meta_globals import *
 import app_error_handler
+import adaptive_window
 import forms.ui_change_cov_type
 from forms.ui_change_cov_type import Ui_ChangeCovTypeForm
 from ma_dataset import Covariate
@@ -40,7 +41,9 @@ class ChangeCovTypeForm(QDialog, Ui_ChangeCovTypeForm):
         self.cov_prev_table.setModel(self.cov_model)
         self.cov_prev_table.resizeColumnsToContents()
         qt_layout.configure_spreadsheet_table_view(self.cov_prev_table)
-        qt_layout.fit_application_dialog_to_contents(self)
+        adaptive_window.register_adaptive_window(
+            self, adaptive_window.WindowRole.TRANSACTIONAL
+        )
 
     def data_error(self, msg):
         QMessageBox.warning(self, "Warning", msg)

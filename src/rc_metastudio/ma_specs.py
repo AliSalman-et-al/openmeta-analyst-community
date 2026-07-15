@@ -25,6 +25,8 @@ import os
 import sys
 
 import forms.ui_ma_specs
+import adaptive_controls
+import adaptive_window
 from analysis_method_labels import (
     diagnostic_metric_group_display_label,
     normalize_available_method_labels,
@@ -79,7 +81,7 @@ class _DiagnosticMethodPanel(object):
         self.label.setText(label)
         self.combo = combo
         self.param_box = param_box
-        owner._cap_method_selector_width(self.combo)
+        owner._configure_method_selector(self.combo)
         self.param_box.setLayout(QGridLayout())
         self.combo.currentIndexChanged[str].connect(
             app_error_handler.safe_slot(
@@ -149,11 +151,11 @@ class _DiagnosticMethodPanel(object):
             self.param_box.layout().addWidget(control, row, 1)
             self.widgets.extend((label, control))
             row += 1
-        qt_layout.fit_analysis_dialog_to_contents(self.owner)
+        self.owner._schedule_local_reflow()
 
     def _control(self, name, definition, default, metadata):
         if isinstance(definition, list):
-            control = QComboBox()
+            control = adaptive_controls.AdaptiveComboBox()
             for value in definition:
                 control.addItem(
                     parameter_value_display_label(name, value, metadata.get(name)),
@@ -187,7 +189,10 @@ class _DiagnosticMethodPanel(object):
             control.valueChanged[float].connect(
                 lambda value, n=name: self.params.__setitem__(n, value)
             )
-        self.owner._cap_value_control_width(control)
+        if isinstance(control, QComboBox):
+            self.owner._configure_value_control(control)
+        else:
+            adaptive_controls.configure_numeric_value_control(control)
         return control
 
 
@@ -206,6 +211,11 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         super(MA_Specs, self).__init__(parent)
         self.setupUi(self)
+        self._layout_reflow_pending = False
+        self._focus_reveal_connected = False
+        self._first_show_content_refit_pending = True
+        for combo in self.findChildren(QComboBox):
+            self._configure_value_control(combo)
         apply_plot_text_input_limits(self)
         apply_default_forest_arm_labels(self)
         if _text_value(self.image_path) == "":
@@ -235,7 +245,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.save_btn.pressed.connect(
             app_error_handler.safe_slot(self.select_out_path, parent=self)
         )
-        self._cap_method_selector_width(self.method_cbo_box)
+        self._configure_method_selector(self.method_cbo_box)
         self.method_cbo_box.currentIndexChanged[str].connect(
             app_error_handler.safe_slot(
                 lambda _text: self.method_changed(), parent=self
@@ -304,7 +314,61 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.populate_cbo_box()
         if self._combined_diagnostic:
             self._finish_combined_diagnostic_ui()
-        qt_layout.fit_analysis_dialog_to_contents(self)
+        adaptive_window.register_adaptive_window(
+            self, adaptive_window.WindowRole.TRANSACTIONAL
+        )
+
+    def sizeHint(self):
+        """Include the scroll body's content width in first-use negotiation."""
+        hint = super(MA_Specs, self).sizeHint()
+        if hasattr(self, "specs_tab"):
+            content_hint = self.specs_tab.minimumSizeHint()
+            if content_hint.isValid():
+                margins = self.layout().contentsMargins()
+                scrollbar_width = (
+                    self.content_scroll_area.verticalScrollBar().sizeHint().width()
+                )
+                hint.setWidth(
+                    max(
+                        hint.width(),
+                        content_hint.width()
+                        + margins.left()
+                        + margins.right()
+                        + scrollbar_width,
+                    )
+                )
+        return hint
+
+    def showEvent(self, event):
+        super(MA_Specs, self).showEvent(event)
+        if self._first_show_content_refit_pending:
+            self._first_show_content_refit_pending = False
+            QtCore.QTimer.singleShot(
+                0, self._adaptive_window_controller.request_content_refit
+            )
+        app = QtWidgets.QApplication.instance()
+        if app is not None and not self._focus_reveal_connected:
+            app.focusChanged.connect(self._reveal_focused_control)
+            self._focus_reveal_connected = True
+
+    def hideEvent(self, event):
+        self._disconnect_focus_reveal()
+        super(MA_Specs, self).hideEvent(event)
+
+    def closeEvent(self, event):
+        self._disconnect_focus_reveal()
+        super(MA_Specs, self).closeEvent(event)
+
+    def _disconnect_focus_reveal(self):
+        if not self._focus_reveal_connected:
+            return
+        app = QtWidgets.QApplication.instance()
+        if app is not None:
+            try:
+                app.focusChanged.disconnect(self._reveal_focused_control)
+            except (TypeError, RuntimeError):
+                pass
+        self._focus_reveal_connected = False
 
     def cancel(self):
         print("(cancel)")
@@ -709,7 +773,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.ui_for_params(
             excluded_names=SHARED_DIAGNOSTIC_PARAMS if self._combined_diagnostic else ()
         )
-        qt_layout.fit_analysis_dialog_to_contents(self)
+        self._schedule_local_reflow()
 
     def _set_parameter_box_title(self, cbo_box, param_box):
         param_box.setTitle(str(cbo_box.currentText()))
@@ -904,7 +968,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                         )
                         cur_grid_row += 1
 
-        qt_layout.fit_analysis_dialog_to_contents(self, adjust_root=adjust_root)
+        self._schedule_local_reflow()
 
     def add_param(self, layout, cur_grid_row, name, value):
         print("adding param. name: %s, value: %s" % (name, value))
@@ -939,7 +1003,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             self._parameter_display_label(name),
             tool_tip_text=self._parameter_description(name),
         )
-        cbo_box = QComboBox()
+        cbo_box = adaptive_controls.AdaptiveComboBox()
         for index, value in enumerate(values):
             name_str = self._get_enum_item_pretty_name(name, value)
             cbo_box.addItem(name_str)
@@ -959,7 +1023,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             )
         )
 
-        self._cap_value_control_width(cbo_box)
+        self._configure_value_control(cbo_box)
         self.current_widgets.append(cbo_box)
         layout.addWidget(cbo_box, cur_grid_row, 1)
 
@@ -1029,8 +1093,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             finput.setValue(value)
             self.current_param_vals[name] = value
 
-        finput.setMaximumWidth(50)
-        self._cap_value_control_width(finput)
+        adaptive_controls.configure_numeric_value_control(finput)
         finput.valueChanged[float].connect(
             app_error_handler.safe_slot(
                 self.set_param_f(name, to_type=float), parent=self
@@ -1056,7 +1119,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                 self.set_param_f(name, to_type=float), parent=self
             )
         )
-        self._cap_value_control_width(conf_input)
+        adaptive_controls.configure_numeric_value_control(conf_input)
         self.current_widgets.append(conf_input)
         layout.addWidget(conf_input, cur_grid_row, 1)
 
@@ -1092,8 +1155,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             iinput.setValue(value)
             self.current_param_vals[name] = value
 
-        iinput.setMaximumWidth(50)
-        self._cap_value_control_width(iinput)
+        adaptive_controls.configure_numeric_value_control(iinput)
         iinput.valueChanged[int].connect(
             app_error_handler.safe_slot(
                 self.set_param_f(name, to_type=int), parent=self
@@ -1117,8 +1179,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             txt_input.setText(str(self.current_defaults[name]))
             self.current_param_vals[name] = self.current_defaults[name]
 
-        txt_input.setMaximumWidth(200)
-        self._cap_value_control_width(txt_input)
+        adaptive_controls.configure_text_value_control(txt_input)
         txt_input.textChanged.connect(
             app_error_handler.safe_slot(
                 self.set_param_f(name, to_type=str), parent=self
@@ -1149,36 +1210,43 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
     def add_method_description(self, layout, cur_grid_row, text):
         lbl = QLabel(text, self.parameter_grp_box)
         lbl.setWordWrap(True)
+        # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
         lbl.setMinimumWidth(0)
         lbl.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.current_widgets.append(lbl)
         layout.addWidget(lbl, cur_grid_row, 0, 1, 2)
 
-    def _cap_value_control_width(self, widget):
-        widget.setProperty(
-            "RCMS_maximum_value_control_width",
-            qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH,
-        )
-        widget.setMaximumWidth(
-            min(
-                widget.maximumWidth(),
-                qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH,
-            )
-        )
-        widget.setSizePolicy(QSizePolicy.Maximum, widget.sizePolicy().verticalPolicy())
+    def _configure_value_control(self, widget):
+        adaptive_controls.configure_choice_control(widget)
 
-    def _cap_method_selector_width(self, widget):
-        widget.setProperty(
-            "RCMS_maximum_combo_width",
-            qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH,
-        )
-        widget.setMaximumWidth(
-            min(
-                widget.maximumWidth(),
-                qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH,
-            )
-        )
-        widget.setSizePolicy(QSizePolicy.Maximum, widget.sizePolicy().verticalPolicy())
+    def _configure_method_selector(self, widget):
+        adaptive_controls.configure_choice_control(widget, visible_characters=28)
+
+    def _schedule_local_reflow(self):
+        """Coalesce dynamic content negotiation without resizing the root window."""
+        if self._layout_reflow_pending:
+            return
+        self._layout_reflow_pending = True
+        QtCore.QTimer.singleShot(0, self._apply_local_reflow)
+
+    def _apply_local_reflow(self):
+        self._layout_reflow_pending = False
+        for combo in self.content_scroll_area.findChildren(QComboBox):
+            adaptive_controls.refresh_choice_popup_width(combo)
+        for layout in (
+            self.parameter_grp_box.layout(),
+            self.shared_diagnostic_params_box.layout(),
+            self.content_scroll_layout,
+        ):
+            if layout is not None:
+                layout.invalidate()
+        self.content_scroll_area_widget.updateGeometry()
+        self.specs_tab.updateGeometry()
+        self._reveal_focused_control(None, QtWidgets.QApplication.focusWidget())
+
+    def _reveal_focused_control(self, _old, focused):
+        if focused is not None and self.content_scroll_area.isAncestorOf(focused):
+            self.content_scroll_area.ensureWidgetVisible(focused)
 
     def setup_params(self):
         # parses out information about the parameters of the current method
@@ -1261,7 +1329,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             label.setToolTip(parameter_description(name, metadata))
             value = self.current_param_vals.get(name, default)
             if isinstance(definition, list):
-                control = QComboBox()
+                control = adaptive_controls.AdaptiveComboBox()
                 for option in definition:
                     control.addItem(
                         parameter_value_display_label(name, option, metadata), option
@@ -1306,7 +1374,10 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                         n, new_value
                     )
                 )
-            self._cap_value_control_width(control)
+            if isinstance(control, QComboBox):
+                self._configure_value_control(control)
+            else:
+                adaptive_controls.configure_numeric_value_control(control)
             layout.addWidget(label, row, 0)
             layout.addWidget(control, row, 1)
             self._shared_diagnostic_widgets.extend((label, control))
@@ -1814,4 +1885,6 @@ class MetaProgress(QDialog, forms.ui_running.Ui_running):
     def __init__(self, parent=None):
         super(MetaProgress, self).__init__(parent)
         self.setupUi(self)
-        qt_layout.fit_application_dialog_to_contents(self)
+        self._layout_controller = adaptive_window.register_adaptive_window(
+            self, adaptive_window.WindowRole.TRANSIENT
+        )

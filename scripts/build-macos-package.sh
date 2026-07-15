@@ -314,13 +314,13 @@ cache_library="$r_package_cache_root/$r_package_cache_key/library"
 test_r_dependency_packages() {
   local library="$1"
   [ -d "$library" ] || return 1
-  R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" "$rscript" -e "lib <- normalizePath('$library', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','metafor','lme4','pdftools','rsvg','svglite','tiff','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)" >/dev/null 2>&1
+  R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" "$rscript" -e "lib <- normalizePath('$library', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','metafor','lme4','pdftools','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)" >/dev/null 2>&1
 }
 
 test_bundled_r_packages() {
   local library="$1"
   [ -d "$library" ] || return 1
-  R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" "$rscript" -e "lib <- normalizePath('$library', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','RCMetaR','metafor','lme4','pdftools','rsvg','svglite','tiff','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)" >/dev/null 2>&1
+  R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" "$rscript" -e "lib <- normalizePath('$library', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','RCMetaR','metafor','lme4','pdftools','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)" >/dev/null 2>&1
 }
 
 copy_r_library() {
@@ -367,7 +367,7 @@ fi
 
 step "Installing local RCMetaR package"
 install_local_r_packages
-R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$rscript" -e "pkgs <- c('HSROC','RCMetaR','metafor','lme4','pdftools','rsvg','svglite','tiff','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
+R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$rscript" -e "pkgs <- c('HSROC','RCMetaR','metafor','lme4','pdftools','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
 
 if ! test_bundled_r_packages "$r_lib"; then
   echo "Bundled R package verification failed after local RCMetaR install." >&2
@@ -399,11 +399,44 @@ do
   fi
 done
 
+run_adaptive_layout_evidence() {
+  local evidence_root="$repo_root/build/macos-package/$architecture/adaptive-layout-evidence/macos-$architecture"
+  local sample_path="$app_root/sample_projects/amino.rcms"
+  rm -rf "$evidence_root"
+  mkdir -p "$evidence_root"
+  for scale in "1.0" "1.5"; do
+    local scale_label
+    case "$scale" in
+      1.0) scale_label="100" ;;
+      1.5) scale_label="150" ;;
+      *) echo "Unsupported adaptive-layout evidence scale: $scale" >&2; exit 2 ;;
+    esac
+    local output_dir="$evidence_root/scale-$scale_label"
+    local log_path="$output_dir/automation-adaptive-layout-evidence.log"
+    mkdir -p "$output_dir"
+    env -u QT_QPA_PLATFORM \
+      QT_SCALE_FACTOR="$scale" \
+      RCMS_REQUIRE_IN_PROCESS_RPY2=1 \
+      RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG="$log_path" \
+      RPY2_CFFI_MODE=ABI \
+      RCMS_R_HOME="$r_home" \
+      RCMS_R_LIBS="$r_lib" \
+      "$app_root/RCMetaStudio" \
+        --automation-adaptive-layout-evidence "$output_dir" "$sample_path"
+    "$python_exe" "$repo_root/scripts/validate_adaptive_layout_evidence.py" \
+      --root "$output_dir" --platform-plugin cocoa --scale-factor "$scale"
+  done
+}
+
 if [ "$skip_smoke" -eq 0 ]; then
   sample_path="$app_root/sample_projects/amino.rcms"
   step "Running packaged macOS smoke checks"
   QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}" RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=ABI RCMS_R_HOME="$r_home" RCMS_R_LIBS="$r_lib" "$app_root/RCMetaStudio" --automation-smoke "$sample_path"
   QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}" RCMS_STARTUP_PROJECT_SMOKE=1 RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=ABI RCMS_R_HOME="$r_home" RCMS_R_LIBS="$r_lib" "$app_root/RCMetaStudio" "$sample_path"
+  if [ "$architecture" = "x64" ]; then
+    step "Capturing native macOS adaptive-layout evidence"
+    run_adaptive_layout_evidence
+  fi
 fi
 
 (

@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 
+import pytest
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import (
     QDialog,
@@ -8,6 +9,7 @@ from PyQt5.QtWidgets import (
     QHeaderView,
     QLineEdit,
     QSizePolicy,
+    QStyle,
     QTableWidget,
     QTableWidgetItem,
 )
@@ -347,7 +349,7 @@ def _assert_effect_ci_fields_fit_signed_precision(qapp, form):
         assert field.maximumWidth() >= required_width
 
 
-def test_calculator_effect_ci_fields_fit_signed_precision(qapp, monkeypatch):
+def test_calculator_effect_ci_fields_fit_valid_domain_samples(qapp, monkeypatch):
     import binary_data_form
     import continuous_data_form
     import diagnostic_data_form
@@ -388,31 +390,86 @@ def test_calculator_effect_ci_fields_fit_signed_precision(qapp, monkeypatch):
         lambda data: {"TP": None, "FP": None, "FN": None, "TN": None},
     )
 
-    forms = [
-        binary_data_form.BinaryDataForm2(
-            FakeMAUnit(),
-            ["Group 1", "Group 2"],
-            "Group 1-Group 2",
-            "OR",
-            conf_level=95.0,
+    forms_and_representatives = [
+        (
+            binary_data_form.BinaryDataForm2(
+                FakeMAUnit(),
+                ["Group 1", "Group 2"],
+                "Group 1-Group 2",
+                "OR",
+                conf_level=95.0,
+            ),
+            "-0.8888",
         ),
-        continuous_data_form.ContinuousDataForm(
-            FakeContinuousMAUnit(),
-            ["Group 1", "Group 2"],
-            "Group 1-Group 2",
-            "ROM",
-            conf_level=95.0,
+        (
+            continuous_data_form.ContinuousDataForm(
+                FakeContinuousMAUnit(),
+                ["Group 1", "Group 2"],
+                "Group 1-Group 2",
+                "ROM",
+                conf_level=95.0,
+            ),
+            "-0.8888",
         ),
-        diagnostic_data_form.DiagnosticDataForm(
-            FakeDiagnosticMAUnit(),
-            ["Group 1", "Group 2"],
-            "Group 1-Group 2",
-            conf_level=95.0,
+        (
+            diagnostic_data_form.DiagnosticDataForm(
+                FakeDiagnosticMAUnit(),
+                ["Group 1", "Group 2"],
+                "Group 1-Group 2",
+                conf_level=95.0,
+            ),
+            "1.0000",
         ),
     ]
 
-    for form in forms:
-        _assert_effect_ci_fields_fit_signed_precision(qapp, form)
+    for form, representative in forms_and_representatives:
+        fields = [form.effect_txt_box, form.low_txt_box, form.high_txt_box]
+        for field in fields:
+            field.setText(representative)
+        form.show()
+        qapp.processEvents()
+        for field in fields:
+            assert field.width() >= field.fontMetrics().horizontalAdvance(
+                representative
+            )
+
+
+@pytest.mark.parametrize(
+    ("metric", "representative"),
+    [("MD", "-9999.9999"), ("SMD", "-10.9999"), ("TX Mean", "9999.9999")],
+    ids=["md", "smd", "tx_mean"],
+)
+def test_continuous_effect_fields_fit_metric_domain_samples(
+    qapp, monkeypatch, metric, representative
+):
+    import calculator_routines
+
+    monkeypatch.setattr(
+        calculator_routines.meta_py_r,
+        "continuous_convert_scale",
+        lambda value, *args, **kwargs: value,
+    )
+    unit = FakeContinuousMAUnit()
+    fields = {name: QLineEdit() for name in ("effect", "lower", "upper")}
+    calculator_routines.helper_set_current_effect(
+        unit,
+        fields,
+        metric,
+        "Group 1" if metric == "TX Mean" else "Group 1-Group 2",
+        "continuous",
+        mult=1.96,
+    )
+    for field in fields.values():
+        margins = field.textMargins()
+        frame = field.style().pixelMetric(QStyle.PM_DefaultFrameWidth, None, field)
+        required = (
+            field.fontMetrics().horizontalAdvance(representative)
+            + margins.left()
+            + margins.right()
+            + 2 * frame
+        )
+        assert field.minimumWidth() >= required
+        assert field.maximumWidth() >= required
 
 
 def test_binary_calculator_grid_columns_fill_expanded_table_width(qapp, monkeypatch):
@@ -436,7 +493,69 @@ def test_binary_calculator_grid_columns_fill_expanded_table_width(qapp, monkeypa
         conf_level=95.0,
     )
 
-    _assert_calculator_table_grid_fills_width(qapp, form.raw_data_table)
+    form.show()
+    qapp.processEvents()
+    header = form.raw_data_table.horizontalHeader()
+    assert header.sectionResizeMode(0) == QHeaderView.Interactive
+    assert not header.stretchLastSection()
+    for column in range(form.raw_data_table.columnCount()):
+        assert header.sectionSize(column) >= header.sectionSizeHint(column)
+
+
+def test_binary_effect_fields_follow_metric_display_domains(qapp, monkeypatch):
+    import calculator_routines
+
+    monkeypatch.setattr(
+        calculator_routines.meta_py_r,
+        "binary_convert_scale",
+        lambda value, *args, **kwargs: value,
+    )
+
+    widths = {}
+    for metric in ("OR", "RD", "PR", "PLO", "AS"):
+        fields = {name: QLineEdit() for name in ("effect", "lower", "upper")}
+        calculator_routines.helper_set_current_effect(
+            FakeMAUnit(), fields, metric, "Group 1-Group 2", "binary", mult=1.96
+        )
+        widths[metric] = fields["effect"].width()
+
+    assert widths["OR"] > widths["RD"]
+    assert widths["OR"] > widths["PR"]
+    assert widths["PR"] == widths["PLO"]
+    assert widths["AS"] >= widths["RD"]
+
+    maximum_rendered_ratio = str(round(sys.float_info.max, 4))
+    assert (
+        calculator_routines.format_calculator_display_value(sys.float_info.max)
+        == maximum_rendered_ratio
+    )
+    assert maximum_rendered_ratio in calculator_routines.binary_effect_display_samples(
+        "OR"
+    )
+    ratio_field = QLineEdit()
+    ratio_fields = {
+        name: ratio_field if name == "effect" else QLineEdit()
+        for name in ("effect", "lower", "upper")
+    }
+    calculator_routines.helper_set_current_effect(
+        FakeMAUnit(),
+        ratio_fields,
+        "OR",
+        "Group 1-Group 2",
+        "binary",
+        mult=1.96,
+    )
+    text_margins = ratio_field.textMargins()
+    frame_width = ratio_field.style().pixelMetric(
+        QStyle.PM_DefaultFrameWidth, None, ratio_field
+    )
+    required_rendered_width = (
+        ratio_field.fontMetrics().horizontalAdvance(maximum_rendered_ratio)
+        + text_margins.left()
+        + text_margins.right()
+        + (2 * frame_width)
+    )
+    assert ratio_field.minimumWidth() >= required_rendered_width
 
 
 def test_binary_calculator_does_not_wire_raw_edits_to_consistency_checker(
@@ -583,7 +702,13 @@ def test_diagnostic_calculator_grid_columns_fill_expanded_table_width(
         conf_level=95.0,
     )
 
-    _assert_calculator_table_grid_fills_width(qapp, form.two_by_two_table)
+    form.show()
+    qapp.processEvents()
+    header = form.two_by_two_table.horizontalHeader()
+    assert header.sectionResizeMode(0) == QHeaderView.Interactive
+    assert not header.stretchLastSection()
+    for column in range(form.two_by_two_table.columnCount()):
+        assert header.sectionSize(column) >= header.sectionSizeHint(column)
 
 
 def test_diagnostic_calculator_does_not_wire_raw_edits_to_consistency_checker(
@@ -721,9 +846,7 @@ class FakeContinuousMAUnit:
         pass
 
 
-def test_continuous_calculator_grid_columns_fill_expanded_table_width(
-    qapp, monkeypatch
-):
+def test_continuous_calculator_grid_columns_keep_internal_overflow(qapp, monkeypatch):
     import continuous_data_form
 
     monkeypatch.setattr(
@@ -748,12 +871,22 @@ def test_continuous_calculator_grid_columns_fill_expanded_table_width(
         conf_level=95.0,
     )
 
-    _assert_calculator_table_content_columns_fill_width(qapp, form.simple_table)
+    form.resize(360, form.height())
+    form.show()
+    qapp.processEvents()
+    table = form.simple_table
+    header = table.horizontalHeader()
+    assert header.sectionResizeMode(0) == QHeaderView.Interactive
+    assert not header.stretchLastSection()
+    assert table.horizontalScrollBarPolicy() == QtCore.Qt.ScrollBarAsNeeded
+    assert (
+        sum(header.sectionSize(column) for column in range(table.columnCount()))
+        > table.viewport().width()
+    )
 
 
 def test_continuous_calculator_keeps_long_imputed_values_compact(qapp, monkeypatch):
     import continuous_data_form
-    import qt_layout
 
     long_imputed = {
         "n": 10,
@@ -807,4 +940,6 @@ def test_continuous_calculator_keeps_long_imputed_values_compact(qapp, monkeypat
         for column in range(form.simple_table.columnCount())
     )
     assert form.simple_table.minimumWidth() < natural_width * 2
-    assert form.minimumWidth() < qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH * 2
+    assert (
+        form.frameGeometry().width() < qapp.primaryScreen().availableGeometry().width()
+    )

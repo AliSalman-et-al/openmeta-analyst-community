@@ -6,6 +6,1310 @@
   "tests": [
     {
       "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_analysis_configuration_layout.py::test_method_parameters_declares_scroll_body_with_actions_outside",
+      "reason": "Guards the Method and Parameters Overflow Boundary and reachable primary actions.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_analysis_configuration_layout.py::test_method_parameters_variants_stay_bounded_and_stable",
+      "reason": "Guards binary, continuous, diagnostic, and Meta-Regression dynamic analysis configuration with long content and enlarged fonts.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_analysis_configuration_layout.py::test_regression_and_subgroup_selectors_use_transactional_layouts",
+      "reason": "Guards screen-bounded Meta-Regression and Subgroup selectors with complete long covariate choices.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_analysis_configuration_layout.py::test_choice_control_remeasures_font_and_style_before_bounded_popup",
+      "reason": "Guards live font and style metric remeasurement before a screen-bounded complete-value popup opens.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_analysis_configuration_layout.py::test_choice_popup_show_burst_coalesces_measurement_tooltips_and_clamp",
+      "reason": "Guards one popup measurement and tooltip scan plus one coalesced frame clamp per show burst.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "subprocess"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_analysis_configuration_layout.py::test_native_windows_promoted_choice_popup_is_bounded_at_real_right_edge",
+      "reason": "Guards the promoted AdaptiveComboBox opening seam and outer-frame containment on the native Windows Qt platform.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_analysis_configuration_layout.py::test_method_parameters_default_and_cancel_keyboard_actions",
+      "reason": "Guards standard Enter acceptance and Escape cancellation after the Method and Parameters layout rewrite.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_compact_transient_layout.py::test_complete_compact_transactional_inventory_is_content_preferred",
+      "reason": "Guards the complete compact, About/Legal, progress, and splash inventory across constrained, floor, large, and enlarged-font conditions.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_compact_transient_layout.py::test_long_choice_values_remain_available_without_widening_the_dialog",
+      "reason": "Guards complete long choice values through bounded popup overflow rather than root growth.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_compact_transient_layout.py::test_about_legal_has_explicit_overflow_and_reachable_action",
+      "reason": "Guards About/Legal Required Content overflow and its always-reachable Close action under enlarged fonts.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_compact_transient_layout.py::test_all_progress_entry_points_are_minimal_stable_transient_windows",
+      "reason": "Guards every maintained progress entry point as a minimal stable Transient Window.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_compact_transient_layout.py::test_startup_splash_declares_transient_archetype",
+      "reason": "Guards startup splash classification and its high-DPI-capable resource.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_compact_transient_layout.py::test_bounded_dpr_splash_preserves_its_logical_size",
+      "reason": "Guards a bounded DPR 2 splash against unintended logical shrinkage.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_compact_transient_layout.py::test_oversized_dpr_splash_is_bounded_without_double_scaling",
+      "reason": "Guards DPR-preserving physical scaling to an aspect-safe logical screen bound.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "subprocess"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_compact_transient_layout.py::test_remaining_inventory_survives_representative_process_scale_factors",
+      "reason": "Guards representative compact and Transient surfaces across process-level Qt scale factors.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_compact_transient_layout.py::test_canonical_forms_do_not_hard_code_platform_fonts",
+      "reason": "Guards canonical Qt Designer forms against platform-specific font families and absolute point sizes.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_diagnostic_data_declares_transactional_overflow_and_reachable_actions",
+      "reason": "Guards the Diagnostic Data declarative Transactional layout and internal table overflow.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_count_entry_preserves_diagnostic_behavior_without_root_growth[size0]",
+      "reason": "Guards count-based diagnostic entry and stable geometry on a large logical screen.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_count_entry_preserves_diagnostic_behavior_without_root_growth[size1]",
+      "reason": "Guards count-based diagnostic entry and stable geometry at the Full-Usability Floor.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_count_entry_preserves_diagnostic_behavior_without_root_growth[size2]",
+      "reason": "Guards count-based diagnostic entry and stable geometry in a Constrained Layout.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_entered_effect_switching_is_semantically_sized_and_geometry_stable",
+      "reason": "Guards direct diagnostic effect entry, semantic field sizing, and stable metric transitions.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_back_calculation_updates_counts_without_root_growth",
+      "reason": "Guards diagnostic Back-Calculation while preserving visible root geometry.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_large_font_count_overflow_and_focus_stay_inside_content",
+      "reason": "Guards table overflow and keyboard focus reachability with enlarged fonts.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_invalid_count_guidance_wraps_and_remains_reachable",
+      "reason": "Guards complete reachable validation guidance for invalid diagnostic counts.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_direct_effect_validation_is_complete_and_reachable_with_large_font[effect]",
+      "reason": "Guards numeric Direct Effect-Size Entry validation, rollback, and reachable acceptance with enlarged fonts.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_direct_effect_validation_is_complete_and_reachable_with_large_font[interval]",
+      "reason": "Guards diagnostic interval ordering validation, rollback, and reachable acceptance with enlarged fonts.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_diagnostic_metric_availability_preserves_workflow_and_explains_limits[raw-counts]",
+      "reason": "Guards complete diagnostic metric availability for Raw Count Entry.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_diagnostic_metric_availability_preserves_workflow_and_explains_limits[entered-effects]",
+      "reason": "Guards diagnostic metric availability and guidance for Entered Diagnostic Effect Estimates.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_metric_guidance_and_focus_remain_reachable_with_large_font",
+      "reason": "Guards scrollable metric guidance, reachable focus, and fixed primary action placement.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["filesystem", "qt"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_pyqt5_ui_generation.py::test_ui_generator_reproduces_owned_raw_output_without_reformatting_peers",
+      "reason": "Guards raw deterministic generation for the Continuous companions and preserves semantically equivalent peer formatting.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_variants_are_transactional_and_screen_bounded[size0]",
+      "reason": "Guards the Continuous Data Transactional Dialog on a normal logical screen.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_variants_are_transactional_and_screen_bounded[size1]",
+      "reason": "Guards the Continuous Data Transactional Dialog at the Full-Usability Floor.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_variants_are_transactional_and_screen_bounded[size2]",
+      "reason": "Guards the Continuous Data Transactional Dialog on a constrained logical screen.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_metric_transition_does_not_resize_visible_root",
+      "reason": "Guards stable visible root geometry during a public metric transition.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_major_variant_behavior_matrix[tx_mean-size0]",
+      "reason": "Guards the one-arm Continuous Data variant on a normal logical screen.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_long_values_and_large_font_overflow_inside_content",
+      "reason": "Guards enlarged-font semantic fields and internal table overflow.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_back_calculation_choice_keeps_guidance_and_actions_reachable[size0]",
+      "reason": "Guards wrapped back-calculation guidance and reachable actions on a normal screen.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_back_calculation_choice_keeps_guidance_and_actions_reachable[size1]",
+      "reason": "Guards back-calculation reachability at the Full-Usability Floor.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_back_calculation_choice_keeps_guidance_and_actions_reachable[size2]",
+      "reason": "Guards back-calculation reachability on a constrained logical screen.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_major_variant_behavior_matrix[tx_mean-size1]",
+      "reason": "Guards one-arm behavior at the Full-Usability Floor.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_major_variant_behavior_matrix[tx_mean-size2]",
+      "reason": "Guards one-arm behavior on a constrained logical screen.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_major_variant_behavior_matrix[md_simple-size0]",
+      "reason": "Guards MD simple-data calculation behavior on a normal screen.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_major_variant_behavior_matrix[md_simple-size1]",
+      "reason": "Guards MD simple-data behavior at the Full-Usability Floor.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_major_variant_behavior_matrix[md_simple-size2]",
+      "reason": "Guards MD simple-data behavior on a constrained logical screen.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_major_variant_behavior_matrix[smd_pre_post-size0]",
+      "reason": "Guards SMD pre-post correlation behavior on a normal screen.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_major_variant_behavior_matrix[smd_pre_post-size1]",
+      "reason": "Guards SMD pre-post behavior at the Full-Usability Floor.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_major_variant_behavior_matrix[smd_pre_post-size2]",
+      "reason": "Guards SMD pre-post behavior on a constrained logical screen.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_long_metric_choice_is_fully_accessible[size0]",
+      "reason": "Guards full long-metric access at the Full-Usability Floor.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_long_metric_choice_is_fully_accessible[size1]",
+      "reason": "Guards full long-metric access on a constrained logical screen.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_successful_continuous_back_calculation_updates_data_without_root_growth[size0]",
+      "reason": "Guards successful back-calculation through the visible action and choice path on a normal logical screen.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_successful_continuous_back_calculation_updates_data_without_root_growth[size1]",
+      "reason": "Guards successful back-calculation and stable geometry at the Full-Usability Floor.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_successful_continuous_back_calculation_updates_data_without_root_growth[size2]",
+      "reason": "Guards successful back-calculation and stable geometry on a constrained logical screen.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_continuous_effect_fields_fit_metric_domain_samples[md]",
+      "reason": "Guards semantic MD field width against its representative formatted domain.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_continuous_effect_fields_fit_metric_domain_samples[smd]",
+      "reason": "Guards semantic SMD field width against its representative formatted domain.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_continuous_effect_fields_fit_metric_domain_samples[tx_mean]",
+      "reason": "Guards semantic one-arm field width against its representative formatted domain.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_binary_data_transactional_layout.py::test_binary_data_declares_transactional_overflow_and_reachable_actions",
+      "reason": "Guards the Binary Data Transactional Dialog overflow boundary, native table overflow, and actions outside scrolling content.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_binary_data_transactional_layout.py::test_binary_data_is_screen_bounded_with_large_font_and_long_metric",
+      "reason": "Guards screen-bounded first display with enlarged platform text and a representative long binary metric.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_binary_data_transactional_layout.py::test_binary_back_calculation_choices_are_scrollable_and_screen_bounded",
+      "reason": "Guards long back-calculation instructions and choices within a screen-bounded Transactional Dialog.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_binary_data_transactional_layout.py::test_binary_data_focus_reveals_offscreen_controls_without_moving_actions",
+      "reason": "Guards keyboard focus revelation inside the Binary Data overflow boundary while primary actions remain fixed and reachable.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_binary_data_transactional_layout.py::test_binary_table_long_count_overflows_inside_table_and_remains_accessible",
+      "reason": "Guards real internal table overflow and access to long count data in a constrained Binary Data dialog.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_binary_data_transactional_layout.py::test_binary_validation_message_wraps_and_is_revealed",
+      "reason": "Guards readable, wrapped, reachable validation feedback after a real invalid count edit.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_binary_data_transactional_layout.py::test_binary_calculator_refits_are_local_and_coalesced",
+      "reason": "Guards coalesced local calculator relayout and preserved binary effect data behavior.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_main_wizard_is_a_stable_workflow_window",
+      "reason": "Guards Workflow Window registration and stable user-owned geometry across page and content changes.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_every_wizard_page_declares_a_focus_revealing_overflow_boundary",
+      "reason": "Guards canonical page Overflow Boundaries, keyboard focus revelation, and navigation outside scrolling content.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_csv_preview_overflows_inside_stable_wizard_and_finish_stays_reachable",
+      "reason": "Guards content-rich CSV preview overflow and stable reachable workflow actions.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt", "subprocess"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_workflow_layout_survives_process_level_scale_factors",
+      "reason": "Guards the replacement Workflow Window contract across process-level Qt scale factors.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_tab_and_backtab_follow_logical_order_and_reveal_controls",
+      "reason": "Guards logical keyboard traversal, navigation reachability, and focused-control revelation within workflow overflow.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_hidden_and_closed_wizards_stop_observing_application_focus",
+      "reason": "Guards lifecycle-scoped focus observation so inactive workflow windows perform no reveal work.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_workflow_path_matrix_is_bounded_stable_and_scrollable[None-available_size0]",
+      "reason": "Guards the startup workflow at 800 by 600 with enlarged fonts, stable outer geometry, overflow, and reachable actions.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_workflow_path_matrix_is_bounded_stable_and_scrollable[None-available_size1]",
+      "reason": "Guards the startup workflow at 1024 by 640 with enlarged fonts, stable outer geometry, overflow, and reachable actions.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_workflow_path_matrix_is_bounded_stable_and_scrollable[new_dataset-available_size0]",
+      "reason": "Guards the new-dataset workflow at 800 by 600 with enlarged fonts, stable geometry, overflow, and reachable actions.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_workflow_path_matrix_is_bounded_stable_and_scrollable[new_dataset-available_size1]",
+      "reason": "Guards the new-dataset workflow at 1024 by 640 with enlarged fonts, stable geometry, overflow, and reachable actions.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_workflow_path_matrix_is_bounded_stable_and_scrollable[csv_import-available_size0]",
+      "reason": "Guards the CSV workflow and content-rich preview at 800 by 600 with enlarged fonts and stable reachable chrome.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_workflow_path_matrix_is_bounded_stable_and_scrollable[csv_import-available_size1]",
+      "reason": "Guards the CSV workflow and content-rich preview at 1024 by 640 with enlarged fonts and stable reachable chrome.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_edit_dataset_workspace_layout.py::test_edit_dataset_is_modal_workspace_with_persisted_placement_and_panes",
+      "reason": "Guards Edit Dataset's modal Workspace contract, first-use sizing, independent screen-safe placement, adjustable pane persistence, and expanding collections.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_edit_dataset_workspace_layout.py::test_edit_dataset_first_use_tracks_logical_screen_contract[screen_size0]",
+      "reason": "Guards Edit Dataset's approximately 80 percent first-use geometry on a constrained 800 by 600 logical screen.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_edit_dataset_workspace_layout.py::test_edit_dataset_first_use_tracks_logical_screen_contract[screen_size1]",
+      "reason": "Guards Edit Dataset's approximately 80 percent first-use geometry at the 1024 by 640 full-usability floor.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_edit_dataset_workspace_layout.py::test_edit_dataset_first_use_tracks_logical_screen_contract[screen_size2]",
+      "reason": "Guards Edit Dataset's approximately 80 percent first-use geometry on a large logical screen.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_edit_dataset_workspace_layout.py::test_dataset_nested_actions_keep_long_required_content_and_keyboard_access",
+      "reason": "Guards enlarged-font Transactional actions, long editable Required Content, visible actions, and logical keyboard traversal.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_edit_dataset_workspace_layout.py::test_dataset_path_canonical_forms_are_declarative_and_platform_native",
+      "reason": "Rejects platform fonts, historical nonzero root geometry, absolute child geometry, fixed roots, and unmanaged Dataset-path form content.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["analysis_behavior", "gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_edit_dataset_rejection_leaves_main_dataset_unchanged",
+      "reason": "Guards the real Edit Dataset rejection path so edits to the dialog copy cannot mutate the main dataset or undo history.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_view_first_use_tracks_owning_screen[screen_size0]",
+      "reason": "Guards Network View's eighty-percent first-use Workspace geometry on a constrained 800 by 600 logical screen.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_view_first_use_tracks_owning_screen[screen_size1]",
+      "reason": "Guards Network View's eighty-percent first-use Workspace geometry at the Full-Usability Floor.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_view_first_use_tracks_owning_screen[screen_size2]",
+      "reason": "Guards Network View's eighty-percent first-use Workspace geometry on a large logical screen.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_viewport_owns_surplus_space_and_preserves_image_ratio",
+      "reason": "Guards graph viewport expansion, content-sized controls, high-DPI source preservation, and undistorted intrinsic-ratio fitting.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["analysis_behavior", "gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_selectors_keep_content_and_refresh_only_the_graph",
+      "reason": "Guards complete selector content, single-artifact replacement, and stable user-owned root geometry during graph refresh.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_selectors_are_usable_with_large_font_on_constrained_screen",
+      "reason": "Guards wide stacked selectors, content-sized controls, and full selected and popup values through tooltips at 800 by 600 with an enlarged application font.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_view_restores_independent_placement",
+      "reason": "Guards independent returning-use Network View placement persistence.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_workspace_policy_uses_injected_owning_screen[parent]",
+      "reason": "Exercises the public adaptive registration seam to prove parent-owned Network first-use sizing uses the injected owning screen without unparented placement.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_workspace_policy_uses_injected_owning_screen[active_workspace]",
+      "reason": "Exercises the public adaptive registration seam to prove unparented Network first-use sizing and placement use the injected active Workspace screen.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_workspace_screen_transition_preserves_valid_and_clamps_invalid",
+      "reason": "Exercises the public screen-assignment handler to prove valid moves do not recenter and invalid frames clamp minimally.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_viewport_refit_is_local_and_coalesced",
+      "reason": "Observes the public refit signal to guard one local graph fit per event-loop turn for viewport resize bursts.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_repeated_network_view_close_releases_owned_qt_objects",
+      "reason": "Guards delete-on-close lifecycle ownership by observing each repeated child window and scene destruction without accumulation.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_network_view_workspace_layout.py::test_network_view_canonical_form_is_managed_and_platform_native",
+      "reason": "Rejects historical Network View geometry, fixed roots, platform fonts, and absolute child positioning.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["analysis_behavior", "gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_edit_dataset_acceptance_propagates_copied_dataset_mutation",
+      "reason": "Guards accepted Edit Dataset propagation through the real dialog seam, including copied-dataset isolation and undo restoration.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_dpr_raster_uses_device_independent_dimensions_for_viewport_fit",
+      "reason": "Guards device-independent raster fitting, aspect ratio, and physical source preservation at high DPI.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_qtsvg_renders_materialized_default_black_plot_stroke",
+      "reason": "Guards the real QtSvg pixel-rendering seam for svglite plot strokes materialized as SVG presentation attributes.",
+      "runtime_class": "seconds",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_first_show_runs_one_scheduled_expensive_reflow",
+      "reason": "Guards a single scheduled expensive reflow when first-show setup and splitter restoration coincide.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_refit_does_not_dispatch_unrelated_layout_requests",
+      "reason": "Guards local deterministic Results relayout without dispatching another widget's pending layout work.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_regeneration_burst_runs_one_scheduled_expensive_reflow",
+      "reason": "Guards coalescing of plot regeneration bursts through the shared viewport-refit scheduler.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_main_and_results_share_typed_workspace_placement_policy",
+      "reason": "Guards the shared typed placement policy and unchanged persisted geometry schema for Main and Results workspaces.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_plot_editor_is_screen_bounded_transactional_dialog_with_fixed_actions",
+      "reason": "Guards the plot editor's screen-bounded transactional overflow contract and always-reachable actions.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_long_text_reflows_inside_constrained_viewport_without_window_growth",
+      "reason": "Guards local long-summary reflow within a constrained viewport without changing user-owned outer geometry.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_resize_burst_runs_one_expensive_reflow_per_event_loop_turn",
+      "reason": "Guards the deterministic one-expensive-reflow-per-event-loop-turn work bound.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_splitter_proportions_persist_independently_of_outer_geometry",
+      "reason": "Guards meaningful navigation/content proportions independently from screen-clamped outer geometry.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_workspace_defaults_maximized_and_restores_screen_safe_state",
+      "reason": "Guards fresh maximization and valid returning Results workspace placement with restored pane preference.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_dataset_model_covariate_identity_survives_rename",
+      "reason": "Guards semantic workspace column identity across a covariate display-name change.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_workspace_window.py::test_added_covariate_keeps_identity_and_width_through_undo_redo",
+      "reason": "Guards stable covariate identity and user-owned width through the real add-covariate undo/redo lifecycle.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_workspace_window.py::test_deleted_covariate_keeps_identity_and_width_through_undo_redo",
+      "reason": "Guards stable covariate identity and user-owned width through repeated delete and undo operations.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_explicit_auto_fit_transfers_new_widths_to_user_ownership",
+      "reason": "Proves explicit auto-fit establishes a new user-owned column width.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_fresh_main_placement_defaults_to_maximized",
+      "reason": "Guards maximized first use when no valid Main placement exists.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_layout_settings_migration_deletes_only_legacy_main_geometry",
+      "reason": "Guards one-time deletion of obsolete geometry without removing unrelated settings.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_legacy_covariate_identity_and_widths_are_deterministic_across_loads",
+      "reason": "Proves untouched legacy schemas derive repeatable covariate identities and restore widths across loads.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_main_column_widths_round_trip_in_versioned_workspace_state",
+      "reason": "Guards versioned semantic column-width serialization through QSettings.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_stale_main_placement_is_clamped_to_available_screen",
+      "reason": "Guards stale-screen Main placement clamping to reachable logical geometry.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_workspace_columns_keep_width_when_display_header_is_renamed",
+      "reason": "Proves mutable display headers do not change user-owned widths.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_workspace_columns_preserve_user_widths_and_initialize_only_new_columns",
+      "reason": "Guards existing width ownership while content-fitting only a genuinely new schema column.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_workspace_columns_survive_middle_insertion_and_removal_by_identity",
+      "reason": "Guards semantic width ownership across middle insertion and removal.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_workspace_window.py::test_main_inherits_fonts_and_navigation_icons_from_active_style",
+      "reason": "Guards platform font inheritance and style-metric navigation icon sizing.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_workspace_window.py::test_main_is_a_managed_workspace_with_expanding_table_and_layouted_navigation",
+      "reason": "Guards Main workspace registration and fully managed canonical layout.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_workspace_window.py::test_returning_normal_workspace_is_not_remaximized_on_first_show",
+      "reason": "Guards restoration of a returning normal workspace without replaying first-use maximization.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_workspace_window.py::test_runtime_content_changes_do_not_resize_or_reposition_visible_main",
+      "reason": "Guards stable Main geometry and readable plain-text tooltips during runtime content growth.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem",
+        "subprocess"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_window_policy.py::test_application_bootstrap_enables_qt_high_dpi_before_construction",
+      "reason": "Proves maintained application construction enables Qt-native high-DPI behavior before QApplication exists.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_window_policy.py::test_geometry_helpers_bound_the_outer_frame_in_logical_space",
+      "reason": "Guards pure Logical Layout Space sizing and decorated outer-frame bounds.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_window_policy.py::test_unparented_workspace_uses_active_screen_before_maximizing",
+      "reason": "Guards active-application screen ownership and placement before first-use Workspace maximization.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_window_policy.py::test_workspace_roles_apply_maximized_or_eighty_percent_first_use",
+      "reason": "Proves Workspace roles distinguish maximized Main and Results from eighty-percent Edit Dataset and Network windows.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_window_policy.py::test_visible_transactional_content_refit_preserves_placement",
+      "reason": "Proves application-owned content refitting preserves visible placement instead of replaying first-use centering.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_window_policy.py::test_visible_user_owned_windows_do_not_reclaim_geometry",
+      "reason": "Guards Geometry Ownership for visible Workspace and Workflow windows during content changes.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_window_policy.py::test_content_refit_requests_are_local_and_coalesced",
+      "reason": "Guards deterministic one-per-event-loop refitting on one explicitly registered window.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_window_policy.py::test_runtime_clamp_preserves_user_geometry_without_recentering",
+      "reason": "Proves runtime reachability checks preserve user geometry and clamp only when required.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_window_policy.py::test_screen_metric_changes_clamp_and_reconnect_to_new_screen",
+      "reason": "Guards clamp-only screen assignment, DPI, available-geometry, and signal reconnection behavior.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_window_policy.py::test_confidence_level_is_a_compact_transactional_dialog",
+      "reason": "Covers the first compact Transactional Dialog migrated without an unnecessary overflow boundary.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_window_policy.py::test_confidence_level_handles_representative_long_text_and_enlarged_font",
+      "reason": "Guards representative text wrapping and platform-font scaling on the compact Confidence Level dialog.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
       "evidence": [
         "r_stack",
         "release_readiness"
@@ -535,6 +1839,21 @@
         "release_readiness"
       ],
       "external_dependencies": [
+        "qt"
+      ],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_binary_effect_fields_follow_metric_display_domains",
+      "reason": "Guards metric-specific semantic widths for ratios, bounded effects, proportions, and transformed binary metrics.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [
         "filesystem"
       ],
       "lane": "fast",
@@ -583,7 +1902,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_calculator_effect_ci_fields_fit_signed_precision",
+      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_calculator_effect_ci_fields_fit_valid_domain_samples",
       "reason": "Covers fast GUI/data-model behavior required by the verification lane.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -613,8 +1932,8 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_continuous_calculator_grid_columns_fill_expanded_table_width",
-      "reason": "Covers fast GUI/data-model behavior required by the verification lane.",
+      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_continuous_calculator_grid_columns_keep_internal_overflow",
+      "reason": "Guards Continuous Data table overflow without top-level width growth.",
       "runtime_class": "subsecond",
       "size": "small"
     },
@@ -2704,21 +4023,6 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_declarative_dialog_sizing.py::test_analysis_dialog_uses_fixed_layout_constraint_without_refit_filter",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
       "nodeid": "tests/python/gui/test_declarative_dialog_sizing.py::test_application_wizard_modern_style_renders_sized_nonblank_pages",
       "reason": "Guards ModernStyle wizard rendering with real Qt screenshots for the app-owned wizard entry paths.",
       "runtime_class": "seconds",
@@ -2750,23 +4054,8 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_declarative_dialog_sizing.py::test_application_wizard_uses_minimum_layout_constraint_without_refit_filter",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_declarative_dialog_sizing.py::test_combo_policy_caps_closed_control_but_keeps_popup_full_width",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "nodeid": "tests/python/gui/test_declarative_dialog_sizing.py::test_application_wizard_uses_workflow_policy_without_legacy_refit",
+      "reason": "Guards the replacement Workflow Window policy and canonical overflow without legacy refit behavior.",
       "runtime_class": "seconds",
       "size": "medium"
     },
@@ -2877,7 +4166,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_diagnostic_analysis_workflow.py::test_diagnostic_method_selector_uses_combo_width_policy",
+      "nodeid": "tests/python/gui/test_diagnostic_analysis_workflow.py::test_diagnostic_method_selector_exposes_full_choices_without_root_cap",
       "reason": "Covers GUI compatibility behavior required by the verification lane.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -3098,7 +4387,7 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_analysis_dialog_family_uses_shared_base_size",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_analysis_dialog_family_declares_migrated_transactional_surfaces",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "seconds",
       "size": "medium"
@@ -3342,8 +4631,8 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_data_type_page_canonical_geometry_covers_normalized_content",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_data_type_page_canonical_form_declares_reflow_and_overflow",
+      "reason": "Guards the canonical data-type page grid, Overflow Boundary, and absence of fixed root constraints.",
       "runtime_class": "seconds",
       "size": "medium"
     },
@@ -3357,8 +4646,8 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_data_type_page_data_type_buttons_use_uniform_size",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_data_type_page_reflows_buttons_without_horizontal_overflow",
+      "reason": "Guards the canonical two-column data-type layout against unnecessary horizontal overflow.",
       "runtime_class": "seconds",
       "size": "medium"
     },
@@ -3892,8 +5181,8 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_new_dataset_wizard_sizes_to_show_diagnostic_choice",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_new_dataset_wizard_overflow_keeps_diagnostic_choice_reachable",
+      "reason": "Guards keyboard-reachable diagnostic choice through the data page Overflow Boundary.",
       "runtime_class": "seconds",
       "size": "medium"
     },
@@ -3908,8 +5197,8 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_new_dataset_wizard_uses_declarative_minimum_size_policy",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_new_dataset_wizard_uses_replacement_workflow_policy",
+      "reason": "Guards replacement Workflow Window registration without legacy sizing markers.",
       "runtime_class": "seconds",
       "size": "medium"
     },
@@ -3972,6 +5261,21 @@
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "minutes",
       "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility"
+      ],
+      "external_dependencies": [
+        "qt",
+        "filesystem"
+      ],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_functional_icon_set_is_embedded_and_renders_at_supported_sizes",
+      "reason": "Protects the complete cross-platform Functional Icon package, semantic families, Qt embedding, and small-size SVG rendering.",
+      "runtime_class": "seconds",
+      "size": "medium"
     },
     {
       "decision": "keep",
@@ -4568,21 +5872,6 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_wizard_size_refit_ignores_closed_wizard_without_current_page",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
       "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_wizard_uses_modern_style_with_explicit_back_navigation[None]",
       "reason": "Guards startup wizard chrome against falling back to ClassicStyle or losing explicit back navigation.",
       "runtime_class": "seconds",
@@ -4662,22 +5951,6 @@
       "reason": "Guards the user-facing Confidence Level dialog against accepting a typed 100% value after one-decimal spinbox rounding.",
       "runtime_class": "subsecond",
       "size": "small"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_content_fit_does_not_resize_visible_main_window",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
     },
     {
       "decision": "keep",
@@ -5057,24 +6330,8 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_analysis_dialog_combo_widths_fit_long_selectable_items",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "analysis_behavior"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_analysis_dialog_refit_tracks_revealed_content_without_stable_ratchet",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_change_confidence_level_dialog_does_not_use_legacy_fixed_layout_policy",
+      "reason": "Guards the Confidence Level dialog against regression to the legacy fixed-root sizing helper.",
       "runtime_class": "seconds",
       "size": "medium"
     },
@@ -5089,272 +6346,8 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_application_dialog_fit_collapses_expanding_vertical_spacers",
+      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_generated_dialogs_do_not_depend_on_fixed_position_content",
       "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_application_dialog_fit_configures_wizard_navigation_chrome",
-      "reason": "Guards the shared application wizard chrome policy, including the selected Qt wizard style and explicit back navigation.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_application_dialog_refit_expands_for_new_combo_choices",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_application_dialog_refit_shrinks_to_current_contents",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_application_dialog_refits_after_first_show_content_changes",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_application_fit_allows_embedded_pages_to_fill_page_containers",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_application_fit_propagates_root_width_floor_to_embedded_pages_before_reflow",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_application_fit_wraps_embedded_page_text_inside_container_width",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "analysis_behavior"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_change_confidence_level_dialog_uses_fixed_analysis_layout_policy",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_content_fit_resizes_dialog_roots_only",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_dialog_width_fit_does_not_lock_stretched_combo_geometry",
-      "reason": "Guards analysis dialog combo boxes against inheriting stretched parent layout geometry instead of content-based widths.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_dialog_width_fit_includes_hidden_tab_contents_and_late_content",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_dialog_width_fit_includes_labels_combos_and_window_title",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_generated_dialog_and_wizard_surfaces_fit_root_to_contents",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_generated_fixed_position_dialog_rows_fill_fitted_width",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_generated_qdialog_surfaces_use_declarative_fixed_size_and_fit_combos",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_generated_ui_combo_boxes_do_not_stretch_to_wide_parent_geometry",
-      "reason": "Guards every generated UI surface with combo boxes against inheriting stretched parent layout geometry.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_generated_ui_surfaces_do_not_cap_visible_text_widgets_below_contents",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
       "runtime_class": "seconds",
       "size": "medium"
     },
@@ -5431,132 +6424,6 @@
       "lane": "gui",
       "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_issue_94_current_outcome_and_follow_up_labels_can_expand",
       "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_layout_fitters_ignore_missing_or_deleted_roots",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_maximized_roots_fit_child_text_without_resizing_root",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_option_group_forms_fit_checkbox_and_radio_labels",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_wizard_body_sync_repairs_late_fixed_width_page_constraints",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_wizard_refit_allows_current_page_to_fill_page_container",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_wizard_refit_expands_stale_fixed_width_current_page_to_page_container",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_wizard_refit_propagates_root_width_floor_to_current_page_before_reflow",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
-      "runtime_class": "seconds",
-      "size": "medium"
-    },
-    {
-      "decision": "keep",
-      "evidence": [
-        "gui_compatibility",
-        "release_readiness"
-      ],
-      "external_dependencies": [
-        "qt",
-        "filesystem"
-      ],
-      "lane": "gui",
-      "nodeid": "tests/python/gui/test_user_facing_text_regressions.py::test_wizard_refit_shrinks_to_current_page_contents",
-      "reason": "Covers GUI compatibility behavior required by the verification lane.",
       "runtime_class": "seconds",
       "size": "medium"
     },
@@ -6135,6 +7002,247 @@
       "reason": "Locks the third-party inventory boundary that notices are created only when bundled components remain.",
       "runtime_class": "subsecond",
       "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt_layout_contract_audit.py::test_repository_satisfies_canonical_qt_layout_contract",
+      "reason": "Guards the application-wide canonical-form inventory, declarative root contract, and retired sizing surface.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt_layout_contract_audit.py::test_audit_rejects_unmanaged_content_geometry_and_legacy_helpers",
+      "reason": "Proves the layout audit fails closed on historical root sizes, absolute content geometry, and retired sizing helpers.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt_layout_contract_audit.py::test_audit_allows_qt_chrome_and_scroll_area_content_geometry",
+      "reason": "Proves the layout audit distinguishes Qt chrome and scroll-area canvas geometry from unmanaged content.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_packagers_run_fail_closed_native_adaptive_layout_evidence",
+      "reason": "Guards fail-closed native adaptive-layout evidence in both supported package builders.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_package_workflow_publishes_supported_platform_evidence",
+      "reason": "Guards durable Windows x64 and macOS Intel x64 screenshot evidence artifacts.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_native_evidence_runner_covers_the_release_review_contract",
+      "reason": "Guards the metadata and human-review contract required by PRD 293.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_native_evidence_validator_is_exact_and_checks_png_integrity",
+      "reason": "Guards fail-closed exact artifact membership and independent native PNG integrity validation.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_native_evidence_validator_rejects_semantic_contract_mutations[wrong-request-exact client viewport]",
+      "reason": "Guards exact viewport, archetype, owner, screen-containment, and frame-capture semantics against manifest mutations.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_native_evidence_validator_rejects_semantic_contract_mutations[wrong-actual-exact client viewport]",
+      "reason": "Guards exact reached Workspace client dimensions against manifest mutation.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_native_evidence_validator_rejects_semantic_contract_mutations[wrong-owner-owning Workspace contract]",
+      "reason": "Guards constrained owner relationships for content-driven surfaces.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_native_evidence_validator_rejects_semantic_contract_mutations[off-screen-outside its recorded available screen]",
+      "reason": "Guards full frame containment within the recorded owning screen.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_native_evidence_validator_rejects_semantic_contract_mutations[wrong-archetype-wrong archetype]",
+      "reason": "Guards exact scenario archetype classification.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_native_evidence_validator_rejects_semantic_contract_mutations[tiny-workspace-exact client viewport]",
+      "reason": "Guards against placeholder-sized evidence fixtures masquerading as release viewports.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_native_evidence_validator_rejects_semantic_contract_mutations[client-only-capture-not a native-frame capture]",
+      "reason": "Guards frame-inclusive native chrome evidence against client-only captures.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_launch_exposes_native_evidence_as_an_explicit_automation_mode",
+      "reason": "Guards the explicit packaged automation entry point and failure log seam.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_layout_native_evidence.py::test_native_evidence_rejects_non_native_and_wrong_platform_plugins",
+      "reason": "Proves native evidence fails closed on offscreen, wrong-platform, and non-x64 Qt runtimes.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_layout_native_evidence.py::test_evidence_runner_captures_all_archetypes_and_runtime_contracts",
+      "reason": "Exercises screenshot capture, metadata, remembered geometry, tables, splitters, and runtime resize across all archetypes.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_native_evidence_validator_matches_qt_half_up_pixel_rounding",
+      "reason": "Guards native screenshot dimension validation against Qt half-up device-pixel rounding.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_layout_native_evidence.py::test_exact_client_size_repositions_the_outer_frame_inside_the_screen",
+      "reason": "Guards exact client sizing while keeping the native outer frame reachable on its owning screen.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_adaptive_layout_native_evidence.py::test_native_frame_capture_retries_until_compositor_pixels_are_visible",
+      "reason": "Guards native evidence capture against transient blank compositor frames.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_analysis_configuration_layout.py::test_method_parameters_opens_at_its_content_preferred_width",
+      "reason": "Guards first-show sizing of the Method and Parameters Transactional Dialog.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_edit_empty_dataset_acceptance_preserves_empty_outcome_state",
+      "reason": "Guards accepting the Edit Dataset workspace when the dataset has no outcomes.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_edit_empty_dataset_can_be_cancelled",
+      "reason": "Guards cancelling the Edit Dataset workspace when the dataset has no outcomes.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_toolbar_copy_without_a_selection_is_a_no_op",
+      "reason": "Guards the main table Copy command when no cells are selected.",
+      "runtime_class": "subsecond",
+      "size": "small"
     }
+
   ]
 }

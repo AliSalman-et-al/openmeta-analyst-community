@@ -5,20 +5,25 @@
 import copy
 from functools import partial
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QEvent, QTimer, Qt
 from PyQt5.QtGui import QKeySequence, QPalette
 from PyQt5.QtWidgets import (
     QAction,
     QDialog,
     QDialogButtonBox,
     QMessageBox,
+    QHeaderView,
+    QSizePolicy,
+    QStyle,
     QTableWidgetItem,
     QUndoStack,
+    QWidget,
+    QWIDGETSIZE_MAX,
 )
 
 import meta_py_r
 import app_error_handler
-import qt_layout
+import adaptive_window
 import tabular_data
 from meta_globals import *
 import calculator_routines as calc_fncs
@@ -32,7 +37,12 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
     def __init__(self, ma_unit, cur_txs, cur_group_str, conf_level=None, parent=None):
         super(DiagnosticDataForm, self).__init__(parent)
         self.setupUi(self)
-        qt_layout.configure_compact_table(self.two_by_two_table, stretch_columns=True)
+        self._configure_raw_data_table()
+        self._configure_semantic_fields()
+        self._configure_focus_revelation()
+        self._layout_controller = adaptive_window.register_adaptive_window(
+            self, adaptive_window.WindowRole.TRANSACTIONAL
+        )
 
         if conf_level is None:
             raise ValueError("Confidence level must be specified")
@@ -72,10 +82,91 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         self._populate_effect_cmbo_box()  # make cmbo box entries for effects
         self.set_current_effect()  # fill in current effect data in line edits
         self._update_data_table()  # fill in the rest of the data table
+        self._fit_raw_data_columns_for_first_display()
         self.enable_back_calculation_btn()
 
         self.current_prevalence = self._get_prevalence_str()
-        qt_layout.fit_analysis_dialog_to_contents(self)
+        self._request_initial_content_refit()
+
+    def _configure_raw_data_table(self):
+        """Give the diagnostic grid internal overflow and semantic row height."""
+        table = self.two_by_two_table
+        # layout-audit: allow=compact-table-overflow; reason=compact table keeps rows visible and owns excess overflow
+        table.setMinimumWidth(0)
+        table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        table.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        table.horizontalHeader().setStretchLastSection(False)
+        table.resizeColumnsToContents()
+        table.resizeRowsToContents()
+        height = (
+            table.horizontalHeader().sizeHint().height()
+            + sum(table.rowHeight(row) for row in range(table.rowCount()))
+            + 2 * table.frameWidth()
+            + table.horizontalScrollBar().sizeHint().height()
+        )
+        # layout-audit: allow=compact-table-overflow; reason=compact table keeps rows visible and owns excess overflow
+        table.setMinimumHeight(height)
+        # layout-audit: allow=compact-table-overflow; reason=compact table keeps rows visible and owns excess overflow
+        table.setMaximumHeight(height)
+
+    def _configure_semantic_fields(self):
+        # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
+        self.effect_cbo_box.setMinimumWidth(0)
+        # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
+        self.effect_cbo_box.setMaximumWidth(QWIDGETSIZE_MAX)
+        self.effect_cbo_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self._size_line_edit_for_samples(
+            self.prevalence_txt_box, ("0.0000", "1.0000")
+        )
+
+    @staticmethod
+    def _size_line_edit_for_samples(line_edit, samples):
+        margins = line_edit.textMargins()
+        frame = line_edit.style().pixelMetric(
+            QStyle.PM_DefaultFrameWidth, None, line_edit
+        )
+        required = (
+            max(line_edit.fontMetrics().horizontalAdvance(value) for value in samples)
+            + margins.left()
+            + margins.right()
+            + 2 * frame
+            + 12
+        )
+        # layout-audit: allow=numeric-domain-control; reason=editor width follows representative values from its numeric domain
+        line_edit.setMinimumWidth(required)
+        # layout-audit: allow=numeric-domain-control; reason=editor width follows representative values from its numeric domain
+        line_edit.setMaximumWidth(required)
+        line_edit.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+
+    def _configure_focus_revelation(self):
+        for widget in self.content_widget.findChildren(QWidget):
+            widget.installEventFilter(self)
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.FocusIn and self.content_widget.isAncestorOf(watched):
+            self.content_scroll.ensureWidgetVisible(watched)
+        return super(DiagnosticDataForm, self).eventFilter(watched, event)
+
+    def _fit_raw_data_columns_for_first_display(self):
+        self._grow_all_raw_data_columns_to_contents()
+
+    def _grow_all_raw_data_columns_to_contents(self):
+        for column in range(self.two_by_two_table.columnCount()):
+            self._grow_raw_data_column_to_contents(column)
+
+    def _grow_raw_data_column_to_contents(self, column):
+        table = self.two_by_two_table
+        header = table.horizontalHeader()
+        required = max(header.sectionSizeHint(column), table.sizeHintForColumn(column))
+        if required > table.columnWidth(column):
+            header.resizeSection(column, required)
+
+    def _request_initial_content_refit(self):
+        controller = self.__dict__.get("_layout_controller")
+        if controller is not None and not self.isVisible():
+            controller.request_content_refit()
 
     #        # Color for clear_button_pallette
     #        self.orig_palette = self.clear_Btn.palette()
@@ -170,6 +261,28 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
     def _mark_table_consistent(self):
         self.inconsistencyLabel.setVisible(False)
         self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(True)
+
+    def _mark_table_invalid(self, message):
+        self.inconsistencyLabel.setText(str(message))
+        self.inconsistencyLabel.setVisible(True)
+        # The rejected edit has already been rolled back to a valid state, so
+        # acceptance must remain available while the inline guidance is shown.
+        self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(True)
+        self.content_layout.invalidate()
+        self.content_widget.updateGeometry()
+        self.content_scroll.ensureWidgetVisible(self.inconsistencyLabel)
+        QTimer.singleShot(
+            0,
+            lambda: self._ensure_content_widget_visible(self.inconsistencyLabel),
+        )
+
+    def _ensure_content_widget_visible(self, widget):
+        try:
+            self.content_scroll.ensureWidgetVisible(widget)
+            center = widget.mapTo(self.content_widget, widget.rect().center())
+            self.content_scroll.ensureVisible(center.x(), center.y(), 12, 12)
+        except RuntimeError:
+            pass
 
     def _raw_count_cell_is_editable(self, row, col):
         return (row, col) in DIAGNOSTIC_RAW_COUNT_CELLS
@@ -266,7 +379,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
                 self.two_by_two_table.item(row, col).text()
             )
             if warning_msg:
-                raise Exception("Invalid Cell Data")
+                raise ValueError(warning_msg)
 
             self._update_data_table()  # calculate derived margins from raw counts
             self._mark_table_consistent()
@@ -276,6 +389,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             self.restore_ma_unit_and_table(
                 old_ma_unit, old_table, old_prevalence
             )  # brings things back to the way they were
+            self._mark_table_invalid(msg)
             return  # and leave
 
         # if we got here, everything seems ok
@@ -535,6 +649,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             val_str, new_text
         )
         if no_errors is False:  # There are errors
+            guidance = self._validation_guidance(val_str, new_text)
             self.restore_ma_unit_and_table(old_ma_unit, old_table, old_prevalence)
             calc_fncs.block_signals(self.entry_widgets, True)
             if val_str == "est":
@@ -546,6 +661,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             elif val_str == "prevalence":
                 self.prevalence_txt_box.setFocus()
             calc_fncs.block_signals(self.entry_widgets, False)
+            self._mark_table_invalid(guidance)
             return
 
         # If we got to this point it means everything is ok so far
@@ -588,6 +704,32 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         self.undoStack.push(command)
 
         self.current_prevalence = new_prevalence
+        self._mark_table_consistent()
+
+    def _validation_guidance(self, val_str, new_text):
+        labels = {
+            "est": "Effect estimate",
+            "lower": "Lower confidence limit",
+            "upper": "Upper confidence limit",
+            "prevalence": "Prevalence",
+        }
+        label = labels.get(val_str, "Entered value")
+        if not is_a_float(new_text):
+            return "{} must be numeric.".format(label)
+        if val_str == "prevalence" and not 0 <= float(new_text) <= 1:
+            return "Prevalence must be between 0 and 1."
+
+        values = {
+            "est": self.effect_txt_box.text(),
+            "lower": self.low_txt_box.text(),
+            "upper": self.high_txt_box.text(),
+        }
+        good, message = calc_fncs.between_bounds(
+            est=values["est"], low=values["lower"], high=values["upper"]
+        )
+        if not good and message:
+            return str(message).replace("!", ".")
+        return "Enter a valid diagnostic effect estimate and confidence interval."
 
     def effect_changed(self):
         self.cur_effect = str(self.effect_cbo_box.currentText())
@@ -595,6 +737,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
 
         self.enable_txt_box_input()
         self.enable_back_calculation_btn()
+        self._mark_table_consistent()
 
     def _update_raw_data(self):
         """populates the 2x2 table with whatever parametric data was provided"""
@@ -661,6 +804,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             self.enable_txt_box_input()
 
         calc_fncs.block_signals(self.entry_widgets, False)
+        self._grow_all_raw_data_columns_to_contents()
 
     def clear_column(self, col):
         """Clears out column in table and ma_unit"""

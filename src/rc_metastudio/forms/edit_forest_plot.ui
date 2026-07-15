@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>560</width>
-    <height>620</height>
+    <width>0</width>
+    <height>0</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -18,6 +18,16 @@
     <normaloff>:/misc/meta.png</normaloff>:/misc/meta.png</iconset>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QScrollArea" name="content_scroll">
+     <property name="frameShape">
+      <enum>QFrame::NoFrame</enum>
+     </property>
+     <property name="widgetResizable">
+      <bool>true</bool>
+     </property>
+     <widget class="QWidget" name="content_scroll_contents">
+      <layout class="QVBoxLayout" name="content_layout">
    <item>
     <widget class="QGroupBox" name="style_group">
      <property name="title">
@@ -75,12 +85,6 @@
       </item>
       <item row="0" column="2">
        <widget class="QPushButton" name="color_btn">
-        <property name="maximumSize">
-         <size>
-          <width>32</width>
-          <height>16777215</height>
-         </size>
-        </property>
         <property name="text">
          <string>...</string>
         </property>
@@ -331,12 +335,6 @@
     <layout class="QGridLayout" name="gridLayout_4">
      <item row="0" column="0">
       <widget class="QLabel" name="label_12">
-       <property name="maximumSize">
-        <size>
-         <width>16777215</width>
-         <height>50</height>
-        </size>
-       </property>
        <property name="text">
         <string>X-axis label:</string>
        </property>
@@ -428,18 +426,16 @@
      </item>
      <item>
       <widget class="QPushButton" name="save_btn">
-       <property name="maximumSize">
-        <size>
-         <width>25</width>
-         <height>16777215</height>
-        </size>
-       </property>
        <property name="text">
         <string>...</string>
        </property>
       </widget>
      </item>
     </layout>
+   </item>
+      </layout>
+     </widget>
+    </widget>
    </item>
    <item>
     <widget class="QDialogButtonBox" name="buttonBox">

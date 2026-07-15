@@ -208,26 +208,6 @@ def test_new_dataset_preserves_main_window_state(show_method, state_method):
         _close_without_prompt(app, window)
 
 
-def test_content_fit_does_not_resize_visible_main_window(monkeypatch):
-    import launch
-    import qt_layout
-
-    app, window = launch.start_automation()
-    try:
-        window.showMaximized()
-        app.processEvents()
-
-        adjust_calls = []
-        monkeypatch.setattr(window, "adjustSize", lambda: adjust_calls.append(True))
-
-        qt_layout.fit_text_to_contents(window)
-
-        assert adjust_calls == []
-        assert window.isMaximized()
-    finally:
-        _close_without_prompt(app, window)
-
-
 def test_data_table_editing_preserves_maximized_main_window_state():
     import launch
 
@@ -394,6 +374,34 @@ def test_copy_paste_undo_and_redo_work_through_real_table_path():
         window.redo()
         assert _cell_text(window.model, 1, window.model.NAME) == "Beta"
         assert _cell_text(window.model, 1, window.model.RAW_DATA[-1]) == "12.0"
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_toolbar_copy_without_a_selection_is_a_no_op(monkeypatch):
+    import app_error_handler
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        table = window.tableView
+        table.clearSelection()
+        assert table.selectionModel().selectedIndexes() == []
+
+        errors = []
+        monkeypatch.setattr(
+            app_error_handler,
+            "handle_exception",
+            lambda exc_type, exc_value, exc_traceback, parent=None: errors.append(
+                exc_value
+            ),
+        )
+
+        window.action_copy.trigger()
+        app.processEvents()
+
+        assert errors == []
     finally:
         _close_without_prompt(app, window)
 
@@ -993,6 +1001,104 @@ def test_metaform_dialog_text_slots_accept_pyqt5_line_edit_strings(monkeypatch):
         assert "Added group" in window.model.dataset.get_group_names()
         assert "week 4" in window.model.dataset.get_follow_up_names()
         assert "Renamed dose" in window.model.get_covariate_names()
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_edit_dataset_rejection_leaves_main_dataset_unchanged(monkeypatch):
+    import launch
+    import edit_dialog
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        original_dataset = window.model.dataset
+        original_names = [study.name for study in original_dataset.studies]
+        original_undo_count = window.tableView.undoStack.count()
+
+        def reject_after_editing_copy(dialog):
+            dialog.dataset.studies[0].name = "Rejected dataset edit"
+            return dialog.Rejected
+
+        monkeypatch.setattr(edit_dialog.EditDialog, "exec", reject_after_editing_copy)
+
+        window.edit_dataset()
+
+        assert window.model.dataset is original_dataset
+        assert [study.name for study in window.model.dataset.studies] == original_names
+        assert window.tableView.undoStack.count() == original_undo_count
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_edit_empty_dataset_can_be_cancelled(monkeypatch):
+    import launch
+    import edit_dialog
+
+    app, window = launch.start_automation()
+    try:
+        original_dataset = window.model.dataset
+        monkeypatch.setattr(
+            edit_dialog.EditDialog, "exec", lambda dialog: dialog.Rejected
+        )
+
+        window.edit_dataset()
+
+        assert window.model.dataset is original_dataset
+        assert window.model.current_outcome is None
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_edit_empty_dataset_acceptance_preserves_empty_outcome_state(monkeypatch):
+    import launch
+    import edit_dialog
+
+    app, window = launch.start_automation()
+    try:
+        original_undo_count = window.tableView.undoStack.count()
+        monkeypatch.setattr(
+            edit_dialog.EditDialog, "exec", lambda dialog: dialog.Accepted
+        )
+
+        window.edit_dataset()
+
+        assert window.model.dataset.get_outcome_names() == []
+        assert window.model.current_outcome is None
+        assert window.tableView.undoStack.count() == original_undo_count + 1
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_edit_dataset_acceptance_propagates_copied_dataset_mutation(monkeypatch):
+    import launch
+    import edit_dialog
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        original_dataset = window.model.dataset
+        original_name = original_dataset.studies[0].name
+        renamed_study = "Renamed through Edit Dataset"
+        original_undo_count = window.tableView.undoStack.count()
+
+        def accept_after_renaming_study(dialog):
+            dialog.dataset.studies[0].name = renamed_study
+            return dialog.Accepted
+
+        monkeypatch.setattr(
+            edit_dialog.EditDialog, "exec", accept_after_renaming_study
+        )
+
+        window.edit_dataset()
+
+        assert window.model.dataset is not original_dataset
+        assert window.model.dataset.studies[0].name == renamed_study
+        assert original_dataset.studies[0].name == original_name
+        assert window.tableView.undoStack.count() == original_undo_count + 1
+
+        window.tableView.undoStack.undo()
+        assert window.model.dataset.studies[0].name == original_name
     finally:
         _close_without_prompt(app, window)
 

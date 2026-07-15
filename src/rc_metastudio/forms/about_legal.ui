@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>AboutLegalDialog</class>
+ <widget class="QDialog" name="AboutLegalDialog">
+  <property name="geometry"><rect><x>0</x><y>0</y><width>0</width><height>0</height></rect></property>
+  <property name="windowTitle"><string>About/Legal</string></property>
+  <property name="windowIcon"><iconset><normaloff>:/misc/meta.png</normaloff>:/misc/meta.png</iconset></property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QTextBrowser" name="content_scroll_area">
+     <property name="openExternalLinks"><bool>true</bool></property>
+     <property name="lineWrapMode"><enum>QTextEdit::WidgetWidth</enum></property>
+     <property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Expanding"><horstretch>0</horstretch><verstretch>1</verstretch></sizepolicy></property>
+    </widget>
+   </item>
+   <item><widget class="QDialogButtonBox" name="buttonBox"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="standardButtons"><set>QDialogButtonBox::Close</set></property></widget></item>
+  </layout>
+ </widget>
+ <resources><include location="images/icons.qrc"/></resources>
+ <connections><connection><sender>buttonBox</sender><signal>rejected()</signal><receiver>AboutLegalDialog</receiver><slot>reject()</slot></connection></connections>
+</ui>

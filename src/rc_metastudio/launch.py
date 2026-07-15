@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import sys, time, traceback
-from PyQt5 import QtWidgets
+from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import QThread
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtWidgets import QSplashScreen
@@ -19,14 +19,69 @@ import meta_globals
 meta_py_r_backend.install_meta_py_r_backend()
 import app_error_handler
 import settings
+import adaptive_window
+import icons_rc  # noqa: F401 - registers canonical Qt image resources
 
 SPLASH_DISPLAY_TIME = 0  # Keep startup smoke tests fast; packaged builds may override.
 APPLICATION_ICON_PATH = ":/misc/meta.png"
 AUTOMATION_SMOKE_LOG_ENV = "RCMS_AUTOMATION_SMOKE_LOG"
+ADAPTIVE_LAYOUT_EVIDENCE_LOG_ENV = "RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG"
+
+
+def screen_bounded_splash_pixmap(source, available_logical_size):
+    """Bound a splash in Logical Layout Space while preserving source DPR."""
+    pixmap = QPixmap(source)
+    available = QtCore.QSize(available_logical_size)
+    if pixmap.isNull() or not available.isValid():
+        return pixmap
+
+    device_pixel_ratio = max(1.0, pixmap.devicePixelRatioF())
+    logical_width = pixmap.width() / device_pixel_ratio
+    logical_height = pixmap.height() / device_pixel_ratio
+    if (
+        logical_width <= available.width()
+        and logical_height <= available.height()
+    ):
+        return pixmap
+
+    scale = min(
+        available.width() / logical_width,
+        available.height() / logical_height,
+    )
+    target_logical_width = max(1, int(logical_width * scale))
+    target_logical_height = max(1, int(logical_height * scale))
+    target_physical_size = QtCore.QSize(
+        max(1, round(target_logical_width * device_pixel_ratio)),
+        max(1, round(target_logical_height * device_pixel_ratio)),
+    )
+    bounded = pixmap.scaled(
+        target_physical_size,
+        QtCore.Qt.IgnoreAspectRatio,
+        QtCore.Qt.SmoothTransformation,
+    )
+    bounded.setDevicePixelRatio(device_pixel_ratio)
+    return bounded
+
+
+def create_startup_splash():
+    """Build the startup Transient Window from high-DPI-capable resources."""
+    splash_pixmap = QPixmap(":/misc/splash.png")
+    screen = QtWidgets.QApplication.primaryScreen()
+    if screen is not None:
+        splash_pixmap = screen_bounded_splash_pixmap(
+            splash_pixmap, screen.availableGeometry().size()
+        )
+    splash = QSplashScreen(splash_pixmap)
+    adaptive_window.register_adaptive_window(
+        splash, adaptive_window.WindowRole.TRANSIENT
+    )
+    return splash
 
 
 def _write_automation_smoke_log(message):
-    log_path = os.environ.get(AUTOMATION_SMOKE_LOG_ENV)
+    log_path = os.environ.get(ADAPTIVE_LAYOUT_EVIDENCE_LOG_ENV) or os.environ.get(
+        AUTOMATION_SMOKE_LOG_ENV
+    )
     if not log_path:
         return
     try:
@@ -155,6 +210,23 @@ def start():
         return start_automation_smoke(sample_path)
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-wizard-layout-smoke":
         return _run_automation_smoke(start_wizard_layout_smoke)
+    if (
+        len(startup_argv) > 1
+        and startup_argv[1] == "--automation-adaptive-layout-evidence"
+    ):
+        if len(startup_argv) < 3:
+            raise SystemExit(
+                "--automation-adaptive-layout-evidence requires an output directory."
+            )
+        output_dir = startup_argv[2]
+        sample_path = (
+            startup_argv[3]
+            if len(startup_argv) > 3
+            else os.path.join("sample_projects", "amino.rcms")
+        )
+        return _run_automation_smoke(
+            lambda: start_adaptive_layout_evidence(output_dir, sample_path)
+        )
 
     startup_project_path = _startup_project_path(startup_argv)
     meta_form = _import_meta_form()
@@ -164,8 +236,7 @@ def start():
     _set_application_icon(app)
     settings.setup_directories()
 
-    splash_pixmap = QPixmap(":/misc/splash.png")
-    splash = QSplashScreen(splash_pixmap)
+    splash = create_startup_splash()
     splash.show()
     splash_starttime = time.time()
 
@@ -257,6 +328,21 @@ def start_automation_smoke(sample_path):
     return 0
 
 
+def start_adaptive_layout_evidence(output_dir, sample_path):
+    """Run the packaged native adaptive-layout evidence workflow."""
+    import adaptive_layout_evidence
+
+    adaptive_layout_evidence.configure_isolated_evidence_settings(output_dir)
+    app, meta = start_automation()
+    adaptive_layout_evidence.run_native_adaptive_layout_evidence(
+        app,
+        meta,
+        sample_path,
+        output_dir,
+    )
+    return 0
+
+
 def start_wizard_layout_smoke():
     app_error_handler.install_global_exception_handler()
     app = app_error_handler.get_or_create_application(sys.argv)
@@ -268,6 +354,7 @@ def start_wizard_layout_smoke():
     import main_wizard
 
     parent_shell = QtWidgets.QMainWindow()
+    # layout-audit: allow=verification-layout-fixture; reason=automation smoke fixture exercises a representative viewport
     parent_shell.resize(1600, 900)
     parent_shell.show()
     _flush_gui_events(app)
@@ -302,12 +389,16 @@ def start_wizard_layout_smoke():
 
     try:
         for scenario_name, wizard, actions in scenarios:
-            _show_wizard_for_layout_smoke(app, wizard, scenario_name)
+            stable_geometry = _show_wizard_for_layout_smoke(
+                app, wizard, scenario_name
+            )
             for action, expected_page_id, value in actions:
                 _advance_wizard_layout_smoke_page(
                     app, wizard, action, expected_page_id, value
                 )
-                _assert_wizard_layout_smoke_page(app, wizard, scenario_name)
+                _assert_wizard_layout_smoke_page(
+                    app, wizard, scenario_name, stable_geometry
+                )
     finally:
         for _scenario_name, wizard, _actions in scenarios:
             wizard.close()
@@ -321,6 +412,7 @@ def _show_wizard_for_layout_smoke(app, wizard, scenario_name):
     wizard.show()
     _flush_gui_events(app)
     _assert_wizard_layout_smoke_page(app, wizard, scenario_name)
+    return _window_frame_tuple(wizard)
 
 
 def _advance_wizard_layout_smoke_page(app, wizard, action, expected_page_id, value):
@@ -343,7 +435,9 @@ def _advance_wizard_layout_smoke_page(app, wizard, action, expected_page_id, val
     _flush_gui_events(app)
 
 
-def _assert_wizard_layout_smoke_page(app, wizard, scenario_name):
+def _assert_wizard_layout_smoke_page(
+    app, wizard, scenario_name, expected_geometry=None
+):
     _flush_gui_events(app)
     page = wizard.currentPage()
     if page is None:
@@ -364,6 +458,35 @@ def _assert_wizard_layout_smoke_page(app, wizard, scenario_name):
         raise SystemExit("Wizard layout smoke saw an empty body: %s" % scenario_name)
     if wizard.wizardStyle() != QtWidgets.QWizard.ModernStyle:
         raise SystemExit("Wizard layout smoke expected ModernStyle: %s" % scenario_name)
+    if wizard.property("RCMS_window_archetype") != "workflow":
+        raise SystemExit(
+            "Wizard layout smoke expected Workflow Window policy: %s"
+            % scenario_name
+        )
+    overflow = page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
+    if overflow is None or not overflow.widgetResizable():
+        raise SystemExit(
+            "Wizard layout smoke expected a page Overflow Boundary: %s"
+            % scenario_name
+        )
+    for button_role in (
+        QtWidgets.QWizard.BackButton,
+        QtWidgets.QWizard.NextButton,
+        QtWidgets.QWizard.FinishButton,
+        QtWidgets.QWizard.CancelButton,
+    ):
+        if overflow.isAncestorOf(wizard.button(button_role)):
+            raise SystemExit(
+                "Wizard navigation entered page overflow: %s" % scenario_name
+            )
+    if (
+        expected_geometry is not None
+        and _window_frame_tuple(wizard) != expected_geometry
+    ):
+        raise SystemExit(
+            "Visible Workflow Window geometry changed between pages: %s"
+            % scenario_name
+        )
     if page.sizeHint().width() <= 0 or page.sizeHint().height() <= 0:
         raise SystemExit(
             "Wizard layout smoke saw an invalid page size hint: %s" % scenario_name
@@ -376,6 +499,11 @@ def _assert_wizard_layout_smoke_page(app, wizard, scenario_name):
     image = pixmap.toImage()
     if pixmap.isNull() or image.isNull() or image.width() <= 0 or image.height() <= 0:
         raise SystemExit("Wizard layout smoke could not render: %s" % scenario_name)
+
+
+def _window_frame_tuple(window):
+    geometry = window.frameGeometry()
+    return geometry.x(), geometry.y(), geometry.width(), geometry.height()
 
 
 def _assert_visible_children_are_laid_out(page, scenario_name):
@@ -476,6 +604,7 @@ def _assert_standard_binary_summary_is_formatted(meta):
 def _force_table_paint(app, meta):
     """Renders every cell and both headers so paint-time data() bugs surface here."""
     view = meta.tableView
+    # layout-audit: allow=verification-layout-fixture; reason=automation smoke fixture exercises a representative viewport
     view.resize(1400, 900)
     app.processEvents()
     model = view.model()

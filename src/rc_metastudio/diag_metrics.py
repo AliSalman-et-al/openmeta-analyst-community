@@ -1,9 +1,10 @@
-from PyQt5.QtWidgets import QDialog, QMessageBox
+from PyQt5.QtCore import QEvent
+from PyQt5.QtWidgets import QDialog, QMessageBox, QWidget
 
 import forms.ui_diagnostic_metrics
 import app_error_handler
 import ma_specs
-import qt_layout
+import adaptive_window
 from meta_globals import DIAG_METRIC_NAMES_D
 
 
@@ -13,6 +14,10 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
     def __init__(self, model, parent=None, meta_f_str=None, external_params=None):
         super(Diag_Metrics, self).__init__(parent)
         self.setupUi(self)
+        self._configure_focus_revelation()
+        self._layout_controller = adaptive_window.register_adaptive_window(
+            self, adaptive_window.WindowRole.TRANSACTIONAL
+        )
         self.model = model
         self.parent = parent
         self.external_params = external_params
@@ -23,7 +28,21 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
             self._metric_checkbox(metric).toggled.connect(
                 app_error_handler.safe_slot(self._refresh_ok_enabled, parent=self)
             )
-        qt_layout.fit_analysis_dialog_to_contents(self)
+        self._request_initial_content_refit()
+
+    def _configure_focus_revelation(self):
+        for widget in self.content_widget.findChildren(QWidget):
+            widget.installEventFilter(self)
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.FocusIn and self.content_widget.isAncestorOf(watched):
+            self.content_scroll.ensureWidgetVisible(watched)
+        return super(Diag_Metrics, self).eventFilter(watched, event)
+
+    def _request_initial_content_refit(self):
+        controller = self.__dict__.get("_layout_controller")
+        if controller is not None and not self.isVisible():
+            controller.request_content_refit()
 
     def ok(self):
         selected_metrics = self.get_selected_metrics()
@@ -76,6 +95,7 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
 
     def _configure_metric_checkboxes(self):
         raw_data_available = self.model.included_studies_have_raw_data()
+        unavailable = []
         for metric in self.SELECTABLE_METRICS:
             checkbox = self._metric_checkbox(metric)
             metric_available = (
@@ -87,10 +107,20 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
             if metric_available:
                 checkbox.setToolTip("")
             else:
-                checkbox.setToolTip(
+                reason = (
                     "Requires complete TP/FN/FP/TN counts or complete entered "
                     "effect estimates and confidence intervals for this metric."
                 )
+                checkbox.setToolTip(reason)
+                unavailable.append("{}: {}".format(checkbox.text(), reason))
+        if unavailable:
+            self.availability_label.setText(
+                "Some metrics are unavailable:\n" + "\n".join(unavailable)
+            )
+        else:
+            self.availability_label.setText(
+                "All diagnostic metrics are available for the included studies."
+            )
         self._refresh_ok_enabled()
 
     def _entered_estimates_available_for_metric(self, metric):

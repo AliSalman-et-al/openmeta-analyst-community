@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.abspath("src"))
 sys.path.insert(0, os.path.abspath(os.path.join("src", "forms")))
 
 import pytest
-from PyQt5 import QtWidgets
+from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtWidgets import QHeaderView
 
 REPO_ROOT = os.getcwd()
@@ -349,6 +349,235 @@ def test_rc_metastudio_logo_resource_is_valid_and_used_consistently():
     ]
 
     assert low_resolution_icon_refs == []
+
+
+def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
+    import xml.etree.ElementTree as ET
+
+    import icons_rc  # noqa: F401
+    from PyQt5 import QtGui
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    qrc_path = Path("src", "rc_metastudio", "images", "icons.qrc")
+    qrc_root = ET.parse(qrc_path).getroot()
+    resources = {}
+    family_counts = {}
+    for resource_group in qrc_root.findall("qresource"):
+        prefix = resource_group.attrib["prefix"].lstrip("/")
+        if not prefix.startswith("icons/"):
+            continue
+        family_counts[prefix] = len(resource_group.findall("file"))
+        for file_node in resource_group.findall("file"):
+            alias = file_node.attrib["alias"]
+            resources[f":/{prefix}/{alias}"] = qrc_path.parent / file_node.text
+
+    assert family_counts == {
+        "icons/actions": 23,
+        "icons/analyses": 5,
+        "icons/analyses/compact": 5,
+        "icons/dataset-types": 8,
+        "icons/table": 1,
+    }
+    assert len(resources) == 42
+
+    wide_dataset_icon_sizes = {
+        ":/icons/dataset-types/generic-effect-size.svg": (54, 40),
+        ":/icons/dataset-types/two-arm-means.svg": (58, 40),
+        ":/icons/dataset-types/two-arm-proportions.svg": (72, 44),
+    }
+    simple_dataset_height_ranges = {
+        ":/icons/dataset-types/one-arm-mean.svg": (18, 21),
+        ":/icons/dataset-types/single-regression-coefficient.svg": (20, 22),
+        ":/icons/dataset-types/standardized-mean-difference.svg": (19, 21),
+    }
+
+    for resource_path, source_path in resources.items():
+        root = ET.parse(source_path).getroot()
+        assert root.tag == "{http://www.w3.org/2000/svg}svg"
+        if "/analyses/compact/" in resource_path:
+            expected_width, expected_height = (20, 20)
+        elif resource_path.startswith(":/icons/table/"):
+            expected_width, expected_height = (18, 18)
+        else:
+            expected_width, expected_height = wide_dataset_icon_sizes.get(
+                resource_path, (48, 48)
+            )
+        assert root.attrib["viewBox"] == (
+            f"0 0 {expected_width} {expected_height}"
+        )
+        assert not root.findall(".//{http://www.w3.org/2000/svg}text")
+        if resource_path.startswith(":/icons/dataset-types/"):
+            source_text = source_path.read_text(encoding="utf-8").lower()
+            assert "#60798d" in source_text
+            assert "#243746" not in source_text
+
+        embedded_file = QtCore.QFile(resource_path)
+        assert embedded_file.open(QtCore.QIODevice.ReadOnly)
+        assert bytes(embedded_file.readAll()) == source_path.read_bytes(), (
+            f"{resource_path} is stale; regenerate the checked-in Qt resources"
+        )
+
+        icon = QtGui.QIcon(resource_path)
+        assert icon.isNull() is False
+        for extent in (16, 18, 24, 28, 40, 48):
+            pixmap = icon.pixmap(extent, extent)
+            assert pixmap.isNull() is False
+            assert 0 < pixmap.width() <= extent
+            assert 0 < pixmap.height() <= extent
+            assert extent in (pixmap.width(), pixmap.height())
+            assert pixmap.toImage().hasAlphaChannel()
+
+            if "/analyses/compact/" in resource_path:
+                family = "compact-analyses"
+                ui_extent = 18
+            elif resource_path.startswith(":/icons/table/"):
+                family = "table"
+                ui_extent = 16
+            else:
+                family = resource_path.split("/")[2]
+                ui_extent = {
+                    "actions": 28,
+                    "analyses": 28,
+                    "dataset-types": 40,
+                }[family]
+            if extent == ui_extent:
+                image = pixmap.toImage()
+                rendered_width = image.width()
+                rendered_height = image.height()
+                perimeter_alpha = [
+                    QtGui.qAlpha(image.pixel(x, y))
+                    for x, y in (
+                        *((x, 0) for x in range(rendered_width)),
+                        *((x, rendered_height - 1) for x in range(rendered_width)),
+                        *((0, y) for y in range(rendered_height)),
+                        *((rendered_width - 1, y) for y in range(rendered_height)),
+                    )
+                ]
+                assert max(perimeter_alpha) <= 4, (
+                    f"{resource_path} paints into its {extent}px UI pixmap boundary"
+                )
+
+                visible_pixels = [
+                    (x, y)
+                    for y in range(rendered_height)
+                    for x in range(rendered_width)
+                    if QtGui.qAlpha(image.pixel(x, y)) > 4
+                ]
+                visible_height = (
+                    max(y for _, y in visible_pixels)
+                    - min(y for _, y in visible_pixels)
+                    + 1
+                )
+                visible_width = (
+                    max(x for x, _ in visible_pixels)
+                    - min(x for x, _ in visible_pixels)
+                    + 1
+                )
+                if family == "actions":
+                    assert 14 <= visible_width <= 26
+                    assert 14 <= visible_height <= 24, (
+                        f"{resource_path} is outside the toolbar optical-size grid"
+                    )
+                elif family == "analyses":
+                    assert 22 <= visible_width <= 24
+                    assert 21 <= visible_height <= 24, (
+                        f"{resource_path} is outside the standard analysis grid"
+                    )
+                elif family == "compact-analyses":
+                    assert 14 <= visible_width <= 16
+                    assert 14 <= visible_height <= 16, (
+                        f"{resource_path} is outside the compact analysis grid"
+                    )
+                elif family == "table":
+                    assert 11 <= visible_width <= 13
+                    assert 13 <= visible_height <= 15, (
+                        f"{resource_path} is outside the compact table grid"
+                    )
+                elif (
+                    family == "dataset-types"
+                    and resource_path not in wide_dataset_icon_sizes
+                ):
+                    assert 13 <= visible_height <= 24, (
+                        f"{resource_path} is outside the dataset icon optical-size range"
+                    )
+                    center_x = (
+                        min(x for x, _ in visible_pixels)
+                        + max(x for x, _ in visible_pixels)
+                    ) / 2
+                    center_y = (
+                        min(y for _, y in visible_pixels)
+                        + max(y for _, y in visible_pixels)
+                    ) / 2
+                    assert abs(center_x - (rendered_width - 1) / 2) <= 2
+                    assert abs(center_y - (rendered_height - 1) / 2) <= 2
+                    if resource_path in simple_dataset_height_ranges:
+                        minimum_height, maximum_height = (
+                            simple_dataset_height_ranges[resource_path]
+                        )
+                        assert minimum_height <= visible_height <= maximum_height
+
+        if resource_path in wide_dataset_icon_sizes:
+            requested_width, requested_height = wide_dataset_icon_sizes[resource_path]
+            ui_pixmap = icon.pixmap(requested_width, requested_height)
+            assert ui_pixmap.width() == requested_width
+            assert ui_pixmap.height() == requested_height
+            ui_image = ui_pixmap.toImage()
+            ui_visible_pixels = [
+                (x, y)
+                for y in range(ui_image.height())
+                for x in range(ui_image.width())
+                if QtGui.qAlpha(ui_image.pixel(x, y)) > 4
+            ]
+            ui_visible_height = (
+                max(y for _, y in ui_visible_pixels)
+                - min(y for _, y in ui_visible_pixels)
+                + 1
+            )
+            assert 13 <= ui_visible_height <= 24, (
+                f"{resource_path} is outside the dataset icon optical-size range"
+            )
+
+            ui_visible_width = (
+                max(x for x, _ in ui_visible_pixels)
+                - min(x for x, _ in ui_visible_pixels)
+                + 1
+            )
+            ui_center_x = (
+                min(x for x, _ in ui_visible_pixels)
+                + max(x for x, _ in ui_visible_pixels)
+            ) / 2
+            ui_center_y = (
+                min(y for _, y in ui_visible_pixels)
+                + max(y for _, y in ui_visible_pixels)
+            ) / 2
+            assert abs(ui_center_x - (ui_image.width() - 1) / 2) <= 2
+            assert abs(ui_center_y - (ui_image.height() - 1) / 2) <= 2
+            assert ui_visible_width <= requested_width - 2
+
+    for analysis_prefix in (":/icons/analyses/", ":/icons/analyses/compact/"):
+        cumulative_root = ET.parse(
+            resources[analysis_prefix + "cumulative-analysis.svg"]
+        ).getroot()
+        leave_one_out_root = ET.parse(
+            resources[analysis_prefix + "leave-one-out-analysis.svg"]
+        ).getroot()
+        assert [ET.tostring(child) for child in list(cumulative_root)[:-1]] == [
+            ET.tostring(child) for child in list(leave_one_out_root)[:-1]
+        ]
+        for root in (cumulative_root, leave_one_out_root):
+            assert not any("opacity" in element.attrib for element in root.iter())
+            assert not any(
+                float(rect.attrib.get("width", 0)) > 8
+                and float(rect.attrib.get("height", 0)) > 8
+                for rect in root.findall(".//{http://www.w3.org/2000/svg}rect")
+            ), "analysis icons must not restore a haze-producing background tile"
+
+    canonical_ui = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in Path("src", "rc_metastudio", "forms").glob("*.ui")
+    )
+    for legacy_prefix in (":/function_icon_set/", ":/toolbar-icons/", ":/new_dataset/"):
+        assert legacy_prefix not in canonical_ui
 
 
 def test_automation_launch_shows_default_confidence_level_at_startup():
@@ -990,8 +1219,8 @@ def test_standard_meta_analysis_opens_specs_and_runs_through_backend(monkeypatch
             def __init__(self, result, parent=None):
                 shown.append((result, parent))
 
-            def showMaximized(self):
-                shown.append("maximized")
+            def show(self):
+                shown.append("shown")
 
         def run(method, params, _method=method_name):
             calls.append(method)
@@ -1049,7 +1278,7 @@ def test_standard_meta_analysis_opens_specs_and_runs_through_backend(monkeypatch
                     {"texts": {"Summary": "%s model" % method_name}, "images": {}},
                     window,
                 ),
-                "maximized",
+                "shown",
             ]
         finally:
             window.close()
@@ -1064,7 +1293,6 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
     app, window = launch.start_automation()
     meta_form = sys.modules["meta_form"]
     meta_py_r = sys.modules["meta_py_r"]
-    qt_layout = sys.modules["qt_layout"]
 
     params = {
         "rm.method": ["HE", "DL", "SJ", "ML", "REML", "EB"],
@@ -1160,7 +1388,7 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         window.action_go.trigger()
         specs = window.findChildren(meta_form.ma_specs.MA_Specs)
         assert len(specs) == 1
-        assert specs[0].minimumWidth() >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
+        assert specs[0].property("RCMS_window_archetype") == "transactional"
 
         enum_combos = [
             combo
@@ -1172,7 +1400,9 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
             "Only zero-event studies",
         ]
         method_combo = specs[0].method_cbo_box
-        assert method_combo.sizeAdjustPolicy() == QtWidgets.QComboBox.AdjustToContents
+        assert method_combo.sizeAdjustPolicy() == (
+            QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon
+        )
         widest_method_label = (
             max(
                 method_combo.fontMetrics().horizontalAdvance(
@@ -1180,45 +1410,29 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
                 )
                 for index in range(method_combo.count())
             )
-            + 48
         )
-        assert (
-            widest_method_label > qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
-        )
-        assert method_combo.minimumWidth() == min(
-            widest_method_label,
-            qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH,
-        )
-        assert (
-            method_combo.maximumWidth()
-            == qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH
-        )
+        assert method_combo.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
         assert method_combo.view().minimumWidth() >= widest_method_label
         assert method_combo.width() <= method_combo.maximumWidth()
         assert (
             method_combo.sizePolicy().horizontalPolicy()
-            != QtWidgets.QSizePolicy.Expanding
+            == QtWidgets.QSizePolicy.Expanding
         )
 
         for combo in enum_combos:
-            assert combo.sizeAdjustPolicy() == QtWidgets.QComboBox.AdjustToContents
+            assert combo.sizeAdjustPolicy() == (
+                QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon
+            )
             widest_enum_label = (
                 max(
                     combo.fontMetrics().horizontalAdvance(str(combo.itemText(index)))
                     for index in range(combo.count())
                 )
-                + 48
             )
-            assert combo.minimumWidth() == min(
-                widest_enum_label,
-                qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH,
-            )
+            assert combo.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
+            assert combo.view().minimumWidth() >= widest_enum_label
             assert (
-                combo.maximumWidth()
-                == qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
-            )
-            assert (
-                combo.sizePolicy().horizontalPolicy() != QtWidgets.QSizePolicy.Expanding
+                combo.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Expanding
             )
 
         confidence_spinboxes = specs[0].parameter_grp_box.findChildren(
@@ -1378,7 +1592,6 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
     app, window = launch.start_automation()
     meta_form = sys.modules["meta_form"]
     meta_py_r = sys.modules["meta_py_r"]
-    qt_layout = sys.modules["qt_layout"]
 
     method_map = {
         "binary.random": "binary.random",
@@ -1463,18 +1676,19 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
 
         stable_width = specs.width()
         stable_height = specs.height()
-        stable_minimum_width = specs.minimumWidth()
-        assert stable_minimum_width >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
-        assert specs.layout().sizeConstraint() == QtWidgets.QLayout.SetFixedSize
-        assert specs.maximumSize() == specs.minimumSize()
-        assert specs.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Fixed
-        assert specs.sizePolicy().verticalPolicy() == QtWidgets.QSizePolicy.Fixed
+        assert specs.property("RCMS_window_archetype") == "transactional"
+        assert specs.layout().sizeConstraint() == QtWidgets.QLayout.SetMinimumSize
+        assert specs.maximumSize() == QtCore.QSize(16777215, 16777215)
+        assert specs.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Preferred
+        assert specs.sizePolicy().verticalPolicy() == QtWidgets.QSizePolicy.Preferred
         assert specs.isSizeGripEnabled() is False
 
         specs.resize(stable_width + 300, stable_height + 200)
         app.processEvents()
-        assert specs.width() == stable_width
-        assert specs.height() == stable_height
+        assert specs.width() == stable_width + 300
+        assert specs.height() == stable_height + 200
+        stable_width = specs.width()
+        stable_height = specs.height()
 
         long_method_index = specs.method_cbo_box.findText(
             "Binary Fixed-Effect Mantel-Haenszel"
@@ -1491,7 +1705,6 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
         assert specs.parameter_grp_box.title() != "binary.random"
 
         assert specs.width() == stable_width
-        assert specs.minimumWidth() == stable_minimum_width
         assert (
             specs.parameter_grp_box.layout().alignment() & QtCore.Qt.AlignTop
         ) == QtCore.Qt.AlignTop
@@ -1514,14 +1727,7 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
             value_controls.extend(specs.parameter_grp_box.findChildren(control_type))
 
         for value_control in value_controls:
-            assert (
-                value_control.maximumWidth()
-                <= qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
-            )
-            assert (
-                value_control.sizePolicy().horizontalPolicy()
-                != QtWidgets.QSizePolicy.Expanding
-            )
+            assert value_control.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
     finally:
         window.close()
         app.processEvents()
@@ -1600,15 +1806,14 @@ def test_meta_regression_uses_shared_method_covariates_and_plots_dialog(monkeypa
     shown = []
 
     class SharedSpecsDialog(object):
-        pass
+        def show(self):
+            shown.append(self)
 
     def build_specs(**kwargs):
         built.append(kwargs)
         return SharedSpecsDialog()
 
     monkeypatch.setattr(window, "_build_analysis_specs_dialog", build_specs)
-    monkeypatch.setattr(meta_form.qt_layout, "show_centered", shown.append)
-
     try:
         window.meta_reg()
 
@@ -1865,8 +2070,8 @@ def test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe(monke
         def __init__(self, result, parent=None):
             shown.append((result, parent))
 
-        def showMaximized(self):
-            shown.append("maximized")
+        def show(self):
+            shown.append("shown")
 
     def run_meta_regression(dataset, studies, covariates, metric, **kwargs):
         shown.append(
@@ -1930,7 +2135,7 @@ def test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe(monke
                 },
                 window,
             ),
-            "maximized",
+            "shown",
         ]
 
         factor_column = window.model.columnCount() - 1
@@ -2002,15 +2207,15 @@ def test_sequential_analysis_results_use_results_window(monkeypatch):
         def __init__(self, result, parent=None):
             shown.append((result, parent))
 
-        def showMaximized(self):
-            shown.append("maximized")
+        def show(self):
+            shown.append("shown")
 
     monkeypatch.setattr(meta_form.results_window, "ResultsWindow", ResultDialog)
 
     try:
         window.analysis(results)
 
-        assert shown == [(results, window), "maximized"]
+        assert shown == [(results, window), "shown"]
     finally:
         window.close()
         app.processEvents()
@@ -2020,6 +2225,9 @@ def test_sequential_analysis_results_use_results_window(monkeypatch):
 def test_analysis_opens_results_window_maximized_and_fits_svg_plot(tmp_path):
     import launch
     import results_window
+    import settings
+
+    QtCore.QSettings().remove(settings.RESULTS_WORKSPACE_GROUP)
 
     plot_path = tmp_path / "forest.svg"
     plot_path.write_text(
@@ -2309,22 +2517,25 @@ def test_results_window_refits_svg_after_viewport_geometry_settles(tmp_path):
     )
 
     try:
-        window.showMaximized()
-        app.processEvents()
+        window.resize(700, 500)
+        window.show()
+        for _ in range(3):
+            app.processEvents()
         plot_item = next(
             item
             for item in window.scene.items()
             if isinstance(item, results_window.QGraphicsSvgItem)
         )
         initial_width = plot_item.sceneBoundingRect().width()
-        initial_view_width = window.graphics_view.width()
+        initial_window_width = window.width()
         initial_viewport_width = window.graphics_view.viewport().width()
         assert initial_width >= initial_viewport_width * 0.9
         assert initial_width <= initial_viewport_width
 
-        settled_width = initial_view_width - 300
-        window.graphics_view.resize(settled_width, window.graphics_view.height())
-        app.processEvents()
+        settled_width = initial_window_width - 200
+        window.resize(settled_width, window.height())
+        for _ in range(3):
+            app.processEvents()
 
         viewport_width = window.graphics_view.viewport().width()
         assert viewport_width < initial_width
@@ -2332,8 +2543,9 @@ def test_results_window_refits_svg_after_viewport_geometry_settles(tmp_path):
         assert plot_item.sceneBoundingRect().width() == pytest.approx(available_width)
 
         shrunken_width = plot_item.sceneBoundingRect().width()
-        window.graphics_view.resize(initial_view_width, window.graphics_view.height())
-        app.processEvents()
+        window.resize(initial_window_width, window.height())
+        for _ in range(3):
+            app.processEvents()
 
         grown_viewport_width = window.graphics_view.viewport().width()
         grown_available_width = (
@@ -2345,7 +2557,8 @@ def test_results_window_refits_svg_after_viewport_geometry_settles(tmp_path):
         )
     finally:
         window.close()
-        app.processEvents()
+        for _ in range(3):
+            app.processEvents()
 
 
 def test_results_window_refits_raster_fallback_from_original_source(tmp_path):
@@ -2378,15 +2591,17 @@ def test_results_window_refits_raster_fallback_from_original_source(tmp_path):
     )
 
     try:
-        window.showMaximized()
-        app.processEvents()
+        window.resize(700, 500)
+        window.show()
+        for _ in range(3):
+            app.processEvents()
         plot_item = next(
             item
             for item in window.scene.items()
             if isinstance(item, results_window.QGraphicsPixmapItem)
         )
         initial_width = plot_item.sceneBoundingRect().width()
-        initial_view_width = window.graphics_view.width()
+        initial_window_width = window.width()
         initial_available_width = (
             window.graphics_view.viewport().width()
             - window.x_coord
@@ -2394,10 +2609,9 @@ def test_results_window_refits_raster_fallback_from_original_source(tmp_path):
         )
         assert initial_width == pytest.approx(initial_available_width, abs=5)
 
-        window.graphics_view.resize(
-            initial_view_width - 300, window.graphics_view.height()
-        )
-        app.processEvents()
+        window.resize(initial_window_width - 200, window.height())
+        for _ in range(3):
+            app.processEvents()
         shrunken_width = plot_item.sceneBoundingRect().width()
         shrunken_available_width = (
             window.graphics_view.viewport().width()
@@ -2407,7 +2621,7 @@ def test_results_window_refits_raster_fallback_from_original_source(tmp_path):
         assert shrunken_width < initial_width
         assert shrunken_width == pytest.approx(shrunken_available_width, abs=5)
 
-        window.graphics_view.resize(initial_view_width, window.graphics_view.height())
+        window.resize(initial_window_width, window.height())
         app.processEvents()
         assert plot_item.sceneBoundingRect().width() == pytest.approx(
             initial_width, abs=5
@@ -3536,11 +3750,11 @@ def test_apply_regression_plot_edits_rebuilds_and_redraws_bubble_plot(
         assert plot_item.boundingRect().height() == pytest.approx(500)
 
         initial_width = plot_item.sceneBoundingRect().width()
-        view_width = window.graphics_view.width()
-        window.graphics_view.resize(view_width - 200, window.graphics_view.height())
+        window_width = window.width()
+        window.resize(window_width - 200, window.height())
         app.processEvents()
         assert plot_item.sceneBoundingRect().width() < initial_width
-        window.graphics_view.resize(view_width, window.graphics_view.height())
+        window.resize(window_width, window.height())
         app.processEvents()
         assert plot_item.sceneBoundingRect().width() > initial_width - 5
     finally:
@@ -4030,11 +4244,11 @@ def test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog(
         )
 
         initial_width = plot_item.sceneBoundingRect().width()
-        view_width = window.graphics_view.width()
-        window.graphics_view.resize(view_width - 200, window.graphics_view.height())
+        window_width = window.width()
+        window.resize(window_width - 200, window.height())
         app.processEvents()
         assert plot_item.sceneBoundingRect().width() < initial_width
-        window.graphics_view.resize(view_width, window.graphics_view.height())
+        window.resize(window_width, window.height())
         app.processEvents()
         assert plot_item.sceneBoundingRect().width() > initial_width - 5
     finally:
@@ -4112,7 +4326,8 @@ def test_results_window_uses_reader_oriented_section_names_and_order(tmp_path):
         ]
 
         assert nav_titles == ["Meta-Analysis Summary", "Forest Plot", "Weights"]
-        assert standard_window.nav_tree.minimumWidth() >= 250
+        assert standard_window.nav_tree.minimumWidth() == 0
+        assert not standard_window.results_nav_splitter.childrenCollapsible()
     finally:
         standard_window.close()
         app.processEvents()
@@ -4302,27 +4517,10 @@ def test_welcome_wizard_open_existing_selects_project(monkeypatch):
         app.processEvents()
 
 
-def test_wizard_size_refit_ignores_closed_wizard_without_current_page(monkeypatch):
-    import launch
-    from PyQt5 import QtWidgets
-    import main_wizard
-
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-    wizard = main_wizard.MainWizard(path="csv_import")
-    try:
-        monkeypatch.setattr(wizard, "currentPage", lambda: None)
-
-        wizard._change_size(-1)
-    finally:
-        wizard.close()
-        app.processEvents()
-
-
 def test_modal_dialogs_center_over_parent_window():
     import launch
     from PyQt5 import QtWidgets
     import main_wizard
-    import qt_layout
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     parent = QtWidgets.QMainWindow()
@@ -4332,7 +4530,9 @@ def test_modal_dialogs_center_over_parent_window():
 
     wizard = main_wizard.MainWizard(parent=parent)
     try:
-        qt_layout.center_dialog_over_parent(wizard)
+        wizard.show()
+        app.processEvents()
+        app.processEvents()
 
         parent_center = parent.frameGeometry().center()
         wizard_center = wizard.frameGeometry().center()
@@ -4390,6 +4590,7 @@ def test_data_type_page_multiline_buttons_fit_icon_and_caption():
     wizard = main_wizard.MainWizard(path="new_dataset")
     try:
         wizard.restart()
+        wizard.show()
         app.processEvents()
 
         data_type_page = wizard.page(main_wizard.Page_DataType)
@@ -4400,14 +4601,13 @@ def test_data_type_page_multiline_buttons_fit_icon_and_caption():
 
         for button in multiline_buttons:
             assert "\n" in button.text()
-            assert button.maximumHeight() >= button.sizeHint().height()
-            assert button.minimumHeight() >= button.sizeHint().height()
+            assert button.height() >= button.sizeHint().height()
     finally:
         wizard.close()
         app.processEvents()
 
 
-def test_data_type_page_data_type_buttons_use_uniform_size():
+def test_data_type_page_reflows_buttons_without_horizontal_overflow():
     import launch
     from PyQt5 import QtWidgets
     import main_wizard
@@ -4416,25 +4616,14 @@ def test_data_type_page_data_type_buttons_use_uniform_size():
     wizard = main_wizard.MainWizard(path="new_dataset")
     try:
         wizard.restart()
+        wizard.show()
         app.processEvents()
 
         data_type_page = wizard.page(main_wizard.Page_DataType)
-        data_type_buttons = [
-            data_type_page.onearm_proportion_Button,
-            data_type_page.onearm_mean_Button,
-            data_type_page.onearm_single_reg_coef_Button,
-            data_type_page.onearm_generic_effect_size_Button,
-            data_type_page.twoarm_proportions_Button,
-            data_type_page.twoarm_means_Button,
-            data_type_page.twoarm_smds_Button,
-            data_type_page.diagnostic_Button,
-        ]
-
-        button_sizes = {
-            button.objectName(): (button.size().width(), button.size().height())
-            for button in data_type_buttons
-        }
-        assert len(set(button_sizes.values())) == 1, button_sizes
+        overflow = data_type_page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
+        assert overflow.horizontalScrollBar().maximum() == 0
+        assert data_type_page.oneArmDataTypesLayout.columnCount() == 2
+        assert data_type_page.multiArmDataTypesLayout.columnCount() == 2
     finally:
         wizard.close()
         app.processEvents()
@@ -4467,7 +4656,7 @@ def test_data_type_page_buttons_center_icons_inside_declared_slots():
         app.processEvents()
 
 
-def test_new_dataset_wizard_sizes_to_show_diagnostic_choice():
+def test_new_dataset_wizard_overflow_keeps_diagnostic_choice_reachable():
     import launch
     from PyQt5 import QtWidgets
     import main_wizard
@@ -4482,16 +4671,21 @@ def test_new_dataset_wizard_sizes_to_show_diagnostic_choice():
         data_type_page.layout().activate()
         app.processEvents()
 
+        overflow = data_type_page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
         diagnostic_button = data_type_page.diagnostic_Button
-        assert data_type_page.rect().contains(diagnostic_button.geometry())
-        assert wizard.minimumHeight() >= data_type_page.sizeHint().height()
-        assert wizard.minimumHeight() >= wizard.sizeHint().height()
+        overflow.ensureWidgetVisible(diagnostic_button)
+        app.processEvents()
+        diagnostic_rect = QtCore.QRect(
+            diagnostic_button.mapTo(overflow.viewport(), QtCore.QPoint()),
+            diagnostic_button.size(),
+        )
+        assert overflow.viewport().rect().intersects(diagnostic_rect)
     finally:
         wizard.close()
         app.processEvents()
 
 
-def test_new_dataset_wizard_uses_declarative_minimum_size_policy():
+def test_new_dataset_wizard_uses_replacement_workflow_policy():
     import launch
     from PyQt5 import QtWidgets
     import main_wizard
@@ -4502,7 +4696,8 @@ def test_new_dataset_wizard_uses_declarative_minimum_size_policy():
         wizard.restart()
         app.processEvents()
 
-        assert wizard.layout().sizeConstraint() == QtWidgets.QLayout.SetMinimumSize
+        assert wizard.property("RCMS_window_archetype") == "workflow"
+        assert wizard.property("RCMS_window_role") == "workflow"
         assert not hasattr(wizard, "_oma_first_show_refit_filter")
         assert wizard.property("RCMS_first_show_refit_options") is None
     finally:
@@ -4581,40 +4776,36 @@ def test_new_dataset_wizard_pages_fill_body_without_clipping_content():
             assert abs(page_body_width - stable_body_width) <= 4
             assert abs(wizard.width() - stable_wizard_width) <= 4
             assert page.width() >= page_body_width - 4
-            _assert_visible_children_fit_page(page)
+            overflow = page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
+            assert overflow is not None
+            assert page.rect().contains(overflow.geometry())
     finally:
         wizard.close()
         app.processEvents()
 
 
-def _assert_visible_children_fit_page(page):
-    page_rect = page.rect().adjusted(0, 0, 1, 1)
-    for child in page.findChildren(QtWidgets.QWidget):
-        if child is page or not child.isVisible():
-            continue
-        child_rect = child.geometry()
-        mapped_top_left = child.parentWidget().mapTo(page, child_rect.topLeft())
-        mapped_rect = child_rect
-        mapped_rect.moveTopLeft(mapped_top_left)
-        assert page_rect.contains(mapped_rect), child.objectName()
+def test_data_type_page_canonical_form_declares_reflow_and_overflow():
+    ui_path = (
+        Path(__file__).resolve().parents[3]
+        / "src"
+        / "rc_metastudio"
+        / "forms"
+        / "data_type_page.ui"
+    )
+    root = ET.parse(ui_path).getroot().find("widget")
 
-
-def test_data_type_page_canonical_geometry_covers_normalized_content():
-    import launch
-    from PyQt5 import QtWidgets
-    import main_wizard
-
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-    data_type_page = main_wizard.DataTypePage()
-    try:
-        data_type_page.layout().activate()
-        ui_tree = ET.parse(Path("src", "forms", "data_type_page.ui"))
-        ui_height = int(ui_tree.findtext(".//height"))
-
-        assert ui_height >= data_type_page.minimumHeight()
-    finally:
-        data_type_page.close()
-        app.processEvents()
+    assert root.find("./layout").get("name") == "workflowPageLayout"
+    assert root.find(".//widget[@name='pageScrollArea']") is not None
+    assert (
+        root.find(".//layout[@name='oneArmDataTypesLayout']").get("class")
+        == "QGridLayout"
+    )
+    assert (
+        root.find(".//layout[@name='multiArmDataTypesLayout']").get("class")
+        == "QGridLayout"
+    )
+    assert root.find("./property[@name='minimumSize']") is None
+    assert root.find("./property[@name='maximumSize']") is None
 
 
 @pytest.mark.parametrize(
@@ -4875,20 +5066,26 @@ def test_removed_help_surfaces_do_not_leave_active_ui_or_urls():
         )
         assert window.action_about_legal.text() == "About/Legal"
 
-        about_calls = []
-        original_about = QtWidgets.QMessageBox.about
-        QtWidgets.QMessageBox.about = lambda *args: about_calls.append(args)
+        import about_legal_dialog
+
+        about_dialogs = []
+        original_exec = about_legal_dialog.AboutLegalDialog.exec
+        about_legal_dialog.AboutLegalDialog.exec = (
+            lambda dialog: about_dialogs.append(dialog)
+        )
         try:
             window.action_about_legal.trigger()
         finally:
-            QtWidgets.QMessageBox.about = original_about
-        about_text = about_calls[0][2]
+            about_legal_dialog.AboutLegalDialog.exec = original_exec
+        about_text = about_dialogs[0].content_scroll_area.toPlainText()
+        assert about_dialogs[0].property("RCMS_window_archetype") == "transactional"
         assert "RC MetaStudio" in about_text
         assert "Ali Salman" in about_text
         assert "GPL-3.0-or-later" in about_text
         assert "without warranty" in about_text.lower()
         assert "Original OpenMeta[Analyst] Project" in about_text
         assert "NOTICE.md" in about_text
+        about_dialogs[0].close()
 
         wizard = main_wizard.MainWizard()
         welcome = wizard.page(main_wizard.Page_Welcome)
@@ -5138,16 +5335,14 @@ def test_csv_required_format_table_expands_and_shows_all_rows(monkeypatch):
     app.processEvents()
 
 
-def test_analysis_dialog_family_uses_shared_base_size(monkeypatch):
+def test_analysis_dialog_family_declares_migrated_transactional_surfaces(monkeypatch):
     import copy
     import launch
-    import add_new_dialogs
     import binary_data_form
     import continuous_data_form
     import diagnostic_data_form
     import meta_reg_form
     import meta_subgroup_form
-    import qt_layout
 
     app, window = launch.start_automation()
     dialogs = []
@@ -5170,7 +5365,6 @@ def test_analysis_dialog_family_uses_shared_base_size(monkeypatch):
             [
                 meta_reg_form.MetaRegForm(model, parent=window),
                 meta_subgroup_form.MetaSubgroupForm(model, parent=window),
-                add_new_dialogs.AddNewCovariateForm(parent=window),
                 binary_data_form.BinaryDataForm2(
                     copy.deepcopy(model.get_current_ma_unit_for_study(0)),
                     model.current_txs,
@@ -5218,8 +5412,8 @@ def test_analysis_dialog_family_uses_shared_base_size(monkeypatch):
         for dialog in dialogs:
             dialog.show()
             app.processEvents()
-            assert dialog.minimumWidth() >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
-            assert dialog.minimumHeight() >= qt_layout.ANALYSIS_DIALOG_MINIMUM_HEIGHT
+            assert dialog.property("RCMS_window_archetype") == "transactional"
+            assert dialog.maximumSize() == QtCore.QSize(16777215, 16777215)
     finally:
         for dialog in dialogs:
             dialog.close()
@@ -5231,31 +5425,26 @@ def test_analysis_dialog_family_uses_shared_base_size(monkeypatch):
 def test_add_covariate_dialog_fields_and_buttons_fill_fitted_width():
     import launch
     import add_new_dialogs
-    import qt_layout
 
     app, window = launch.start_automation()
     dialog = add_new_dialogs.AddNewCovariateForm(parent=window)
 
     try:
+        enlarged_font = dialog.font()
+        enlarged_font.setPointSize(enlarged_font.pointSize() + 4)
+        dialog.setFont(enlarged_font)
         dialog.show()
         app.processEvents()
-        if dialog.layout() is not None:
-            dialog.layout().activate()
-        app.processEvents()
 
-        contents = dialog.contentsRect()
-        dialog_layout = dialog.layout()
-        assert dialog_layout is not None
-        left_margin = dialog_layout.contentsMargins().left()
-        right_margin = dialog_layout.contentsMargins().right()
-        expected_content_width = contents.width() - left_margin - right_margin
-
-        assert dialog.minimumWidth() >= qt_layout.ANALYSIS_DIALOG_MINIMUM_WIDTH
-        assert dialog.layoutWidget.width() >= expected_content_width
-        assert dialog.buttonBox.width() >= expected_content_width
-        assert (
-            dialog.buttonBox.geometry().right() >= contents.right() - right_margin - 1
+        assert dialog.property("RCMS_window_archetype") == "transactional"
+        assert dialog.layout() is not None
+        assert dialog.minimumSize() == dialog.minimumSizeHint()
+        assert dialog.maximumSize() == QtCore.QSize(16777215, 16777215)
+        assert dialog.covariate_name_le.sizePolicy().horizontalPolicy() == (
+            QtWidgets.QSizePolicy.Expanding
         )
+        assert dialog.buttonBox.isVisible()
+        assert dialog.contentsRect().contains(dialog.buttonBox.geometry().center())
     finally:
         dialog.close()
         window.close()

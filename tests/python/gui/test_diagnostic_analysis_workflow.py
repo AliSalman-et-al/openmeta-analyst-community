@@ -851,14 +851,15 @@ def test_diagnostic_direct_effects_do_not_offer_count_based_methods(monkeypatch)
         _close_without_prompt(app, window)
 
 
-def test_diagnostic_method_selector_uses_combo_width_policy(monkeypatch):
+def test_diagnostic_method_selector_exposes_full_choices_without_root_cap(monkeypatch):
+    import adaptive_controls
     import launch
-    import qt_layout
+    from PyQt5 import QtCore, QtWidgets
 
     app, window = launch.start_automation()
     import ma_specs
 
-    backend = ma_specs.meta_py_r
+    backend = sys.modules.get("meta_py_r", ma_specs.meta_py_r)
     saved = {
         name: getattr(backend, name)
         for name in (
@@ -878,6 +879,12 @@ def test_diagnostic_method_selector_uses_combo_width_policy(monkeypatch):
         }
         backend.get_params = lambda method: ({}, {}, [], {})
         backend.get_method_description = lambda method: "stub method"
+        monkeypatch.setattr(
+            backend,
+            "get_analysis_plot_capabilities",
+            lambda *_args, **_kwargs: [],
+            raising=False,
+        )
 
         form = window._build_analysis_specs_dialog(
             diag_metrics=["sens", "spec"],
@@ -887,21 +894,43 @@ def test_diagnostic_method_selector_uses_combo_width_policy(monkeypatch):
         app.processEvents()
 
         label = "Diagnostic Fixed-Effect Inverse Variance"
-        label_width = form.method_cbo_box.fontMetrics().horizontalAdvance(label) + 48
+        label_index = form.method_cbo_box.findText(label)
+        assert label_index >= 0
+        controller = adaptive_controls.configure_choice_control(
+            form.method_cbo_box, visible_characters=28
+        )
+        app.processEvents()
+        baseline = (
+            controller.measurement_applied_count,
+            controller.tooltip_scan_applied_count,
+            controller.popup_clamp_applied_count,
+        )
+        form.method_cbo_box.showPopup()
+        settle = QtCore.QEventLoop()
+        QtCore.QTimer.singleShot(20, settle.quit)
+        settle.exec()
 
-        assert form.method_cbo_box.findText(label) >= 0
-        assert label_width > qt_layout.ANALYSIS_DIALOG_VALUE_CONTROL_MAXIMUM_WIDTH
-        assert label_width <= qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH
-        assert form.method_cbo_box.minimumWidth() == min(
-            label_width, qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH
+        popup = form.method_cbo_box.view().window()
+        available = adaptive_controls.available_geometry_for_choice_control(
+            form.method_cbo_box
         )
-        assert (
-            form.method_cbo_box.maximumWidth()
-            == qt_layout.ANALYSIS_DIALOG_METHOD_COMBO_MAXIMUM_WIDTH
+        applied = (
+            controller.measurement_applied_count - baseline[0],
+            controller.tooltip_scan_applied_count - baseline[1],
+            controller.popup_clamp_applied_count - baseline[2],
         )
-        assert form.method_cbo_box.view().minimumWidth() >= label_width
+        assert applied == (1, 1, 1)
+        assert available.contains(popup.frameGeometry())
+        if (
+            form.method_cbo_box.view().sizeHintForColumn(0)
+            > form.method_cbo_box.view().viewport().width()
+        ):
+            assert form.method_cbo_box.view().horizontalScrollBar().maximum() > 0
+        assert form.method_cbo_box.itemData(label_index, QtCore.Qt.ToolTipRole) == label
         assert form.method_cbo_box.toolTip() == form.method_cbo_box.currentText()
-        assert form.method_cbo_box.width() <= form.method_cbo_box.maximumWidth()
+        form.method_cbo_box.hidePopup()
+        assert form.method_cbo_box.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
+        assert form.property("RCMS_window_archetype") == "transactional"
     finally:
         for name, value in saved.items():
             setattr(backend, name, value)

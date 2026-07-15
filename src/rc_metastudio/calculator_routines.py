@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Shared calculator helpers for data-entry dialogs."""
 
+import sys
 from functools import partial
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QMessageBox, QSizePolicy, QUndoCommand
+from PyQt5.QtWidgets import QMessageBox, QSizePolicy, QStyle, QUndoCommand
 
 from meta_globals import *
 import meta_py_r
@@ -257,10 +258,13 @@ def enable_txt_box_input(*args):
         text_box.blockSignals(False)
 
 
-def fit_effect_ci_line_edits_to_contents(line_edits, digits=CALC_NUM_DIGITS):
-    """Keep calculator effect/CI values wide enough to show signs and precision."""
+def fit_effect_ci_line_edits_to_contents(
+    line_edits, digits=CALC_NUM_DIGITS, semantic_samples=None
+):
+    """Size calculator values from a semantic contract when one is supplied."""
 
-    signed_precision_sample = "-0." + ("8" * digits)
+    if semantic_samples is None:
+        semantic_samples = ()
     for line_edit in line_edits:
         if line_edit is None:
             continue
@@ -268,21 +272,92 @@ def fit_effect_ci_line_edits_to_contents(line_edits, digits=CALC_NUM_DIGITS):
         policy = line_edit.sizePolicy()
         line_edit.setSizePolicy(QSizePolicy.Fixed, policy.verticalPolicy())
 
-        base_minimum_width = line_edit.property("RCMS_effect_ci_base_minimum_width")
-        if not isinstance(base_minimum_width, int):
-            base_minimum_width = line_edit.minimumWidth()
-            line_edit.setProperty(
-                "RCMS_effect_ci_base_minimum_width", base_minimum_width
+        if semantic_samples:
+            content_width = max(
+                line_edit.fontMetrics().horizontalAdvance(sample)
+                for sample in semantic_samples
             )
-
-        text = str(line_edit.text())
-        content_width = max(
-            line_edit.fontMetrics().horizontalAdvance(value)
-            for value in (signed_precision_sample, text)
-        )
-        required_width = max(base_minimum_width, content_width + 12)
+            text_margins = line_edit.textMargins()
+            frame_width = line_edit.style().pixelMetric(
+                QStyle.PM_DefaultFrameWidth, None, line_edit
+            )
+            required_width = (
+                content_width
+                + text_margins.left()
+                + text_margins.right()
+                + (2 * frame_width)
+            )
+        else:
+            signed_precision_sample = "-0." + ("8" * digits)
+            base_minimum_width = line_edit.property(
+                "RCMS_effect_ci_base_minimum_width"
+            )
+            if not isinstance(base_minimum_width, int):
+                base_minimum_width = line_edit.minimumWidth()
+                line_edit.setProperty(
+                    "RCMS_effect_ci_base_minimum_width", base_minimum_width
+                )
+            content_width = max(
+                line_edit.fontMetrics().horizontalAdvance(value)
+                for value in (signed_precision_sample, str(line_edit.text()))
+            )
+            required_width = max(base_minimum_width, content_width + 12)
+        # layout-audit: allow=numeric-domain-control; reason=editor width follows representative values from its numeric domain
         line_edit.setMinimumWidth(required_width)
+        # layout-audit: allow=numeric-domain-control; reason=editor width follows representative values from its numeric domain
         line_edit.setMaximumWidth(required_width)
+
+
+def format_calculator_display_value(value, digits=CALC_NUM_DIGITS):
+    """Format a calculator value exactly as it is rendered in its line edit."""
+    return str(round(value, digits))
+
+
+def binary_effect_display_samples(metric, digits=CALC_NUM_DIGITS):
+    """Return semantic display-domain samples for a binary calculator metric."""
+    precision = "0." + ("0" * digits)
+    proportion_metrics = {"PR", "PLN", "PLO", "PAS", "PFT"}
+    signed_unit_metrics = {"RD", "YUQ", "YUY"}
+    positive_ratio_metrics = {"OR", "RR"}
+
+    if metric in proportion_metrics:
+        return (precision, "1." + ("0" * digits))
+    if metric in signed_unit_metrics:
+        return ("-1." + ("0" * digits), "1." + ("0" * digits))
+    if metric == "AS":
+        return ("-1.5708", "1.5708")
+    if metric in positive_ratio_metrics:
+        # Ratios are positive and unbounded, so use the exact text produced by
+        # the renderer at the largest accepted finite binary64 value.
+        return (
+            precision,
+            format_calculator_display_value(sys.float_info.max, digits),
+        )
+    return ("-" + precision, precision)
+
+
+def continuous_effect_display_samples(metric, digits=CALC_NUM_DIGITS):
+    """Return formatter-derived semantic samples for continuous effect fields.
+
+    Continuous effect domains are mathematically unbounded, so values beyond
+    these common display magnitudes remain reachable through QLineEdit's native
+    horizontal navigation rather than forcing the dialog to grow indefinitely.
+    """
+    magnitude = 10.9999 if metric == "SMD" else 9999.9999
+    return tuple(
+        format_calculator_display_value(value, digits)
+        for value in (-magnitude, magnitude)
+    )
+
+
+def diagnostic_effect_display_samples(metric, digits=CALC_NUM_DIGITS):
+    """Return valid display-domain samples for diagnostic effect fields."""
+    precision = "0." + ("0" * digits)
+    if metric in {"Sens", "Spec"}:
+        return (precision, "1." + ("0" * digits))
+    # Diagnostic ratios are positive and unbounded. Keep common values visible;
+    # larger entries remain reachable through native line-edit navigation.
+    return (precision, "9999." + ("9" * digits))
 
 
 def helper_set_current_effect(
@@ -320,11 +395,22 @@ def helper_set_current_effect(
     ):
         txt_box.blockSignals(True)
         if val is not None:
-            txt_box.setText("%s" % round(val, CALC_NUM_DIGITS))
+            txt_box.setText(format_calculator_display_value(val))
         else:
             txt_box.setText("")
         txt_box.blockSignals(False)
-    fit_effect_ci_line_edits_to_contents([effect_tbox, lower_tbox, upper_tbox])
+    fit_effect_ci_line_edits_to_contents(
+        [effect_tbox, lower_tbox, upper_tbox],
+        semantic_samples=(
+            binary_effect_display_samples(current_effect)
+            if data_type == "binary"
+            else (
+                continuous_effect_display_samples(current_effect)
+                if data_type == "continuous"
+                else diagnostic_effect_display_samples(current_effect)
+            )
+        ),
+    )
 
 
 def save_table_data(table):

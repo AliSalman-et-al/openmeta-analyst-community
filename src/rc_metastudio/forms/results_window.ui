@@ -6,14 +6,9 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>799</width>
-    <height>544</height>
+    <width>0</width>
+    <height>0</height>
    </rect>
-  </property>
-  <property name="font">
-   <font>
-    <family>Verdana</family>
-   </font>
   </property>
   <property name="windowTitle">
    <string>Results / Analysis</string>
@@ -22,17 +17,6 @@
    <layout class="QVBoxLayout" name="verticalLayout">
     <item>
      <widget class="QFrame" name="frame">
-       <property name="minimumSize">
-        <size>
-         <width>733</width>
-         <height>0</height>
-        </size>
-       </property>
-       <property name="font">
-        <font>
-         <family>Verdana</family>
-        </font>
-       </property>
        <property name="frameShape">
         <enum>QFrame::StyledPanel</enum>
        </property>
@@ -46,17 +30,6 @@
            <enum>Qt::Horizontal</enum>
           </property>
           <widget class="QTreeWidget" name="nav_tree">
-           <property name="maximumSize">
-            <size>
-             <width>16777215</width>
-             <height>16777215</height>
-            </size>
-           </property>
-           <property name="font">
-            <font>
-             <family>Verdana</family>
-            </font>
-           </property>
            <column>
             <property name="text">
              <string notr="true">1</string>

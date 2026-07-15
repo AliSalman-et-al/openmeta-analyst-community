@@ -88,6 +88,7 @@ def install_stub_meta_py_r():
     meta_py_r.ma_dataset_to_simple_binary_robj = _analysis_unavailable
     meta_py_r.ma_dataset_to_simple_continuous_robj = _analysis_unavailable
     meta_py_r.ma_dataset_to_simple_diagnostic_robj = _analysis_unavailable
+    meta_py_r.ma_dataset_to_simple_network = _analysis_unavailable
     meta_py_r.get_available_methods = _analysis_unavailable
     meta_py_r.get_params = _analysis_unavailable
     meta_py_r.get_method_description = _analysis_unavailable

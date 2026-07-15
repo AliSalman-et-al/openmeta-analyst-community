@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'src\rc_metastudio\forms\change_group_name_dlg.ui'
+# Form implementation generated from reading ui file 'src/rc_metastudio/forms/change_group_name_dlg.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -14,59 +14,35 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_group_name_dialog(object):
     def setupUi(self, group_name_dialog):
         group_name_dialog.setObjectName("group_name_dialog")
-        group_name_dialog.setEnabled(True)
-        group_name_dialog.resize(301, 100)
-        group_name_dialog.setMinimumSize(QtCore.QSize(301, 100))
-        group_name_dialog.setMaximumSize(QtCore.QSize(500, 100))
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        group_name_dialog.setFont(font)
-        icon = QtGui.QIcon()
-        icon.addPixmap(
-            QtGui.QPixmap(":/misc/meta.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
-        )
-        group_name_dialog.setWindowIcon(icon)
+        group_name_dialog.resize(0, 0)
         self.verticalLayout = QtWidgets.QVBoxLayout(group_name_dialog)
         self.verticalLayout.setObjectName("verticalLayout")
-        self.gridLayout = QtWidgets.QGridLayout()
-        self.gridLayout.setObjectName("gridLayout")
+        self.formLayout = QtWidgets.QFormLayout()
+        self.formLayout.setFieldGrowthPolicy(QtWidgets.QFormLayout.AllNonFixedFieldsGrow)
+        self.formLayout.setRowWrapPolicy(QtWidgets.QFormLayout.WrapAllRows)
+        self.formLayout.setObjectName("formLayout")
         self.field_lbl = QtWidgets.QLabel(group_name_dialog)
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        font.setPointSize(10)
-        self.field_lbl.setFont(font)
         self.field_lbl.setObjectName("field_lbl")
-        self.gridLayout.addWidget(self.field_lbl, 0, 0, 1, 1)
+        self.formLayout.setWidget(0, QtWidgets.QFormLayout.LabelRole, self.field_lbl)
         self.group_name_le = QtWidgets.QLineEdit(group_name_dialog)
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        self.group_name_le.setFont(font)
         self.group_name_le.setAlignment(QtCore.Qt.AlignCenter)
         self.group_name_le.setObjectName("group_name_le")
-        self.gridLayout.addWidget(self.group_name_le, 0, 1, 1, 1)
-        self.verticalLayout.addLayout(self.gridLayout)
+        self.formLayout.setWidget(0, QtWidgets.QFormLayout.FieldRole, self.group_name_le)
+        self.verticalLayout.addLayout(self.formLayout)
         self.buttonBox = QtWidgets.QDialogButtonBox(group_name_dialog)
-        font = QtGui.QFont()
-        font.setFamily("Verdana")
-        self.buttonBox.setFont(font)
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(
-            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
-        )
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
         self.buttonBox.setObjectName("buttonBox")
         self.verticalLayout.addWidget(self.buttonBox)
+        self.field_lbl.setBuddy(self.group_name_le)
 
         self.retranslateUi(group_name_dialog)
-        self.buttonBox.accepted.connect(group_name_dialog.accept)  # type: ignore
-        self.buttonBox.rejected.connect(group_name_dialog.reject)  # type: ignore
+        self.buttonBox.accepted.connect(group_name_dialog.accept) # type: ignore
+        self.buttonBox.rejected.connect(group_name_dialog.reject) # type: ignore
         QtCore.QMetaObject.connectSlotsByName(group_name_dialog)
 
     def retranslateUi(self, group_name_dialog):
         _translate = QtCore.QCoreApplication.translate
-        group_name_dialog.setWindowTitle(
-            _translate("group_name_dialog", "Edit Group Name")
-        )
+        group_name_dialog.setWindowTitle(_translate("group_name_dialog", "Edit Group Name"))
         self.field_lbl.setText(_translate("group_name_dialog", "Group name:"))
-
-
 import icons_rc

@@ -1,3 +1,5 @@
+import ast
+from io import StringIO
 from pathlib import Path
 import subprocess
 import sys
@@ -8,12 +10,15 @@ from PyQt5 import uic
 ROOT = Path(__file__).resolve().parents[1]
 
 UI_MODULES = {
+    "src/rc_metastudio/forms/about_legal.ui": "src/rc_metastudio/forms/ui_about_legal.py",
     "src/rc_metastudio/forms/binary_data_form2.ui": "src/rc_metastudio/forms/ui_binary_data_form.py",
     "src/rc_metastudio/forms/change_cov_type_form.ui": "src/rc_metastudio/forms/ui_change_cov_type.py",
+    "src/rc_metastudio/forms/conf_level_dialog.ui": "src/rc_metastudio/forms/ui_conf_level_dialog.py",
     "src/rc_metastudio/forms/change_group_name_dlg.ui": "src/rc_metastudio/forms/ui_edit_group_name.py",
     "src/rc_metastudio/forms/choose_back_calc_result_form.ui": "src/rc_metastudio/forms/ui_choose_back_calc_result_form.py",
     "src/rc_metastudio/forms/choose_metric_page.ui": "src/rc_metastudio/forms/ui_choose_metric_page.py",
     "src/rc_metastudio/forms/continuous_data_form.ui": "src/rc_metastudio/forms/ui_continuous_data_form.py",
+    "src/rc_metastudio/forms/continuous_back_calc_result_form.ui": "src/rc_metastudio/forms/ui_continuous_back_calc_result_form.py",
     "src/rc_metastudio/forms/cov_reg_dlg2.ui": "src/rc_metastudio/forms/ui_meta_reg.py",
     "src/rc_metastudio/forms/cov_subgroup_dlg.ui": "src/rc_metastudio/forms/ui_cov_subgroup_dlg.py",
     "src/rc_metastudio/forms/csv_import_page.ui": "src/rc_metastudio/forms/ui_csv_import_page.py",
@@ -38,8 +43,19 @@ UI_MODULES = {
 
 
 def compile_ui(source, target):
+    generated = StringIO()
+    uic.compileUi(str(source), generated)
+    source_label = source.relative_to(ROOT).as_posix()
+    rendered = generated.getvalue().replace(str(source), source_label, 1)
+    if target.exists():
+        existing = target.read_text(encoding="utf-8")
+        try:
+            if ast.dump(ast.parse(existing)) == ast.dump(ast.parse(rendered)):
+                return
+        except SyntaxError:
+            pass
     with target.open("w", encoding="utf-8", newline="\n") as output:
-        uic.compileUi(str(source), output)
+        output.write(rendered)
 
 
 def main():
