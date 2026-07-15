@@ -93,6 +93,75 @@ rcmetar.open.svg_device <- function(outpath, size) {
     invisible(NULL)
 }
 
+rcmetar.svg.style.has.property <- function(node, property) {
+    presentation <- xml2::xml_attr(node, property)
+    if (!is.na(presentation)) {
+        return(TRUE)
+    }
+    style <- xml2::xml_attr(node, "style")
+    !is.na(style) && grepl(
+        paste0("(^|;)[[:space:]]*", property, "[[:space:]]*:"),
+        style,
+        ignore.case=TRUE,
+        perl=TRUE
+    )
+}
+
+rcmetar.materialize.svg.property <- function(node, property, value) {
+    if (!rcmetar.svg.style.has.property(node, property)) {
+        xml2::xml_set_attr(node, property, value)
+    }
+    invisible(node)
+}
+
+rcmetar.normalize.svglite.svg <- function(svg.path) {
+    compressed <- grepl("[.]svgz$", tolower(svg.path))
+    input <- if (compressed) gzfile(svg.path, open="rt") else file(svg.path, open="rt")
+    svg <- paste(readLines(input, warn=FALSE), collapse="\n")
+    close(input)
+
+    document <- xml2::read_xml(svg, options="NOBLANKS")
+    shapes <- xml2::xml_find_all(
+        document,
+        "//*[local-name()='g' and contains(concat(' ', normalize-space(@class), ' '), ' svglite ')]//*[local-name()='line' or local-name()='polyline' or local-name()='polygon' or local-name()='path' or local-name()='rect' or local-name()='circle']"
+    )
+    glyph.paths <- xml2::xml_find_all(
+        document,
+        "//*[local-name()='g' and contains(concat(' ', normalize-space(@class), ' '), ' svglite ')]//*[local-name()='g' and contains(concat(' ', normalize-space(@class), ' '), ' glyphgroup ')]//*[local-name()='path']"
+    )
+    if (length(glyph.paths) > 0) {
+        shapes <- shapes[!(xml2::xml_path(shapes) %in% xml2::xml_path(glyph.paths))]
+    }
+    defaults <- c(
+        fill="none",
+        stroke="#000000",
+        `stroke-linecap`="round",
+        `stroke-linejoin`="round",
+        `stroke-miterlimit`="10.00"
+    )
+    for (node in shapes) {
+        for (property in names(defaults)) {
+            rcmetar.materialize.svg.property(node, property, defaults[[property]])
+        }
+    }
+
+    for (node in glyph.paths) {
+        if (!rcmetar.svg.style.has.property(node, "fill")) {
+            xml2::xml_set_attr(node, "fill", "inherit")
+        }
+        if (!rcmetar.svg.style.has.property(node, "stroke")) {
+            xml2::xml_set_attr(node, "stroke", "none")
+        }
+    }
+
+    normalized <- as.character(document)
+
+    output <- if (compressed) gzfile(svg.path, open="wt") else file(svg.path, open="wt")
+    writeLines(normalized, output, useBytes=TRUE)
+    close(output)
+    invisible(svg.path)
+}
+
 rcmetar.render.plot_svg <- function(svg.path, size, draw) {
     rcmetar.open.svg_device(svg.path, size)
     close.device <- TRUE
@@ -104,6 +173,7 @@ rcmetar.render.plot_svg <- function(svg.path, size, draw) {
     result <- draw()
     grDevices::dev.off()
     close.device <- FALSE
+    rcmetar.normalize.svglite.svg(svg.path)
     invisible(result)
 }
 

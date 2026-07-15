@@ -892,6 +892,16 @@
     {
       "decision": "keep",
       "evidence": ["gui_compatibility"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_qtsvg_renders_materialized_default_black_plot_stroke",
+      "reason": "Guards the real QtSvg pixel-rendering seam for svglite plot strokes materialized as SVG presentation attributes.",
+      "runtime_class": "seconds",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility"],
       "external_dependencies": ["qt", "filesystem"],
       "lane": "gui",
       "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_first_show_runs_one_scheduled_expensive_reflow",

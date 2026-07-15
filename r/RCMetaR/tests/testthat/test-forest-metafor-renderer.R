@@ -394,6 +394,31 @@ test_that("Forest Layout Preflight produces deterministic layout plans for Defau
   expect_equal(bmj.plan$footer$axis$axis.x, mean(bmj.plan$x$alim), tolerance = 1e-8)
 })
 
+test_that("RevMan SVG uses inline study CI strokes for QtSvg compatibility", {
+  fixture <- metafor_continuous_fixture(5)
+  fixture$params$fp_style <- "revman"
+  fixture$params$fp_show_raw_counts <- FALSE
+  fixture$params$fp_color <- "#000000"
+  res <- rma.uni(
+    yi = fixture$data@y,
+    sei = fixture$data@SE,
+    slab = fixture$data@study.names,
+    method = fixture$params$rm.method,
+    level = fixture$params$conf.level,
+    digits = fixture$params$digits
+  )
+  bundle <- rcmetar.regenerate.plot.data(fixture$data, res, fixture$params)
+  svg.path <- tempfile(fileext = ".svg")
+
+  rcmetar.draw.forest.plot(bundle, svg.path)
+
+  svg <- readLines(svg.path, warn = FALSE)
+  line.tags <- unlist(regmatches(svg, gregexpr("<(line|polyline)\\b[^>]*>", svg, perl = TRUE)))
+  study.intervals <- line.tags[grepl("stroke-width: 0[.]86", line.tags, fixed = FALSE)]
+  expect_gte(length(study.intervals), length(fixture$data@y))
+  expect_true(all(grepl("stroke=\"#000000\"", study.intervals, fixed = TRUE)))
+})
+
 test_that("journal ratio axes adapt to observed effects across Forest Plot Styles", {
   fixture <- metafor_binary_fixture()
   res <- rma.uni(

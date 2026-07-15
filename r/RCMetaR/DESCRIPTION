@@ -30,7 +30,8 @@ Imports:
     svglite,
     stats,
     tiff,
-    utils
+    utils,
+    xml2
 Suggests:
     coda,
     roxygen2,

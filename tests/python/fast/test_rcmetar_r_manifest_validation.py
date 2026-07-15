@@ -439,6 +439,7 @@ def test_RCMetaR_description_declares_only_direct_package_dependencies():
         "svglite",
         "tiff",
         "utils",
+        "xml2",
     }
     assert parse_packages(fields["Suggests"]) == {"coda", "roxygen2", "testthat"}
     assert "igraph" not in fields["Imports"]

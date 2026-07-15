@@ -2,7 +2,7 @@ import os
 import sys
 
 import pytest
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtCore, QtGui, QtSvg, QtWidgets
 
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -29,6 +29,22 @@ def _dispose(widget, qapp):
     widget.close()
     widget.deleteLater()
     qapp.processEvents()
+
+
+def test_qtsvg_renders_materialized_default_black_plot_stroke():
+    svg = b"""<svg xmlns='http://www.w3.org/2000/svg' width='100' height='40' viewBox='0 0 100 40'>
+    <g class='svglite'><line x1='10' y1='20' x2='90' y2='20' stroke='#000000' fill='none'
+    stroke-linecap='round' stroke-linejoin='round' stroke-miterlimit='10.00'/></g></svg>"""
+    renderer = QtSvg.QSvgRenderer(QtCore.QByteArray(svg))
+    assert renderer.isValid()
+
+    image = QtGui.QImage(100, 40, QtGui.QImage.Format_ARGB32)
+    image.fill(QtCore.Qt.white)
+    painter = QtGui.QPainter(image)
+    renderer.render(painter)
+    painter.end()
+
+    assert sum(image.pixelColor(x, 20) != QtGui.QColor(QtCore.Qt.white) for x in range(100)) >= 75
 
 
 def test_results_workspace_defaults_maximized_and_restores_screen_safe_state(
