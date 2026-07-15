@@ -43,6 +43,7 @@ jobs:
           gh attestation verify promotion/RCMetaStudio-windows-x64.zip --repo "${{ github.repository }}"
           gh attestation verify promotion/RCMetaStudio-macos-x64.zip --repo "${{ github.repository }}"
           source_sha="$(jq -r .source.commit "$manifest")"
+          git fetch origin "refs/tags/$RC_TAG:refs/tags/$RC_TAG"
           test "$(git rev-list -n 1 "$RC_TAG")" = "$source_sha"
           python scripts/delivery.py verify --manifest "$manifest"
           python scripts/delivery.py promote --manifest "$manifest" --from-channel rc --channel stable --version "$STABLE_VERSION" --output promotion/release-set-stable.json

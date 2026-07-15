@@ -111,6 +111,7 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     assert "sha256sum --check SHA256SUMS" in promote
     verification_step = promote[promote.index("Verify RC release set") : promote.index("Publish stable release")]
     assert "GH_TOKEN: ${{ github.token }}" in verification_step
+    assert 'git fetch origin "refs/tags/$RC_TAG:refs/tags/$RC_TAG"' in verification_step
     for publisher in (community, sign, promote):
         assert "git ls-remote --exit-code --tags origin" in publisher
         assert "tag_args=(--verify-tag)" in publisher
