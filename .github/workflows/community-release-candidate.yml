@@ -202,4 +202,4 @@ jobs:
           else
             tag_args=(--target "${{ inputs.source_sha }}")
           fi
-          gh release create "$TAG" release/RCMetaStudio-*.zip release/*.cdx.json release/SHA256SUMS release/release-set-rc.json "${tag_args[@]}" --prerelease --title "RC MetaStudio ${{ inputs.version }} - UNSIGNED COMMUNITY BUILD" --notes "UNSIGNED COMMUNITY BUILD: no Authenticode certificate, Apple Developer ID, or notarization is present. SmartScreen and Gatekeeper warnings are expected. Artifacts were built once, package-smoke tested, SBOM inventoried, checksummed, and provenance-attested."
+          gh release create "$TAG" release/RCMetaStudio-*.zip release/*.cdx.json release/SHA256SUMS release/release-set-rc.json "${tag_args[@]}" --prerelease --title "RC MetaStudio ${{ inputs.version }}" --notes "Artifacts were built once, package-smoke tested, SBOM inventoried, checksummed, and provenance-attested."
