@@ -5732,3 +5732,46 @@ def _dataset_summary(dataset):
             str(name) for name in dataset.outcome_names_to_follow_ups.keys()
         ),
     }
+
+
+def test_native_packaged_smoke_requires_expected_plugin_and_exposed_window(monkeypatch):
+    import launch
+
+    class Handle:
+        def isExposed(self):
+            return True
+
+    class Model:
+        def rowCount(self):
+            return 1
+
+    class Table:
+        def model(self):
+            return Model()
+
+    class App:
+        def platformName(self):
+            return "windows" if sys.platform == "win32" else "cocoa"
+
+        def processEvents(self):
+            pass
+
+    class Meta:
+        tableView = Table()
+
+        def windowHandle(self):
+            return Handle()
+
+        def open(self, _path):
+            return True
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(launch, "start_automation", lambda: (App(), Meta()))
+    monkeypatch.setattr(launch, "_force_table_paint", lambda _app, _meta: None)
+    monkeypatch.setattr(
+        launch, "_assert_standard_binary_summary_is_formatted", lambda _meta: None
+    )
+
+    assert launch.start_automation_smoke("sample.rcms", require_native_exposure=True) == 0

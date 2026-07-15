@@ -19,7 +19,7 @@ def _text(*parts):
     return ROOT.joinpath(*parts).read_text(encoding="utf-8")
 
 
-def test_packagers_run_fail_closed_native_adaptive_layout_evidence():
+def test_packagers_retain_opt_in_controlled_adaptive_layout_evidence():
     windows = _text("scripts", "build-windows-package.ps1")
     macos = _text("scripts", "build-macos-package.sh")
 
@@ -37,26 +37,32 @@ def test_packagers_run_fail_closed_native_adaptive_layout_evidence():
     ]
     assert "-WindowStyle Hidden" not in evidence_block
     assert "validate_adaptive_layout_evidence.py" in evidence_block
+    assert "[switch]$CaptureAdaptiveLayoutEvidence" in windows
+    assert "if ($CaptureAdaptiveLayoutEvidence)" in windows
+    assert windows.index("if (-not $SkipSmoke)") < windows.index(
+        "if ($CaptureAdaptiveLayoutEvidence)"
+    )
     assert 'for scale in "1.0" "1.5"' in macos
     assert "--automation-adaptive-layout-evidence" in macos
     assert "validate_adaptive_layout_evidence.py" in macos
+    assert "--capture-adaptive-layout-evidence" in macos
+    assert 'if [ "$capture_adaptive_layout_evidence" -eq 1 ]' in macos
     assert "QT_QPA_PLATFORM=" not in macos[
         macos.index("run_adaptive_layout_evidence()") :
         macos.index("if [ \"$skip_smoke\" -eq 0 ]")
     ]
 
 
-def test_package_workflow_publishes_supported_platform_evidence():
+def test_hosted_package_workflow_does_not_require_native_layout_evidence():
     workflow = _text(".github", "workflows", "package-verification.yml")
     target = _text(".github", "workflows", "package-target.yml")
 
-    assert "Upload adaptive-layout evidence" in target
     assert "artifact_name: RCMetaStudio-windows-x64" in workflow
     assert "artifact_name: RCMetaStudio-macos-x64" in workflow
-    assert "${{ inputs.artifact_name }}-adaptive-layout-evidence" in target
-    assert "build/windows-package/adaptive-layout-evidence/windows-x64" in workflow
-    assert "build/macos-package/x64/adaptive-layout-evidence/macos-x64" in workflow
-    assert target.count("if-no-files-found: error") >= 2
+    assert "Upload adaptive-layout evidence" not in target
+    assert "evidence_path" not in target
+    assert "adaptive-layout-evidence" not in workflow
+    assert target.count("if-no-files-found: error") >= 1
 
 
 def test_native_evidence_runner_covers_the_release_review_contract():

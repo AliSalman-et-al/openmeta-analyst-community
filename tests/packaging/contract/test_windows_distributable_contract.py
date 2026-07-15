@@ -557,7 +557,7 @@ def test_windows_packager_restores_smoke_environment():
     assert relative_order(
         script,
         "$previousEnv = @{",
-        'Start-Process -FilePath $exePath -ArgumentList @("--automation-smoke", $samplePath)',
+        'Start-Process -FilePath $exePath -ArgumentList @("--automation-native-smoke", $samplePath)',
         "foreach ($name in $previousEnv.Keys)",
     )
 

@@ -15,9 +15,6 @@ on:
       archive_platform:
         required: true
         type: string
-      evidence_path:
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -68,14 +65,6 @@ jobs:
         shell: bash
         run: bash scripts/package-macos.sh --architecture x64 --artifact-name "${{ inputs.artifact_name }}" --archive-root-name "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ inputs.archive_platform }}" --r-runtime-root "${{ steps.package-metadata.outputs.r-runtime-root }}"
 
-      - name: Upload adaptive-layout evidence
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: ${{ inputs.artifact_name }}-adaptive-layout-evidence
-          path: ${{ inputs.evidence_path }}
-          if-no-files-found: error
-          retention-days: 30
-
       - name: Upload package artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -94,7 +83,6 @@ jobs:
             build/windows-package/work/RCMetaStudio/warn-RCMetaStudio.txt
             build/windows-package/work/RCMetaStudio/xref-RCMetaStudio.html
             build/windows-package/dist/RCMetaStudio/automation-wizard-layout-smoke.log
-            ${{ inputs.evidence_path }}
           if-no-files-found: ignore
           retention-days: 14
           compression-level: 0
@@ -107,7 +95,6 @@ jobs:
           path: |
             build/macos-package/x64/work/RCMetaStudio/warn-RCMetaStudio.txt
             build/macos-package/x64/work/RCMetaStudio/xref-RCMetaStudio.html
-            ${{ inputs.evidence_path }}
           if-no-files-found: ignore
           retention-days: 14
           compression-level: 0

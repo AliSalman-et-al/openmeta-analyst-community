@@ -6,7 +6,8 @@ param(
     [switch]$RecreateVenv,
     [switch]$SkipClean,
     [switch]$SkipSmoke,
-    [switch]$SkipVerification
+    [switch]$SkipVerification,
+    [switch]$CaptureAdaptiveLayoutEvidence
 )
 
 $ErrorActionPreference = "Stop"
@@ -73,6 +74,7 @@ try {
     }
     if ($SkipClean) { $buildArgs.SkipClean = $true }
     if ($SkipSmoke) { $buildArgs.SkipSmoke = $true }
+    if ($CaptureAdaptiveLayoutEvidence) { $buildArgs.CaptureAdaptiveLayoutEvidence = $true }
     & (Join-Path $repoRoot "scripts\build-windows-package.ps1") @buildArgs
     if ($LASTEXITCODE -ne 0) { throw "Windows package build failed." }
 

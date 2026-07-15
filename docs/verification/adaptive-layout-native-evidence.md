@@ -1,69 +1,48 @@
-# Adaptive-Layout Native Package Evidence
+# Controlled Adaptive-Layout Native Evidence
 
-Issue [#306](https://github.com/AliSalman-et-al/rc-metastudio/issues/306) is the
-supported-platform release gate for the adaptive-layout rewrite in PRD
-[#293](https://github.com/AliSalman-et-al/rc-metastudio/issues/293). Offscreen Qt
-tests remain required, but they are not native rendering evidence.
+Native screenshots are controlled release-qualification evidence, not a
+GitHub-hosted build gate. GitHub-hosted runners do not contract display
+geometry, DPI, scaling, fonts, or window-manager state, so package construction
+must never fail because an exact viewport does not fit their transient desktop.
 
-## Evidence contract
+Deterministic layout policy, reflow, reachability, restoration, clamping,
+splitter, paint-role, and validator tests remain required in CI. Hosted Windows
+and macOS packages also run a narrow native smoke that proves the expected Qt
+plugin loaded, the main window became exposed, the bundled sample/R stack
+initialized, and the process exited cleanly. That smoke makes no exact geometry
+or screenshot claim.
 
-Run the **Package Verification** workflow with both `build_windows` and
-`build_macos` selected. Each supported package must complete its packaged smoke
-checks and its fail-closed native evidence mode. The evidence mode rejects
-offscreen/minimal Qt plugins. At process scale factors 1.0 and 1.5 it requires
-both Workspace surfaces at exact 800 by 600 constrained viewports and attempts
-the exact 1024 by 640 full-usability client viewports. Content-driven Workflow, Transactional, and
-Transient surfaces are captured once at their preferred size while owned by the
-constrained 800 by 600 Workspace; they are never stretched to Workspace sizes.
+## Controlled capture
 
-At scale 1.5 only, a full-usability native-frame scenario may be recorded as
-`capability-unavailable` when runtime-measured frame margins prove that the
-requested client plus native chrome exceeds `QScreen.availableGeometry()`.
-The validator recomputes that proof and rejects feasible omissions, constrained
-scenario omissions, other scenario types, and capability records at scale 1.0.
-This status is not a pass for the omitted scenario; strict full-usability native
-evidence still requires a controlled display with sufficient geometry.
+Run against the final package ZIP on a preflighted interactive machine:
 
-The workflow publishes these 30-day artifacts:
+```powershell
+.\scripts\capture-adaptive-layout-evidence-windows.ps1 `
+  -Package .\artifacts\RCMetaStudio-windows-x64.zip
+```
 
-- `RCMetaStudio-windows-x64-adaptive-layout-evidence`
-- `RCMetaStudio-macos-x64-adaptive-layout-evidence`
+```bash
+bash scripts/capture-adaptive-layout-evidence-macos.sh \
+  artifacts/RCMetaStudio-macos-x64.zip
+```
 
-Each successful scale directory contains exactly `manifest.json`,
-`HUMAN_REVIEW.md`, the intrinsic-ratio PNG, and one screenshot per available
-scenario. A
-failure may also leave an automation log. The package wrapper independently
-validates exact scenario/file membership, PNG readability and nonblank content,
-pixel dimensions, frame-geometry/DPR consistency, exact viewport and owner
-relationships, archetypes, available-screen containment, and every SHA-256
-digest. Each screenshot is a deterministic owning-screen crop of the complete
-native `frameGeometry`, including the platform titlebar and frame; a separate
-client paint probe proves that the application content was painted before the
-frame capture. The
-manifest records the
-Qt platform plugin, system font, logical DPI, device-pixel ratio, owning screen,
-window frame/client geometry, table and splitter state, remembered geometry,
-runtime resize behavior, an Intrinsic-Ratio Artifact ratio check, screenshot
-hashes, capture method, and any proven capability-unavailable scenarios.
+The commands first run the native smoke, then capture exact 800 by 600 and 1024
+by 640 scenarios at scale factors 1.0 and 1.5, validate the manifests and PNGs,
+and write `PACKAGE_SHA256`. Evidence qualifies only that digest.
+
+Before capture, record OS build, architecture, unlocked interactive session,
+screen count, available geometry, native scale, logical DPI/DPR, and expected
+fonts. Do not use offscreen/minimal plugins. If the controlled display cannot
+fit a required scenario, the qualification is incomplete; `capability-
+unavailable` is diagnostic, not a pass.
 
 ## Human review
 
-Download both evidence artifacts and complete every `HUMAN_REVIEW.md` checklist.
-Review the screenshots visually; do not add a pixel-diff gate. Confirm:
+Complete each generated `HUMAN_REVIEW.md`. Check reflow, spacing, required
+content, reachable actions, undistorted plots/icons, native fonts/chrome, and
+cross-platform consistency. Do not add pixel-diff baselines.
 
-- professional reflow and appropriate spacing;
-- readable Required Content and reachable primary actions;
-- undistorted visual artifacts;
-- native fonts, icons, paint, and window chrome; and
-- consistent behavior across the two supported platforms and both scales.
-
-Any platform defect must be fixed and both package lanes rerun. Record the final
-workflow run URL, artifact names, reviewer, date, and verdict in PRD #293 and
-issue #306. A source commit or a Windows-only run is not sufficient to mark the
-native package evidence complete.
-
-## Current evidence status
-
-The current local Windows run is implementation evidence only. Until a committed
-revision is pushed and both native jobs finish, Windows x64 and macOS Intel x64
-release evidence remain **pending**, and human review remains **required**.
+For layout-system, Qt, supported-OS, font, or icon changes, attach controlled
+Windows and Intel Mac evidence to the release qualification record when those
+hosts are available. Otherwise record `not-run: controlled display unavailable`
+in release notes. Deterministic CI and native hosted smoke still must pass.

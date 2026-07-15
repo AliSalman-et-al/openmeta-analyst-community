@@ -95,6 +95,11 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     assert "contents: write" not in candidate
     assert "environment: ${{ matrix.environment }}" in sign
     assert "attestations: write" in sign
+    assert "--automation-native-smoke" in sign
+    assert "--automation-native-smoke" in (
+        ROOT / ".github/workflows/community-release-candidate.yml"
+    ).read_text(encoding="utf-8")
+    assert "automation-adaptive-layout-evidence" not in sign
     assert "--clobber" not in sign + promote + legacy
     assert "push:\n    tags:" not in legacy
     assert "refusing overwrite" in sign.lower() and "refusing overwrite" in promote.lower()
