@@ -237,6 +237,17 @@ def _show_at_exact_client_size(app, window, requested):
     window.showNormal()
     window.show()
     _flush(app)
+    # Workspace first-show placement can reapply a remembered/default maximized
+    # state after the initial normalization, particularly through Cocoa.  The
+    # evidence viewport owns geometry here, so normalize once more after those
+    # callbacks have run before requesting the exact client size.
+    window.setWindowState(
+        window.windowState()
+        & ~QtCore.Qt.WindowMaximized
+        & ~QtCore.Qt.WindowFullScreen
+    )
+    window.showNormal()
+    _flush(app)
     margins = window.windowHandle().frameMargins()
     required_width = requested.width() + margins.left() + margins.right()
     required_height = requested.height() + margins.top() + margins.bottom()

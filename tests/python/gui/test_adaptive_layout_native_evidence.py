@@ -71,9 +71,20 @@ def test_exact_client_size_clears_sticky_maximized_state(qapp):
     import adaptive_layout_evidence
 
     class StickyMaximizedWindow(adaptive_layout_evidence.QtWidgets.QMainWindow):
+        first_show = True
+
+        def show(self):
+            super().show()
+            if self.first_show:
+                self.first_show = False
+                self.setWindowState(
+                    self.windowState()
+                    | adaptive_layout_evidence.QtCore.Qt.WindowMaximized
+                )
+
         def showNormal(self):
-            # Cocoa can retain the maximized state after showNormal() while the
-            # native window transition is still being processed.
+            # Model a Cocoa first-show callback that reapplies remembered
+            # maximized placement while showNormal() is still being processed.
             self.show()
 
         def resize(self, *args):
