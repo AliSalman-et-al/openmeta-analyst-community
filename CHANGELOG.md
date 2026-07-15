@@ -4,6 +4,28 @@ All notable RC MetaStudio changes will be recorded in this file.
 
 RC MetaStudio starts a fresh maintained-product changelog. Historical release history for the Original OpenMeta[Analyst] Project is not reconstructed here; see [NOTICE.md](NOTICE.md) for provenance.
 
+## 0.1.2 - 2026-07-15 (Prerelease)
+
+### Added
+
+- Added adaptive, screen-bounded layouts across the main workspace, Results window, dataset editor, setup wizard, analysis configuration, data-entry, and supporting dialogs.
+- Added packaged native-layout evidence for Windows x64 and macOS Intel x64, including high-DPI and constrained-screen scenarios.
+- Added a self-contained semantic SVG icon system for application actions and statistical concepts.
+
+### Changed
+
+- Improved window placement, size persistence, splitter behavior, overflow handling, and high-DPI scaling across the application.
+- Improved keyboard access, focus handling, text visibility, and control sizing in data-entry and analysis workflows.
+- Improved Results-window plot fitting and made SVG plots render reliably in Qt across supported platforms.
+- Refined functional icon artwork and sizing while preserving existing app and splash branding.
+
+### Fixed
+
+- Fixed layout clipping, overlap, unreachable controls, and unstable resizing on smaller screens and enlarged display scales.
+- Fixed table copy and paste when no cells are selected.
+- Fixed empty-dataset handling in the dataset editor.
+- Fixed first-show sizing in the Method and Parameters dialog.
+
 ## 0.1.1 - 2026-07-11 (Prerelease)
 
 ### Added
