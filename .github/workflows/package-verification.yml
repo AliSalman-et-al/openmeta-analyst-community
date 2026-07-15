@@ -35,7 +35,6 @@ jobs:
       target_os: windows
       artifact_name: RCMetaStudio-windows-x64
       archive_platform: windows-x64
-      evidence_path: build/windows-package/adaptive-layout-evidence/windows-x64
 
   macos-package-intel:
     if: ${{ inputs.build_macos }}
@@ -45,7 +44,6 @@ jobs:
       target_os: macos
       artifact_name: RCMetaStudio-macos-x64
       archive_platform: macos-x64
-      evidence_path: build/macos-package/x64/adaptive-layout-evidence/macos-x64
 
   macos-package-arm64:
     if: ${{ inputs.build_macos_arm64 }}

@@ -138,7 +138,7 @@ def _startup_project_path(argv):
     index = 1
     while index < len(args):
         arg = args[index]
-        if arg == "--automation-smoke":
+        if arg in ("--automation-smoke", "--automation-native-smoke"):
             return None
         if arg.startswith("-"):
             index += 1
@@ -208,6 +208,13 @@ def start():
             else os.path.join("sample_projects", "amino.rcms")
         )
         return start_automation_smoke(sample_path)
+    if len(startup_argv) > 1 and startup_argv[1] == "--automation-native-smoke":
+        sample_path = (
+            startup_argv[2]
+            if len(startup_argv) > 2
+            else os.path.join("sample_projects", "amino.rcms")
+        )
+        return start_automation_smoke(sample_path, require_native_exposure=True)
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-wizard-layout-smoke":
         return _run_automation_smoke(start_wizard_layout_smoke)
     if (
@@ -302,9 +309,30 @@ def _set_application_icon(app):
     app.setWindowIcon(QIcon(APPLICATION_ICON_PATH))
 
 
-def start_automation_smoke(sample_path):
+def start_automation_smoke(sample_path, require_native_exposure=False):
     app, meta = start_automation()
     try:
+        if require_native_exposure:
+            platform_name = app.platformName().lower()
+            expected = "windows" if sys.platform == "win32" else "cocoa"
+            if platform_name != expected:
+                raise SystemExit(
+                    "Native smoke loaded Qt platform %s, expected %s."
+                    % (platform_name, expected)
+                )
+            deadline = time.monotonic() + 10.0
+            while time.monotonic() < deadline:
+                app.processEvents()
+                handle = meta.windowHandle()
+                if handle is not None and handle.isExposed():
+                    break
+                time.sleep(0.05)
+            else:
+                raise SystemExit(
+                    "Native smoke main window did not become exposed on Qt platform %s."
+                    % platform_name
+                )
+            print("Native smoke exposed the main window with Qt platform %s." % platform_name)
         sample_path = os.path.abspath(sample_path)
         if not meta.open(sample_path):
             raise SystemExit("Could not open smoke-test project: %s" % sample_path)

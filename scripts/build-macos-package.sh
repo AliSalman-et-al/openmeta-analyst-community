@@ -11,6 +11,7 @@ bundle_identifier="org.researchconsultancy.rc-metastudio"
 skip_dependency_install=0
 skip_clean=0
 skip_smoke=0
+capture_adaptive_layout_evidence=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -52,6 +53,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --skip-smoke)
       skip_smoke=1
+      shift
+      ;;
+    --capture-adaptive-layout-evidence)
+      capture_adaptive_layout_evidence=1
       shift
       ;;
     *)
@@ -431,12 +436,16 @@ run_adaptive_layout_evidence() {
 if [ "$skip_smoke" -eq 0 ]; then
   sample_path="$app_root/sample_projects/amino.rcms"
   step "Running packaged macOS smoke checks"
-  QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}" RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=ABI RCMS_R_HOME="$r_home" RCMS_R_LIBS="$r_lib" "$app_root/RCMetaStudio" --automation-smoke "$sample_path"
+  env -u QT_QPA_PLATFORM RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=ABI RCMS_R_HOME="$r_home" RCMS_R_LIBS="$r_lib" "$app_root/RCMetaStudio" --automation-native-smoke "$sample_path"
   QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}" RCMS_STARTUP_PROJECT_SMOKE=1 RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=ABI RCMS_R_HOME="$r_home" RCMS_R_LIBS="$r_lib" "$app_root/RCMetaStudio" "$sample_path"
-  if [ "$architecture" = "x64" ]; then
-    step "Capturing native macOS adaptive-layout evidence"
-    run_adaptive_layout_evidence
+fi
+if [ "$capture_adaptive_layout_evidence" -eq 1 ]; then
+  if [ "$architecture" != "x64" ]; then
+    echo "Controlled adaptive-layout evidence is supported only for macOS Intel." >&2
+    exit 2
   fi
+  step "Capturing controlled native macOS adaptive-layout evidence"
+  run_adaptive_layout_evidence
 fi
 
 (

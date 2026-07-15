@@ -38,6 +38,11 @@ SBOMs, checksums, and promotion. PowerShell and Bash are adapters only for
 assembly, Authenticode, Developer ID signing, notarization, native launch, and
 archive mechanics.
 
+Hosted builders and release qualifiers run deterministic verification and a
+geometry-independent native launch smoke. Exact adaptive-layout screenshots are
+captured only after assembly on controlled machines and are keyed to the final
+ZIP digest; they never determine whether artifact bytes can be constructed.
+
 ## Consequences
 
 - `candidate.yml` has no write or signing authority.

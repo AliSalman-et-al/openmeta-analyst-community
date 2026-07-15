@@ -7038,8 +7038,8 @@
       "evidence": ["gui_compatibility", "release_readiness"],
       "external_dependencies": ["filesystem"],
       "lane": "packaging_contract",
-      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_packagers_run_fail_closed_native_adaptive_layout_evidence",
-      "reason": "Guards fail-closed native adaptive-layout evidence in both supported package builders.",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_packagers_retain_opt_in_controlled_adaptive_layout_evidence",
+      "reason": "Guards the opt-in controlled native evidence harness without coupling it to package construction.",
       "runtime_class": "subsecond",
       "size": "small"
     },
@@ -7048,8 +7048,8 @@
       "evidence": ["gui_compatibility", "release_readiness"],
       "external_dependencies": ["filesystem"],
       "lane": "packaging_contract",
-      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_package_workflow_publishes_supported_platform_evidence",
-      "reason": "Guards durable Windows x64 and macOS Intel x64 screenshot evidence artifacts.",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_hosted_package_workflow_does_not_require_native_layout_evidence",
+      "reason": "Guards hosted package qualification against undocumented display-geometry dependencies.",
       "runtime_class": "subsecond",
       "size": "small"
     },
@@ -7270,6 +7270,16 @@
       "lane": "packaging_contract",
       "nodeid": "tests/packaging/contract/test_clean_slate_delivery_contract.py::test_clean_slate_delivery_state_machine_and_workflow_policy",
       "reason": "Guards build-once delivery stages, immutable promotion, supported target parity, and least-privilege workflow policy.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_native_packaged_smoke_requires_expected_plugin_and_exposed_window",
+      "reason": "Guards the hosted native smoke contract without asserting undocumented display geometry or pixels.",
       "runtime_class": "subsecond",
       "size": "small"
     }

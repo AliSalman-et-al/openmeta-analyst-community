@@ -6,7 +6,8 @@ param(
     [string]$RPackageCacheRoot,
     [switch]$SkipDependencyInstall,
     [switch]$SkipClean,
-    [switch]$SkipSmoke
+    [switch]$SkipSmoke,
+    [switch]$CaptureAdaptiveLayoutEvidence
 )
 
 $ErrorActionPreference = "Stop"
@@ -106,7 +107,7 @@ function Invoke-PackagedAppSmokeTest {
     try {
         $env:RCMS_REQUIRE_IN_PROCESS_RPY2 = "1"
         $env:RPY2_CFFI_MODE = "ABI"
-        $process = Start-Process -FilePath $exePath -ArgumentList @("--automation-smoke", $samplePath) -Wait -PassThru -WindowStyle Hidden
+        $process = Start-Process -FilePath $exePath -ArgumentList @("--automation-native-smoke", $samplePath) -Wait -PassThru -WindowStyle Hidden
         if ($process.ExitCode -ne 0) { throw "Packaged app smoke test failed while opening '$samplePath' with exit code $($process.ExitCode)." }
 
         $env:RCMS_STARTUP_PROJECT_SMOKE = "1"
@@ -521,9 +522,11 @@ Assert-AppLayout -Root $appDir
 if (-not $SkipSmoke) {
     Write-Step "Running packaged Windows smoke checks"
     Invoke-PackagedAppSmokeTest -Root $appDir
-    Write-Step "Capturing native Windows adaptive-layout evidence"
-    Invoke-PackagedAdaptiveLayoutEvidence -Root $appDir
     Invoke-PackagedWizardLayoutSmokeTest -Root $appDir
+}
+if ($CaptureAdaptiveLayoutEvidence) {
+    Write-Step "Capturing controlled native Windows adaptive-layout evidence"
+    Invoke-PackagedAdaptiveLayoutEvidence -Root $appDir
 }
 Compress-AppDirectory -SourceDirectory $appDir -ArchiveStagingRoot $archiveStagingRoot -ArchiveRootDirectory $archiveRootDir -DestinationPath $zipPath
 Assert-ZipLayout -Path $zipPath -ArchiveRootName $archiveRootName

@@ -138,9 +138,9 @@ jobs:
         run: |
           $exe = Get-ChildItem signed/final-tree -Recurse -Filter RCMetaStudio.exe | Select-Object -First 1
           if (-not $exe) { throw "Signed RCMetaStudio.exe is missing." }
-          $env:QT_QPA_PLATFORM = "offscreen"
           $env:RCMS_REQUIRE_IN_PROCESS_RPY2 = "1"
-          $process = Start-Process -FilePath $exe.FullName -ArgumentList @("--automation-smoke") -PassThru -Wait -WindowStyle Hidden
+          Remove-Item Env:\QT_QPA_PLATFORM -ErrorAction SilentlyContinue
+          $process = Start-Process -FilePath $exe.FullName -ArgumentList @("--automation-native-smoke") -PassThru -Wait -WindowStyle Hidden
           if ($process.ExitCode -ne 0) { throw "Signed packaged smoke failed with exit code $($process.ExitCode)." }
       - name: Launch exact notarized macOS bytes
         if: matrix.target == 'macos-x64'
@@ -149,7 +149,7 @@ jobs:
           set -euo pipefail
           executable="$(find signed/final-tree -path '*.app/Contents/MacOS/RCMetaStudio' -print -quit)"
           test -n "$executable"
-          QT_QPA_PLATFORM=offscreen RCMS_REQUIRE_IN_PROCESS_RPY2=1 "$executable" --automation-smoke
+          env -u QT_QPA_PLATFORM RCMS_REQUIRE_IN_PROCESS_RPY2=1 "$executable" --automation-native-smoke
       - name: Produce immutable signing stage chain
         shell: pwsh
         env:

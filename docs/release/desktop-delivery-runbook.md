@@ -50,6 +50,12 @@ the workflows.
 7. Review the immutable prerelease, `SHA256SUMS`, both SBOMs, and
    `release-set-rc.json`. Never rerun into the same RC tag; increment `rc.N`.
 
+For layout-system, Qt, supported-OS, font, or icon changes, run the controlled
+adaptive-layout commands in `docs/verification/adaptive-layout-native-evidence.md`
+against the final RC ZIPs. Record the package digest and human verdict. If a
+controlled platform is unavailable, record that evidence as not run; do not
+substitute hosted-runner screenshots.
+
 ## Stable promotion
 
 1. Complete human native-layout review and release acceptance against the RC.
