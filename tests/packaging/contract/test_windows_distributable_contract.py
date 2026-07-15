@@ -557,6 +557,8 @@ def test_macos_packager_relocates_every_bundled_r_macho_before_use():
 
     assert "find \"$r_home\" -type f -print0" in script
     assert "file \"$binary\" | grep -q 'Mach-O'" in script
+    assert "otool -D \"$binary\"" in script
+    assert 'install_name_tool -id "@rpath/$source_relative" "$binary"' in script
     assert "otool -L \"$binary\"" in script
     assert 'install_name_tool -change "$dependency" "@loader_path/$relative_target"' in script
     assert "Bundled R runtime retains an absolute source-framework dependency" in script
