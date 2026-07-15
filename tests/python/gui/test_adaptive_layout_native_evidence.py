@@ -67,6 +67,35 @@ def test_exact_client_size_repositions_the_outer_frame_inside_the_screen(qapp):
         qapp.processEvents()
 
 
+def test_exact_client_size_clears_sticky_maximized_state(qapp):
+    import adaptive_layout_evidence
+
+    class StickyMaximizedWindow(adaptive_layout_evidence.QtWidgets.QMainWindow):
+        def showNormal(self):
+            # Cocoa can retain the maximized state after showNormal() while the
+            # native window transition is still being processed.
+            self.show()
+
+        def resize(self, *args):
+            if not self.isMaximized():
+                super().resize(*args)
+
+    window = StickyMaximizedWindow()
+    window.setWindowState(
+        window.windowState() | adaptive_layout_evidence.QtCore.Qt.WindowMaximized
+    )
+
+    try:
+        requested = adaptive_layout_evidence.QtCore.QSize(640, 480)
+        adaptive_layout_evidence._show_at_exact_client_size(qapp, window, requested)
+
+        assert not window.isMaximized()
+        assert window.size() == requested
+    finally:
+        window.close()
+        qapp.processEvents()
+
+
 def test_native_frame_capture_retries_until_compositor_pixels_are_visible(
     qapp, monkeypatch
 ):
