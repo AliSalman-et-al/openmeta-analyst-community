@@ -292,8 +292,43 @@ fi
 
 relocate_bundled_r_runtime() {
   local binary dylib_id dependency source_relative target loader_dir relative_target
+  local macho_manifest="$work_root/bundled-r-mach-o-files.list"
+
+  # Spawning `file` for every file in a complete R installation is extremely
+  # expensive on GitHub's macOS runners. Scan the tree once in one process,
+  # using the Mach-O and universal-binary magic numbers, then reuse the
+  # resulting NUL-delimited manifest for both mutation and verification.
+  "$python_exe" - "$r_home" > "$macho_manifest" <<'PY'
+import os
+from pathlib import Path
+import stat
+import sys
+
+MACH_O_MAGICS = {
+    b"\xfe\xed\xfa\xce",  # MH_MAGIC
+    b"\xce\xfa\xed\xfe",  # MH_CIGAM
+    b"\xfe\xed\xfa\xcf",  # MH_MAGIC_64
+    b"\xcf\xfa\xed\xfe",  # MH_CIGAM_64
+    b"\xca\xfe\xba\xbe",  # FAT_MAGIC
+    b"\xbe\xba\xfe\xca",  # FAT_CIGAM
+    b"\xca\xfe\xba\xbf",  # FAT_MAGIC_64
+    b"\xbf\xba\xfe\xca",  # FAT_CIGAM_64
+}
+
+root = Path(sys.argv[1])
+for directory, _, filenames in os.walk(root):
+    for filename in filenames:
+        path = Path(directory, filename)
+        if not stat.S_ISREG(path.lstat().st_mode):
+            continue
+        with path.open("rb") as handle:
+            if handle.read(4) in MACH_O_MAGICS:
+                sys.stdout.buffer.write(os.fsencode(path) + b"\0")
+PY
+
+  local macho_count=0
   while IFS= read -r -d '' binary; do
-    file "$binary" | grep -q 'Mach-O' || continue
+    macho_count=$((macho_count + 1))
     dylib_id="$(otool -D "$binary" 2>/dev/null | awk 'NR > 1 && $1 ~ /^\// { print $1; exit }' || true)"
     case "$dylib_id" in
       "$r_runtime_root"/*)
@@ -331,18 +366,18 @@ PY
 )"
       install_name_tool -change "$dependency" "@loader_path/$relative_target" "$binary"
     done < <(otool -L "$binary" | awk 'NR > 1 { print $1 }')
-  done < <(find "$r_home" -type f -print0)
+  done < "$macho_manifest"
 
   local dependency_report
-  dependency_report="$(find "$r_home" -type f -print0 | while IFS= read -r -d '' binary; do
-    file "$binary" | grep -q 'Mach-O' || continue
+  dependency_report="$(while IFS= read -r -d '' binary; do
     otool -L "$binary"
-  done)"
+  done < "$macho_manifest")"
   if printf '%s\n' "$dependency_report" | grep -F "$r_runtime_root/" \
     || printf '%s\n' "$dependency_report" | grep -E '/Library/Frameworks/R\.framework/.*/Resources|R\.framework/Resources'; then
     echo "Bundled R runtime retains an absolute source-framework dependency." >&2
     exit 1
   fi
+  echo "Relocated and verified $macho_count bundled R Mach-O files."
 }
 
 configure_relocatable_r_launchers() {

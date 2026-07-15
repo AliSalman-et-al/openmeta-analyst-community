@@ -120,3 +120,5 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     assert 'tag_args=(--target "${{ inputs.source_sha }}")' in sign
     assert 'tag_args=(--target "$source_sha")' in promote
     assert "git push origin" not in community + sign + promote
+    assert "UNSIGNED COMMUNITY BUILD" not in community + promote
+    assert "SmartScreen and Gatekeeper warnings" not in community + promote

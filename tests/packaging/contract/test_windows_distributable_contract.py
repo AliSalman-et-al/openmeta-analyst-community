@@ -556,8 +556,12 @@ def test_macos_packager_copies_resolved_r_runtime_contents():
 def test_macos_packager_relocates_every_bundled_r_macho_before_use():
     script = sh_contract("scripts", "build-macos-package.sh")["text"]
 
-    assert "find \"$r_home\" -type f -print0" in script
-    assert "file \"$binary\" | grep -q 'Mach-O'" in script
+    assert 'local macho_manifest="$work_root/bundled-r-mach-o-files.list"' in script
+    assert "MACH_O_MAGICS = {" in script
+    assert 'sys.stdout.buffer.write(os.fsencode(path) + b"\\0")' in script
+    assert 'done < "$macho_manifest"' in script
+    assert 'find "$r_home" -type f -print0' not in script
+    assert "file \"$binary\" | grep -q 'Mach-O'" not in script
     assert "otool -D \"$binary\"" in script
     assert 'install_name_tool -id "@rpath/$source_relative" "$binary"' in script
     assert "otool -L \"$binary\"" in script
