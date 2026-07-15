@@ -7417,6 +7417,136 @@
       "reason": "Guards independently retained Golden Analysis Test outputs and rendered interface PNG evidence.",
       "runtime_class": "subsecond",
       "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_build_slice.py::test_qt6_runtime_and_verification_tools_are_exactly_locked",
+      "reason": "Guards the exact Python, PyQt6, Qt6, SIP, PyInstaller, ty, and Qt archive-tool lock.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem", "network", "qt"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_build_slice.py::test_matching_official_rcc_identity_is_accepted",
+      "reason": "Proves the hash-pinned official Qt 6.11.1 Windows x64 rcc identity is accepted.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem", "network", "qt"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_build_slice.py::test_rcc_digest_and_configured_tool_identity_fail_closed",
+      "reason": "Guards cached and configured rcc paths against unpinned compiler content.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem", "network", "qt"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_build_slice.py::test_rcc_wrong_architecture_is_rejected_even_with_matching_digest",
+      "reason": "Guards the official resource compiler boundary against non-x64 PE tools.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["network", "qt"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_build_slice.py::test_rcc_wrong_version_is_rejected",
+      "reason": "Guards exact Qt 6.11.1 resource compiler version matching.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_build_slice.py::test_official_archive_rejects_oversized_content_length_before_writing",
+      "reason": "Guards the official Qt archive boundary against oversized declared payloads without network access.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_build_slice.py::test_official_archive_stops_streaming_at_the_pinned_byte_ceiling",
+      "reason": "Guards bounded official Qt archive streaming without network access.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_build_slice.py::test_official_archive_rejects_short_download_before_digest",
+      "reason": "Guards exact official Qt archive byte count before digest validation without network access.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem", "network", "qt", "subprocess"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_build_slice.py::test_canonical_form_generation_is_deterministic_and_importable",
+      "reason": "Guards isolated deterministic pyuic6 and binary resource generation.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem", "network", "qt", "subprocess"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_build_slice.py::test_binary_resource_registers_and_exposes_icon_and_svg",
+      "reason": "Guards official binary QResource registration and canonical PNG and SVG paths.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["network", "qt", "subprocess"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_build_slice.py::test_minimal_qt6_window_reports_resources_and_exits_cleanly",
+      "reason": "Guards the fast offscreen Qt6 form, resource rendering, and shutdown behavior.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["network", "qt", "subprocess"],
+      "lane": "gui",
+      "nodeid": "tests/python/fast/test_qt6_build_slice.py::test_native_windows_smoke_uses_qwindows_and_a_visible_dialog",
+      "reason": "Guards a visible native qwindows launch with rendered PNG and SVG resources and clean exit.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_build_slice.py::test_qt6_generation_and_type_checks_have_a_maintained_entry_point",
+      "reason": "Guards hosted and local wiring for generation, ty, focused tests, and native smoke.",
+      "runtime_class": "subsecond",
+      "size": "small"
     }
 
   ]

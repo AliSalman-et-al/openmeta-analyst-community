@@ -11,8 +11,7 @@ maintainers = [
     { name = "Ali Salman", email = "alisalman.et.al@gmail.com" },
 ]
 dependencies = [
-    "PyQt5==5.15.11",
-    "PyQt5-Qt5==5.15.2",
+    "PyQt6==6.11.0",
     "pyinstaller==6.21.0",
     "pytest==9.1.1",
     "pytest-xdist==3.8.0",
@@ -67,4 +66,16 @@ markers = [
 dev = [
     "matplotlib>=3.11.0",
     "pillow>=12.3.0",
+    "py7zr==1.1.3",
+    "ty==0.0.18",
 ]
+
+[tool.ty.environment]
+python-version = "3.11"
+root = ["./src"]
+
+[tool.ty.src]
+exclude = ["build", "src/rc_metastudio/forms/ui_*.py"]
+
+[tool.ty.rules]
+all = "error"

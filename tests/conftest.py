@@ -22,7 +22,7 @@ _QAPPLICATION = None
 
 def _get_qapplication():
     global _QAPPLICATION
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
 
     app = QtWidgets.QApplication.instance()
     if app is None:
@@ -70,12 +70,14 @@ def _isolate_qsettings_for_qt_tests(request, tmp_path):
     if not _entry_requires_qt(entry):
         return
 
-    from PyQt5 import QtCore
+    from PyQt6 import QtCore
 
     QtCore.QSettings.setPath(
-        QtCore.QSettings.IniFormat, QtCore.QSettings.UserScope, str(tmp_path)
+        QtCore.QSettings.Format.IniFormat,
+        QtCore.QSettings.Scope.UserScope,
+        str(tmp_path),
     )
-    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.IniFormat)
+    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.Format.IniFormat)
 
 
 def pytest_collection_modifyitems(config, items):

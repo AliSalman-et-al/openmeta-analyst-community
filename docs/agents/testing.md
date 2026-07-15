@@ -1,6 +1,7 @@
 # Testing
 
-The maintained test workflow uses the uv-managed Python 3.11/PyQt5 environment in `pyproject.toml` and `uv.lock`, with pytest tests under `tests`.
+The maintained integration workflow uses the uv-managed Python 3.11/PyQt6
+environment in `pyproject.toml` and `uv.lock`.
 
 ## Python/Qt uv environment
 
@@ -10,21 +11,40 @@ Sync the locked verification environment from the repository root:
 uv sync --locked
 ```
 
-Warm local verification skips dependency sync by default. Run the Smoke Verification Lane for the fastest first check:
+During the dependency-first Native Qt6 Port interval, run the Qt6 vertical-slice
+lane:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-qt6.ps1 -Sync
+```
+
+It performs deterministic form and binary-resource generation, strict `ty`
+checking, focused offscreen tests, taxonomy-manifest validation, and a separate
+visible native `qwindows` smoke with `QT_QPA_PLATFORM` unset.
+
+The historical Smoke Verification Lane, Fast Verification Lane, GUI suite,
+Default R Evidence, and packaging-contract aggregate remain preserved but are
+temporarily unavailable after the Qt6 Hard Cutover because their source and
+tests still import PyQt5. They are not mandatory CI paths during this interval.
+They return to the maintained path after the dependency-ordered source/test
+port is integrated and the zero-legacy gate in Issue #340 is green. Do not
+restore PyQt5 or introduce a binding selector to run them in the interim.
+
+The former commands remain documented here as unavailable integration targets:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-smoke.ps1
-```
-
-Daily local verification uses the Fast Verification Lane:
-
-```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-fast.ps1
 ```
 
-Use `-Sync` when dependency inputs changed, or `-RecreateVenv` for a clean environment rebuild. The Fast Verification Lane runs `tests\python\fast`, `tests\analysis_regression\golden`, and `tests\packaging\contract` with a bounded pytest-xdist worker count by default. Use `-FastWorkers 1` when debugging a fast-lane failure without parallel workers. GitHub calls smoke and fast verification with `-Sync`.
+The first clean run downloads the immutable official Qt 6.11.1 Windows x64
+`qtbase` package used only for its matching `rcc` and `Qt6Core.dll`. The package,
+compiler, companion DLL, version, and PE architecture are pinned and validated
+before every use. The PyQt6 runtime remains supplied solely by the locked
+PyQt6 wheels.
 
-Run lane-specific tests when working in an area:
+These lane-specific commands become available again as their PyQt6 source and
+tests are integrated:
 
 ```powershell
 uv run pytest tests -m gui
@@ -54,9 +74,10 @@ bash ./scripts/package-macos.sh --architecture x64
 bash ./scripts/package-macos.sh --architecture arm64
 ```
 
-Windows remains the default active package target. Fast GitHub verification runs on pull requests and manual dispatch, not every feature-branch push. Pull requests always run a lightweight classifier and stable gate check; the Windows smoke/fast lanes run only when source, tests, dependency files, or validated manifests changed. Manual Package Qualification never publishes. Production delivery uses the build-once candidate, protected signing, RC, and exact-byte promotion workflows documented in `docs/release/desktop-delivery-runbook.md`; version tags never trigger package builds.
-
-The Apple Silicon package job is currently experimental under the single Qt runtime policy because `PyQt5-Qt5==5.15.2` is the newest PyPI Qt5 runtime wheel with Windows support, but its macOS wheel is Intel-only.
+The hosted pull-request path currently runs the Windows Qt6 vertical slice when
+source, tests, dependency files, or its verification inputs change. Broader
+source, R, and packaging gates return as the corresponding Qt6 tickets land.
+Native macOS Intel and Apple Silicon feasibility is delivered by Issue #329.
 
 ## GUI paint coverage
 
