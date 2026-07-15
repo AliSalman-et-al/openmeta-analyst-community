@@ -7278,8 +7278,8 @@
       "evidence": ["gui_compatibility", "release_readiness"],
       "external_dependencies": ["qt"],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_native_packaged_smoke_requires_expected_plugin_and_exposed_window",
-      "reason": "Guards the hosted native smoke contract without asserting undocumented display geometry or pixels.",
+      "nodeid": "tests/python/gui/test_metaform_automation_launch.py::test_native_packaged_smoke_requires_expected_plugin_and_visible_window",
+      "reason": "Guards the hosted native smoke contract without asserting compositor exposure, undocumented display geometry, or pixels.",
       "runtime_class": "subsecond",
       "size": "small"
     }

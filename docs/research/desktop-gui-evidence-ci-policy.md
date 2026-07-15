@@ -72,7 +72,7 @@ Qt:
 | Question | Required environment | Lane |
 | --- | --- | --- |
 | Is layout policy, reflow, reachability, sizing, or state restoration correct in Qt's logical model? | Offscreen/minimal Qt with controlled inputs | Deterministic CI |
-| Does the built executable contain its dependencies, start with the native platform plugin, expose a window, open a sample project, and exit cleanly? | Hosted native OS; no exact pixel/geometry claim | Hosted native smoke |
+| Does the built executable contain its dependencies, start with the native platform plugin, show a Qt-visible window, open a sample project, and exit cleanly? | Hosted native OS; no compositor-exposure, exact pixel, or geometry claim | Hosted native smoke |
 | Does the complete native frame fit and render correctly at a particular physical display mode, DPI, scale, font set, and OS build? | Controlled, preflighted physical/interactive host | Controlled native evidence |
 | Is spacing, clipping, iconography, typography, and overall polish acceptable? | Human inspection of controlled evidence | Manual review |
 
@@ -123,7 +123,7 @@ For both Windows x64 and macOS Intel x64, run the already-built package without
 
 - the expected native plugin (`windows` or `cocoa`) loaded;
 - the process started and did not crash;
-- the primary window became exposed within a bounded timeout;
+- the primary window became Qt-visible after event processing;
 - the bundled sample project opened and the in-process R bridge initialized;
 - the automation mode exited cleanly.
 
