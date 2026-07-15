@@ -345,9 +345,6 @@ PY
   fi
 }
 
-step "Relocating bundled R runtime dependencies"
-relocate_bundled_r_runtime
-
 r_version_cache_key="$("$rscript" -e "cat(paste0('R-', getRversion()))")"
 sha256_file() {
   if command -v sha256sum >/dev/null 2>&1; then
@@ -436,6 +433,9 @@ if ! test_bundled_r_packages "$r_lib"; then
   echo "Bundled R package verification failed after local RCMetaR install." >&2
   exit 1
 fi
+
+step "Relocating completed bundled R runtime dependencies"
+relocate_bundled_r_runtime
 
 cat > "$app_root/LaunchRCMetaStudio.command" <<'SH'
 #!/usr/bin/env bash
