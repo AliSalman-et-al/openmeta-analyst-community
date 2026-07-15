@@ -58,7 +58,7 @@ jobs:
           profile="$(jq -r .trust_profile promotion/release-set-stable.json)"
           if [ "$profile" = unsigned-community ]; then
             title="RC MetaStudio ${{ inputs.stable_version }}"
-            notes=$'Signing status: Unsigned community build.\n\nPromoted from ${{ inputs.rc_tag }} without rebuilding or modifying deliverables.'
+            notes=$'**Signing status:** Unsigned community build.\n\nPromoted from ${{ inputs.rc_tag }} without rebuilding or modifying deliverables.'
           else
             title="RC MetaStudio ${{ inputs.stable_version }}"
             notes="Promoted from ${{ inputs.rc_tag }} without rebuilding or modifying deliverables."
