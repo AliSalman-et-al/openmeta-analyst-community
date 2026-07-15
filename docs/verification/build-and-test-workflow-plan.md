@@ -27,6 +27,7 @@ This plan turns the verification path optimization decisions into small, reviewa
 - R dependency installation now uses `RCMS_CRAN_REPO`, defaulting to `https://cloud.r-project.org`, instead of hard-coding the CRAN origin mirror.
 - Full R Stack Evidence now accepts an R dependency cache root and copies cached dependencies into a clean per-run verification library before building, checking, and installing rcmetar.
 - Windows and macOS packaging wrappers pass a shared R package cache root into Full R Stack Evidence and package assembly.
+- Windows x64 and macOS Intel x64 use one reusable GitHub Actions package workflow and one platform-neutral release verifier. Both targets run strict taxonomy, the same Python/package contract set, and Full R Stack Evidence; their adapters retain only native build, path, launch, and diagnostic mechanics.
 - Smoke/Fast Default R Evidence uses a separate `r-default-library-cache` cache root so the required fast workflow does not restore the larger bundled-R packaging cache.
 - GitHub R dependency caches use exact v2 cache keys without broad `restore-keys`; stale cache directories must not be merged into a new cache archive.
 - R package cache keys now include R version, installer script, dependency manifest, RCMetaR package metadata, and CRAN repository policy.
@@ -34,7 +35,10 @@ This plan turns the verification path optimization decisions into small, reviewa
 - GitHub smoke/fast verification calls strict R evidence and taxonomy flags explicitly.
 - GitHub smoke/fast verification runs on pull requests and manual dispatch rather than every feature-branch push.
 - GitHub pull requests always run a lightweight Fast Verification Gate classifier so required checks do not get stuck pending when Windows lanes are intentionally skipped.
-- GitHub package verification runs only by manual dispatch or release tags, so ordinary PR iteration does not build distributable artifacts unless explicitly requested.
+- Manual package qualification runs only by dispatch and never publishes.
+  Production releases build an immutable candidate from a full protected-master
+  SHA, sign and verify those bytes in protected native environments, then
+  promote the same digests from RC to stable without rebuilding.
 - GitHub R library cache keys include the R version resolved from the runner after `setup-r`, so a new R release cannot primary-hit an old outer cache while rebuilding a different inner dependency directory.
 - GitHub jobs use explicit timeouts to cap runaway runner usage.
 - Packaging contract tests now use structured parsers for workflows and scripts; the rewritten nodes live under the `packaging_contract` lane directory.

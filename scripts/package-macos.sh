@@ -115,8 +115,10 @@ step "Syncing locked verification environment with uv"
 uv sync --locked
 
 if [ "$skip_tests" -eq 0 ]; then
-  step "Running focused macOS packaging tests"
-  uv run pytest tests/python/fast/test_pyqt5_verification_path.py tests/python/fast/test_pyqt5_generated_ui_imports.py tests/python/fast/test_project_pickle_migration.py tests/python/fast/test_qt_text_boundaries.py
+  step "Running shared release-package verification"
+  "$python_exe" scripts/verify_package_release.py \
+    --rscript "$r_runtime_root/bin/Rscript" \
+    --r-library-cache-root "$r_package_cache_root"
 fi
 
 build_args=(

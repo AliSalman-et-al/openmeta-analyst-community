@@ -48,14 +48,15 @@ def test_packagers_run_fail_closed_native_adaptive_layout_evidence():
 
 def test_package_workflow_publishes_supported_platform_evidence():
     workflow = _text(".github", "workflows", "package-verification.yml")
+    target = _text(".github", "workflows", "package-target.yml")
 
-    assert "Upload Windows adaptive-layout evidence" in workflow
-    assert "Upload macOS Intel adaptive-layout evidence" in workflow
-    assert "RCMetaStudio-windows-x64-adaptive-layout-evidence" in workflow
-    assert "RCMetaStudio-macos-x64-adaptive-layout-evidence" in workflow
-    assert "build\\windows-package\\adaptive-layout-evidence\\windows-x64" in workflow
+    assert "Upload adaptive-layout evidence" in target
+    assert "artifact_name: RCMetaStudio-windows-x64" in workflow
+    assert "artifact_name: RCMetaStudio-macos-x64" in workflow
+    assert "${{ inputs.artifact_name }}-adaptive-layout-evidence" in target
+    assert "build/windows-package/adaptive-layout-evidence/windows-x64" in workflow
     assert "build/macos-package/x64/adaptive-layout-evidence/macos-x64" in workflow
-    assert workflow.count("if-no-files-found: error") >= 4
+    assert target.count("if-no-files-found: error") >= 2
 
 
 def test_native_evidence_runner_covers_the_release_review_contract():
@@ -175,11 +176,12 @@ def _write_validator_fixture(tmp_path, validator):
     artifact = tmp_path / "intrinsic-ratio-evidence.png"
     write_nonblank_png(artifact, [640, 360])
     manifest = {
-        "schema_version": 1,
+        "schema_version": 2,
         "platform_plugin": "windows",
         "scale_factor_environment": "1.0",
         "machine": platform.machine(),
         "surfaces": surfaces,
+        "unavailable_scenarios": [],
         "intrinsic_artifact": {
             "path": artifact.name,
             "sha256": hashlib.sha256(artifact.read_bytes()).hexdigest(),
@@ -205,6 +207,56 @@ def test_native_evidence_validator_is_exact_and_checks_png_integrity(tmp_path):
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     with pytest.raises(ValueError, match="SHA-256 mismatch"):
         validator.validate_evidence(tmp_path, "windows", "1.0")
+
+
+def test_validator_accepts_only_proven_unavailable_full_usability_at_150(tmp_path):
+    validator = _load_validator()
+    manifest = _write_validator_fixture(tmp_path, validator)
+    unavailable_names = {
+        "main-workspace-full-usability",
+        "results-workspace-full-usability",
+    }
+    unavailable = []
+    retained_surfaces = []
+    for surface in manifest["surfaces"]:
+        if surface["name"] not in unavailable_names:
+            retained_surfaces.append(surface)
+            continue
+        path = tmp_path / surface["screenshot"]
+        path.unlink()
+        unavailable.append(
+            {
+                "name": surface["name"],
+                "status": "capability-unavailable",
+                "reason": "required native frame exceeds available screen geometry",
+                "requested_client_size": [1024, 640],
+                "required_frame_size": [1040, 679],
+                "available_screen_geometry": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 1280,
+                    "height": 647,
+                },
+                "frame_margins": {"left": 8, "top": 31, "right": 8, "bottom": 8},
+            }
+        )
+    manifest["surfaces"] = retained_surfaces
+    manifest["unavailable_scenarios"] = unavailable
+    manifest["scale_factor_environment"] = "1.5"
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    validator.validate_evidence(tmp_path, "windows", "1.5")
+
+    manifest["scale_factor_environment"] = "1.0"
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="allowed only at scale 1.5"):
+        validator.validate_evidence(tmp_path, "windows", "1.0")
+
+    manifest["scale_factor_environment"] = "1.5"
+    manifest["unavailable_scenarios"][0]["available_screen_geometry"]["height"] = 900
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="even though its native frame fits"):
+        validator.validate_evidence(tmp_path, "windows", "1.5")
 
 
 @pytest.mark.parametrize(

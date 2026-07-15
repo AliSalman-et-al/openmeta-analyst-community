@@ -57,7 +57,11 @@ The script updates `pyproject.toml`, `uv.lock`, application version constants, `
 
 ## Packaging And Release
 
-The release workflow builds Windows x64 and macOS Intel x64 packages when a `v*` tag is pushed. Apple Silicon packaging remains experimental and opt-in through manual workflow dispatch.
+Desktop releases use the build-once candidate, protected signing, immutable RC,
+and exact-byte stable promotion process in
+[`docs/release/desktop-delivery-runbook.md`](../release/desktop-delivery-runbook.md).
+Version tags never trigger a rebuild. Apple Silicon packaging remains
+experimental and is available only through manual package qualification.
 
 Package locally only when packaging evidence is needed:
 

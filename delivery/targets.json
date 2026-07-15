@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "product": "RC MetaStudio",
+  "python_version": "3.11.9",
+  "r_version": "4.6.1",
+  "trust_profiles": {
+    "unsigned-community": {
+      "release_label": "UNSIGNED COMMUNITY BUILD",
+      "stages": ["assembled", "unsigned-qualified", "verified", "attested"]
+    },
+    "trusted-signed": {
+      "release_label": "SIGNED AND PLATFORM-TRUSTED BUILD",
+      "windows_stages": ["assembled", "signed", "verified", "attested"],
+      "macos_stages": ["assembled", "signed", "notarized", "verified", "attested"]
+    }
+  },
+  "targets": {
+    "windows-x64": {
+      "runner": "windows-latest",
+      "os": "windows",
+      "architecture": "x86_64",
+      "artifact": "RCMetaStudio-windows-x64.zip",
+      "signing_profile": "authenticode"
+    },
+    "macos-x64": {
+      "runner": "macos-15-intel",
+      "os": "macos",
+      "architecture": "x86_64",
+      "artifact": "RCMetaStudio-macos-x64.zip",
+      "signing_profile": "developer-id-notarized"
+    }
+  }
+}

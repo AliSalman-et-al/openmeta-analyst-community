@@ -10,11 +10,19 @@ tests remain required, but they are not native rendering evidence.
 Run the **Package Verification** workflow with both `build_windows` and
 `build_macos` selected. Each supported package must complete its packaged smoke
 checks and its fail-closed native evidence mode. The evidence mode rejects
-offscreen/minimal Qt plugins. At process scale factors 1.0 and 1.5 it captures
-both Workspace surfaces at exact 800 by 600 constrained and 1024 by 640
-full-usability client viewports. Content-driven Workflow, Transactional, and
+offscreen/minimal Qt plugins. At process scale factors 1.0 and 1.5 it requires
+both Workspace surfaces at exact 800 by 600 constrained viewports and attempts
+the exact 1024 by 640 full-usability client viewports. Content-driven Workflow, Transactional, and
 Transient surfaces are captured once at their preferred size while owned by the
 constrained 800 by 600 Workspace; they are never stretched to Workspace sizes.
+
+At scale 1.5 only, a full-usability native-frame scenario may be recorded as
+`capability-unavailable` when runtime-measured frame margins prove that the
+requested client plus native chrome exceeds `QScreen.availableGeometry()`.
+The validator recomputes that proof and rejects feasible omissions, constrained
+scenario omissions, other scenario types, and capability records at scale 1.0.
+This status is not a pass for the omitted scenario; strict full-usability native
+evidence still requires a controlled display with sufficient geometry.
 
 The workflow publishes these 30-day artifacts:
 
@@ -22,7 +30,8 @@ The workflow publishes these 30-day artifacts:
 - `RCMetaStudio-macos-x64-adaptive-layout-evidence`
 
 Each successful scale directory contains exactly `manifest.json`,
-`HUMAN_REVIEW.md`, the intrinsic-ratio PNG, and seven native screenshots. A
+`HUMAN_REVIEW.md`, the intrinsic-ratio PNG, and one screenshot per available
+scenario. A
 failure may also leave an automation log. The package wrapper independently
 validates exact scenario/file membership, PNG readability and nonblank content,
 pixel dimensions, frame-geometry/DPR consistency, exact viewport and owner
@@ -35,7 +44,7 @@ manifest records the
 Qt platform plugin, system font, logical DPI, device-pixel ratio, owning screen,
 window frame/client geometry, table and splitter state, remembered geometry,
 runtime resize behavior, an Intrinsic-Ratio Artifact ratio check, screenshot
-hashes, and capture method.
+hashes, capture method, and any proven capability-unavailable scenarios.
 
 ## Human review
 

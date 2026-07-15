@@ -1,0 +1,199 @@
+name: Publish Unsigned Community Release Candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_run_id:
+        description: Successful unsigned-community candidate workflow run ID.
+        required: true
+        type: string
+      version:
+        description: RC version, for example 0.1.2-rc.1.
+        required: true
+        type: string
+      source_sha:
+        description: Exact candidate source SHA.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  qualify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: windows-x64
+            runner: windows-latest
+            artifact: RCMetaStudio-windows-x64.zip
+          - target: macos-x64
+            runner: macos-15-intel
+            artifact: RCMetaStudio-macos-x64.zip
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ inputs.source_sha }}
+      - name: Download immutable candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.candidate_run_id }}
+          TARGET: ${{ matrix.target }}
+        shell: pwsh
+        run: gh run download "$env:RUN_ID" --name "candidate-$env:TARGET" --dir candidate
+      - run: uv python install 3.11.9
+      - name: Assert unsigned-community profile
+        shell: pwsh
+        run: |
+          $manifest = Get-ChildItem candidate -Recurse -Filter release-set.json | Select-Object -First 1
+          if (-not $manifest) { throw "Initial release set is missing." }
+          $profile = (Get-Content $manifest.FullName -Raw | ConvertFrom-Json).trust_profile
+          if ($profile -ne 'unsigned-community') { throw "Candidate trust profile is $profile, expected unsigned-community." }
+      - name: Expand unsigned Windows artifact
+        if: matrix.target == 'windows-x64'
+        shell: pwsh
+        run: Expand-Archive -LiteralPath candidate/artifacts/${{ matrix.artifact }} -DestinationPath qualified/tree
+      - name: Expand unsigned macOS artifact
+        if: matrix.target == 'macos-x64'
+        shell: bash
+        run: mkdir -p qualified/tree && ditto -x -k candidate/artifacts/${{ matrix.artifact }} qualified/tree
+      - name: Launch exact unsigned Windows bytes
+        if: matrix.target == 'windows-x64'
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem qualified/tree -Recurse -Filter RCMetaStudio.exe | Select-Object -First 1
+          if (-not $exe) { throw "RCMetaStudio.exe is missing." }
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $env:RCMS_REQUIRE_IN_PROCESS_RPY2 = "1"
+          $process = Start-Process -FilePath $exe.FullName -ArgumentList @("--automation-smoke") -PassThru -Wait -WindowStyle Hidden
+          if ($process.ExitCode -ne 0) { throw "Unsigned packaged smoke failed with exit code $($process.ExitCode)." }
+      - name: Launch exact unsigned macOS bytes
+        if: matrix.target == 'macos-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          executable="$(find qualified/tree -path '*.app/Contents/MacOS/RCMetaStudio' -print -quit)"
+          test -n "$executable"
+          QT_QPA_PLATFORM=offscreen RCMS_REQUIRE_IN_PROCESS_RPY2=1 "$executable" --automation-smoke
+      - name: Record unsigned qualification and final evidence
+        shell: pwsh
+        env:
+          TARGET: ${{ matrix.target }}
+          ARTIFACT: ${{ matrix.artifact }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          New-Item -ItemType Directory -Force qualified/records | Out-Null
+          Copy-Item "candidate/artifacts/$env:ARTIFACT" "qualified/$env:ARTIFACT"
+          $assembled = Get-ChildItem candidate -Recurse -Filter "$env:TARGET.assembled.json" | Select-Object -First 1
+          if (-not $assembled) { throw "Missing assembled stage result." }
+          Copy-Item $assembled.FullName "qualified/records/$env:TARGET.assembled.json"
+          uv run python scripts/delivery.py inventory --root qualified/tree --output "qualified/$env:TARGET.inventory.json"
+          uv run python scripts/delivery.py sbom --inventory "qualified/$env:TARGET.inventory.json" --version "$env:VERSION" --output "qualified/$env:TARGET.cdx.json"
+          $input = uv run python scripts/delivery.py digest --json $assembled.FullName
+          uv run python scripts/delivery.py stage-result --target "$env:TARGET" --stage unsigned-qualified --commit "$env:SOURCE_SHA" --input-digest "$input" --output-file "qualified/$env:ARTIFACT" --result "qualified/records/$env:TARGET.unsigned-qualified.json"
+          $input = uv run python scripts/delivery.py digest --json "qualified/records/$env:TARGET.unsigned-qualified.json"
+          uv run python scripts/delivery.py stage-result --target "$env:TARGET" --stage verified --commit "$env:SOURCE_SHA" --input-digest "$input" --output-file "qualified/$env:ARTIFACT" --output-file "qualified/$env:TARGET.inventory.json" --output-file "qualified/$env:TARGET.cdx.json" --result "qualified/records/$env:TARGET.verified.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: qualified-${{ matrix.target }}
+          path: qualified
+          compression-level: 0
+
+  attest:
+    needs: qualify
+    strategy:
+      matrix:
+        include:
+          - target: windows-x64
+            artifact: RCMetaStudio-windows-x64.zip
+          - target: macos-x64
+            artifact: RCMetaStudio-macos-x64.zip
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ inputs.source_sha }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: qualified-${{ matrix.target }}
+          path: bundle
+      - uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
+        with:
+          subject-path: bundle/${{ matrix.artifact }}
+      - uses: actions/attest-sbom@51e74621a501c89df81fc1391c5a8f4cfc9fab2f # v3
+        with:
+          subject-path: bundle/${{ matrix.artifact }}
+          sbom-path: bundle/${{ matrix.target }}.cdx.json
+      - name: Record attested stage
+        env:
+          TARGET: ${{ matrix.target }}
+          ARTIFACT: ${{ matrix.artifact }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          input="$(python scripts/delivery.py digest --json bundle/records/$TARGET.verified.json)"
+          python scripts/delivery.py stage-result --target "$TARGET" --stage attested --commit "$SOURCE_SHA" --input-digest "$input" --output-file "bundle/$ARTIFACT" --output-file "bundle/$TARGET.cdx.json" --result "bundle/records/$TARGET.attested.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: community-${{ matrix.target }}
+          path: bundle
+          compression-level: 0
+
+  publish-rc:
+    needs: attest
+    runs-on: ubuntu-latest
+    environment: release-candidate
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ inputs.source_sha }}
+      - name: Download initial manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.candidate_run_id }}
+        run: gh run download "$RUN_ID" --name release-set-initial --dir release
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: community-*
+          path: release/targets
+      - name: Assemble unsigned community release set
+        run: |
+          set -euo pipefail
+          manifest=release/release-set.json
+          test "$(jq -r .trust_profile "$manifest")" = unsigned-community
+          for target in windows-x64 macos-x64; do
+            root="release/targets/community-$target"
+            for stage in assembled unsigned-qualified verified attested; do
+              python scripts/delivery.py attach --manifest "$manifest" --result "$root/records/$target.$stage.json"
+            done
+          done
+          python scripts/delivery.py verify --manifest "$manifest"
+          python scripts/delivery.py promote --manifest "$manifest" --from-channel candidate --channel rc --output release/release-set-rc.json
+          for target in windows-x64 macos-x64; do
+            root="release/targets/community-$target"
+            cp "$root/RCMetaStudio-$target.zip" release/
+            cp "$root/$target.cdx.json" release/
+          done
+          python scripts/delivery.py checksums --files release/RCMetaStudio-windows-x64.zip --files release/RCMetaStudio-macos-x64.zip --files release/windows-x64.cdx.json --files release/macos-x64.cdx.json --output release/SHA256SUMS
+      - name: Publish clearly labeled immutable unsigned RC
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then echo "Release $TAG already exists; refusing overwrite." >&2; exit 1; fi
+          git tag -a "$TAG" "${{ inputs.source_sha }}" -m "RC MetaStudio ${{ inputs.version }} unsigned community build"
+          git push origin "$TAG"
+          gh release create "$TAG" release/RCMetaStudio-*.zip release/*.cdx.json release/SHA256SUMS release/release-set-rc.json --prerelease --verify-tag --title "RC MetaStudio ${{ inputs.version }} - UNSIGNED COMMUNITY BUILD" --notes "UNSIGNED COMMUNITY BUILD: no Authenticode certificate, Apple Developer ID, or notarization is present. SmartScreen and Gatekeeper warnings are expected. Artifacts were built once, package-smoke tested, SBOM inventoried, checksummed, and provenance-attested."

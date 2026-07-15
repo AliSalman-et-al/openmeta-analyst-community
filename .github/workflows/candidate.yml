@@ -1,0 +1,121 @@
+name: Build Immutable Candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Repository version to build.
+        required: true
+        type: string
+      source_sha:
+        description: Full protected-master commit SHA.
+        required: true
+        type: string
+      trust_profile:
+        description: Explicit artifact trust profile.
+        required: true
+        default: unsigned-community
+        type: choice
+        options:
+          - unsigned-community
+          - trusted-signed
+
+permissions:
+  contents: read
+
+concurrency:
+  group: candidate-${{ inputs.version }}-${{ inputs.source_sha }}
+  cancel-in-progress: false
+
+jobs:
+  initialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ inputs.source_sha }}
+      - name: Verify source is protected master
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          git fetch origin master --depth=1
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/master
+      - name: Initialize release set
+        run: python scripts/delivery.py init --version "${{ inputs.version }}" --commit "${{ inputs.source_sha }}" --repository "${{ github.repository }}" --trust-profile "${{ inputs.trust_profile }}" --output candidate/release-set.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-set-initial
+          path: candidate/release-set.json
+          if-no-files-found: error
+
+  build:
+    needs: initialize
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: windows-x64
+            runner: windows-latest
+            artifact: RCMetaStudio-windows-x64.zip
+          - target: macos-x64
+            runner: macos-15-intel
+            artifact: RCMetaStudio-macos-x64.zip
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ inputs.source_sha }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-set-initial
+          path: candidate
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+      - run: uv python install 3.11.9
+      - uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
+        with:
+          r-version: 4.6.1
+      - id: metadata
+        run: uv run python scripts/resolve_package_ci_metadata.py
+      - name: Build Windows unsigned candidate
+        if: matrix.target == 'windows-x64'
+        shell: powershell
+        run: .\scripts\package-windows.ps1 -ArtifactName RCMetaStudio-windows-x64 -ArchiveRootName "RCMetaStudio-${{ inputs.version }}-windows-x64" -RRuntimeRoot "${{ steps.metadata.outputs.r-runtime-root }}"
+      - name: Build macOS unsigned candidate
+        if: matrix.target == 'macos-x64'
+        shell: bash
+        run: bash scripts/package-macos.sh --architecture x64 --artifact-name RCMetaStudio-macos-x64 --archive-root-name "RCMetaStudio-${{ inputs.version }}-macos-x64" --r-runtime-root "${{ steps.metadata.outputs.r-runtime-root }}"
+      - name: Inventory and describe candidate
+        shell: pwsh
+        env:
+          TARGET: ${{ matrix.target }}
+          ARTIFACT: ${{ matrix.artifact }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          Expand-Archive -LiteralPath "artifacts/$env:ARTIFACT" -DestinationPath candidate/tree
+          uv run python scripts/delivery.py inventory --root candidate/tree --output "candidate/$env:TARGET.inventory.json"
+          uv run python scripts/delivery.py sbom --inventory "candidate/$env:TARGET.inventory.json" --version "$env:VERSION" --output "candidate/$env:TARGET.cdx.json"
+          $identity = uv run python scripts/delivery.py digest --json candidate/release-set.json --release-identity
+          uv run python scripts/delivery.py stage-result --target "$env:TARGET" --stage assembled --commit "$env:SOURCE_SHA" --input-digest "$identity" --output-file "artifacts/$env:ARTIFACT" --output-file "candidate/$env:TARGET.inventory.json" --output-file "candidate/$env:TARGET.cdx.json" --result "candidate/$env:TARGET.assembled.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: candidate-${{ matrix.target }}
+          path: |
+            artifacts/${{ matrix.artifact }}
+            candidate/release-set.json
+            candidate/${{ matrix.target }}.*.json
+          if-no-files-found: error
+          compression-level: 0
+
+  candidate-gate:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Unsigned candidates were built once and are ready for protected signing."

@@ -297,83 +297,56 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
 
 def test_package_workflow_builds_path_aware_artifacts():
     workflow = workflow_contract(".github", "workflows", "package-verification.yml")
+    target = workflow_contract(".github", "workflows", "package-target.yml")
 
     assert {
         "windows-package",
         "macos-package-intel",
         "macos-package-arm64",
-        "publish-release-assets",
     } <= workflow["jobs"]
-    assert workflow["env"]["RCMS_CRAN_REPO"] == "https://cloud.r-project.org"
-    assert workflow["events"] == {"workflow_dispatch", "push"}
+    assert target["env"]["RCMS_CRAN_REPO"] == "https://cloud.r-project.org"
+    assert workflow["events"] == {"workflow_dispatch"}
     assert workflow["legacy_uses"] == []
-    assert all(re.fullmatch(r"[0-9a-f]{40}", ref) for _, ref, _ in workflow["uses"])
-    assert workflow["paths"] == {"v*"}
-    assert any(
-        "RCMetaStudio-windows-x64.zip" in run for run in workflow["text"].splitlines()
+    pinned_uses = workflow["uses"] + target["uses"]
+    assert all(
+        ref.startswith("./") or re.fullmatch(r"[0-9a-f]{40}", ref)
+        for _, ref, _ in pinned_uses
     )
+    assert workflow["paths"] == set()
+    assert "artifacts/${{ inputs.artifact_name }}.zip" in target["text"]
     assert any("RCMetaStudio-macos-x64" in run for run in workflow["text"].splitlines())
     assert any(
         "RCMetaStudio-macos-arm64" in run for run in workflow["text"].splitlines()
     )
     assert (
-        "build\\windows-package\\dist\\RCMetaStudio\\automation-wizard-layout-smoke.log"
-        in workflow["text"]
+        "build/windows-package/dist/RCMetaStudio/automation-wizard-layout-smoke.log"
+        in target["text"]
     )
-    assert all("RCMS_CRAN_REPO_KEY" in key for key in workflow["cache_keys"])
+    assert all("RCMS_CRAN_REPO_KEY" in key for key in target["cache_keys"])
     assert workflow["restore_keys"] == []
+    assert all(key.startswith("bundled-r-library-v3-") for key in target["cache_keys"])
     assert all(
-        key.startswith("bundled-r-library-v2-") for key in workflow["cache_keys"]
+        "steps.package-metadata.outputs.r-version" in key for key in target["cache_keys"]
     )
-    assert all(
-        "steps.r-cache-key.outputs.version" in key for key in workflow["cache_keys"]
-    )
-    assert "-RRuntimeRoot" in workflow["text"]
-    assert "--r-runtime-root" in workflow["text"]
-    assert workflow["text"].count("Resolve RC MetaStudio version") == 3
-    assert "tomllib.loads" in workflow["text"]
+    assert "-RRuntimeRoot" in target["text"]
+    assert "--r-runtime-root" in target["text"]
+    assert "Resolve shared package metadata" in target["text"]
+    assert "scripts/resolve_package_ci_metadata.py" in target["text"]
     assert (
-        "-ArchiveRootName \"RCMetaStudio-${{ steps.package-version.outputs.version }}-windows-x64\""
-        in workflow["text"]
+        "-ArchiveRootName \"RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ inputs.archive_platform }}\""
+        in target["text"]
     )
     assert (
-        "--archive-root-name \"RCMetaStudio-${{ steps.package-version.outputs.version }}-macos-x64\""
-        in workflow["text"]
+        "--archive-root-name \"RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ inputs.archive_platform }}\""
+        in target["text"]
     )
-    assert (
-        '--archive-root-name "RCMetaStudio-${{ steps.package-version.outputs.version }}-macos-arm64"'
-        in workflow["text"]
-    )
-    assert (
-        "if: ${{ github.event_name == 'push' || inputs.build_windows }}"
-        in workflow["text"]
-    )
-    assert (
-        "if: ${{ github.event_name == 'push' || inputs.build_macos }}"
-        in workflow["text"]
-    )
-    assert (
-        "${{ github.event_name == 'push' || inputs.build_windows }}" in workflow["text"]
-    )
-    assert (
-        "${{ github.event_name == 'push' || inputs.build_macos }}" in workflow["text"]
-    )
-    assert (
-        "RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}"
-        in workflow["text"]
-    )
-    assert "publish_release:" in workflow["text"]
-    assert "release_tag:" in workflow["text"]
-    assert "Publish Release Assets" in workflow["text"]
-    assert (
-        "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093"
-        in workflow["text"]
-    )
-    assert (
-        'gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber' in workflow["text"]
-    )
-    assert "contents: write" in workflow["text"]
-    assert "timeout-minutes: 45" in workflow["text"]
+    assert "if: ${{ inputs.build_windows }}" in workflow["text"]
+    assert "if: ${{ inputs.build_macos }}" in workflow["text"]
+    assert "publish_release:" not in workflow["text"]
+    assert "release_tag:" not in workflow["text"]
+    assert "gh release" not in workflow["text"]
+    assert "contents: write" not in workflow["text"]
+    assert "timeout-minutes: 60" in target["text"]
     assert "timeout-minutes: 60" in workflow["text"]
 
 
@@ -517,7 +490,7 @@ def test_local_macos_package_script_uses_shared_build_script():
     assert relative_order(
         script["text"],
         "uv sync --locked",
-        "uv run pytest tests/python/fast/test_pyqt5_verification_path.py tests/python/fast/test_pyqt5_generated_ui_imports.py tests/python/fast/test_project_pickle_migration.py tests/python/fast/test_qt_text_boundaries.py",
+        '"$python_exe" scripts/verify_package_release.py',
         '--r-runtime-root "$r_runtime_root"',
         'build_args+=(--archive-root-name "$archive_root_name")',
         'bash "$repo_root/scripts/build-macos-package.sh"',

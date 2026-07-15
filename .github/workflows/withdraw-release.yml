@@ -1,0 +1,44 @@
+name: Withdraw Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Stable tag to withdraw without deleting evidence.
+        required: true
+        type: string
+      superseded_by:
+        description: Last-known-good or replacement tag.
+        required: true
+        type: string
+      reason:
+        description: Public withdrawal reason.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  withdraw:
+    runs-on: ubuntu-latest
+    environment: production-release
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - name: Preserve assets and mark release withdrawn
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          SUPERSEDED_BY: ${{ inputs.superseded_by }}
+          REASON: ${{ inputs.reason }}
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" >/dev/null
+          gh release view "$SUPERSEDED_BY" >/dev/null
+          existing="$(gh release view "$TAG" --json body --jq .body)"
+          notice="WITHDRAWN: $REASON Replacement/last-known-good: $SUPERSEDED_BY. Assets and evidence are retained for audit."
+          notes="$(printf '%s\n\n%s' "$notice" "$existing")"
+          gh release edit "$TAG" --prerelease --notes "$notes"
+          gh issue create --title "Release $TAG withdrawn" --body "$notice" --label bug

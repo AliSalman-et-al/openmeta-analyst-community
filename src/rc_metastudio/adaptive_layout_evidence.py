@@ -16,7 +16,7 @@ from pathlib import Path
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 
-EVIDENCE_SCHEMA_VERSION = 1
+EVIDENCE_SCHEMA_VERSION = 2
 CONSTRAINED_WORKSPACE = QtCore.QSize(800, 600)
 FULL_USABILITY_WORKSPACE = QtCore.QSize(1024, 640)
 NON_NATIVE_PLUGINS = {"offscreen", "minimal", "minimalegl", "vnc"}
@@ -126,21 +126,33 @@ def run_native_adaptive_layout_evidence(app, main_window, sample_path, output_di
     ]
 
     records = []
+    unavailable_scenarios = []
     try:
         for viewport_name, viewport in (
             ("constrained", CONSTRAINED_WORKSPACE),
             ("full-usability", FULL_USABILITY_WORKSPACE),
         ):
-            _show_at_exact_client_size(app, main_window, viewport)
-            _exercise_main_workspace(main_window)
             for surface_name, _archetype, window in surfaces[:2]:
-                if window is results:
-                    _show_at_exact_client_size(app, window, viewport)
+                scenario_name = "%s-%s" % (surface_name, viewport_name)
+                unavailable = _exact_client_size_unavailability(
+                    app, window, viewport, scenario_name
+                )
+                if unavailable is not None:
+                    if viewport != FULL_USABILITY_WORKSPACE:
+                        raise RuntimeError(
+                            "%s is required even on a constrained native screen."
+                            % scenario_name
+                        )
+                    unavailable_scenarios.append(unavailable)
+                    continue
+                _show_at_exact_client_size(app, window, viewport)
+                if window is main_window:
+                    _exercise_main_workspace(main_window)
                 record = _capture_surface(
                     app,
                     window,
                     screenshots,
-                    "%s-%s" % (surface_name, viewport_name),
+                    scenario_name,
                     "workspace",
                     viewport,
                 )
@@ -205,6 +217,7 @@ def run_native_adaptive_layout_evidence(app, main_window, sample_path, output_di
         "remembered_geometry": remembered_geometry,
         "runtime_resize": runtime_resize,
         "surfaces": records,
+        "unavailable_scenarios": unavailable_scenarios,
         "human_review": {
             "status": "required",
             "method": "manual screenshot review; no pixel-diff gate",
@@ -227,28 +240,7 @@ def run_native_adaptive_layout_evidence(app, main_window, sample_path, output_di
 
 
 def _show_at_exact_client_size(app, window, requested):
-    screen = window.screen() or app.primaryScreen()
-    available = screen.availableGeometry()
-    window.setWindowState(
-        window.windowState()
-        & ~QtCore.Qt.WindowMaximized
-        & ~QtCore.Qt.WindowFullScreen
-    )
-    window.showNormal()
-    window.show()
-    _flush(app)
-    # Workspace first-show placement can reapply a remembered/default maximized
-    # state after the initial normalization, particularly through Cocoa.  The
-    # evidence viewport owns geometry here, so normalize once more after those
-    # callbacks have run before requesting the exact client size.
-    window.setWindowState(
-        window.windowState()
-        & ~QtCore.Qt.WindowMaximized
-        & ~QtCore.Qt.WindowFullScreen
-    )
-    window.showNormal()
-    _flush(app)
-    margins = window.windowHandle().frameMargins()
+    available, margins = _normalize_window_for_exact_size(app, window)
     required_width = requested.width() + margins.left() + margins.right()
     required_height = requested.height() + margins.top() + margins.bottom()
     if available.width() < required_width or available.height() < required_height:
@@ -285,6 +277,56 @@ def _show_at_exact_client_size(app, window, requested):
             )
         )
     _assert_screen_reachable(window)
+
+
+def _normalize_window_for_exact_size(app, window):
+    screen = window.screen() or app.primaryScreen()
+    available = screen.availableGeometry()
+    window.setWindowState(
+        window.windowState()
+        & ~QtCore.Qt.WindowMaximized
+        & ~QtCore.Qt.WindowFullScreen
+    )
+    window.showNormal()
+    window.show()
+    _flush(app)
+    # Workspace first-show placement can reapply a remembered/default maximized
+    # state after the initial normalization, particularly through Cocoa.  The
+    # evidence viewport owns geometry here, so normalize once more after those
+    # callbacks have run before requesting the exact client size.
+    window.setWindowState(
+        window.windowState()
+        & ~QtCore.Qt.WindowMaximized
+        & ~QtCore.Qt.WindowFullScreen
+    )
+    window.showNormal()
+    _flush(app)
+    margins = window.windowHandle().frameMargins()
+    return available, margins
+
+
+def _exact_client_size_unavailability(app, window, requested, scenario_name):
+    available, margins = _normalize_window_for_exact_size(app, window)
+    required = QtCore.QSize(
+        requested.width() + margins.left() + margins.right(),
+        requested.height() + margins.top() + margins.bottom(),
+    )
+    if available.width() >= required.width() and available.height() >= required.height():
+        return None
+    return {
+        "name": scenario_name,
+        "status": "capability-unavailable",
+        "reason": "required native frame exceeds available screen geometry",
+        "requested_client_size": [requested.width(), requested.height()],
+        "required_frame_size": [required.width(), required.height()],
+        "available_screen_geometry": _rect_record(available),
+        "frame_margins": {
+            "left": margins.left(),
+            "top": margins.top(),
+            "right": margins.right(),
+            "bottom": margins.bottom(),
+        },
+    }
 
 
 def _show_content_driven_surface(app, window, archetype):
@@ -641,6 +683,12 @@ def _human_review_template(manifest):
         "- Device pixel ratio: `%s`\n\n" % manifest["device_pixel_ratio"],
     ]
     lines.extend("- [ ] %s\n" % item for item in manifest["human_review"]["checklist"])
+    if manifest["unavailable_scenarios"]:
+        lines.append("\n## Capability-unavailable native scenarios\n\n")
+        lines.extend(
+            "- `%s`: %s\n" % (item["name"], item["reason"])
+            for item in manifest["unavailable_scenarios"]
+        )
     lines.extend(
         [
             "\nReviewer: ____________________\n",
