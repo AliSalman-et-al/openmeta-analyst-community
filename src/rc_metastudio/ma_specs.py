@@ -213,6 +213,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.setupUi(self)
         self._layout_reflow_pending = False
         self._focus_reveal_connected = False
+        self._first_show_content_refit_pending = True
         for combo in self.findChildren(QComboBox):
             self._configure_value_control(combo)
         apply_plot_text_input_limits(self)
@@ -317,8 +318,34 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             self, adaptive_window.WindowRole.TRANSACTIONAL
         )
 
+    def sizeHint(self):
+        """Include the scroll body's content width in first-use negotiation."""
+        hint = super(MA_Specs, self).sizeHint()
+        if hasattr(self, "specs_tab"):
+            content_hint = self.specs_tab.minimumSizeHint()
+            if content_hint.isValid():
+                margins = self.layout().contentsMargins()
+                scrollbar_width = (
+                    self.content_scroll_area.verticalScrollBar().sizeHint().width()
+                )
+                hint.setWidth(
+                    max(
+                        hint.width(),
+                        content_hint.width()
+                        + margins.left()
+                        + margins.right()
+                        + scrollbar_width,
+                    )
+                )
+        return hint
+
     def showEvent(self, event):
         super(MA_Specs, self).showEvent(event)
+        if self._first_show_content_refit_pending:
+            self._first_show_content_refit_pending = False
+            QtCore.QTimer.singleShot(
+                0, self._adaptive_window_controller.request_content_refit
+            )
         app = QtWidgets.QApplication.instance()
         if app is not None and not self._focus_reveal_connected:
             app.focusChanged.connect(self._reveal_focused_control)

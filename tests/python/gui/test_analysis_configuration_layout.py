@@ -221,6 +221,34 @@ def test_method_parameters_variants_stay_bounded_and_stable(
             dialog.close()
 
 
+def test_method_parameters_opens_at_its_content_preferred_width(qapp, monkeypatch):
+    import adaptive_window
+    import ma_specs
+
+    _install_analysis_backend(monkeypatch, ma_specs)
+    monkeypatch.setattr(
+        adaptive_window,
+        "available_geometry_for_window",
+        lambda _window: QtCore.QRect(0, 0, 1920, 1080),
+    )
+    monkeypatch.setattr(
+        adaptive_window.AdaptiveWindowController,
+        "_connect_runtime_screen",
+        lambda _controller, _screen: None,
+    )
+
+    dialog = ma_specs.MA_Specs(_AnalysisModel("binary"), conf_level=95.0)
+    try:
+        dialog.show()
+        QTest.qWait(1)
+        qapp.processEvents()
+
+        assert dialog.frameGeometry().width() <= 1728
+        assert dialog.content_scroll_area.horizontalScrollBar().maximum() == 0
+    finally:
+        dialog.close()
+
+
 def test_regression_and_subgroup_selectors_use_transactional_layouts(qapp, monkeypatch):
     import adaptive_controls
     import change_cov_type_form
