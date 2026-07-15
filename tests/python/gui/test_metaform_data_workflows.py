@@ -378,6 +378,34 @@ def test_copy_paste_undo_and_redo_work_through_real_table_path():
         _close_without_prompt(app, window)
 
 
+def test_toolbar_copy_without_a_selection_is_a_no_op(monkeypatch):
+    import app_error_handler
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        table = window.tableView
+        table.clearSelection()
+        assert table.selectionModel().selectedIndexes() == []
+
+        errors = []
+        monkeypatch.setattr(
+            app_error_handler,
+            "handle_exception",
+            lambda exc_type, exc_value, exc_traceback, parent=None: errors.append(
+                exc_value
+            ),
+        )
+
+        window.action_copy.trigger()
+        app.processEvents()
+
+        assert errors == []
+    finally:
+        _close_without_prompt(app, window)
+
+
 def test_diagnostic_complete_paste_recomputes_sens_spec_confidence_intervals(
     monkeypatch,
 ):

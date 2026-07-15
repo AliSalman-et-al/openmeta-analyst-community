@@ -413,8 +413,9 @@ class MADataTable(QtWidgets.QTableView):
             self.scrollTo(target)
 
     def copy(self):
-        # copy/paste: these only happen if at least one cell is selected
         selected_indexes = self.selectionModel().selectedIndexes()
+        if not selected_indexes:
+            return
         upper_left_index = self._upper_left(selected_indexes)
         lower_right_index = self._lower_right(selected_indexes)
         self.copy_contents_in_range(
@@ -422,8 +423,9 @@ class MADataTable(QtWidgets.QTableView):
         )
 
     def paste(self):
-        # copy/paste: these only happen if at least one cell is selected
         selected_indexes = self.selectionModel().selectedIndexes()
+        if not selected_indexes:
+            return
         upper_left_index = self._upper_left(selected_indexes)
         lower_right_index = self._lower_right(selected_indexes)
 
