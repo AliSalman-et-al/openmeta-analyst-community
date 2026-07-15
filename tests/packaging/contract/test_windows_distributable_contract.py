@@ -565,8 +565,10 @@ def test_macos_packager_relocates_every_bundled_r_macho_before_use():
     assert relative_order(
         script,
         'copy_tree "$r_runtime_root" "$app_root/R"',
-        "relocate_bundled_r_runtime",
-        'r_version_cache_key="$("$rscript"',
+        "install_local_r_packages",
+        'if ! test_bundled_r_packages "$r_lib"',
+        'step "Relocating completed bundled R runtime dependencies"',
+        'cat > "$app_root/LaunchRCMetaStudio.command"',
     )
 
 
