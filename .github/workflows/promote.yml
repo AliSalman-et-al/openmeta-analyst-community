@@ -61,6 +61,13 @@ jobs:
             title="RC MetaStudio ${{ inputs.stable_version }}"
             notes="Promoted from ${{ inputs.rc_tag }} without rebuilding or modifying deliverables."
           fi
-          gh release create "$STABLE_TAG" promotion/RCMetaStudio-*.zip promotion/*.cdx.json promotion/SHA256SUMS promotion/release-set-stable.json --target "$source_sha" --title "$title" --notes "$notes"
+          if git ls-remote --exit-code --tags origin "refs/tags/$STABLE_TAG" >/dev/null 2>&1; then
+            git fetch origin "refs/tags/$STABLE_TAG:refs/tags/$STABLE_TAG"
+            test "$(git rev-list -n 1 "$STABLE_TAG")" = "$source_sha"
+            tag_args=(--verify-tag)
+          else
+            tag_args=(--target "$source_sha")
+          fi
+          gh release create "$STABLE_TAG" promotion/RCMetaStudio-*.zip promotion/*.cdx.json promotion/SHA256SUMS promotion/release-set-stable.json "${tag_args[@]}" --title "$title" --notes "$notes"
       - name: Prove promotion preserved artifact bytes
         run: (cd promotion && sha256sum --check SHA256SUMS)

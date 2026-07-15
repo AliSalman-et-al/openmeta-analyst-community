@@ -109,7 +109,11 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     assert "push:\n    tags:" not in legacy
     assert "refusing overwrite" in sign.lower() and "refusing overwrite" in promote.lower()
     assert "sha256sum --check SHA256SUMS" in promote
-    assert '--target "${{ inputs.source_sha }}" --prerelease' in community
-    assert '--target "${{ inputs.source_sha }}" --prerelease' in sign
-    assert '--target "$source_sha"' in promote
+    for publisher in (community, sign, promote):
+        assert "git ls-remote --exit-code --tags origin" in publisher
+        assert "tag_args=(--verify-tag)" in publisher
+        assert '"${tag_args[@]}"' in publisher
+    assert 'tag_args=(--target "${{ inputs.source_sha }}")' in community
+    assert 'tag_args=(--target "${{ inputs.source_sha }}")' in sign
+    assert 'tag_args=(--target "$source_sha")' in promote
     assert "git push origin" not in community + sign + promote
