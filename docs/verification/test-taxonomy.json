@@ -16,6 +16,21 @@
     },
     {
       "decision": "keep",
+      "evidence": [
+        "packaging_contract",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_windows_distributable_contract.py::test_macos_packager_relocates_every_bundled_r_macho_before_use",
+      "reason": "Guards fail-closed relocation of the bundled macOS R runtime so build-host framework paths cannot leak into release artifacts.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
       "evidence": ["gui_compatibility", "analysis_behavior"],
       "external_dependencies": ["qt"],
       "lane": "gui",
