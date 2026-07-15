@@ -291,9 +291,20 @@ if [ ! -x "$rscript" ] || [ ! -x "$r_binary" ]; then
 fi
 
 relocate_bundled_r_runtime() {
-  local binary dependency source_relative target loader_dir relative_target
+  local binary dylib_id dependency source_relative target loader_dir relative_target
   while IFS= read -r -d '' binary; do
     file "$binary" | grep -q 'Mach-O' || continue
+    dylib_id="$(otool -D "$binary" 2>/dev/null | awk 'NR > 1 && $1 ~ /^\// { print $1; exit }' || true)"
+    case "$dylib_id" in
+      "$r_runtime_root"/*)
+        source_relative="${dylib_id#"$r_runtime_root"/}"
+        install_name_tool -id "@rpath/$source_relative" "$binary"
+        ;;
+      /Library/Frameworks/R.framework/Versions/*/Resources/*)
+        source_relative="${dylib_id#*/Resources/}"
+        install_name_tool -id "@rpath/$source_relative" "$binary"
+        ;;
+    esac
     while IFS= read -r dependency; do
       case "$dependency" in
         "$r_runtime_root"/*)
