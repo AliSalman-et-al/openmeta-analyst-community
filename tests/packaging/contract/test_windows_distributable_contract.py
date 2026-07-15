@@ -428,6 +428,7 @@ def test_macos_distributable_contract_is_declared():
         "sha256_stdin_12",
         "test_r_dependency_packages",
         "copy_r_library_packages",
+        "configure_relocatable_r_launchers",
         "relocate_bundled_r_runtime",
     } <= script["functions"]
     assert {"--windowed", "--target-architecture", "--osx-bundle-identifier"} <= script[
@@ -562,11 +563,14 @@ def test_macos_packager_relocates_every_bundled_r_macho_before_use():
     assert "otool -L \"$binary\"" in script
     assert 'install_name_tool -change "$dependency" "@loader_path/$relative_target"' in script
     assert "Bundled R runtime retains an absolute source-framework dependency" in script
+    assert "Bundled R launchers retain an absolute source-framework path" in script
+    assert 'exec "$R_HOME/bin/exec/R" --no-echo --no-restore "$@"' in script
     assert relative_order(
         script,
         'copy_tree "$r_runtime_root" "$app_root/R"',
         "install_local_r_packages",
         'if ! test_bundled_r_packages "$r_lib"',
+        'step "Configuring relocatable bundled R launchers"',
         'step "Relocating completed bundled R runtime dependencies"',
         'cat > "$app_root/LaunchRCMetaStudio.command"',
     )

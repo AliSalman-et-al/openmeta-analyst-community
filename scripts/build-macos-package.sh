@@ -345,6 +345,49 @@ PY
   fi
 }
 
+configure_relocatable_r_launchers() {
+  "$python_exe" - "$r_binary" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text()
+replacements = {
+    'R_HOME_DIR="/Library/Frameworks/R.framework/Resources"':
+        'R_HOME_DIR="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"',
+    'R_SHARE_DIR="/Library/Frameworks/R.framework/Resources/share"':
+        'R_SHARE_DIR="${R_HOME_DIR}/share"',
+    'R_INCLUDE_DIR="/Library/Frameworks/R.framework/Resources/include"':
+        'R_INCLUDE_DIR="${R_HOME_DIR}/include"',
+    'R_DOC_DIR="/Library/Frameworks/R.framework/Resources/doc"':
+        'R_DOC_DIR="${R_HOME_DIR}/doc"',
+}
+for old, new in replacements.items():
+    if old not in text:
+        raise SystemExit(f"Bundled R launcher is missing expected path: {old}")
+    text = text.replace(old, new)
+path.write_text(text)
+PY
+
+  rm -f "$rscript"
+  cat > "$rscript" <<'SH'
+#!/bin/sh
+set -eu
+R_HOME="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
+export R_HOME
+export R_SHARE_DIR="$R_HOME/share"
+export R_INCLUDE_DIR="$R_HOME/include"
+export R_DOC_DIR="$R_HOME/doc"
+exec "$R_HOME/bin/exec/R" --no-echo --no-restore "$@"
+SH
+  chmod +x "$rscript"
+
+  if grep -aE '/Library/Frameworks/R\.framework/.*/Resources|/Library/Frameworks/R\.framework/Resources' "$r_binary" "$rscript"; then
+    echo "Bundled R launchers retain an absolute source-framework path." >&2
+    exit 1
+  fi
+}
+
 r_version_cache_key="$("$rscript" -e "cat(paste0('R-', getRversion()))")"
 sha256_file() {
   if command -v sha256sum >/dev/null 2>&1; then
@@ -434,6 +477,8 @@ if ! test_bundled_r_packages "$r_lib"; then
   exit 1
 fi
 
+step "Configuring relocatable bundled R launchers"
+configure_relocatable_r_launchers
 step "Relocating completed bundled R runtime dependencies"
 relocate_bundled_r_runtime
 
