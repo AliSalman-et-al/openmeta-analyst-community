@@ -271,8 +271,4 @@ jobs:
         run: |
           set -euo pipefail
           if gh release view "$TAG" >/dev/null 2>&1; then echo "Release $TAG already exists; refusing overwrite." >&2; exit 1; fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" "${{ inputs.source_sha }}" -m "RC MetaStudio ${{ inputs.version }}"
-          git push origin "$TAG"
-          gh release create "$TAG" release/RCMetaStudio-*.zip release/*.cdx.json release/SHA256SUMS release/release-set-rc.json --prerelease --verify-tag --title "RC MetaStudio ${{ inputs.version }}" --notes "Immutable signed release candidate. Verify SHA256SUMS and GitHub artifact attestations before promotion."
+          gh release create "$TAG" release/RCMetaStudio-*.zip release/*.cdx.json release/SHA256SUMS release/release-set-rc.json --target "${{ inputs.source_sha }}" --prerelease --title "RC MetaStudio ${{ inputs.version }}" --notes "Immutable signed release candidate. Verify SHA256SUMS and GitHub artifact attestations before promotion."

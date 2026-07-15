@@ -195,8 +195,4 @@ jobs:
         run: |
           set -euo pipefail
           if gh release view "$TAG" >/dev/null 2>&1; then echo "Release $TAG already exists; refusing overwrite." >&2; exit 1; fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" "${{ inputs.source_sha }}" -m "RC MetaStudio ${{ inputs.version }} unsigned community build"
-          git push origin "$TAG"
-          gh release create "$TAG" release/RCMetaStudio-*.zip release/*.cdx.json release/SHA256SUMS release/release-set-rc.json --prerelease --verify-tag --title "RC MetaStudio ${{ inputs.version }} - UNSIGNED COMMUNITY BUILD" --notes "UNSIGNED COMMUNITY BUILD: no Authenticode certificate, Apple Developer ID, or notarization is present. SmartScreen and Gatekeeper warnings are expected. Artifacts were built once, package-smoke tested, SBOM inventoried, checksummed, and provenance-attested."
+          gh release create "$TAG" release/RCMetaStudio-*.zip release/*.cdx.json release/SHA256SUMS release/release-set-rc.json --target "${{ inputs.source_sha }}" --prerelease --title "RC MetaStudio ${{ inputs.version }} - UNSIGNED COMMUNITY BUILD" --notes "UNSIGNED COMMUNITY BUILD: no Authenticode certificate, Apple Developer ID, or notarization is present. SmartScreen and Gatekeeper warnings are expected. Artifacts were built once, package-smoke tested, SBOM inventoried, checksummed, and provenance-attested."

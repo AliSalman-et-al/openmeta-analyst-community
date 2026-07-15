@@ -63,7 +63,7 @@ substitute hosted-runner screenshots.
    version.
 3. Approve `production-release`.
 4. Confirm the workflow verifies checksums and GitHub attestations, then creates
-   the stable annotated tag at the same source SHA.
+   the stable release tag at the same source SHA through the GitHub Release API.
 5. Compare the RC and stable `SHA256SUMS`; deliverable digests must be identical.
 
 ## Withdrawal and rollback
