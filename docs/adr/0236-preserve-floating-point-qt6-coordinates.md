@@ -1,0 +1,3 @@
+# Preserve floating-point Qt6 coordinates
+
+RC MetaStudio will preserve `QPointF` and `QRectF` values throughout Qt6 event, graphics, placement, and scaling calculations. Conversion to integer `QPoint` or `QRect` will occur only through named, audited boundary helpers for APIs that explicitly require integer coordinates; each helper will identify the source and target coordinate spaces and define its rounding rule. Verification will cover fractional positions and 125%, 150%, and 175% display scaling so viewport, scene, window, global, logical, and physical coordinates cannot be silently conflated.
