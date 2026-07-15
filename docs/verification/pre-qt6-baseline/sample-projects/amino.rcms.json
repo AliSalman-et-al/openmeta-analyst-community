@@ -1,0 +1,2965 @@
+{
+  "baseline_commit": "e8a21fc3c277e8a8c144413dfa320ea9e68a20e4",
+  "dataset": {
+    "analysis_family": "binary",
+    "covariates": [],
+    "is_diagnostic": false,
+    "notes": "",
+    "outcomes": [
+      {
+        "data_type": 0,
+        "follow_ups": [
+          "first"
+        ],
+        "name": "clinical failure",
+        "sub_type": null
+      },
+      {
+        "data_type": 0,
+        "follow_ups": [
+          "first"
+        ],
+        "name": "nephrotoxic",
+        "sub_type": null
+      }
+    ],
+    "studies": [
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.6172133998483676,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.5714285714285714,
+                  "display_lower": 0.17044683954275572,
+                  "display_se": 0.6172133998483676,
+                  "display_upper": 1.9157328649850938,
+                  "est": -0.5596157879354227,
+                  "lower": -1.7693318224137426,
+                  "upper": 0.6501002465428973
+                },
+                "tx B-tx A": {
+                  "display_est": 1.7499999999999998,
+                  "display_lower": 0.5219934460996893,
+                  "display_upper": 5.8669318990168495,
+                  "est": 0.5596157879354225,
+                  "lower": -0.6501002465428974,
+                  "upper": 1.7693318224137426
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.6666666666666666,
+                  "display_lower": 0.275252514462663,
+                  "display_upper": 1.6146789623777686,
+                  "est": -0.4054651081081644,
+                  "lower": -1.290066368225204,
+                  "upper": 0.4791361520088754
+                },
+                "tx B-tx A": {
+                  "display_est": 1.5,
+                  "display_lower": 0.6193181575409917,
+                  "display_upper": 3.633027665349979,
+                  "est": 0.4054651081081644,
+                  "lower": -0.4791361520088754,
+                  "upper": 1.290066368225204
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  6.0,
+                  27.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  9.0,
+                  27.0
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "display_est": 1.3068181818181817,
+                  "display_lower": 0.3099778951524333,
+                  "display_upper": 5.509340462779681,
+                  "est": 0.26759531388504354,
+                  "lower": -1.1712542900052285,
+                  "upper": 1.7064449177753156
+                },
+                "tx B-tx A": {
+                  "display_est": 0.7652173913043478,
+                  "display_lower": 0.18150992968320936,
+                  "display_upper": 3.2260364872412746,
+                  "est": -0.26759531388504354,
+                  "lower": -1.7064449177753156,
+                  "upper": 1.1712542900052285
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 1.25,
+                  "display_lower": 0.3758499752923444,
+                  "display_upper": 4.15724385450512,
+                  "est": 0.2231435513142097,
+                  "lower": -0.9785652170967367,
+                  "upper": 1.4248523197251561
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  5.0,
+                  27.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  4.0,
+                  27.0
+                ]
+              }
+            ],
+            "outcome": "nephrotoxic"
+          }
+        ],
+        "covariates": {},
+        "id": 0,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Gonzalez",
+        "notes": "",
+        "sample_size": null,
+        "year": 1993
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.7152562328961152,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.4362244897959183,
+                  "display_lower": 0.10736997058643398,
+                  "display_se": 0.7152562328961152,
+                  "display_upper": 1.7723000617246354,
+                  "est": -0.8295982832878028,
+                  "lower": -2.2314747394819814,
+                  "upper": 0.5722781729063757
+                },
+                "tx B-tx A": {
+                  "display_est": 2.2923976608187138,
+                  "display_lower": 0.5642385404122224,
+                  "display_upper": 9.31359107707857,
+                  "est": 0.8295982832878028,
+                  "lower": -0.5722781729063757,
+                  "upper": 2.2314747394819814
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.4648910411622276,
+                  "display_lower": 0.12601214415212958,
+                  "display_upper": 1.7151019975660615,
+                  "est": -0.7659522209332512,
+                  "lower": -2.0713769945153624,
+                  "upper": 0.5394725526488597
+                },
+                "tx B-tx A": {
+                  "display_est": 2.1510416666666665,
+                  "display_lower": 0.5830557024708278,
+                  "display_upper": 7.9357430724513245,
+                  "est": 0.7659522209332512,
+                  "lower": -0.5394725526488597,
+                  "upper": 2.0713769945153624
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  3.0,
+                  59.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  7.0,
+                  64.0
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "display_est": 0.16905901116427433,
+                  "display_lower": 0.035797783706675544,
+                  "display_upper": 0.7983999649261101,
+                  "est": -1.7775074465208536,
+                  "lower": -3.3298692951266005,
+                  "upper": -0.2251455979151067
+                },
+                "tx B-tx A": {
+                  "display_est": 5.915094339622642,
+                  "display_lower": 1.2525050650428668,
+                  "display_upper": 27.934690264456812,
+                  "est": 1.7775074465208536,
+                  "lower": 0.2251455979151067,
+                  "upper": 3.3298692951266005
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.19722650231124803,
+                  "display_lower": 0.045596556431417815,
+                  "display_upper": 0.8530971691346033,
+                  "est": -1.623402452784473,
+                  "lower": -3.0879230821682104,
+                  "upper": -0.15888182340073564
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  2.0,
+                  59.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  11.0,
+                  64.0
+                ]
+              }
+            ],
+            "outcome": "nephrotoxic"
+          }
+        ],
+        "covariates": {},
+        "id": 1,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Prins",
+        "notes": "",
+        "sample_size": null,
+        "year": 1993
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 1.5012730442323252,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.07600596125186287,
+                  "display_lower": 0.004008313891981378,
+                  "display_se": 1.5012730442323252,
+                  "display_upper": 1.441230976789609,
+                  "est": -2.5769435042473563,
+                  "lower": -5.51938460190352,
+                  "upper": 0.36549759340880783
+                },
+                "tx B-tx A": {
+                  "display_est": 13.156862745098042,
+                  "display_lower": 0.6938513091271002,
+                  "display_upper": 249.48145952354145,
+                  "est": 2.5769435042473563,
+                  "lower": -0.3654975934088083,
+                  "upper": 5.519384601903521
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.0909090909090909,
+                  "display_lower": 0.005248413351747529,
+                  "display_upper": 1.5746592838701612,
+                  "est": -2.3978952727983707,
+                  "lower": -5.24982946677064,
+                  "upper": 0.4540389211738991
+                },
+                "tx B-tx A": {
+                  "display_est": 11.000000000000002,
+                  "display_lower": 0.6350580155614509,
+                  "display_upper": 190.53377334828946,
+                  "est": 2.3978952727983707,
+                  "lower": -0.4540389211738991,
+                  "upper": 5.24982946677064
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  0.0,
+                  30.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  5.0,
+                  30.0
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "display_est": 3.2222222222222237,
+                  "display_lower": 0.3156865567336118,
+                  "display_upper": 32.88931957322481,
+                  "est": 1.170071252650255,
+                  "lower": -1.153005466733426,
+                  "upper": 3.493147972033936
+                },
+                "tx B-tx A": {
+                  "display_est": 0.3103448275862068,
+                  "display_lower": 0.030405007247827034,
+                  "display_upper": 3.167699031428309,
+                  "est": -1.170071252650255,
+                  "lower": -3.493147972033936,
+                  "upper": 1.153005466733426
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 3.000000000000001,
+                  "display_lower": 0.33046504210308875,
+                  "display_upper": 27.234348125670888,
+                  "est": 1.09861228866811,
+                  "lower": -1.1072543980439158,
+                  "upper": 3.304478975380136
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  3.0,
+                  30.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  1.0,
+                  30.0
+                ]
+              }
+            ],
+            "outcome": "nephrotoxic"
+          }
+        ],
+        "covariates": {},
+        "id": 2,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Giamarellou",
+        "notes": "",
+        "sample_size": null,
+        "year": 1991
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.37900587356781135,
+                  "display_conf_level": 95.0,
+                  "display_est": 1.4010610079575598,
+                  "display_lower": 0.6665713790778653,
+                  "display_se": 0.37900587356781135,
+                  "display_upper": 2.944878837634206,
+                  "est": 0.33722981241502126,
+                  "lower": -0.4056080497070301,
+                  "upper": 1.0800676745370725
+                },
+                "tx B-tx A": {
+                  "display_est": 0.7137447936387731,
+                  "display_lower": 0.3395725444525788,
+                  "display_upper": 1.5002144277232543,
+                  "est": -0.33722981241502126,
+                  "lower": -1.0800676745370725,
+                  "upper": 0.4056080497070301
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 1.3545966228893058,
+                  "display_lower": 0.6931159918888493,
+                  "display_upper": 2.647366432482153,
+                  "est": 0.3035037147269817,
+                  "lower": -0.3665579173351251,
+                  "upper": 0.9735653467890885
+                },
+                "tx B-tx A": {
+                  "display_est": 0.7382271468144045,
+                  "display_lower": 0.3777338821443039,
+                  "display_upper": 1.4427599589425772,
+                  "est": -0.3035037147269817,
+                  "lower": -0.9735653467890885,
+                  "upper": 0.3665579173351251
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  19.0,
+                  164.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  13.0,
+                  152.0
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "display_est": 0.7442815249266863,
+                  "display_lower": 0.2995945892606217,
+                  "display_upper": 1.8490153300642556,
+                  "est": -0.29533592200322945,
+                  "lower": -1.2053250873799188,
+                  "upper": 0.61465324337346
+                },
+                "tx B-tx A": {
+                  "display_est": 1.3435776201733647,
+                  "display_lower": 0.5408283986294743,
+                  "display_upper": 3.3378439926699914,
+                  "est": 0.29533592200322945,
+                  "lower": -0.6146532433734598,
+                  "upper": 1.2053250873799186
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.7583148558758314,
+                  "display_lower": 0.32319213392725216,
+                  "display_upper": 1.7792556200375218,
+                  "est": -0.2766566024400734,
+                  "lower": -1.1295082907277463,
+                  "upper": 0.5761950858475995
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  9.0,
+                  164.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  11.0,
+                  152.0
+                ]
+              }
+            ],
+            "outcome": "nephrotoxic"
+          }
+        ],
+        "covariates": {},
+        "id": 3,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Maller",
+        "notes": "",
+        "sample_size": null,
+        "year": 1993
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 1.5672851583296352,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.18904109589041102,
+                  "display_lower": 0.008759527509015779,
+                  "display_se": 1.5672851583296352,
+                  "display_upper": 4.079733284548234,
+                  "est": -1.6657908489852318,
+                  "lower": -4.737613312815473,
+                  "upper": 1.4060316148450087
+                },
+                "tx B-tx A": {
+                  "display_est": 5.289855072463766,
+                  "display_lower": 0.24511406267351962,
+                  "display_upper": 114.16140870278059,
+                  "est": 1.6657908489852318,
+                  "lower": -1.4060316148450087,
+                  "upper": 4.737613312815473
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.20000000000000007,
+                  "display_lower": 0.009937765788056422,
+                  "display_upper": 4.025049578857405,
+                  "est": -1.6094379124341,
+                  "lower": -4.611413053391412,
+                  "upper": 1.3925372285232118
+                },
+                "tx B-tx A": {
+                  "display_est": 4.999999999999998,
+                  "display_lower": 0.2484441447014104,
+                  "display_upper": 100.62623947143506,
+                  "est": 1.6094379124341,
+                  "lower": -1.3925372285232118,
+                  "upper": 4.611413053391412
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  0.0,
+                  36.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  2.0,
+                  36.0
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "display_est": 3.0845070422535215,
+                  "display_lower": 0.12155479819891589,
+                  "display_upper": 78.27073743434033,
+                  "est": 1.1263918527751855,
+                  "lower": -2.107390103894923,
+                  "upper": 4.360173809445294
+                },
+                "tx B-tx A": {
+                  "display_est": 0.3242009132420091,
+                  "display_lower": 0.012776166838071238,
+                  "display_upper": 8.226742299086954,
+                  "est": -1.1263918527751855,
+                  "lower": -4.360173809445294,
+                  "upper": 2.107390103894923
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 2.9999999999999982,
+                  "display_lower": 0.1262626735981487,
+                  "display_upper": 71.27997327732771,
+                  "est": 1.0986122886681091,
+                  "lower": -2.069390830929067,
+                  "upper": 4.266615408265285
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  1.0,
+                  36.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  0.0,
+                  36.0
+                ]
+              }
+            ],
+            "outcome": "nephrotoxic"
+          }
+        ],
+        "covariates": {},
+        "id": 4,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Sturm",
+        "notes": "",
+        "sample_size": null,
+        "year": 1989
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.27755775322985915,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.39487422876127193,
+                  "display_lower": 0.2291929226878957,
+                  "display_se": 0.27755775322985915,
+                  "display_upper": 0.6803249188987465,
+                  "est": -0.9291879729829805,
+                  "lower": -1.4731911729433602,
+                  "upper": -0.3851847730226008
+                },
+                "tx B-tx A": {
+                  "display_est": 2.5324519230769234,
+                  "display_lower": 1.4698858916100221,
+                  "display_upper": 4.363136471546958,
+                  "est": 0.9291879729829805,
+                  "lower": 0.3851847730226008,
+                  "upper": 1.4731911729433602
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.4963791968400264,
+                  "display_lower": 0.3267406064297969,
+                  "display_upper": 0.7540914787048031,
+                  "est": -0.7004151345878167,
+                  "lower": -1.1185886753844045,
+                  "upper": -0.2822415937912289
+                },
+                "tx B-tx A": {
+                  "display_est": 2.0145888594164454,
+                  "display_lower": 1.3260990585884347,
+                  "display_upper": 3.060531750022502,
+                  "est": 0.7004151345878167,
+                  "lower": 0.2822415937912289,
+                  "upper": 1.1185886753844045
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  26.0,
+                  155.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  49.0,
+                  145.0
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "display_est": 0.22889610389610382,
+                  "display_lower": 0.025281827555407036,
+                  "display_upper": 2.0723749603936583,
+                  "est": -1.4744870731553519,
+                  "lower": -3.677669419776625,
+                  "upper": 0.7286952734659211
+                },
+                "tx B-tx A": {
+                  "display_est": 4.368794326241137,
+                  "display_lower": 0.4825381598945998,
+                  "display_upper": 39.55410255878158,
+                  "est": 1.4744870731553519,
+                  "lower": -0.7286952734659211,
+                  "upper": 3.677669419776625
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.23387096774193547,
+                  "display_lower": 0.02644837081740773,
+                  "display_upper": 2.068015074733827,
+                  "est": -1.452985735618563,
+                  "lower": -3.6325607173798673,
+                  "upper": 0.7265892461427415
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  1.0,
+                  155.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  4.0,
+                  145.0
+                ]
+              }
+            ],
+            "outcome": "nephrotoxic"
+          }
+        ],
+        "covariates": {},
+        "id": 5,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Marik",
+        "notes": "",
+        "sample_size": null,
+        "year": 1991
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.6064784348631227,
+                  "display_conf_level": 95.0,
+                  "display_est": 1.611111111111111,
+                  "display_lower": 0.4907836804369662,
+                  "display_se": 0.6064784348631227,
+                  "display_upper": 5.288845403405899,
+                  "est": 0.4769240720903092,
+                  "lower": -0.7117518176416322,
+                  "upper": 1.6655999618222506
+                },
+                "tx B-tx A": {
+                  "display_est": 0.6206896551724139,
+                  "display_lower": 0.18907718485324268,
+                  "display_upper": 2.037557563262202,
+                  "est": -0.4769240720903092,
+                  "lower": -1.6655999618222506,
+                  "upper": 0.7117518176416322
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 1.4583333333333335,
+                  "display_lower": 0.5675454135382414,
+                  "display_upper": 3.7472527490838607,
+                  "est": 0.3772942311414682,
+                  "lower": -0.5664345089723853,
+                  "upper": 1.3210229712553216
+                },
+                "tx B-tx A": {
+                  "display_est": 0.6857142857142856,
+                  "display_lower": 0.26686216995757306,
+                  "display_upper": 1.761973537528411,
+                  "est": -0.3772942311414682,
+                  "lower": -1.3210229712553216,
+                  "upper": 0.5664345089723853
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  8.0,
+                  32.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  6.0,
+                  35.0
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "display_est": 0.4592592592592593,
+                  "display_lower": 0.08231397304350621,
+                  "display_upper": 2.562372576814928,
+                  "est": -0.7781403933933377,
+                  "lower": -2.497214403893814,
+                  "upper": 0.9409336171071383
+                },
+                "tx B-tx A": {
+                  "display_est": 2.1774193548387095,
+                  "display_lower": 0.390263308719537,
+                  "display_upper": 12.148605674415208,
+                  "est": 0.7781403933933377,
+                  "lower": -0.9409336171071385,
+                  "upper": 2.497214403893814
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.496551724137931,
+                  "display_lower": 0.10380228911912949,
+                  "display_upper": 2.37531962769512,
+                  "est": -0.7000676234045191,
+                  "lower": -2.265267255322712,
+                  "upper": 0.8651320085136736
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  2.0,
+                  29.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  5.0,
+                  36.0
+                ]
+              }
+            ],
+            "outcome": "nephrotoxic"
+          }
+        ],
+        "covariates": {},
+        "id": 6,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Muijsken",
+        "notes": "",
+        "sample_size": null,
+        "year": 1988
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 1.6414799742935207,
+                  "display_conf_level": 95.0,
+                  "display_est": 2.877551020408164,
+                  "display_lower": 0.11529029364928232,
+                  "display_se": 1.6414799742935207,
+                  "display_upper": 71.82130960860478,
+                  "est": 1.056939592267542,
+                  "lower": -2.160302038691492,
+                  "upper": 4.2741812232265755
+                },
+                "tx B-tx A": {
+                  "display_est": 0.3475177304964538,
+                  "display_lower": 0.013923444245859196,
+                  "display_upper": 8.673757073097935,
+                  "est": -1.056939592267542,
+                  "lower": -4.2741812232265755,
+                  "upper": 2.160302038691492
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 2.8400000000000007,
+                  "display_lower": 0.11761868251744756,
+                  "display_upper": 68.57413998667728,
+                  "est": 1.043804052173115,
+                  "lower": -2.1403073911910275,
+                  "upper": 4.227915495537257
+                },
+                "tx B-tx A": {
+                  "display_est": 0.35211267605633795,
+                  "display_lower": 0.014582756709661719,
+                  "display_upper": 8.502050682736224,
+                  "est": -1.043804052173115,
+                  "lower": -4.227915495537257,
+                  "upper": 2.1403073911910275
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  1.0,
+                  74.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  0.0,
+                  70.0
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "display_est": 0.9444444444444446,
+                  "display_lower": 0.12938701497072336,
+                  "display_upper": 6.893854911513376,
+                  "est": -0.05715841383994835,
+                  "lower": -2.044947249935669,
+                  "upper": 1.9306304222557726
+                },
+                "tx B-tx A": {
+                  "display_est": 1.0588235294117645,
+                  "display_lower": 0.14505672266613956,
+                  "display_upper": 7.728750835053053,
+                  "est": 0.05715841383994835,
+                  "lower": -1.9306304222557726,
+                  "upper": 2.044947249935669
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.9459459459459458,
+                  "display_lower": 0.1369555192364366,
+                  "display_upper": 6.533608412719652,
+                  "est": -0.055569851154810834,
+                  "lower": -1.9880990829793375,
+                  "upper": 1.8769593806697158
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  2.0,
+                  74.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  2.0,
+                  70.0
+                ]
+              }
+            ],
+            "outcome": "nephrotoxic"
+          }
+        ],
+        "covariates": {},
+        "id": 7,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Vigano",
+        "notes": "",
+        "sample_size": null,
+        "year": 1992
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.8242394247854379,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.13986013986013984,
+                  "display_lower": 0.027803539564581998,
+                  "display_se": 0.8242394247854379,
+                  "display_upper": 0.703538435322667,
+                  "est": -1.9671123567059163,
+                  "lower": -3.5825919439233846,
+                  "upper": -0.3516327694884478
+                },
+                "tx B-tx A": {
+                  "display_est": 7.15,
+                  "display_lower": 1.4213864513903431,
+                  "display_upper": 35.96664365978304,
+                  "est": 1.9671123567059163,
+                  "lower": 0.3516327694884478,
+                  "upper": 3.5825919439233846
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.20129870129870123,
+                  "display_lower": 0.048786535773060205,
+                  "display_upper": 0.8305809482566175,
+                  "est": -1.6029653979284832,
+                  "lower": -3.0203009104819283,
+                  "upper": -0.18562988537503822
+                },
+                "tx B-tx A": {
+                  "display_est": 4.967741935483873,
+                  "display_lower": 1.2039765685680508,
+                  "display_upper": 20.49745865645572,
+                  "est": 1.6029653979284832,
+                  "lower": 0.18562988537503844,
+                  "upper": 3.020300910481928
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  2.0,
+                  28.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  11.0,
+                  31.0
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "display_est": 0.1383219954648526,
+                  "display_lower": 0.006854177694765348,
+                  "display_upper": 2.7914325075042763,
+                  "est": -1.9781710112735347,
+                  "lower": -4.982896930163225,
+                  "upper": 1.026554907616156
+                },
+                "tx B-tx A": {
+                  "display_est": 7.229508196721311,
+                  "display_lower": 0.3582390035623915,
+                  "display_upper": 145.89642179304994,
+                  "est": 1.9781710112735347,
+                  "lower": -1.026554907616156,
+                  "upper": 4.982896930163225
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.15178571428571436,
+                  "display_lower": 0.008156930437807798,
+                  "display_upper": 2.82445746434688,
+                  "est": -1.885285527238878,
+                  "lower": -4.808887352613775,
+                  "upper": 1.0383162981360186
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  0.0,
+                  31.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  3.0,
+                  33.0
+                ]
+              }
+            ],
+            "outcome": "nephrotoxic"
+          }
+        ],
+        "covariates": {},
+        "id": 8,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Hansen",
+        "notes": "",
+        "sample_size": null,
+        "year": 1988
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.7260937567907465,
+                  "display_conf_level": 95.0,
+                  "display_est": 1.9729729729729728,
+                  "display_lower": 0.4754107631069844,
+                  "display_se": 0.7260937567907465,
+                  "display_upper": 8.187913808770526,
+                  "est": 0.6795415285041666,
+                  "lower": -0.7435760842050816,
+                  "upper": 2.102659141213415
+                },
+                "tx B-tx A": {
+                  "display_est": 0.5068493150684932,
+                  "display_lower": 0.12213123188092734,
+                  "display_upper": 2.1034441741803063,
+                  "est": -0.6795415285041666,
+                  "lower": -2.102659141213415,
+                  "upper": 0.7435760842050816
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 1.9000000000000001,
+                  "display_lower": 0.4926174941072738,
+                  "display_upper": 7.328200973743487,
+                  "est": 0.6418538861723948,
+                  "lower": -0.7080222801072305,
+                  "upper": 1.99173005245202
+                },
+                "tx B-tx A": {
+                  "display_est": 0.5263157894736842,
+                  "display_lower": 0.1364591396419041,
+                  "display_upper": 2.0299725689040127,
+                  "est": -0.6418538861723948,
+                  "lower": -1.99173005245202,
+                  "upper": 0.7080222801072305
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  6.0,
+                  80.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  3.0,
+                  76.0
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "display_est": 1.2812500000000002,
+                  "display_lower": 0.46965202058892713,
+                  "display_upper": 3.4953571804960823,
+                  "est": 0.2478361639045814,
+                  "lower": -0.7557632402216286,
+                  "upper": 1.2514355680307914
+                },
+                "tx B-tx A": {
+                  "display_est": 0.7804878048780487,
+                  "display_lower": 0.28609379481443264,
+                  "display_upper": 2.1292360219083806,
+                  "est": -0.2478361639045814,
+                  "lower": -1.2514355680307914,
+                  "upper": 0.7557632402216286
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 1.25,
+                  "display_lower": 0.5062709840397046,
+                  "display_upper": 3.0862918264291834,
+                  "est": 0.2231435513142097,
+                  "lower": -0.6806832114654416,
+                  "upper": 1.1269703140938612
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  9.0,
+                  81.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  8.0,
+                  90.0
+                ]
+              }
+            ],
+            "outcome": "nephrotoxic"
+          }
+        ],
+        "covariates": {},
+        "id": 9,
+        "include": true,
+        "manually_excluded": false,
+        "name": "De Vries",
+        "notes": "",
+        "sample_size": null,
+        "year": 1990
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 1.4751561056666294,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.0727650727650728,
+                  "display_lower": 0.004038943838513734,
+                  "display_se": 1.4751561056666294,
+                  "display_upper": 1.3109258326440905,
+                  "est": -2.620519208616347,
+                  "lower": -5.511772047297303,
+                  "upper": 0.27073363006460793
+                },
+                "tx B-tx A": {
+                  "display_est": 13.742857142857138,
+                  "display_lower": 0.7628196615692863,
+                  "display_upper": 247.58947882968926,
+                  "est": 2.620519208616347,
+                  "lower": -0.27073363006460793,
+                  "upper": 5.511772047297303
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.07775020678246489,
+                  "display_lower": 0.004443222247165909,
+                  "display_upper": 1.3605204327944396,
+                  "est": -2.5542540683447883,
+                  "lower": -5.41637543440998,
+                  "upper": 0.30786729772040333
+                },
+                "tx B-tx A": {
+                  "display_est": 12.861702127659568,
+                  "display_lower": 0.7350128494182561,
+                  "display_upper": 225.0618907568366,
+                  "est": 2.5542540683447883,
+                  "lower": -0.30786729772040333,
+                  "upper": 5.41637543440998
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  0.0,
+                  92.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  6.0,
+                  93.0
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "display_est": 1.0111111111111108,
+                  "display_lower": 0.13939362481651654,
+                  "display_upper": 7.3342355531542855,
+                  "est": 0.011049836186584727,
+                  "lower": -1.9704535147250544,
+                  "upper": 1.9925531870982238
+                },
+                "tx B-tx A": {
+                  "display_est": 0.9890109890109893,
+                  "display_lower": 0.13634686161258117,
+                  "display_upper": 7.173929233250784,
+                  "est": -0.011049836186584727,
+                  "lower": -1.9925531870982238,
+                  "upper": 1.9704535147250544
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 1.0108695652173911,
+                  "display_lower": 0.14546091506653783,
+                  "display_upper": 7.02496115479111,
+                  "est": 0.010810916104215362,
+                  "lower": -1.927847853428989,
+                  "upper": 1.9494696856374196
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  2.0,
+                  92.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  2.0,
+                  93.0
+                ]
+              }
+            ],
+            "outcome": "nephrotoxic"
+          }
+        ],
+        "covariates": {},
+        "id": 10,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Mauracher",
+        "notes": "",
+        "sample_size": null,
+        "year": 1989
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.815642772704103,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.6634615384615383,
+                  "display_lower": 0.13413415095497114,
+                  "display_se": 0.815642772704103,
+                  "display_upper": 3.2816490795511153,
+                  "est": -0.4102843945441135,
+                  "lower": -2.0089148532945442,
+                  "upper": 1.1883460642063175
+                },
+                "tx B-tx A": {
+                  "display_est": 1.5072463768115945,
+                  "display_lower": 0.3047248428332217,
+                  "display_upper": 7.455222945688903,
+                  "est": 0.4102843945441135,
+                  "lower": -1.1883460642063173,
+                  "upper": 2.0089148532945442
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.6982758620689657,
+                  "display_lower": 0.17181762137784332,
+                  "display_upper": 2.837829878204996,
+                  "est": -0.3591410364339256,
+                  "lower": -1.7613217055542152,
+                  "upper": 1.043039632686364
+                },
+                "tx B-tx A": {
+                  "display_est": 1.4320987654320982,
+                  "display_lower": 0.352381940749925,
+                  "display_upper": 5.820124804317393,
+                  "est": 0.3591410364339256,
+                  "lower": -1.0430396326863642,
+                  "upper": 1.7613217055542154
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  3.0,
+                  29.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  4.0,
+                  27.0
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "display_est": 0.4615384615384614,
+                  "display_lower": 0.09840149153470144,
+                  "display_upper": 2.1647817340671995,
+                  "est": -0.773189888233482,
+                  "lower": -2.3186993171658266,
+                  "upper": 0.7723195406988625
+                },
+                "tx B-tx A": {
+                  "display_est": 2.1666666666666674,
+                  "display_lower": 0.46194033526012646,
+                  "display_upper": 10.16244758492658,
+                  "est": 0.773189888233482,
+                  "lower": -0.7723195406988625,
+                  "upper": 2.3186993171658266
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.5172413793103449,
+                  "display_lower": 0.13712038313057734,
+                  "display_upper": 1.9511223522187486,
+                  "est": -0.6592456288842639,
+                  "lower": -1.9868960300104235,
+                  "upper": 0.6684047722418958
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  3.0,
+                  29.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  5.0,
+                  25.0
+                ]
+              }
+            ],
+            "outcome": "nephrotoxic"
+          }
+        ],
+        "covariates": {},
+        "id": 11,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Nordstrom",
+        "notes": "",
+        "sample_size": null,
+        "year": 1990
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.4012965998347868,
+                  "display_conf_level": 95.0,
+                  "display_est": 1.0181818181818183,
+                  "display_lower": 0.46370422446203113,
+                  "display_se": 0.4012965998347868,
+                  "display_upper": 2.235679901512132,
+                  "est": 0.018018505502678472,
+                  "lower": -0.7685083772918857,
+                  "upper": 0.8045453882972426
+                },
+                "tx B-tx A": {
+                  "display_est": 0.982142857142857,
+                  "display_lower": 0.44729122417016703,
+                  "display_upper": 2.1565470988757007,
+                  "est": -0.018018505502678472,
+                  "lower": -0.8045453882972426,
+                  "upper": 0.7685083772918857
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 1.0140845070422537,
+                  "display_lower": 0.5507221969153867,
+                  "display_upper": 1.8673069529121047,
+                  "est": 0.013986241974740077,
+                  "lower": -0.5965247767974925,
+                  "upper": 0.6244972607469726
+                },
+                "tx B-tx A": {
+                  "display_est": 0.9861111111111109,
+                  "display_lower": 0.5355305931038702,
+                  "display_upper": 1.8157975211477462,
+                  "est": -0.013986241974740077,
+                  "lower": -0.6244972607469726,
+                  "upper": 0.5965247767974925
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  16.0,
+                  71.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  16.0,
+                  72.0
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "display_est": 0.7500000000000001,
+                  "display_lower": 0.16171764550234738,
+                  "display_upper": 3.4782846253585564,
+                  "est": -0.2876820724517808,
+                  "lower": -1.8219033934155555,
+                  "upper": 1.246539248511994
+                },
+                "tx B-tx A": {
+                  "display_est": 1.3333333333333333,
+                  "display_lower": 0.2874980364486175,
+                  "display_upper": 6.183617111748543,
+                  "est": 0.2876820724517808,
+                  "lower": -1.246539248511994,
+                  "upper": 1.8219033934155555
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.7605633802816902,
+                  "display_lower": 0.17652204435498442,
+                  "display_upper": 3.27696553447024,
+                  "est": -0.27369583047704094,
+                  "lower": -1.7343095132124118,
+                  "upper": 1.18691785225833
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  3.0,
+                  71.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  4.0,
+                  72.0
+                ]
+              }
+            ],
+            "outcome": "nephrotoxic"
+          }
+        ],
+        "covariates": {},
+        "id": 12,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Rozdzinski",
+        "notes": "",
+        "sample_size": null,
+        "year": 1993
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.5075176376662912,
+                  "display_conf_level": 95.0,
+                  "display_est": 1.3559322033898302,
+                  "display_lower": 0.5014621737848847,
+                  "display_se": 0.5075176376662912,
+                  "display_upper": 3.666382503614909,
+                  "est": 0.30448919076816194,
+                  "lower": -0.6902271005766174,
+                  "upper": 1.2992054821129413
+                },
+                "tx B-tx A": {
+                  "display_est": 0.7375000000000002,
+                  "display_lower": 0.27274841046018505,
+                  "display_upper": 1.9941683586067973,
+                  "est": -0.30448919076816194,
+                  "lower": -1.2992054821129413,
+                  "upper": 0.6902271005766174
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 1.304347826086957,
+                  "display_lower": 0.5469611137552747,
+                  "display_upper": 3.1105012927463593,
+                  "est": 0.265703165733006,
+                  "lower": -0.6033775691140917,
+                  "upper": 1.1347839005801037
+                },
+                "tx B-tx A": {
+                  "display_est": 0.7666666666666664,
+                  "display_lower": 0.32149158797393357,
+                  "display_upper": 1.8282835376253588,
+                  "est": -0.265703165733006,
+                  "lower": -1.1347839005801035,
+                  "upper": 0.6033775691140916
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  10.0,
+                  69.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  8.0,
+                  72.0
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "display_est": 0.823529411764706,
+                  "display_lower": 0.3700246339809555,
+                  "display_upper": 1.8328528150815724,
+                  "est": -0.19415601444095731,
+                  "lower": -0.9941856972331986,
+                  "upper": 0.605873668351284
+                },
+                "tx B-tx A": {
+                  "display_est": 1.2142857142857142,
+                  "display_lower": 0.5455975470433475,
+                  "display_upper": 2.702522773258032,
+                  "est": 0.19415601444095731,
+                  "lower": -0.605873668351284,
+                  "upper": 0.9941856972331986
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.8593350383631714,
+                  "display_lower": 0.4597092376123071,
+                  "display_upper": 1.606356034945302,
+                  "est": -0.15159640002216146,
+                  "lower": -0.7771610815006182,
+                  "upper": 0.4739682814562953
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  14.0,
+                  69.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  17.0,
+                  72.0
+                ]
+              }
+            ],
+            "outcome": "nephrotoxic"
+          }
+        ],
+        "covariates": {},
+        "id": 13,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Ter Braak",
+        "notes": "",
+        "sample_size": null,
+        "year": 1990
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 2.0254787341673333,
+                  "display_conf_level": 95.0,
+                  "display_est": 1.0,
+                  "display_lower": 0.018875974228581675,
+                  "display_se": 2.0254787341673333,
+                  "display_upper": 52.97739803468354,
+                  "est": 0.0,
+                  "lower": -3.9698653704197504,
+                  "upper": 3.9698653704197504
+                },
+                "tx B-tx A": {
+                  "display_est": 1.0,
+                  "display_lower": 0.018875974228581675,
+                  "display_upper": 52.97739803468354,
+                  "est": 0.0,
+                  "lower": -3.9698653704197504,
+                  "upper": 3.9698653704197504
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 1.0,
+                  "display_lower": 0.020845467589655896,
+                  "display_upper": 47.97205894753966,
+                  "est": 0.0,
+                  "lower": -3.870618736159257,
+                  "upper": 3.870618736159257
+                },
+                "tx B-tx A": {
+                  "display_est": 1.0,
+                  "display_lower": 0.020845467589655896,
+                  "display_upper": 47.97205894753966,
+                  "est": 0.0,
+                  "lower": -3.870618736159257,
+                  "upper": 3.870618736159257
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  0.0,
+                  19.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  0.0,
+                  19.0
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "display_est": 1.0,
+                  "display_lower": 0.018875974228581675,
+                  "display_upper": 52.97739803468354,
+                  "est": 0.0,
+                  "lower": -3.9698653704197504,
+                  "upper": 3.9698653704197504
+                },
+                "tx B-tx A": {
+                  "display_est": 1.0,
+                  "display_lower": 0.018875974228581675,
+                  "display_upper": 52.97739803468354,
+                  "est": 0.0,
+                  "lower": -3.9698653704197504,
+                  "upper": 3.9698653704197504
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 1.0,
+                  "display_lower": 0.020845467589655896,
+                  "display_upper": 47.97205894753966,
+                  "est": 0.0,
+                  "lower": -3.870618736159257,
+                  "upper": 3.870618736159257
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  0.0,
+                  19.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  0.0,
+                  19.0
+                ]
+              }
+            ],
+            "outcome": "nephrotoxic"
+          }
+        ],
+        "covariates": {},
+        "id": 14,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Tulkens",
+        "notes": "",
+        "sample_size": null,
+        "year": 1988
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 1.57094704065546,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.18688524590163932,
+                  "display_lower": 0.00859770363919009,
+                  "display_se": 1.57094704065546,
+                  "display_upper": 4.062258551983106,
+                  "est": -1.6772605087728616,
+                  "lower": -4.756260130077342,
+                  "upper": 1.4017391125316192
+                },
+                "tx B-tx A": {
+                  "display_est": 5.350877192982456,
+                  "display_lower": 0.24616847677305567,
+                  "display_upper": 116.310126746146,
+                  "est": 1.6772605087728616,
+                  "lower": -1.4017391125316192,
+                  "upper": 4.756260130077342
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.19999999999999998,
+                  "display_lower": 0.010004585820506876,
+                  "display_upper": 3.998166512601658,
+                  "est": -1.6094379124341005,
+                  "lower": -4.604711709054017,
+                  "upper": 1.3858358841858158
+                },
+                "tx B-tx A": {
+                  "display_est": 5.000000000000001,
+                  "display_lower": 0.25011464551267204,
+                  "display_upper": 99.95416281504153,
+                  "est": 1.6094379124341005,
+                  "lower": -1.3858358841858158,
+                  "upper": 4.604711709054017
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  0.0,
+                  30.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  2.0,
+                  30.0
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "display_est": 0.3103448275862068,
+                  "display_lower": 0.030405007247827034,
+                  "display_upper": 3.167699031428309,
+                  "est": -1.170071252650255,
+                  "lower": -3.493147972033936,
+                  "upper": 1.153005466733426
+                },
+                "tx B-tx A": {
+                  "display_est": 3.2222222222222237,
+                  "display_lower": 0.3156865567336118,
+                  "display_upper": 32.88931957322481,
+                  "est": 1.170071252650255,
+                  "lower": -1.153005466733426,
+                  "upper": 3.493147972033936
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.3333333333333332,
+                  "display_lower": 0.03671833801145428,
+                  "display_upper": 3.026038680630097,
+                  "est": -1.09861228866811,
+                  "lower": -3.304478975380136,
+                  "upper": 1.1072543980439158
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  1.0,
+                  30.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  3.0,
+                  30.0
+                ]
+              }
+            ],
+            "outcome": "nephrotoxic"
+          }
+        ],
+        "covariates": {},
+        "id": 15,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Van der Auwera",
+        "notes": "",
+        "sample_size": null,
+        "year": 1991
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.7356123579206245,
+                  "display_conf_level": 95.0,
+                  "display_est": 5.761904761904762,
+                  "display_lower": 1.362735913059034,
+                  "display_se": 0.7356123579206245,
+                  "display_upper": 24.36242133718726,
+                  "est": 1.751268107873318,
+                  "lower": 0.30949437976630656,
+                  "upper": 3.1930418359803294
+                },
+                "tx B-tx A": {
+                  "display_est": 0.17355371900826447,
+                  "display_lower": 0.04104682314452796,
+                  "display_upper": 0.7338178956150252,
+                  "est": -1.751268107873318,
+                  "lower": -3.1930418359803294,
+                  "upper": -0.30949437976630656
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 3.666666666666666,
+                  "display_lower": 1.161055452880369,
+                  "display_upper": 11.579502435556545,
+                  "est": 1.2992829841302607,
+                  "lower": 0.149329464607324,
+                  "upper": 2.4492365036531973
+                },
+                "tx B-tx A": {
+                  "display_est": 0.27272727272727276,
+                  "display_lower": 0.08635949649523408,
+                  "display_upper": 0.8612853051240409,
+                  "est": -1.2992829841302607,
+                  "lower": -2.4492365036531973,
+                  "upper": -0.149329464607324
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  11.0,
+                  25.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  3.0,
+                  25.0
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "display_est": 1.0,
+                  "display_lower": 0.181603474383249,
+                  "display_upper": 5.50650257874273,
+                  "est": 0.0,
+                  "lower": -1.7059296809316107,
+                  "upper": 1.7059296809316107
+                },
+                "tx B-tx A": {
+                  "display_est": 0.63768115942029,
+                  "display_lower": 0.09708560362404184,
+                  "display_upper": 4.188440365002866,
+                  "est": -0.449916870678998,
+                  "lower": -2.332162178075089,
+                  "upper": 1.4323284367170934
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 1.0,
+                  "display_lower": 0.22285852648651205,
+                  "display_upper": 4.487151628279847,
+                  "est": 0.0,
+                  "lower": -1.5012181192198175,
+                  "upper": 1.5012181192198175
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  3.0,
+                  25.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  3.0,
+                  25.0
+                ]
+              }
+            ],
+            "outcome": "nephrotoxic"
+          }
+        ],
+        "covariates": {},
+        "id": 16,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Klastersky",
+        "notes": "",
+        "sample_size": null,
+        "year": 1977
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 2.0248611159995464,
+                  "display_conf_level": 95.0,
+                  "display_est": 1.0512820512820515,
+                  "display_lower": 0.01986800876689609,
+                  "display_se": 2.0248611159995464,
+                  "display_upper": 55.62681013052818,
+                  "est": 0.05001042057466165,
+                  "lower": -3.918644440480029,
+                  "upper": 4.018665281629352
+                },
+                "tx B-tx A": {
+                  "display_est": 0.9512195121951217,
+                  "display_lower": 0.01797694309009455,
+                  "display_upper": 50.33217026087645,
+                  "est": -0.05001042057466165,
+                  "lower": -4.018665281629352,
+                  "upper": 3.918644440480029
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 1.0500000000000003,
+                  "display_lower": 0.0218618996502113,
+                  "display_upper": 50.430201292655944,
+                  "est": 0.04879016416943216,
+                  "lower": -3.8230098992677988,
+                  "upper": 3.920590227606663
+                },
+                "tx B-tx A": {
+                  "display_est": 0.9523809523809522,
+                  "display_lower": 0.01982938743783337,
+                  "display_upper": 45.74167917701218,
+                  "est": -0.04879016416943216,
+                  "lower": -3.920590227606663,
+                  "upper": 3.8230098992677988
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  0.0,
+                  19.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  0.0,
+                  20.0
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "display_est": 0.33333333333333337,
+                  "display_lower": 0.012775966257926734,
+                  "display_upper": 8.696885141049368,
+                  "est": -1.0986122886681096,
+                  "lower": -4.360189509124359,
+                  "upper": 2.162964931788139
+                },
+                "tx B-tx A": {
+                  "display_est": 2.9999999999999996,
+                  "display_lower": 0.11498369632134056,
+                  "display_upper": 78.27196626944432,
+                  "est": 1.0986122886681096,
+                  "lower": -2.1629649317881396,
+                  "upper": 4.360189509124359
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.3500000000000001,
+                  "display_lower": 0.015126589692568587,
+                  "display_upper": 8.098322390550601,
+                  "est": -1.0498221244986774,
+                  "lower": -4.191301176947334,
+                  "upper": 2.09165692794998
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  0.0,
+                  19.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  1.0,
+                  20.0
+                ]
+              }
+            ],
+            "outcome": "nephrotoxic"
+          }
+        ],
+        "covariates": {},
+        "id": 17,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Vanhaeverbeek",
+        "notes": "",
+        "sample_size": null,
+        "year": 1993
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 1.6437088251204048,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.31623931623931617,
+                  "display_lower": 0.012615032501693012,
+                  "display_se": 1.6437088251204048,
+                  "display_upper": 7.927629605558974,
+                  "est": -1.151256022153532,
+                  "lower": -4.372866120460171,
+                  "upper": 2.070354076153107
+                },
+                "tx B-tx A": {
+                  "display_est": 3.162162162162163,
+                  "display_lower": 0.12614111023789315,
+                  "display_upper": 79.27050523776249,
+                  "est": 1.151256022153532,
+                  "lower": -2.070354076153107,
+                  "upper": 4.372866120460171
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.3220338983050846,
+                  "display_lower": 0.013394124514413765,
+                  "display_upper": 7.742636074942344,
+                  "est": -1.1330984647392794,
+                  "lower": -4.312939137254544,
+                  "upper": 2.0467422077759854
+                },
+                "tx B-tx A": {
+                  "display_est": 3.105263157894738,
+                  "display_lower": 0.12915497904341922,
+                  "display_upper": 74.65960159798978,
+                  "est": 1.1330984647392794,
+                  "lower": -2.0467422077759854,
+                  "upper": 4.312939137254544
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  0.0,
+                  58.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  1.0,
+                  56.0
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "display_est": 0.1306471306471306,
+                  "display_lower": 0.006594308775753563,
+                  "display_upper": 2.588394527275967,
+                  "est": -2.0352552493911635,
+                  "lower": -5.021548308654056,
+                  "upper": 0.9510378098717287
+                },
+                "tx B-tx A": {
+                  "display_est": 7.654205607476638,
+                  "display_lower": 0.38633986800010833,
+                  "display_upper": 151.64591680584826,
+                  "est": 2.0352552493911635,
+                  "lower": -0.9510378098717287,
+                  "upper": 5.021548308654056
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.1380145278450363,
+                  "display_lower": 0.00729081401204228,
+                  "display_upper": 2.6126040061955473,
+                  "est": -1.980396325126483,
+                  "lower": -4.921140077735401,
+                  "upper": 0.9603474274824348
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  0.0,
+                  58.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  3.0,
+                  56.0
+                ]
+              }
+            ],
+            "outcome": "nephrotoxic"
+          }
+        ],
+        "covariates": {},
+        "id": 18,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Hollender",
+        "notes": "",
+        "sample_size": null,
+        "year": 1989
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {},
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "clinical failure"
+          },
+          {
+            "entered_effects": {},
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "nephrotoxic"
+          }
+        ],
+        "covariates": {},
+        "id": 19,
+        "include": false,
+        "manually_excluded": false,
+        "name": "",
+        "notes": "",
+        "sample_size": null,
+        "year": null
+      }
+    ],
+    "summary": null,
+    "title": "aminoglycosides"
+  },
+  "project_file": "sample_projects/amino.rcms",
+  "schema_version": 1,
+  "source_sha256": "4179f4de621fe08952d8825415d479d797b75999c978c7fdbde037f84ad6be7e"
+}

@@ -1,0 +1,542 @@
+{
+  "baseline_commit": "e8a21fc3c277e8a8c144413dfa320ea9e68a20e4",
+  "dataset": {
+    "analysis_family": "continuous",
+    "covariates": [],
+    "is_diagnostic": false,
+    "notes": "",
+    "outcomes": [
+      {
+        "data_type": 1,
+        "follow_ups": [
+          "first"
+        ],
+        "name": "blood pressure",
+        "sub_type": null
+      }
+    ],
+    "studies": [
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "blood pressure"
+          },
+          {
+            "entered_effects": {
+              "MD": {
+                "tx A-tx B": {
+                  "display_est": 2.0,
+                  "display_lower": -5.52313055127718,
+                  "display_upper": 9.52313055127718,
+                  "est": 2.0,
+                  "lower": -5.52313055127718,
+                  "upper": 9.52313055127718
+                }
+              },
+              "SMD": {
+                "tx A-tx B": {
+                  "SE": 0.1826761115625136,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.09452415852032972,
+                  "display_lower": -0.2635144409780178,
+                  "display_se": 0.1826761115625136,
+                  "display_upper": 0.4525627580186772,
+                  "est": 0.09452415852032972,
+                  "lower": -0.2635144409780177,
+                  "upper": 0.4525627580186772
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  60.0,
+                  94.0,
+                  22.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  60.0,
+                  92.0,
+                  20.0
+                ]
+              }
+            ],
+            "outcome": "blood pressure"
+          }
+        ],
+        "covariates": {},
+        "id": 0,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Carroll",
+        "notes": "",
+        "sample_size": null,
+        "year": 1997
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "blood pressure"
+          },
+          {
+            "entered_effects": {
+              "MD": {
+                "tx A-tx B": {
+                  "display_est": 6.0,
+                  "display_lower": -1.3937077293331654,
+                  "display_upper": 13.393707729333165,
+                  "est": 6.0,
+                  "lower": -1.3937077293331654,
+                  "upper": 13.393707729333165
+                }
+              },
+              "SMD": {
+                "tx A-tx B": {
+                  "SE": 0.17625294625526444,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.2773558662655102,
+                  "display_lower": -0.06809356056388183,
+                  "display_se": 0.17625294625526444,
+                  "display_upper": 0.6228052930949022,
+                  "est": 0.2773558662655102,
+                  "lower": -0.06809356056388177,
+                  "upper": 0.6228052930949022
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  65.0,
+                  98.0,
+                  21.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  65.0,
+                  92.0,
+                  22.0
+                ]
+              }
+            ],
+            "outcome": "blood pressure"
+          }
+        ],
+        "covariates": {},
+        "id": 1,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Grant",
+        "notes": "",
+        "sample_size": null,
+        "year": 1981
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "blood pressure"
+          },
+          {
+            "entered_effects": {
+              "MD": {
+                "tx A-tx B": {
+                  "display_est": 10.0,
+                  "display_lower": -1.841167465893534,
+                  "display_upper": 21.841167465893534,
+                  "est": 10.0,
+                  "lower": -1.841167465893534,
+                  "upper": 21.841167465893534
+                }
+              },
+              "SMD": {
+                "tx A-tx B": {
+                  "SE": 0.22547664539272624,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.36654442951592,
+                  "display_lower": -0.07538167480873248,
+                  "display_se": 0.22547664539272624,
+                  "display_upper": 0.8084705338405724,
+                  "est": 0.36654442951592,
+                  "lower": -0.07538167480873242,
+                  "upper": 0.8084705338405724
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  40.0,
+                  98.0,
+                  28.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  40.0,
+                  88.0,
+                  26.0
+                ]
+              }
+            ],
+            "outcome": "blood pressure"
+          }
+        ],
+        "covariates": {},
+        "id": 2,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Peck",
+        "notes": "",
+        "sample_size": null,
+        "year": 1987
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "blood pressure"
+          },
+          {
+            "entered_effects": {
+              "MD": {
+                "tx A-tx B": {
+                  "display_est": 12.0,
+                  "display_lower": 8.466624677839064,
+                  "display_upper": 15.533375322160936,
+                  "est": 12.0,
+                  "lower": 8.466624677839064,
+                  "upper": 15.533375322160936
+                }
+              },
+              "SMD": {
+                "tx A-tx B": {
+                  "SE": 0.10272175637455506,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.664384968326914,
+                  "display_lower": 0.46305402540408835,
+                  "display_se": 0.10272175637455506,
+                  "display_upper": 0.8657159112497396,
+                  "est": 0.664384968326914,
+                  "lower": 0.46305402540408835,
+                  "upper": 0.8657159112497396
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  200.0,
+                  94.0,
+                  19.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  200.0,
+                  82.0,
+                  17.0
+                ]
+              }
+            ],
+            "outcome": "blood pressure"
+          }
+        ],
+        "covariates": {},
+        "id": 3,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Donat",
+        "notes": "",
+        "sample_size": null,
+        "year": 2003
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "blood pressure"
+          },
+          {
+            "entered_effects": {
+              "MD": {
+                "tx A-tx B": {
+                  "display_est": 10.0,
+                  "display_lower": 1.3282821448759794,
+                  "display_upper": 18.671717855124022,
+                  "est": 10.0,
+                  "lower": 1.3282821448759794,
+                  "upper": 18.671717855124022
+                }
+              },
+              "SMD": {
+                "tx A-tx B": {
+                  "SE": 0.2081938274991157,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.4618062812876984,
+                  "display_lower": 0.05375387758588701,
+                  "display_se": 0.2081938274991157,
+                  "display_upper": 0.8698586849895098,
+                  "est": 0.4618062812876984,
+                  "lower": 0.053753877585886956,
+                  "upper": 0.8698586849895098
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  50.0,
+                  98.0,
+                  21.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  45.0,
+                  88.0,
+                  22.0
+                ]
+              }
+            ],
+            "outcome": "blood pressure"
+          }
+        ],
+        "covariates": {},
+        "id": 4,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Stewart",
+        "notes": "",
+        "sample_size": null,
+        "year": 1990
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "blood pressure"
+          },
+          {
+            "entered_effects": {
+              "MD": {
+                "tx A-tx B": {
+                  "display_est": 4.0,
+                  "display_lower": -2.465609847167473,
+                  "display_upper": 10.465609847167473,
+                  "est": 4.0,
+                  "lower": -2.465609847167473,
+                  "upper": 10.465609847167473
+                }
+              },
+              "SMD": {
+                "tx A-tx B": {
+                  "SE": 0.1537213471041727,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.18516443739910043,
+                  "display_lower": -0.11612386658005852,
+                  "display_se": 0.1537213471041727,
+                  "display_upper": 0.4864527413782594,
+                  "est": 0.18516443739910043,
+                  "lower": -0.11612386658005852,
+                  "upper": 0.4864527413782594
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  85.0,
+                  96.0,
+                  21.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  85.0,
+                  92.0,
+                  22.0
+                ]
+              }
+            ],
+            "outcome": "blood pressure"
+          }
+        ],
+        "covariates": {},
+        "id": 5,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Young",
+        "notes": "",
+        "sample_size": null,
+        "year": 1995
+      }
+    ],
+    "summary": null,
+    "title": "continuous"
+  },
+  "project_file": "sample_projects/continuous.rcms",
+  "schema_version": 1,
+  "source_sha256": "37078020fdfb50a674d0836778bcf6860cf80b11cdaed5bd9b9dd1eaef97b72d"
+}

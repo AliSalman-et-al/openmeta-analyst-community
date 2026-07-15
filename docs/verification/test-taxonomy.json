@@ -7297,6 +7297,126 @@
       "reason": "Guards the hosted native smoke contract without asserting compositor exposure, undocumented display geometry, or pixels.",
       "runtime_class": "subsecond",
       "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness", "analysis_behavior"],
+      "external_dependencies": ["filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_pre_qt6_baseline.py::test_frozen_sample_semantic_snapshots_cover_every_committed_project",
+      "reason": "Guards complete normalized semantic evidence for every committed pre-Qt6 sample project.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem", "git"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_pre_qt6_baseline.py::test_qt_port_inventory_classifies_required_surfaces_and_completion_rules",
+      "reason": "Guards the authoritative Qt-bearing source inventory and measurable zero-legacy completion rules.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_pre_qt6_baseline.py::test_removed_api_detector_accepts_native_pyqt6_locations_and_rejects_legacy_ones",
+      "reason": "Guards import-aware Qt6 API ownership without rejecting QAction and QGraphicsSvgItem in their native modules.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_pre_qt6_baseline.py::test_dependency_detector_blocks_qt5_and_alternate_bindings_but_allows_pyqt6",
+      "reason": "Guards PyQt6-only dependency declarations in project metadata and the resolved lock.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem", "git", "subprocess"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_pre_qt6_baseline.py::test_native_pyqt6_fixture_reaches_all_zero_legacy_targets",
+      "reason": "Proves a clean native PyQt6 source and lock fixture reaches all eight migration targets at zero.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness", "analysis_behavior"],
+      "external_dependencies": ["filesystem", "git"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_pre_qt6_baseline.py::test_checked_in_baseline_evidence_is_reproducible",
+      "reason": "Guards hashes linking locked dependencies, golden evidence, and sample semantics to the immutable PyQt5 commit.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_pre_qt6_baseline.py::test_baseline_is_explicitly_diagnostic_and_not_a_forward_ci_target",
+      "reason": "Guards the diagnostic-only baseline policy and prevents it from becoming a maintained CI runtime.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem", "git"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_pre_qt6_baseline.py::test_all_zero_legacy_checks_have_executable_detectors",
+      "reason": "Guards the executable report contract for all eight final Qt6 legacy-contraction checks.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem", "git", "subprocess"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_pre_qt6_baseline.py::test_zero_legacy_report_cli_writes_machine_readable_report",
+      "reason": "Guards the machine-readable CLI report used for final zero-legacy contraction.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem", "git"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_pre_qt6_baseline.py::test_one_time_capture_refuses_post_baseline_input_drift",
+      "reason": "Guards fail-closed one-time capture when runtime inputs differ from the tagged baseline.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem", "git"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_pre_qt6_baseline.py::test_forward_validation_does_not_import_pyqt5_or_execute_pickle",
+      "reason": "Guards Qt5-independent frozen-hash validation after the hard cutover.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness", "analysis_behavior", "gui_compatibility"],
+      "external_dependencies": ["filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_pre_qt6_baseline.py::test_baseline_retains_actual_golden_outputs_and_rendered_interface_payloads",
+      "reason": "Guards independently retained Golden Analysis Test outputs and rendered interface PNG evidence.",
+      "runtime_class": "subsecond",
+      "size": "small"
     }
 
   ]

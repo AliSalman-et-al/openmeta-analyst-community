@@ -1,0 +1,1254 @@
+{
+  "baseline_commit": "e8a21fc3c277e8a8c144413dfa320ea9e68a20e4",
+  "dataset": {
+    "analysis_family": "binary",
+    "covariates": [
+      {
+        "data_type": 1,
+        "name": "latitude",
+        "stable_id": null
+      }
+    ],
+    "is_diagnostic": false,
+    "notes": "",
+    "outcomes": [
+      {
+        "data_type": 0,
+        "follow_ups": [
+          "first"
+        ],
+        "name": "tuberculosis",
+        "sub_type": null
+      }
+    ],
+    "studies": [
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.5975993241743407,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.39113827349121466,
+                  "display_lower": 0.12124193177534495,
+                  "display_se": 0.5975993241743407,
+                  "display_upper": 1.261850143341243,
+                  "est": -0.9386941408703922,
+                  "lower": -2.109967293437576,
+                  "upper": 0.23257901169679185
+                }
+              },
+              "RD": {
+                "tx A-tx B": {
+                  "display_est": -0.0466,
+                  "display_lower": -0.1014,
+                  "display_upper": 0.0081,
+                  "est": -0.0466,
+                  "lower": -0.1014,
+                  "upper": 0.0081
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.41093865484109393,
+                  "display_lower": 0.13430157083258856,
+                  "display_upper": 1.2573983833227884,
+                  "est": -0.8893113339202054,
+                  "lower": -2.0076674790761615,
+                  "upper": 0.22904481123575082
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  4.0,
+                  123.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  11.0,
+                  139.0
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          }
+        ],
+        "covariates": {
+          "latitude": 44.0
+        },
+        "id": 0,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Aaronson",
+        "notes": "",
+        "sample_size": null,
+        "year": 1948
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.45621529309875836,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.18896551724137936,
+                  "display_lower": 0.07727720378054155,
+                  "display_se": 0.45621529309875836,
+                  "display_upper": 0.4620763298800069,
+                  "est": -1.6661907290265496,
+                  "lower": -2.5603562726965006,
+                  "upper": -0.7720251853565988
+                }
+              },
+              "RD": {
+                "tx A-tx B": {
+                  "display_est": -0.07610172781984081,
+                  "display_lower": -0.11268867400786281,
+                  "display_upper": -0.03951478163181881,
+                  "est": -0.07610172781984081,
+                  "lower": -0.11268867400786281,
+                  "upper": -0.03951478163181881
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.20486815415821502,
+                  "display_lower": 0.08629744963356457,
+                  "display_upper": 0.4863522707381372,
+                  "est": -1.5853886572014306,
+                  "lower": -2.4499552336635637,
+                  "upper": -0.7208220807392974
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  6.0,
+                  306.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  29.0,
+                  303.0
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          }
+        ],
+        "covariates": {
+          "latitude": 55.0
+        },
+        "id": 1,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Ferguson & Simes",
+        "notes": "",
+        "sample_size": null,
+        "year": 1949
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.6583411563543026,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.24999999999999994,
+                  "display_lower": 0.06879533668269952,
+                  "display_se": 0.6583411563543026,
+                  "display_upper": 0.9084918108369013,
+                  "est": -1.3862943611198908,
+                  "lower": -2.676619317114776,
+                  "upper": -0.09596940512500551
+                }
+              },
+              "RD": {
+                "tx A-tx B": {
+                  "display_est": -0.03701298701298701,
+                  "display_lower": -0.06930185661917619,
+                  "display_upper": -0.004724117406797831,
+                  "est": -0.03701298701298701,
+                  "lower": -0.06930185661917619,
+                  "upper": -0.004724117406797831
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.25974025974025966,
+                  "display_lower": 0.07344259068807578,
+                  "display_upper": 0.9186086969136726,
+                  "est": -1.3480731482996933,
+                  "lower": -2.6112512570383393,
+                  "upper": -0.08489503956104749
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  3.0,
+                  231.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  11.0,
+                  220.0
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          }
+        ],
+        "covariates": {
+          "latitude": 42.0
+        },
+        "id": 2,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Rosenthal",
+        "notes": "",
+        "sample_size": null,
+        "year": 1960
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.1425286391333242,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.2330636820330969,
+                  "display_lower": 0.17626009738910864,
+                  "display_se": 0.1425286391333242,
+                  "display_upper": 0.30817343623106913,
+                  "est": -1.4564435493129846,
+                  "lower": -1.735794548779806,
+                  "upper": -1.177092549846163
+                }
+              },
+              "RD": {
+                "tx A-tx B": {
+                  "display_est": -0.014714618026393848,
+                  "display_lower": -0.01734627016787833,
+                  "display_upper": -0.012082965884909366,
+                  "est": -0.014714618026393848,
+                  "lower": -0.01734627016787833,
+                  "upper": -0.012082965884909366
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.23656052360641272,
+                  "display_lower": 0.17928089408142128,
+                  "display_upper": 0.3121407979119361,
+                  "est": -1.4415511900213054,
+                  "lower": -1.7188014624346246,
+                  "upper": -1.1643009176079862
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  62.0,
+                  13598.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  248.0,
+                  12867.0
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          }
+        ],
+        "covariates": {
+          "latitude": 52.0
+        },
+        "id": 3,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Hart & Sutherland",
+        "notes": "",
+        "sample_size": null,
+        "year": 1977
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.227929325267988,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.803208388961182,
+                  "display_lower": 0.5138240669993956,
+                  "display_se": 0.227929325267988,
+                  "display_upper": 1.2555731767589164,
+                  "est": -0.21914108567543256,
+                  "lower": -0.6658743542212042,
+                  "upper": 0.22759218287033917
+                }
+              },
+              "RD": {
+                "tx A-tx B": {
+                  "display_est": -0.0015821267065460826,
+                  "display_lower": -0.004777512729933288,
+                  "display_upper": 0.0016132593168411225,
+                  "est": -0.0015821267065460826,
+                  "lower": -0.004777512729933288,
+                  "upper": 0.0016132593168411225
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.8044895337953267,
+                  "display_lower": 0.5162931271266508,
+                  "display_upper": 1.2535580583614048,
+                  "est": -0.21754732221129558,
+                  "lower": -0.6610805989677224,
+                  "upper": 0.22598595454513132
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  33.0,
+                  5069.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  47.0,
+                  5808.0
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          }
+        ],
+        "covariates": {
+          "latitude": 13.0
+        },
+        "id": 4,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Frimodt-Moller",
+        "notes": "",
+        "sample_size": null,
+        "year": 1973
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.0995252004034066,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.3836126188049585,
+                  "display_lower": 0.31562898631572056,
+                  "display_se": 0.0995252004034066,
+                  "display_upper": 0.46623931161758714,
+                  "est": -0.9581220407762674,
+                  "lower": -1.1531878491210754,
+                  "upper": -0.7630562324314593
+                }
+              },
+              "RD": {
+                "tx A-tx B": {
+                  "display_est": -0.13956764584472833,
+                  "display_lower": -0.1671701502255252,
+                  "display_upper": -0.11196514146393147,
+                  "est": -0.13956764584472833,
+                  "lower": -0.1671701502255252,
+                  "upper": -0.11196514146393147
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.45561114483682574,
+                  "display_lower": 0.38713233532784835,
+                  "display_upper": 0.536202988891976,
+                  "est": -0.786115585818864,
+                  "lower": -0.9489886926529845,
+                  "upper": -0.6232424789847435
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  180.0,
+                  1541.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  372.0,
+                  1451.0
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          }
+        ],
+        "covariates": {
+          "latitude": 44.0
+        },
+        "id": 5,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Stein & Aaronson",
+        "notes": "",
+        "sample_size": null,
+        "year": 1953
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.47645532342864383,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.19519117067402433,
+                  "display_lower": 0.0767185987999075,
+                  "display_se": 0.47645532342864383,
+                  "display_upper": 0.49661481967971016,
+                  "est": -1.633775838228896,
+                  "lower": -2.567611112391421,
+                  "upper": -0.6999405640663713
+                }
+              },
+              "RD": {
+                "tx A-tx B": {
+                  "display_est": -0.012754832724785342,
+                  "display_lower": -0.02276885939870451,
+                  "display_upper": -0.0027408060508661725,
+                  "est": -0.012754832724785342,
+                  "lower": -0.02276885939870451,
+                  "upper": -0.0027408060508661725
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.19772102161100208,
+                  "display_lower": 0.07835657668143126,
+                  "display_upper": 0.4989192234091393,
+                  "est": -1.6208982235983918,
+                  "lower": -2.546485373927087,
+                  "upper": -0.6953110732696962
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  8.0,
+                  2545.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  10.0,
+                  629.0
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          }
+        ],
+        "covariates": {
+          "latitude": 19.0
+        },
+        "id": 6,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Vandiviere",
+        "notes": "",
+        "sample_size": null,
+        "year": 1973
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.06330056881378579,
+                  "display_conf_level": 95.0,
+                  "display_est": 1.012093139240272,
+                  "display_lower": 0.8940029235505601,
+                  "display_se": 0.06330056881378579,
+                  "display_upper": 1.145782072422158,
+                  "est": 0.012020601452732649,
+                  "lower": -0.1120462336231868,
+                  "upper": 0.1360874365286521
+                }
+              },
+              "RD": {
+                "tx A-tx B": {
+                  "display_est": 6.788021404894196e-05,
+                  "display_lower": -0.000632719722727074,
+                  "display_upper": 0.000768480150824958,
+                  "est": 6.788021404894196e-05,
+                  "lower": -0.000632719722727074,
+                  "upper": 0.000768480150824958
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 1.0120240480961917,
+                  "display_lower": 0.8945719775501424,
+                  "display_upper": 1.14489688882256,
+                  "est": 0.011952333523840508,
+                  "lower": -0.11140991247338973,
+                  "upper": 0.13531457952107073
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  505.0,
+                  88391.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  499.0,
+                  88391.0
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          }
+        ],
+        "covariates": {
+          "latitude": 13.0
+        },
+        "id": 7,
+        "include": true,
+        "manually_excluded": false,
+        "name": "TB Prevention Trial",
+        "notes": "",
+        "sample_size": null,
+        "year": 1980
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.2386988143828173,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.6239119440725868,
+                  "display_lower": 0.3907891529619548,
+                  "display_se": 0.2386988143828173,
+                  "display_upper": 0.9961026579320937,
+                  "est": -0.471746035838696,
+                  "lower": -0.9395871151814292,
+                  "upper": -0.003904956495962786
+                }
+              },
+              "RD": {
+                "tx A-tx B": {
+                  "display_est": -0.002316684687178207,
+                  "display_lower": -0.004600884858758814,
+                  "display_upper": -3.2484515597600364e-05,
+                  "est": -0.002316684687178207,
+                  "lower": -0.004600884858758814,
+                  "upper": -3.2484515597600364e-05
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.6253663451423148,
+                  "display_lower": 0.39257626600049916,
+                  "display_upper": 0.9961964069324547,
+                  "est": -0.4694176487381494,
+                  "lower": -0.9350244523535565,
+                  "upper": -0.003810845122742268
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  29.0,
+                  7499.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  45.0,
+                  7277.0
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          }
+        ],
+        "covariates": {
+          "latitude": 27.0
+        },
+        "id": 8,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Coetzee & Berjak",
+        "notes": "",
+        "sample_size": null,
+        "year": 1968
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.274630162791563,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.24629872775840977,
+                  "display_lower": 0.1437793613311035,
+                  "display_se": 0.274630162791563,
+                  "display_upper": 0.4219177407229735,
+                  "est": -1.401210139283481,
+                  "lower": -1.9394753674233165,
+                  "upper": -0.8629449111436457
+                }
+              },
+              "RD": {
+                "tx A-tx B": {
+                  "display_est": -0.029132279132279136,
+                  "display_lower": -0.03954917033264761,
+                  "display_upper": -0.018715387931910656,
+                  "est": -0.029132279132279136,
+                  "lower": -0.03954917033264761,
+                  "upper": -0.018715387931910656
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.25376546530392685,
+                  "display_lower": 0.1494209435217671,
+                  "display_upper": 0.4309764740010318,
+                  "est": -1.3713448034727844,
+                  "lower": -1.9009878318930005,
+                  "upper": -0.8417017750525684
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  17.0,
+                  1716.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  65.0,
+                  1665.0
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          }
+        ],
+        "covariates": {
+          "latitude": 42.0
+        },
+        "id": 9,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Rosenthal61",
+        "notes": "",
+        "sample_size": null,
+        "year": 1961
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.11191574429103136,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.711165826534675,
+                  "display_lower": 0.5710945624866659,
+                  "display_se": 0.11191574429103136,
+                  "display_upper": 0.8855920998942377,
+                  "est": -0.34084964636621073,
+                  "lower": -0.5602004744796263,
+                  "upper": -0.12149881825279515
+                }
+              },
+              "RD": {
+                "tx A-tx B": {
+                  "display_est": -0.0014842349885014817,
+                  "display_lower": -0.002483569613855683,
+                  "display_upper": -0.0004849003631472806,
+                  "est": -0.0014842349885014817,
+                  "lower": -0.002483569613855683,
+                  "upper": -0.0004849003631472806
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.7122268360591947,
+                  "display_lower": 0.5725136829862565,
+                  "display_upper": 0.8860348338872248,
+                  "est": -0.3393588283383906,
+                  "lower": -0.5577186434266777,
+                  "upper": -0.12099901325010351
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  186.0,
+                  50634.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  141.0,
+                  27338.0
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          }
+        ],
+        "covariates": {
+          "latitude": 18.0
+        },
+        "id": 10,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Comstock",
+        "notes": "",
+        "sample_size": null,
+        "year": 1974
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.7308639904077345,
+                  "display_conf_level": 95.0,
+                  "display_est": 1.5630431875919237,
+                  "display_lower": 0.37312849929957,
+                  "display_se": 0.7308639904077345,
+                  "display_upper": 6.547621022955019,
+                  "est": 0.44663468227444625,
+                  "lower": -0.9858324165219405,
+                  "upper": 1.879101781070833
+                }
+              },
+              "RD": {
+                "tx A-tx B": {
+                  "display_est": 0.0007200976500978654,
+                  "display_lower": -0.0015541307130805158,
+                  "display_upper": 0.0029943260132762467,
+                  "est": 0.0007200976500978654,
+                  "lower": -0.0015541307130805158,
+                  "upper": 0.0029943260132762467
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 1.5619161996263682,
+                  "display_lower": 0.3736891112218343,
+                  "display_upper": 6.528373831066915,
+                  "est": 0.44591340057137874,
+                  "lower": -0.9843310806678625,
+                  "upper": 1.87615788181062
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  5.0,
+                  2498.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  3.0,
+                  2341.0
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          }
+        ],
+        "covariates": {
+          "latitude": 33.0
+        },
+        "id": 11,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Comstock & Webster",
+        "notes": "",
+        "sample_size": null,
+        "year": 1969
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.2676473749089625,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.9828076308878605,
+                  "display_lower": 0.5816298155899247,
+                  "display_se": 0.2676473749089625,
+                  "display_upper": 1.6606969131245841,
+                  "est": -0.017341873929093587,
+                  "lower": -0.5419210893073493,
+                  "upper": 0.5072373414491621
+                }
+              },
+              "RD": {
+                "tx A-tx B": {
+                  "display_est": -2.78807421670098e-05,
+                  "display_lower": -0.0008710453145285464,
+                  "display_upper": 0.0008152838301945268,
+                  "est": -2.78807421670098e-05,
+                  "lower": -0.0008710453145285464,
+                  "upper": 0.0008152838301945268
+                }
+              },
+              "RR": {
+                "tx A-tx B": {
+                  "display_est": 0.9828350768741447,
+                  "display_lower": 0.5821374615339748,
+                  "display_upper": 1.6593413964269164,
+                  "est": -0.017313948216879815,
+                  "lower": -0.5410486709360358,
+                  "upper": 0.5064207745022762
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  27.0,
+                  16913.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  29.0,
+                  17854.0
+                ]
+              }
+            ],
+            "outcome": "tuberculosis"
+          }
+        ],
+        "covariates": {
+          "latitude": 33.0
+        },
+        "id": 12,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Comstock76",
+        "notes": "",
+        "sample_size": null,
+        "year": 1976
+      }
+    ],
+    "summary": null,
+    "title": "BCG"
+  },
+  "project_file": "sample_projects/BCG.rcms",
+  "schema_version": 1,
+  "source_sha256": "9eb3621ba9a84d9a7a08b22aa94fb9273df1140f49d4de6db3b51fa57f09f75f"
+}
