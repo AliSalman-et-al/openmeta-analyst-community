@@ -1031,6 +1031,45 @@ def test_edit_dataset_rejection_leaves_main_dataset_unchanged(monkeypatch):
         _close_without_prompt(app, window)
 
 
+def test_edit_empty_dataset_can_be_cancelled(monkeypatch):
+    import launch
+    import edit_dialog
+
+    app, window = launch.start_automation()
+    try:
+        original_dataset = window.model.dataset
+        monkeypatch.setattr(
+            edit_dialog.EditDialog, "exec", lambda dialog: dialog.Rejected
+        )
+
+        window.edit_dataset()
+
+        assert window.model.dataset is original_dataset
+        assert window.model.current_outcome is None
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_edit_empty_dataset_acceptance_preserves_empty_outcome_state(monkeypatch):
+    import launch
+    import edit_dialog
+
+    app, window = launch.start_automation()
+    try:
+        original_undo_count = window.tableView.undoStack.count()
+        monkeypatch.setattr(
+            edit_dialog.EditDialog, "exec", lambda dialog: dialog.Accepted
+        )
+
+        window.edit_dataset()
+
+        assert window.model.dataset.get_outcome_names() == []
+        assert window.model.current_outcome is None
+        assert window.tableView.undoStack.count() == original_undo_count + 1
+    finally:
+        _close_without_prompt(app, window)
+
+
 def test_edit_dataset_acceptance_propagates_copied_dataset_mutation(monkeypatch):
     import launch
     import edit_dialog

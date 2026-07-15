@@ -766,21 +766,17 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
             # update the new state dict to reflect the currently selected
             # outcomes, etc.
-            new_state_dict["current_outcome"] = old_state_dict["current_outcome"]
-
-            if edit_window.outcome_list.model().current_outcome is not None:
-                new_state_dict["current_outcome"] = (
-                    edit_window.outcome_list.model().current_outcome
-                )
-            # fix for issue #130: if the current outcome no longer exists, pick a different one.
-            elif (
-                new_state_dict["current_outcome"]
-                not in edit_window.outcome_list.model().outcome_list
-            ):
-                # then just show a random outcome
-                new_state_dict["current_outcome"] = (
-                    edit_window.outcome_list.model().outcome_list[0]
-                )
+            outcome_model = edit_window.outcome_list.model()
+            edited_outcomes = outcome_model.outcome_list
+            if outcome_model.current_outcome is not None:
+                new_state_dict["current_outcome"] = outcome_model.current_outcome
+            elif old_state_dict["current_outcome"] in edited_outcomes:
+                new_state_dict["current_outcome"] = old_state_dict["current_outcome"]
+            elif edited_outcomes:
+                # If the current outcome was removed, select the first remaining one.
+                new_state_dict["current_outcome"] = edited_outcomes[0]
+            else:
+                new_state_dict["current_outcome"] = None
 
             new_state_dict["current_time_point"] = max(
                 edit_window.follow_up_list.currentIndex().row(), 0

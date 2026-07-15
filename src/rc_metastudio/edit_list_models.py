@@ -170,12 +170,15 @@ class FollowUpsModel(ResettableTableModel):
         ## we maintain a current outcome string variable because
         # the follow-ups are outcome specific
         self.current_outcome = outcome
-        self.follow_up_list = self.dataset.get_follow_up_names_for_outcome(outcome)
+        self.follow_up_list = self._follow_up_names_for_current_outcome()
+
+    def _follow_up_names_for_current_outcome(self):
+        if self.current_outcome is None:
+            return []
+        return self.dataset.get_follow_up_names_for_outcome(self.current_outcome)
 
     def refresh_follow_up_list(self):
-        self.follow_up_list = self.dataset.get_follow_up_names_for_outcome(
-            self.current_outcome
-        )
+        self.follow_up_list = self._follow_up_names_for_current_outcome()
         self.reset_model()
 
     def data(self, index, role=Qt.DisplayRole):
