@@ -15,6 +15,11 @@ declared target. It installs Python 3.11.9 and R 4.6.1, synchronizes the frozen
 `uv.lock`, and obtains `rcc` 6.11.1 from the official Qt online repository with
 the exactly selected `aqtinstall` client. The repository validator records and
 checks the resolved Python, PyQt6, Qt, SIP, R, rpy2, and PyInstaller versions.
+Qt installs library executables under `libexec` on Unix-family SDKs, so the
+resolver recognizes the official macOS `libexec/rcc` layout (plus explicit
+documented fallback layouts), rejects missing or ambiguous executables, and
+validates the selected tool's exact version and Mach-O architecture before
+exporting it to later steps.
 
 The source proof generates the representative Designer form, compiles and
 registers the binary resource, renders its SVG icon, shows a real Cocoa dialog,
@@ -38,6 +43,13 @@ manual or alternate Qt collection. Native probes are capped at 100 MB; the
 inspected minimal deployment is capped at 10,000 files and 1 GB. The two
 architecture evidence artifacts are retained separately for 30 days and named
 with the source commit SHA.
+
+The per-target diagnostics directory and setup log are created immediately
+after checkout, before uv, Python, R, lock synchronization, or Qt installation.
+Successful evidence upload remains mandatory. On an earlier failure, a
+separate best-effort upload retains setup and identity diagnostics without
+allowing an artifact-service failure or cache cleanup to replace the primary
+setup error.
 
 ## Blocking policy
 

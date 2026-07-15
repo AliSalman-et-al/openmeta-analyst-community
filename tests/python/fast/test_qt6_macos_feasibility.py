@@ -9,6 +9,8 @@ import yaml
 
 from rc_metastudio.qt6_macos_feasibility import (
     EvidenceError,
+    append_github_env,
+    discover_macos_rcc,
     discover_rpy2_native_extensions,
     validate_evidence,
 )
@@ -302,16 +304,26 @@ def test_native_macos_workflow_uses_two_strict_native_jobs_and_retains_evidence(
     assert job["strategy"]["fail-fast"] is False
     assert job["continue-on-error"] is False
     assert job["runs-on"] == "${{ matrix.runner }}"
-    assert any(
-        step.get("uses", "").startswith("actions/upload-artifact@")
-        and step.get("if") == "${{ always() }}"
-        and step["with"]["if-no-files-found"] == "error"
-        for step in job["steps"]
+    steps = {step["name"]: step for step in job["steps"]}
+    success_upload = steps["Upload successful native feasibility evidence"]
+    failure_upload = steps["Upload early failure diagnostics"]
+    assert success_upload["if"] == "${{ success() }}"
+    assert success_upload["with"]["if-no-files-found"] == "error"
+    assert failure_upload["if"] == "${{ failure() }}"
+    assert failure_upload["continue-on-error"] is True
+    assert failure_upload["with"]["if-no-files-found"] == "warn"
+    step_names = list(steps)
+    assert step_names.index("Prepare retained setup diagnostics") < step_names.index(
+        "Install uv"
     )
+    assert "mkdir -p" in steps["Prepare retained setup diagnostics"]["run"]
+    assert "setup.log" in steps["Prepare retained setup diagnostics"]["run"]
 
     script_steps = "\n".join(str(step.get("run", "")) for step in job["steps"])
     assert "uv sync --locked" in script_steps
     assert "uv run aqt install-qt mac desktop" in script_steps
+    assert "qt6_macos_feasibility.py resolve-rcc" in script_steps
+    assert "/macos/bin/rcc" not in script_steps
     assert workflow["env"]["R_VERSION"] == "4.6.1"
     assert "qt6_macos_feasibility.py run" in script_steps
     assert "qt6_macos_feasibility.py validate" in script_steps
@@ -328,6 +340,82 @@ def test_locked_rpy2_runtime_discovers_concrete_native_extensions():
     assert all(path.is_file() for path in extensions)
     assert all(path.suffix.lower() in {".dylib", ".pyd", ".so"} for path in extensions)
     assert any("rinterface" in path.name.lower() or "rinterface_lib" in path.as_posix() for path in extensions)
+
+
+def test_macos_sdk_rcc_discovery_uses_qt6_libexec_layout_and_fails_ambiguous(
+    tmp_path,
+):
+    sdk_root = tmp_path / "6.11.1/macos"
+    libexec_rcc = sdk_root / "libexec/rcc"
+    libexec_rcc.parent.mkdir(parents=True)
+    libexec_rcc.write_bytes(b"official macOS rcc")
+
+    assert discover_macos_rcc(sdk_root) == libexec_rcc.resolve()
+
+    bin_rcc = sdk_root / "bin/rcc"
+    bin_rcc.parent.mkdir()
+    bin_rcc.write_bytes(b"different rcc")
+    with pytest.raises(RuntimeError, match="ambiguous"):
+        discover_macos_rcc(sdk_root)
+
+    libexec_rcc.unlink()
+    bin_rcc.unlink()
+    (sdk_root / "unexpected/rcc").parent.mkdir()
+    (sdk_root / "unexpected/rcc").write_bytes(b"unrecognized")
+    with pytest.raises(RuntimeError, match="recognized layout"):
+        discover_macos_rcc(sdk_root)
+
+
+def test_macos_sdk_rcc_discovery_supports_every_allowlisted_layout(tmp_path):
+    layouts = [
+        "libexec/rcc",
+        "libexec/rcc.app/Contents/MacOS/rcc",
+        "bin/rcc",
+        "bin/rcc.app/Contents/MacOS/rcc",
+    ]
+    for index, relative in enumerate(layouts):
+        sdk_root = tmp_path / str(index) / "6.11.1/macos"
+        candidate = sdk_root / relative
+        candidate.parent.mkdir(parents=True)
+        candidate.write_bytes(relative.encode())
+
+        assert discover_macos_rcc(sdk_root) == candidate.resolve()
+
+
+def test_macos_sdk_rcc_discovery_deduplicates_aliases_and_rejects_escape(
+    tmp_path,
+):
+    sdk_root = tmp_path / "sdk/6.11.1/macos"
+    libexec_rcc = sdk_root / "libexec/rcc"
+    libexec_rcc.parent.mkdir(parents=True)
+    libexec_rcc.write_bytes(b"one official rcc")
+    bin_rcc = sdk_root / "bin/rcc"
+    bin_rcc.parent.mkdir()
+    try:
+        bin_rcc.symlink_to(libexec_rcc)
+    except OSError as exc:
+        pytest.skip(f"file symlinks unavailable: {exc}")
+
+    assert discover_macos_rcc(sdk_root) == libexec_rcc.resolve()
+
+    bin_rcc.unlink()
+    outside = tmp_path / "outside-rcc"
+    outside.write_bytes(b"escaping rcc")
+    bin_rcc.symlink_to(outside)
+    with pytest.raises(RuntimeError, match="escapes the declared SDK root"):
+        discover_macos_rcc(sdk_root)
+
+
+def test_github_env_export_rejects_newlines_and_preserves_exact_utf8(tmp_path):
+    github_env = tmp_path / "github-env"
+    value = str((tmp_path / "Qt SDK/libexec/rcc-µ").resolve())
+    append_github_env(github_env, "RCMS_QT6_RCC", value)
+
+    assert github_env.read_bytes() == f"RCMS_QT6_RCC={value}\n".encode("utf-8")
+    for unsafe in (f"{value}\nINJECTED=1", f"{value}\rINJECTED=1"):
+        with pytest.raises(RuntimeError, match="CR or LF"):
+            append_github_env(github_env, "RCMS_QT6_RCC", unsafe)
+    assert github_env.read_bytes() == f"RCMS_QT6_RCC={value}\n".encode("utf-8")
 
 
 def test_native_macos_evidence_recomputes_retained_diagnostic_hashes(

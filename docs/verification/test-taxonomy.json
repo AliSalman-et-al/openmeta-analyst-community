@@ -7909,6 +7909,26 @@
       "reason": "Guards split namespace-package discovery against Path(None) and proves concrete rpy2-rinterface extensions are found.", "runtime_class": "subsecond", "size": "small"
     },
     {
+      "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_macos_sdk_rcc_discovery_uses_qt6_libexec_layout_and_fails_ambiguous",
+      "reason": "Guards the official Qt macOS libexec rcc layout and fail-closed ambiguous or unknown SDK layouts.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_macos_sdk_rcc_discovery_supports_every_allowlisted_layout",
+      "reason": "Guards every explicitly supported command and app-bundle rcc fallback layout.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": ["filesystem", "symlinks"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_macos_sdk_rcc_discovery_deduplicates_aliases_and_rejects_escape",
+      "reason": "Guards same-target alias deduplication and rejects rcc symlinks escaping the declared SDK root.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_github_env_export_rejects_newlines_and_preserves_exact_utf8",
+      "reason": "Guards GitHub environment-file export against CR/LF injection while preserving exact UTF-8 paths.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
       "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
       "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_native_macos_evidence_recomputes_retained_diagnostic_hashes",
       "reason": "Guards retained diagnostic bytes against evidence digest tampering.", "runtime_class": "subsecond", "size": "small"

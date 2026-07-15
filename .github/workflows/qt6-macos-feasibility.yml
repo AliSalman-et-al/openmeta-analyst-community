@@ -49,13 +49,25 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
+      - name: Prepare retained setup diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="artifacts/qt6-feasibility/${{ matrix.target }}"
+          mkdir -p "$evidence_dir"
+          printf 'target=%s\nrunner=%s\nexpected-machine=%s\n' \
+            "${{ matrix.target }}" "${{ matrix.runner }}" "${{ matrix.machine }}" \
+            > "$evidence_dir/setup.log"
+
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           enable-cache: true
 
       - name: Install native Python
-        run: uv python install "$PYTHON_VERSION"
+        run: |
+          set -euo pipefail
+          uv python install "$PYTHON_VERSION" 2>&1 | tee -a "artifacts/qt6-feasibility/${{ matrix.target }}/setup.log"
 
       - name: Install native R
         uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
@@ -63,13 +75,21 @@ jobs:
           r-version: ${{ env.R_VERSION }}
 
       - name: Sync locked application stack
-        run: uv sync --locked
+        run: |
+          set -euo pipefail
+          uv sync --locked 2>&1 | tee -a "artifacts/qt6-feasibility/${{ matrix.target }}/setup.log"
 
       - name: Install matching official Qt SDK tools
         run: |
           set -euo pipefail
-          uv run aqt install-qt mac desktop "$QT_VERSION" clang_64 --outputdir "$PWD/build/qt-sdk"
-          test -x "$PWD/build/qt-sdk/$QT_VERSION/macos/bin/rcc"
+          evidence_dir="artifacts/qt6-feasibility/${{ matrix.target }}"
+          uv run aqt install-qt mac desktop "$QT_VERSION" clang_64 --outputdir "$PWD/build/qt-sdk" \
+            2>&1 | tee -a "$evidence_dir/setup.log"
+          uv run python scripts/qt6_macos_feasibility.py resolve-rcc \
+            --sdk-root "$PWD/build/qt-sdk/$QT_VERSION/macos" \
+            --github-env "$GITHUB_ENV" \
+            --diagnostic "$evidence_dir/rcc-identity.json" \
+            2>&1 | tee -a "$evidence_dir/setup.log"
 
       - name: Prove native architecture before launch
         run: |
@@ -83,7 +103,6 @@ jobs:
 
       - name: Run source, R, and packaged native proof
         env:
-          RCMS_QT6_RCC: ${{ github.workspace }}/build/qt-sdk/${{ env.QT_VERSION }}/macos/bin/rcc
           RCMS_RUNNER_IMAGE: ${{ matrix.runner }}
           RPY2_CFFI_MODE: ABI
         run: |
@@ -100,8 +119,8 @@ jobs:
             --target "${{ matrix.target }}" \
             --evidence "artifacts/qt6-feasibility/${{ matrix.target }}/evidence.json"
 
-      - name: Upload native feasibility evidence and diagnostics
-        if: ${{ always() }}
+      - name: Upload successful native feasibility evidence
+        if: ${{ success() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: qt6-feasibility-${{ matrix.target }}-${{ github.sha }}
@@ -110,6 +129,18 @@ jobs:
           retention-days: 30
           compression-level: 0
 
+      - name: Upload early failure diagnostics
+        if: ${{ failure() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: qt6-feasibility-${{ matrix.target }}-${{ github.sha }}-failure
+          path: artifacts/qt6-feasibility/${{ matrix.target }}
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 0
+
       - name: Prune uv cache
         if: ${{ always() }}
+        continue-on-error: true
         run: uv cache prune --ci

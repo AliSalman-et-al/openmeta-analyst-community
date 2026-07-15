@@ -525,6 +525,79 @@ def discover_rpy2_native_extensions() -> list[Path]:
     return extensions
 
 
+def discover_macos_rcc(sdk_root: Path) -> Path:
+    """Resolve one recognized Qt macOS SDK ``rcc`` layout, fail closed otherwise."""
+
+    root = sdk_root.resolve()
+    relative_candidates = (
+        Path("libexec/rcc"),
+        Path("libexec/rcc.app/Contents/MacOS/rcc"),
+        Path("bin/rcc"),
+        Path("bin/rcc.app/Contents/MacOS/rcc"),
+    )
+    candidates = set()
+    for relative in relative_candidates:
+        candidate = root / relative
+        if not candidate.is_file():
+            continue
+        resolved = candidate.resolve()
+        if not resolved.is_relative_to(root):
+            raise RuntimeError(
+                f"Qt macOS SDK rcc escapes the declared SDK root: {candidate} -> "
+                f"{resolved}"
+            )
+        candidates.add(resolved)
+    if not candidates:
+        searched = ", ".join(relative.as_posix() for relative in relative_candidates)
+        raise RuntimeError(
+            f"Qt macOS SDK contains no rcc in a recognized layout under {root}; "
+            f"searched {searched}"
+        )
+    if len(candidates) != 1:
+        raise RuntimeError(
+            "Qt macOS SDK contains ambiguous distinct rcc executables: "
+            + ", ".join(str(candidate) for candidate in sorted(candidates))
+        )
+    return candidates.pop()
+
+
+def append_github_env(github_env: Path, name: str, value: str) -> None:
+    """Append one safe, exact UTF-8 GitHub environment-file assignment."""
+
+    if not re.fullmatch(r"[A-Z_][A-Z0-9_]*", name):
+        raise RuntimeError(f"invalid GitHub environment variable name: {name!r}")
+    if "\r" in value or "\n" in value:
+        raise RuntimeError("GitHub environment variable value contains CR or LF")
+    github_env.parent.mkdir(parents=True, exist_ok=True)
+    with github_env.open("ab") as stream:
+        stream.write(f"{name}={value}\n".encode("utf-8"))
+
+
+def resolve_macos_rcc(
+    sdk_root: Path, github_env: Path, diagnostic: Path
+) -> dict[str, object]:
+    """Validate, record, and export the exact official SDK ``rcc`` executable."""
+
+    from rc_metastudio.qt6_build import validate_macos_rcc
+
+    rcc = discover_macos_rcc(sdk_root)
+    validate_macos_rcc(rcc)
+    record: dict[str, object] = {
+        "path": str(rcc),
+        "version": EXPECTED_VERSIONS["qt"],
+        "sha256": _sha256(rcc),
+        "architectures": _archs(rcc),
+    }
+    diagnostic.parent.mkdir(parents=True, exist_ok=True)
+    diagnostic.write_text(
+        json.dumps(record, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    append_github_env(github_env, "RCMS_QT6_RCC", str(rcc))
+    return record
+
+
 def _native_component_paths() -> dict[str, list[Path]]:
     from PyQt6 import QtCore, sip
 
@@ -868,6 +941,10 @@ def _parser() -> argparse.ArgumentParser:
     validate = subparsers.add_parser("validate")
     validate.add_argument("--target", choices=sorted(TARGET_MACHINES), required=True)
     validate.add_argument("--evidence", type=Path, required=True)
+    resolve = subparsers.add_parser("resolve-rcc")
+    resolve.add_argument("--sdk-root", type=Path, required=True)
+    resolve.add_argument("--github-env", type=Path, required=True)
+    resolve.add_argument("--diagnostic", type=Path, required=True)
     return parser
 
 
@@ -875,6 +952,14 @@ def main(arguments: list[str] | None = None) -> int:
     options = _parser().parse_args(arguments)
     if options.command == "run":
         run_feasibility(options.target, options.evidence_dir.resolve())
+        return 0
+    if options.command == "resolve-rcc":
+        record = resolve_macos_rcc(
+            options.sdk_root.resolve(),
+            options.github_env.resolve(),
+            options.diagnostic.resolve(),
+        )
+        print(json.dumps(record, sort_keys=True))
         return 0
     evidence = json.loads(options.evidence.read_text(encoding="utf-8"))
     validate_evidence(evidence, options.target, evidence_dir=options.evidence.parent)
