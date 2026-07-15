@@ -54,7 +54,7 @@ bash ./scripts/package-macos.sh --architecture x64
 bash ./scripts/package-macos.sh --architecture arm64
 ```
 
-Windows remains the default active package target. Fast GitHub verification runs on pull requests and manual dispatch, not every feature-branch push. Pull requests always run a lightweight classifier and stable gate check; the Windows smoke/fast lanes run only when source, tests, dependency files, or validated manifests changed. Package jobs run from manual dispatch and release tags; macOS package jobs are opt-in through the GitHub Actions `workflow_dispatch` inputs.
+Windows remains the default active package target. Fast GitHub verification runs on pull requests and manual dispatch, not every feature-branch push. Pull requests always run a lightweight classifier and stable gate check; the Windows smoke/fast lanes run only when source, tests, dependency files, or validated manifests changed. Manual Package Qualification never publishes. Production delivery uses the build-once candidate, protected signing, RC, and exact-byte promotion workflows documented in `docs/release/desktop-delivery-runbook.md`; version tags never trigger package builds.
 
 The Apple Silicon package job is currently experimental under the single Qt runtime policy because `PyQt5-Qt5==5.15.2` is the newest PyPI Qt5 runtime wheel with Windows support, but its macOS wheel is Intel-only.
 

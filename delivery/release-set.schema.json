@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rc-metastudio.org/schemas/release-set-v1.json",
+  "type": "object",
+  "required": ["schema_version", "product", "version", "channel", "trust_profile", "source", "policy_inputs", "targets", "history"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "product": {"const": "RC MetaStudio"},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-rc\\.[0-9]+)?$"},
+    "channel": {"enum": ["candidate", "rc", "stable", "withdrawn"]},
+    "trust_profile": {"enum": ["unsigned-community", "trusted-signed"]},
+    "source": {
+      "type": "object",
+      "required": ["repository", "commit"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
+      },
+      "additionalProperties": false
+    },
+    "policy_inputs": {"type": "object", "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+    "targets": {"type": "object"},
+    "history": {"type": "array"}
+  },
+  "additionalProperties": false
+}

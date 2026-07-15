@@ -35,7 +35,10 @@ This plan turns the verification path optimization decisions into small, reviewa
 - GitHub smoke/fast verification calls strict R evidence and taxonomy flags explicitly.
 - GitHub smoke/fast verification runs on pull requests and manual dispatch rather than every feature-branch push.
 - GitHub pull requests always run a lightweight Fast Verification Gate classifier so required checks do not get stuck pending when Windows lanes are intentionally skipped.
-- GitHub package verification runs only by manual dispatch or release tags, so ordinary PR iteration does not build distributable artifacts unless explicitly requested.
+- Manual package qualification runs only by dispatch and never publishes.
+  Production releases build an immutable candidate from a full protected-master
+  SHA, sign and verify those bytes in protected native environments, then
+  promote the same digests from RC to stable without rebuilding.
 - GitHub R library cache keys include the R version resolved from the runner after `setup-r`, so a new R release cannot primary-hit an old outer cache while rebuilding a different inner dependency directory.
 - GitHub jobs use explicit timeouts to cap runaway runner usage.
 - Packaging contract tests now use structured parsers for workflows and scripts; the rewritten nodes live under the `packaging_contract` lane directory.

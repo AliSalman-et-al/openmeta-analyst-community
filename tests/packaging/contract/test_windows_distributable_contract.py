@@ -303,17 +303,16 @@ def test_package_workflow_builds_path_aware_artifacts():
         "windows-package",
         "macos-package-intel",
         "macos-package-arm64",
-        "publish-release-assets",
     } <= workflow["jobs"]
     assert target["env"]["RCMS_CRAN_REPO"] == "https://cloud.r-project.org"
-    assert workflow["events"] == {"workflow_dispatch", "push"}
+    assert workflow["events"] == {"workflow_dispatch"}
     assert workflow["legacy_uses"] == []
     pinned_uses = workflow["uses"] + target["uses"]
     assert all(
         ref.startswith("./") or re.fullmatch(r"[0-9a-f]{40}", ref)
         for _, ref, _ in pinned_uses
     )
-    assert workflow["paths"] == {"v*"}
+    assert workflow["paths"] == set()
     assert "artifacts/${{ inputs.artifact_name }}.zip" in target["text"]
     assert any("RCMetaStudio-macos-x64" in run for run in workflow["text"].splitlines())
     assert any(
@@ -341,35 +340,12 @@ def test_package_workflow_builds_path_aware_artifacts():
         "--archive-root-name \"RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ inputs.archive_platform }}\""
         in target["text"]
     )
-    assert (
-        "if: ${{ github.event_name == 'push' || inputs.build_windows }}"
-        in workflow["text"]
-    )
-    assert (
-        "if: ${{ github.event_name == 'push' || inputs.build_macos }}"
-        in workflow["text"]
-    )
-    assert (
-        "${{ github.event_name == 'push' || inputs.build_windows }}" in workflow["text"]
-    )
-    assert (
-        "${{ github.event_name == 'push' || inputs.build_macos }}" in workflow["text"]
-    )
-    assert (
-        "RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}"
-        in workflow["text"]
-    )
-    assert "publish_release:" in workflow["text"]
-    assert "release_tag:" in workflow["text"]
-    assert "Publish Release Assets" in workflow["text"]
-    assert (
-        "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093"
-        in workflow["text"]
-    )
-    assert (
-        'gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber' in workflow["text"]
-    )
-    assert "contents: write" in workflow["text"]
+    assert "if: ${{ inputs.build_windows }}" in workflow["text"]
+    assert "if: ${{ inputs.build_macos }}" in workflow["text"]
+    assert "publish_release:" not in workflow["text"]
+    assert "release_tag:" not in workflow["text"]
+    assert "gh release" not in workflow["text"]
+    assert "contents: write" not in workflow["text"]
     assert "timeout-minutes: 60" in target["text"]
     assert "timeout-minutes: 60" in workflow["text"]
 

@@ -7262,6 +7262,16 @@
       "reason": "Guards fail-closed capability qualification for native full-usability scenarios that cannot fit at 150 percent scale.",
       "runtime_class": "subsecond",
       "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_clean_slate_delivery_contract.py::test_clean_slate_delivery_state_machine_and_workflow_policy",
+      "reason": "Guards build-once delivery stages, immutable promotion, supported target parity, and least-privilege workflow policy.",
+      "runtime_class": "subsecond",
+      "size": "small"
     }
 
   ]

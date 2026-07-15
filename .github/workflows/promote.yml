@@ -1,0 +1,68 @@
+name: Promote Release Candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      rc_tag:
+        description: Immutable RC tag to promote.
+        required: true
+        type: string
+      stable_version:
+        description: Stable semantic version without v prefix.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    environment: production-release
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Download immutable RC assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RC_TAG: ${{ inputs.rc_tag }}
+        run: gh release download "$RC_TAG" --dir promotion
+      - name: Verify RC release set and exact asset digests
+        env:
+          RC_TAG: ${{ inputs.rc_tag }}
+          STABLE_VERSION: ${{ inputs.stable_version }}
+        run: |
+          set -euo pipefail
+          manifest="$(find promotion -name 'release-set-rc.json' -print -quit)"
+          test -n "$manifest"
+          test "$(jq -r .channel "$manifest")" = rc
+          (cd promotion && sha256sum --check SHA256SUMS)
+          gh attestation verify promotion/RCMetaStudio-windows-x64.zip --repo "${{ github.repository }}"
+          gh attestation verify promotion/RCMetaStudio-macos-x64.zip --repo "${{ github.repository }}"
+          source_sha="$(jq -r .source.commit "$manifest")"
+          test "$(git rev-list -n 1 "$RC_TAG")" = "$source_sha"
+          python scripts/delivery.py verify --manifest "$manifest"
+          python scripts/delivery.py promote --manifest "$manifest" --from-channel rc --channel stable --version "$STABLE_VERSION" --output promotion/release-set-stable.json
+      - name: Publish stable release without rebuilding
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STABLE_TAG: v${{ inputs.stable_version }}
+        run: |
+          set -euo pipefail
+          if gh release view "$STABLE_TAG" >/dev/null 2>&1; then echo "Stable release already exists; refusing overwrite." >&2; exit 1; fi
+          source_sha="$(jq -r .source.commit promotion/release-set-stable.json)"
+          profile="$(jq -r .trust_profile promotion/release-set-stable.json)"
+          if [ "$profile" = unsigned-community ]; then
+            title="RC MetaStudio ${{ inputs.stable_version }} - UNSIGNED COMMUNITY BUILD"
+            notes="Promoted from ${{ inputs.rc_tag }} without rebuilding. UNSIGNED: SmartScreen and Gatekeeper warnings are expected."
+          else
+            title="RC MetaStudio ${{ inputs.stable_version }}"
+            notes="Promoted from ${{ inputs.rc_tag }} without rebuilding or modifying deliverables."
+          fi
+          git tag -a "$STABLE_TAG" "$source_sha" -m "RC MetaStudio ${{ inputs.stable_version }}"
+          git push origin "$STABLE_TAG"
+          gh release create "$STABLE_TAG" promotion/RCMetaStudio-*.zip promotion/*.cdx.json promotion/SHA256SUMS promotion/release-set-stable.json --verify-tag --title "$title" --notes "$notes"
+      - name: Prove promotion preserved artifact bytes
+        run: (cd promotion && sha256sum --check SHA256SUMS)

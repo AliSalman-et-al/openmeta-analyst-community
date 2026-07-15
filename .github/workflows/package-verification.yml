@@ -1,48 +1,34 @@
-name: Package Verification
+name: Manual Package Qualification
 
 on:
   workflow_dispatch:
     inputs:
       build_windows:
-        description: Build the Windows package artifact.
+        description: Qualify the Windows x64 package without publishing it.
         required: true
         default: true
         type: boolean
       build_macos:
-        description: Build the opt-in macOS Intel package artifact.
+        description: Qualify the macOS Intel package without publishing it.
         required: true
-        default: false
+        default: true
         type: boolean
       build_macos_arm64:
-        description: Also attempt the experimental Apple Silicon macOS artifact.
+        description: Attempt the unsupported experimental Apple Silicon package.
         required: true
         default: false
         type: boolean
-      publish_release:
-        description: Upload selected package artifacts to the GitHub release.
-        required: true
-        default: false
-        type: boolean
-      release_tag:
-        description: Existing release tag to receive uploaded package artifacts.
-        required: true
-        default: v0.1.2
-        type: string
-  push:
-    tags:
-      - "v*"
 
 permissions:
   contents: read
 
 concurrency:
-  group: package-verification-${{ github.ref }}
+  group: manual-package-qualification-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   windows-package:
-    name: Windows Packaging Lane
-    if: ${{ github.event_name == 'push' || inputs.build_windows }}
+    if: ${{ inputs.build_windows }}
     uses: ./.github/workflows/package-target.yml
     with:
       runner: windows-latest
@@ -52,8 +38,7 @@ jobs:
       evidence_path: build/windows-package/adaptive-layout-evidence/windows-x64
 
   macos-package-intel:
-    name: macOS Packaging Lane (Intel)
-    if: ${{ github.event_name == 'push' || inputs.build_macos }}
+    if: ${{ inputs.build_macos }}
     uses: ./.github/workflows/package-target.yml
     with:
       runner: macos-15-intel
@@ -63,139 +48,15 @@ jobs:
       evidence_path: build/macos-package/x64/adaptive-layout-evidence/macos-x64
 
   macos-package-arm64:
-    name: macOS Packaging Lane (Apple Silicon)
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_macos_arm64 }}
+    if: ${{ inputs.build_macos_arm64 }}
     runs-on: macos-14
     timeout-minutes: 60
     continue-on-error: true
-    defaults:
-      run:
-        shell: bash
-    env:
-      RCMS_CRAN_REPO: https://cloud.r-project.org
-      RCMS_CRAN_REPO_KEY: cloud-r-project-org
     steps:
-      - name: Check out repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-      - name: Install uv
-        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      - run: uv python install 3.11.9
+      - uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
         with:
-          enable-cache: true
-      - name: Install Python
-        run: uv python install 3.11
-
-      - name: Resolve RC MetaStudio version
-        id: package-version
-        run: |
-          version="$(python -c "import pathlib, tomllib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text(encoding='utf-8'))['project']['version'])")"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - name: Set up R for bundled runtime
-        uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
-        with:
-          r-version: release
-
-      - name: Resolve R cache version
-        id: r-cache-key
-        run: |
-          version="$(Rscript -e "cat(paste0('R-', getRversion()))")"
-          runtime_root="$(Rscript -e "cat(normalizePath(R.home(), winslash='/', mustWork=TRUE))")"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "runtime-root=$runtime_root" >> "$GITHUB_OUTPUT"
-
-      - name: Cache bundled R package library
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
-        with:
-          path: artifacts/r-library-cache
-          key: bundled-r-library-v2-macos-arm64-${{ steps.r-cache-key.outputs.version }}-${{ env.RCMS_CRAN_REPO_KEY }}-${{ hashFiles('scripts/install-r-deps.R', 'docs/verification/RCMetaR-r-dependencies.json', 'r/RCMetaR/DESCRIPTION') }}
-
-      - name: Explain current Apple Silicon dependency limitation
-        run: |
-          echo "Apple Silicon packaging is experimental."
-          echo "The shared lock currently pins PyQt5-Qt5==5.15.2, which has no macOS arm64 wheel."
-
-      - name: Build macOS package
-        run: bash scripts/package-macos.sh --architecture arm64 --artifact-name RCMetaStudio-macos-arm64 --archive-root-name "RCMetaStudio-${{ steps.package-version.outputs.version }}-macos-arm64" --r-runtime-root "${{ steps.r-cache-key.outputs.runtime-root }}"
-
-      - name: Upload macOS Apple Silicon package artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: RCMetaStudio-macos-arm64
-          path: artifacts/RCMetaStudio-macos-arm64.zip
-          if-no-files-found: error
-          retention-days: 30
-          compression-level: 0
-
-      - name: Upload macOS Apple Silicon packaging diagnostics
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: RCMetaStudio-macos-arm64-diagnostics
-          path: |
-            build/macos-package/arm64/work/RCMetaStudio/warn-RCMetaStudio.txt
-            build/macos-package/arm64/work/RCMetaStudio/xref-RCMetaStudio.html
-          if-no-files-found: ignore
-          retention-days: 14
-          compression-level: 0
-
-  publish-release-assets:
-    name: Publish Release Assets
-    if: ${{ always() && ((github.event_name == 'workflow_dispatch' && inputs.publish_release) || github.event_name == 'push') }}
-    needs:
-      - windows-package
-      - macos-package-intel
-      - macos-package-arm64
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    steps:
-      - name: Validate selected package lanes
-        shell: bash
-        run: |
-          if [[ "${{ github.event_name == 'push' || inputs.build_windows }}" == "true" && "${{ needs.windows-package.result }}" != "success" ]]; then
-            echo "Windows package was selected but did not succeed: ${{ needs.windows-package.result }}" >&2
-            exit 1
-          fi
-          if [[ "${{ github.event_name == 'push' || inputs.build_macos }}" == "true" && "${{ needs.macos-package-intel.result }}" != "success" ]]; then
-            echo "macOS Intel package was selected but did not succeed: ${{ needs.macos-package-intel.result }}" >&2
-            exit 1
-          fi
-          if [[ "${{ inputs.build_macos_arm64 }}" == "true" && "${{ needs.macos-package-arm64.result }}" != "success" ]]; then
-            echo "macOS Apple Silicon package was selected but did not succeed: ${{ needs.macos-package-arm64.result }}" >&2
-            exit 1
-          fi
-
-      - name: Download Windows package artifact
-        if: ${{ github.event_name == 'push' || inputs.build_windows }}
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: RCMetaStudio-windows-x64
-          path: release-assets
-      - name: Download macOS Intel package artifact
-        if: ${{ github.event_name == 'push' || inputs.build_macos }}
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: RCMetaStudio-macos-x64
-          path: release-assets
-      - name: Download macOS Apple Silicon package artifact
-        if: ${{ inputs.build_macos_arm64 }}
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: RCMetaStudio-macos-arm64
-          path: release-assets
-
-      - name: Upload package artifacts to release
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
-        run: |
-          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
-          shopt -s nullglob
-          assets=(release-assets/*.zip)
-          if [[ ${#assets[@]} -eq 0 ]]; then
-            echo "No release ZIP assets were downloaded." >&2
-            exit 1
-          fi
-          gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+          r-version: 4.6.1
+      - run: bash scripts/package-macos.sh --architecture arm64 --artifact-name RCMetaStudio-macos-arm64 --r-runtime-root "$(R RHOME)"

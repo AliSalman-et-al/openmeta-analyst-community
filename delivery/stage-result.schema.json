@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rc-metastudio.org/schemas/stage-result-v1.json",
+  "type": "object",
+  "required": ["schema_version", "target", "stage", "source_commit", "input_digest", "outputs", "completed_at"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "target": {"enum": ["windows-x64", "macos-x64"]},
+    "stage": {"enum": ["assembled", "unsigned-qualified", "signed", "notarized", "verified", "attested"]},
+    "source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "input_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "outputs": {"type": "array", "items": {"$ref": "#/$defs/output"}, "minItems": 1},
+    "completed_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "output": {
+      "type": "object",
+      "required": ["name", "sha256", "size"],
+      "properties": {
+        "name": {"type": "string"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "size": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
