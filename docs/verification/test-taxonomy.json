@@ -7547,6 +7547,291 @@
       "reason": "Guards hosted and local wiring for generation, ty, focused tests, and native smoke.",
       "runtime_class": "subsecond",
       "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_project_round_trip_has_schema_validated_integrity_members",
+      "reason": "Guards the public Versioned Project Format save/load seam and deterministic member integrity.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_project_schema_rejects_unknown_fields_and_invalid_types[unknown-field]",
+      "reason": "Guards fail-closed rejection of fields outside the committed Project Format Schema.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_project_schema_rejects_unknown_fields_and_invalid_types[invalid-type]",
+      "reason": "Guards fail-closed rejection of values with invalid schema types.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_reader_rejects_unsupported_versions_before_decoding_project_data",
+      "reason": "Guards manifest-selected format dispatch against unsupported versions.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_reader_rejects_unsafe_duplicate_or_missing_archive_members[unsafe-name]",
+      "reason": "Guards the archive boundary against unsafe member names.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_reader_rejects_unsafe_duplicate_or_missing_archive_members[duplicate-name]",
+      "reason": "Guards the archive boundary against duplicate members.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_reader_rejects_unsafe_duplicate_or_missing_archive_members[missing-member]",
+      "reason": "Guards the archive boundary against incomplete containers.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_reader_rejects_malformed_utf8_before_schema_validation",
+      "reason": "Guards strict UTF-8 JSON decoding at the project boundary.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_reader_rejects_member_content_that_does_not_match_integrity",
+      "reason": "Guards deterministic integrity verification before project data is returned.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_reader_applies_member_size_and_compression_limits",
+      "reason": "Guards configured ZIP member and compression resource ceilings.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_failed_atomic_replace_preserves_the_previous_project",
+      "reason": "Guards crash-safe atomic replacement and temporary-file cleanup on failure.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_writer_output_and_current_version_migration_are_deterministic",
+      "reason": "Guards deterministic writing and pure structured migration dispatch.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["analysis_behavior", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_all_committed_samples_match_the_frozen_semantics_and_round_trip",
+      "reason": "Guards exact semantic conversion and Project File Round Trip behavior for every committed sample.",
+      "runtime_class": "seconds",
+      "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_state_schema_contains_only_explicit_durable_v1_fields",
+      "reason": "Guards the explicit durable state v1 contract against arbitrary JSON bags.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_semantic_validation_rejects_invalid_domain_relationships[duplicate-outcome]",
+      "reason": "Guards unique outcome identifiers.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_semantic_validation_rejects_invalid_domain_relationships[outcome-reference]",
+      "reason": "Guards analysis-unit references to declared outcomes.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_semantic_validation_rejects_invalid_domain_relationships[raw-arity]",
+      "reason": "Guards family-specific raw-data arity.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_semantic_validation_rejects_invalid_domain_relationships[group-reference]",
+      "reason": "Guards entered-effect references to declared group identifiers.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_schema_rejects_values_outside_the_domain_vocabulary[data_type-99]",
+      "reason": "Guards maintained outcome data-type vocabulary.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_schema_rejects_values_outside_the_domain_vocabulary[sub_type-unknown]",
+      "reason": "Guards maintained outcome subtype vocabulary.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_pre_replace_failures_preserve_previous_project_and_clean_temporary_files",
+      "reason": "Guards atomic-save preservation across archive, fsync, and temporary-validation failures.", "runtime_class": "seconds", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_serialization_and_schema_recursion_errors_use_project_format_boundary",
+      "reason": "Guards normalized errors from recursive serialization and schema validation.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_json_nesting_is_bounded_for_manifest_and_project_data",
+      "reason": "Guards explicit JSON nesting limits for read and write boundaries.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_cleanup_failure_preserves_and_annotates_the_primary_error",
+      "reason": "Guards primary save errors against temporary-cleanup masking.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_supported_directory_fsync_runs_after_atomic_replacement",
+      "reason": "Guards POSIX parent-directory durability after replacement.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_post_replace_directory_fsync_failure_reports_new_file_is_installed",
+      "reason": "Guards truthful post-replacement durability failure semantics.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["analysis_behavior", "golden", "release_readiness"], "external_dependencies": ["filesystem", "subprocess"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_every_sample_has_authoritative_analysis_text_numeric_and_plot_evidence",
+      "reason": "Binds every converted sample to authoritative numeric, text, and plot Analysis Behavior evidence.", "runtime_class": "seconds", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_semantic_validation_enforces_domain_identity_family_and_numeric_contracts[study-identifier]",
+      "reason": "Guards unique study identifiers.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_semantic_validation_enforces_domain_identity_family_and_numeric_contracts[group-identifier]",
+      "reason": "Guards unique group identifiers.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_semantic_validation_enforces_domain_identity_family_and_numeric_contracts[covariate-identifier]",
+      "reason": "Guards unique covariate identifiers.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_semantic_validation_enforces_domain_identity_family_and_numeric_contracts[follow-up-reference]",
+      "reason": "Guards references to declared follow-ups.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_semantic_validation_enforces_domain_identity_family_and_numeric_contracts[cross-family-metric]",
+      "reason": "Guards analysis-family metric consistency.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_semantic_validation_enforces_domain_identity_family_and_numeric_contracts[numeric-domain]",
+      "reason": "Guards finite and valid numeric domain values.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_family_raw_counts_and_sample_sizes_reject_fractional_values_on_save_and_load",
+      "reason": "Guards family-specific integer-valued count and sample-size semantics at both save and load boundaries.", "runtime_class": "seconds", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_family_raw_counts_and_sample_sizes_accept_json_integers_and_integral_floats",
+      "reason": "Guards compatibility for JSON integers and legacy integral floats across all analysis families.", "runtime_class": "seconds", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_reader_rejects_symlink_encryption_and_unsupported_compression_metadata",
+      "reason": "Guards fail-closed handling of malicious ZIP member types, encryption, and unsupported compression.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_reader_enforces_archive_total_size_and_member_count_ceilings",
+      "reason": "Guards archive, aggregate uncompressed, and member-count resource ceilings.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_reader_normalizes_crc_and_truncated_archive_failures",
+      "reason": "Guards normalized project-format errors for corrupt and truncated ZIP containers.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_reader_supports_bounded_zip_data_descriptors",
+      "reason": "Guards documented support for bounded ZIP data descriptors.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_post_replace_directory_close_failure_reports_durability_uncertainty",
+      "reason": "Guards truthful post-replacement durability reporting for directory-close failure.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_directory_close_failure_annotates_primary_post_replace_fsync_error",
+      "reason": "Guards preservation of the primary directory-fsync error when directory close also fails.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_reader_rejects_oversized_overflowing_and_nonfinite_numeric_literals",
+      "reason": "Guards strict numeric decoding for oversized integers, conversion overflow, exponent overflow, and non-finite sample sizes.", "runtime_class": "seconds", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_writer_and_reconstruction_normalize_numeric_conversion_overflow",
+      "reason": "Guards canonical-save and reconstruction boundaries against Python numeric conversion overflow.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_study_sample_size_requires_a_finite_positive_integer_on_save_and_load",
+      "reason": "Guards finite positive integer semantics for study-level sample size on save and load.", "runtime_class": "seconds", "size": "small"
     }
 
   ]

@@ -1,10 +1,14 @@
 {
   "manifest": "rc-metastudio-sample-projects",
-  "version": 1,
-  "storage_note": "Initial .rcms sample projects preserve the transitional pickle-based project content shape pending a later structured project-file format.",
+  "version": 2,
+  "format_version": 1,
+  "storage_note": "Every sample is a schema-validated Versioned Project Format ZIP/JSON container exported from the immutable pre-Qt6 semantic snapshot.",
   "projects": [
     {
       "file": "amino.rcms",
+      "sha256": "6d9cee38492586a61fed96b39bd5e2e037d1aa25a00b80517fc517654bb9892e",
+      "semantic_sha256": "c739a52d1b299855dc0eb773f58d1d92ee8ac27849f1a4c24346f6455e5c9a61",
+      "analysis_evidence": "amino-binary-random",
       "scientific_name": "Aminoglycosides",
       "analysis_family": "binary",
       "provenance": "Repository-owned representative project carried forward from the maintained RC MetaStudio sample corpus.",
@@ -15,7 +19,7 @@
         "project open/save round trip coverage"
       ],
       "test_usage": [
-        "tests/python/fast/test_project_pickle_migration.py",
+        "tests/python/fast/test_project_format.py",
         "tests/python/gui/test_gui_binary_slice.py",
         "tests/python/gui/test_metaform_automation_launch.py",
         "tests/analysis_regression/golden/test_analysis_regression_compare.py",
@@ -24,6 +28,9 @@
     },
     {
       "file": "BCG.rcms",
+      "sha256": "c799d6756022b5782514bfe2772997c536dd5bcdf2693026a80803a53bfe6b81",
+      "semantic_sha256": "d63b300c07fe5c652a52df6b01a6d4e345ca08215981f2e5d6b4a566f3ee1b12",
+      "analysis_evidence": "bcg-binary-random",
       "scientific_name": "BCG vaccine",
       "analysis_family": "binary",
       "provenance": "Repository-owned representative project carried forward from the maintained RC MetaStudio sample corpus.",
@@ -33,13 +40,16 @@
         "project open/save round trip coverage"
       ],
       "test_usage": [
-        "tests/python/fast/test_project_pickle_migration.py",
+        "tests/python/fast/test_project_format.py",
         "tests/python/gui/test_gui_binary_slice.py",
         "tests/packaging/contract/test_windows_distributable_contract.py"
       ]
     },
     {
       "file": "continuous.rcms",
+      "sha256": "0f05881aff44ac45fca12b811a94c8498856161edb6dcf33725f75e9a82767a4",
+      "semantic_sha256": "6cd5b52ff79929c7aa6f7bd4d8d3d73ca16fae558107cbf818e37d119437eefd",
+      "analysis_evidence": "continuous-random",
       "scientific_name": "Continuous outcome example",
       "analysis_family": "continuous",
       "provenance": "Repository-owned representative project carried forward from the maintained RC MetaStudio sample corpus.",
@@ -49,7 +59,7 @@
         "project open/save round trip coverage"
       ],
       "test_usage": [
-        "tests/python/fast/test_project_pickle_migration.py",
+        "tests/python/fast/test_project_format.py",
         "tests/python/gui/test_gui_binary_slice.py",
         "tests/python/gui/test_metaform_automation_launch.py",
         "tests/analysis_regression/golden/test_analysis_regression_compare.py"
@@ -57,6 +67,9 @@
     },
     {
       "file": "lymph.rcms",
+      "sha256": "1c6bdebec12e68601aeed8544a1d234f2cc9f6a71e99f65896aed5491ca965d3",
+      "semantic_sha256": "c4ed7206376a415cae2ebdca7937509df929644fc0b93f85a59e4aeecf4f227b",
+      "analysis_evidence": "lymph-diagnostic-random-dor",
       "scientific_name": "Lymph diagnostic accuracy",
       "analysis_family": "diagnostic",
       "provenance": "Repository-owned representative project carried forward from the maintained RC MetaStudio sample corpus.",
@@ -66,7 +79,7 @@
         "project open/save round trip coverage"
       ],
       "test_usage": [
-        "tests/python/fast/test_project_pickle_migration.py",
+        "tests/python/fast/test_project_format.py",
         "tests/python/gui/test_gui_binary_slice.py",
         "tests/python/gui/test_metaform_automation_launch.py",
         "tests/analysis_regression/golden/test_analysis_regression_compare.py"
@@ -74,8 +87,11 @@
     },
     {
       "file": "meantime.rcms",
+      "sha256": "4361bf3be3ae692889140e56056ff78b00e321f97df4bc0359c2b26221b1b89d",
+      "semantic_sha256": "0afd9a70681ce04c734d386ab8cdbab3d873021de38db68586a506b717366676",
+      "analysis_evidence": "meantime-binary-random",
       "scientific_name": "Meantime subgroup example",
-      "analysis_family": "continuous",
+      "analysis_family": "binary",
       "provenance": "Repository-owned representative project carried forward from the maintained RC MetaStudio sample corpus.",
       "workflow_coverage": [
         "factor covariate project-load coverage",
@@ -83,7 +99,7 @@
         "project open/save round trip coverage"
       ],
       "test_usage": [
-        "tests/python/fast/test_project_pickle_migration.py",
+        "tests/python/fast/test_project_format.py",
         "tests/python/gui/test_gui_binary_slice.py",
         "tests/python/gui/test_metaform_automation_launch.py"
       ]

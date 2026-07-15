@@ -279,6 +279,10 @@ def test_qt6_generation_and_type_checks_have_a_maintained_entry_point():
     assert "build_qt6.py" in workflow
     assert "ty check" in workflow
     assert "test_qt6_build_slice.py" in workflow
+    assert "project_format.py" in workflow
+    assert "project_domain.py" in workflow
+    assert "project_evidence.py" in workflow
+    assert "test_project_format.py" in workflow
     assert "--require-covered" in workflow
     assert "native-smoke" in workflow
     assert "Remove-Item Env:QT_QPA_PLATFORM" in workflow

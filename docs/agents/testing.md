@@ -19,8 +19,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-qt6.ps1 -Sync
 ```
 
 It performs deterministic form and binary-resource generation, strict `ty`
-checking, focused offscreen tests, taxonomy-manifest validation, and a separate
-visible native `qwindows` smoke with `QT_QPA_PLATFORM` unset.
+checking, focused offscreen and Versioned Project Format tests,
+taxonomy-manifest validation, and a separate visible native `qwindows` smoke
+with `QT_QPA_PLATFORM` unset.
 
 The historical Smoke Verification Lane, Fast Verification Lane, GUI suite,
 Default R Evidence, and packaging-contract aggregate remain preserved but are

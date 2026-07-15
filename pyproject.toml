@@ -12,6 +12,7 @@ maintainers = [
 ]
 dependencies = [
     "PyQt6==6.11.0",
+    "jsonschema==4.25.1",
     "pyinstaller==6.21.0",
     "pytest==9.1.1",
     "pytest-xdist==3.8.0",
@@ -43,6 +44,7 @@ include = ["rc_metastudio*"]
 rc_metastudio = [
     "forms/*.ui",
     "images/**/*",
+    "project_schemas/**/*.json",
 ]
 
 [tool.pytest.ini_options]

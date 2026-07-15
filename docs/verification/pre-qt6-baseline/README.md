@@ -18,6 +18,11 @@ match before the bundle can be imported.
 `rendered-interface/` contains actual PNG renders of the startup and
 new-dataset surfaces captured from that same code. `sample-projects/` contains
 normalized, reviewable semantic snapshots for every committed `.rcms` sample.
+`sample-analysis-evidence.json` binds each converted sample to its tagged Git
+blob, normalized semantic hash, and successful authoritative numeric, text, and
+plot evidence. The original Golden bundle covers amino, continuous, and lymph;
+`sample-analysis/` retains equivalent tagged-environment captures for BCG and
+meantime, which were not part of the original curated set.
 
 `qt-port-inventory.json` classifies the Qt-bearing migration surface, including
 application-owned versus allowed Designer properties, and records the initial

@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rcmetastudio.org/schemas/project/v1/project.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["dataset", "schema_version"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "dataset": {"$ref": "#/$defs/dataset"}
+  },
+  "$defs": {
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["analysis_family", "covariates", "is_diagnostic", "notes", "outcomes", "studies", "summary", "title"],
+      "properties": {
+        "analysis_family": {"enum": ["binary", "continuous", "diagnostic"]},
+        "covariates": {"type": "array", "items": {"$ref": "#/$defs/covariate"}},
+        "is_diagnostic": {"type": "boolean"},
+        "notes": {"type": "string"},
+        "outcomes": {"type": "array", "items": {"$ref": "#/$defs/outcome"}},
+        "studies": {"type": "array", "items": {"$ref": "#/$defs/study"}},
+        "summary": {
+          "oneOf": [
+            {"type": "string"},
+            {"type": "null"},
+            {"$ref": "#/$defs/project_summary"}
+          ]
+        },
+        "title": {"type": "string"}
+      }
+    },
+    "covariate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["data_type", "name", "stable_id"],
+      "properties": {
+        "data_type": {"enum": [1, 4]},
+        "name": {"type": "string"},
+        "stable_id": {"type": ["string", "null"]}
+      }
+    },
+    "project_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["arms", "data_type", "effect", "metric_choices", "name", "sub_type"],
+      "properties": {
+        "arms": {"enum": ["one", "two", null]},
+        "data_type": {"enum": ["binary", "continuous", "diagnostic", null]},
+        "effect": {"$ref": "#/$defs/nullable_metric"},
+        "metric_choices": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/metric"}},
+        "name": {"type": ["string", "null"]},
+        "sub_type": {"enum": ["proportion", "proportions", "mean", "means", "smd", "reg_coef", "generic_effect", null]}
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["data_type", "follow_ups", "name", "sub_type"],
+      "properties": {
+        "data_type": {"enum": [0, 1, 2]},
+        "follow_ups": {"type": "array", "items": {"type": "string"}},
+        "name": {"type": "string"},
+        "sub_type": {"enum": ["proportion", "proportions", "mean", "means", "smd", "reg_coef", "generic_effect", null]}
+      }
+    },
+    "study": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["analysis_units", "covariates", "id", "include", "manually_excluded", "name", "notes", "sample_size", "year"],
+      "properties": {
+        "analysis_units": {"type": "array", "items": {"$ref": "#/$defs/analysis_unit"}},
+        "covariates": {"type": "object", "additionalProperties": {"$ref": "#/$defs/scalar"}},
+        "id": {"type": "integer"},
+        "include": {"type": "boolean"},
+        "manually_excluded": {"type": "boolean"},
+        "name": {"type": "string"},
+        "notes": {"type": "string"},
+        "sample_size": {"type": ["number", "null"]},
+        "year": {"type": ["integer", "null"]}
+      }
+    },
+    "analysis_unit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entered_effects", "follow_up", "groups", "outcome"],
+      "properties": {
+        "entered_effects": {
+          "type": "object",
+          "propertyNames": {"$ref": "#/$defs/metric"},
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {"$ref": "#/$defs/effect"}
+          }
+        },
+        "follow_up": {"type": ["string", "null"]},
+        "groups": {"type": "array", "items": {"$ref": "#/$defs/group"}},
+        "outcome": {"type": "string"}
+      }
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "raw_data"],
+      "properties": {
+        "id": {"type": "integer"},
+        "name": {"type": "string"},
+        "raw_data": {"type": "array", "items": {"$ref": "#/$defs/scalar"}}
+      }
+    },
+    "effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["display_est", "display_lower", "display_upper", "est", "lower", "upper"],
+      "properties": {
+        "SE": {"type": "number"},
+        "display_conf_level": {"type": "number"},
+        "display_est": {"type": "number"},
+        "display_lower": {"type": "number"},
+        "display_se": {"type": "number"},
+        "display_upper": {"type": "number"},
+        "est": {"type": "number"},
+        "lower": {"type": "number"},
+        "upper": {"type": "number"}
+      }
+    },
+    "metric": {"enum": ["OR", "RD", "RR", "AS", "YUQ", "YUY", "PR", "PLN", "PLO", "PAS", "PFT", "MD", "SMD", "TX Mean", "Sens", "Spec", "PLR", "NLR", "DOR"]},
+    "nullable_metric": {
+      "anyOf": [
+        {"$ref": "#/$defs/metric"},
+        {"type": "null"}
+      ]
+    },
+    "scalar": {"type": ["string", "number", "boolean", "null"]}
+  }
+}
