@@ -1,0 +1,115 @@
+name: Native macOS Qt6 Feasibility
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/qt6-macos-feasibility.yml
+      - .python-version
+      - pyproject.toml
+      - uv.lock
+      - scripts/build_qt6.py
+      - scripts/qt6_macos_feasibility.py
+      - src/rc_metastudio/forms/about_legal.ui
+      - src/rc_metastudio/images/**
+      - src/rc_metastudio/qt6_build.py
+      - src/rc_metastudio/qt6_macos_feasibility.py
+      - tests/python/fast/test_qt6_macos_feasibility.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-macos-qt6-feasibility-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: 3.11.9
+  QT_VERSION: 6.11.1
+  R_VERSION: 4.6.1
+
+jobs:
+  native-macos-feasibility:
+    name: Native Qt6 Feasibility (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: macos-x64
+            runner: macos-15-intel
+            machine: x86_64
+          - target: macos-arm64
+            runner: macos-14
+            machine: arm64
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: false
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Install native Python
+        run: uv python install "$PYTHON_VERSION"
+
+      - name: Install native R
+        uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
+        with:
+          r-version: ${{ env.R_VERSION }}
+
+      - name: Sync locked application stack
+        run: uv sync --locked
+
+      - name: Install matching official Qt SDK tools
+        run: |
+          set -euo pipefail
+          uv run aqt install-qt mac desktop "$QT_VERSION" clang_64 --outputdir "$PWD/build/qt-sdk"
+          test -x "$PWD/build/qt-sdk/$QT_VERSION/macos/bin/rcc"
+
+      - name: Prove native architecture before launch
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "${{ matrix.machine }}"
+          test "$(uv run python -c 'import platform; print(platform.machine())')" = "${{ matrix.machine }}"
+          if [ "$(sysctl -in sysctl.proc_translated 2>/dev/null || true)" = "1" ]; then
+            echo "Rosetta-translated execution is forbidden" >&2
+            exit 1
+          fi
+
+      - name: Run source, R, and packaged native proof
+        env:
+          RCMS_QT6_RCC: ${{ github.workspace }}/build/qt-sdk/${{ env.QT_VERSION }}/macos/bin/rcc
+          RCMS_RUNNER_IMAGE: ${{ matrix.runner }}
+          RPY2_CFFI_MODE: ABI
+        run: |
+          set -euo pipefail
+          mkdir -p "artifacts/qt6-feasibility/${{ matrix.target }}"
+          uv run python scripts/qt6_macos_feasibility.py run \
+            --target "${{ matrix.target }}" \
+            --evidence-dir "artifacts/qt6-feasibility/${{ matrix.target }}" \
+            2>&1 | tee "artifacts/qt6-feasibility/${{ matrix.target }}/run.log"
+
+      - name: Validate retained evidence
+        run: |
+          uv run python scripts/qt6_macos_feasibility.py validate \
+            --target "${{ matrix.target }}" \
+            --evidence "artifacts/qt6-feasibility/${{ matrix.target }}/evidence.json"
+
+      - name: Upload native feasibility evidence and diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: qt6-feasibility-${{ matrix.target }}-${{ github.sha }}
+          path: artifacts/qt6-feasibility/${{ matrix.target }}
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - name: Prune uv cache
+        if: ${{ always() }}
+        run: uv cache prune --ci

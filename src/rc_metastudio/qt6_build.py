@@ -120,6 +120,27 @@ def validate_rcc(
         raise RuntimeError("rcc is not paired with the pinned official Qt6Core.dll")
 
 
+def validate_macos_rcc(rcc: Path, *, expected_version: str = QT_RCC_VERSION) -> None:
+    """Validate the official macOS SDK rcc selected by the native CI job."""
+
+    completed = subprocess.run(
+        [str(rcc), "--version"], check=True, capture_output=True, text=True
+    )
+    reported = completed.stdout.strip() or completed.stderr.strip()
+    if reported != f"rcc {expected_version}":
+        raise RuntimeError(
+            f"rcc version mismatch: expected 'rcc {expected_version}', got {reported!r}"
+        )
+    architectures = subprocess.run(
+        ["lipo", "-archs", str(rcc)], check=True, capture_output=True, text=True
+    ).stdout.split()
+    host = platform.machine().lower()
+    if host not in architectures:
+        raise RuntimeError(
+            f"rcc architecture mismatch: host {host!r}, slices {architectures!r}"
+        )
+
+
 def download_pinned_archive(
     url: str,
     destination: Path,
@@ -200,11 +221,18 @@ def _resolve_rcc() -> Path:
         rcc = Path(configured).expanduser().resolve()
         if not rcc.is_file():
             raise RuntimeError(f"RCMS_QT6_RCC does not name a file: {rcc}")
-        validate_rcc(rcc)
+        if sys.platform == "darwin":
+            validate_macos_rcc(rcc)
+        else:
+            validate_rcc(rcc)
         return rcc
 
+    if sys.platform == "darwin":
+        raise RuntimeError(
+            "macOS requires RCMS_QT6_RCC from the pinned official Qt SDK"
+        )
     if sys.platform != "win32":
-        raise RuntimeError("Issue #328 provisions the official rcc slice on Windows only")
+        raise RuntimeError("The official rcc slice supports Windows and macOS only")
     rcc = _download_official_rcc(ROOT / "build" / "qt-rcc")
     validate_rcc(rcc)
     return rcc
@@ -296,6 +324,10 @@ def smoke(
         raise RuntimeError(
             f"Native Windows smoke requires x64 Python, got {platform.machine()!r}"
         )
+    if expected_qpa == "cocoa" and architecture not in {"x86_64", "arm64"}:
+        raise RuntimeError(
+            f"Native macOS smoke requires x86_64 or arm64 Python, got {platform.machine()!r}"
+        )
 
     dialog = QtWidgets.QDialog()
     form_type = _load_generated_form(module_path)
@@ -333,10 +365,14 @@ def smoke(
         "qt": QtCore.qVersion(),
         "form": dialog.objectName(),
         "app_icon": not app_icon_pixmap.isNull(),
+        "resource_registered": True,
         "architecture": platform.machine(),
         "svg_icon": not svg_icon_pixmap.isNull(),
         "clean_exit": True,
-        "native": qpa == "windows",
+        "native": qpa in {"windows", "cocoa"},
+        "plugin_path": QtCore.QLibraryInfo.path(
+            QtCore.QLibraryInfo.LibraryPath.PluginsPath
+        ),
         "qpa": qpa,
         "visible": visible,
     }
@@ -360,7 +396,9 @@ def main(arguments: list[str] | None = None) -> int:
         module, resource = generate(build_root)
         print(json.dumps({"form": str(module), "resource": str(resource)}, sort_keys=True))
         return 0
-    expected_qpa = "windows" if options.command == "native-smoke" else None
+    expected_qpa = None
+    if options.command == "native-smoke":
+        expected_qpa = "cocoa" if sys.platform == "darwin" else "windows"
     report = smoke(build_root, options.exit_after_ms, expected_qpa=expected_qpa)
     print(json.dumps(report, sort_keys=True))
     return 0

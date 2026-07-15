@@ -7832,6 +7832,96 @@
       "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
       "nodeid": "tests/python/fast/test_project_format.py::test_study_sample_size_requires_a_finite_positive_integer_on_save_and_load",
       "reason": "Guards finite positive integer semantics for study-level sample size on save and load.", "runtime_class": "seconds", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_native_macos_evidence_accepts_the_complete_locked_contract[macos-x64]",
+      "reason": "Guards the complete Intel native feasibility evidence contract.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_native_macos_evidence_accepts_the_complete_locked_contract[macos-arm64]",
+      "reason": "Guards the complete Apple Silicon native feasibility evidence contract.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_native_macos_evidence_fails_closed_on_incomplete_or_mismatched_proof[rosetta]",
+      "reason": "Rejects Rosetta-translated feasibility evidence.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_native_macos_evidence_fails_closed_on_incomplete_or_mismatched_proof[missing-runner-field]",
+      "reason": "Rejects incomplete nested runner identity evidence.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_native_macos_evidence_fails_closed_on_incomplete_or_mismatched_proof[unknown-runner-system]",
+      "reason": "Rejects runner evidence that does not identify Darwin.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_native_macos_evidence_fails_closed_on_incomplete_or_mismatched_proof[malformed-runner-release]",
+      "reason": "Rejects malformed macOS release identities.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_native_macos_evidence_fails_closed_on_incomplete_or_mismatched_proof[qt-version]",
+      "reason": "Rejects drift from the locked Qt runtime.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_native_macos_evidence_fails_closed_on_incomplete_or_mismatched_proof[source-qpa]",
+      "reason": "Rejects source evidence that did not load Cocoa.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness", "r_stack"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_native_macos_evidence_fails_closed_on_incomplete_or_mismatched_proof[r-result]",
+      "reason": "Rejects an incorrect representative R result.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_native_macos_evidence_fails_closed_on_incomplete_or_mismatched_proof[universal-package]",
+      "reason": "Rejects a non-thin packaged executable.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_native_macos_evidence_fails_closed_on_incomplete_or_mismatched_proof[manual-qt-collection]",
+      "reason": "Rejects a Qt collector other than PyInstaller.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_native_macos_evidence_fails_closed_on_incomplete_or_mismatched_proof[missing-diagnostic]",
+      "reason": "Rejects incomplete retained diagnostic inventories.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness", "r_stack"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_native_macos_evidence_fails_closed_on_incomplete_or_mismatched_proof[wrong-r-architecture]",
+      "reason": "Rejects an R runtime without the required native slice.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_native_macos_workflow_uses_two_strict_native_jobs_and_retains_evidence",
+      "reason": "Guards the two native runner legs and fail-closed artifact retention contract.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness", "r_stack"], "external_dependencies": ["installed Python packages"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_locked_rpy2_runtime_discovers_concrete_native_extensions",
+      "reason": "Guards split namespace-package discovery against Path(None) and proves concrete rpy2-rinterface extensions are found.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_native_macos_evidence_recomputes_retained_diagnostic_hashes",
+      "reason": "Guards retained diagnostic bytes against evidence digest tampering.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_native_macos_evidence_rejects_invented_hashes_and_missing_artifacts",
+      "reason": "Rejects invented hashes, missing native probes, and tampered deployment inventories.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_pyinstaller_plan_rejects_split_equals_and_ambiguous_collection_options",
+      "reason": "Rejects split, equals-form, alternate-binding, and ambiguous PyInstaller collection options outside the allowlisted plan.", "runtime_class": "subsecond", "size": "small"
     }
 
   ]

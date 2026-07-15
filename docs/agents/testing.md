@@ -79,6 +79,10 @@ The hosted pull-request path currently runs the Windows Qt6 vertical slice when
 source, tests, dependency files, or its verification inputs change. Broader
 source, R, and packaging gates return as the corresponding Qt6 tickets land.
 Native macOS Intel and Apple Silicon feasibility is delivered by Issue #329.
+Its native workflow and retained evidence contract are documented in
+`docs/verification/native-macos-qt6-feasibility.md`. Local non-macOS validation
+can check the validator and workflow structure, but it cannot satisfy the two
+native Cocoa evidence legs.
 
 ## GUI paint coverage
 
