@@ -1,0 +1,117 @@
+name: Package Supported Target
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+      target_os:
+        required: true
+        type: string
+      artifact_name:
+        required: true
+        type: string
+      archive_platform:
+        required: true
+        type: string
+      evidence_path:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  RCMS_CRAN_REPO: https://cloud.r-project.org
+  RCMS_CRAN_REPO_KEY: cloud-r-project-org
+
+jobs:
+  package:
+    name: ${{ inputs.artifact_name }}
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install 3.11
+
+      - name: Set up R for bundled runtime
+        uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
+        with:
+          r-version: release
+
+      - name: Resolve shared package metadata
+        id: package-metadata
+        run: uv run python scripts/resolve_package_ci_metadata.py
+
+      - name: Cache bundled R package library
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: artifacts/r-library-cache
+          key: bundled-r-library-v3-${{ inputs.archive_platform }}-${{ steps.package-metadata.outputs.r-version }}-${{ env.RCMS_CRAN_REPO_KEY }}-${{ hashFiles('scripts/install-r-deps.R', 'docs/verification/RCMetaR-r-dependencies.json', 'r/RCMetaR/DESCRIPTION') }}
+
+      - name: Build Windows package
+        if: ${{ inputs.target_os == 'windows' }}
+        shell: powershell
+        run: .\scripts\package-windows.ps1 -ArtifactName "${{ inputs.artifact_name }}" -ArchiveRootName "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ inputs.archive_platform }}" -RRuntimeRoot "${{ steps.package-metadata.outputs.r-runtime-root }}"
+
+      - name: Build macOS package
+        if: ${{ inputs.target_os == 'macos' }}
+        shell: bash
+        run: bash scripts/package-macos.sh --architecture x64 --artifact-name "${{ inputs.artifact_name }}" --archive-root-name "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ inputs.archive_platform }}" --r-runtime-root "${{ steps.package-metadata.outputs.r-runtime-root }}"
+
+      - name: Upload adaptive-layout evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ inputs.artifact_name }}-adaptive-layout-evidence
+          path: ${{ inputs.evidence_path }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: artifacts/${{ inputs.artifact_name }}.zip
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - name: Upload Windows packaging diagnostics
+        if: ${{ failure() && inputs.target_os == 'windows' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ inputs.artifact_name }}-diagnostics
+          path: |
+            build/windows-package/work/RCMetaStudio/warn-RCMetaStudio.txt
+            build/windows-package/work/RCMetaStudio/xref-RCMetaStudio.html
+            build/windows-package/dist/RCMetaStudio/automation-wizard-layout-smoke.log
+            ${{ inputs.evidence_path }}
+          if-no-files-found: ignore
+          retention-days: 14
+          compression-level: 0
+
+      - name: Upload macOS packaging diagnostics
+        if: ${{ failure() && inputs.target_os == 'macos' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ inputs.artifact_name }}-diagnostics
+          path: |
+            build/macos-package/x64/work/RCMetaStudio/warn-RCMetaStudio.txt
+            build/macos-package/x64/work/RCMetaStudio/xref-RCMetaStudio.html
+            ${{ inputs.evidence_path }}
+          if-no-files-found: ignore
+          retention-days: 14
+          compression-level: 0
+
+      - name: Prune uv cache
+        if: ${{ always() }}
+        run: uv cache prune --ci

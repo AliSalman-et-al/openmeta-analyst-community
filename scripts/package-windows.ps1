@@ -57,9 +57,9 @@ try {
     $resolvedRscript = Resolve-RscriptFromRuntime -Root $resolvedRRuntimeRoot
 
     if (-not $SkipVerification) {
-        Write-Step "Verifying Full R Stack Evidence"
-        uv run python scripts\verify_rcmetar_r_stack.py --rscript $resolvedRscript --r-library-cache-root $RPackageCacheRoot
-        if ($LASTEXITCODE -ne 0) { throw "Full R Stack Evidence failed." }
+        Write-Step "Running shared release-package verification"
+        & $pythonExe scripts\verify_package_release.py --rscript $resolvedRscript --r-library-cache-root $RPackageCacheRoot
+        if ($LASTEXITCODE -ne 0) { throw "Shared release-package verification failed." }
     }
 
     Write-Step "Building Windows package artifact with PyInstaller"

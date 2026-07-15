@@ -26,7 +26,7 @@ on:
       release_tag:
         description: Existing release tag to receive uploaded package artifacts.
         required: true
-        default: v0.1.1
+        default: v0.1.2
         type: string
   push:
     tags:
@@ -34,10 +34,6 @@ on:
 
 permissions:
   contents: read
-
-env:
-  RCMS_CRAN_REPO: https://cloud.r-project.org
-  RCMS_CRAN_REPO_KEY: cloud-r-project-org
 
 concurrency:
   group: package-verification-${{ github.ref }}
@@ -47,165 +43,24 @@ jobs:
   windows-package:
     name: Windows Packaging Lane
     if: ${{ github.event_name == 'push' || inputs.build_windows }}
-    runs-on: windows-latest
-    timeout-minutes: 45
-    defaults:
-      run:
-        shell: powershell
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
-        with:
-          enable-cache: true
-
-      - name: Install Python
-        run: uv python install 3.11
-
-      - name: Resolve RC MetaStudio version
-        id: package-version
-        run: |
-          $version = python -c "import pathlib, tomllib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text(encoding='utf-8'))['project']['version'])"
-          "version=$version" >> $env:GITHUB_OUTPUT
-
-      - name: Set up R for bundled runtime
-        uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
-        with:
-          r-version: release
-
-      - name: Resolve R cache version
-        id: r-cache-key
-        run: |
-          $version = Rscript -e "cat(paste0('R-', getRversion()))"
-          $runtimeRoot = Rscript -e "cat(normalizePath(R.home(), winslash='/', mustWork=TRUE))"
-          "version=$version" >> $env:GITHUB_OUTPUT
-          "runtime-root=$runtimeRoot" >> $env:GITHUB_OUTPUT
-
-      - name: Cache bundled R package library
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
-        with:
-          path: artifacts\r-library-cache
-          key: bundled-r-library-v2-windows-${{ steps.r-cache-key.outputs.version }}-${{ env.RCMS_CRAN_REPO_KEY }}-${{ hashFiles('scripts/install-r-deps.R', 'docs/verification/RCMetaR-r-dependencies.json', 'r/RCMetaR/DESCRIPTION') }}
-
-      - name: Build Windows package
-        run: .\scripts\package-windows.ps1 -ArtifactName RCMetaStudio-windows-x64 -ArchiveRootName "RCMetaStudio-${{ steps.package-version.outputs.version }}-windows-x64" -RRuntimeRoot "${{ steps.r-cache-key.outputs.runtime-root }}"
-
-      - name: Upload Windows adaptive-layout evidence
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: RCMetaStudio-windows-x64-adaptive-layout-evidence
-          path: build\windows-package\adaptive-layout-evidence\windows-x64
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload Windows package artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: RCMetaStudio-windows-x64
-          path: artifacts\RCMetaStudio-windows-x64.zip
-          if-no-files-found: error
-          retention-days: 30
-          compression-level: 0
-
-      - name: Upload Windows packaging diagnostics
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: RCMetaStudio-windows-x64-diagnostics
-          path: |
-            build\windows-package\work\RCMetaStudio\warn-RCMetaStudio.txt
-            build\windows-package\work\RCMetaStudio\xref-RCMetaStudio.html
-            build\windows-package\dist\RCMetaStudio\automation-wizard-layout-smoke.log
-            build\windows-package\adaptive-layout-evidence\windows-x64
-          if-no-files-found: ignore
-          retention-days: 14
-          compression-level: 0
-
-      - name: Prune uv cache
-        if: ${{ always() }}
-        run: uv cache prune --ci
+    uses: ./.github/workflows/package-target.yml
+    with:
+      runner: windows-latest
+      target_os: windows
+      artifact_name: RCMetaStudio-windows-x64
+      archive_platform: windows-x64
+      evidence_path: build/windows-package/adaptive-layout-evidence/windows-x64
 
   macos-package-intel:
     name: macOS Packaging Lane (Intel)
     if: ${{ github.event_name == 'push' || inputs.build_macos }}
-    runs-on: macos-15-intel
-    timeout-minutes: 60
-    defaults:
-      run:
-        shell: bash
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
-        with:
-          enable-cache: true
-
-      - name: Install Python
-        run: uv python install 3.11
-
-      - name: Resolve RC MetaStudio version
-        id: package-version
-        run: |
-          version="$(python -c "import pathlib, tomllib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text(encoding='utf-8'))['project']['version'])")"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - name: Set up R for bundled runtime
-        uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
-        with:
-          r-version: release
-
-      - name: Resolve R cache version
-        id: r-cache-key
-        run: |
-          version="$(Rscript -e "cat(paste0('R-', getRversion()))")"
-          runtime_root="$(Rscript -e "cat(normalizePath(R.home(), winslash='/', mustWork=TRUE))")"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "runtime-root=$runtime_root" >> "$GITHUB_OUTPUT"
-
-      - name: Cache bundled R package library
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
-        with:
-          path: artifacts/r-library-cache
-          key: bundled-r-library-v2-macos-x64-${{ steps.r-cache-key.outputs.version }}-${{ env.RCMS_CRAN_REPO_KEY }}-${{ hashFiles('scripts/install-r-deps.R', 'docs/verification/RCMetaR-r-dependencies.json', 'r/RCMetaR/DESCRIPTION') }}
-
-      - name: Build macOS package
-        run: bash scripts/package-macos.sh --architecture x64 --artifact-name RCMetaStudio-macos-x64 --archive-root-name "RCMetaStudio-${{ steps.package-version.outputs.version }}-macos-x64" --r-runtime-root "${{ steps.r-cache-key.outputs.runtime-root }}"
-
-      - name: Upload macOS Intel adaptive-layout evidence
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: RCMetaStudio-macos-x64-adaptive-layout-evidence
-          path: build/macos-package/x64/adaptive-layout-evidence/macos-x64
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload macOS package artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: RCMetaStudio-macos-x64
-          path: artifacts/RCMetaStudio-macos-x64.zip
-          if-no-files-found: error
-          retention-days: 30
-          compression-level: 0
-
-      - name: Upload macOS Intel packaging diagnostics
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: RCMetaStudio-macos-x64-diagnostics
-          path: |
-            build/macos-package/x64/work/RCMetaStudio/warn-RCMetaStudio.txt
-            build/macos-package/x64/work/RCMetaStudio/xref-RCMetaStudio.html
-            build/macos-package/x64/adaptive-layout-evidence/macos-x64
-          if-no-files-found: ignore
-          retention-days: 14
-          compression-level: 0
+    uses: ./.github/workflows/package-target.yml
+    with:
+      runner: macos-15-intel
+      target_os: macos
+      artifact_name: RCMetaStudio-macos-x64
+      archive_platform: macos-x64
+      evidence_path: build/macos-package/x64/adaptive-layout-evidence/macos-x64
 
   macos-package-arm64:
     name: macOS Packaging Lane (Apple Silicon)
@@ -216,16 +71,16 @@ jobs:
     defaults:
       run:
         shell: bash
-
+    env:
+      RCMS_CRAN_REPO: https://cloud.r-project.org
+      RCMS_CRAN_REPO_KEY: cloud-r-project-org
     steps:
       - name: Check out repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           enable-cache: true
-
       - name: Install Python
         run: uv python install 3.11
 
@@ -262,7 +117,7 @@ jobs:
       - name: Build macOS package
         run: bash scripts/package-macos.sh --architecture arm64 --artifact-name RCMetaStudio-macos-arm64 --archive-root-name "RCMetaStudio-${{ steps.package-version.outputs.version }}-macos-arm64" --r-runtime-root "${{ steps.r-cache-key.outputs.runtime-root }}"
 
-      - name: Upload macOS package artifact
+      - name: Upload macOS Apple Silicon package artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: RCMetaStudio-macos-arm64
@@ -294,12 +149,9 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: write
-    defaults:
-      run:
-        shell: bash
-
     steps:
       - name: Validate selected package lanes
+        shell: bash
         run: |
           if [[ "${{ github.event_name == 'push' || inputs.build_windows }}" == "true" && "${{ needs.windows-package.result }}" != "success" ]]; then
             echo "Windows package was selected but did not succeed: ${{ needs.windows-package.result }}" >&2
@@ -320,14 +172,12 @@ jobs:
         with:
           name: RCMetaStudio-windows-x64
           path: release-assets
-
       - name: Download macOS Intel package artifact
         if: ${{ github.event_name == 'push' || inputs.build_macos }}
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: RCMetaStudio-macos-x64
           path: release-assets
-
       - name: Download macOS Apple Silicon package artifact
         if: ${{ inputs.build_macos_arm64 }}
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -336,14 +186,11 @@ jobs:
           path: release-assets
 
       - name: Upload package artifacts to release
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
         run: |
-          if [[ -z "$RELEASE_TAG" ]]; then
-            echo "release_tag is required when publish_release is true." >&2
-            exit 1
-          fi
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
           shopt -s nullglob
           assets=(release-assets/*.zip)

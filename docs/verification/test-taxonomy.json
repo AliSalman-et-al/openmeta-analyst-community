@@ -7252,6 +7252,16 @@
       "reason": "Guards exact native evidence sizing when a platform retains maximized state during showNormal.",
       "runtime_class": "subsecond",
       "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_adaptive_layout_native_evidence_contract.py::test_validator_accepts_only_proven_unavailable_full_usability_at_150",
+      "reason": "Guards fail-closed capability qualification for native full-usability scenarios that cannot fit at 150 percent scale.",
+      "runtime_class": "subsecond",
+      "size": "small"
     }
 
   ]
