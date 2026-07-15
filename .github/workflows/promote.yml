@@ -61,10 +61,6 @@ jobs:
             title="RC MetaStudio ${{ inputs.stable_version }}"
             notes="Promoted from ${{ inputs.rc_tag }} without rebuilding or modifying deliverables."
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$STABLE_TAG" "$source_sha" -m "RC MetaStudio ${{ inputs.stable_version }}"
-          git push origin "$STABLE_TAG"
-          gh release create "$STABLE_TAG" promotion/RCMetaStudio-*.zip promotion/*.cdx.json promotion/SHA256SUMS promotion/release-set-stable.json --verify-tag --title "$title" --notes "$notes"
+          gh release create "$STABLE_TAG" promotion/RCMetaStudio-*.zip promotion/*.cdx.json promotion/SHA256SUMS promotion/release-set-stable.json --target "$source_sha" --title "$title" --notes "$notes"
       - name: Prove promotion preserved artifact bytes
         run: (cd promotion && sha256sum --check SHA256SUMS)
