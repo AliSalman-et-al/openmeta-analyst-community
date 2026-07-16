@@ -78,6 +78,25 @@ separate best-effort upload retains setup and identity diagnostics without
 allowing an artifact-service failure or cache cleanup to replace the primary
 setup error.
 
+## Acceptance record
+
+The gate passed for source commit
+`a943b196daed17283cf925ab2199250e0db7dff0` on
+[PR #345](https://github.com/AliSalman-et-al/rc-metastudio/pull/345) in
+[GitHub Actions run 29462556132](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29462556132).
+
+| Target | Native job | Runner and result | Evidence artifact | `evidence.json` |
+| --- | --- | --- | --- | --- |
+| Intel x64 | [87508955301](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29462556132/job/87508955301) | `macos-15-intel`; success; `2026-07-16T00:50:50Z`–`00:57:52Z` | ID `8361818490`; `qt6-feasibility-macos-x64-9fefe2e3f57211bc71efb3b49c94cff1dbeedc3d`; 23,308,552 bytes; `sha256:f820f9e0ad39e236eaf8f5d885dd11abf3959b30a9fb892650bcbe4ec556f3d8`; expires `2026-08-15` | 7,193 bytes; `f744017d3f2de71271ea7a18dc2e11974bf610f611fba798af05b971c68441a9` |
+| Apple Silicon ARM64 | [87508955302](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29462556132/job/87508955302) | `macos-14`; success; `2026-07-16T00:50:48Z`–`00:52:10Z` | ID `8361729466`; `qt6-feasibility-macos-arm64-9fefe2e3f57211bc71efb3b49c94cff1dbeedc3d`; 22,779,715 bytes; `sha256:ca45cab5dc7b552b9aff9dac32e19b60295327deb1e61e454c8453c0dbf64cbb`; expires `2026-08-15` | 7,174 bytes; `dbb13a46d5ee0f683755392a9b3c36a9b12b62a3a73d6049bfe68619708068fc` |
+
+The public validation CLI accepted both downloaded records unchanged on
+Windows. Each native job proved the exact Python 3.11.9, PyQt6 6.11.0, Qt
+6.11.1, R 4.6.1, and rpy2 3.6.7 stack; Cocoa source and packaged execution;
+visible form, registered resource, SVG rendering, clean exit, and R result 7.5;
+a thin target-architecture package; and PyInstaller as the sole collector with
+the retained deployment inventory.
+
 ## Blocking policy
 
 This workflow is deliberately fail-closed. A missing wheel, incompatible R or
