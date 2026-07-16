@@ -1,8 +1,9 @@
 import copy
 import hashlib
 import json
-from pathlib import Path
+import posixpath
 import tomllib
+from pathlib import Path
 
 import pytest
 import yaml
@@ -151,37 +152,70 @@ def _materialize_retained_evidence(evidence: dict, root: Path) -> None:
     inventory_files = [
         {
             "path": executable["deployment_path"],
+            "kind": "file",
             "size": executable["size"],
             "sha256": executable["sha256"],
             "architectures": executable["architectures"],
         },
         {
             "path": cocoa["deployment_path"],
+            "kind": "file",
             "size": cocoa["size"],
             "sha256": cocoa["sha256"],
             "architectures": cocoa["architectures"],
         },
         {
             "path": "Contents/Frameworks/PyQt6/QtCore.abi3.so",
+            "kind": "file",
             "size": 4,
             "sha256": hashlib.sha256(b"core").hexdigest(),
             "architectures": executable["architectures"],
         },
         {
             "path": "Contents/Frameworks/PyQt6/Qt6/lib/QtCore.framework/Versions/A/QtCore",
+            "kind": "file",
             "size": 7,
             "sha256": hashlib.sha256(b"qt core").hexdigest(),
             "architectures": executable["architectures"],
         },
         {
             "path": "Contents/Frameworks/_rinterface_cffi_api.abi3.so",
+            "kind": "file",
             "size": 4,
             "sha256": hashlib.sha256(b"rpy2").hexdigest(),
             "architectures": executable["architectures"],
         },
+        {
+            "path": "Contents/Frameworks/PyQt6/Qt6/lib/QtCore.framework/QtCore",
+            "kind": "symlink",
+            "size": 17,
+            "link_target": "Versions/A/QtCore",
+            "resolved_path": "Contents/Frameworks/PyQt6/Qt6/lib/QtCore.framework/Versions/A/QtCore",
+        },
+        {
+            "path": "Contents/Frameworks/QtCore",
+            "kind": "file",
+            "size": 7,
+            "sha256": hashlib.sha256(b"qt core").hexdigest(),
+            "architectures": executable["architectures"],
+        },
+        {
+            "path": "Contents/Resources/QtCore",
+            "kind": "file",
+            "size": 7,
+            "sha256": hashlib.sha256(b"qt core").hexdigest(),
+            "architectures": executable["architectures"],
+        },
+        {
+            "path": "Contents/Resources/PyQt6",
+            "kind": "symlink",
+            "size": 20,
+            "link_target": "../Frameworks/PyQt6",
+            "resolved_path": "Contents/Frameworks/PyQt6",
+        },
     ]
     inventory = {
-        "schema_version": 1,
+        "schema_version": 2,
         "file_count": len(inventory_files),
         "total_bytes": sum(record["size"] for record in inventory_files),
         "files": inventory_files,
@@ -492,4 +526,484 @@ def test_pyinstaller_plan_rejects_split_equals_and_ambiguous_collection_options(
         record["sha256"] = hashlib.sha256(plan_path.read_bytes()).hexdigest()
 
         with pytest.raises(EvidenceError, match="PyInstaller build plan"):
+            validate_evidence(evidence, "macos-arm64", evidence_dir=root)
+
+
+def test_deployment_inventory_rejects_incoherent_qt_payloads_and_aliases(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
+    )
+
+    def second_payload(files):
+        files.append(
+            {
+                "path": "Contents/Frameworks/SecondQt/QtCore",
+                "kind": "file",
+                "size": 6,
+                "sha256": hashlib.sha256(b"second").hexdigest(),
+                "architectures": ["arm64"],
+            }
+        )
+
+    def alternate_binding(files):
+        files.append(
+            {
+                "path": "Contents/Frameworks/PySide6/QtCore.abi3.so",
+                "kind": "file",
+                "size": 7,
+                "sha256": hashlib.sha256(b"pyside6").hexdigest(),
+                "architectures": ["arm64"],
+            }
+        )
+
+    def mismatched_alias_hash(files):
+        next(item for item in files if item["path"] == "Contents/Frameworks/QtCore")[
+            "sha256"
+        ] = "1" * 64
+
+    def mismatched_alias_architecture(files):
+        next(item for item in files if item["path"] == "Contents/Resources/QtCore")[
+            "architectures"
+        ] = ["x86_64"]
+
+    def missing_authoritative_root(files):
+        files[:] = [
+            item
+            for item in files
+            if not item["path"].startswith("Contents/Frameworks/PyQt6/Qt6/")
+        ]
+
+    def multiple_cocoa_plugins(files):
+        files.append(
+            {
+                "path": "Contents/Frameworks/Other/libqcocoa.dylib",
+                "kind": "file",
+                "size": 5,
+                "sha256": hashlib.sha256(b"other").hexdigest(),
+                "architectures": ["arm64"],
+            }
+        )
+
+    def escaping_qt_alias(files):
+        next(
+            item for item in files if item["path"] == "Contents/Resources/PyQt6"
+        )["resolved_path"] = "Contents/Other/PyQt6"
+
+    def add_qt_file(files, path):
+        files.append(
+            {
+                "path": path,
+                "kind": "file",
+                "size": len(path),
+                "sha256": hashlib.sha256(path.encode()).hexdigest(),
+                "architectures": ["arm64"],
+            }
+        )
+
+    def qt6_unversioned_dylib(files):
+        add_qt_file(files, "Contents/Frameworks/libQt6Core.dylib")
+
+    def qt6_versioned_dylib(files):
+        add_qt_file(files, "Contents/Frameworks/libQt6Core.6.dylib")
+
+    def second_framework(files):
+        add_qt_file(
+            files,
+            "Contents/Frameworks/QtGui.framework/Versions/A/QtGui",
+        )
+
+    def second_platform_plugin(files):
+        add_qt_file(
+            files,
+            "Contents/Frameworks/Other/plugins/platforms/libqoffscreen.dylib",
+        )
+
+    def pyside_platform_plugin(files):
+        add_qt_file(
+            files,
+            "Contents/Frameworks/PySide6/Qt/plugins/platforms/libqcocoa.dylib",
+        )
+
+    def authoritative_qt_dylib(files):
+        add_qt_file(
+            files,
+            "Contents/Frameworks/PyQt6/Qt6/lib/libQt6Core.dylib",
+        )
+
+    def displaced_offscreen_plugin(files):
+        add_qt_file(files, "Contents/Frameworks/Other/libqoffscreen.dylib")
+
+    def lowercase_qt_dylib(files):
+        add_qt_file(files, "Contents/Frameworks/libqt6core.dylib")
+
+    def unprefixed_qt_dylib(files):
+        add_qt_file(files, "Contents/Frameworks/QtCore.dylib")
+
+    def shiboken_runtime(files):
+        add_qt_file(files, "Contents/Frameworks/libshiboken6.abi3.6.10.dylib")
+
+    def pyside_runtime(files):
+        add_qt_file(files, "Contents/Frameworks/libpyside6.abi3.6.10.dylib")
+
+    def case_variant_pyqt6_root(files):
+        add_qt_file(files, "Contents/Frameworks/pyqt6/qtcore.abi3.so")
+
+    def shiboken_package_extension(files):
+        add_qt_file(files, "Contents/Frameworks/shiboken6/Shiboken.abi3.so")
+
+    def top_level_shiboken_extension(files):
+        add_qt_file(files, "Contents/Frameworks/Shiboken.abi3.so")
+
+    def shiboken6_extension(files):
+        add_qt_file(files, "Contents/Frameworks/shiboken6.abi3.so")
+
+    def libshiboken6_extension(files):
+        add_qt_file(files, "Contents/Frameworks/libshiboken6.abi3.so")
+
+    def debug_qt_dylib(files):
+        add_qt_file(files, "Contents/Frameworks/QtCore_debug.dylib")
+
+    def debug_versioned_qt_dylib(files):
+        add_qt_file(files, "Contents/Frameworks/libQt6Core_debug.6.abi3.dylib")
+
+    def shiboken_cpython_extension(files):
+        add_qt_file(files, "Contents/Frameworks/Shiboken.cpython-311-darwin.so")
+
+    def shiboken_debug_runtime(files):
+        add_qt_file(files, "Contents/Frameworks/libshiboken6_debug.dylib")
+
+    def shiboken_debug_versioned_extension(files):
+        add_qt_file(files, "Contents/Frameworks/libshiboken_debug.6.10.so")
+
+    mutations = [
+        second_payload,
+        alternate_binding,
+        mismatched_alias_hash,
+        mismatched_alias_architecture,
+        missing_authoritative_root,
+        multiple_cocoa_plugins,
+        escaping_qt_alias,
+        qt6_unversioned_dylib,
+        qt6_versioned_dylib,
+        second_framework,
+        second_platform_plugin,
+        pyside_platform_plugin,
+        authoritative_qt_dylib,
+        displaced_offscreen_plugin,
+        lowercase_qt_dylib,
+        unprefixed_qt_dylib,
+        shiboken_runtime,
+        pyside_runtime,
+        case_variant_pyqt6_root,
+        shiboken_package_extension,
+        top_level_shiboken_extension,
+        shiboken6_extension,
+        libshiboken6_extension,
+        debug_qt_dylib,
+        debug_versioned_qt_dylib,
+        shiboken_cpython_extension,
+        shiboken_debug_runtime,
+        shiboken_debug_versioned_extension,
+    ]
+    for index, mutation in enumerate(mutations):
+        evidence = _valid_evidence()
+        root = tmp_path / str(index)
+        _materialize_retained_evidence(evidence, root)
+        record = evidence["package"]["inventory"]
+        inventory_path = root / record["retained_path"]
+        inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+        mutation(inventory["files"])
+        inventory["file_count"] = len(inventory["files"])
+        inventory["total_bytes"] = sum(item["size"] for item in inventory["files"])
+        inventory_path.write_text(json.dumps(inventory, sort_keys=True), encoding="utf-8")
+        record["size"] = inventory_path.stat().st_size
+        record["sha256"] = hashlib.sha256(inventory_path.read_bytes()).hexdigest()
+
+        with pytest.raises(EvidenceError):
+            validate_evidence(evidence, "macos-arm64", evidence_dir=root)
+
+
+def test_deployment_inventory_rejects_displaced_runtime_symlinks(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
+    )
+    forged_paths = [
+        "Contents/Frameworks/shiboken6/Shiboken.abi3.so",
+        "Contents/Frameworks/Shiboken.abi3.so",
+        "Contents/Frameworks/shiboken6.abi3.so",
+        "Contents/Frameworks/libshiboken6.abi3.so",
+        "Contents/Frameworks/QtCore_debug.dylib",
+        "Contents/Frameworks/libQt6Core_debug.6.abi3.dylib",
+        "Contents/Frameworks/Shiboken.cpython-311-darwin.so",
+        "Contents/Frameworks/libshiboken6_debug.dylib",
+        "Contents/Frameworks/libshiboken_debug.6.10.so",
+    ]
+    for index, forged_path in enumerate(forged_paths):
+        evidence = _valid_evidence()
+        root = tmp_path / str(index)
+        _materialize_retained_evidence(evidence, root)
+        record = evidence["package"]["inventory"]
+        inventory_path = root / record["retained_path"]
+        inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+        link_target = posixpath.relpath(
+            "Contents/Resources/QtCore", posixpath.dirname(forged_path)
+        )
+        inventory["files"].append(
+            {
+                "path": forged_path,
+                "kind": "symlink",
+                "size": len(link_target.encode()),
+                "link_target": link_target,
+                "resolved_path": "Contents/Resources/QtCore",
+            }
+        )
+        inventory["file_count"] = len(inventory["files"])
+        inventory["total_bytes"] = sum(item["size"] for item in inventory["files"])
+        inventory_path.write_text(json.dumps(inventory, sort_keys=True), encoding="utf-8")
+        record["size"] = inventory_path.stat().st_size
+        record["sha256"] = hashlib.sha256(inventory_path.read_bytes()).hexdigest()
+
+        with pytest.raises(EvidenceError, match="unrecognized Qt deployment symlink"):
+            validate_evidence(evidence, "macos-arm64", evidence_dir=root)
+
+
+def test_deployment_inventory_allows_unrelated_shiboken_prose_and_data(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
+    )
+    evidence = _valid_evidence()
+    _materialize_retained_evidence(evidence, tmp_path)
+    record = evidence["package"]["inventory"]
+    inventory_path = tmp_path / record["retained_path"]
+    inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+    for path in (
+        "Contents/Resources/Shiboken.cpython-311-darwin.txt",
+        "Contents/Resources/libshiboken6_debug.json",
+    ):
+        payload = path.encode()
+        inventory["files"].append(
+            {
+                "path": path,
+                "kind": "file",
+                "size": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+                "architectures": [],
+            }
+        )
+    inventory["file_count"] = len(inventory["files"])
+    inventory["total_bytes"] = sum(item["size"] for item in inventory["files"])
+    inventory_path.write_text(json.dumps(inventory, sort_keys=True), encoding="utf-8")
+    record["size"] = inventory_path.stat().st_size
+    record["sha256"] = hashlib.sha256(inventory_path.read_bytes()).hexdigest()
+
+    validate_evidence(evidence, "macos-arm64", evidence_dir=tmp_path)
+
+
+def test_deployment_inventory_rejects_noncanonical_record_paths(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
+    )
+    forged_paths = [
+        "",
+        "/Contents/MacOS/Qt6MacFeasibility",
+        "C:/Contents/MacOS/Qt6MacFeasibility",
+        "Contents\\MacOS\\Qt6MacFeasibility",
+        "Contents/MacOS/Qt6MacFeasibility\0suffix",
+        "Contents//MacOS/Qt6MacFeasibility",
+        "Contents/./MacOS/Qt6MacFeasibility",
+        "Contents/../MacOS/Qt6MacFeasibility",
+        "Contents/MacOS/Qt6MacFeasibility/",
+    ]
+    for index, forged_path in enumerate(forged_paths):
+        evidence = _valid_evidence()
+        root = tmp_path / str(index)
+        _materialize_retained_evidence(evidence, root)
+        record = evidence["package"]["inventory"]
+        inventory_path = root / record["retained_path"]
+        inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+        inventory["files"][0]["path"] = forged_path
+        inventory_path.write_text(json.dumps(inventory, sort_keys=True), encoding="utf-8")
+        record["size"] = inventory_path.stat().st_size
+        record["sha256"] = hashlib.sha256(inventory_path.read_bytes()).hexdigest()
+
+        with pytest.raises(EvidenceError, match="record path"):
+            validate_evidence(evidence, "macos-arm64", evidence_dir=root)
+
+
+def test_deployment_inventory_rejects_noncanonical_resolved_paths(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
+    )
+    forged_paths = [
+        "/Contents/Frameworks/PyQt6",
+        "C:/Contents/Frameworks/PyQt6",
+        "Contents\\Frameworks\\PyQt6",
+        "Contents//Frameworks/PyQt6",
+        "Contents/./Frameworks/PyQt6",
+        "Contents/../Frameworks/PyQt6",
+    ]
+    for index, forged_path in enumerate(forged_paths):
+        evidence = _valid_evidence()
+        root = tmp_path / str(index)
+        _materialize_retained_evidence(evidence, root)
+        record = evidence["package"]["inventory"]
+        inventory_path = root / record["retained_path"]
+        inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+        alias = next(
+            item
+            for item in inventory["files"]
+            if item["path"] == "Contents/Resources/PyQt6"
+        )
+        alias["resolved_path"] = forged_path
+        inventory_path.write_text(json.dumps(inventory, sort_keys=True), encoding="utf-8")
+        record["size"] = inventory_path.stat().st_size
+        record["sha256"] = hashlib.sha256(inventory_path.read_bytes()).hexdigest()
+
+        with pytest.raises(EvidenceError, match="resolved path"):
+            validate_evidence(evidence, "macos-arm64", evidence_dir=root)
+
+
+def test_deployment_inventory_resolves_a_long_symlink_chain_iteratively(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
+    )
+    evidence = _valid_evidence()
+    _materialize_retained_evidence(evidence, tmp_path)
+    record = evidence["package"]["inventory"]
+    inventory_path = tmp_path / record["retained_path"]
+    inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+    target = "Contents/Resources/QtCore"
+    for index in range(1_100):
+        link_target = f"{index + 1:04d}" if index < 1_099 else "../QtCore"
+        inventory["files"].append(
+            {
+                "path": f"Contents/Resources/chain/{index:04d}",
+                "kind": "symlink",
+                "size": len(link_target.encode()),
+                "link_target": link_target,
+                "resolved_path": target,
+            }
+        )
+    inventory["file_count"] = len(inventory["files"])
+    inventory["total_bytes"] = sum(item["size"] for item in inventory["files"])
+    inventory_path.write_text(json.dumps(inventory, sort_keys=True), encoding="utf-8")
+    record["size"] = inventory_path.stat().st_size
+    record["sha256"] = hashlib.sha256(inventory_path.read_bytes()).hexdigest()
+
+    validate_evidence(evidence, "macos-arm64", evidence_dir=tmp_path)
+
+
+def test_deployment_inventory_resolves_symlink_graph_and_rejects_forgery(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
+    )
+
+    def forged_escape(files):
+        alias = next(
+            item for item in files if item["path"] == "Contents/Resources/PyQt6"
+        )
+        alias["link_target"] = "../../../outside"
+
+    def wrong_component(files):
+        files.append(
+            {
+                "path": "Contents/Frameworks/PyQt6/Qt6/lib/QtGui.framework/Versions/A/QtGui",
+                "kind": "file",
+                "size": 5,
+                "sha256": hashlib.sha256(b"qtgui").hexdigest(),
+                "architectures": ["arm64"],
+            }
+        )
+        alias = next(
+            item
+            for item in files
+            if item["path"]
+            == "Contents/Frameworks/PyQt6/Qt6/lib/QtCore.framework/QtCore"
+        )
+        alias["link_target"] = "../QtGui.framework/Versions/A/QtGui"
+        alias["resolved_path"] = (
+            "Contents/Frameworks/PyQt6/Qt6/lib/QtGui.framework/Versions/A/QtGui"
+        )
+
+    def cyclic(files):
+        files.extend(
+            [
+                {
+                    "path": "Contents/Resources/cycle-a",
+                    "kind": "symlink",
+                    "size": 7,
+                    "link_target": "cycle-b",
+                    "resolved_path": "Contents/Resources/cycle-b",
+                },
+                {
+                    "path": "Contents/Resources/cycle-b",
+                    "kind": "symlink",
+                    "size": 7,
+                    "link_target": "cycle-a",
+                    "resolved_path": "Contents/Resources/cycle-a",
+                },
+            ]
+        )
+
+    def dangling(files):
+        files.append(
+            {
+                "path": "Contents/Resources/dangling",
+                "kind": "symlink",
+                "size": 7,
+                "link_target": "missing",
+                "resolved_path": "Contents/Resources/missing",
+            }
+        )
+
+    def absolute_target(files):
+        alias = next(
+            item for item in files if item["path"] == "Contents/Resources/PyQt6"
+        )
+        alias["link_target"] = "/Contents/Frameworks/PyQt6"
+
+    def normalization_trick(files):
+        alias = next(
+            item for item in files if item["path"] == "Contents/Resources/PyQt6"
+        )
+        alias["link_target"] = ".././Frameworks/PyQt6"
+
+    for index, (mutation, expected_error) in enumerate(
+        [
+            (forged_escape, "escapes the virtual bundle"),
+            (wrong_component, "wrong canonical component"),
+            (cyclic, "cyclic symlink"),
+            (dangling, "dangling symlink"),
+            (absolute_target, "unsafe symlink target"),
+            (normalization_trick, "unsafe symlink target"),
+        ]
+    ):
+        evidence = _valid_evidence()
+        root = tmp_path / str(index)
+        _materialize_retained_evidence(evidence, root)
+        record = evidence["package"]["inventory"]
+        inventory_path = root / record["retained_path"]
+        inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+        mutation(inventory["files"])
+        inventory["file_count"] = len(inventory["files"])
+        inventory["total_bytes"] = sum(item["size"] for item in inventory["files"])
+        inventory_path.write_text(json.dumps(inventory, sort_keys=True), encoding="utf-8")
+        record["size"] = inventory_path.stat().st_size
+        record["sha256"] = hashlib.sha256(inventory_path.read_bytes()).hexdigest()
+
+        with pytest.raises(EvidenceError, match=expected_error):
             validate_evidence(evidence, "macos-arm64", evidence_dir=root)

@@ -7942,6 +7942,41 @@
       "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": ["filesystem"], "lane": "fast",
       "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_pyinstaller_plan_rejects_split_equals_and_ambiguous_collection_options",
       "reason": "Rejects split, equals-form, alternate-binding, and ambiguous PyInstaller collection options outside the allowlisted plan.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_deployment_inventory_rejects_incoherent_qt_payloads_and_aliases",
+      "reason": "Rejects second or alternate Qt payloads, missing authoritative roots, duplicate Cocoa plugins, and hash, architecture, or symlink alias mismatches.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_deployment_inventory_rejects_displaced_runtime_symlinks",
+      "reason": "Rejects displaced shiboken package and ABI extension symlinks plus debug, versioned, and ABI-suffixed Qt library symlinks.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_deployment_inventory_allows_unrelated_shiboken_prose_and_data",
+      "reason": "Keeps the Shiboken native stem classifier from rejecting clearly unrelated prose and data filenames.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_deployment_inventory_resolves_symlink_graph_and_rejects_forgery",
+      "reason": "Rejects forged resolved paths, escaping, absolute, cyclic, dangling, normalized, and wrong-component symlink targets by resolving the virtual bundle graph.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_deployment_inventory_rejects_noncanonical_record_paths",
+      "reason": "Rejects absolute, drive-qualified, non-POSIX, empty-component, dot-component, NUL, and otherwise noncanonical inventory record paths.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_deployment_inventory_rejects_noncanonical_resolved_paths",
+      "reason": "Rejects noncanonical claimed symlink resolutions before comparing them with the bounded virtual graph result.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_deployment_inventory_resolves_a_long_symlink_chain_iteratively",
+      "reason": "Proves the bounded virtual bundle resolver handles a 1,100-link chain without recursive stack growth.", "runtime_class": "subsecond", "size": "small"
     }
 
   ]

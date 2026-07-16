@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import posixpath
 import re
 import shutil
 import subprocess
@@ -107,6 +108,175 @@ def _validate_retained_file_record(
                 _fail(f"{label} architectures do not match retained bytes")
 
 
+def _normalize_inventory_link(parent: str, link_target: str) -> str:
+    if (
+        not link_target
+        or link_target.startswith("/")
+        or "\\" in link_target
+        or "\0" in link_target
+        or ":" in link_target
+        or "//" in link_target
+        or any(part == "." for part in link_target.split("/"))
+    ):
+        _fail("deployment inventory has an unsafe symlink target")
+    normalized = posixpath.normpath(posixpath.join(parent, link_target))
+    if normalized == ".." or normalized.startswith("../") or normalized.startswith("/"):
+        _fail("deployment inventory symlink escapes the virtual bundle")
+    return normalized
+
+
+def _validate_inventory_record_path(path: object, label: str) -> str:
+    if not isinstance(path, str) or not path:
+        _fail(f"{label} must be a non-empty relative POSIX path")
+    if (
+        path.startswith("/")
+        or "\\" in path
+        or "\0" in path
+        or ":" in path
+        or "//" in path
+    ):
+        _fail(f"{label} is not a canonical relative POSIX path")
+    parts = path.split("/")
+    if any(part in {"", ".", ".."} for part in parts) or posixpath.normpath(path) != path:
+        _fail(f"{label} contains path-normalization ambiguity")
+    return path
+
+
+def _validate_inventory_symlinks(
+    records: dict[str, dict[str, Any]],
+) -> dict[str, str]:
+    virtual_nodes = set(records)
+    for path in records:
+        components = path.split("/")
+        virtual_nodes.update(
+            "/".join(components[:index]) for index in range(1, len(components))
+        )
+
+    resolution_cache: dict[str, str] = {}
+
+    def resolve(start: str) -> str:
+        current = start
+        seen: set[str] = set()
+        cacheable: list[str] = []
+        hop_bound = len(records)
+        for _hop in range(hop_bound + 1):
+            components = current.split("/")
+            symlink_path = None
+            suffix: list[str] = []
+            for index in range(1, len(components) + 1):
+                prefix = "/".join(components[:index])
+                record = records.get(prefix)
+                if record is not None and record.get("kind") == "symlink":
+                    symlink_path = prefix
+                    suffix = components[index:]
+                    break
+            if symlink_path is None:
+                for path in cacheable:
+                    resolution_cache[path] = current
+                return current
+            if symlink_path in seen:
+                _fail(f"deployment inventory contains a cyclic symlink at {symlink_path}")
+            seen.add(symlink_path)
+            if not suffix:
+                cacheable.append(symlink_path)
+            cached = resolution_cache.get(symlink_path)
+            if cached is None:
+                record = records[symlink_path]
+                cached = _normalize_inventory_link(
+                    posixpath.dirname(symlink_path), cast(str, record["link_target"])
+                )
+            current = posixpath.join(cached, *suffix) if suffix else cached
+        _fail(f"deployment inventory symlink hop bound exceeded at {start}")
+
+    resolved_links: dict[str, str] = {}
+    for path, record in records.items():
+        if record.get("kind") != "symlink":
+            continue
+        resolved = resolve(path)
+        if resolved not in virtual_nodes:
+            _fail(f"deployment inventory contains a dangling symlink at {path}")
+        if record.get("resolved_path") != resolved:
+            _fail(f"deployment inventory symlink resolution mismatch at {path}")
+        resolved_links[path] = resolved
+    return resolved_links
+
+
+def _is_shiboken_native_payload(parts: list[str], name: str) -> bool:
+    if any(part in {"shiboken", "shiboken6"} for part in parts[:-1]):
+        return True
+    extension = next(
+        (candidate for candidate in (".dylib", ".so") if name.endswith(candidate)),
+        None,
+    )
+    if extension is None:
+        return False
+    stem = name[: -len(extension)]
+    return re.match(r"(?:lib)?shiboken6?(?=[._-]|$)", stem) is not None
+
+
+def _classify_macos_qt_payload(path: str) -> str | None:
+    folded = path.casefold()
+    name = Path(folded).name
+    parts = folded.split("/")
+    if (
+        any(part.startswith("pyside6") for part in parts)
+        or _is_shiboken_native_payload(parts, name)
+        or re.fullmatch(
+            r"libpyside6(?:\.abi3)?(?:\.\d+)*\.dylib", name
+        )
+    ):
+        return "alternate-binding"
+    if any(part == "pyqt6" for part in parts):
+        return "pyqt6-binding"
+    if any(re.fullmatch(r"qt[a-z0-9]+\.framework", part) for part in parts):
+        return "qt-framework"
+    if re.fullmatch(
+        r"(?:lib)?qt(?:5|6)?[a-z0-9]+"
+        r"(?:(?:[_-]debug)|(?:\.(?:abi3|debug|\d+)))*\.dylib",
+        name,
+    ):
+        return "qt-library"
+    if re.fullmatch(r"libq[a-z0-9_]+\.dylib", name):
+        return "qt-plugin"
+    return None
+
+
+def _is_allowed_authoritative_qt_path(path: str) -> bool:
+    relative = path.removeprefix("Contents/Frameworks/PyQt6/Qt6/")
+    framework = re.fullmatch(
+        r"lib/(Qt[A-Za-z0-9]+)\.framework/(.+)", relative
+    )
+    if framework is not None and framework.group(2) in {
+        framework.group(1),
+        f"Versions/A/{framework.group(1)}",
+        "Versions/A/Resources/Info.plist",
+        "Versions/A/_CodeSignature/CodeResources",
+        "Versions/Current",
+        "Resources",
+    }:
+        return True
+    if re.fullmatch(
+        r"plugins/(generic|iconengines|imageformats|platforms|styles)/"
+        r"libq[A-Za-z0-9_]+\.dylib",
+        relative,
+    ):
+        return True
+    return bool(
+        re.fullmatch(r"translations/[^/]+\.qm", relative)
+        or re.fullmatch(
+            r"(?:resources|data)/(?:[^/]+/)*[^/]+\.(?:bin|conf|dat|ini|json|pak)",
+            relative,
+        )
+    )
+
+
+def _is_known_pyqt6_binding_module(name: str) -> bool:
+    return bool(
+        re.fullmatch(r"Qt[A-Za-z0-9]+\.abi3\.so", name)
+        or re.fullmatch(r"sip\.cpython-\d+-darwin\.so", name)
+    )
+
+
 def _validate_deployment_inventory(
     value: object,
     expected_machine: str,
@@ -117,7 +287,7 @@ def _validate_deployment_inventory(
     if set(inventory) != {"schema_version", "file_count", "total_bytes", "files"}:
         _fail("deployment inventory contains missing or unknown fields")
     files = inventory.get("files")
-    if inventory.get("schema_version") != 1 or not isinstance(files, list):
+    if inventory.get("schema_version") != 2 or not isinstance(files, list):
         _fail("deployment inventory has an unsupported schema")
     if not files or len(files) > MAX_DEPLOYMENT_FILES:
         _fail("deployment inventory file count is empty or exceeds its bound")
@@ -125,30 +295,57 @@ def _validate_deployment_inventory(
     total = 0
     for raw_record in files:
         record = _mapping(raw_record, "deployment inventory file")
-        if set(record) != {"path", "size", "sha256", "architectures"}:
-            _fail("deployment inventory file contains missing or unknown fields")
-        path = record.get("path")
+        path = _validate_inventory_record_path(
+            record.get("path"), "deployment inventory record path"
+        )
         size = record.get("size")
-        digest = record.get("sha256")
-        architectures = record.get("architectures")
-        if (
-            not isinstance(path, str)
-            or not path
-            or path.startswith("/")
-            or ".." in Path(path).parts
-            or path in records
-        ):
-            _fail("deployment inventory has an invalid or duplicate path")
+        if path in records:
+            _fail("deployment inventory has a duplicate path")
         if not isinstance(size, int) or isinstance(size, bool) or size < 0:
             _fail(f"deployment inventory has an invalid size for {path}")
-        if not isinstance(digest, str) or len(digest) != 64 or any(
-            character not in "0123456789abcdef" for character in digest
-        ):
-            _fail(f"deployment inventory has an invalid digest for {path}")
-        if not isinstance(architectures, list) or not all(
-            architecture in {"x86_64", "arm64"} for architecture in architectures
-        ):
-            _fail(f"deployment inventory has invalid architectures for {path}")
+        kind = record.get("kind")
+        if kind == "file":
+            if set(record) != {
+                "path",
+                "kind",
+                "size",
+                "sha256",
+                "architectures",
+            }:
+                _fail("deployment inventory file contains missing or unknown fields")
+            digest = record.get("sha256")
+            architectures = record.get("architectures")
+            if not isinstance(digest, str) or len(digest) != 64 or any(
+                character not in "0123456789abcdef" for character in digest
+            ):
+                _fail(f"deployment inventory has an invalid digest for {path}")
+            if not isinstance(architectures, list) or not all(
+                architecture in {"x86_64", "arm64"}
+                for architecture in architectures
+            ):
+                _fail(f"deployment inventory has invalid architectures for {path}")
+        elif kind == "symlink":
+            if set(record) != {
+                "path",
+                "kind",
+                "size",
+                "link_target",
+                "resolved_path",
+            }:
+                _fail("deployment inventory symlink contains missing or unknown fields")
+            link_target = record.get("link_target")
+            resolved_path = record.get("resolved_path")
+            if (
+                not isinstance(link_target, str)
+                or not link_target
+                or not isinstance(resolved_path, str)
+            ):
+                _fail(f"deployment inventory has an unsafe symlink for {path}")
+            _validate_inventory_record_path(
+                resolved_path, f"deployment inventory resolved path for {path}"
+            )
+        else:
+            _fail(f"deployment inventory has an invalid kind for {path}")
         records[path] = record
         total += size
     if inventory.get("file_count") != len(files) or inventory.get(
@@ -157,25 +354,168 @@ def _validate_deployment_inventory(
         _fail("deployment inventory totals do not match its files")
     if total > MAX_DEPLOYMENT_BYTES:
         _fail("deployment inventory exceeds the bounded feasibility deployment size")
+    resolved_links = _validate_inventory_symlinks(records)
 
     lowered = [path.lower() for path in records]
     forbidden = ("pyqt5", "pyside2", "pyside6", "qt5")
     if any(token in path for path in lowered for token in forbidden):
         _fail("deployment inventory contains an alternate or legacy Qt binding")
-    qt_roots = {
-        path[: path.lower().index("/pyqt6/qt6/") + len("/PyQt6/Qt6")]
-        for path in records
-        if "/pyqt6/qt6/" in path.lower()
+    authoritative_qt_root = "Contents/Frameworks/PyQt6/Qt6/"
+    authoritative_binding_root = "Contents/Frameworks/PyQt6/"
+    authoritative_files = {
+        path: record
+        for path, record in records.items()
+        if path.startswith(authoritative_qt_root) and record["kind"] == "file"
     }
-    if len(qt_roots) != 1:
-        _fail("deployment inventory does not contain one coherent PyQt6 Qt root")
-    if not any("/pyqt6/qtcore" in path for path in lowered):
+    if not authoritative_files:
+        _fail("deployment inventory is missing the authoritative PyQt6 Qt root")
+    for path in records:
+        if path.startswith(authoritative_qt_root) and not _is_allowed_authoritative_qt_path(
+            path
+        ):
+            _fail(f"unrecognized payload inside the authoritative Qt root: {path}")
+    if not any(
+        path.startswith(authoritative_binding_root)
+        and path.lower().endswith("/qtcore.abi3.so")
+        and record["kind"] == "file"
+        for path, record in records.items()
+    ):
         _fail("deployment inventory is missing the PyQt6 QtCore extension")
     if not any("rinterface" in path for path in lowered):
         _fail("deployment inventory is missing the packaged rpy2 native bridge")
-    cocoa_paths = [path for path in records if path.endswith("libqcocoa.dylib")]
-    if len(cocoa_paths) != 1:
+    cocoa_paths = [
+        path
+        for path, record in records.items()
+        if path.endswith("libqcocoa.dylib") and record["kind"] == "file"
+    ]
+    authoritative_cocoa = (
+        "Contents/Frameworks/PyQt6/Qt6/plugins/platforms/libqcocoa.dylib"
+    )
+    if cocoa_paths != [authoritative_cocoa]:
         _fail("deployment inventory must contain exactly one Cocoa platform plugin")
+
+    framework_pattern = re.compile(
+        r"^Contents/Frameworks/PyQt6/Qt6/lib/(Qt[A-Za-z0-9]+)\.framework/"
+        r"Versions/A/\1$"
+    )
+    canonical_frameworks: dict[str, tuple[str, tuple[str, ...]]] = {}
+    canonical_framework_paths: dict[str, str] = {}
+    for path, record in authoritative_files.items():
+        match = framework_pattern.fullmatch(path)
+        if match:
+            canonical_frameworks[match.group(1)] = (
+                cast(str, record["sha256"]),
+                tuple(cast(list[str], record["architectures"])),
+            )
+            canonical_framework_paths[match.group(1)] = path
+    if "QtCore" not in canonical_frameworks:
+        _fail("deployment inventory is missing authoritative QtCore")
+    for path, record in authoritative_files.items():
+        name = Path(path).name
+        if name not in canonical_frameworks or framework_pattern.fullmatch(path):
+            continue
+        identity = (
+            cast(str, record["sha256"]),
+            tuple(cast(list[str], record["architectures"])),
+        )
+        expected_alias = (
+            f"Contents/Frameworks/PyQt6/Qt6/lib/{name}.framework/{name}"
+        )
+        if path != expected_alias or identity != canonical_frameworks[name]:
+            _fail(f"incoherent authoritative Qt framework alias: {path}")
+
+    binding_extensions = {
+        Path(path).name: (
+            cast(str, record["sha256"]),
+            tuple(cast(list[str], record["architectures"])),
+        )
+        for path, record in records.items()
+        if path.startswith(authoritative_binding_root)
+        and not path.startswith(authoritative_qt_root)
+        and path.count("/") == 3
+        and _is_known_pyqt6_binding_module(Path(path).name)
+        and record["kind"] == "file"
+    }
+    binding_extension_paths = {
+        Path(path).name: path
+        for path, record in records.items()
+        if path.startswith(authoritative_binding_root)
+        and not path.startswith(authoritative_qt_root)
+        and path.count("/") == 3
+        and _is_known_pyqt6_binding_module(Path(path).name)
+        and record["kind"] == "file"
+    }
+    for path in records:
+        if (
+            path.startswith(authoritative_binding_root)
+            and not path.startswith(authoritative_qt_root)
+            and path not in binding_extension_paths.values()
+        ):
+            _fail(f"unrecognized payload inside the authoritative PyQt6 root: {path}")
+    for path, record in records.items():
+        if record["kind"] == "symlink":
+            resolved = resolved_links[path]
+            name = Path(path).name
+            if name in canonical_framework_paths:
+                if resolved != canonical_framework_paths[name]:
+                    _fail(f"Qt alias {path} targets the wrong canonical component")
+            elif name in binding_extension_paths:
+                if resolved != binding_extension_paths[name]:
+                    _fail(f"PyQt6 alias {path} targets the wrong canonical extension")
+            elif path == "Contents/Resources/PyQt6":
+                if resolved != "Contents/Frameworks/PyQt6":
+                    _fail("PyQt6 resource alias targets the wrong binding root")
+            elif match := re.fullmatch(
+                r"Contents/Frameworks/PyQt6/Qt6/lib/(Qt[A-Za-z0-9]+)\.framework/"
+                r"(Versions/Current|Resources)",
+                path,
+            ):
+                component = match.group(1)
+                canonical_path = canonical_framework_paths.get(component)
+                if canonical_path is None:
+                    _fail(f"framework alias has no canonical component: {path}")
+                canonical_root = posixpath.dirname(canonical_path)
+                expected = (
+                    canonical_root
+                    if match.group(2) == "Versions/Current"
+                    else canonical_root + "/Resources"
+                )
+                if resolved != expected:
+                    _fail(f"framework alias {path} targets the wrong component")
+            elif _classify_macos_qt_payload(path) is not None or any(
+                token in path.lower() for token in ("pyqt", "pyside")
+            ):
+                _fail(f"unrecognized Qt deployment symlink: {path}")
+            continue
+        if path.startswith(authoritative_qt_root):
+            continue
+        name = Path(path).name
+        identity = (
+            cast(str, record["sha256"]),
+            tuple(cast(list[str], record["architectures"])),
+        )
+        if path in binding_extension_paths.values():
+            continue
+        if name in canonical_frameworks:
+            if path not in {
+                f"Contents/Frameworks/{name}",
+                f"Contents/Resources/{name}",
+            } or identity != canonical_frameworks[name]:
+                _fail(f"incoherent Qt framework alias: {path}")
+        elif name in binding_extensions and path == f"Contents/Resources/PyQt6/{name}":
+            if identity != binding_extensions[name]:
+                _fail(f"incoherent PyQt6 extension alias: {path}")
+        elif re.fullmatch(
+            r"Contents/Resources/PyQt6/Qt6/translations/[^/]+\.qm", path
+        ):
+            continue
+        elif path.startswith("Contents/Resources/PyQt6/"):
+            _fail(f"unrecognized PyQt6 resource alias: {path}")
+        elif (
+            path.startswith(("Contents/Frameworks/", "Contents/Resources/"))
+            and re.fullmatch(r"Qt[A-Za-z0-9]+", name)
+        ) or _classify_macos_qt_payload(path) is not None:
+            _fail(f"deployment inventory contains a second Qt payload: {path}")
     for label, artifact in (("executable", executable), ("Cocoa plugin", cocoa_plugin)):
         deployment_path = artifact.get("deployment_path")
         if not isinstance(deployment_path, str) or deployment_path not in records:
@@ -183,7 +523,7 @@ def _validate_deployment_inventory(
         inventory_record = records[deployment_path]
         if inventory_record["sha256"] != artifact.get("sha256"):
             _fail(f"packaged {label} digest disagrees with the deployment inventory")
-    if cocoa_paths[0] != cocoa_plugin.get("deployment_path"):
+    if authoritative_cocoa != cocoa_plugin.get("deployment_path"):
         _fail("packaged Cocoa plugin path disagrees with the deployment inventory")
     if records[cast(str, executable["deployment_path"])]["architectures"] != [
         expected_machine
@@ -670,24 +1010,60 @@ def _maybe_archs(path: Path) -> list[str]:
 
 
 def _write_deployment_inventory(app_root: Path, destination: Path) -> dict[str, object]:
-    files = []
+    root = app_root.resolve()
+    files: list[dict[str, object]] = []
     total_bytes = 0
-    for path in sorted(candidate for candidate in app_root.rglob("*") if candidate.is_file()):
-        relative = path.relative_to(app_root).as_posix()
-        size = path.stat().st_size
-        total_bytes += size
-        files.append(
-            {
-                "path": relative,
-                "size": size,
-                "sha256": _sha256(path),
-                "architectures": _maybe_archs(path),
-            }
-        )
+    for current, directories, filenames in os.walk(root, followlinks=False):
+        current_path = Path(current)
+        for name in list(directories):
+            path = current_path / name
+            if path.is_symlink():
+                directories.remove(name)
+                resolved = path.resolve(strict=True)
+                if not resolved.is_relative_to(root):
+                    raise RuntimeError(f"packaged symlink escapes the app bundle: {path}")
+                size = path.lstat().st_size
+                files.append(
+                    {
+                        "path": path.relative_to(root).as_posix(),
+                        "kind": "symlink",
+                        "size": size,
+                        "link_target": os.readlink(path),
+                        "resolved_path": resolved.relative_to(root).as_posix(),
+                    }
+                )
+                total_bytes += size
+        for name in filenames:
+            path = current_path / name
+            relative = path.relative_to(root).as_posix()
+            if path.is_symlink():
+                resolved = path.resolve(strict=True)
+                if not resolved.is_relative_to(root):
+                    raise RuntimeError(f"packaged symlink escapes the app bundle: {path}")
+                size = path.lstat().st_size
+                record: dict[str, object] = {
+                    "path": relative,
+                    "kind": "symlink",
+                    "size": size,
+                    "link_target": os.readlink(path),
+                    "resolved_path": resolved.relative_to(root).as_posix(),
+                }
+            else:
+                size = path.stat().st_size
+                record = {
+                    "path": relative,
+                    "kind": "file",
+                    "size": size,
+                    "sha256": _sha256(path),
+                    "architectures": _maybe_archs(path),
+                }
+            files.append(record)
+            total_bytes += size
         if len(files) > MAX_DEPLOYMENT_FILES or total_bytes > MAX_DEPLOYMENT_BYTES:
             raise RuntimeError("minimal PyInstaller deployment exceeded its inventory bound")
+    files.sort(key=lambda record: cast(str, record["path"]))
     inventory = {
-        "schema_version": 1,
+        "schema_version": 2,
         "file_count": len(files),
         "total_bytes": total_bytes,
         "files": files,

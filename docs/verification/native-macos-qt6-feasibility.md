@@ -38,8 +38,27 @@ R, rpy2, `rcc`, and Cocoa probes plus the packaged executable and packaged
 Cocoa plugin. It also retains a complete file/hash deployment inventory and the
 exact PyInstaller build plan, but not the full disposable application bundle.
 The validator recomputes retained sizes, hashes, and architectures, checks the
-deployment has one coherent PyQt6/Qt6 root and one Cocoa plugin, and rejects
-manual or alternate Qt collection. Native probes are capped at 100 MB; the
+deployment has one authoritative `Contents/Frameworks/PyQt6/Qt6` payload and
+one Cocoa plugin, and rejects manual or alternate Qt collection. PyInstaller's
+normal framework and resource aliases are checked against canonical component
+hash and architecture identities rather than counted as extra Qt roots.
+Symlinks are inventoried without traversal, record their target and resolved
+in-bundle path, and contribute their `lstat` size once, keeping file and byte
+totals truthful. Validation reconstructs each target through the bounded
+virtual bundle graph instead of trusting the recorded resolved path, rejecting
+absolute, escaping, cyclic, dangling, normalized, or wrong-component aliases.
+Inventory and claimed-resolution paths must be canonical relative POSIX paths;
+drive-qualified, backslash, repeated-separator, dot-component, NUL, and
+normalization-ambiguous forms are rejected before indexing. Symlinks are
+resolved iteratively with a record-count hop bound, so a malicious long chain
+cannot exhaust the Python stack. The authoritative root accepts only canonical
+Qt framework, plugin, translation, and non-executable data shapes. A single
+case-folded payload classifier rejects displaced or duplicate Qt libraries and
+plugins plus PySide6 and shiboken6 runtimes; outside-root aliases are accepted
+only at their observed canonical locations.
+Regular aliases must match their same-name canonical Qt component's hash and
+architecture. Native probes
+are capped at 100 MB; the
 inspected minimal deployment is capped at 10,000 files and 1 GB. The two
 architecture evidence artifacts are retained separately for 30 days and named
 with the source commit SHA.
