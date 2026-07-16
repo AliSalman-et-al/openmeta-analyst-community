@@ -18,6 +18,7 @@ try {
 
     uv run ty check `
         --extra-search-path src/rc_metastudio `
+        --extra-search-path scripts `
         --extra-search-path "$BuildRoot/generated/rc_metastudio" `
         --extra-search-path "$BuildRoot/generated/rc_metastudio/forms" `
         src/rc_metastudio/launch.py `
@@ -44,10 +45,13 @@ try {
         src/rc_metastudio/qt6_ui.py `
         src/rc_metastudio/qt6_macos_feasibility.py `
         src/rc_metastudio/qt_text.py `
+        src/rc_metastudio/adaptive_controls.py `
         scripts/build_qt6.py `
         scripts/qt6_port.py `
         scripts/native_analysis_smoke.py `
         scripts/native_results_smoke.py `
+        scripts/native_remaining_surfaces_smoke.py `
+        scripts/validate_qt6_surface_inventory.py `
         scripts/verify_golden_compatibility.py `
         scripts/verify_rcmetar_r_stack.py
     if ($LASTEXITCODE -ne 0) { throw "Qt6 strict type verification failed." }
@@ -63,6 +67,9 @@ try {
         --report "$BuildRoot/strict-source-findings.json" `
         src/rc_metastudio
     if ($LASTEXITCODE -ne 0) { throw "Qt6 authoritative source backlog drifted." }
+
+    uv run python scripts/validate_qt6_surface_inventory.py --check-document
+    if ($LASTEXITCODE -ne 0) { throw "Native Qt6 surface inventory validation failed." }
 
     uv run python scripts/validate_test_taxonomy.py `
         --tests-path tests/python/fast/test_qt6_port_tools.py `
@@ -88,6 +95,11 @@ try {
         --tests-path tests/python/fast/test_qt6_macos_feasibility.py `
         --require-covered
     if ($LASTEXITCODE -ne 0) { throw "Native macOS feasibility taxonomy validation failed." }
+
+    uv run python scripts/validate_test_taxonomy.py `
+        --tests-path tests/python/fast/test_native_remaining_surfaces_evidence.py `
+        --require-covered
+    if ($LASTEXITCODE -ne 0) { throw "Native remaining-surface taxonomy validation failed." }
 
     $env:RCMS_QT6_BUILD_ROOT = (Resolve-Path $BuildRoot).Path
     uv run python scripts/validate_test_taxonomy.py `
@@ -144,12 +156,26 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Qt6 Results taxonomy validation failed: $resultsTests" }
     }
 
+    foreach ($remainingSurfaceTests in @(
+        "tests/python/gui/test_adaptive_window_policy.py",
+        "tests/python/gui/test_compact_transient_layout.py",
+        "tests/python/gui/test_declarative_dialog_sizing.py",
+        "tests/python/gui/test_edit_dataset_workspace_layout.py",
+        "tests/python/gui/test_main_wizard_workflow_layout.py"
+    )) {
+        uv run python scripts/validate_test_taxonomy.py `
+            --tests-path $remainingSurfaceTests `
+            --require-covered
+        if ($LASTEXITCODE -ne 0) { throw "Qt6 remaining-surface taxonomy validation failed: $remainingSurfaceTests" }
+    }
+
     uv run pytest -W error `
         tests/python/fast/test_qt6_build_slice.py `
         tests/python/fast/test_qt6_port_tools.py `
         tests/python/fast/test_project_format.py `
         tests/python/fast/test_project_adapter.py `
-        tests/python/fast/test_qt6_macos_feasibility.py
+        tests/python/fast/test_qt6_macos_feasibility.py `
+        tests/python/fast/test_native_remaining_surfaces_evidence.py
     if ($LASTEXITCODE -ne 0) { throw "Qt6 vertical-slice tests failed." }
 
     uv run pytest -W error tests/python/gui/test_qt6_application_shell.py
@@ -182,6 +208,14 @@ try {
         tests/python/gui/test_network_view_workspace_layout.py
     if ($LASTEXITCODE -ne 0) { throw "Qt6 Results and Network View tests failed." }
 
+    uv run pytest -W error `
+        tests/python/gui/test_adaptive_window_policy.py `
+        tests/python/gui/test_compact_transient_layout.py `
+        tests/python/gui/test_declarative_dialog_sizing.py `
+        tests/python/gui/test_edit_dataset_workspace_layout.py `
+        tests/python/gui/test_main_wizard_workflow_layout.py
+    if ($LASTEXITCODE -ne 0) { throw "Qt6 remaining-window and accessibility tests failed." }
+
     powershell -ExecutionPolicy Bypass -File scripts/verify-r-stack-full.ps1
     if ($LASTEXITCODE -ne 0) { throw "Real-R stack and Golden compatibility verification failed." }
 
@@ -205,6 +239,10 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Native Qt6 Results fractional-scale smoke failed." }
         uv run python scripts/native_results_smoke.py --validate-only
         if ($LASTEXITCODE -ne 0) { throw "Native Qt6 Results evidence validation failed." }
+        uv run python scripts/native_remaining_surfaces_smoke.py
+        if ($LASTEXITCODE -ne 0) { throw "Native Qt6 remaining-surface smoke failed." }
+        uv run python scripts/native_remaining_surfaces_smoke.py --validate-only
+        if ($LASTEXITCODE -ne 0) { throw "Native Qt6 remaining-surface evidence validation failed." }
         uv run rc-metastudio --automation-shell-failure-smoke r-load
         if ($LASTEXITCODE -ne 0) { throw "Native R-load teardown smoke failed." }
         uv run rc-metastudio --automation-shell-failure-smoke meta-form

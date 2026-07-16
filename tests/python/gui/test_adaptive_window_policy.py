@@ -3,10 +3,15 @@ from pathlib import Path
 import subprocess
 import sys
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 
 ROOT = Path(__file__).resolve().parents[3]
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
+from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+
+prepare_generated_ui_imports()
 
 
 class FakeScreen(QtCore.QObject):
@@ -51,12 +56,10 @@ def _dialog_with_content(text="Content"):
 
 def test_application_bootstrap_enables_qt_high_dpi_before_construction():
     script = """
-from PyQt5 import QtCore, QtWidgets
+from PyQt6 import QtWidgets
 import app_error_handler
 
 assert QtWidgets.QApplication.instance() is None
-assert QtCore.QCoreApplication.testAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
-assert QtCore.QCoreApplication.testAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
 app = app_error_handler.get_or_create_application([])
 assert app is QtWidgets.QApplication.instance()
 """
@@ -64,10 +67,11 @@ assert app is QtWidgets.QApplication.instance()
     env["PYTHONPATH"] = os.pathsep.join(
         [
             str(ROOT / "src" / "rc_metastudio"),
-            str(ROOT / "src" / "rc_metastudio" / "forms"),
+            str(ROOT / "build" / "qt6-verification" / "generated" / "rc_metastudio"),
         ]
     )
     env["QT_QPA_PLATFORM"] = "offscreen"
+    env["RCMS_QT6_BUILD_ROOT"] = str(ROOT / "build" / "qt6-verification")
 
     result = subprocess.run(
         [sys.executable, "-c", script],
@@ -122,12 +126,18 @@ def test_workspace_roles_apply_maximized_or_eighty_percent_first_use(qapp):
         network, adaptive_window.WindowRole.NETWORK_VIEW, provider
     )
 
-    assert main.windowState() & QtCore.Qt.WindowMaximized
-    assert results.windowState() & QtCore.Qt.WindowMaximized
+    assert main.windowState() & QtCore.Qt.WindowState.WindowMaximized
+    assert results.windowState() & QtCore.Qt.WindowState.WindowMaximized
     assert edit_dataset.frameGeometry().size() == QtCore.QSize(800, 640)
     assert network.frameGeometry().size() == QtCore.QSize(800, 640)
-    assert edit_dataset.property("RCMS_window_archetype") == "workspace"
-    assert edit_dataset.property("RCMS_window_role") == "edit_dataset"
+    assert (
+        adaptive_window.adaptive_window_state(edit_dataset).policy.archetype
+        is adaptive_window.WindowArchetype.WORKSPACE
+    )
+    assert (
+        adaptive_window.adaptive_window_state(edit_dataset).role
+        is adaptive_window.WindowRole.EDIT_DATASET
+    )
 
 
 def test_unparented_workspace_uses_active_screen_before_maximizing(qapp):
@@ -148,13 +158,13 @@ def test_unparented_workspace_uses_active_screen_before_maximizing(qapp):
         available_geometry_provider=lambda _window: active_screen.availableGeometry(),
         first_use_screen_provider=lambda _window, _archetype: active_screen,
         screen_placer=lambda window, screen: placements.append(
-            (screen, bool(window.windowState() & QtCore.Qt.WindowMaximized))
+            (screen, bool(window.windowState() & QtCore.Qt.WindowState.WindowMaximized))
         ),
     )
 
     assert selected is active_screen
     assert placements == [(active_screen, False)]
-    assert main.windowState() & QtCore.Qt.WindowMaximized
+    assert main.windowState() & QtCore.Qt.WindowState.WindowMaximized
 
 
 def test_content_refit_requests_are_local_and_coalesced(qapp):
@@ -191,11 +201,7 @@ def test_visible_transactional_content_refit_preserves_placement(qapp):
     dialog.move(available.left() + 40, available.top() + 100)
     qapp.processEvents()
     before = QtCore.QRect(dialog.frameGeometry())
-    dialog.layout().addWidget(
-        QtWidgets.QPushButton(
-            "A Newly Revealed Option"
-        )
-    )
+    dialog.layout().addWidget(QtWidgets.QPushButton("A Newly Revealed Option"))
 
     controller.request_content_refit()
     qapp.processEvents()
@@ -313,6 +319,7 @@ def test_screen_metric_changes_clamp_and_reconnect_to_new_screen(qapp):
 
 
 def test_confidence_level_is_a_compact_transactional_dialog(qapp):
+    import adaptive_window
     import conf_level_dialog
 
     parent = QtWidgets.QWidget()
@@ -324,9 +331,18 @@ def test_confidence_level_is_a_compact_transactional_dialog(qapp):
 
     try:
         available = parent.windowHandle().screen().availableGeometry()
-        assert dialog.property("RCMS_window_archetype") == "transactional"
-        assert dialog.property("RCMS_window_role") == "confidence_level"
-        assert dialog.layout().sizeConstraint() == QtWidgets.QLayout.SetMinimumSize
+        assert (
+            adaptive_window.adaptive_window_state(dialog).policy.archetype
+            is adaptive_window.WindowArchetype.TRANSACTIONAL
+        )
+        assert (
+            adaptive_window.adaptive_window_state(dialog).role
+            is adaptive_window.WindowRole.CONFIDENCE_LEVEL
+        )
+        assert (
+            dialog.layout().sizeConstraint()
+            == QtWidgets.QLayout.SizeConstraint.SetMinimumSize
+        )
         assert not dialog.findChildren(QtWidgets.QScrollArea)
         assert available.contains(dialog.frameGeometry())
         assert dialog.conf_level_spinbox.value() == 95.0

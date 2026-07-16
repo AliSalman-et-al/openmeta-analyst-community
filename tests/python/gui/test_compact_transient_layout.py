@@ -4,10 +4,16 @@ from pathlib import Path
 import subprocess
 import sys
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+import pytest
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 
 ROOT = Path(__file__).resolve().parents[3]
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
+from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+
+prepare_generated_ui_imports()
 LONG_VALUE = "A representative translated value with complete required content " * 20
 
 
@@ -20,6 +26,7 @@ def _show(window, qapp):
 def _remaining_surface_inventory():
     import about_legal_dialog
     import add_new_dialogs
+    import adaptive_controls
     import edit_group_name_form
     import launch
     import ma_specs
@@ -81,9 +88,7 @@ def _frame_margins(window):
 
 def _pixmap_logical_size(pixmap):
     ratio = max(1.0, pixmap.devicePixelRatioF())
-    return QtCore.QSize(
-        round(pixmap.width() / ratio), round(pixmap.height() / ratio)
-    )
+    return QtCore.QSize(round(pixmap.width() / ratio), round(pixmap.height() / ratio))
 
 
 def _assert_content_preferred_outer_size(window, available, fraction, tolerance=6):
@@ -123,11 +128,14 @@ def test_complete_compact_transactional_inventory_is_content_preferred(
                 for name, kind, window in surfaces:
                     _show(window, qapp)
                     expected = (
-                        "transient"
+                        adaptive_window.WindowArchetype.TRANSIENT
                         if kind in ("progress", "splash")
-                        else "transactional"
+                        else adaptive_window.WindowArchetype.TRANSACTIONAL
                     )
-                    assert window.property("RCMS_window_archetype") == expected, name
+                    assert (
+                        adaptive_window.adaptive_window_state(window).policy.archetype
+                        is expected
+                    ), name
                     assert available.contains(window.frameGeometry()), name
 
                     if kind in ("compact", "choice"):
@@ -135,8 +143,8 @@ def test_complete_compact_transactional_inventory_is_content_preferred(
                         _assert_content_preferred_outer_size(window, available, 0.90)
                         button_box = window.findChild(QtWidgets.QDialogButtonBox)
                         for role in (
-                            QtWidgets.QDialogButtonBox.Ok,
-                            QtWidgets.QDialogButtonBox.Cancel,
+                            QtWidgets.QDialogButtonBox.StandardButton.Ok,
+                            QtWidgets.QDialogButtonBox.StandardButton.Cancel,
                         ):
                             assert button_box.button(role).isVisible(), (name, role)
                         for editor in window.findChildren(QtWidgets.QLineEdit):
@@ -145,7 +153,9 @@ def test_complete_compact_transactional_inventory_is_content_preferred(
                         assert isinstance(
                             window.content_scroll_area, QtWidgets.QTextBrowser
                         )
-                        close = window.buttonBox.button(QtWidgets.QDialogButtonBox.Close)
+                        close = window.buttonBox.button(
+                            QtWidgets.QDialogButtonBox.StandardButton.Close
+                        )
                         assert close.isVisible()
                         assert not window.content_scroll_area.isAncestorOf(close)
                         assert (
@@ -175,6 +185,7 @@ def test_complete_compact_transactional_inventory_is_content_preferred(
 
 def test_long_choice_values_remain_available_without_widening_the_dialog(qapp):
     import add_new_dialogs
+    import adaptive_controls
 
     for dialog in (
         add_new_dialogs.AddNewOutcomeForm(),
@@ -185,14 +196,144 @@ def test_long_choice_values_remain_available_without_widening_the_dialog(qapp):
         combo.setCurrentText(LONG_VALUE)
         _show(dialog, qapp)
         try:
-            assert combo.property("RCMS_choice_control_configured") is True
+            controller = adaptive_controls.choice_control_controller(combo)
+            assert controller.combo is combo
+            assert controller.parent() is combo
             assert combo.toolTip() == LONG_VALUE
-            assert combo.itemData(combo.currentIndex(), QtCore.Qt.ToolTipRole) == LONG_VALUE
-            assert combo.view().horizontalScrollBarPolicy() == QtCore.Qt.ScrollBarAsNeeded
-            assert dialog.frameGeometry().width() < dialog.screen().availableGeometry().width()
+            assert (
+                combo.itemData(combo.currentIndex(), QtCore.Qt.ItemDataRole.ToolTipRole)
+                == LONG_VALUE
+            )
+            assert (
+                combo.view().horizontalScrollBarPolicy()
+                == QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
+            )
+            assert (
+                dialog.frameGeometry().width()
+                < dialog.screen().availableGeometry().width()
+            )
         finally:
             dialog.close()
     qapp.processEvents()
+
+
+def test_choice_control_state_is_typed_and_rejects_stale_ownership(qapp):
+    import adaptive_controls
+
+    unconfigured = adaptive_controls.AdaptiveComboBox()
+    with pytest.raises(LookupError, match="not configured"):
+        adaptive_controls.choice_control_controller(unconfigured)
+
+    owner = adaptive_controls.AdaptiveComboBox()
+    stale_target = adaptive_controls.AdaptiveComboBox()
+    controller = adaptive_controls.configure_choice_control(owner)
+    stale_target._adaptive_choice_controller = controller
+    with pytest.raises(LookupError, match="stale ownership"):
+        adaptive_controls.choice_control_controller(stale_target)
+
+    assert adaptive_controls.choice_control_controller(owner) is controller
+
+
+def test_compact_transactional_keyboard_and_accessibility_matrix(qapp, monkeypatch):
+    import add_new_dialogs
+    import change_cov_type_form
+    import edit_group_name_form
+    from PyQt6.QtTest import QTest
+
+    class PreviewModel(QtGui.QStandardItemModel):
+        dataError = QtCore.pyqtSignal(str)
+
+        def __init__(self, _dataset, _covariate):
+            super().__init__(2, 3)
+
+    monkeypatch.setattr(change_cov_type_form, "CovModel", PreviewModel)
+    factories = (
+        ("add-group", add_new_dialogs.AddNewGroupForm, "group_name_le"),
+        ("add-follow-up", add_new_dialogs.AddNewFollowUpForm, "follow_up_name_le"),
+        ("add-outcome", add_new_dialogs.AddNewOutcomeForm, "outcome_name_le"),
+        ("add-study", add_new_dialogs.AddNewStudyForm, "study_lbl"),
+        ("add-covariate", add_new_dialogs.AddNewCovariateForm, "covariate_name_le"),
+        (
+            "edit-group-name",
+            lambda: edit_group_name_form.EditGroupName("Original group"),
+            "group_name_le",
+        ),
+        (
+            "edit-covariate-name",
+            lambda: edit_group_name_form.EditCovariateName("Original covariate"),
+            "group_name_le",
+        ),
+        (
+            "change-covariate-type",
+            lambda: change_cov_type_form.ChangeCovTypeForm(object(), object()),
+            "cov_prev_table",
+        ),
+    )
+
+    for name, factory, initial_name in factories:
+        accepted = []
+        dialog = factory()
+        dialog.accepted.connect(lambda surface=name: accepted.append(surface))
+        dialog.show()
+        dialog.activateWindow()
+        qapp.processEvents()
+        initial = dialog.findChild(QtWidgets.QWidget, initial_name)
+        assert initial is not None, name
+        assert initial.isVisible() and initial.isEnabled(), name
+        initial.setFocus()
+        qapp.processEvents()
+        assert qapp.focusWidget() is initial, name
+        box = dialog.findChild(QtWidgets.QDialogButtonBox)
+        ok = box.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
+        cancel = box.button(QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+        assert ok.isVisible() and ok.isDefault(), name
+        assert cancel.isVisible(), name
+        QTest.keyClick(initial, QtCore.Qt.Key.Key_Tab)
+        qapp.processEvents()
+        assert qapp.focusWidget() is not initial, name
+        for control in dialog.findChildren(QtWidgets.QAbstractButton):
+            if control.icon().isNull() or control.text().strip():
+                continue
+            assert control.accessibleName().strip(), (name, control.objectName())
+        for view in dialog.findChildren(QtWidgets.QAbstractItemView):
+            if isinstance(view, QtWidgets.QHeaderView):
+                continue
+            assert view.accessibleName().strip(), (name, view.objectName())
+        initial.setFocus()
+        QTest.keyClick(initial, QtCore.Qt.Key.Key_Return)
+        qapp.processEvents()
+        assert accepted == [name], name
+        dialog.deleteLater()
+        qapp.processEvents()
+
+        rejected = []
+        dialog = factory()
+        before_cancel = {
+            "editors": [editor.text() for editor in dialog.findChildren(QtWidgets.QLineEdit)],
+            "models": [
+                (view.model().rowCount(), view.model().columnCount())
+                for view in dialog.findChildren(QtWidgets.QAbstractItemView)
+                if view.model() is not None
+            ],
+        }
+        dialog.rejected.connect(lambda surface=name: rejected.append(surface))
+        dialog.show()
+        qapp.processEvents()
+        QTest.keyClick(dialog, QtCore.Qt.Key.Key_Escape)
+        qapp.processEvents()
+        assert rejected == [name], name
+        assert dialog.result() == QtWidgets.QDialog.DialogCode.Rejected, name
+        assert not dialog.isVisible(), name
+        assert before_cancel == {
+            "editors": [editor.text() for editor in dialog.findChildren(QtWidgets.QLineEdit)],
+            "models": [
+                (view.model().rowCount(), view.model().columnCount())
+                for view in dialog.findChildren(QtWidgets.QAbstractItemView)
+                if view.model() is not None
+            ],
+        }, name
+        dialog.deleteLater()
+        qapp.processEvents()
 
 
 def test_about_legal_has_explicit_overflow_and_reachable_action(qapp):
@@ -206,12 +347,21 @@ def test_about_legal_has_explicit_overflow_and_reachable_action(qapp):
     dialog.resize(420, 300)
     _show(dialog, qapp)
     try:
-        close_button = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.Close)
-        assert dialog.property("RCMS_window_archetype") == "transactional"
+        close_button = dialog.buttonBox.button(
+            QtWidgets.QDialogButtonBox.StandardButton.Close
+        )
+        import adaptive_window
+
+        assert (
+            adaptive_window.adaptive_window_state(dialog).policy.archetype
+            is adaptive_window.WindowArchetype.TRANSACTIONAL
+        )
         assert dialog.content_scroll_area.verticalScrollBar().maximum() > 0
         assert close_button.isVisible()
         assert not dialog.content_scroll_area.isAncestorOf(close_button)
-        assert dialog.content_scroll_area.lineWrapMode() != QtWidgets.QTextEdit.NoWrap
+        assert dialog.content_scroll_area.lineWrapMode() != (
+            QtWidgets.QTextEdit.LineWrapMode.NoWrap
+        )
     finally:
         dialog.close()
         qapp.processEvents()
@@ -245,7 +395,12 @@ def test_startup_splash_declares_transient_archetype(qapp):
     splash = launch.create_startup_splash()
     try:
         _show(splash, qapp)
-        assert splash.property("RCMS_window_archetype") == "transient"
+        import adaptive_window
+
+        assert (
+            adaptive_window.adaptive_window_state(splash).policy.archetype
+            is adaptive_window.WindowArchetype.TRANSIENT
+        )
         assert not splash.pixmap().isNull()
         assert splash.size() == _pixmap_logical_size(splash.pixmap())
     finally:
@@ -260,9 +415,7 @@ def test_bounded_dpr_splash_preserves_its_logical_size(qapp):
     source.fill(QtGui.QColor("navy"))
     source.setDevicePixelRatio(2.0)
 
-    bounded = launch.screen_bounded_splash_pixmap(
-        source, QtCore.QSize(500, 400)
-    )
+    bounded = launch.screen_bounded_splash_pixmap(source, QtCore.QSize(500, 400))
 
     assert bounded.devicePixelRatioF() == 2.0
     assert bounded.size() == QtCore.QSize(800, 600)
@@ -276,9 +429,7 @@ def test_oversized_dpr_splash_is_bounded_without_double_scaling(qapp):
     source.fill(QtGui.QColor("navy"))
     source.setDevicePixelRatio(2.0)
 
-    bounded = launch.screen_bounded_splash_pixmap(
-        source, QtCore.QSize(500, 320)
-    )
+    bounded = launch.screen_bounded_splash_pixmap(source, QtCore.QSize(500, 320))
     logical_width = bounded.width() / bounded.devicePixelRatioF()
     logical_height = bounded.height() / bounded.devicePixelRatioF()
 
@@ -290,10 +441,13 @@ def test_oversized_dpr_splash_is_bounded_without_double_scaling(qapp):
 
 
 def test_remaining_inventory_survives_representative_process_scale_factors():
-    script = r'''
+    script = r"""
 import json
-from PyQt5 import QtWidgets
+from PyQt6 import QtWidgets
+from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+prepare_generated_ui_imports()
 import app_error_handler
+import adaptive_window
 import about_legal_dialog, add_new_dialogs, edit_group_name_form, launch, ma_specs, meta_form, progress_bar
 
 app = app_error_handler.get_or_create_application([])
@@ -311,9 +465,9 @@ for window in windows:
 app.processEvents(); app.processEvents()
 available = app.primaryScreen().availableGeometry()
 payload = {
-    "roles": [window.property("RCMS_window_archetype") for window in windows],
+    "roles": [adaptive_window.adaptive_window_state(window).policy.archetype.value for window in windows],
     "visible": all(window.isVisible() for window in windows),
-    "actions": all(box.button(QtWidgets.QDialogButtonBox.Ok).isVisible()
+    "actions": all(box.button(QtWidgets.QDialogButtonBox.StandardButton.Ok).isVisible()
         for box in [window.findChild(QtWidgets.QDialogButtonBox) for window in windows[:8]]),
     "splash": not windows[-1].pixmap().isNull(),
     "bounded": all(available.contains(window.frameGeometry()) for window in windows),
@@ -323,7 +477,7 @@ for window in windows:
     window.deleteLater()
 app.processEvents()
 print("COMPACT_LAYOUT=" + json.dumps(payload), flush=True)
-'''
+"""
     expected_roles = ["transactional"] * 9 + ["transient"] * 4
     for scale_factor in ("1", "1.5", "2"):
         environment = os.environ.copy()
@@ -335,19 +489,38 @@ print("COMPACT_LAYOUT=" + json.dumps(payload), flush=True)
                     [
                         str(ROOT / "src"),
                         str(ROOT / "src" / "rc_metastudio"),
-                        str(ROOT / "src" / "rc_metastudio" / "forms"),
+                        str(
+                            ROOT
+                            / "build"
+                            / "qt6-verification"
+                            / "generated"
+                            / "rc_metastudio"
+                        ),
                     ]
                 ),
+                "RCMS_QT6_BUILD_ROOT": str(ROOT / "build" / "qt6-verification"),
             }
         )
         completed = subprocess.run(
-            [sys.executable, "-c", script], cwd=ROOT, env=environment,
-            capture_output=True, text=True, timeout=30, check=True,
+            [sys.executable, "-c", script],
+            cwd=ROOT,
+            env=environment,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=True,
         )
-        marker = next(line for line in completed.stdout.splitlines() if line.startswith("COMPACT_LAYOUT="))
+        marker = next(
+            line
+            for line in completed.stdout.splitlines()
+            if line.startswith("COMPACT_LAYOUT=")
+        )
         assert json.loads(marker.split("=", 1)[1]) == {
-            "roles": expected_roles, "visible": True, "actions": True,
-            "splash": True, "bounded": True,
+            "roles": expected_roles,
+            "visible": True,
+            "actions": True,
+            "splash": True,
+            "bounded": True,
         }
 
 

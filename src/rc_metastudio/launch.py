@@ -67,8 +67,9 @@ def screen_bounded_splash_pixmap(source, available_logical_size):
     return bounded
 
 
-def create_startup_splash():
+def create_startup_splash() -> QSplashScreen:
     """Build the startup Transient Window from high-DPI-capable resources."""
+    qt6_resources.ensure_application_resources()
     splash_pixmap = QPixmap(":/misc/splash.png")
     screen = QtWidgets.QApplication.primaryScreen()
     if screen is not None:

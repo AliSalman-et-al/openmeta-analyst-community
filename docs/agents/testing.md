@@ -21,6 +21,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-qt6.ps1 -Sync
 It performs deterministic form and binary-resource generation, strict `ty`
 checking, focused offscreen and Versioned Project Format tests,
 taxonomy-manifest validation, the full native PyQt6 application-shell suite,
+the complete remaining-window accessibility and adaptive-layout matrix,
 the maintained analysis tests, the full isolated R build/check/analysis stack,
 the fail-closed real-R comparison against the frozen pre-Qt6 Golden archive,
 and separate visible native `qwindows` smokes with `QT_QPA_PLATFORM` unset. The

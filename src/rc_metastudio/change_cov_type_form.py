@@ -39,6 +39,7 @@ class ChangeCovTypeForm(QDialog, Ui_ChangeCovTypeForm):
             app_error_handler.safe_slot(self.data_error, parent=self)
         )
         self.cov_prev_table.setModel(self.cov_model)
+        self.cov_prev_table.setTabKeyNavigation(False)
         self.cov_prev_table.resizeColumnsToContents()
         qt_layout.configure_spreadsheet_table_view(self.cov_prev_table)
         adaptive_window.register_adaptive_window(

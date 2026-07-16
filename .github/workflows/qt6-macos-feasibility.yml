@@ -10,6 +10,11 @@ on:
       - uv.lock
       - scripts/build_qt6.py
       - scripts/qt6_macos_feasibility.py
+      - scripts/native_remaining_surfaces_smoke.py
+      - scripts/validate_qt6_surface_inventory.py
+      - docs/verification/native-qt6-surface-inventory.json
+      - docs/verification/native-qt6-remaining-surfaces.md
+      - src/rc_metastudio/**
       - src/rc_metastudio/forms/about_legal.ui
       - src/rc_metastudio/images/**
       - src/rc_metastudio/qt6_build.py
@@ -118,6 +123,19 @@ jobs:
           uv run python scripts/qt6_macos_feasibility.py validate \
             --target "${{ matrix.target }}" \
             --evidence "artifacts/qt6-feasibility/${{ matrix.target }}/evidence.json"
+
+      - name: Capture remaining native surfaces at fractional scales
+        env:
+          RCMS_STUB_BACKEND: "1"
+          RCMS_QT6_BUILD_ROOT: build/qt6-verification
+          QT_FATAL_WARNINGS: "1"
+        run: |
+          set -euo pipefail
+          evidence_root="artifacts/qt6-feasibility/${{ matrix.target }}/remaining-surfaces"
+          uv run python scripts/build_qt6.py generate --build-root "$RCMS_QT6_BUILD_ROOT"
+          uv run python scripts/validate_qt6_surface_inventory.py --check-document
+          uv run python scripts/native_remaining_surfaces_smoke.py --evidence-root "$evidence_root"
+          uv run python scripts/native_remaining_surfaces_smoke.py --evidence-root "$evidence_root" --validate-only
 
       - name: Upload successful native feasibility evidence
         if: ${{ success() }}

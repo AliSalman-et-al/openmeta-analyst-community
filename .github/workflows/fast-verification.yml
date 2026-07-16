@@ -104,6 +104,15 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      - name: Upload native remaining-surface evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-remaining-surface-evidence
+          path: build/qt6-verification/native-remaining-surfaces
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Prune uv cache
         if: ${{ always() }}
         run: uv cache prune --ci

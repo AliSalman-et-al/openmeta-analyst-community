@@ -248,6 +248,9 @@ class AdaptiveWindowController(QObject):
         self.role = WindowRole(role)
         self.policy = WINDOW_POLICIES[self.role]
         self.state = AdaptiveWindowState(self.role, self.policy)
+        self._uses_default_available_geometry_provider = (
+            available_geometry_provider is None
+        )
         self._available_geometry_provider = (
             available_geometry_provider or available_geometry_for_window
         )
@@ -299,7 +302,9 @@ class AdaptiveWindowController(QObject):
         ):
             self._screen_placer(self.window, screen)
         if self.policy.first_use_behavior == FirstUseBehavior.MAXIMIZED:
-            self.window.setWindowState(self.window.windowState() | Qt.WindowState.WindowMaximized)
+            self.window.setWindowState(
+                self.window.windowState() | Qt.WindowState.WindowMaximized
+            )
             self.refitApplied.emit()
             return
 
@@ -468,7 +473,10 @@ class AdaptiveWindowController(QObject):
         handle = self.window.windowHandle()
         if handle is None:
             return
-        if handle is not self._window_handle:
+        if (
+            handle is not self._window_handle
+            and self._uses_default_available_geometry_provider
+        ):
             if self._window_handle is not None:
                 try:
                     self._window_handle.screenChanged.disconnect(
@@ -478,7 +486,8 @@ class AdaptiveWindowController(QObject):
                     pass
             self._window_handle = handle
             handle.screenChanged.connect(self.handle_screen_assignment_change)
-        self._connect_runtime_screen(handle.screen())
+        if self._uses_default_available_geometry_provider:
+            self._connect_runtime_screen(handle.screen())
 
     def _connect_runtime_screen(self, screen):
         if screen is self._runtime_screen:

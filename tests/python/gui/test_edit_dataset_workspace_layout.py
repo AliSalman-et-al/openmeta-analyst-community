@@ -3,7 +3,18 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
-from PyQt5 import QtCore, QtGui, QtTest, QtWidgets
+from PyQt6 import QtCore, QtGui, QtTest, QtWidgets
+
+
+ROOT = Path(__file__).resolve().parents[3]
+import os
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
+from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+
+prepare_generated_ui_imports()
+import adaptive_window
 
 
 DATASET_FORM_PATHS = (
@@ -84,8 +95,14 @@ def test_edit_dataset_is_modal_workspace_with_persisted_placement_and_panes(
         available = first.screen().availableGeometry()
 
         assert first.isModal()
-        assert first.property("RCMS_window_archetype") == "workspace"
-        assert first.property("RCMS_window_role") == "edit_dataset"
+        assert (
+            adaptive_window.adaptive_window_state(first).policy.archetype
+            is adaptive_window.WindowArchetype.WORKSPACE
+        )
+        assert (
+            adaptive_window.adaptive_window_state(first).role
+            is adaptive_window.WindowRole.EDIT_DATASET
+        )
         assert first.frameGeometry().width() == pytest.approx(
             available.width() * 0.80, abs=8
         )
@@ -101,11 +118,21 @@ def test_edit_dataset_is_modal_workspace_with_persisted_placement_and_panes(
             first.covariate_list,
         ):
             assert (
-                view.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Expanding
+                view.sizePolicy().horizontalPolicy()
+                == QtWidgets.QSizePolicy.Policy.Expanding
             )
-            assert view.sizePolicy().verticalPolicy() == QtWidgets.QSizePolicy.Expanding
-            assert view.horizontalScrollBarPolicy() == QtCore.Qt.ScrollBarAsNeeded
-            assert view.verticalScrollBarPolicy() == QtCore.Qt.ScrollBarAsNeeded
+            assert (
+                view.sizePolicy().verticalPolicy()
+                == QtWidgets.QSizePolicy.Policy.Expanding
+            )
+            assert (
+                view.horizontalScrollBarPolicy()
+                == QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
+            )
+            assert (
+                view.verticalScrollBarPolicy()
+                == QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
+            )
 
         for button in (
             first.add_outcome_btn,
@@ -139,7 +166,7 @@ def test_edit_dataset_is_modal_workspace_with_persisted_placement_and_panes(
         first.edit_tab.setCurrentWidget(first.tab_2)
         qapp.processEvents()
         assert first.geometry() == stable_geometry
-        assert first.study_list.textElideMode() == QtCore.Qt.ElideNone
+        assert first.study_list.textElideMode() == QtCore.Qt.TextElideMode.ElideNone
         assert first.study_list.horizontalScrollBar().maximum() > 0
 
         first.edit_tab.setCurrentWidget(first.tab)
@@ -147,7 +174,7 @@ def test_edit_dataset_is_modal_workspace_with_persisted_placement_and_panes(
         first.outcome_list.setFocus()
         traversed = set()
         for _ in range(8):
-            QtTest.QTest.keyClick(qapp.focusWidget(), QtCore.Qt.Key_Tab)
+            QtTest.QTest.keyClick(qapp.focusWidget(), QtCore.Qt.Key.Key_Tab)
             traversed.add(qapp.focusWidget().objectName())
         assert {
             "add_outcome_btn",
@@ -168,7 +195,7 @@ def test_edit_dataset_is_modal_workspace_with_persisted_placement_and_panes(
         expected_proportions = tuple(
             value / sum(expected_sizes) for value in expected_sizes
         )
-        first.done(QtWidgets.QDialog.Rejected)
+        first.done(QtWidgets.QDialog.DialogCode.Rejected)
 
         state = settings.load_edit_dataset_window_state(
             available_geometries=[QtCore.QRect(0, 0, 800, 600)]
@@ -197,7 +224,8 @@ def test_edit_dataset_is_modal_workspace_with_persisted_placement_and_panes(
         stale = settings.load_edit_dataset_window_state(
             available_geometries=[QtCore.QRect(0, 0, 800, 600)]
         )
-        assert QtCore.QRect(0, 0, 800, 600).contains(stale.frame_geometry)
+        assert stale.frame_geometry is None
+        assert not store.contains(group + "/frame_geometry")
         assert stale.maximized is True
         assert stale.full_screen is True
     finally:
@@ -227,7 +255,10 @@ def test_dataset_nested_actions_keep_long_required_content_and_keyboard_access(q
             dialog.resize(320, 180)
             dialog.show()
             qapp.processEvents()
-            assert dialog.property("RCMS_window_archetype") == "transactional"
+            assert (
+                adaptive_window.adaptive_window_state(dialog).policy.archetype
+                is adaptive_window.WindowArchetype.TRANSACTIONAL
+            )
             assert dialog.layout() is not None
             assert dialog.buttonBox.isVisible()
             assert dialog.rect().contains(dialog.buttonBox.geometry().center())
@@ -238,7 +269,7 @@ def test_dataset_nested_actions_keep_long_required_content_and_keyboard_access(q
         qapp.processEvents()
         outcome.outcome_name_le.setText(long_name)
         outcome.outcome_name_le.setFocus()
-        QtTest.QTest.keyClick(outcome.outcome_name_le, QtCore.Qt.Key_Tab)
+        QtTest.QTest.keyClick(outcome.outcome_name_le, QtCore.Qt.Key.Key_Tab)
         assert outcome.datatype_cbo_box.hasFocus()
         assert outcome.outcome_name_le.text() == long_name
 
@@ -248,7 +279,7 @@ def test_dataset_nested_actions_keep_long_required_content_and_keyboard_access(q
         qapp.processEvents()
         assert rename.group_name_le.text() == long_name
         rename.group_name_le.setFocus()
-        QtTest.QTest.keyClick(rename.group_name_le, QtCore.Qt.Key_Tab)
+        QtTest.QTest.keyClick(rename.group_name_le, QtCore.Qt.Key.Key_Tab)
         assert qapp.focusWidget() in rename.buttonBox.buttons()
     finally:
         qapp.setFont(old_font)

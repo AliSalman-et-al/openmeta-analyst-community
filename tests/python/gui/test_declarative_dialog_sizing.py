@@ -1,14 +1,19 @@
 import os
 import sys
+from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-sys.path.insert(0, os.path.abspath("src"))
-sys.path.insert(0, os.path.abspath(os.path.join("src", "forms")))
+ROOT = Path(__file__).resolve().parents[3]
+os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
 
-from PyQt5 import QtWidgets
+from PyQt6 import QtWidgets
+from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+
+prepare_generated_ui_imports()
 
 
 def test_application_wizard_uses_workflow_policy_without_legacy_refit(qapp):
+    import adaptive_window
     import main_wizard
 
     wizard = main_wizard.MainWizard(path="new_dataset")
@@ -16,7 +21,10 @@ def test_application_wizard_uses_workflow_policy_without_legacy_refit(qapp):
         wizard.restart()
         qapp.processEvents()
 
-        assert wizard.property("RCMS_window_archetype") == "workflow"
+        assert (
+            adaptive_window.adaptive_window_state(wizard).policy.archetype
+            is adaptive_window.WindowArchetype.WORKFLOW
+        )
         assert wizard.currentPage().findChild(QtWidgets.QScrollArea, "pageScrollArea")
         assert not hasattr(wizard, "_oma_first_show_refit_filter")
         assert wizard.property("RCMS_first_show_refit_options") is None
@@ -50,7 +58,7 @@ def test_application_wizard_modern_style_renders_sized_nonblank_pages(qapp, tmp_
             assert pixmap.save(str(image_path), "PNG")
             assert image_path.stat().st_size > 0
             assert not pixmap.toImage().isGrayscale()
-            assert wizard.wizardStyle() == QtWidgets.QWizard.ModernStyle
+            assert wizard.wizardStyle() == QtWidgets.QWizard.WizardStyle.ModernStyle
             assert page.width() >= page.parentWidget().contentsRect().width() - 4
         finally:
             wizard.close()
@@ -88,10 +96,10 @@ def test_application_wizard_pages_do_not_use_background_pixmaps(qapp):
     try:
         for page_id in wizard.pageIds():
             page = wizard.page(page_id)
-            assert page.pixmap(QtWidgets.QWizard.BackgroundPixmap).isNull()
-            assert page.pixmap(QtWidgets.QWizard.BannerPixmap).isNull()
-        assert wizard.pixmap(QtWidgets.QWizard.BackgroundPixmap).isNull()
-        assert wizard.pixmap(QtWidgets.QWizard.BannerPixmap).isNull()
+            assert page.pixmap(QtWidgets.QWizard.WizardPixmap.BackgroundPixmap).isNull()
+            assert page.pixmap(QtWidgets.QWizard.WizardPixmap.BannerPixmap).isNull()
+        assert wizard.pixmap(QtWidgets.QWizard.WizardPixmap.BackgroundPixmap).isNull()
+        assert wizard.pixmap(QtWidgets.QWizard.WizardPixmap.BannerPixmap).isNull()
     finally:
         wizard.close()
         qapp.processEvents()

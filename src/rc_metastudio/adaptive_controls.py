@@ -90,7 +90,13 @@ class ChoiceControlController(QObject):
         self.visible_characters = visible_characters
         self._invalidate_measurements()
 
-    def eventFilter(self, watched, event):
+    def eventFilter(  # ty: ignore[invalid-method-override] -- PyQt6 stub rejects the binding's valid override
+        self,
+        watched: QObject | None,
+        event: QEvent | None,
+    ) -> bool:
+        if event is None:
+            return False
         event_type = event.type()
         if watched is self.combo and event_type in self._METRIC_EVENTS:
             self._invalidate_measurements()
@@ -129,6 +135,8 @@ class ChoiceControlController(QObject):
         combo.setSizePolicy(QSizePolicy.Policy.Expanding, combo.sizePolicy().verticalPolicy())
 
         view = combo.view()
+        view.setAccessibleName(combo.accessibleName() or "Available choices")
+        view.setAccessibleDescription(combo.accessibleDescription())
         view.setTextElideMode(Qt.TextElideMode.ElideNone)
         view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         view.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
@@ -345,17 +353,36 @@ def configure_choice_control(combo, visible_characters=VALUE_SELECTOR_VISIBLE_CH
     if controller is None:
         controller = ChoiceControlController(combo, visible_characters)
         combo._adaptive_choice_controller = controller
-        combo.setProperty("RCMS_choice_control_configured", True)
     else:
         controller.reconfigure(visible_characters)
     return controller
 
 
-def refresh_choice_popup_width(combo):
-    """Refresh a configured choice control after local content reflow."""
+def choice_control_controller(combo: QComboBox) -> ChoiceControlController:
+    """Return the live typed controller registered for ``combo``.
+
+    Application state is deliberately held as a Python-owned attribute rather
+    than a dynamic Qt property. The parent check rejects stale controllers
+    after Qt ownership or teardown changes.
+    """
     controller = getattr(combo, "_adaptive_choice_controller", None)
-    if controller is not None:
-        controller.refresh()
+    if not isinstance(controller, ChoiceControlController):
+        raise LookupError("choice control is not configured")
+    try:
+        if controller.parent() is not combo or controller.combo is not combo:
+            raise LookupError("choice control controller has stale ownership")
+    except RuntimeError as exc:
+        raise LookupError("choice control controller has been deleted") from exc
+    return controller
+
+
+def refresh_choice_popup_width(combo: QComboBox) -> None:
+    """Refresh a configured choice control after local content reflow."""
+    try:
+        controller = choice_control_controller(combo)
+    except LookupError:
+        return
+    controller.refresh()
 
 
 def configure_numeric_value_control(control):
