@@ -8247,6 +8247,66 @@
       "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["qt"], "lane": "fast",
       "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_class_scoped_enum_manifest_targets_exist_in_locked_pyqt6",
       "reason": "Validates every authoritative class-enum mapping against the locked PyQt6 runtime.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_maintained_entry_point_reuses_one_native_application_and_closes_shell",
+      "reason": "Exercises repeated construction and destruction through the maintained native PyQt6 shell entry point.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_console_entry_point_launches_real_shell_and_exits_cleanly",
+      "reason": "Runs the installed console-module boundary in a subprocess and proves the full shell exits cleanly.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["qt", "subprocess"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_startup_failure_injections_release_qt_objects_with_fatal_warnings",
+      "reason": "Injects R-load and partial-shell constructor failures in warning-fatal subprocesses and rejects leaked top-level objects.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_shell_actions_use_native_resources_and_fire_once",
+      "reason": "Guards native QAction resources, platform shortcuts, About access, and the project file-dialog entry point.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_close_cancel_and_failed_save_keep_owned_shell_alive",
+      "reason": "Guards close cancellation and failed-save lifetime behavior before allowing deterministic shell deletion.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_qt6_settings_migration_preserves_domain_values_and_recent_projects",
+      "reason": "Proves obsolete Qt5 machine layout is reset without erasing domain settings or recent projects.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_workspace_settings_store_only_portable_typed_values",
+      "reason": "Guards the versioned JSON geometry codec and typed primitive workspace settings contract.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_invalid_portable_setting_resets_only_its_own_field",
+      "reason": "Proves validation failures repair one portable field without erasing domain settings or the previous valid value.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_schema_versions_use_strict_raw_integer_validation",
+      "reason": "Rejects Qt coercion for corrupt schema versions and repairs versions without disturbing domain settings.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_geometry_codec_rejects_overflow_and_repairs_only_geometry",
+      "reason": "Rejects non-JSON, bool, invalid-dimension, and signed-32-bit-overflow geometry before QRect construction.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_workspace_boolean_and_splitter_codecs_repair_only_invalid_fields",
+      "reason": "Rejects coerced booleans and malformed, non-finite, negative, oversized, or wrong-length splitter values field-locally.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_adaptive_shell_state_is_typed_without_dynamic_qt_properties",
+      "reason": "Proves adaptive shell policy is application-owned typed state rather than dynamic QObject properties.", "runtime_class": "seconds", "size": "medium"
     }
 
   ]

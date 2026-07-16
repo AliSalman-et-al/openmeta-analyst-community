@@ -11,7 +11,9 @@ import math
 from PyQt6.QtGui import QColor, QUndoCommand
 
 APPLICATION_NAME = "RCMetaStudio"
+APPLICATION_DISPLAY_NAME = "RC MetaStudio"
 ORGANIZATION_NAME = "Research Consultancy"
+ORGANIZATION_DOMAIN = "rcmetastudio.org"
 
 # Default display precision. Editing and calculations retain their full values.
 NUM_DIGITS = 2

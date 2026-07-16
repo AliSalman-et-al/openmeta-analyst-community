@@ -20,8 +20,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-qt6.ps1 -Sync
 
 It performs deterministic form and binary-resource generation, strict `ty`
 checking, focused offscreen and Versioned Project Format tests,
-taxonomy-manifest validation, and a separate visible native `qwindows` smoke
-with `QT_QPA_PLATFORM` unset.
+taxonomy-manifest validation, the full native PyQt6 application-shell suite,
+and separate visible native `qwindows` smokes with `QT_QPA_PLATFORM` unset.
+The shell smoke constructs the real `MetaForm`, exercises its menu surface,
+processes events, and verifies the owned window is deleted on close with Qt
+warnings fatal inside the controlled process.
 
 The historical Smoke Verification Lane, Fast Verification Lane, GUI suite,
 Default R Evidence, and packaging-contract aggregate remain preserved but are

@@ -4,6 +4,8 @@
 
 import os
 import sys
+import json
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from PyQt6 import QtCore, QtGui
@@ -19,9 +21,13 @@ ANALYSIS_SCRATCH_ENV_VAR = "RCMS_ANALYSIS_SCRATCH_DIR"
 ##################### HANDLE SETTINGS #####################
 
 MAX_RECENT_FILES = 10
+SIGNED_INT32_MIN = -(2**31)
+SIGNED_INT32_MAX = 2**31 - 1
+APPLICATION_SETTINGS_SCHEMA_KEY = "application_settings/schema_version"
+APPLICATION_SETTINGS_SCHEMA_VERSION = 1
 LEGACY_MAIN_WINDOW_GROUP = "main_window"
 WORKSPACE_LAYOUT_GROUP = "workspace_layout"
-WORKSPACE_LAYOUT_SCHEMA_VERSION = 1
+WORKSPACE_LAYOUT_SCHEMA_VERSION = 2
 MAIN_WORKSPACE_GROUP = WORKSPACE_LAYOUT_GROUP + "/main"
 RESULTS_WORKSPACE_GROUP = WORKSPACE_LAYOUT_GROUP + "/results"
 EDIT_DATASET_WORKSPACE_GROUP = WORKSPACE_LAYOUT_GROUP + "/edit_dataset"
@@ -33,6 +39,21 @@ DEFAULT_SETTINGS = {
     "digits": 2,
     "recent_files": [],
     # "method_params":{},
+}
+
+
+@dataclass(frozen=True)
+class SettingSpec:
+    """Portable QSettings field contract."""
+
+    value_type: type
+    default: object
+
+
+SETTING_SPECS = {
+    "splash": SettingSpec(bool, True),
+    "digits": SettingSpec(int, 2),
+    "recent_files": SettingSpec(list, []),
 }
 
 
@@ -65,6 +86,8 @@ class WorkspacePlacement(Mapping):
 
 class WorkspacePaneState(Mapping):
     """Mapping-compatible placement and proportions shared by pane workspaces."""
+
+    placement: WorkspacePlacement
 
     _FIELDS = (
         "frame_geometry",
@@ -119,99 +142,86 @@ class EditDatasetWorkspaceState(WorkspacePaneState):
 
 
 def update_setting(field, value):
-    """Updates the setting with key field to value."""
-
+    """Write one validated field using portable primitive storage."""
+    spec = SETTING_SPECS[field]
     settings = QSettings()
-
-    # see if we need to store the value in a special way
-    value_type = get_setting_type(field)
-    if value_type == list:
-        # QSettings arrays are used for recent-file paths, which are stored as
-        # strings.
-        if settings.contains(field):
-            settings.remove(field)
-        settings.beginGroup(field)
-        for i, x in enumerate(value):  # value is a list
-            settings.setValue(str(i), x)
-        settings.endGroup()
-    elif value_type == dict:
-        raise Exception("Not implemented yet!")
-    elif value_type == bool:
-        settings.setValue(field, value)
-    elif value_type == QColor:
-        # just being explicit to signify i am aware of QColors and to match get_setting
-        settings.setValue(field, value)
-    elif value_type == int:
-        settings.setValue(field, value)
-    elif value_type == str:
-        settings.setValue(field, value)
+    if spec.value_type is list:
+        if not isinstance(value, list) or any(
+            not isinstance(item, str) for item in value
+        ) or len(value) > MAX_RECENT_FILES:
+            raise TypeError("%s must be a list of strings" % field)
+        encoded = json.dumps(value, ensure_ascii=False)
+    elif spec.value_type is bool:
+        if type(value) is not bool:
+            raise TypeError("%s must be a boolean" % field)
+        encoded = value
+    elif spec.value_type is int:
+        if type(value) is not int:
+            raise TypeError("%s must be an integer" % field)
+        if field == "digits" and not 0 <= value <= 15:
+            raise ValueError("digits must be between 0 and 15")
+        encoded = value
+    elif spec.value_type is str:
+        if not isinstance(value, str):
+            raise TypeError("%s must be a string" % field)
+        encoded = value
     else:
-        # nothing special needs to be done
-        print(("Field: %s" % field))
-        print(("Value type: %s" % str(value_type)))
-        raise Exception("Are you SURE that NOTHING special needs to be done?")
-        settings.setValue(field, value)
+        raise TypeError("Unsupported settings codec for %s" % field)
+    settings.remove(field)
+    settings.setValue(field, encoded)
 
 
 def get_setting_type(field):
-    return type(DEFAULT_SETTINGS[field])
+    return SETTING_SPECS[field].value_type
 
 
 def get_setting(field):
     try:
         return _get_setting_helper(field)
-    except Exception as e:
+    except (TypeError, ValueError, json.JSONDecodeError):
         print(
-            "Exception while trying to access setting '%s', resetting settings to defaults"
+            "Invalid value for setting '%s'; resetting only that field"
             % field
         )
-        reset_settings()
+        update_setting(field, SETTING_SPECS[field].default)
         return _get_setting_helper(field)
-    return _get_setting_helper(field)
 
 
 def _get_setting_helper(field):
     settings = QSettings()
-
-    # see if we need to store the value in a special way
-    value_type = get_setting_type(field)
-    # print("Setting type: %s for %s" % (str(value_type), field))
-    if value_type == list:
-        settings.beginGroup(field)
-        indexes = list(settings.childKeys())
-        foo_list = []
-        for i in indexes:
-            value = settings.value(i)
-            foo_list.append(qt_text.to_native_text(value))
-        settings.endGroup()
-        setting_value = foo_list
-    elif value_type == dict:
-        raise Exception("Not implemented yet!")
-    elif value_type == bool:
-        print(("Converted %s to a boolean" % field))
-        value = settings.value(field)
-        if hasattr(value, "toBool"):
-            setting_value = value.toBool()
-        elif hasattr(value, "value"):
-            setting_value = bool(value.value())
-        else:
-            setting_value = bool(value)
-    elif value_type == str:
-        value = settings.value(field)
-        setting_value = qt_text.to_native_text(value)
-    elif value_type == str:
-        settings.setValue(field, value)
-    elif value_type == int:
-        value = settings.value(field)
-        setting_value = value.toInt()[0] if hasattr(value, "toInt") else int(value)
-    elif value_type == QColor:
-        setting_value = QColor(settings.value(field))
-    else:
-        # nothing special needs to be done
-        raise Exception("Are you SURE that NOTHING special needs to be done?")
-        setting_value = settings.value(field)
-
-    return setting_value
+    spec = SETTING_SPECS[field]
+    if spec.value_type is list:
+        raw = settings.value(field)
+        if raw is None and field in settings.childGroups():
+            settings.beginGroup(field)
+            indexes = sorted(settings.childKeys(), key=lambda key: int(key))
+            legacy = [qt_text.to_native_text(settings.value(key)) for key in indexes]
+            settings.endGroup()
+            update_setting(field, legacy)
+            return legacy
+        if not isinstance(raw, str):
+            raise TypeError("%s must use the JSON string codec" % field)
+        decoded = json.loads(raw)
+        if not isinstance(decoded, list) or any(
+            not isinstance(item, str) for item in decoded
+        ) or len(decoded) > MAX_RECENT_FILES:
+            raise ValueError("%s must contain a list of strings" % field)
+        return decoded
+    if spec.value_type is bool:
+        value = settings.value(field, spec.default)
+        if type(value) is not bool:
+            raise TypeError("%s must contain a boolean" % field)
+        return value
+    if spec.value_type is int:
+        value = settings.value(field, spec.default)
+        if type(value) is not int:
+            raise TypeError("%s must contain an integer" % field)
+        if field == "digits" and not 0 <= value <= 15:
+            raise ValueError("digits must be between 0 and 15")
+        return value
+    if spec.value_type is str:
+        return qt_text.to_native_text(settings.value(field, spec.default))
+    raise TypeError("Unsupported settings codec for %s" % field)
 
 
 def save_settings():
@@ -221,12 +231,39 @@ def save_settings():
 
 
 def migrate_workspace_layout_settings():
-    """Delete pre-rewrite geometry without disturbing unrelated settings."""
+    """Delete only Qt5-bound placement fields, retaining portable state."""
     settings = QSettings()
-    version = settings.value(WORKSPACE_LAYOUT_GROUP + "/schema_version", 0, type=int)
+    version = _strict_schema_version(
+        settings.value(WORKSPACE_LAYOUT_GROUP + "/schema_version")
+    )
     if version != WORKSPACE_LAYOUT_SCHEMA_VERSION:
-        settings.remove(WORKSPACE_LAYOUT_GROUP)
-        settings.remove(LEGACY_MAIN_WINDOW_GROUP)
+        obsolete_suffixes = (
+            "frame_geometry",
+            "geometry",
+            "maximized",
+            "full_screen",
+            "window_state",
+            "windowState",
+            "state",
+            "splitter",
+            "splitter_state",
+            "splitterState",
+            "splitter_proportions",
+            "screen",
+            "screen_name",
+            "screen_geometry",
+            "screen_placement",
+        )
+        groups = (
+            LEGACY_MAIN_WINDOW_GROUP,
+            MAIN_WORKSPACE_GROUP,
+            RESULTS_WORKSPACE_GROUP,
+            EDIT_DATASET_WORKSPACE_GROUP,
+            NETWORK_VIEW_WORKSPACE_GROUP,
+        )
+        for group in groups:
+            for suffix in obsolete_suffixes:
+                settings.remove(group + "/" + suffix)
         settings.setValue(
             WORKSPACE_LAYOUT_GROUP + "/schema_version",
             WORKSPACE_LAYOUT_SCHEMA_VERSION,
@@ -234,11 +271,144 @@ def migrate_workspace_layout_settings():
         settings.sync()
 
 
+def migrate_application_settings():
+    """Establish the portable contract without clearing domain settings."""
+    migrate_workspace_layout_settings()
+    settings = QSettings()
+    version = _strict_schema_version(settings.value(APPLICATION_SETTINGS_SCHEMA_KEY))
+    if version != APPLICATION_SETTINGS_SCHEMA_VERSION:
+        settings.setValue(
+            APPLICATION_SETTINGS_SCHEMA_KEY, APPLICATION_SETTINGS_SCHEMA_VERSION
+        )
+        settings.sync()
+
+
+def _strict_schema_version(raw):
+    if type(raw) is not int:
+        return None
+    if not 1 <= raw <= SIGNED_INT32_MAX:
+        return None
+    return raw
+
+
+def _encode_frame_geometry(frame_geometry):
+    frame = QtCore.QRect(frame_geometry)
+    if not frame.isValid():
+        return ""
+    return json.dumps(
+        {
+            "height": frame.height(),
+            "width": frame.width(),
+            "x": frame.x(),
+            "y": frame.y(),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def _decode_frame_geometry(raw):
+    if raw in (None, ""):
+        return None
+    try:
+        if not isinstance(raw, str):
+            return None
+        value = json.loads(raw)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+    keys = {"height", "width", "x", "y"}
+    if not isinstance(value, dict) or set(value) != keys:
+        return None
+    if any(type(value[key]) is not int for key in keys):
+        return None
+    x, y = value["x"], value["y"]
+    width, height = value["width"], value["height"]
+    if not (
+        SIGNED_INT32_MIN <= x <= SIGNED_INT32_MAX
+        and SIGNED_INT32_MIN <= y <= SIGNED_INT32_MAX
+        and 1 <= width <= SIGNED_INT32_MAX
+        and 1 <= height <= SIGNED_INT32_MAX
+        and x <= SIGNED_INT32_MAX - width + 1
+        and y <= SIGNED_INT32_MAX - height + 1
+    ):
+        return None
+    try:
+        frame = QtCore.QRect(x, y, width, height)
+    except (OverflowError, TypeError, ValueError):
+        return None
+    return frame if frame.isValid() else None
+
+
+def _encode_float_list(values):
+    normalized = _strict_positive_numbers(values, len(values))
+    if normalized is None:
+        raise ValueError("splitter values must be finite positive numbers")
+    return json.dumps(normalized, separators=(",", ":"))
+
+
+def _decode_float_list(raw, default):
+    try:
+        if not isinstance(raw, str):
+            return None
+        decoded = json.loads(raw)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+    return _strict_positive_numbers(decoded, len(default), upper_bound=1.0)
+
+
+def _strict_positive_numbers(values, expected_length, upper_bound=SIGNED_INT32_MAX):
+    if not isinstance(values, (list, tuple)) or len(values) != expected_length:
+        return None
+    normalized = []
+    for value in values:
+        if type(value) not in (int, float):
+            return None
+        number = float(value)
+        if not math.isfinite(number) or not 0.0 < number <= upper_bound:
+            return None
+        normalized.append(number)
+    return normalized
+
+
+def _read_bool(settings, key, default):
+    raw = settings.value(key)
+    if raw is None:
+        return default
+    if type(raw) is bool:
+        return raw
+    settings.remove(key)
+    return default
+
+
+def _read_frame_geometry(settings, key):
+    raw = settings.value(key)
+    if raw is None:
+        return None
+    decoded = _decode_frame_geometry(raw)
+    if decoded is None:
+        settings.remove(key)
+    return decoded
+
+
+def _read_splitter_proportions(settings, key, default):
+    raw = settings.value(key)
+    if raw is None:
+        return tuple(default)
+    decoded = _decode_float_list(raw, default)
+    if decoded is None or not math.isclose(sum(decoded), 1.0, abs_tol=1e-9):
+        settings.setValue(key, _encode_float_list(default))
+        return tuple(default)
+    return tuple(decoded)
+
+
 def _available_screen_geometries():
     app = QtGui.QGuiApplication.instance()
     if app is None:
         return []
-    return [QtCore.QRect(screen.availableGeometry()) for screen in app.screens()]
+    return [
+        QtCore.QRect(screen.availableGeometry())
+        for screen in QtGui.QGuiApplication.screens()
+    ]
 
 
 def _screen_safe_geometry(frame_geometry, available_geometries):
@@ -258,7 +428,7 @@ def load_workspace_placement(group, available_geometries=None, default_maximized
     """Load one Workspace role through the shared ADR 0196 policy."""
     migrate_workspace_layout_settings()
     settings = QSettings()
-    geometry = settings.value(group + "/frame_geometry")
+    geometry = _read_frame_geometry(settings, group + "/frame_geometry")
     geometry = (
         _screen_safe_geometry(
             geometry,
@@ -271,12 +441,12 @@ def load_workspace_placement(group, available_geometries=None, default_maximized
     )
     return WorkspacePlacement(
         frame_geometry=geometry,
-        maximized=settings.value(
+        maximized=_read_bool(
+            settings,
             group + "/maximized",
             bool(default_maximized and geometry is None),
-            type=bool,
         ),
-        full_screen=settings.value(group + "/full_screen", False, type=bool),
+        full_screen=_read_bool(settings, group + "/full_screen", False),
     )
 
 
@@ -289,12 +459,15 @@ def load_main_window_placement(available_geometries=None):
 
 
 def _splitter_proportions(sizes, default=DEFAULT_RESULTS_SPLITTER_PROPORTIONS):
-    try:
-        values = [max(0.0, float(value)) for value in sizes]
-    except (TypeError, ValueError):
+    values = _strict_positive_numbers(sizes, len(default))
+    if values is None:
         return list(default)
     total = sum(values)
-    if len(values) != len(default) or total <= 0 or any(value <= 0 for value in values):
+    if (
+        len(values) != len(default)
+        or not math.isfinite(total)
+        or total <= 0
+    ):
         return list(default)
     return [value / total for value in values]
 
@@ -307,13 +480,14 @@ def load_results_window_state(available_geometries=None):
         default_maximized=True,
     )
     settings = QSettings()
-    proportions = settings.value(
+    proportions = _read_splitter_proportions(
+        settings,
         RESULTS_WORKSPACE_GROUP + "/splitter_proportions",
-        list(DEFAULT_RESULTS_SPLITTER_PROPORTIONS),
+        DEFAULT_RESULTS_SPLITTER_PROPORTIONS,
     )
     return ResultsWorkspaceState(
         placement=placement,
-        splitter_proportions=tuple(_splitter_proportions(proportions)),
+        splitter_proportions=proportions,
     )
 
 
@@ -337,7 +511,10 @@ def save_workspace_placement(group, window):
     """Persist the shared typed portion of one Workspace role's state."""
     migrate_workspace_layout_settings()
     settings = QSettings()
-    settings.setValue(group + "/frame_geometry", _workspace_normal_frame(window))
+    settings.setValue(
+        group + "/frame_geometry",
+        _encode_frame_geometry(_workspace_normal_frame(window)),
+    )
     settings.setValue(group + "/maximized", window.isMaximized())
     settings.setValue(group + "/full_screen", window.isFullScreen())
     return settings
@@ -388,7 +565,9 @@ def save_results_window_state(window):
     settings = save_workspace_placement(RESULTS_WORKSPACE_GROUP, window)
     settings.setValue(
         RESULTS_WORKSPACE_GROUP + "/splitter_proportions",
-        _splitter_proportions(window.results_nav_splitter.sizes()),
+        _encode_float_list(
+            _splitter_proportions(window.results_nav_splitter.sizes())
+        ),
     )
     settings.sync()
 
@@ -412,18 +591,15 @@ def load_edit_dataset_window_state(available_geometries=None):
         available_geometries=available_geometries,
         default_maximized=False,
     )
-    proportions = QSettings().value(
+    settings = QSettings()
+    proportions = _read_splitter_proportions(
+        settings,
         EDIT_DATASET_WORKSPACE_GROUP + "/splitter_proportions",
-        list(DEFAULT_EDIT_DATASET_SPLITTER_PROPORTIONS),
+        DEFAULT_EDIT_DATASET_SPLITTER_PROPORTIONS,
     )
     return EditDatasetWorkspaceState(
         placement=placement,
-        splitter_proportions=tuple(
-            _splitter_proportions(
-                proportions,
-                default=DEFAULT_EDIT_DATASET_SPLITTER_PROPORTIONS,
-            )
-        ),
+        splitter_proportions=proportions,
     )
 
 
@@ -432,9 +608,11 @@ def save_edit_dataset_window_state(window):
     settings = save_workspace_placement(EDIT_DATASET_WORKSPACE_GROUP, window)
     settings.setValue(
         EDIT_DATASET_WORKSPACE_GROUP + "/splitter_proportions",
-        _splitter_proportions(
-            window.dataset_structure_splitter.sizes(),
-            default=DEFAULT_EDIT_DATASET_SPLITTER_PROPORTIONS,
+        _encode_float_list(
+            _splitter_proportions(
+                window.dataset_structure_splitter.sizes(),
+                default=DEFAULT_EDIT_DATASET_SPLITTER_PROPORTIONS,
+            )
         ),
     )
     settings.sync()
@@ -509,7 +687,7 @@ def load_settings():
     """loads settings from QSettings object, setting suitable defaults if
     there are missing fields"""
 
-    migrate_workspace_layout_settings()
+    migrate_application_settings()
     settings = QSettings()
 
     def field_is_toplevel_child_group_keys(field_name):

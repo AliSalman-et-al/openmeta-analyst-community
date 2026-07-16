@@ -213,6 +213,19 @@ def start():
             else os.path.join("sample_projects", "amino.rcms")
         )
         return start_automation_smoke(sample_path)
+    if len(startup_argv) > 1 and startup_argv[1] == "--automation-shell-smoke":
+        return start_shell_smoke()
+    if (
+        len(startup_argv) > 1
+        and startup_argv[1] == "--automation-native-shell-smoke"
+    ):
+        return start_shell_smoke(require_native_window=True)
+    if len(startup_argv) > 1 and startup_argv[1] == "--automation-shell-failure-smoke":
+        if len(startup_argv) != 3:
+            raise SystemExit(
+                "--automation-shell-failure-smoke requires r-load or meta-form"
+            )
+        return start_shell_failure_smoke(startup_argv[2])
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-native-smoke":
         sample_path = (
             startup_argv[2]
@@ -243,45 +256,26 @@ def start():
     startup_project_path = _startup_project_path(startup_argv)
     meta_form = _import_meta_form()
     app = app_error_handler.get_or_create_application(list(sys.argv))
-    app.setApplicationName(meta_globals.APPLICATION_NAME)
-    app.setOrganizationName(meta_globals.ORGANIZATION_NAME)
-    _set_application_icon(app)
-    settings.setup_directories()
-
-    splash = create_startup_splash()
-    splash.show()
-    splash_starttime = time.time()
-
-    load_R_libraries(app, splash)
-
-    # Show splash screen for at least SPLASH_DISPLAY_TIME seconds
-    time_elapsed = time.time() - splash_starttime
-    print(("It took %s seconds to load the R libraries" % str(time_elapsed)))
-    if time_elapsed < SPLASH_DISPLAY_TIME:  # seconds
-        print(
-            (
-                "Going to sleep for %f seconds"
-                % float(SPLASH_DISPLAY_TIME - time_elapsed)
-            )
-        )
-        QThread.sleep(int(SPLASH_DISPLAY_TIME - time_elapsed))
-
-    meta = meta_form.MetaForm()
-    splash.finish(meta)
-    _show_main_window(meta)
-    if startup_project_path:
-        opened = meta.open(startup_project_path)
-        if os.environ.get("RCMS_STARTUP_PROJECT_SMOKE") == "1":
-            return _assert_opened_project_for_startup_smoke(
-                app, meta, startup_project_path, opened
-            )
-    else:
-        if os.environ.get("RCMS_STARTUP_PROJECT_SMOKE") == "1":
-            raise SystemExit(
-                "Startup project smoke test did not receive a project path."
-            )
-        meta.start()
-    sys.exit(app.exec())
+    _configure_application(app)
+    baseline_ids = _top_level_ids(app)
+    try:
+        settings.setup_directories()
+        meta = _create_interactive_shell(app, meta_form.MetaForm, load_R_libraries)
+        if startup_project_path:
+            opened = meta.open(startup_project_path)
+            if os.environ.get("RCMS_STARTUP_PROJECT_SMOKE") == "1":
+                return _assert_opened_project_for_startup_smoke(
+                    app, meta, startup_project_path, opened
+                )
+        else:
+            if os.environ.get("RCMS_STARTUP_PROJECT_SMOKE") == "1":
+                raise SystemExit(
+                    "Startup project smoke test did not receive a project path."
+                )
+            meta.start()
+        return app.exec()
+    finally:
+        _dispose_new_top_levels(app, baseline_ids)
 
 
 def start_automation():
@@ -289,15 +283,69 @@ def start_automation():
     app_error_handler.install_global_exception_handler()
     meta_form = _import_meta_form()
     app = app_error_handler.get_or_create_application(sys.argv)
-    app.setApplicationName(meta_globals.APPLICATION_NAME)
-    app.setOrganizationName(meta_globals.ORGANIZATION_NAME)
-    _set_application_icon(app)
-    settings.setup_directories()
-    if os.environ.get("RCMS_REQUIRE_IN_PROCESS_RPY2") == "1":
-        load_R_libraries(app, None)
-    meta = meta_form.MetaForm()
-    _show_main_window(meta)
-    return app, meta
+    _configure_application(app)
+    baseline_ids = _top_level_ids(app)
+    try:
+        settings.setup_directories()
+        if os.environ.get("RCMS_REQUIRE_IN_PROCESS_RPY2") == "1":
+            load_R_libraries(app, None)
+        meta = meta_form.MetaForm()
+        _show_main_window(meta)
+        return app, meta
+    except BaseException:
+        _dispose_new_top_levels(app, baseline_ids)
+        raise
+
+
+def _create_interactive_shell(app, meta_factory, r_loader):
+    """Create splash and shell with fail-closed ownership transfer."""
+    baseline_ids = _top_level_ids(app)
+    splash = None
+    try:
+        splash = create_startup_splash()
+        splash.show()
+        splash_starttime = time.time()
+        r_loader(app, splash)
+
+        time_elapsed = time.time() - splash_starttime
+        print("It took %s seconds to load the R libraries" % time_elapsed)
+        if time_elapsed < SPLASH_DISPLAY_TIME:
+            QThread.msleep(max(0, round((SPLASH_DISPLAY_TIME - time_elapsed) * 1000)))
+
+        meta = meta_factory()
+        splash.finish(meta)
+        _show_main_window(meta)
+        _dispose_qobjects(app, (splash,))
+        return meta
+    except BaseException:
+        _dispose_new_top_levels(app, baseline_ids, (splash,))
+        raise
+
+
+def _top_level_ids(app):
+    return {id(widget) for widget in app.topLevelWidgets()}
+
+
+def _dispose_new_top_levels(app, baseline_ids, known=()):
+    owned = list(known)
+    owned.extend(
+        widget for widget in app.topLevelWidgets() if id(widget) not in baseline_ids
+    )
+    _dispose_qobjects(app, owned)
+
+
+def _dispose_qobjects(app, objects):
+    """Hide and delete owned Qt objects without invoking user close prompts."""
+    unique = {id(obj): obj for obj in objects if obj is not None}
+    for obj in unique.values():
+        try:
+            obj.hide()
+            obj.deleteLater()
+        except RuntimeError:
+            pass
+    for _index in range(2):
+        app.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
+        app.processEvents()
 
 
 def _show_main_window(window):
@@ -313,6 +361,16 @@ def _show_main_window(window):
 
 def _set_application_icon(app):
     app.setWindowIcon(QIcon(APPLICATION_ICON_PATH))
+
+
+def _configure_application(app):
+    """Apply the complete process-wide application identity exactly once."""
+    app.setApplicationName(meta_globals.APPLICATION_NAME)
+    app.setApplicationDisplayName(meta_globals.APPLICATION_DISPLAY_NAME)
+    app.setApplicationVersion(meta_globals.VERSION)
+    app.setOrganizationName(meta_globals.ORGANIZATION_NAME)
+    app.setOrganizationDomain(meta_globals.ORGANIZATION_DOMAIN)
+    _set_application_icon(app)
 
 
 def start_automation_smoke(sample_path, require_native_window=False):
@@ -356,6 +414,81 @@ def start_automation_smoke(sample_path, require_native_window=False):
     finally:
         meta.close()
         app.processEvents()
+    return 0
+
+
+def start_shell_smoke(require_native_window=False):
+    """Exercise the maintained full shell without invoking analysis."""
+    app, meta = start_automation()
+    try:
+        if require_native_window:
+            platform_name = app.platformName().lower()
+            expected = "windows" if sys.platform == "win32" else "cocoa"
+            if platform_name != expected:
+                raise SystemExit(
+                    "Native shell smoke loaded Qt platform %s, expected %s."
+                    % (platform_name, expected)
+                )
+        app.processEvents()
+        if not meta.isVisible():
+            raise SystemExit("Application shell did not become visible.")
+        if meta.menuBar() is None or not meta.menuBar().actions():
+            raise SystemExit("Application shell did not expose its menus.")
+        print(
+            "Application shell smoke passed with Qt platform %s."
+            % app.platformName().lower()
+        )
+    finally:
+        meta.current_data_unsaved = False
+        meta.close()
+        app.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
+        app.processEvents()
+    if meta in app.topLevelWidgets():
+        raise SystemExit("Application shell remained owned after close.")
+    return 0
+
+
+class _InjectedStartupFailure(RuntimeError):
+    pass
+
+
+def start_shell_failure_smoke(stage):
+    """Prove startup failures release every newly owned top-level object."""
+    if stage not in {"r-load", "meta-form"}:
+        raise SystemExit("Unknown shell failure stage: %s" % stage)
+    app = app_error_handler.get_or_create_application(sys.argv)
+    _configure_application(app)
+    baseline_ids = _top_level_ids(app)
+
+    def r_loader(_app, _splash):
+        if stage == "r-load":
+            raise _InjectedStartupFailure(stage)
+
+    def meta_factory():
+        if stage == "meta-form":
+            partial = QtWidgets.QMainWindow()
+            partial.setWindowTitle("Injected partial shell")
+            partial.show()
+            app.processEvents()
+            raise _InjectedStartupFailure(stage)
+        return QtWidgets.QMainWindow()
+
+    try:
+        _create_interactive_shell(app, meta_factory, r_loader)
+    except _InjectedStartupFailure:
+        pass
+    else:
+        raise SystemExit("Injected startup failure did not fire: %s" % stage)
+
+    leaked = [
+        widget for widget in app.topLevelWidgets() if id(widget) not in baseline_ids
+    ]
+    if leaked:
+        raise SystemExit(
+            "Startup failure leaked top-level objects at %s: %s"
+            % (stage, [type(widget).__name__ for widget in leaked])
+        )
+    print("Application shell failure teardown passed at %s." % stage)
     return 0
 
 
@@ -489,7 +622,10 @@ def _assert_wizard_layout_smoke_page(
         raise SystemExit("Wizard layout smoke saw an empty body: %s" % scenario_name)
     if wizard.wizardStyle() != QtWidgets.QWizard.WizardStyle.ModernStyle:
         raise SystemExit("Wizard layout smoke expected ModernStyle: %s" % scenario_name)
-    if wizard.property("RCMS_window_archetype") != "workflow":
+    if (
+        adaptive_window.adaptive_window_state(wizard).policy.archetype
+        is not adaptive_window.WindowArchetype.WORKFLOW
+    ):
         raise SystemExit(
             "Wizard layout smoke expected Workflow Window policy: %s"
             % scenario_name

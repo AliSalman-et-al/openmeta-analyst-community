@@ -96,7 +96,7 @@ class WelcomePage(QWizardPage, forms.ui_welcome_page.Ui_WizardPage):
                 # argument. Instead, I've opted to use the .sender method to
                 # retrieve the action_item, i.e., dataset, selected (see
                 # the dataset_selected routine).
-                action_item.triggered.connect(
+                action_item.triggered[bool].connect(
                     app_error_handler.safe_slot(
                         lambda _checked=False, action_item=action_item: (
                             self.dataset_selected(action_item)

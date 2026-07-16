@@ -355,7 +355,9 @@ def _capture_surface(
     window.activateWindow()
     window.repaint()
     _flush(app)
-    actual_archetype = str(window.property("RCMS_window_archetype") or "")
+    actual_archetype = adaptive_window.adaptive_window_state(
+        window
+    ).policy.archetype.value
     if actual_archetype != archetype:
         raise RuntimeError(
             "%s declared %s, expected %s." % (name, actual_archetype, archetype)

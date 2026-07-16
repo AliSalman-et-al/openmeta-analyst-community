@@ -56,6 +56,14 @@ class WindowPolicy:
     application_owns_geometry: bool
 
 
+@dataclass(frozen=True)
+class AdaptiveWindowState:
+    """Application-owned window role state, independent of Qt properties."""
+
+    role: WindowRole
+    policy: WindowPolicy
+
+
 WINDOW_POLICIES = {
     WindowRole.MAIN: WindowPolicy(
         WindowArchetype.WORKSPACE, FirstUseBehavior.MAXIMIZED, 1.00, False
@@ -213,6 +221,14 @@ def register_adaptive_window(
     return controller
 
 
+def adaptive_window_state(window):
+    """Return the typed adaptive policy registered for ``window``."""
+    controller = getattr(window, "_adaptive_window_controller", None)
+    if not isinstance(controller, AdaptiveWindowController):
+        raise LookupError("window is not registered with the adaptive policy")
+    return controller.state
+
+
 class AdaptiveWindowController(QObject):
     """Own local sizing and reachability work for one registered window."""
 
@@ -231,6 +247,7 @@ class AdaptiveWindowController(QObject):
         self.window = window
         self.role = WindowRole(role)
         self.policy = WINDOW_POLICIES[self.role]
+        self.state = AdaptiveWindowState(self.role, self.policy)
         self._available_geometry_provider = (
             available_geometry_provider or available_geometry_for_window
         )
@@ -245,8 +262,6 @@ class AdaptiveWindowController(QObject):
         self._window_handle = None
         self._runtime_screen = None
 
-        window.setProperty("RCMS_window_archetype", self.policy.archetype.value)
-        window.setProperty("RCMS_window_role", self.role.value)
         # layout-audit: allow=adaptive-window-policy; reason=central adaptive policy owns screen-safe outer geometry
         window.setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX)
         window.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)

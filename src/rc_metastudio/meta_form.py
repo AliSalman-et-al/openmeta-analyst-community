@@ -7,7 +7,7 @@ import os
 from functools import cmp_to_key
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction, QTextDocument, QUndoCommand
+from PyQt6.QtGui import QAction, QKeySequence, QTextDocument, QUndoCommand
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
@@ -121,7 +121,7 @@ def _qt_text(value):
 
 def _connect_action(action, callback):
     parent = getattr(callback, "__self__", None)
-    action.triggered.connect(
+    action.triggered[bool].connect(
         app_error_handler.safe_slot(lambda checked=False: callback(), parent=parent)
     )
 
@@ -199,6 +199,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         # Namely, we use multiple inheritance to gain access to the ui. We take
         # this approach throughout the application.
         super(MetaForm, self).__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self.setupUi(self)
         qt_layout.configure_analysis_menu(self.menuAnalysis)
         for action, icon_name in (
@@ -261,6 +262,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.update_dimension()
         self._model_signal_connections = []
         self._setup_connections()
+        self._configure_standard_shortcuts()
         self.tableView.setSelectionMode(QTableView.SelectionMode.ContiguousSelection)
         self.model.reset_model()
         ##
@@ -298,7 +300,31 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             self._handle_wizard_results(wizard_data)
 
     def closeEvent(self, event):
-        self.quit()
+        if not self._confirm_close():
+            event.ignore()
+            return
+        self._disconnections()
+        save_main_window_placement(self, self.tableView.column_width_state())
+        save_settings()
+        event.accept()
+
+    def _confirm_close(self):
+        if not self.current_data_unsaved:
+            return True
+        choice = self.prompt_to_save_unsaved_data()
+        if choice == QMessageBox.StandardButton.Yes:
+            return self.save() is True
+        return choice == QMessageBox.StandardButton.No
+
+    def _configure_standard_shortcuts(self):
+        """Use platform-native shortcuts for the maintained shell actions."""
+        for action, standard_key in (
+            (self.action_new_dataset, QKeySequence.StandardKey.New),
+            (self.action_open, QKeySequence.StandardKey.Open),
+            (self.action_save, QKeySequence.StandardKey.Save),
+            (self.action_quit, QKeySequence.StandardKey.Quit),
+        ):
+            action.setShortcut(QKeySequence(standard_key))
 
     def _model_about_to_be_reset(self):
         """Call all the functions here that should be called when the model is
@@ -1553,19 +1579,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         )
 
     def quit(self):
-        if self.current_data_unsaved:
-            choice = self.prompt_to_save_unsaved_data()
-            if choice == QMessageBox.StandardButton.Yes:
-                if self.save() is False:
-                    return
-            elif choice == QMessageBox.StandardButton.No:
-                pass
-            else:  # Cancel
-                return
-
-        save_main_window_placement(self, self.tableView.column_width_state())
-        save_settings()
-        QApplication.quit()
+        self.close()
 
     def prompt_to_save_unsaved_data(self):
         choice = QMessageBox.warning(
