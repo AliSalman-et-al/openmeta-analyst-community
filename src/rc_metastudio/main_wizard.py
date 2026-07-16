@@ -7,7 +7,7 @@ import forms.ui_data_type_page
 import forms.ui_outcome_name_page
 import forms.ui_welcome_page
 
-from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtCore import QSize, Qt, QTimer
 from PyQt6.QtGui import QAction, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
     QAbstractButton,
     QMenu,
     QMessageBox,
+    QPushButton,
     QSizePolicy,
     QScrollArea,
     QStyle,
@@ -722,14 +723,38 @@ class MainWizard(QWizard):
             self, adaptive_window.WindowRole.WORKFLOW
         )
         self._focus_reveal_connected = False
+        self.currentIdChanged.connect(self._schedule_default_action_sync)
 
     def showEvent(self, event):
         """Scope focus observation to the wizard's visible lifetime."""
         super(MainWizard, self).showEvent(event)
+        self._schedule_default_action_sync()
         app = QApplication.instance()
         if app is not None and not self._focus_reveal_connected:
             app.focusChanged.connect(self._reveal_focused_control)
             self._focus_reveal_connected = True
+
+    def _schedule_default_action_sync(self, _page_id=None):
+        """Restore the visible forward action as the dialog's Return default."""
+        QTimer.singleShot(0, self._synchronize_default_action)
+
+    def _synchronize_default_action(self):
+        forward_buttons = [
+            self.button(QWizard.WizardButton.NextButton),
+            self.button(QWizard.WizardButton.FinishButton),
+        ]
+        for button in forward_buttons:
+            if isinstance(button, QPushButton):
+                button.setDefault(False)
+        for button in forward_buttons:
+            if (
+                isinstance(button, QPushButton)
+                and button.isVisible()
+                and button.isEnabled()
+            ):
+                button.setAutoDefault(True)
+                button.setDefault(True)
+                break
 
     def hideEvent(self, event):
         self._disconnect_focus_reveal()

@@ -655,9 +655,7 @@ def _observe_actions(app, factory, surface_id, QtCore, QtWidgets, QTest) -> dict
                 and next_button.isEnabled()
                 and next_button.isDefault()
             )
-            QTest.mouseClick(
-                next_button, QtCore.Qt.MouseButton.LeftButton
-            )
+            QTest.keyClick(wizard, QtCore.Qt.Key.Key_Return)
             app.processEvents()
             transitioned = wizard.currentId() != before_page
         finally:

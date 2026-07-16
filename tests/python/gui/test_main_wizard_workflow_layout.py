@@ -281,6 +281,30 @@ def test_tab_and_backtab_follow_logical_order_and_reveal_controls(qapp):
         qapp.processEvents()
 
 
+def test_return_activates_visible_default_wizard_action(qapp):
+    import main_wizard
+
+    wizard = main_wizard.MainWizard(path="new_dataset")
+    try:
+        _show(wizard, qapp)
+        choice = wizard.currentPage().diagnostic_Button
+        QTest.mouseClick(choice, QtCore.Qt.MouseButton.LeftButton)
+        qapp.processEvents()
+        next_button = wizard.button(main_wizard.QWizard.WizardButton.NextButton)
+        assert next_button.isVisible()
+        assert next_button.isEnabled()
+        assert next_button.isDefault()
+        before_page = wizard.currentId()
+
+        QTest.keyClick(wizard, QtCore.Qt.Key.Key_Return)
+        qapp.processEvents()
+
+        assert wizard.currentId() != before_page
+    finally:
+        wizard.close()
+        qapp.processEvents()
+
+
 def test_hidden_and_closed_wizards_stop_observing_application_focus(qapp, monkeypatch):
     import main_wizard
 
