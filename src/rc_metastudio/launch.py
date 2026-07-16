@@ -171,7 +171,7 @@ def _resolve_startup_argv(argv=None, native_argv=None, frozen=None):
 
 def load_R_libraries(app, splash=None):
     """Loads the R libraries while updating the splash screen"""
-    import meta_py_r
+    from rc_metastudio import meta_py_r
 
     def _status(message):
         if splash is not None:

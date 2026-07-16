@@ -21,13 +21,17 @@ def install_meta_py_r_backend():
     # set RCMS_REQUIRE_IN_PROCESS_RPY2=1 to fail loudly instead of falling back.
     if os.environ.get("RCMS_STUB_BACKEND") == "1":
         return install_stub_meta_py_r()
-    if "meta_py_r" in sys.modules:
-        return sys.modules["meta_py_r"]
+    for module_name in ("rc_metastudio.meta_py_r", "meta_py_r"):
+        if module_name in sys.modules:
+            backend = sys.modules[module_name]
+            sys.modules["rc_metastudio.meta_py_r"] = backend
+            sys.modules["meta_py_r"] = backend
+            return backend
     try:
         import r_runtime
 
         r_runtime.configure_bundled_r_environment()
-        import meta_py_r
+        from rc_metastudio import meta_py_r
 
         return meta_py_r
     except Exception:
@@ -37,11 +41,15 @@ def install_meta_py_r_backend():
 
 
 def install_stub_meta_py_r():
-    existing = sys.modules.get("meta_py_r")
+    existing = sys.modules.get("rc_metastudio.meta_py_r") or sys.modules.get(
+        "meta_py_r"
+    )
     if getattr(existing, "_oma_stub_backend", False):
+        sys.modules["rc_metastudio.meta_py_r"] = existing
+        sys.modules["meta_py_r"] = existing
         return existing
 
-    meta_py_r = types.ModuleType("meta_py_r")
+    meta_py_r = existing or types.ModuleType("rc_metastudio.meta_py_r")
     meta_py_r._oma_stub_backend = True
     meta_py_r.AnalysisBackendUnavailableError = AnalysisBackendUnavailableError
 
@@ -110,6 +118,7 @@ def install_stub_meta_py_r():
             "load_gemtc": lambda self: None,
         },
     )()
+    sys.modules["rc_metastudio.meta_py_r"] = meta_py_r
     sys.modules["meta_py_r"] = meta_py_r
     return meta_py_r
 

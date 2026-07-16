@@ -4,18 +4,30 @@
 
 import sys
 from functools import partial
+from weakref import WeakKeyDictionary
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QUndoCommand
 from PyQt6.QtWidgets import QMessageBox, QSizePolicy, QStyle
 
 from meta_globals import *
-import meta_py_r
+from rc_metastudio import meta_py_r
 import qt_text
+
+
+_EFFECT_CI_BASE_MINIMUM_WIDTHS = WeakKeyDictionary()
 
 
 def cell_text_is_blank(value):
     """Return whether Qt item text is blank."""
     return qt_text.is_blank(value)
+
+
+def numeric_value(value):
+    """Return finite interface numeric input using explicit decimal rules."""
+    number, valid = qt_text.parse_decimal(value)
+    if not valid:
+        raise ValueError("Enter an unambiguous finite number using '.' or ',' as decimal separator.")
+    return number
 
 
 def set_table_item_text_color(item, color):
@@ -25,9 +37,9 @@ def set_table_item_text_color(item, color):
 
 def between_bounds(est=None, low=None, high=None):
     def my_lt(a, b):
-        if is_a_float(a) and is_a_float(b):
-            return float(a) < float(b)
-        else:
+        try:
+            return numeric_value(a) < numeric_value(b)
+        except ValueError:
             return None
 
     good_result = my_lt(low, est)
@@ -290,14 +302,10 @@ def fit_effect_ci_line_edits_to_contents(
             )
         else:
             signed_precision_sample = "-0." + ("8" * digits)
-            base_minimum_width = line_edit.property(
-                "RCMS_effect_ci_base_minimum_width"
-            )
-            if not isinstance(base_minimum_width, int):
+            base_minimum_width = _EFFECT_CI_BASE_MINIMUM_WIDTHS.get(line_edit)
+            if base_minimum_width is None:
                 base_minimum_width = line_edit.minimumWidth()
-                line_edit.setProperty(
-                    "RCMS_effect_ci_base_minimum_width", base_minimum_width
-                )
+                _EFFECT_CI_BASE_MINIMUM_WIDTHS[line_edit] = base_minimum_width
             content_width = max(
                 line_edit.fontMetrics().horizontalAdvance(value)
                 for value in (signed_precision_sample, str(line_edit.text()))
@@ -432,7 +440,12 @@ def save_table_data(table):
 
 class CommandFieldChanged(QUndoCommand):
     def __init__(
-        self, restore_new_f=None, restore_old_f=None, parent=None, description=""
+        self,
+        restore_new_f=None,
+        restore_old_f=None,
+        parent=None,
+        description="",
+        refresh_on_initial_redo=True,
     ):
         super(CommandFieldChanged, self).__init__(description)
 
@@ -440,11 +453,13 @@ class CommandFieldChanged(QUndoCommand):
         self.just_created = True
         self.restore_new_f = restore_new_f
         self.restore_old_f = restore_old_f
+        self.refresh_on_initial_redo = refresh_on_initial_redo
 
     def redo(self):
         if self.just_created:
             self.just_created = False
-            self.parent.enable_back_calculation_btn()
+            if self.refresh_on_initial_redo:
+                self.parent.enable_back_calculation_btn()
         else:
             print("Restoring new ma_unit")
             self.restore_new_f()
@@ -524,7 +539,9 @@ def evaluate(
     is_between_bounds = partial(between_bounds, est=d_est, low=d_lower, high=d_upper)
     ###### ERROR CHECKING CODE#####
     # Make sure entered value is numeric and between the appropriate bounds
-    if not is_a_float(new_text):
+    try:
+        parsed_value = numeric_value(new_text)
+    except ValueError:
         QMessageBox.warning(parent, "Warning", "Must be numeric!")
         raise Exception("error")
     if not opt_cmp_fn:  # est, lower, upper
@@ -538,4 +555,4 @@ def evaluate(
             QMessageBox.warning(parent, "Warning", opt_cmp_msg)
             print("raising exception")
             raise Exception("error")
-    return float(new_text)  # display_scale_val
+    return parsed_value  # display_scale_val

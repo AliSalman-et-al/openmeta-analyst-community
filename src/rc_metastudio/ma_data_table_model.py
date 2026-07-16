@@ -15,7 +15,7 @@ from PyQt6.QtGui import QColor, QIcon
 from ma_dataset import Dataset, Outcome, Study, Covariate
 from meta_globals import *
 import calculator_routines as calc_fncs
-import meta_py_r
+from rc_metastudio import meta_py_r
 import qt_text
 import name_validation
 from workspace_column_identity import (
@@ -2027,6 +2027,11 @@ class DatasetModel(QAbstractTableModel):
         if "conf_level" not in list(state_dict.keys()):
             self.set_conf_level(DEFAULT_CONF_LEVEL)
 
+        # Signals emitted by reset_model immediately query visible cells. Keep
+        # the column schema synchronized with the restored outcome before that
+        # reset so a continuous project cannot momentarily use the previous
+        # binary or diagnostic outcome indices.
+        self.update_column_indices()
         self.reset_model()
 
     def raw_data_is_complete_for_study(self, study_index, first_arm_only=False):

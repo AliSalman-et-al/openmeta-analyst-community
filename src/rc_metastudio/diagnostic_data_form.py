@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QWIDGETSIZE_MAX,
 )
 
-import meta_py_r
+from rc_metastudio import meta_py_r
 import app_error_handler
 import adaptive_window
 import tabular_data
@@ -46,6 +46,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             raise ValueError("Confidence level must be specified")
         self.global_conf_level = conf_level
         self.mult = meta_py_r.get_mult_from_r(self.global_conf_level)
+        self.current_item_data: int | None = None
 
         self.setup_signals_and_slots()
 
@@ -84,6 +85,9 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         self.enable_back_calculation_btn()
 
         self.current_prevalence = self._get_prevalence_str()
+        self.two_by_two_table.setCurrentCell(0, 0)
+        self.two_by_two_table.setFocus()
+        self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setDefault(True)
         self._request_initial_content_refit()
 
     def _configure_raw_data_table(self):
@@ -196,7 +200,12 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         self.two_by_two_table.cellChanged.connect(
             app_error_handler.safe_slot(self.cell_changed, parent=self)
         )
-        self.effect_cbo_box.currentIndexChanged[str].connect(
+        self.two_by_two_table.currentCellChanged.connect(
+            app_error_handler.safe_slot(
+                self.on_two_by_two_table_currentCellChanged, parent=self
+            )
+        )
+        self.effect_cbo_box.currentTextChanged.connect(
             app_error_handler.safe_slot(
                 lambda _text: self.effect_changed(), parent=self
             )
@@ -288,7 +297,11 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
     def _get_int(self, i, j):
         try:
             if not self._is_empty(i, j):
-                int_val = int(float(self.two_by_two_table.item(i, j).text()))
+                text = self.two_by_two_table.item(i, j).text()
+                try:
+                    int_val = int(text)
+                except ValueError:
+                    int_val = int(calc_fncs.numeric_value(text))
                 return int_val
         except:
             # Should never appear....
@@ -303,13 +316,15 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         if calc_fncs.cell_text_is_blank(celldata_string):
             return None
 
-        if not is_a_float(celldata_string):
+        try:
+            value = calc_fncs.numeric_value(celldata_string)
+        except ValueError:
             return "Raw data needs to be numeric."
 
-        if not is_an_int(celldata_string):
+        if not value.is_integer():
             return "Expected a whole number (count), but a decimal value was entered."
 
-        if int(celldata_string) < 0:
+        if value < 0:
             return "Counts cannot be negative."
         return None
 
@@ -614,7 +629,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
                 display_scale_val = get_disp_scale_val_if_valid(ci_param="high")
             elif val_str == "prevalence" and not is_empty(new_text):
                 get_disp_scale_val_if_valid(
-                    opt_cmp_fn=lambda x: 0 <= float(x) <= 1,
+                    opt_cmp_fn=lambda x: 0 <= calc_fncs.numeric_value(x) <= 1,
                     opt_cmp_msg="Prevalence must be between 0 and 1.",
                 )
         except:
@@ -712,9 +727,11 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             "prevalence": "Prevalence",
         }
         label = labels.get(val_str, "Entered value")
-        if not is_a_float(new_text):
+        try:
+            value = calc_fncs.numeric_value(new_text)
+        except ValueError:
             return "{} must be numeric.".format(label)
-        if val_str == "prevalence" and not 0 <= float(new_text) <= 1:
+        if val_str == "prevalence" and not 0 <= value <= 1:
             return "Prevalence must be between 0 and 1."
 
         values = {
@@ -903,7 +920,10 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             d["total"] = float(x) if is_a_float(x) else None
 
             x = self.prevalence_txt_box.text()
-            d["prev"] = float(x) if is_a_float(x) else None
+            try:
+                d["prev"] = calc_fncs.numeric_value(x)
+            except ValueError:
+                d["prev"] = None
 
             d["conf.level"] = self.global_conf_level
 

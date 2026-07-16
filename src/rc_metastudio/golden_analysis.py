@@ -12,7 +12,7 @@ import zipfile
 
 import headless_analysis
 import meta_globals
-import meta_py_r
+from rc_metastudio import meta_py_r
 from plot_defaults import FOREST_ARM_LABELS
 
 

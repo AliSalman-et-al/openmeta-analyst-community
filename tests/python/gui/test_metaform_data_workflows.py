@@ -184,6 +184,409 @@ def test_real_metaform_creates_binary_continuous_and_diagnostic_datasets():
             _close_without_prompt(app, window)
 
 
+@pytest.mark.parametrize("count", ["7.0", "7,0"])
+def test_binary_calculator_accept_cancel_and_project_round_trip(
+    monkeypatch, tmp_path, count
+):
+    from PyQt6 import QtCore, QtWidgets
+
+    import launch
+    import binary_data_form
+    import ma_data_table_model
+
+    app, window = launch.start_automation()
+    try:
+        warnings = []
+        monkeypatch.setattr(
+            binary_data_form.QMessageBox,
+            "warning",
+            lambda *args: warnings.append(args),
+        )
+        monkeypatch.setattr(
+            binary_data_form.meta_py_r,
+            "get_mult_from_r",
+            lambda confidence: 1.96,
+        )
+        monkeypatch.setattr(
+            binary_data_form.meta_py_r,
+            "effect_for_study",
+            lambda *args, **kwargs: {"calc_scale": (1.2, 0.8, 1.8)},
+        )
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "effect_for_study",
+            lambda *args, **kwargs: {"calc_scale": (1.2, 0.8, 1.8)},
+        )
+        monkeypatch.setattr(
+            binary_data_form.meta_py_r,
+            "binary_convert_scale",
+            lambda value, *args, **kwargs: value,
+        )
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "binary_convert_scale",
+            lambda value, *args, **kwargs: value,
+        )
+        monkeypatch.setattr(
+            binary_data_form.meta_py_r,
+            "impute_bin_data",
+            lambda data: {"FAIL": True},
+        )
+        monkeypatch.setattr(
+            binary_data_form.meta_py_r,
+            "effect_triplet",
+            lambda result, scale, metric=None: result[scale],
+        )
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "effect_triplet",
+            lambda result, scale, metric=None: result[scale],
+        )
+        _create_binary_dataset(window)
+        model = window.model
+        table = window.tableView
+        table.set_data_in_model(model.index(0, model.NAME), _variant("Alpha"))
+        for offset, value in enumerate(("6", "21", "9", "18")):
+            table.set_data_in_model(model.index(0, model.RAW_DATA[offset]), value)
+
+        opened_dialogs = []
+        callback_errors = []
+
+        def accept_edit():
+            dialog = QtWidgets.QApplication.activeModalWidget()
+            opened_dialogs.append(dialog)
+            try:
+                dialog.raw_data_table.setCurrentCell(0, 0)
+                dialog.raw_data_table.item(0, 0).setText(count)
+                dialog.accept()
+            except Exception as error:
+                callback_errors.append(error)
+                if isinstance(dialog, QtWidgets.QDialog):
+                    dialog.reject()
+
+        QtCore.QTimer.singleShot(0, accept_edit)
+        table.row_header_clicked(0)
+        assert callback_errors == []
+        assert warnings == []
+        assert isinstance(opened_dialogs[-1], binary_data_form.BinaryDataForm2)
+        committed = model.get_current_ma_unit_for_study(0)
+        assert committed.get_raw_data_for_group(model.current_txs[0]) == [7, 22]
+
+        def reject_edit():
+            dialog = QtWidgets.QApplication.activeModalWidget()
+            opened_dialogs.append(dialog)
+            try:
+                dialog.raw_data_table.setCurrentCell(0, 0)
+                dialog.raw_data_table.item(0, 0).setText("8")
+                dialog.reject()
+            except Exception as error:
+                callback_errors.append(error)
+                if isinstance(dialog, QtWidgets.QDialog):
+                    dialog.reject()
+
+        QtCore.QTimer.singleShot(0, reject_edit)
+        table.row_header_clicked(0)
+        assert callback_errors == []
+        unchanged = model.get_current_ma_unit_for_study(0)
+        assert unchanged.get_raw_data_for_group(model.current_txs[0]) == [7, 22]
+
+        saved_path = str(
+            tmp_path / ("binary-" + count.replace(",", "c") + "-round-trip.rcms")
+        )
+        meta_form = sys.modules["meta_form"]
+        monkeypatch.setattr(
+            meta_form.QFileDialog,
+            "getSaveFileName",
+            lambda **kwargs: (saved_path, ""),
+        )
+        assert window.save_as() is True
+        assert window.open(file_path=saved_path) is True
+        reopened = window.model.get_current_ma_unit_for_study(0)
+        assert reopened.get_raw_data_for_group(window.model.current_txs[0]) == [7, 22]
+    finally:
+        _close_without_prompt(app, window)
+
+
+@pytest.mark.parametrize("decimal", ["95.5", "95,5"])
+def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
+    monkeypatch, tmp_path, decimal
+):
+    from PyQt6 import QtCore, QtWidgets
+
+    import launch
+    import continuous_data_form
+    import ma_data_table_model
+
+    app, window = launch.start_automation()
+    r_payloads = []
+    warnings = []
+    try:
+        monkeypatch.setattr(
+            continuous_data_form.QMessageBox,
+            "warning",
+            lambda *args: warnings.append(args[2]),
+        )
+        monkeypatch.setattr(
+            continuous_data_form.meta_py_r, "get_mult_from_r", lambda _level: 1.96
+        )
+        monkeypatch.setattr(
+            continuous_data_form.meta_py_r,
+            "continuous_convert_scale",
+            lambda value, *args, **kwargs: value,
+        )
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "continuous_convert_scale",
+            lambda value, *args, **kwargs: value,
+        )
+
+        def impute(payload, alpha):
+            r_payloads.append(dict(payload))
+            return {"succeeded": False, "comment": "complete input"}
+
+        monkeypatch.setattr(
+            continuous_data_form.meta_py_r, "impute_cont_data", impute
+        )
+        monkeypatch.setattr(
+            continuous_data_form.meta_py_r,
+            "continuous_effect_for_study",
+            lambda *args, **kwargs: {"calc_scale": (1.5, 1.0, 2.0)},
+        )
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "continuous_effect_for_study",
+            lambda *args, **kwargs: {"calc_scale": (1.5, 1.0, 2.0)},
+        )
+        monkeypatch.setattr(
+            continuous_data_form.meta_py_r,
+            "effect_triplet",
+            lambda result, scale, metric=None: result[scale],
+        )
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "effect_triplet",
+            lambda result, scale, metric=None: result[scale],
+        )
+        monkeypatch.setattr(
+            continuous_data_form.meta_py_r,
+            "back_calc_cont_data",
+            lambda *args, **kwargs: {"FAIL": True},
+        )
+        _create_continuous_dataset(window)
+        model = window.model
+        table = window.tableView
+        unit = model.get_current_ma_unit_for_study(0)
+        unit.get_raw_data_for_group(model.current_txs[0])[:] = [10, 94, 2]
+        unit.get_raw_data_for_group(model.current_txs[1])[:] = [12, 90, 3]
+        table.undoStack.clear()
+        table.undoStack.setClean()
+        window.current_data_unsaved = False
+
+        callback_errors = []
+
+        def accept_edit():
+            dialog = QtWidgets.QApplication.activeModalWidget()
+            try:
+                dialog.simple_table.setCurrentCell(0, 1)
+                dialog.simple_table.item(0, 1).setText(decimal)
+                dialog.accept()
+            except Exception as error:
+                callback_errors.append(error)
+                dialog.reject()
+
+        QtCore.QTimer.singleShot(0, accept_edit)
+        table.row_header_clicked(0)
+        assert callback_errors == []
+        assert warnings == []
+        committed = model.get_current_ma_unit_for_study(0)
+        assert committed.get_raw_data_for_group(model.current_txs[0]) == [
+            10.0,
+            95.5,
+            2.0,
+        ]
+        assert any(payload.get("mean") == 95.5 for payload in r_payloads)
+        assert table.undoStack.count() == 1
+        assert window.current_data_unsaved is True
+
+        window.undo()
+        assert model.get_current_ma_unit_for_study(0).get_raw_data_for_group(
+            model.current_txs[0]
+        ) == [10, 94, 2]
+        assert window.current_data_unsaved is False
+        window.redo()
+        assert window.current_data_unsaved is True
+
+        undo_count = table.undoStack.count()
+        before_invalid = copy.deepcopy(model.get_current_ma_unit_for_study(0))
+
+        def reject_invalid_edit():
+            dialog = QtWidgets.QApplication.activeModalWidget()
+            dialog.simple_table.setCurrentCell(0, 0)
+            dialog.simple_table.item(0, 0).setText("10,5")
+            dialog.reject()
+
+        QtCore.QTimer.singleShot(0, reject_invalid_edit)
+        table.row_header_clicked(0)
+        assert warnings[-1] == "N must be a non-negative whole number."
+        assert table.undoStack.count() == undo_count
+        assert model.get_current_ma_unit_for_study(0).get_raw_data_for_groups(
+            model.current_txs
+        ) == before_invalid.get_raw_data_for_groups(model.current_txs)
+
+        saved_path = str(tmp_path / ("continuous-" + decimal.replace(",", "c") + ".rcms"))
+        meta_form = sys.modules["meta_form"]
+        monkeypatch.setattr(
+            meta_form.QFileDialog,
+            "getSaveFileName",
+            lambda **kwargs: (saved_path, ""),
+        )
+        assert window.save_as() is True
+        assert window.open(file_path=saved_path) is True
+        reopened = window.model.get_current_ma_unit_for_study(0)
+        assert reopened.get_raw_data_for_group(window.model.current_txs[0]) == [
+            10.0,
+            95.5,
+            2.0,
+        ]
+    finally:
+        _close_without_prompt(app, window)
+
+
+@pytest.mark.parametrize("count", ["13.0", "13,0"])
+def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
+    monkeypatch, tmp_path, count
+):
+    from PyQt6 import QtCore, QtWidgets
+
+    import launch
+    import diagnostic_data_form
+    import ma_data_table_model
+
+    app, window = launch.start_automation()
+    r_payloads = []
+    warnings = []
+    try:
+        monkeypatch.setattr(
+            diagnostic_data_form.QMessageBox,
+            "warning",
+            lambda *args: warnings.append(args[2]),
+        )
+        monkeypatch.setattr(
+            diagnostic_data_form.meta_py_r, "get_mult_from_r", lambda _level: 1.96
+        )
+        monkeypatch.setattr(
+            diagnostic_data_form.meta_py_r,
+            "diagnostic_convert_scale",
+            lambda value, *args, **kwargs: value,
+        )
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "diagnostic_convert_scale",
+            lambda value, *args, **kwargs: value,
+        )
+
+        def impute(payload):
+            r_payloads.append(dict(payload))
+            return {"TP": None, "FP": None, "FN": None, "TN": None}
+
+        monkeypatch.setattr(
+            diagnostic_data_form.meta_py_r, "impute_diag_data", impute
+        )
+        monkeypatch.setattr(
+            diagnostic_data_form.meta_py_r,
+            "diagnostic_effects_for_study",
+            lambda *args, metrics, **kwargs: {
+                metric: {"calc_scale": (0.8, 0.7, 0.9)} for metric in metrics
+            },
+        )
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "diagnostic_effects_for_study",
+            lambda *args, metrics, **kwargs: {
+                metric: {"calc_scale": (0.8, 0.7, 0.9)} for metric in metrics
+            },
+        )
+        monkeypatch.setattr(
+            diagnostic_data_form.meta_py_r,
+            "effect_triplet",
+            lambda result, scale, metric=None: result[scale],
+        )
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "effect_triplet",
+            lambda result, scale, metric=None: result[scale],
+        )
+        _create_diagnostic_dataset(window)
+        model = window.model
+        table = window.tableView
+        unit = model.get_current_ma_unit_for_study(0)
+        unit.get_raw_data_for_group(model.current_txs[0])[:] = [12, 3, 4, 21]
+        table.undoStack.clear()
+        table.undoStack.setClean()
+        window.current_data_unsaved = False
+
+        def accept_edit():
+            dialog = QtWidgets.QApplication.activeModalWidget()
+            dialog.two_by_two_table.setCurrentCell(0, 0)
+            dialog.two_by_two_table.item(0, 0).setText(count)
+            dialog.accept()
+
+        QtCore.QTimer.singleShot(0, accept_edit)
+        table.row_header_clicked(0)
+        committed = model.get_current_ma_unit_for_study(0)
+        assert committed.get_raw_data_for_group(model.current_txs[0]) == [
+            13.0,
+            3.0,
+            4.0,
+            21.0,
+        ]
+        assert any(payload.get("TP") == 13 for payload in r_payloads)
+        assert table.undoStack.count() == 1
+        assert window.current_data_unsaved is True
+
+        window.undo()
+        assert model.get_current_ma_unit_for_study(0).get_raw_data_for_group(
+            model.current_txs[0]
+        ) == [12, 3, 4, 21]
+        assert window.current_data_unsaved is False
+        window.redo()
+
+        undo_count = table.undoStack.count()
+
+        def reject_invalid_edit():
+            dialog = QtWidgets.QApplication.activeModalWidget()
+            dialog.two_by_two_table.setCurrentCell(0, 0)
+            dialog.two_by_two_table.item(0, 0).setText("13,5")
+            dialog.reject()
+
+        QtCore.QTimer.singleShot(0, reject_invalid_edit)
+        table.row_header_clicked(0)
+        assert "whole number" in warnings[-1]
+        assert table.undoStack.count() == undo_count
+        assert model.get_current_ma_unit_for_study(0).get_raw_data_for_group(
+            model.current_txs[0]
+        ) == [13.0, 3.0, 4.0, 21.0]
+
+        saved_path = str(tmp_path / ("diagnostic-" + count.replace(",", "c") + ".rcms"))
+        meta_form = sys.modules["meta_form"]
+        monkeypatch.setattr(
+            meta_form.QFileDialog,
+            "getSaveFileName",
+            lambda **kwargs: (saved_path, ""),
+        )
+        assert window.save_as() is True
+        assert window.open(file_path=saved_path) is True
+        reopened = window.model.get_current_ma_unit_for_study(0)
+        assert reopened.get_raw_data_for_group(window.model.current_txs[0]) == [
+            13.0,
+            3.0,
+            4.0,
+            21.0,
+        ]
+    finally:
+        _close_without_prompt(app, window)
+
+
 @pytest.mark.parametrize(
     ("show_method", "state_method"),
     [
@@ -1456,6 +1859,24 @@ def _create_binary_dataset(window):
                 "effect": "OR",
                 "metric_choices": [],
                 "name": "Mortality",
+            },
+            "csv_data": None,
+            "selected_dataset": None,
+        }
+    )
+
+
+def _create_continuous_dataset(window):
+    window._handle_wizard_results(
+        {
+            "path": "new_dataset",
+            "outcome_info": {
+                "arms": "two",
+                "data_type": "continuous",
+                "sub_type": "means",
+                "effect": "MD",
+                "metric_choices": [],
+                "name": "Recovery",
             },
             "csv_data": None,
             "selected_dataset": None,

@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
 import forms.ui_meta_reg
 import adaptive_window
 import app_error_handler
-import meta_py_r
+from rc_metastudio import meta_py_r
 
 
 class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):

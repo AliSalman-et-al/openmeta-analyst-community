@@ -481,17 +481,17 @@
     },
     {
       "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "fast",
-      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_continuous_effect_fields_fit_metric_domain_samples[md]",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_continuous_effect_fields_fit_metric_domain_samples[md]",
       "reason": "Guards semantic MD field width against its representative formatted domain.", "runtime_class": "subsecond", "size": "small"
     },
     {
       "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "fast",
-      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_continuous_effect_fields_fit_metric_domain_samples[smd]",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_continuous_effect_fields_fit_metric_domain_samples[smd]",
       "reason": "Guards semantic SMD field width against its representative formatted domain.", "runtime_class": "subsecond", "size": "small"
     },
     {
       "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "fast",
-      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_continuous_effect_fields_fit_metric_domain_samples[tx_mean]",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_continuous_effect_fields_fit_metric_domain_samples[tx_mean]",
       "reason": "Guards semantic one-arm field width against its representative formatted domain.", "runtime_class": "subsecond", "size": "small"
     },
     {
@@ -1198,6 +1198,32 @@
     {
       "decision": "keep",
       "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_calculator_numeric_input_uses_unambiguous_dot_or_comma_decimal",
+      "reason": "Guards explicit equivalent dot- and comma-decimal calculator input.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "gui_compatibility",
+        "release_readiness"
+      ],
+      "external_dependencies": [],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_calculator_numeric_input_rejects_grouping_and_non_finite_values",
+      "reason": "Guards fail-closed calculator parsing for ambiguous grouping and non-finite values.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
         "gui_compatibility"
       ],
       "external_dependencies": [
@@ -1812,7 +1838,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_binary_calculator_accepts_single_raw_count_edit_and_recomputes_margins",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_binary_calculator_accepts_single_raw_count_edit_and_recomputes_margins",
       "reason": "Covers fast GUI/data-model behavior required by the verification lane.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1827,7 +1853,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_binary_calculator_does_not_wire_raw_edits_to_consistency_checker",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_binary_calculator_does_not_wire_raw_edits_to_consistency_checker",
       "reason": "Covers fast GUI/data-model behavior required by the verification lane.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1842,7 +1868,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_binary_calculator_grid_columns_fill_expanded_table_width",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_binary_calculator_grid_columns_fill_expanded_table_width",
       "reason": "Covers fast GUI/data-model behavior required by the verification lane.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1857,7 +1883,7 @@
         "qt"
       ],
       "lane": "fast",
-      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_binary_effect_fields_follow_metric_display_domains",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_binary_effect_fields_follow_metric_display_domains",
       "reason": "Guards metric-specific semantic widths for ratios, bounded effects, proportions, and transformed binary metrics.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1872,7 +1898,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_binary_calculator_table_layout_uses_real_headers_and_visible_total_row",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_binary_calculator_table_layout_uses_real_headers_and_visible_total_row",
       "reason": "Covers fast GUI/data-model behavior required by the verification lane.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1887,7 +1913,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_binary_calculator_uses_table_headers_and_friendly_two_arm_metric_labels",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_binary_calculator_uses_table_headers_and_friendly_two_arm_metric_labels",
       "reason": "Covers fast GUI/data-model behavior required by the verification lane.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1902,7 +1928,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_calculator_cell_validators_accept_pyqt5_table_item_text",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_calculator_cell_validators_accept_native_qt6_text",
       "reason": "Fast verification guard suitable for default feedback.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1917,7 +1943,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_calculator_effect_ci_fields_fit_valid_domain_samples",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_calculator_effect_ci_fields_fit_valid_domain_samples",
       "reason": "Covers fast GUI/data-model behavior required by the verification lane.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1932,7 +1958,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_consistency_checker_uses_pyqt5_foreground_api",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_consistency_checker_uses_qt6_foreground_api",
       "reason": "Fast verification guard suitable for default feedback.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1947,7 +1973,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_continuous_calculator_grid_columns_keep_internal_overflow",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_continuous_calculator_grid_columns_keep_internal_overflow",
       "reason": "Guards Continuous Data table overflow without top-level width growth.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1962,7 +1988,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_continuous_calculator_keeps_long_imputed_values_compact",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_continuous_calculator_keeps_long_imputed_values_compact",
       "reason": "Covers fast GUI/data-model behavior required by the verification lane.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1977,7 +2003,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_continuous_imputation_uses_r_keys_not_visible_headers",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_continuous_imputation_uses_r_keys_not_visible_headers",
       "reason": "Covers fast GUI/data-model behavior required by the verification lane.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -1992,7 +2018,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_diagnostic_calculator_accepts_single_raw_count_edit_and_recomputes_margins",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_diagnostic_calculator_accepts_single_raw_count_edit_and_recomputes_margins",
       "reason": "Covers fast GUI/data-model behavior required by the verification lane.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -2007,7 +2033,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_diagnostic_calculator_does_not_wire_raw_edits_to_consistency_checker",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_diagnostic_calculator_does_not_wire_raw_edits_to_consistency_checker",
       "reason": "Covers fast GUI/data-model behavior required by the verification lane.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -2022,7 +2048,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_diagnostic_calculator_grid_columns_fill_expanded_table_width",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_diagnostic_calculator_grid_columns_fill_expanded_table_width",
       "reason": "Covers fast GUI/data-model behavior required by the verification lane.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -2037,7 +2063,7 @@
         "filesystem"
       ],
       "lane": "fast",
-      "nodeid": "tests/python/fast/test_calculator_pyqt5_migration.py::test_row_header_signals_are_restored_when_calculator_opening_raises",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_row_header_signals_are_restored_when_calculator_opening_raises",
       "reason": "Covers fast GUI/data-model behavior required by the verification lane.",
       "runtime_class": "subsecond",
       "size": "small"
@@ -8517,6 +8543,161 @@
       "decision": "keep", "evidence": ["analysis_behavior", "release_readiness"], "external_dependencies": [], "lane": "fast",
       "nodeid": "tests/python/fast/test_project_adapter.py::test_adapter_round_trip_preserves_every_multi_arm_group[continuous]",
       "reason": "Proves the application adapter reconstructs and serializes every continuous treatment arm without loss.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["filesystem", "qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_binary_calculator_accept_cancel_and_project_round_trip[7.0]",
+      "reason": "Proves the real binary calculator action commits atomically, cancels without mutation, and survives project save and reopen.", "runtime_class": "seconds", "size": "large"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_back_calculation_choice_opens_only_after_user_action",
+      "reason": "Guards the Continuous Data dialog from opening a nested back-calculation choice before the user invokes that action.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["filesystem", "qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_binary_calculator_accept_cancel_and_project_round_trip[7,0]",
+      "reason": "Proves comma-decimal integer-equivalent binary input commits as a count and survives project save and reopen.", "runtime_class": "seconds", "size": "large"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior", "release_readiness"], "external_dependencies": ["filesystem", "qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_continuous_calculator_workspace_transaction_and_locale_round_trip[95.5]",
+      "reason": "Proves native dot-decimal continuous input reaches R-ready state, undo and dirty semantics, and project round-trip.", "runtime_class": "seconds", "size": "large"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior", "release_readiness"], "external_dependencies": ["filesystem", "qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_continuous_calculator_workspace_transaction_and_locale_round_trip[95,5]",
+      "reason": "Proves native comma-decimal continuous input reaches identical R-ready and persisted state.", "runtime_class": "seconds", "size": "large"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior", "release_readiness"], "external_dependencies": ["filesystem", "qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_diagnostic_calculator_workspace_transaction_and_locale_round_trip[13.0]",
+      "reason": "Proves dot-decimal integer-equivalent diagnostic input, rollback, undo, dirty state, and project round-trip.", "runtime_class": "seconds", "size": "large"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior", "release_readiness"], "external_dependencies": ["filesystem", "qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_diagnostic_calculator_workspace_transaction_and_locale_round_trip[13,0]",
+      "reason": "Proves comma-decimal integer-equivalent diagnostic input reaches identical R-ready and persisted state.", "runtime_class": "seconds", "size": "large"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_binary_data_transactional_layout.py::test_binary_data_keyboard_and_accessibility_contract",
+      "reason": "Guards binary calculator focus, tab, default accept, Escape cancellation, buddies, and accessible metadata.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_data_keyboard_and_accessibility_contract",
+      "reason": "Guards continuous calculator focus, tab, default accept, Escape cancellation, buddies, and accessible metadata.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_failed_pre_post_imputation_restores_value_from_owning_table[g1_pre_post_table]",
+      "reason": "Guards group 1 pre-post rollback against snapshots accidentally taken from the simple table.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_failed_pre_post_imputation_restores_value_from_owning_table[g2_pre_post_table]",
+      "reason": "Guards group 2 pre-post rollback against snapshots accidentally taken from the simple table.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_sample_size_is_rejected_before_model_or_r[10.5]",
+      "reason": "Rejects fractional dot-decimal sample sizes before model or R mutation.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_sample_size_is_rejected_before_model_or_r[10,5]",
+      "reason": "Rejects fractional comma-decimal sample sizes before model or R mutation.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_sample_size_is_rejected_before_model_or_r[nan]",
+      "reason": "Rejects non-finite NaN sample sizes before model or R mutation.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_sample_size_is_rejected_before_model_or_r[inf]",
+      "reason": "Rejects infinite sample sizes before model or R mutation.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_sample_size_is_rejected_before_model_or_r[-1]",
+      "reason": "Rejects negative sample sizes before model or R mutation.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_diagnostic_transactional_layout.py::test_diagnostic_data_keyboard_and_accessibility_contract",
+      "reason": "Guards diagnostic calculator focus, tab, default accept, Escape cancellation, buddies, and accessible metadata.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_native_calculator_evidence_is_relocatable_and_tamper_evident",
+      "reason": "Proves downloaded native calculator evidence uses portable paths and fails closed on path, size, or digest tampering.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_binary_data_transactional_layout.py::test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction",
+      "reason": "Proves cancelling the real binary back-calculation chooser preserves table, copied model, outer dialog, and undo state exactly.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_binary_data_transactional_layout.py::test_binary_back_calculation_chooser_accept_commits_selected_option",
+      "reason": "Proves accepting the real binary chooser commits only the selected option as one undoable transaction.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_assumptions_cancel_button_prevents_r_and_state_mutation",
+      "reason": "Proves cancelling the real continuous assumptions dialog returns before the R boundary and preserves all state.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_back_calculation_apply_failures_restore_exact_transaction[setter]",
+      "reason": "Proves a setter failure after partial back-calculation values restores the transaction without re-entering the setter.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_back_calculation_apply_failures_restore_exact_transaction[impute_data]",
+      "reason": "Proves an imputation failure restores exact calculator and model state without re-entering R.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_back_calculation_apply_failures_restore_exact_transaction[copy]",
+      "reason": "Proves a copied-model write failure cannot leave partially applied back-calculation data.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_back_calculation_apply_failures_restore_exact_transaction[snapshot]",
+      "reason": "Proves failure while capturing the committed snapshot rolls the entire back-calculation transaction back.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_back_calculation_apply_failures_restore_exact_transaction[undo_push]",
+      "reason": "Proves an undo publication failure, including failure after initial redo, leaves no partial command or state.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_back_calculation_undo_publication_has_one_commit_point[before_insert]",
+      "reason": "Proves pre-insertion undo publication failure restores an existing non-tip history and calculator state exactly.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_back_calculation_undo_publication_has_one_commit_point[after_insert]",
+      "reason": "Proves a post-insertion push anomaly is recognized as one committed command with correct redo-branch replacement and undo semantics.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_back_calculation_undo_publication_has_one_commit_point[ambiguous_after_insert]",
+      "reason": "Proves a post-insertion exception with ambiguous state is re-raised and never misreported as a successful commit.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["analysis_behavior", "release_readiness"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_calculator_consumers_share_one_canonical_meta_py_r_identity",
+      "reason": "Guards calculator consumers and the transitional top-level name against divergent R-bridge module identities and mocks.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_back_calculation_undo_publication_has_one_commit_point[clean_after_insert]",
+      "reason": "Proves an injected clean marker prevents post-insertion commit recognition and clears ghost redo history fail closed.", "runtime_class": "seconds", "size": "medium"
     }
 
   ]

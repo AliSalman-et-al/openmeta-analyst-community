@@ -3,7 +3,7 @@ import os
 import ma_data_table_model
 import ma_dataset
 import meta_globals
-import meta_py_r
+from rc_metastudio import meta_py_r
 import project_pickle
 import settings
 

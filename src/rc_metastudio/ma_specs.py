@@ -35,7 +35,7 @@ from analysis_method_labels import (
     parameter_value_display_label,
 )
 import app_error_handler
-import meta_py_r
+from rc_metastudio import meta_py_r
 import progress_bar as progress_dialog
 import qt_layout
 import qt_text

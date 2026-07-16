@@ -1,9 +1,14 @@
+import hashlib
+import importlib.util
+import json
+import os
+import shutil
 import sys
 from pathlib import Path
 
 import pytest
-from PyQt5 import QtCore
-from PyQt5.QtWidgets import (
+from PyQt6 import QtCore
+from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QHeaderView,
@@ -18,9 +23,101 @@ from PyQt5.QtWidgets import (
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "src" / "forms"))
+os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
+
+from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+
+prepare_generated_ui_imports()
 
 
-def test_calculator_cell_validators_accept_pyqt5_table_item_text():
+def _load_native_calculator_smoke():
+    path = ROOT / "scripts" / "native_calculator_smoke.py"
+    spec = importlib.util.spec_from_file_location("native_calculator_smoke_test", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_native_calculator_evidence_is_relocatable_and_tamper_evident(tmp_path):
+    smoke = _load_native_calculator_smoke()
+    source = tmp_path / "source"
+    source.mkdir()
+    records = []
+    for calculator in ("binary", "continuous", "diagnostic"):
+        payload = (calculator + " screenshot").encode()
+        image = source / (calculator + ".png")
+        image.write_bytes(payload)
+        records.append(
+            {
+                "calculator": calculator,
+                "image": image.name,
+                "image_size": len(payload),
+                "image_sha256": hashlib.sha256(payload).hexdigest(),
+            }
+        )
+    (source / "evidence.json").write_text(json.dumps(records), encoding="utf-8")
+
+    relocated = tmp_path / "downloaded" / "native-calculator-evidence"
+    shutil.copytree(source, relocated)
+    assert smoke.validate_evidence_bundle(relocated) == records
+
+    manifest = relocated / "evidence.json"
+    tampered = json.loads(manifest.read_text(encoding="utf-8"))
+    tampered[0]["image"] = "../binary.png"
+    manifest.write_text(json.dumps(tampered), encoding="utf-8")
+    with pytest.raises(ValueError, match="relative and canonical"):
+        smoke.validate_evidence_bundle(relocated)
+
+    shutil.copy2(source / "evidence.json", manifest)
+    tampered = json.loads(manifest.read_text(encoding="utf-8"))
+    tampered[0]["image_size"] += 1
+    manifest.write_text(json.dumps(tampered), encoding="utf-8")
+    with pytest.raises(ValueError, match="size does not match"):
+        smoke.validate_evidence_bundle(relocated)
+
+    shutil.copy2(source / "evidence.json", manifest)
+    original_size = (relocated / "binary.png").stat().st_size
+    (relocated / "binary.png").write_bytes(b"x" * original_size)
+    with pytest.raises(ValueError, match="SHA256 does not match"):
+        smoke.validate_evidence_bundle(relocated)
+
+
+def test_calculator_consumers_share_one_canonical_meta_py_r_identity(monkeypatch):
+    import importlib
+
+    import binary_data_form
+    import calculator_routines
+    import continuous_data_form
+    import diagnostic_data_form
+    import ma_data_table_model
+
+    canonical = importlib.import_module("rc_metastudio.meta_py_r")
+    legacy_name = importlib.import_module("meta_py_r")
+    assert legacy_name is canonical
+    for consumer in (
+        binary_data_form,
+        calculator_routines,
+        continuous_data_form,
+        diagnostic_data_form,
+        ma_data_table_model,
+    ):
+        assert consumer.meta_py_r is canonical
+
+    marker = object()
+    monkeypatch.setattr(canonical, "_calculator_identity_marker", marker, raising=False)
+    assert all(
+        consumer.meta_py_r._calculator_identity_marker is marker
+        for consumer in (
+            binary_data_form,
+            calculator_routines,
+            continuous_data_form,
+            diagnostic_data_form,
+            ma_data_table_model,
+        )
+    )
+
+def test_calculator_cell_validators_accept_native_qt6_text():
     import binary_data_form
     import continuous_data_form
     import diagnostic_data_form
@@ -42,6 +139,25 @@ def test_calculator_cell_validators_accept_pyqt5_table_item_text():
         continuous_data_form.ContinuousDataForm._cell_data_not_valid(None, "", "mean")
         is None
     )
+    for value in ("5", "5.0", "5,0"):
+        assert (
+            continuous_data_form.ContinuousDataForm._cell_data_not_valid(
+                None, value, "N"
+            )
+            is None
+        )
+    for value in ("5.5", "5,5", "-1", "nan", "inf"):
+        assert "N must be" in (
+            continuous_data_form.ContinuousDataForm._cell_data_not_valid(
+                None, value, "N"
+            )
+            or ""
+        ) or "numeric" in (
+            continuous_data_form.ContinuousDataForm._cell_data_not_valid(
+                None, value, "N"
+            )
+            or ""
+        )
 
     assert (
         diagnostic_data_form.DiagnosticDataForm.cell_data_invalid(None, " 2 ") is None
@@ -52,7 +168,22 @@ def test_calculator_cell_validators_accept_pyqt5_table_item_text():
     )
 
 
-def test_consistency_checker_uses_pyqt5_foreground_api(qapp):
+def test_calculator_numeric_input_uses_unambiguous_dot_or_comma_decimal():
+    import calculator_routines
+
+    for text in ("12.5", "12,5"):
+        assert calculator_routines.numeric_value(text) == 12.5
+
+
+def test_calculator_numeric_input_rejects_grouping_and_non_finite_values():
+    import calculator_routines
+
+    for text in ("1,234.5", "1.234,5", "1,2,3", "nan", "inf"):
+        with pytest.raises(ValueError, match="unambiguous finite number"):
+            calculator_routines.numeric_value(text)
+
+
+def test_consistency_checker_uses_qt6_foreground_api(qapp):
     import calculator_routines as calc_fncs
 
     table = QTableWidget(3, 3)
@@ -143,7 +274,7 @@ def test_row_header_signals_are_restored_when_calculator_opening_raises(
         def columnCount(self, parent=QtCore.QModelIndex()):
             return 1
 
-        def data(self, index, role=QtCore.Qt.DisplayRole):
+        def data(self, index, role=QtCore.Qt.ItemDataRole.DisplayRole):
             return None
 
         def get_current_ma_unit_for_study(self, study_index):
@@ -286,7 +417,7 @@ def test_binary_calculator_table_layout_uses_real_headers_and_visible_total_row(
 
     assert form.event_lbl_3.isHidden()
     assert table.maximumWidth() > table.minimumWidth()
-    assert table.sizePolicy().horizontalPolicy() == QSizePolicy.Expanding
+    assert table.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Expanding
 
     required_height = (
         table.horizontalHeader().height()
@@ -308,7 +439,7 @@ def _assert_calculator_table_grid_fills_width(qapp, table):
         for column in range(table.columnCount())
     )
 
-    assert table.horizontalHeader().sectionResizeMode(0) == QHeaderView.Stretch
+    assert table.horizontalHeader().sectionResizeMode(0) == QHeaderView.ResizeMode.Stretch
     assert section_width >= table.viewport().width() - 1
 
 
@@ -323,7 +454,7 @@ def _assert_calculator_table_content_columns_fill_width(qapp, table):
         header.sectionSize(column) for column in range(table.columnCount())
     )
 
-    assert header.sectionResizeMode(0) == QHeaderView.Interactive
+    assert header.sectionResizeMode(0) == QHeaderView.ResizeMode.Interactive
     assert header.stretchLastSection()
     assert section_width >= table.viewport().width() - 1
     for column in range(table.columnCount()):
@@ -461,7 +592,7 @@ def test_continuous_effect_fields_fit_metric_domain_samples(
     )
     for field in fields.values():
         margins = field.textMargins()
-        frame = field.style().pixelMetric(QStyle.PM_DefaultFrameWidth, None, field)
+        frame = field.style().pixelMetric(QStyle.PixelMetric.PM_DefaultFrameWidth, None, field)
         required = (
             field.fontMetrics().horizontalAdvance(representative)
             + margins.left()
@@ -496,7 +627,7 @@ def test_binary_calculator_grid_columns_fill_expanded_table_width(qapp, monkeypa
     form.show()
     qapp.processEvents()
     header = form.raw_data_table.horizontalHeader()
-    assert header.sectionResizeMode(0) == QHeaderView.Interactive
+    assert header.sectionResizeMode(0) == QHeaderView.ResizeMode.Interactive
     assert not header.stretchLastSection()
     for column in range(form.raw_data_table.columnCount()):
         assert header.sectionSize(column) >= header.sectionSizeHint(column)
@@ -547,7 +678,7 @@ def test_binary_effect_fields_follow_metric_display_domains(qapp, monkeypatch):
     )
     text_margins = ratio_field.textMargins()
     frame_width = ratio_field.style().pixelMetric(
-        QStyle.PM_DefaultFrameWidth, None, ratio_field
+        QStyle.PixelMetric.PM_DefaultFrameWidth, None, ratio_field
     )
     required_rendered_width = (
         ratio_field.fontMetrics().horizontalAdvance(maximum_rendered_ratio)
@@ -644,7 +775,7 @@ def test_binary_calculator_accepts_single_raw_count_edit_and_recomputes_margins(
     assert table.item(2, 2).text() == "43"
     assert form.ma_unit.get_raw_data_for_group("Group 1") == [7, 21]
     assert not form.inconsistencyLabel.isVisible()
-    assert form.buttonBox.button(QDialogButtonBox.Ok).isEnabled()
+    assert form.buttonBox.button(QDialogButtonBox.StandardButton.Ok).isEnabled()
 
 
 class FakeDiagnosticMAUnit:
@@ -705,7 +836,7 @@ def test_diagnostic_calculator_grid_columns_fill_expanded_table_width(
     form.show()
     qapp.processEvents()
     header = form.two_by_two_table.horizontalHeader()
-    assert header.sectionResizeMode(0) == QHeaderView.Interactive
+    assert header.sectionResizeMode(0) == QHeaderView.ResizeMode.Interactive
     assert not header.stretchLastSection()
     for column in range(form.two_by_two_table.columnCount()):
         assert header.sectionSize(column) >= header.sectionSizeHint(column)
@@ -805,7 +936,7 @@ def test_diagnostic_calculator_accepts_single_raw_count_edit_and_recomputes_marg
     assert table.item(2, 2).text() == "14"
     assert form.ma_unit.raw_data == [5.0, 2.0, 3.0, 4.0]
     assert not form.inconsistencyLabel.isVisible()
-    assert form.buttonBox.button(QDialogButtonBox.Ok).isEnabled()
+    assert form.buttonBox.button(QDialogButtonBox.StandardButton.Ok).isEnabled()
 
 
 class FakeContinuousMAUnit:
@@ -876,9 +1007,9 @@ def test_continuous_calculator_grid_columns_keep_internal_overflow(qapp, monkeyp
     qapp.processEvents()
     table = form.simple_table
     header = table.horizontalHeader()
-    assert header.sectionResizeMode(0) == QHeaderView.Interactive
+    assert header.sectionResizeMode(0) == QHeaderView.ResizeMode.Interactive
     assert not header.stretchLastSection()
-    assert table.horizontalScrollBarPolicy() == QtCore.Qt.ScrollBarAsNeeded
+    assert table.horizontalScrollBarPolicy() == QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
     assert (
         sum(header.sectionSize(column) for column in range(table.columnCount()))
         > table.viewport().width()

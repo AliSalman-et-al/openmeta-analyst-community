@@ -15,7 +15,7 @@ test_backend_compat.install()
 import ma_data_table_model
 import ma_dataset
 import meta_globals
-import meta_py_r
+from rc_metastudio import meta_py_r
 
 
 def test_dataset_group_and_follow_up_order_is_stable_across_hash_seeds():

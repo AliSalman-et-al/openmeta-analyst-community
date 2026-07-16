@@ -6,6 +6,15 @@ print("Entering meta_py_r for import probably")
 import math
 import os
 import re
+import sys
+
+_current_module = sys.modules[__name__]
+for _module_name in ("rc_metastudio.meta_py_r", "meta_py_r"):
+    _existing_module = sys.modules.get(_module_name)
+    if _existing_module is not None and _existing_module is not _current_module:
+        raise ImportError("meta_py_r was loaded under more than one module identity")
+    sys.modules[_module_name] = _current_module
+
 import r_runtime
 from analysis_method_labels import (
     method_display_label,

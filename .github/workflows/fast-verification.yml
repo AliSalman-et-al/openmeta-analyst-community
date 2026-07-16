@@ -95,6 +95,15 @@ jobs:
       - name: Run Native Qt6 Vertical Slice
         run: .\scripts\verify-qt6.ps1 -Sync
 
+      - name: Upload native calculator evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-calculator-evidence
+          path: build/qt6-verification/native-calculators
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Prune uv cache
         if: ${{ always() }}
         run: uv cache prune --ci

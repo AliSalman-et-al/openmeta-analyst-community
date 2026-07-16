@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import QDialog, QGraphicsScene
 import adaptive_window
 import app_error_handler
 import forms.ui_network_view
-import meta_py_r
+from rc_metastudio import meta_py_r
 import settings
 
 

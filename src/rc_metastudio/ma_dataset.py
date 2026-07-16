@@ -14,7 +14,7 @@ import meta_globals
 import meta_py_r_backend
 
 meta_py_r_backend.install_meta_py_r_backend()
-import meta_py_r
+from rc_metastudio import meta_py_r
 
 BINARY = meta_globals.BINARY
 CONTINUOUS = meta_globals.CONTINUOUS

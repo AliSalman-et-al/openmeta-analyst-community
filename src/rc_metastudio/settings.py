@@ -9,7 +9,7 @@ import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from PyQt6 import QtCore, QtGui
-import meta_py_r
+from rc_metastudio import meta_py_r
 import qt_text
 from workspace_column_identity import WorkspaceColumnWidthState
 

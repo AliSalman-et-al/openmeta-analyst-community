@@ -92,6 +92,18 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Qt6 workspace taxonomy validation failed: $workspaceTests" }
     }
 
+    foreach ($calculatorTests in @(
+        "tests/python/fast/test_calculator_qt6.py",
+        "tests/python/gui/test_binary_data_transactional_layout.py",
+        "tests/python/gui/test_continuous_data_transactional_layout.py",
+        "tests/python/gui/test_diagnostic_transactional_layout.py"
+    )) {
+        uv run python scripts/validate_test_taxonomy.py `
+            --tests-path $calculatorTests `
+            --require-covered
+        if ($LASTEXITCODE -ne 0) { throw "Qt6 calculator taxonomy validation failed: $calculatorTests" }
+    }
+
     uv run pytest -W error `
         tests/python/fast/test_qt6_build_slice.py `
         tests/python/fast/test_qt6_port_tools.py `
@@ -108,8 +120,12 @@ try {
         tests/python/fast/test_dataset_ordering.py `
         tests/python/fast/test_main_workspace_policy.py `
         tests/python/fast/test_workspace_model_contracts.py `
+        tests/python/fast/test_calculator_qt6.py `
         tests/python/gui/test_main_workspace_window.py `
-        tests/python/gui/test_metaform_data_workflows.py
+        tests/python/gui/test_metaform_data_workflows.py `
+        tests/python/gui/test_binary_data_transactional_layout.py `
+        tests/python/gui/test_continuous_data_transactional_layout.py `
+        tests/python/gui/test_diagnostic_transactional_layout.py
     if ($LASTEXITCODE -ne 0) { throw "Qt6 main workspace tests failed." }
 
     $previousQpa = $env:QT_QPA_PLATFORM
@@ -122,6 +138,10 @@ try {
         $env:RCMS_STUB_BACKEND = "1"
         uv run rc-metastudio --automation-native-shell-smoke
         if ($LASTEXITCODE -ne 0) { throw "Native RC MetaStudio Qt6 shell smoke failed." }
+        uv run python scripts/native_calculator_smoke.py
+        if ($LASTEXITCODE -ne 0) { throw "Native Qt6 calculator smoke failed." }
+        uv run python scripts/native_calculator_smoke.py --validate-only
+        if ($LASTEXITCODE -ne 0) { throw "Native Qt6 calculator evidence validation failed." }
         uv run rc-metastudio --automation-shell-failure-smoke r-load
         if ($LASTEXITCODE -ne 0) { throw "Native R-load teardown smoke failed." }
         uv run rc-metastudio --automation-shell-failure-smoke meta-form

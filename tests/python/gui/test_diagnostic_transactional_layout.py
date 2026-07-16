@@ -1,5 +1,20 @@
+import os
+from pathlib import Path
+
 import pytest
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore, QtGui, QtTest, QtWidgets
+
+import adaptive_window
+
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+os.environ.setdefault(
+    "RCMS_QT6_BUILD_ROOT", str(REPO_ROOT / "build" / "qt6-verification")
+)
+
+from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+
+prepare_generated_ui_imports()
 
 
 AVAILABLE = QtCore.QRect(20, 30, 800, 600)
@@ -123,7 +138,10 @@ def test_diagnostic_data_declares_transactional_overflow_and_reachable_actions(
         dialog.show()
         app.processEvents()
 
-        assert dialog.property("RCMS_window_archetype") == "transactional"
+        assert (
+            adaptive_window.adaptive_window_state(dialog).role
+            is adaptive_window.WindowRole.TRANSACTIONAL
+        )
         assert isinstance(dialog.content_scroll, QtWidgets.QScrollArea)
         assert dialog.content_scroll.widgetResizable()
         assert not dialog.content_scroll.isAncestorOf(dialog.buttonBox)
@@ -131,12 +149,38 @@ def test_diagnostic_data_declares_transactional_overflow_and_reachable_actions(
         assert AVAILABLE.contains(dialog.frameGeometry())
         assert (
             dialog.two_by_two_table.horizontalScrollBarPolicy()
-            == QtCore.Qt.ScrollBarAsNeeded
+            == QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
         )
         assert (
             dialog.two_by_two_table.horizontalHeader().sectionResizeMode(0)
-            == QtWidgets.QHeaderView.Interactive
+            == QtWidgets.QHeaderView.ResizeMode.Interactive
         )
+    finally:
+        dialog.close()
+        app.processEvents()
+
+
+def test_diagnostic_data_keyboard_and_accessibility_contract(monkeypatch):
+    app, dialog = _open_data_dialog(monkeypatch)
+    try:
+        dialog.show()
+        app.processEvents()
+        ok = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
+        assert dialog.focusWidget() is dialog.two_by_two_table
+        assert ok.isDefault()
+        assert dialog.prevalence_lbl.buddy() is dialog.prevalence_txt_box
+        assert dialog.label_13.buddy() is dialog.effect_cbo_box
+        assert dialog.label_14.buddy() is dialog.effect_txt_box
+        assert dialog.two_by_two_table.accessibleName() == (
+            "Diagnostic two by two counts"
+        )
+
+        dialog.effect_cbo_box.setFocus()
+        QtTest.QTest.keyClick(dialog.effect_cbo_box, QtCore.Qt.Key.Key_Tab)
+        assert dialog.focusWidget() is dialog.effect_txt_box
+
+        QtTest.QTest.keyClick(dialog, QtCore.Qt.Key.Key_Escape)
+        assert dialog.result() == QtWidgets.QDialog.DialogCode.Rejected
     finally:
         dialog.close()
         app.processEvents()
@@ -329,7 +373,7 @@ def test_invalid_count_guidance_wraps_and_remains_reachable(monkeypatch):
         assert dialog.content_scroll.viewport().rect().intersects(
             QtCore.QRect(mapped, dialog.inconsistencyLabel.size())
         )
-        ok = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.Ok)
+        ok = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
         assert ok.isEnabled()
         assert ok.isVisible()
         assert AVAILABLE.contains(dialog.frameGeometry())
@@ -391,7 +435,7 @@ def test_direct_effect_validation_is_complete_and_reachable_with_large_font(
         assert dialog.content_scroll.viewport().rect().intersects(
             QtCore.QRect(mapped, dialog.inconsistencyLabel.size())
         )
-        ok = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.Ok)
+        ok = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
         assert ok.isEnabled()
         assert ok.isVisible()
         assert AVAILABLE.contains(dialog.frameGeometry())
@@ -420,7 +464,10 @@ def test_diagnostic_metric_availability_preserves_workflow_and_explains_limits(
         dialog.show()
         app.processEvents()
 
-        assert dialog.property("RCMS_window_archetype") == "transactional"
+        assert (
+            adaptive_window.adaptive_window_state(dialog).role
+            is adaptive_window.WindowRole.TRANSACTIONAL
+        )
         assert isinstance(dialog.content_scroll, QtWidgets.QScrollArea)
         assert dialog.content_scroll.widgetResizable()
         assert not dialog.content_scroll.isAncestorOf(dialog.btn_ok)

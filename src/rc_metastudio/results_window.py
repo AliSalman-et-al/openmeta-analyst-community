@@ -37,7 +37,7 @@ import sys
 import ui_results_window
 import app_error_handler
 import forms.ui_edit_forest_plot
-import meta_py_r
+from rc_metastudio import meta_py_r
 from plot_defaults import FOREST_ARM_LABELS
 import plot_capabilities
 from plot_text import apply_plot_text_input_limits, plot_text_value, set_plot_text_value
