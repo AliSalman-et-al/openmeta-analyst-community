@@ -724,6 +724,10 @@ class MainWizard(QWizard):
         )
         self._focus_reveal_connected = False
         self.currentIdChanged.connect(self._schedule_default_action_sync)
+        for page_id in self.pageIds():
+            self.page(page_id).completeChanged.connect(
+                self._schedule_default_action_sync
+            )
 
     def showEvent(self, event):
         """Scope focus observation to the wizard's visible lifetime."""

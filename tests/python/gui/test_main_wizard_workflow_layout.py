@@ -296,7 +296,8 @@ def test_return_activates_visible_default_wizard_action(qapp):
         assert next_button.isDefault()
         before_page = wizard.currentId()
 
-        QTest.keyClick(wizard, QtCore.Qt.Key.Key_Return)
+        assert qapp.focusWidget() is choice
+        QTest.keyClick(choice, QtCore.Qt.Key.Key_Return)
         qapp.processEvents()
 
         assert wizard.currentId() != before_page

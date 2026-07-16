@@ -483,7 +483,8 @@ def _show_and_prepare(app, window, QtCore, QtWidgets, QTest) -> None:
             cast(QtWidgets.QWidget, visible_choices[0]),
             QtCore.Qt.MouseButton.LeftButton,
         )
-        app.processEvents()
+        for _ in range(3):
+            app.processEvents()
 
 
 def _widget_identity(window, widget) -> str:
@@ -655,7 +656,10 @@ def _observe_actions(app, factory, surface_id, QtCore, QtWidgets, QTest) -> dict
                 and next_button.isEnabled()
                 and next_button.isDefault()
             )
-            QTest.keyClick(wizard, QtCore.Qt.Key.Key_Return)
+            return_target = app.focusWidget()
+            if return_target is None or not wizard.isAncestorOf(return_target):
+                raise RuntimeError("native wizard Return target is not a descendant")
+            QTest.keyClick(return_target, QtCore.Qt.Key.Key_Return)
             app.processEvents()
             transitioned = wizard.currentId() != before_page
         finally:

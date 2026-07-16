@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 from PyQt6 import QtCore, QtGui, QtWidgets
+from PyQt6.QtTest import QTest
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -296,6 +297,33 @@ def test_focus_observer_does_not_accept_programmatic_fallback_after_consumed_tab
     assert observation["moved"] is False
     assert set(observation["traversed"]) == {"firstControl"}
     assert {step["kind"] for step in observation["steps"]} == {"key-event"}
+
+
+def test_wizard_action_observer_uses_fresh_factory_choice_timing_and_return(qapp):
+    from rc_metastudio import meta_py_r_backend
+    from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+
+    prepare_generated_ui_imports()
+    meta_py_r_backend.install_stub_meta_py_r()
+    import main_wizard
+
+    actions = native_smoke._observe_actions(
+        qapp,
+        lambda: main_wizard.MainWizard(path="new_dataset"),
+        "main-wizard",
+        QtCore,
+        QtWidgets,
+        QTest,
+    )
+
+    assert actions == {
+        "cancel_visible_enabled": True,
+        "contract": "wizard-next-cancel",
+        "default_next_visible_enabled": True,
+        "next_transition_observed": True,
+        "reject_nonmutation": True,
+        "rejected_observed": True,
+    }
 
 
 def test_native_remaining_surface_evidence_rejects_programmatic_focus_movement(
