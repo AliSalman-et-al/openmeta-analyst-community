@@ -15,6 +15,7 @@ showed no error. Two distinct defects caused this:
 
 import os
 import sys
+from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("RCMS_STUB_BACKEND", "1")
@@ -22,6 +23,13 @@ sys.path.insert(0, os.path.abspath("src"))
 
 
 REPO_ROOT = os.getcwd()
+ROOT = Path(__file__).resolve().parents[3]
+os.environ.setdefault(
+    "RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification")
+)
+from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+
+prepare_generated_ui_imports()
 
 
 def _create_diagnostic_dataset(window):
@@ -223,6 +231,12 @@ def test_diagnostic_backend_failure_does_not_open_empty_results(monkeypatch):
         }
         backend.get_params = lambda method: ({}, {}, [], {})
         backend.get_method_description = lambda method: "stub method"
+        monkeypatch.setattr(
+            backend,
+            "get_analysis_plot_capabilities",
+            lambda *args, **kwargs: [],
+            raising=False,
+        )
         backend.run_diagnostic_multi = lambda *args, **kwargs: (_ for _ in ()).throw(
             RuntimeError("simulated diagnostic failure")
         )
@@ -277,6 +291,12 @@ def test_diagnostic_multi_metric_failure_keeps_independent_results(monkeypatch):
         }
         backend.get_params = lambda method: ({}, {}, [], {})
         backend.get_method_description = lambda method: "stub method"
+        monkeypatch.setattr(
+            backend,
+            "get_analysis_plot_capabilities",
+            lambda *args, **kwargs: [],
+            raising=False,
+        )
         backend.reset_Rs_working_dir = lambda: None
 
         def run_metric(method_names, param_vals):
@@ -446,7 +466,12 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
         form.add_cur_analysis_details()
 
         assert form.windowTitle() == "Method & Parameters"
-        assert form.buttonBox.button(ma_specs.QDialogButtonBox.Ok) is not None
+        assert (
+            form.buttonBox.button(
+                ma_specs.QDialogButtonBox.StandardButton.Ok
+            )
+            is not None
+        )
         assert form.method_lbl.text() == "Sensitivity and Specificity"
         assert form.lr_dor_method_lbl.text() == (
             "Likelihood Ratios and Diagnostic Odds Ratio"
@@ -484,10 +509,11 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
 
 
 def test_per_metric_diagnostic_merge_preserves_display_artifacts():
+    import analysis_adapter
     import ma_specs
 
-    def run_metric(_method, params):
-        metric = params["measure"]
+    def run_metric(request):
+        metric = request.metric
         title = "%s Forest Plot" % metric
         return {
             "texts": {"%s Summary" % metric: "%s ok" % metric},
@@ -508,8 +534,16 @@ def test_per_metric_diagnostic_merge_preserves_display_artifacts():
         }
 
     result = ma_specs._run_diagnostic_methods_per_metric(
-        ["diagnostic.random", "diagnostic.random"],
-        [{"measure": "Sens"}, {"measure": "Spec"}],
+        tuple(
+            analysis_adapter.make_analysis_request(
+                data_type="diagnostic",
+                workflow="standard",
+                method="diagnostic.random",
+                metric=metric,
+                parameters={"measure": metric},
+            )
+            for metric in ("Sens", "Spec")
+        ),
         run_metric,
     )
 
@@ -519,10 +553,11 @@ def test_per_metric_diagnostic_merge_preserves_display_artifacts():
     }
 
 
-def test_diagnostic_run_rejects_unconfigured_metric_slots(monkeypatch):
+def test_combined_diagnostic_configuration_returns_typed_analysis_requests(monkeypatch):
     import launch
 
     app, window = launch.start_automation()
+    import analysis_adapter
     import ma_specs
 
     backend = ma_specs.meta_py_r
@@ -537,8 +572,6 @@ def test_diagnostic_run_rejects_unconfigured_metric_slots(monkeypatch):
             "reset_Rs_working_dir",
         )
     }
-    shown = []
-    results = []
     try:
         _create_diagnostic_dataset(window)
 
@@ -547,28 +580,43 @@ def test_diagnostic_run_rejects_unconfigured_metric_slots(monkeypatch):
             "HSROC": "diagnostic.hsroc",
             "Diagnostic Random-Effects": "diagnostic.random",
         }
-        backend.get_params = lambda method: ({}, {}, [], {})
-        backend.get_method_description = lambda method: "stub method"
-        backend.run_diagnostic_multi = lambda *args, **kwargs: results.append(args)
-        backend.reset_Rs_working_dir = lambda: None
-        monkeypatch.setattr(
-            ma_specs.QMessageBox, "critical", lambda *args, **kwargs: shown.append(args)
+        backend.get_params = lambda method: (
+            {"conf.level": "float"},
+            {"conf.level": 95.0},
+            ["conf.level"],
+            {},
         )
-        monkeypatch.setattr(window, "analysis", lambda result: results.append(result))
+        backend.get_method_description = lambda method: "stub method"
+        monkeypatch.setattr(
+            backend,
+            "get_analysis_plot_capabilities",
+            lambda *args, **kwargs: [],
+            raising=False,
+        )
+        backend.reset_Rs_working_dir = lambda: None
 
         form = window._build_analysis_specs_dialog(
             diag_metrics=["sens", "spec", "lr", "dor"],
             conf_level=window.model.get_global_conf_level(),
         )
-        form.diag_metrics_to_analysis_details["NLR"] = None
+        requests = form.analysis_requests()
 
-        form.run_ma()
-
-        assert shown
-        assert shown[0][1] == "Analysis Failed"
-        assert "No method and parameters were selected for: NLR" in shown[0][2]
-        assert "cannot unpack non-iterable NoneType object" not in shown[0][2]
-        assert results == []
+        assert all(
+            isinstance(request, analysis_adapter.AnalysisRequest)
+            for request in requests
+        )
+        assert [request.metric for request in requests] == [
+            "Sens",
+            "Spec",
+            "NLR",
+            "PLR",
+            "DOR",
+        ]
+        assert all(request.workflow == "standard" for request in requests)
+        assert all(
+            isinstance(request.parameter_values()["conf.level"], float)
+            for request in requests
+        )
     finally:
         for name, value in saved.items():
             setattr(backend, name, value)
@@ -613,6 +661,12 @@ def test_diagnostic_direct_effects_build_analysis_data_per_metric(monkeypatch):
         }
         backend.get_params = lambda method: ({}, {}, [], {})
         backend.get_method_description = lambda method: "stub method"
+        monkeypatch.setattr(
+            backend,
+            "get_analysis_plot_capabilities",
+            lambda *args, **kwargs: [],
+            raising=False,
+        )
 
         def build_metric(model, **kwargs):
             built_metrics.append(kwargs.get("metric", "Sens"))
@@ -828,6 +882,12 @@ def test_diagnostic_direct_effects_do_not_offer_count_based_methods(monkeypatch)
         }
         backend.get_params = lambda method: ({}, {}, [], {})
         backend.get_method_description = lambda method: "stub method"
+        monkeypatch.setattr(
+            backend,
+            "get_analysis_plot_capabilities",
+            lambda *args, **kwargs: [],
+            raising=False,
+        )
 
         form = window._build_analysis_specs_dialog(
             diag_metrics=["sens", "spec"],
@@ -853,8 +913,9 @@ def test_diagnostic_direct_effects_do_not_offer_count_based_methods(monkeypatch)
 
 def test_diagnostic_method_selector_exposes_full_choices_without_root_cap(monkeypatch):
     import adaptive_controls
+    import adaptive_window
     import launch
-    from PyQt5 import QtCore, QtWidgets
+    from PyQt6 import QtCore, QtWidgets
 
     app, window = launch.start_automation()
     import ma_specs
@@ -926,11 +987,14 @@ def test_diagnostic_method_selector_exposes_full_choices_without_root_cap(monkey
             > form.method_cbo_box.view().viewport().width()
         ):
             assert form.method_cbo_box.view().horizontalScrollBar().maximum() > 0
-        assert form.method_cbo_box.itemData(label_index, QtCore.Qt.ToolTipRole) == label
+        assert form.method_cbo_box.itemData(label_index, QtCore.Qt.ItemDataRole.ToolTipRole) == label
         assert form.method_cbo_box.toolTip() == form.method_cbo_box.currentText()
         form.method_cbo_box.hidePopup()
         assert form.method_cbo_box.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
-        assert form.property("RCMS_window_archetype") == "transactional"
+        assert (
+            adaptive_window.adaptive_window_state(form).policy.archetype
+            is adaptive_window.WindowArchetype.TRANSACTIONAL
+        )
     finally:
         for name, value in saved.items():
             setattr(backend, name, value)

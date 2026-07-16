@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+from importlib import metadata
 import json
 import os
 import shutil
@@ -22,6 +23,11 @@ BRIDGE_TESTS = (
     Path("tests") / "python" / "fast" / "test_rcmetar_r_manifest_validation.py",
 )
 DEFAULT_CRAN_REPO = "https://cloud.r-project.org"
+REQUIRED_RPY2_IDENTITIES = {
+    "rpy2": "3.6.7",
+    "rpy2-rinterface": "3.6.6",
+    "rpy2-robjects": "3.6.5",
+}
 
 
 class VerificationError(Exception):
@@ -30,6 +36,24 @@ class VerificationError(Exception):
 
 def step(message: str) -> None:
     print(f"[RCMetaR-r-stack] {message}", flush=True)
+
+
+def verify_rpy2_identities() -> dict[str, str]:
+    observed = {}
+    for distribution, required in REQUIRED_RPY2_IDENTITIES.items():
+        try:
+            version = metadata.version(distribution)
+        except metadata.PackageNotFoundError as exc:
+            raise VerificationError(
+                f"required distribution is missing: {distribution}"
+            ) from exc
+        if version != required:
+            raise VerificationError(
+                f"{distribution} identity mismatch: expected {required}, observed {version}"
+            )
+        observed[distribution] = version
+    step("Locked rpy2 identities verified: " + json.dumps(observed, sort_keys=True))
+    return observed
 
 
 def run(
@@ -167,13 +191,13 @@ def _windows_registry_r_homes() -> list[Path]:
 
 
 def _common_rscript_candidates(env: dict[str, str] | None = None) -> list[Path]:
-    env = env or os.environ
+    active_env = dict(os.environ) if env is None else env
     candidates: list[Path] = []
-    if env.get("RCMS_RSCRIPT"):
-        candidates.append(Path(env["RCMS_RSCRIPT"]))
+    if active_env.get("RCMS_RSCRIPT"):
+        candidates.append(Path(active_env["RCMS_RSCRIPT"]))
     for variable in ("RCMS_R_HOME", "R_HOME"):
-        candidates.extend(_rscript_paths_for_r_home(env.get(variable)))
-    r_home = _r_home_from_r_command(env)
+        candidates.extend(_rscript_paths_for_r_home(active_env.get(variable)))
+    r_home = _r_home_from_r_command(active_env)
     candidates.extend(_rscript_paths_for_r_home(r_home))
     for r_home in _windows_registry_r_homes():
         candidates.extend(_rscript_paths_for_r_home(r_home))
@@ -181,21 +205,21 @@ def _common_rscript_candidates(env: dict[str, str] | None = None) -> list[Path]:
 
 
 def resolve_rscript(name: str, env: dict[str, str] | None = None) -> Path:
-    env = env or os.environ
+    active_env = dict(os.environ) if env is None else env
     explicit = name and name != "Rscript"
     if explicit:
         requested = Path(name)
         if requested.exists():
             return requested.resolve()
-        resolved = shutil.which(name, path=env.get("PATH"))
+        resolved = shutil.which(name, path=active_env.get("PATH"))
         if resolved:
             return Path(resolved).resolve()
         raise VerificationError(f"Rscript was not found: {name}")
 
-    for candidate in _common_rscript_candidates(env):
+    for candidate in _common_rscript_candidates(active_env):
         if candidate.exists():
             return candidate.resolve()
-    resolved = shutil.which(name or "Rscript", path=env.get("PATH"))
+    resolved = shutil.which(name or "Rscript", path=active_env.get("PATH"))
     if resolved:
         return Path(resolved).resolve()
     raise VerificationError(f"Rscript was not found: {name}")
@@ -417,6 +441,8 @@ def verify(args: argparse.Namespace) -> None:
     cran_repo = args.cran_repo or base_env.get("RCMS_CRAN_REPO") or DEFAULT_CRAN_REPO
     base_env["RCMS_CRAN_REPO"] = cran_repo
 
+    verify_rpy2_identities()
+
     run([python, R_MANIFEST_VALIDATOR, "--root", root], cwd=root, env=base_env)
 
     with tempfile.TemporaryDirectory(
@@ -472,6 +498,18 @@ def verify(args: argparse.Namespace) -> None:
         if args.pytest_runner == "uv":
             pytest_command = ["uv", "run", "pytest", *map(str, BRIDGE_TESTS)]
         run(pytest_command, cwd=root, env=env)
+        run(
+            [
+                python,
+                "scripts/verify_golden_compatibility.py",
+                "--root",
+                root,
+                "--output-root",
+                "build/qt6-verification/golden-compatibility-r-stack-v2",
+            ],
+            cwd=root,
+            env=env,
+        )
 
     step("RCMetaR R Stack Slice verification complete")
 

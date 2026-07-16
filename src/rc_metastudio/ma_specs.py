@@ -4,7 +4,7 @@
 
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor
+from PyQt6.QtGui import QCloseEvent, QColor, QHideEvent, QShowEvent
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -22,11 +22,11 @@ from PyQt6.QtWidgets import (
 import copy
 import hashlib
 import os
-import sys
 
-import forms.ui_ma_specs
+import forms.ui_ma_specs  # ty: ignore[unresolved-import]
 import adaptive_controls
 import adaptive_window
+import analysis_adapter
 from analysis_method_labels import (
     diagnostic_metric_group_display_label,
     normalize_available_method_labels,
@@ -83,7 +83,7 @@ class _DiagnosticMethodPanel(object):
         self.param_box = param_box
         owner._configure_method_selector(self.combo)
         self.param_box.setLayout(QGridLayout())
-        self.combo.currentIndexChanged[str].connect(
+        self.combo.currentTextChanged.connect(
             app_error_handler.safe_slot(
                 lambda _text: self._method_changed(), parent=owner
             )
@@ -212,17 +212,16 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         super(MA_Specs, self).__init__(parent)
         self.setupUi(self)
         self._layout_reflow_pending = False
+        self._layout_reflow_timer = QtCore.QTimer(self)
+        self._layout_reflow_timer.setSingleShot(True)
+        self._layout_reflow_timer.timeout.connect(self._apply_local_reflow)
         self._focus_reveal_connected = False
-        self._first_show_content_refit_pending = True
         for combo in self.findChildren(QComboBox):
             self._configure_value_control(combo)
         apply_plot_text_input_limits(self)
         apply_default_forest_arm_labels(self)
         if _text_value(self.image_path) == "":
             self.image_path.setText(analysis_output_path("forest.png"))
-        global meta_py_r
-        meta_py_r = sys.modules.get("meta_py_r", meta_py_r)
-
         self.current_param_vals = external_params or {}
         self.meta_f_str = meta_f_str
         self.is_meta_regression = meta_f_str == "meta-regression"
@@ -246,7 +245,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             app_error_handler.safe_slot(self.select_out_path, parent=self)
         )
         self._configure_method_selector(self.method_cbo_box)
-        self.method_cbo_box.currentIndexChanged[str].connect(
+        self.method_cbo_box.currentTextChanged.connect(
             app_error_handler.safe_slot(
                 lambda _text: self.method_changed(), parent=self
             )
@@ -324,7 +323,10 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         if hasattr(self, "specs_tab"):
             content_hint = self.specs_tab.minimumSizeHint()
             if content_hint.isValid():
-                margins = self.layout().contentsMargins()
+                root_layout = self.layout()
+                if root_layout is None:
+                    return hint
+                margins = root_layout.contentsMargins()
                 scrollbar_width = (
                     self.content_scroll_area.verticalScrollBar().sizeHint().width()
                 )
@@ -339,31 +341,33 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                 )
         return hint
 
-    def showEvent(self, event):
+    def showEvent(  # ty: ignore[invalid-method-override] -- PyQt6 multiple-inheritance stub mismatch
+        self, event: QShowEvent | None
+    ) -> None:
         super(MA_Specs, self).showEvent(event)
-        if self._first_show_content_refit_pending:
-            self._first_show_content_refit_pending = False
-            QtCore.QTimer.singleShot(
-                0, self._adaptive_window_controller.request_content_refit
-            )
         app = QtWidgets.QApplication.instance()
-        if app is not None and not self._focus_reveal_connected:
+        if isinstance(app, QtWidgets.QApplication) and not self._focus_reveal_connected:
             app.focusChanged.connect(self._reveal_focused_control)
             self._focus_reveal_connected = True
 
-    def hideEvent(self, event):
+    def hideEvent(  # ty: ignore[invalid-method-override] -- PyQt6 multiple-inheritance stub mismatch
+        self, event: QHideEvent | None
+    ) -> None:
         self._disconnect_focus_reveal()
         super(MA_Specs, self).hideEvent(event)
 
-    def closeEvent(self, event):
-        self._disconnect_focus_reveal()
+    def closeEvent(  # ty: ignore[invalid-method-override] -- PyQt6 multiple-inheritance stub mismatch
+        self, event: QCloseEvent | None
+    ) -> None:
+        self._release_owned_connections()
         super(MA_Specs, self).closeEvent(event)
+        self.deleteLater()
 
     def _disconnect_focus_reveal(self):
         if not self._focus_reveal_connected:
             return
         app = QtWidgets.QApplication.instance()
-        if app is not None:
+        if isinstance(app, QtWidgets.QApplication):
             try:
                 app.focusChanged.disconnect(self._reveal_focused_control)
             except (TypeError, RuntimeError):
@@ -450,7 +454,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.color_btn.clicked.connect(
             app_error_handler.safe_slot(self._choose_plot_color, parent=self)
         )
-        self.style_cbo.currentIndexChanged[str].connect(
+        self.style_cbo.currentTextChanged.connect(
             app_error_handler.safe_slot(self._plot_style_changed, parent=self)
         )
 
@@ -521,43 +525,50 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                 if self.specificity_radio.isChecked()
                 else "DOR"
             )
-            meta_py_r.ma_dataset_to_simple_diagnostic_robj(
-                self.model,
-                metric=metric,
-                covs_to_include=selected_covariates,
-                studies=studies,
-            )
-        elif self.data_type == "continuous":
-            meta_py_r.ma_dataset_to_simple_continuous_robj(
-                self.model, covs_to_include=selected_covariates, studies=studies
-            )
-        else:
-            meta_py_r.ma_dataset_to_simple_binary_robj(
-                self.model,
-                include_raw_data=False,
-                covs_to_include=selected_covariates,
-                studies=studies,
-            )
-
         add_plot_params(self)
-        result = meta_py_r.run_meta_regression(
-            self.model.dataset,
-            studies,
-            selected_covariates,
-            metric,
-            fixed_effects=self.fixed_effects_radio.isChecked(),
-            conf_level=self.current_param_vals.get("conf.level", self.conf_level),
-            params=self.current_param_vals,
+        parameters = copy.deepcopy(self.current_param_vals)
+        parameters["measure"] = metric
+        request = analysis_adapter.make_analysis_request(
+            data_type=self.data_type,
+            workflow="meta-regression",
+            method="meta_regression",
+            metric=metric,
+            parameters=parameters,
         )
-        if isinstance(result, str):
+        fixed_effects = self.fixed_effects_radio.isChecked()
+        bar = MetaProgress(self)
+        bar.show()
+        result = None
+        succeeded = False
+        try:
+            result = _execute_meta_regression_request(
+                self.model,
+                tuple(studies),
+                tuple(selected_covariates),
+                request,
+                fixed_effects,
+                self.conf_level,
+            )
+            if isinstance(result, str):
+                raise RuntimeError(result)
+            succeeded = True
+        except Exception as error:
+            app_error_handler.log_exception(
+                type(error), error, error.__traceback__
+            )
             QMessageBox.critical(
                 self,
                 "Analysis Failed",
-                "Sorry, there was an error performing the regression.\n%s" % result,
+                "Sorry, there was an error performing the regression.\n%s" % error,
             )
-            return
-        self.parent().analysis(result)
-        self.accept()
+            _reset_r_working_dir_safely()
+        finally:
+            _dispose_progress(bar)
+        try:
+            if succeeded:
+                self._deliver_result(result)
+        finally:
+            self.done(QDialog.DialogCode.Accepted.value)
 
     def _load_plot_params(self):
         self._loading_plot_style = True
@@ -659,83 +670,82 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             progress_dialog.hide_once(bar)
 
     def run_ma(self):
-        ###
-        # first, let's fire up a progress bar
         bar = MetaProgress(self)
         bar.show()
         result = None
+        succeeded = False
+        try:
+            requests = self.analysis_requests()
+            result = _execute_analysis_requests(self.model, requests)
+            succeeded = True
+        except Exception as e:
+            app_error_handler.log_exception(type(e), e, e.__traceback__)
+            QMessageBox.critical(
+                self,
+                "Analysis Failed",
+                "Sorry, this analysis could not be completed:\n\n%s" % e,
+            )
+            _reset_r_working_dir_safely()
+        finally:
+            _dispose_progress(bar)
 
         try:
-            # this method is defined statically, below
-            add_plot_params(self)
-
-            # also add the metric to the parameters
-            # -- this is for scaling
-
-            if not self.data_type == "diagnostic":
-                self.current_param_vals["measure"] = self.model.current_effect
-
-            # dispatch on type; build an R object, then run the analysis
-            if self.data_type == "binary":
-                result = _run_guarded_analysis(
-                    self, bar, lambda: _run_binary_analysis(self)
-                )
-                if result is None:
-                    return
-
-                # _writeout_test_data(self.meta_f_str, self.current_method, self.current_param_vals, result) # FOR MAKING TESTS
-            elif self.data_type == "continuous":
-                result = _run_guarded_analysis(
-                    self, bar, lambda: _run_continuous_analysis(self)
-                )
-                if result is None:
-                    return
-
-                # _writeout_test_data(self.meta_f_str, self.current_method, self.current_param_vals, result) # FOR MAKING TESTS
-            elif self.data_type == "diagnostic":
-                try:
-                    # add the current metrics (e.g., PLR, etc.) to the method/params
-                    # dictionary
-                    self.add_cur_analysis_details()
-                    if len(self.diag_metrics_to_analysis_details) == 0:
-                        self.add_cur_analysis_details()
-
-                    method_names, list_of_param_vals = _diagnostic_analysis_requests(
-                        self
-                    )
-
-                    if self.meta_f_str is None:
-                        # regular meta-analysis
-                        result = _run_diagnostic_analysis_isolating_metric_failures(
-                            self.model, method_names, list_of_param_vals
-                        )
-                        # _writeout_test_data(self.meta_f_str, method_names, list_of_param_vals, result, diag=True) # FOR MAKING TESTS
-                    else:
-                        # in the case of diagnostic, we pass in lists
-                        # of param values to the meta_method
-                        result = _run_diagnostic_analysis_isolating_metric_failures(
-                            self.model,
-                            method_names,
-                            list_of_param_vals,
-                            meta_f_str=self.meta_f_str,
-                        )
-                        # _writeout_test_data(self.meta_f_str, method_names, list_of_param_vals, result, diag=True) # FOR MAKING TESTS
-                except Exception as e:
-                    app_error_handler.log_exception(type(e), e, e.__traceback__)
-                    error_message = (
-                        "Sorry, this analysis could not be completed:\n\n%s" % e
-                    )
-
-                    QMessageBox.critical(self, "Analysis Failed", error_message)
-                    # reset Rs working directory
-                    _reset_r_working_dir_safely()
-                    self.accept()
-                    return
+            if succeeded:
+                self._deliver_result(result)
         finally:
-            progress_dialog.hide_once(bar)
+            self.done(QDialog.DialogCode.Accepted.value)
 
-        self.parent().analysis(result)
-        self.accept()
+    def done(  # ty: ignore[invalid-method-override] -- PyQt6 generated-form multiple inheritance
+        self, result: int
+    ) -> None:
+        self._release_owned_connections()
+        super().done(result)
+        self.deleteLater()
+
+    def _release_owned_connections(self) -> None:
+        self._disconnect_focus_reveal()
+        self._layout_reflow_timer.stop()
+        try:
+            self._layout_reflow_timer.timeout.disconnect(self._apply_local_reflow)
+        except (TypeError, RuntimeError):
+            pass
+
+    def _deliver_result(self, result):
+        parent = self.parentWidget()
+        callback = getattr(parent, "analysis", None)
+        if not callable(callback):
+            raise RuntimeError("analysis configuration has no results owner")
+        callback(result)
+
+    def analysis_requests(self):
+        """Return typed requests represented by the current user configuration."""
+        add_plot_params(self)
+        if self.data_type != "diagnostic":
+            metric = str(self.model.current_effect)
+            self.current_param_vals["measure"] = metric
+            parameters = copy.deepcopy(self.current_param_vals)
+            return (
+                analysis_adapter.make_analysis_request(
+                    data_type=self.data_type,
+                    workflow=self.meta_f_str,
+                    method=self.current_method,
+                    metric=metric,
+                    parameters=parameters,
+                ),
+            )
+
+        self.add_cur_analysis_details()
+        method_names, parameter_values = _diagnostic_analysis_requests(self)
+        return tuple(
+            analysis_adapter.make_analysis_request(
+                data_type=self.data_type,
+                workflow=self.meta_f_str,
+                method=method,
+                metric=str(parameters["measure"]),
+                parameters=parameters,
+            )
+            for method, parameters in zip(method_names, parameter_values)
+        )
 
     def enable_diagnostic_fields(self):
         # self.col3_str_edit.setEnabled(True)
@@ -1058,6 +1068,8 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         def set_param(index):
             combo_box = self.sender()
+            if not isinstance(combo_box, QComboBox):
+                raise RuntimeError("analysis parameter signal has no combo-box sender")
             x = self._enum_item_value(combo_box.itemData(index))
             self.current_param_vals[name] = to_type(x)
             print(str(self.current_param_vals) + " -> weirdo sender thing")
@@ -1227,7 +1239,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         if self._layout_reflow_pending:
             return
         self._layout_reflow_pending = True
-        QtCore.QTimer.singleShot(0, self._apply_local_reflow)
+        self._layout_reflow_timer.start(0)
 
     def _apply_local_reflow(self):
         self._layout_reflow_pending = False
@@ -1483,43 +1495,81 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 # which isn't really a 'child' of ma_specs, so inheritance
 # didn't feel appropriate
 ###
-def _run_binary_analysis(specs_form):
-    # Creates a tmp object in R called tmp_obj unless a caller passes another name.
-    meta_py_r.ma_dataset_to_simple_binary_robj(specs_form.model)
-    if specs_form.meta_f_str is None:
-        return meta_py_r.run_binary_ma(
-            specs_form.current_method, specs_form.current_param_vals
-        )
+def _execute_analysis_requests(model, requests):
+    if not requests:
+        raise ValueError("No analysis requests were configured.")
+    data_types = {request.data_type for request in requests}
+    if len(data_types) != 1:
+        raise ValueError("One execution cannot mix analysis data families.")
+    data_type = requests[0].data_type
+    if data_type == "binary":
+        if len(requests) != 1:
+            raise ValueError("Binary execution requires exactly one request.")
+        meta_py_r.ma_dataset_to_simple_binary_robj(model)
+        return _run_binary_request(requests[0])
+    if data_type == "continuous":
+        if len(requests) != 1:
+            raise ValueError("Continuous execution requires exactly one request.")
+        meta_py_r.ma_dataset_to_simple_continuous_robj(model)
+        return _run_continuous_request(requests[0])
+    if data_type == "diagnostic":
+        return _run_diagnostic_analysis_isolating_metric_failures(model, requests)
+    raise ValueError("Unsupported analysis data family: %s" % data_type)
+
+
+def _run_binary_request(request):
+    parameters = request.parameter_values()
+    if request.workflow == "standard":
+        return meta_py_r.run_binary_ma(request.method, parameters)
     return meta_py_r.run_workflow_analysis(
-        specs_form.meta_f_str, specs_form.current_method, specs_form.current_param_vals
+        request.workflow, request.method, parameters
     )
 
 
-def _run_continuous_analysis(specs_form):
-    meta_py_r.ma_dataset_to_simple_continuous_robj(specs_form.model)
-    if specs_form.meta_f_str is None:
-        return meta_py_r.run_continuous_ma(
-            specs_form.current_method, specs_form.current_param_vals
-        )
+def _run_continuous_request(request):
+    parameters = request.parameter_values()
+    if request.workflow == "standard":
+        return meta_py_r.run_continuous_ma(request.method, parameters)
     return meta_py_r.run_workflow_analysis(
-        specs_form.meta_f_str, specs_form.current_method, specs_form.current_param_vals
+        request.workflow, request.method, parameters
     )
 
 
-def _run_guarded_analysis(specs_form, progress_bar, run_analysis):
-    try:
-        return run_analysis()
-    except Exception as e:
-        app_error_handler.log_exception(type(e), e, e.__traceback__)
-        QMessageBox.critical(
-            specs_form,
-            "Analysis Failed",
-            "Sorry, this analysis could not be completed:\n\n%s" % e,
+def _execute_meta_regression_request(
+    model, studies, selected_covariates, request, fixed_effects, default_conf_level
+):
+    conversion_kwargs = {
+        "covs_to_include": selected_covariates,
+        "studies": studies,
+    }
+    if request.data_type == "diagnostic":
+        meta_py_r.ma_dataset_to_simple_diagnostic_robj(
+            model, metric=request.metric, **conversion_kwargs
         )
-        progress_dialog.hide_once(progress_bar)
-        _reset_r_working_dir_safely()
-        specs_form.accept()
-        return None
+    elif request.data_type == "continuous":
+        meta_py_r.ma_dataset_to_simple_continuous_robj(model, **conversion_kwargs)
+    elif request.data_type == "binary":
+        meta_py_r.ma_dataset_to_simple_binary_robj(
+            model, include_raw_data=False, **conversion_kwargs
+        )
+    else:
+        raise ValueError("Unsupported meta-regression data family: %s" % request.data_type)
+    parameters = request.parameter_values()
+    return meta_py_r.run_meta_regression(
+        model.dataset,
+        list(studies),
+        list(selected_covariates),
+        request.metric,
+        fixed_effects=fixed_effects,
+        conf_level=parameters.get("conf.level", default_conf_level),
+        params=parameters,
+    )
+
+
+def _dispose_progress(progress):
+    progress_dialog.hide_once(progress)
+    progress.close()
+    progress.deleteLater()
 
 
 def _reset_r_working_dir_safely():
@@ -1723,14 +1773,14 @@ def _text_value(widget):
     return qt_text.to_native_text(widget.text())
 
 
-def _diagnostic_direct_effects_need_metric_specific_data(model, list_of_param_vals):
+def _diagnostic_direct_effects_need_metric_specific_data(model, requests):
     if model.included_studies_have_raw_data():
         return False
 
     missing_metrics = [
-        params["measure"]
-        for params in list_of_param_vals
-        if not model.included_studies_have_point_estimates(effect=params["measure"])
+        request.metric
+        for request in requests
+        if not model.included_studies_have_point_estimates(effect=request.metric)
     ]
     if missing_metrics:
         raise ValueError(
@@ -1744,66 +1794,63 @@ def _diagnostic_direct_effects_need_metric_specific_data(model, list_of_param_va
 
 
 def _run_diagnostic_analysis_isolating_metric_failures(
-    model, method_names, list_of_param_vals, meta_f_str=None
+    model, requests
 ):
-    if _diagnostic_direct_effects_need_metric_specific_data(model, list_of_param_vals):
+    if _diagnostic_direct_effects_need_metric_specific_data(model, requests):
         return _run_diagnostic_with_metric_specific_data(
-            model, method_names, list_of_param_vals, meta_f_str=meta_f_str
+            model, requests
         )
 
     meta_py_r.ma_dataset_to_simple_diagnostic_robj(model)
     try:
-        if meta_f_str is None:
-            return meta_py_r.run_diagnostic_multi(method_names, list_of_param_vals)
+        method_names = [request.method for request in requests]
+        parameter_values = [request.parameter_values() for request in requests]
+        workflow = requests[0].workflow
+        if workflow == "standard":
+            return meta_py_r.run_diagnostic_multi(method_names, parameter_values)
         return meta_py_r.run_diagnostic_workflow(
-            meta_f_str, method_names, list_of_param_vals
+            workflow, method_names, parameter_values
         )
     except Exception:
-        return _run_diagnostic_with_shared_data_per_metric(
-            method_names, list_of_param_vals, meta_f_str=meta_f_str
-        )
+        return _run_diagnostic_with_shared_data_per_metric(requests)
 
 
-def _run_diagnostic_with_shared_data_per_metric(
-    method_names, list_of_param_vals, meta_f_str=None
-):
+def _run_diagnostic_with_shared_data_per_metric(requests):
     return _run_diagnostic_methods_per_metric(
-        method_names,
-        list_of_param_vals,
-        lambda method_name, param_vals: (
-            meta_py_r.run_diagnostic_multi([method_name], [param_vals])
-            if meta_f_str is None
+        requests,
+        lambda request: (
+            meta_py_r.run_diagnostic_multi(
+                [request.method], [request.parameter_values()]
+            )
+            if request.workflow == "standard"
             else meta_py_r.run_diagnostic_workflow(
-                meta_f_str, [method_name], [param_vals]
+                request.workflow, [request.method], [request.parameter_values()]
             )
         ),
     )
 
 
-def _run_diagnostic_with_metric_specific_data(
-    model, method_names, list_of_param_vals, meta_f_str=None
-):
-    def run_metric(method_name, param_vals):
-        metric = param_vals["measure"]
-        meta_py_r.ma_dataset_to_simple_diagnostic_robj(model, metric=metric)
-        if meta_f_str is None:
-            return meta_py_r.run_diagnostic_multi([method_name], [param_vals])
+def _run_diagnostic_with_metric_specific_data(model, requests):
+    def run_metric(request):
+        meta_py_r.ma_dataset_to_simple_diagnostic_robj(model, metric=request.metric)
+        if request.workflow == "standard":
+            return meta_py_r.run_diagnostic_multi(
+                [request.method], [request.parameter_values()]
+            )
         return meta_py_r.run_diagnostic_workflow(
-            meta_f_str, [method_name], [param_vals]
+            request.workflow, [request.method], [request.parameter_values()]
         )
 
-    return _run_diagnostic_methods_per_metric(
-        method_names, list_of_param_vals, run_metric
-    )
+    return _run_diagnostic_methods_per_metric(requests, run_metric)
 
 
-def _run_diagnostic_methods_per_metric(method_names, list_of_param_vals, run_metric):
+def _run_diagnostic_methods_per_metric(requests, run_metric):
     merged_result = _empty_diagnostic_result()
     failures = []
-    for method_name, param_vals in zip(method_names, list_of_param_vals):
-        metric = param_vals["measure"]
+    for request in requests:
+        metric = request.metric
         try:
-            metric_result = run_metric(method_name, param_vals)
+            metric_result = run_metric(request)
         except Exception as e:
             failures.append((metric, e))
             merged_result["texts"]["%s Error" % metric] = str(e)
@@ -1878,7 +1925,7 @@ def _writeout_test_data(meta_f_str, method, params, results, diag=False):
 
 ####
 # simple progress bar
-import forms.ui_running
+import forms.ui_running  # ty: ignore[unresolved-import]
 
 
 class MetaProgress(QDialog, forms.ui_running.Ui_running):

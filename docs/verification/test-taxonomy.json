@@ -40,6 +40,61 @@
       "size": "medium"
     },
     {
+      "decision": "keep", "evidence": ["golden", "analysis_behavior"], "external_dependencies": [], "lane": "golden",
+      "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_numeric_comparison_rejects_malformed_values_without_raising",
+      "reason": "Guards deterministic rejection of non-finite and non-real candidate or reference numeric values.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["golden", "analysis_behavior"], "external_dependencies": [], "lane": "golden",
+      "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_numeric_comparison_accepts_finite_int_float_within_policy_only",
+      "reason": "Guards finite integer and float acceptance under the committed absolute and relative tolerance policy.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "golden",
+        "analysis_behavior"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "golden",
+      "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_golden_summary_parser_reads_modern_plain_text_heterogeneity_table",
+      "reason": "Guards numerical heterogeneity extraction from the current RCMetaR plain-text summary used by Golden Analysis Tests.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior", "r_stack"],
+      "external_dependencies": ["qt", "subprocess"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_analysis_configuration_layout.py::test_dot_and_comma_decimal_locales_produce_equivalent_analysis_requests",
+      "reason": "Guards equivalent native numeric values at the user configuration and Analysis Adapter boundary under dot- and comma-decimal locales.",
+      "runtime_class": "seconds",
+      "size": "medium"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior", "r_stack"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_analysis_configuration_layout.py::test_backend_execution_uses_only_frozen_analysis_requests",
+      "reason": "Guards immutable Analysis Adapter dispatch for every maintained data family and standard or advanced workflow.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior", "r_stack"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_analysis_configuration_layout.py::test_meta_regression_backend_execution_uses_frozen_request",
+      "reason": "Guards meta-regression data conversion and backend arguments against post-request mutation.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
       "decision": "keep",
       "evidence": ["gui_compatibility", "analysis_behavior"],
       "external_dependencies": ["qt"],
@@ -3679,6 +3734,101 @@
     },
     {
       "decision": "keep",
+      "evidence": ["golden", "analysis_behavior"],
+      "external_dependencies": ["filesystem"],
+      "lane": "golden",
+      "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_analysis_regression_comparison_rejects_warning_and_reference_tampering",
+      "reason": "Guards normalized warning and reference text against frozen-baseline tampering.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["golden", "analysis_behavior"],
+      "external_dependencies": ["filesystem"],
+      "lane": "golden",
+      "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_analysis_regression_comparison_rejects_artifact_content_and_descriptor_tampering",
+      "reason": "Guards artifact name, type, metadata, and content-hash comparison.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["golden", "analysis_behavior"],
+      "external_dependencies": ["filesystem"],
+      "lane": "golden",
+      "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_analysis_regression_comparison_rejects_extra_cases",
+      "reason": "Guards the exact curated-case coverage contract against unexpected outputs.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["golden", "release_readiness"], "external_dependencies": ["filesystem"], "lane": "golden",
+      "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_golden_output_root_rejects_unsafe_or_unowned_deletion_targets",
+      "reason": "Prevents the Golden verifier from deleting repository, ancestor, arbitrary, or unowned output directories.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["golden", "release_readiness"], "external_dependencies": ["filesystem"], "lane": "golden",
+      "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_golden_output_root_only_replaces_owned_bounded_directory",
+      "reason": "Guards marker-owned bounded replacement inside the dedicated verification output root.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["golden", "release_readiness"], "external_dependencies": ["filesystem"], "lane": "golden",
+      "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_golden_output_root_rejects_symlink_escape",
+      "reason": "Guards canonical output containment against symlink and Windows reparse-point escapes.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["golden", "release_readiness"], "external_dependencies": ["filesystem"], "lane": "golden",
+      "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_golden_verifier_rejects_outer_archive_byte_tampering",
+      "reason": "Guards independent outer size and SHA-256 authentication before the frozen ZIP is opened.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["golden", "release_readiness"], "external_dependencies": ["filesystem"], "lane": "golden",
+      "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_golden_verifier_rejects_internal_manifest_tampering",
+      "reason": "Guards frozen internal manifest-to-capture consistency.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["golden", "release_readiness"], "external_dependencies": ["filesystem"], "lane": "golden",
+      "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_golden_verifier_rejects_internal_artifact_tampering",
+      "reason": "Guards frozen artifact bytes against their internal oracle hashes.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["golden", "release_readiness"], "external_dependencies": ["filesystem"], "lane": "golden",
+      "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_golden_verifier_rejects_traversal_and_duplicate_zip_members",
+      "reason": "Guards ZIP member bounds, traversal, and duplicate-name rejection.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["golden", "analysis_behavior"], "external_dependencies": ["filesystem"], "lane": "golden",
+      "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_numeric_contract_covers_all_cases_and_rejects_shape_and_tolerance_drift",
+      "reason": "Guards all-case numeric coverage, absolute and relative tolerance policy, and missing or unexpected numeric shape drift.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["golden", "analysis_behavior"], "external_dependencies": ["filesystem"], "lane": "golden",
+      "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_numeric_oracle_is_independent_from_runtime_parser",
+      "reason": "Proves runtime parser drift can alter only current candidates and cannot rewrite the committed numeric oracle.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["golden", "release_readiness"], "external_dependencies": ["filesystem"], "lane": "golden",
+      "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_numeric_contract_rejects_hash_canonicalization_and_coverage_tamper",
+      "reason": "Guards numeric contract byte authentication, canonical serialization, and exact case-section-metric coverage.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["golden", "analysis_behavior"], "external_dependencies": ["filesystem"], "lane": "golden",
+      "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_plot_descriptor_contract_rejects_outer_and_semantic_tampering",
+      "reason": "Guards oracle-bound display identity and plot capability descriptor integrity.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["golden", "r_stack"], "external_dependencies": [], "lane": "golden",
+      "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_real_r_verifiers_reject_null_or_mismatched_rpy2_identity",
+      "reason": "Guards exact locked rpy2 distribution identities in both real-R gates.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["golden", "r_stack"], "external_dependencies": [], "lane": "golden",
+      "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_current_golden_manifest_requires_exact_rpy2_identities",
+      "reason": "Guards exact locked rpy2 distribution identities in every current Golden capture manifest row.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep",
       "evidence": [
         "golden",
         "analysis_behavior"
@@ -3832,6 +3982,16 @@
     },
     {
       "decision": "keep",
+      "evidence": ["gui_compatibility", "analysis_behavior"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_analysis_failure_safety.py::test_result_owner_exception_still_deletes_real_specs_and_progress",
+      "reason": "Guards production dialog and progress teardown while preserving result-owner callback exceptions.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
       "evidence": [
         "gui_compatibility",
         "analysis_behavior"
@@ -3937,8 +4097,8 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_analysis_failure_safety.py::test_opening_pickled_non_dataset_reports_invalid_project",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "nodeid": "tests/python/gui/test_analysis_failure_safety.py::test_opening_non_project_payload_reports_invalid_project",
+      "reason": "Guards actionable rejection of malformed structured project input without executing a legacy serializer.",
       "runtime_class": "seconds",
       "size": "medium"
     },
@@ -4303,8 +4463,8 @@
         "filesystem"
       ],
       "lane": "gui",
-      "nodeid": "tests/python/gui/test_diagnostic_analysis_workflow.py::test_diagnostic_run_rejects_unconfigured_metric_slots",
-      "reason": "Protects offscreen Qt and MetaForm workflow compatibility and should be isolated from fast unit checks.",
+      "nodeid": "tests/python/gui/test_diagnostic_analysis_workflow.py::test_combined_diagnostic_configuration_returns_typed_analysis_requests",
+      "reason": "Guards complete native values from combined diagnostic user configuration through the typed Analysis Adapter request boundary.",
       "runtime_class": "seconds",
       "size": "medium"
     },

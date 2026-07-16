@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QMessageBox
 
-import forms.ui_cov_subgroup_dlg
+import forms.ui_cov_subgroup_dlg  # ty: ignore[unresolved-import]
 import adaptive_controls
 import adaptive_window
 import app_error_handler
@@ -38,7 +38,11 @@ class MetaSubgroupForm(QDialog, forms.ui_cov_subgroup_dlg.Ui_cov_subgroup_dialog
                 "Select a factor covariate before running subgroup analysis.",
             )
             return
-        self.parent().meta_subgroup(selected_cov)
+        parent = self.parentWidget()
+        callback = getattr(parent, "meta_subgroup", None)
+        if not callable(callback):
+            raise RuntimeError("subgroup configuration has no workflow owner")
+        callback(selected_cov)
         self.accept()
 
     def _update_ok_button(self):

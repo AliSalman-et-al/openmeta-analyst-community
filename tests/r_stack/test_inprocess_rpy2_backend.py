@@ -43,10 +43,16 @@ _DRIVER = textwrap.dedent(
     import os, sys, tempfile
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     os.environ["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
+    os.environ.setdefault(
+        "RCMS_QT6_BUILD_ROOT",
+        os.path.join(__REPO_ROOT__, "build", "qt6-verification"),
+    )
     sys.path.insert(0, os.path.join(__REPO_ROOT__, "src"))
     sys.path.insert(0, os.path.join(__REPO_ROOT__, "src", "rc_metastudio"))
-    sys.path.insert(0, os.path.join(__REPO_ROOT__, "src", "rc_metastudio", "forms"))
     sys.path.insert(0, os.path.join(__REPO_ROOT__, "tests", "python", "fast"))
+
+    from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+    prepare_generated_ui_imports()
 
     import test_backend_compat
     test_backend_compat.install()
@@ -240,7 +246,7 @@ _DRIVER = textwrap.dedent(
     assert continuous_result["images"]["Forest Plot"] == forest_path
     assert continuous_result["display_images"]["Forest Plot"] == forest_display_path
 
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
     import results_window
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])

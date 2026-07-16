@@ -1,8 +1,10 @@
 import os
-import pickle
 import sys
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+from PyQt6 import QtCore, QtWidgets, sip
 
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -10,6 +12,66 @@ os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 sys.path.insert(0, os.path.abspath("src"))
 
 REPO_ROOT = os.getcwd()
+ROOT = Path(__file__).resolve().parents[3]
+os.environ.setdefault(
+    "RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification")
+)
+from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+
+prepare_generated_ui_imports()
+
+
+def test_result_owner_exception_still_deletes_real_specs_and_progress(qapp, monkeypatch):
+    import ma_specs
+
+    class Model:
+        current_effect = "OR"
+        dataset = SimpleNamespace(covariates=[])
+
+        def get_current_outcome_type(self):
+            return "binary"
+
+        def included_studies_have_raw_data(self):
+            return True
+
+    class Owner(QtWidgets.QWidget):
+        def analysis(self, _result):
+            raise RuntimeError("owner callback failed")
+
+    backend = ma_specs.meta_py_r
+    monkeypatch.setattr(
+        backend, "get_available_methods", lambda **_kwargs: {"Random": "binary.random"}
+    )
+    monkeypatch.setattr(backend, "get_params", lambda _method: ({}, {}, [], {}))
+    monkeypatch.setattr(
+        backend, "get_method_description", lambda _method: "Random-effects"
+    )
+    monkeypatch.setattr(
+        backend,
+        "get_analysis_plot_capabilities",
+        lambda *_args, **_kwargs: [],
+        raising=False,
+    )
+    monkeypatch.setattr(
+        backend, "ma_dataset_to_simple_binary_robj", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        backend,
+        "run_binary_ma",
+        lambda *_args, **_kwargs: {"texts": {"Summary": "ok"}, "images": {}},
+    )
+    owner = Owner()
+    form = ma_specs.MA_Specs(Model(), parent=owner, conf_level=95.0)
+
+    with pytest.raises(RuntimeError, match="owner callback failed"):
+        form.run_ma()
+    progress = form.findChild(ma_specs.MetaProgress)
+    assert progress is not None
+    QtCore.QCoreApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
+    qapp.processEvents()
+
+    assert sip.isdeleted(progress)
+    assert sip.isdeleted(form)
 
 
 def _create_binary_dataset(window):
@@ -58,6 +120,12 @@ def test_binary_analysis_failure_shows_dialog_and_does_not_open_results(monkeypa
         }
         backend.get_params = lambda method: ({}, {}, [], {})
         backend.get_method_description = lambda method: "stub method"
+        monkeypatch.setattr(
+            backend,
+            "get_analysis_plot_capabilities",
+            lambda *args, **kwargs: [],
+            raising=False,
+        )
         backend.run_binary_ma = lambda *args, **kwargs: (_ for _ in ()).throw(
             RuntimeError("simulated R failure")
         )
@@ -127,6 +195,12 @@ def test_continuous_workflow_failure_shows_dialog_and_does_not_open_results(
         }
         backend.get_params = lambda method: ({}, {}, [], {})
         backend.get_method_description = lambda method: "stub method"
+        monkeypatch.setattr(
+            backend,
+            "get_analysis_plot_capabilities",
+            lambda *args, **kwargs: [],
+            raising=False,
+        )
         backend.run_workflow_analysis = lambda *args, **kwargs: (_ for _ in ()).throw(
             RuntimeError("simulated recompute failure")
         )
@@ -167,18 +241,6 @@ def test_diagnostic_progress_dialog_closes_when_run_setup_raises(monkeypatch):
             "ma_dataset_to_simple_diagnostic_robj",
         )
     }
-    progress_events = []
-
-    class ProgressSpy(object):
-        def __init__(self, parent=None):
-            self.parent = parent
-
-        def show(self):
-            progress_events.append("show")
-
-        def hide(self):
-            progress_events.append("hide")
-
     try:
         window._handle_wizard_results(
             {
@@ -203,7 +265,12 @@ def test_diagnostic_progress_dialog_closes_when_run_setup_raises(monkeypatch):
         }
         backend.get_params = lambda method: ({}, {}, [], {})
         backend.get_method_description = lambda method: "stub method"
-        monkeypatch.setattr(ma_specs, "MetaProgress", ProgressSpy)
+        monkeypatch.setattr(
+            backend,
+            "get_analysis_plot_capabilities",
+            lambda *args, **kwargs: [],
+            raising=False,
+        )
         monkeypatch.setattr(
             ma_specs,
             "add_plot_params",
@@ -217,10 +284,16 @@ def test_diagnostic_progress_dialog_closes_when_run_setup_raises(monkeypatch):
             conf_level=window.model.get_global_conf_level(),
         )
 
-        with pytest.raises(RuntimeError, match="simulated setup failure"):
-            form.run_ma()
-
-        assert progress_events == ["show", "hide"]
+        monkeypatch.setattr(ma_specs.QMessageBox, "critical", lambda *_args: None)
+        form.run_ma()
+        progress = form.findChild(ma_specs.MetaProgress)
+        assert progress is not None
+        QtCore.QCoreApplication.sendPostedEvents(
+            None, QtCore.QEvent.Type.DeferredDelete
+        )
+        app.processEvents()
+        assert sip.isdeleted(progress)
+        assert sip.isdeleted(form)
     finally:
         for name, value in saved.items():
             setattr(backend, name, value)
@@ -288,7 +361,7 @@ def test_method_parameters_backend_unavailable_keeps_backend_error(monkeypatch):
 
 
 def test_results_window_accepts_incomplete_result_payload():
-    from PyQt5.QtWidgets import QApplication
+    from PyQt6.QtWidgets import QApplication
 
     import results_window
 
@@ -337,12 +410,13 @@ def test_project_save_failure_reports_original_error(monkeypatch, tmp_path):
     app, window = launch.start_automation()
     shown = []
     try:
+        _create_binary_dataset(window)
         window.out_path = str(tmp_path / "project.rcms")
 
         def _boom(*args, **kwargs):
             raise OSError("disk is full")
 
-        monkeypatch.setattr(meta_form.pickle, "dump", _boom)
+        monkeypatch.setattr(meta_form.project_format, "save_project", _boom)
         monkeypatch.setattr(
             meta_form.QMessageBox,
             "critical",
@@ -358,12 +432,12 @@ def test_project_save_failure_reports_original_error(monkeypatch, tmp_path):
         _close_without_prompt(app, window)
 
 
-def test_opening_pickled_non_dataset_reports_invalid_project(monkeypatch, tmp_path):
+def test_opening_non_project_payload_reports_invalid_project(monkeypatch, tmp_path):
     import launch
     import meta_form
 
     invalid_project = tmp_path / "not-a-dataset.rcms"
-    invalid_project.write_bytes(pickle.dumps({"not": "a dataset"}, protocol=2))
+    invalid_project.write_bytes(b"not a versioned RC MetaStudio project")
 
     app, window = launch.start_automation()
     shown = []
@@ -379,7 +453,7 @@ def test_opening_pickled_non_dataset_reports_invalid_project(monkeypatch, tmp_pa
 
         assert shown
         assert shown[0][1] == "Could Not Open Project"
-        assert "is not a valid RC MetaStudio project file" in shown[0][2]
+        assert "project is not a valid ZIP container" in shown[0][2]
         assert "get_outcome_names" not in shown[0][2]
         assert window.out_path is None
     finally:
@@ -389,7 +463,7 @@ def test_opening_pickled_non_dataset_reports_invalid_project(monkeypatch, tmp_pa
 def test_global_exception_handler_logs_trace_and_shows_recoverable_dialog(
     monkeypatch, tmp_path
 ):
-    from PyQt5.QtWidgets import QApplication
+    from PyQt6.QtWidgets import QApplication
 
     import app_error_handler
 
@@ -415,7 +489,7 @@ def test_global_exception_handler_logs_trace_and_shows_recoverable_dialog(
 
 
 def test_safe_signal_connection_replaces_and_disconnects_wrapped_slots():
-    from PyQt5.QtCore import QObject, pyqtSignal
+    from PyQt6.QtCore import QObject, pyqtSignal
 
     import app_error_handler
 
@@ -480,7 +554,7 @@ def test_safe_slot_preserves_callback_type_errors(monkeypatch):
 def test_meta_reg_covariate_toggles_refresh_ok_button_without_unexpected_error(
     monkeypatch,
 ):
-    from PyQt5.QtWidgets import QApplication, QDialogButtonBox
+    from PyQt6.QtWidgets import QApplication, QDialogButtonBox
 
     import app_error_handler
     import meta_globals
@@ -517,7 +591,7 @@ def test_meta_reg_covariate_toggles_refresh_ok_button_without_unexpected_error(
 
     form = meta_reg_form.MetaRegForm(Model())
     try:
-        ok_button = form.buttonBox.button(QDialogButtonBox.Ok)
+        ok_button = form.buttonBox.button(QDialogButtonBox.StandardButton.Ok)
         assert ok_button.isEnabled() is True
 
         for _covariate, checkbox in form.covs_and_check_boxes:
@@ -554,7 +628,7 @@ def test_metaform_model_reconnect_preserves_external_signal_subscribers():
 
 
 def test_main_window_action_exceptions_are_recoverable(monkeypatch, tmp_path):
-    from PyQt5.QtWidgets import QAction
+    from PyQt6.QtGui import QAction
 
     import launch
     import app_error_handler
@@ -591,8 +665,8 @@ def test_main_window_action_exceptions_are_recoverable(monkeypatch, tmp_path):
 def test_safe_application_notify_reports_event_handler_exceptions(
     monkeypatch, tmp_path
 ):
-    from PyQt5.QtCore import QEvent
-    from PyQt5.QtWidgets import QWidget
+    from PyQt6.QtCore import QEvent
+    from PyQt6.QtWidgets import QWidget
 
     import app_error_handler
 
@@ -612,7 +686,7 @@ def test_safe_application_notify_reports_event_handler_exceptions(
 
     widget = RaisingWidget()
     try:
-        assert app.notify(widget, QEvent(QEvent.User)) is False
+        assert app.notify(widget, QEvent(QEvent.Type.User)) is False
         assert shown
         assert "event exploded" in log_path.read_text(encoding="utf-8")
     finally:
@@ -621,7 +695,7 @@ def test_safe_application_notify_reports_event_handler_exceptions(
 
 
 def test_context_menu_popup_helper_ignores_reentrant_popups(monkeypatch):
-    from PyQt5.QtCore import QPoint
+    from PyQt6.QtCore import QPoint
 
     import app_error_handler
 
@@ -682,13 +756,13 @@ def test_context_menu_popup_helper_ignores_reentrant_popups(monkeypatch):
 
 
 def test_context_menu_events_are_suppressed_while_menu_is_active(monkeypatch):
-    from PyQt5.QtCore import QEvent
+    from PyQt6.QtCore import QEvent
 
     import app_error_handler
 
     class FakeEvent(object):
         def type(self):
-            return QEvent.ContextMenu
+            return QEvent.Type.ContextMenu
 
     monkeypatch.setattr(app_error_handler, "is_context_menu_active", lambda: True)
 
@@ -696,7 +770,7 @@ def test_context_menu_events_are_suppressed_while_menu_is_active(monkeypatch):
 
 
 def test_context_menu_popup_failure_clears_active_guard(monkeypatch):
-    from PyQt5.QtCore import QPoint
+    from PyQt6.QtCore import QPoint
 
     import app_error_handler
 

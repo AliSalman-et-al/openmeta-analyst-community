@@ -27,13 +27,25 @@ try {
         src/rc_metastudio/project_adapter.py `
         src/rc_metastudio/project_evidence.py `
         src/rc_metastudio/project_format.py `
+        src/rc_metastudio/analysis_adapter.py `
+        src/rc_metastudio/analysis_regression_compare.py `
+        src/rc_metastudio/ma_specs.py `
+        src/rc_metastudio/meta_reg_form.py `
+        src/rc_metastudio/meta_subgroup_form.py `
+        src/rc_metastudio/conf_level_dialog.py `
+        src/rc_metastudio/progress_bar.py `
+        src/rc_metastudio/headless_analysis.py `
+        src/rc_metastudio/golden_analysis.py `
         src/rc_metastudio/qt6_port_tools.py `
         src/rc_metastudio/qt6_resources.py `
         src/rc_metastudio/qt6_ui.py `
         src/rc_metastudio/qt6_macos_feasibility.py `
         src/rc_metastudio/qt_text.py `
         scripts/build_qt6.py `
-        scripts/qt6_port.py
+        scripts/qt6_port.py `
+        scripts/native_analysis_smoke.py `
+        scripts/verify_golden_compatibility.py `
+        scripts/verify_rcmetar_r_stack.py
     if ($LASTEXITCODE -ne 0) { throw "Qt6 strict type verification failed." }
 
     $dependencyInputs = @("pyproject.toml", "uv.lock")
@@ -104,6 +116,19 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Qt6 calculator taxonomy validation failed: $calculatorTests" }
     }
 
+    foreach ($analysisTests in @(
+        "tests/python/gui/test_analysis_configuration_layout.py",
+        "tests/python/gui/test_analysis_failure_safety.py",
+        "tests/python/gui/test_diagnostic_analysis_workflow.py",
+        "tests/analysis_regression/golden/test_analysis_regression_compare.py",
+        "tests/analysis_regression/golden/test_golden_baseline_manifest_validation.py"
+    )) {
+        uv run python scripts/validate_test_taxonomy.py `
+            --tests-path $analysisTests `
+            --require-covered
+        if ($LASTEXITCODE -ne 0) { throw "Qt6 analysis taxonomy validation failed: $analysisTests" }
+    }
+
     uv run pytest -W error `
         tests/python/fast/test_qt6_build_slice.py `
         tests/python/fast/test_qt6_port_tools.py `
@@ -128,6 +153,17 @@ try {
         tests/python/gui/test_diagnostic_transactional_layout.py
     if ($LASTEXITCODE -ne 0) { throw "Qt6 main workspace tests failed." }
 
+    uv run pytest -W error `
+        tests/python/gui/test_analysis_configuration_layout.py `
+        tests/python/gui/test_analysis_failure_safety.py `
+        tests/python/gui/test_diagnostic_analysis_workflow.py `
+        tests/analysis_regression/golden/test_analysis_regression_compare.py `
+        tests/analysis_regression/golden/test_golden_baseline_manifest_validation.py
+    if ($LASTEXITCODE -ne 0) { throw "Qt6 analysis workflow tests failed." }
+
+    powershell -ExecutionPolicy Bypass -File scripts/verify-r-stack-full.ps1
+    if ($LASTEXITCODE -ne 0) { throw "Real-R stack and Golden compatibility verification failed." }
+
     $previousQpa = $env:QT_QPA_PLATFORM
     $previousFatalWarnings = $env:QT_FATAL_WARNINGS
     Remove-Item Env:QT_QPA_PLATFORM -ErrorAction SilentlyContinue
@@ -142,6 +178,8 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Native Qt6 calculator smoke failed." }
         uv run python scripts/native_calculator_smoke.py --validate-only
         if ($LASTEXITCODE -ne 0) { throw "Native Qt6 calculator evidence validation failed." }
+        uv run python scripts/native_analysis_smoke.py
+        if ($LASTEXITCODE -ne 0) { throw "Native Qt6 analysis workflow smoke failed." }
         uv run rc-metastudio --automation-shell-failure-smoke r-load
         if ($LASTEXITCODE -ne 0) { throw "Native R-load teardown smoke failed." }
         uv run rc-metastudio --automation-shell-failure-smoke meta-form

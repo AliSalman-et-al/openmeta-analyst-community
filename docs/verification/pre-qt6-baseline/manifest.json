@@ -3,9 +3,20 @@
     "path": "uv.lock",
     "sha256": "d9b943f24d18fecf8d72dc4fee73856b809dc69f626c6fda9d9400f8090109ed"
   },
+  "golden_plot_descriptor_contract": {
+    "path": "docs/verification/pre-qt6-baseline/golden-plot-descriptors.json",
+    "sha256": "438bf2e4d4a7bb6e34324a527e7bad94addd0490c8e78e30fa06443df25830f1",
+    "size": 5400
+  },
+  "golden_numeric_contract": {
+    "path": "docs/verification/pre-qt6-baseline/golden-numeric-contract.json",
+    "sha256": "ebefe0f77a2ea04d5541d0d0394895db7ed8cdc24bd6f28b3a3774350e78cbd4",
+    "size": 42290
+  },
   "observed_golden_analysis_bundle": {
     "path": "docs/verification/pre-qt6-baseline/observed-golden-baseline.zip",
-    "sha256": "73f0973b0916d202e2d95ad83f3b7ac0622439ecf5501a05b74c9a7c2ae0e938"
+    "sha256": "73f0973b0916d202e2d95ad83f3b7ac0622439ecf5501a05b74c9a7c2ae0e938",
+    "size": 7116014
   },
   "observed_golden_analysis_summary": {
     "path": "docs/verification/pre-qt6-baseline/observed-golden-summary.json",

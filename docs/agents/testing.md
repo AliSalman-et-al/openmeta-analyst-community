@@ -21,7 +21,18 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-qt6.ps1 -Sync
 It performs deterministic form and binary-resource generation, strict `ty`
 checking, focused offscreen and Versioned Project Format tests,
 taxonomy-manifest validation, the full native PyQt6 application-shell suite,
-and separate visible native `qwindows` smokes with `QT_QPA_PLATFORM` unset.
+the maintained analysis tests, the full isolated R build/check/analysis stack,
+the fail-closed real-R comparison against the frozen pre-Qt6 Golden archive,
+and separate visible native `qwindows` smokes with `QT_QPA_PLATFORM` unset. The
+Golden verifier writes only below a marker-owned
+`build/qt6-verification/golden-compatibility-*` directory and authenticates the
+committed outer archive, its bounded ZIP structure, internal manifest, artifacts,
+the independently hashed 415-value numeric contract, descriptor contract, and
+exact rpy2 distribution identities before accepting a capture. Frozen numeric
+text is never parsed to create expectations at runtime; only current candidate
+output is parsed and compared under the committed absolute/relative tolerance
+policy. The analysis evidence contract is documented in
+[native-qt6-analysis.md](../verification/native-qt6-analysis.md).
 The shell smoke constructs the real `MetaForm`, exercises its menu surface,
 processes events, and verifies the owned window is deleted on close with Qt
 warnings fatal inside the controlled process.

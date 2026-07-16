@@ -1,5 +1,7 @@
 import argparse
 import json
+import math
+import os
 import sys
 
 
@@ -10,6 +12,8 @@ MISSING_OUTPUT = "missing_output"
 UNSUPPORTED_WORKFLOW = "unsupported_workflow"
 CAPTURE_ERROR = "capture_error"
 ACCEPTED_EXCEPTION = "accepted_exception"
+UNEXPECTED_OUTPUT = "unexpected_output"
+MALFORMED_OUTPUT = "malformed_output"
 
 
 def compare_golden_baseline(reference, current, exceptions=None, manifest=None):
@@ -45,6 +49,14 @@ def compare_golden_baseline(reference, current, exceptions=None, manifest=None):
             )
             continue
         rows.extend(_compare_row(expected, actual, exceptions))
+    for extra_id in sorted(set(current_by_id) - set(reference_by_id)):
+        rows.append(
+            _row(
+                current_by_id[extra_id],
+                UNEXPECTED_OUTPUT,
+                "Current capture contains a case absent from the frozen baseline.",
+            )
+        )
     return {
         "mode": "analysis-regression-comparison",
         "rows": rows,
@@ -91,12 +103,11 @@ def _compare_numbers(expected, actual, accepted):
     rows = []
     tolerances = expected.get("tolerances", {})
     actual_outputs = actual.get("outputs", {})
-    for section, metrics in expected.get(
-        "outputs", expected.get("expected", {})
-    ).items():
+    expected_outputs = expected.get("outputs", expected.get("expected", {}))
+    for section, metrics in expected_outputs.items():
         for metric, expected_value in metrics.items():
-            actual_value = actual_outputs.get(section, {}).get(metric)
-            if actual_value is None:
+            actual_section = actual_outputs.get(section)
+            if not isinstance(actual_section, dict) or metric not in actual_section:
                 rows.append(
                     _row(
                         expected,
@@ -106,24 +117,90 @@ def _compare_numbers(expected, actual, accepted):
                     )
                 )
                 continue
+            actual_value = actual_section[metric]
+            if not _is_finite_real_number(expected_value):
+                rows.append(
+                    _row(
+                        expected,
+                        MALFORMED_OUTPUT,
+                        "%s.%s reference numeric value is malformed."
+                        % (section, metric),
+                    )
+                )
+                continue
+            if not _is_finite_real_number(actual_value):
+                rows.append(
+                    _row(
+                        expected,
+                        MALFORMED_OUTPUT,
+                        "%s.%s current numeric value is malformed."
+                        % (section, metric),
+                    )
+                )
+                continue
             drift = abs(actual_value - expected_value)
-            tolerance = tolerances.get(metric, 0)
+            policy = expected.get("numeric_tolerance_policy")
+            if policy:
+                absolute = policy["absolute"]
+                relative = policy["relative"]
+                tolerance = max(absolute, relative * abs(expected_value))
+                tolerance_detail = "abs %s / rel %s" % (absolute, relative)
+            else:
+                tolerance = tolerances.get(metric, 0)
+                tolerance_detail = str(tolerance)
             if drift > tolerance:
                 rows.append(
                     _row(
                         expected,
                         _maybe_accepted(NUMERIC_DRIFT, accepted),
                         "%s.%s drifted by %s with tolerance %s."
-                        % (section, metric, drift, tolerance),
+                        % (section, metric, drift, tolerance_detail),
                         accepted,
                     )
                 )
+            else:
+                rows.append(
+                    _row(
+                        expected,
+                        PASS,
+                        "%s.%s matched within tolerance %s."
+                        % (section, metric, tolerance_detail),
+                    )
+                )
+        for metric in sorted(set(actual_outputs.get(section, {})) - set(metrics)):
+            rows.append(
+                _row(
+                    expected,
+                    _maybe_accepted(UNEXPECTED_OUTPUT, accepted),
+                    "%s.%s is an unexpected numeric metric." % (section, metric),
+                    accepted,
+                )
+            )
+    for section in sorted(set(actual_outputs) - set(expected_outputs)):
+        rows.append(
+            _row(
+                expected,
+                _maybe_accepted(UNEXPECTED_OUTPUT, accepted),
+                "Unexpected numeric section %s was produced." % section,
+                accepted,
+            )
+        )
     return rows
+
+
+def _is_finite_real_number(value):
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+    )
 
 
 def _compare_texts_and_artifacts(expected, actual, accepted):
     rows = []
-    for section in expected.get("texts", {}):
+    expected_texts = expected.get("texts", {})
+    actual_texts = actual.get("texts", {})
+    for section in expected_texts:
         if section not in actual.get("texts", {}):
             rows.append(
                 _row(
@@ -133,7 +210,9 @@ def _compare_texts_and_artifacts(expected, actual, accepted):
                     accepted,
                 )
             )
-        elif actual["texts"][section] != expected["texts"][section]:
+        elif _normalize_text(actual_texts[section]) != _normalize_text(
+            expected_texts[section]
+        ):
             rows.append(
                 _row(
                     expected,
@@ -142,6 +221,19 @@ def _compare_texts_and_artifacts(expected, actual, accepted):
                     accepted,
                 )
             )
+        else:
+            rows.append(
+                _row(expected, PASS, "Text section %s matched." % section)
+            )
+    for section in sorted(set(actual_texts) - set(expected_texts)):
+        rows.append(
+            _row(
+                expected,
+                _maybe_accepted(TEXT_ARTIFACT_DRIFT, accepted),
+                "Unexpected text section %s was produced." % section,
+                accepted,
+            )
+        )
     expected_artifacts = dict(
         (item["label"], item) for item in expected.get("artifacts", [])
     )
@@ -159,24 +251,55 @@ def _compare_texts_and_artifacts(expected, actual, accepted):
                     accepted,
                 )
             )
-        elif _artifact_metadata(actual_artifact) != _artifact_metadata(
-            expected_artifact
-        ):
+        elif _artifact_descriptor(actual_artifact) != _artifact_descriptor(expected_artifact):
             rows.append(
                 _row(
                     expected,
                     _maybe_accepted(TEXT_ARTIFACT_DRIFT, accepted),
-                    "Artifact %s metadata changed." % label,
+                    "Artifact %s descriptor or content changed." % label,
                     accepted,
                 )
             )
+        else:
+            rows.append(
+                _row(
+                    expected,
+                    PASS,
+                    "Artifact %s descriptor and content matched." % label,
+                )
+            )
+    for label in sorted(set(actual_artifacts) - set(expected_artifacts)):
+        rows.append(
+            _row(
+                expected,
+                _maybe_accepted(TEXT_ARTIFACT_DRIFT, accepted),
+                "Unexpected artifact %s was produced." % label,
+                accepted,
+            )
+        )
     return rows
 
 
-def _artifact_metadata(artifact):
-    return dict(
-        (key, value) for key, value in artifact.items() if key not in ["path", "sha256"]
-    )
+def _artifact_descriptor(artifact):
+    path = artifact.get("bundle_path") or artifact.get("path") or ""
+    basename = os.path.basename(path.replace("\\", "/"))
+    extension = os.path.splitext(basename)[1].lower()
+    metadata = dict(artifact.get("metadata", {}))
+    for key, value in artifact.items():
+        if key not in {"bundle_path", "path", "label", "sha256", "metadata"}:
+            metadata[key] = value
+    return {
+        "label": artifact.get("label"),
+        "name": basename,
+        "type": extension.lstrip("."),
+        "sha256": artifact.get("sha256"),
+        "metadata": metadata,
+    }
+
+
+def _normalize_text(value):
+    lines = str(value).replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    return "\n".join(line.rstrip() for line in lines).strip()
 
 
 def _accepted_exception(row_id, exceptions):

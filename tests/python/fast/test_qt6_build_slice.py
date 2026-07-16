@@ -279,6 +279,13 @@ report_path = Path(sys.argv[4])
 sys.path.insert(0, str(root / "src/rc_metastudio"))
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 layout = prepare_generated_ui_imports(build_root)
+# A later test or tool may prepend source paths. The bootstrap must already have
+# bound the top-level forms package to generated Qt6 output.
+sys.path.insert(0, str(root / "src/rc_metastudio/forms"))
+sys.path.insert(0, str(root / "src/rc_metastudio"))
+forms = importlib.import_module("forms")
+if layout.package_root not in Path(forms.__file__).resolve().parents:
+    raise RuntimeError("forms package escaped the generated Qt6 layout")
 for name in modules:
     importlib.import_module(name)
 fake_launch = types.ModuleType("launch")

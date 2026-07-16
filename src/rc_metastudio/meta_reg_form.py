@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
 )
 
-import forms.ui_meta_reg
+import forms.ui_meta_reg  # ty: ignore[unresolved-import]
 import adaptive_window
 import app_error_handler
 from rc_metastudio import meta_py_r
@@ -140,7 +140,11 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
                 "Sorry, there was an error performing the regression.\n%s" % result,
             )
         else:
-            self.parent().analysis(result)
+            parent = self.parentWidget()
+            callback = getattr(parent, "analysis", None)
+            if not callable(callback):
+                raise RuntimeError("meta-regression configuration has no results owner")
+            callback(result)
             self.accept()
 
     def _selected_covariates(self):

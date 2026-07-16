@@ -6,11 +6,19 @@ import sys
 from types import SimpleNamespace
 
 import pytest
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtTest import QTest
+from PyQt6 import QtCore, QtGui, QtWidgets
+from PyQt6.QtTest import QTest
 
 
 ROOT = Path(__file__).resolve().parents[3]
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ.setdefault("RCMS_STUB_BACKEND", "1")
+os.environ.setdefault(
+    "RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification")
+)
+from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+
+prepare_generated_ui_imports()
 
 
 class _AnalysisModel(object):
@@ -164,7 +172,10 @@ def test_method_parameters_variants_stay_bounded_and_stable(
             dialog.show()
             qapp.processEvents()
 
-            assert dialog.property("RCMS_window_archetype") == "transactional"
+            assert (
+                adaptive_window.adaptive_window_state(dialog).policy.archetype
+                is adaptive_window.WindowArchetype.TRANSACTIONAL
+            )
             assert dialog.frameGeometry().width() <= 720
             assert dialog.frameGeometry().height() <= 540
             assert dialog.buttonBox.isVisible()
@@ -203,16 +214,18 @@ def test_method_parameters_variants_stay_bounded_and_stable(
                     dialog.content_scroll_area.viewport(), editable_value.rect().center()
                 )
                 assert visible_region.contains(control_center)
-            assert dialog.buttonBox.button(QtWidgets.QDialogButtonBox.Ok).isVisible()
-            assert dialog.buttonBox.button(QtWidgets.QDialogButtonBox.Cancel).isVisible()
+            assert dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok).isVisible()
+            assert dialog.buttonBox.button(
+                QtWidgets.QDialogButtonBox.StandardButton.Cancel
+            ).isVisible()
 
             dialog.method_cbo_box.setFocus()
             initial_focus = qapp.focusWidget()
-            QTest.keyClick(initial_focus, QtCore.Qt.Key_Tab)
+            QTest.keyClick(initial_focus, QtCore.Qt.Key.Key_Tab)
             qapp.processEvents()
             forward_focus = qapp.focusWidget()
             assert forward_focus is not initial_focus
-            QTest.keyClick(forward_focus, QtCore.Qt.Key_Backtab)
+            QTest.keyClick(forward_focus, QtCore.Qt.Key.Key_Backtab)
             qapp.processEvents()
             assert qapp.focusWidget() is not forward_focus
             assert dialog.isAncestorOf(qapp.focusWidget())
@@ -251,6 +264,7 @@ def test_method_parameters_opens_at_its_content_preferred_width(qapp, monkeypatc
 
 def test_regression_and_subgroup_selectors_use_transactional_layouts(qapp, monkeypatch):
     import adaptive_controls
+    import adaptive_window
     import change_cov_type_form
     import meta_reg_form
     import meta_subgroup_form
@@ -307,10 +321,16 @@ def test_regression_and_subgroup_selectors_use_transactional_layouts(qapp, monke
         covariate_type.show()
         qapp.processEvents()
 
-        assert regression.property("RCMS_window_archetype") == "transactional"
+        assert (
+            adaptive_window.adaptive_window_state(regression).policy.archetype
+            is adaptive_window.WindowArchetype.TRANSACTIONAL
+        )
         assert regression.content_scroll_area.isAncestorOf(regression.cov_grp_box)
         assert not regression.content_scroll_area.isAncestorOf(regression.buttonBox)
-        assert subgroup.property("RCMS_window_archetype") == "transactional"
+        assert (
+            adaptive_window.adaptive_window_state(subgroup).policy.archetype
+            is adaptive_window.WindowArchetype.TRANSACTIONAL
+        )
         assert subgroup.cov_subgroup_cbo_box.currentText() == long_name
         choice = subgroup.cov_subgroup_cbo_box
         subgroup.move(available.right() - 20, available.top() + 40)
@@ -323,16 +343,19 @@ def test_regression_and_subgroup_selectors_use_transactional_layouts(qapp, monke
         qapp.processEvents()
         popup = choice.view().window()
         assert available.contains(popup.frameGeometry())
-        assert choice.view().textElideMode() == QtCore.Qt.ElideNone
-        assert choice.view().horizontalScrollBarPolicy() == QtCore.Qt.ScrollBarAsNeeded
+        assert choice.view().textElideMode() == QtCore.Qt.TextElideMode.ElideNone
+        assert choice.view().horizontalScrollBarPolicy() == QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
         assert choice.view().horizontalScrollBar().maximum() > 0
-        assert choice.itemData(0, QtCore.Qt.ToolTipRole) == long_name
+        assert choice.itemData(0, QtCore.Qt.ItemDataRole.ToolTipRole) == long_name
         assert choice.toolTip() == long_name
         assert choice.view().sizeHintForColumn(0) > original_column_width
         choice.hidePopup()
-        assert covariate_type.property("RCMS_window_archetype") == "transactional"
+        assert (
+            adaptive_window.adaptive_window_state(covariate_type).policy.archetype
+            is adaptive_window.WindowArchetype.TRANSACTIONAL
+        )
         assert covariate_type.cov_prev_table.verticalScrollMode() == (
-            QtWidgets.QAbstractItemView.ScrollPerItem
+                QtWidgets.QAbstractItemView.ScrollMode.ScrollPerItem
         )
         assert covariate_type.buttonBox.isVisible()
     finally:
@@ -369,7 +392,7 @@ def test_choice_control_remeasures_font_and_style_before_bounded_popup(
     class WideChromeStyle(QtWidgets.QProxyStyle):
         def pixelMetric(self, metric, option=None, widget=None):
             value = super(WideChromeStyle, self).pixelMetric(metric, option, widget)
-            if metric == QtWidgets.QStyle.PM_ScrollBarExtent:
+            if metric == QtWidgets.QStyle.PixelMetric.PM_ScrollBarExtent:
                 return value + 30
             return value
 
@@ -382,7 +405,7 @@ def test_choice_control_remeasures_font_and_style_before_bounded_popup(
         assert font_width > initial_width
         assert combo.view().minimumWidth() > font_width
         assert combo.view().window().frameGeometry().width() <= 2000
-        assert combo.itemData(1, QtCore.Qt.ToolTipRole) == combo.itemText(1)
+        assert combo.itemData(1, QtCore.Qt.ItemDataRole.ToolTipRole) == combo.itemText(1)
     finally:
         combo.hidePopup()
         combo.close()
@@ -417,7 +440,7 @@ def test_choice_popup_show_burst_coalesces_measurement_tooltips_and_clamp(qapp):
         assert applied == (1, 1, 1)
         assert available.contains(combo.view().window().frameGeometry())
         assert combo.view().horizontalScrollBar().maximum() > 0
-        assert combo.itemData(1, QtCore.Qt.ToolTipRole) == combo.itemText(1)
+        assert combo.itemData(1, QtCore.Qt.ItemDataRole.ToolTipRole) == combo.itemText(1)
     finally:
         combo.hidePopup()
         combo.close()
@@ -430,8 +453,11 @@ def test_native_windows_promoted_choice_popup_is_bounded_at_real_right_edge():
     script = r'''
 import json
 import app_error_handler
-from PyQt5 import QtCore, QtWidgets
+from PyQt6 import QtCore, QtWidgets
 import adaptive_controls
+from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+
+prepare_generated_ui_imports()
 from forms.ui_cov_subgroup_dlg import Ui_cov_subgroup_dialog
 
 app = app_error_handler.get_or_create_application([])
@@ -472,7 +498,9 @@ result = {
     "tooltip_delta": controller.tooltip_scan_applied_count - baseline[1],
     "clamp_delta": controller.popup_clamp_applied_count - baseline[2],
     "horizontal_access": combo.view().horizontalScrollBar().maximum() > 0,
-    "tooltip_complete": combo.itemData(1, QtCore.Qt.ToolTipRole) == extreme,
+    "tooltip_complete": combo.itemData(
+        1, QtCore.Qt.ItemDataRole.ToolTipRole
+    ) == extreme,
 }
 print("NATIVE_CHOICE_POPUP=" + json.dumps(result))
 combo.hidePopup()
@@ -481,11 +509,13 @@ app.processEvents()
 '''
     environment = os.environ.copy()
     environment.pop("QT_QPA_PLATFORM", None)
+    environment["RCMS_QT6_BUILD_ROOT"] = str(
+        ROOT / "build" / "qt6-verification"
+    )
     environment["PYTHONPATH"] = os.pathsep.join(
         [
             str(ROOT / "src"),
             str(ROOT / "src" / "rc_metastudio"),
-            str(ROOT / "src" / "rc_metastudio" / "forms"),
         ]
     )
     completed = subprocess.run(
@@ -530,12 +560,194 @@ def test_method_parameters_default_and_cancel_keyboard_actions(qapp, monkeypatch
 
     accepted = make_dialog()
     accepted.method_cbo_box.setFocus()
-    QTest.keyClick(accepted.method_cbo_box, QtCore.Qt.Key_Return)
+    QTest.keyClick(accepted.method_cbo_box, QtCore.Qt.Key.Key_Return)
     qapp.processEvents()
-    assert accepted.result() == QtWidgets.QDialog.Accepted
+    assert accepted.result() == QtWidgets.QDialog.DialogCode.Accepted
 
     cancelled = make_dialog()
     cancelled.method_cbo_box.setFocus()
-    QTest.keyClick(cancelled.method_cbo_box, QtCore.Qt.Key_Escape)
+    QTest.keyClick(cancelled.method_cbo_box, QtCore.Qt.Key.Key_Escape)
     qapp.processEvents()
-    assert cancelled.result() == QtWidgets.QDialog.Rejected
+    assert cancelled.result() == QtWidgets.QDialog.DialogCode.Rejected
+    accepted.close()
+    cancelled.close()
+    qapp.processEvents()
+
+
+def test_dot_and_comma_decimal_locales_produce_equivalent_analysis_requests():
+    script = r'''
+import json
+from types import SimpleNamespace
+from PyQt6 import QtCore, QtWidgets
+from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+
+prepare_generated_ui_imports()
+import app_error_handler
+import ma_specs
+
+class Model:
+    current_effect = "OR"
+    dataset = SimpleNamespace(covariates=[])
+    def get_current_outcome_type(self):
+        return "binary"
+    def included_studies_have_raw_data(self):
+        return True
+
+backend = ma_specs.meta_py_r
+data_calls = []
+backend.ma_dataset_to_simple_binary_robj = lambda *args, **kwargs: data_calls.append("binary")
+backend.get_available_methods = lambda **kwargs: {"Random": "binary.random"}
+backend.get_params = lambda method: (
+    {"conf.level": "float"}, {"conf.level": 95.0}, ["conf.level"], {}
+)
+backend.get_method_description = lambda method: "Random-effects analysis"
+backend.get_analysis_plot_capabilities = lambda *args, **kwargs: []
+
+app = app_error_handler.get_or_create_application([])
+observed = []
+backend_calls = []
+execution_data_calls = []
+backend.run_binary_ma = lambda method, params: backend_calls.append(
+    [method, params["conf.level"]]
+) or {"texts": {}}
+for locale, text in (
+    (QtCore.QLocale(QtCore.QLocale.Language.English), "90.5"),
+    (QtCore.QLocale(QtCore.QLocale.Language.German), "90,5"),
+):
+    dialog = ma_specs.MA_Specs(Model(), conf_level=95.0)
+    confidence_inputs = dialog.parameter_grp_box.findChildren(
+        QtWidgets.QDoubleSpinBox
+    )
+    assert len(confidence_inputs) == 1
+    confidence_input = confidence_inputs[0]
+    confidence_input.setLocale(locale)
+    confidence_input.lineEdit().setText(text)
+    confidence_input.interpretText()
+    request = dialog.analysis_requests()[0]
+    observed.append(request.parameter_values()["conf.level"])
+    confidence_input.setValue(11.0)
+    data_calls.clear()
+    ma_specs._execute_analysis_requests(dialog.model, (request,))
+    execution_data_calls.extend(data_calls)
+    dialog.close()
+    app.processEvents()
+print("LOCALE_ANALYSIS_REQUESTS=" + json.dumps({
+    "requests": observed, "backend_calls": backend_calls,
+    "data_calls": execution_data_calls
+}))
+'''
+    environment = os.environ.copy()
+    environment["QT_QPA_PLATFORM"] = "offscreen"
+    environment["RCMS_STUB_BACKEND"] = "1"
+    environment["RCMS_QT6_BUILD_ROOT"] = str(
+        ROOT / "build" / "qt6-verification"
+    )
+    environment["PYTHONPATH"] = os.pathsep.join(
+        [str(ROOT / "src"), str(ROOT / "src" / "rc_metastudio")]
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+    marker = next(
+        line
+        for line in completed.stdout.splitlines()
+        if line.startswith("LOCALE_ANALYSIS_REQUESTS=")
+    )
+    assert json.loads(marker.split("=", 1)[1]) == {
+        "requests": [90.5, 90.5],
+        "backend_calls": [["binary.random", 90.5], ["binary.random", 90.5]],
+        "data_calls": ["binary", "binary"],
+    }
+
+
+def test_backend_execution_uses_only_frozen_analysis_requests(monkeypatch):
+    cases = [
+        ("binary", "standard", "run_binary_ma"),
+        ("binary", "cumulative", "run_workflow_analysis"),
+        ("continuous", "standard", "run_continuous_ma"),
+        ("continuous", "leave-one-out", "run_workflow_analysis"),
+        ("diagnostic", "standard", "run_diagnostic_multi"),
+        ("diagnostic", "subgroup", "run_diagnostic_workflow"),
+    ]
+    import analysis_adapter
+    import ma_specs
+
+    backend = ma_specs.meta_py_r
+    for converter in (
+        "ma_dataset_to_simple_binary_robj",
+        "ma_dataset_to_simple_continuous_robj",
+        "ma_dataset_to_simple_diagnostic_robj",
+    ):
+        monkeypatch.setattr(backend, converter, lambda *_args, **_kwargs: None)
+
+    for data_type, workflow, backend_name in cases:
+        calls = []
+
+        def capture(*args):
+            calls.append(args)
+            return {"texts": {"Summary": "ok"}, "images": {}}
+
+        monkeypatch.setattr(backend, backend_name, capture)
+        metric = "DOR" if data_type == "diagnostic" else "OR"
+        mutable_parameters = {"conf.level": 90.5, "measure": metric}
+        request = analysis_adapter.make_analysis_request(
+            data_type=data_type,
+            workflow=workflow,
+            method="diagnostic.random" if data_type == "diagnostic" else data_type + ".random",
+            metric=metric,
+            parameters=mutable_parameters,
+        )
+        mutable_parameters["conf.level"] = 1.0
+        mutable_parameters["measure"] = "MUTATED"
+
+        ma_specs._execute_analysis_requests(_AnalysisModel(data_type), (request,))
+
+        rendered = repr(calls)
+        assert "90.5" in rendered
+        assert "MUTATED" not in rendered
+        assert (workflow in rendered) is (workflow != "standard")
+
+
+def test_meta_regression_backend_execution_uses_frozen_request(monkeypatch):
+    import analysis_adapter
+    import ma_specs
+
+    calls = []
+    model = _AnalysisModel("continuous")
+    parameters = {"conf.level": 90.5, "measure": "SMD", "bp_xlabel": "Year"}
+    request = analysis_adapter.make_analysis_request(
+        data_type="continuous",
+        workflow="meta-regression",
+        method="meta_regression",
+        metric="SMD",
+        parameters=parameters,
+    )
+    parameters["conf.level"] = 1.0
+    monkeypatch.setattr(
+        ma_specs.meta_py_r,
+        "ma_dataset_to_simple_continuous_robj",
+        lambda model, **kwargs: calls.append(("data", kwargs)),
+    )
+    monkeypatch.setattr(
+        ma_specs.meta_py_r,
+        "run_meta_regression",
+        lambda *args, **kwargs: calls.append(("backend", args, kwargs)) or {},
+    )
+
+    ma_specs._execute_meta_regression_request(
+        model, ("study",), ("covariate",), request, True, 95.0
+    )
+
+    rendered = repr(calls)
+    assert "90.5" in rendered
+    assert "1.0" not in rendered
+    assert "SMD" in rendered
+    assert "study" in rendered
+    assert "covariate" in rendered

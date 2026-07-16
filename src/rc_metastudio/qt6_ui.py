@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import importlib
 import importlib.util
 import os
 from pathlib import Path
@@ -97,4 +98,8 @@ def prepare_generated_ui_imports(
         if text in sys.path:
             sys.path.remove(text)
         sys.path.insert(0, text)
+    generated_forms = importlib.import_module("forms")
+    generated_file = getattr(generated_forms, "__file__", None)
+    if generated_file is None or package_root not in Path(generated_file).resolve().parents:
+        raise RuntimeError("generated forms package did not bind to the Qt6 build output")
     return GeneratedUiLayout(resolved_build, package_root, forms_root)

@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import QDialog
 
 from meta_globals import DEFAULT_CONF_LEVEL, CONFIDENCE_LEVEL_DISPLAY_MAX
 import adaptive_window
-import forms.ui_conf_level_dialog
+import forms.ui_conf_level_dialog  # ty: ignore[unresolved-import]
 
 
 class ChangeConfLevelDlg(

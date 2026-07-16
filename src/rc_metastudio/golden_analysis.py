@@ -1,6 +1,7 @@
 import json
 import datetime
 import hashlib
+from importlib import metadata
 import os
 import platform
 import re
@@ -195,7 +196,11 @@ def write_golden_coverage_matrix(report_path, root_dir=None, method_discoverer=N
 
 def comprehensive_golden_baseline_manifest(root_dir=None, timestamp=None):
     captured_at = (
-        timestamp or datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+        timestamp
+        or datetime.datetime.now(datetime.timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
     )
     return {
         "baseline": "comprehensive-golden",
@@ -402,8 +407,14 @@ def curated_golden_bundles(root_dir=None):
             "adjust": 0.5,
         },
     )
-    binary_regression_params = {"conf.level": 95.0}
-    continuous_regression_params = {"conf.level": 95.0}
+    regression_path = _analysis_output_path("reg.png")
+    regression_display_path = _analysis_output_path("reg.display.svg")
+    binary_regression_params = {
+        "conf.level": 95.0,
+        "bp_outpath": regression_path,
+        "bp_display_path": regression_display_path,
+    }
+    continuous_regression_params = dict(binary_regression_params)
     binary_subgroup_params = dict(
         binary_params,
         **{
@@ -440,6 +451,19 @@ def curated_golden_bundles(root_dir=None):
         continuous_params,
         **{"fp_outpath": _analysis_output_path("golden_continuous_loo_forest.png")},
     )
+    for plot_params in (
+        binary_params,
+        continuous_params,
+        diagnostic_params,
+        binary_subgroup_params,
+        continuous_subgroup_params,
+        binary_cumulative_params,
+        binary_loo_params,
+        continuous_cumulative_params,
+        continuous_loo_params,
+    ):
+        root, _extension = os.path.splitext(str(plot_params["fp_outpath"]))
+        plot_params["fp_display_path"] = root + ".display.svg"
     amino_group = dict(
         (name, "early" if i % 2 == 0 else "late")
         for i, name in enumerate(
@@ -744,11 +768,14 @@ def curated_golden_bundles(root_dir=None):
 
 
 def parsed_numeric_sections(result):
-    return dict(
-        (name, _parse_summary(text))
-        for name, text in result.get("texts", {}).items()
-        if _parse_summary(text)
-    )
+    parsed = {}
+    for name, text in result.get("texts", {}).items():
+        values = _parse_summary(text)
+        values.update(_parse_result_table(text))
+        values.update(_parse_weights(text))
+        if values:
+            parsed[name] = values
+    return parsed
 
 
 def compare_bundle(bundle, result):
@@ -856,7 +883,11 @@ def capture_bundle(
 ):
     runner = runner or headless_analysis.run_headless_analysis
     captured_at = (
-        timestamp or datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+        timestamp
+        or datetime.datetime.now(datetime.timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
     )
     capture_mode = capture_mode or os.environ.get(
         "RCMS_GOLDEN_CAPTURE_MODE", "local-debug"
@@ -898,6 +929,7 @@ def capture_bundle(
                 "outputs": parsed_numeric_sections(result),
                 "texts": result.get("texts", {}),
                 "artifacts": _capture_artifacts(bundle, result),
+                "plot_descriptors": _capture_plot_descriptors(bundle, result),
             }
         )
     except Exception as exc:
@@ -989,6 +1021,48 @@ def _capture_artifacts(bundle, result):
     return artifacts
 
 
+def _capture_plot_descriptors(bundle, result):
+    displays = result.get("display_images", {})
+    capabilities = result.get("plot_capabilities", {})
+    descriptors = []
+    for label in sorted(bundle.get("artifacts", {})):
+        display_label = _matching_key(displays, label)
+        display_path = displays.get(display_label) if display_label is not None else None
+        capability_label = _matching_key(capabilities, label)
+        capability = (
+            capabilities.get(capability_label, {})
+            if capability_label is not None
+            else {}
+        )
+        descriptors.append(
+            {
+                "artifact_label": label,
+                "display": {
+                    "identity": display_label,
+                    "name": os.path.basename(display_path) if display_path else None,
+                    "type": (
+                        os.path.splitext(display_path)[1].lower().lstrip(".")
+                        if display_path
+                        else None
+                    ),
+                    "sha256": (
+                        _sha256(display_path)
+                        if display_path and os.path.exists(display_path)
+                        else None
+                    ),
+                },
+                "capability": {
+                    "kind": capability.get("plot_kind"),
+                    "editable": capability.get("editable"),
+                    "styleable": capability.get("styleable"),
+                    "composition": capability.get("composition"),
+                    "regeneration": capability.get("regenerator"),
+                },
+            }
+        )
+    return descriptors
+
+
 def _preserve_capture_artifacts(capture, bundle_id, artifacts_dir):
     bundle_dir = os.path.join(artifacts_dir, bundle_id)
     _ensure_dir(bundle_dir)
@@ -1046,12 +1120,11 @@ def _tool_versions():
         versions["r"] = meta_py_r.get_r_version_string()
     except Exception:
         versions["r"] = None
-    try:
-        import rpy2
-
-        versions["rpy2"] = getattr(rpy2, "__version__", None)
-    except Exception:
-        versions["rpy2"] = None
+    for distribution in ("rpy2", "rpy2-rinterface", "rpy2-robjects"):
+        try:
+            versions[distribution] = metadata.version(distribution)
+        except metadata.PackageNotFoundError:
+            versions[distribution] = None
     versions["pyqt"] = _pyqt_version()
     return versions
 
@@ -1071,6 +1144,8 @@ def _package_versions(tool_versions):
         "rc_metastudio": tool_versions.get("rc_metastudio"),
         "r": tool_versions.get("r"),
         "rpy2": tool_versions.get("rpy2"),
+        "rpy2-rinterface": tool_versions.get("rpy2-rinterface"),
+        "rpy2-robjects": tool_versions.get("rpy2-robjects"),
         "pyqt": tool_versions.get("pyqt"),
         "RCMetaR": _r_package_version(RCMetaR_R_PACKAGE),
     }
@@ -1163,7 +1238,7 @@ def _parse_summary(text):
         re.S,
     )
     heterogeneity = re.search(
-        r"Heterogeneity.*?\n\s*(?:tau\^2|τ²|Q).*?\n\s*((?:%s%%?\s+){3}%s%%?)"
+        r"Heterogeneity.*?\n\s*(?:tau\^2|τ²|t²|Q).*?\n\s*((?:%s%%?\s+){3}%s%%?)"
         % (number, number),
         text,
         re.S,
@@ -1177,16 +1252,143 @@ def _parse_summary(text):
                 "p_value": _to_float(model.group(4)),
             }
         )
+        if "Std. error" in model.group(0).splitlines()[0]:
+            model_numbers = re.findall(number, model.group(0).splitlines()[-1])
+            if len(model_numbers) >= 5:
+                values["standard_error"] = _to_float(model_numbers[-2])
     if heterogeneity:
         row = re.findall(number, heterogeneity.group(1))
         values.update(
             {
                 "tau_squared": _to_float(row[0]),
                 "q": _to_float(row[1]),
+                "heterogeneity_p_value": _to_float(row[2]),
                 "i_squared": _to_float(row[3]),
             }
         )
+        degrees = re.search(r"Q\(df=(\d+)\)", text)
+        if degrees:
+            values["heterogeneity_df"] = _to_float(degrees.group(1))
+    calculation_scale = re.search(
+        r"Calculation scale:\s*([^\n]+?)\s*-\s*estimate:\s*(%s),\s*"
+        r"lower:\s*(%s),\s*upper:\s*(%s),\s*std\. error:\s*(%s)"
+        % (number, number, number, number),
+        text,
+    )
+    if calculation_scale:
+        values.update(
+            {
+                "calculation_scale.estimate": _to_float(calculation_scale.group(2)),
+                "calculation_scale.lower_bound": _to_float(calculation_scale.group(3)),
+                "calculation_scale.upper_bound": _to_float(calculation_scale.group(4)),
+                "calculation_scale.standard_error": _to_float(
+                    calculation_scale.group(5)
+                ),
+            }
+        )
+    study_count = re.search(r"\(k\s*=\s*(\d+)\)", text)
+    if study_count:
+        values["study_count"] = _to_float(study_count.group(1))
     return values
+
+
+def _parse_result_table(text):
+    values = {}
+    lines = text.splitlines()
+    is_regression = any("Covariate" in line and "Coefficients" in line for line in lines)
+    is_subgroup = any("Subgroups" in line and "Studies" in line for line in lines)
+    in_heterogeneity = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped == "Heterogeneity":
+            in_heterogeneity = True
+            continue
+        if not stripped or stripped.startswith(("Model Results", "Metric:")):
+            continue
+        if in_heterogeneity:
+            match = re.match(
+                r"^\s*(.+?)\s{2,}(-?\d+(?:\.\d+)?)\s+\((\d+)\)\s+"
+                r"(?:<\s*)?(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)%\s*$",
+                line,
+            )
+            if match:
+                prefix = "heterogeneity.%s" % _result_row_key(match.group(1))
+                values.update(
+                    {
+                        "%s.q" % prefix: _to_float(match.group(2)),
+                        "%s.df" % prefix: _to_float(match.group(3)),
+                        "%s.p_value" % prefix: _to_float(match.group(4)),
+                        "%s.i_squared" % prefix: _to_float(match.group(5)),
+                    }
+                )
+            continue
+        if is_subgroup:
+            match = re.match(
+                r"^\s*(.+?)\s{2,}(\d+)\s+(-?\d+(?:\.\d+)?)\s+"
+                r"(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+"
+                r"(-?\d+(?:\.\d+)?)\s+(?:<\s*)?(-?\d+(?:\.\d+)?)"
+                r"(?:\s+(-?\d+(?:\.\d+)?))?\s*$",
+                line,
+            )
+            if match:
+                prefix = "model.%s" % _result_row_key(match.group(1))
+                names = (
+                    "studies",
+                    "estimate",
+                    "lower_bound",
+                    "upper_bound",
+                    "standard_error",
+                    "p_value",
+                    "z_value",
+                )
+                for metric, raw in zip(names, match.groups()[1:]):
+                    if raw is not None:
+                        values["%s.%s" % (prefix, metric)] = _to_float(raw)
+            continue
+        match = re.match(
+            r"^\s*([+\-]?\s*.+?)\s{2,}(-?\d+(?:\.\d+)?)\s+"
+            r"(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+"
+            r"(-?\d+(?:\.\d+)?)(?:\s+(?:<\s*)?(-?\d+(?:\.\d+)?))?\s*$",
+            line,
+        )
+        if match:
+            prefix = "model.%s" % _result_row_key(match.group(1))
+            first_metric = "coefficient" if is_regression else "estimate"
+            names = (
+                first_metric,
+                "lower_bound",
+                "upper_bound",
+                "standard_error",
+                "p_value",
+            )
+            for metric, raw in zip(names, match.groups()[1:]):
+                if raw is not None:
+                    values["%s.%s" % (prefix, metric)] = _to_float(raw)
+    if is_regression:
+        omnibus = re.search(r"Omnibus p-value\s*\n\s*(?:<\s*)?(-?\d+(?:\.\d+)?)", text)
+        if omnibus:
+            values["omnibus.p_value"] = _to_float(omnibus.group(1))
+    return values
+
+
+def _parse_weights(text):
+    values = {}
+    for name, raw in re.findall(r"^\s*(.+?)\s*:\s*(-?\d+(?:\.\d+)?)%\s*$", text, re.M):
+        values["weight.%s" % _slug(name)] = _to_float(raw)
+    return values
+
+
+def _result_row_key(label):
+    stripped = str(label).strip()
+    if stripped.startswith("+"):
+        return "through_%s" % _slug(stripped[1:])
+    if stripped.startswith("-"):
+        return "without_%s" % _slug(stripped[1:])
+    return _slug(stripped)
+
+
+def _slug(value):
+    return re.sub(r"[^a-z0-9]+", "_", str(value).strip().lower()).strip("_")
 
 
 def _parse_structured_summary_display(text):
@@ -1235,7 +1437,7 @@ def _extract_model_values(row):
 def _extract_heterogeneity_values(row):
     extracted = {}
     for label, value in row.items():
-        if label in {"tau^2", "τ²"}:
+        if label in {"tau^2", "τ²", "t²"}:
             extracted["tau_squared"] = _to_float(value)
         elif label.startswith("Q("):
             extracted["q"] = _to_float(value)

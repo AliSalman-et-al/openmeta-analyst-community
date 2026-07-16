@@ -1,0 +1,84 @@
+{
+  "contract": "qt6-golden-plot-descriptors",
+  "oracle_sha256": "73f0973b0916d202e2d95ad83f3b7ac0622439ecf5501a05b74c9a7c2ae0e938",
+  "rows": [
+    {
+      "artifact_label": "Forest Plot",
+      "artifact_oracle_sha256": "29a444f08865f46279b60e9f172c0aec0b03713c6256feee31e3a6cf41b1e06e",
+      "capability": {"composition": "single", "editable": true, "kind": "forest", "regeneration": "forest", "styleable": true},
+      "display": {"content_required": true, "identity": "Forest Plot", "name": "golden_amino_forest.display.svg", "type": "svg"},
+      "id": "amino-binary-random"
+    },
+    {
+      "artifact_label": "Forest Plot",
+      "artifact_oracle_sha256": "bdcebe7c30eb71c66172a2404676d597492fc200e22aa1dc25a90d460a0594ba",
+      "capability": {"composition": "single", "editable": true, "kind": "forest", "regeneration": "forest", "styleable": true},
+      "display": {"content_required": true, "identity": "Forest Plot", "name": "golden_continuous_forest.display.svg", "type": "svg"},
+      "id": "continuous-random"
+    },
+    {
+      "artifact_label": "Odds Ratio Forest Plot",
+      "artifact_oracle_sha256": "bdb7e6ba38e3508388d2e895075b4f935d3d96c8ed89b8def09793f904dfe1cd",
+      "capability": {"composition": "single", "editable": true, "kind": "forest", "regeneration": "forest", "styleable": true},
+      "display": {"content_required": true, "identity": "Odds Ratio Forest Plot", "name": "golden_lymph_forest_dor.display.svg", "type": "svg"},
+      "id": "lymph-diagnostic-random-dor"
+    },
+    {
+      "artifact_label": "Cumulative Forest Plot",
+      "artifact_oracle_sha256": "f32e5e5048bb4d5b83d9107d4ef368a6d206704cb31044c51c2eb2299ba52883",
+      "capability": {"composition": "single", "editable": true, "kind": "cumulative_forest", "regeneration": "forest", "styleable": true},
+      "display": {"content_required": true, "identity": "Cumulative Forest Plot", "name": "golden_amino_cumulative_forest.display.svg", "type": "svg"},
+      "id": "amino-binary-cumulative"
+    },
+    {
+      "artifact_label": "Leave-one-out Forest plot",
+      "artifact_oracle_sha256": "63c23790b162989e9401948cd39ed9e86bd52032921ed89cc7f05a1596484ada",
+      "capability": {"composition": "single", "editable": true, "kind": "leave_one_out_forest", "regeneration": "forest", "styleable": true},
+      "display": {"content_required": true, "identity": "Leave-one-out Forest Plot", "name": "golden_amino_loo_forest.display.svg", "type": "svg"},
+      "id": "amino-binary-leave-one-out"
+    },
+    {
+      "artifact_label": "Cumulative Forest Plot",
+      "artifact_oracle_sha256": "e5d823c55ef871f89227eb292a697d04fb5431d7337d1f1f972a4590489bad97",
+      "capability": {"composition": "single", "editable": true, "kind": "cumulative_forest", "regeneration": "forest", "styleable": true},
+      "display": {"content_required": true, "identity": "Cumulative Forest Plot", "name": "golden_continuous_cumulative_forest.display.svg", "type": "svg"},
+      "id": "continuous-cumulative"
+    },
+    {
+      "artifact_label": "Leave-one-out Forest plot",
+      "artifact_oracle_sha256": "a6779e3113ce785bd29336c040dd0125ac77a9138c87244e385398940731c295",
+      "capability": {"composition": "single", "editable": true, "kind": "leave_one_out_forest", "regeneration": "forest", "styleable": true},
+      "display": {"content_required": true, "identity": "Leave-one-out Forest Plot", "name": "golden_continuous_loo_forest.display.svg", "type": "svg"},
+      "id": "continuous-leave-one-out"
+    },
+    {
+      "artifact_label": "Regression Plot",
+      "artifact_oracle_sha256": "0a19afbb9289048e032ef491b36d44d914c23ec4c228dbdf7019d942b29b3f69",
+      "capability": {"composition": "single", "editable": true, "kind": "regression", "regeneration": "regression", "styleable": true},
+      "display": {"content_required": true, "identity": "Regression Plot", "name": "reg.display.svg", "type": "svg"},
+      "id": "amino-binary-meta-regression"
+    },
+    {
+      "artifact_label": "Regression Plot",
+      "artifact_oracle_sha256": "78e932fb84ffce04c72602adad56cdb18a13659248852d8859886ba075f96437",
+      "capability": {"composition": "single", "editable": true, "kind": "regression", "regeneration": "regression", "styleable": true},
+      "display": {"content_required": true, "identity": "Regression Plot", "name": "reg.display.svg", "type": "svg"},
+      "id": "continuous-meta-regression"
+    },
+    {
+      "artifact_label": "Subgroup Forest Plot",
+      "artifact_oracle_sha256": "ad7bebe583c222575d77ec6c3175336017f0449b4c598f30399baaafb320dcd4",
+      "capability": {"composition": "single", "editable": true, "kind": "subgroup_forest", "regeneration": "forest", "styleable": true},
+      "display": {"content_required": true, "identity": "Subgroup Forest Plot", "name": "golden_amino_subgroup_forest.display.svg", "type": "svg"},
+      "id": "amino-binary-subgroup"
+    },
+    {
+      "artifact_label": "Subgroups Forest Plot",
+      "artifact_oracle_sha256": "079cb7bad3992a84030120f3d7a0c5d7887f6d7d281d6902bc6de73d97a6c8e6",
+      "capability": {"composition": "single", "editable": true, "kind": "subgroup_forest", "regeneration": "forest", "styleable": true},
+      "display": {"content_required": true, "identity": "Subgroups Forest Plot", "name": "golden_continuous_subgroup_forest.display.svg", "type": "svg"},
+      "id": "continuous-subgroup"
+    }
+  ],
+  "schema_version": 1
+}

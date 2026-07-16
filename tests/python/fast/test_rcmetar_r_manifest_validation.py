@@ -510,7 +510,13 @@ def test_RCMetaR_namespace_preserves_s4_classes_explicitly():
 def test_python_app_calls_r_through_meta_py_r_adapter():
     offenders = []
     for path in APP_SRC.glob("*.py"):
-        if path.name == "meta_py_r.py":
+        if path.name in {
+            "meta_py_r.py",
+            # The native macOS feasibility probe is deployment qualification,
+            # not an application analysis path. It must prove rpy2 directly in
+            # both source and the frozen probe before the app adapter is loaded.
+            "qt6_macos_feasibility.py",
+        }:
             continue
         text = path.read_text(encoding="utf-8")
         if re.search(r"\b(?:execute_r_string|execute_r_function)\s*\(|\bro\.r\b", text):
