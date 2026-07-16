@@ -77,9 +77,11 @@ def _write_bundle(root: Path) -> None:
                     "applicable": False,
                     "attempts": None,
                     "focusable_count": 0,
+                    "focusables": [],
                     "initial": None,
                     "initial_descendant": False,
                     "moved": False,
+                    "traversed": [],
                 }
                 if action_contract == "none"
                 else {
@@ -89,9 +91,11 @@ def _write_bundle(root: Path) -> None:
                     "applicable": True,
                     "attempts": 1,
                     "focusable_count": 2,
+                    "focusables": ["firstControl", "secondControl"],
                     "initial": "firstControl",
                     "initial_descendant": True,
                     "moved": True,
+                    "traversed": ["firstControl", "secondControl"],
                 }
             )
             surfaces[surface_id] = {
@@ -222,6 +226,19 @@ def test_native_remaining_surface_evidence_accepts_relocated_four_scale_bundle(t
     assert [record["scale_factor"] for record in records] == list(native_smoke.SCALE_FACTORS)
 
 
+def test_native_remaining_surface_evidence_accepts_cocoa_focus_sequences(tmp_path):
+    _write_bundle(tmp_path)
+    for scale in native_smoke.SCALE_FACTORS:
+        record_path = native_smoke._record_path(tmp_path, scale)
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+        record["qpa"] = "cocoa"
+        record_path.write_text(json.dumps(record), encoding="utf-8")
+
+    records = native_smoke.validate_evidence(tmp_path)
+
+    assert {record["qpa"] for record in records} == {"cocoa"}
+
+
 def test_native_remaining_surface_evidence_rejects_hash_tampering(tmp_path):
     _write_bundle(tmp_path)
     record_path = native_smoke._record_path(tmp_path, 1.0)
@@ -280,6 +297,24 @@ def test_native_remaining_surface_evidence_rejects_unmoved_focus(tmp_path):
     focus = record["surfaces"]["add-group"]["focus"]
     focus["after_tab"] = focus["initial"]
     focus["moved"] = False
+    record_path.write_text(json.dumps(record), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="focus traversal was not observed"):
+        native_smoke.validate_evidence(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "invalid",
+    [[], ["firstControl", ""], ["firstControl"], ["firstControl", "globalControl"]],
+)
+def test_native_remaining_surface_evidence_rejects_invalid_focus_sequence(
+    tmp_path, invalid
+):
+    _write_bundle(tmp_path)
+    record_path = native_smoke._record_path(tmp_path, 1.0)
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    record["qpa"] = "cocoa"
+    record["surfaces"]["about-legal"]["focus"]["traversed"] = invalid
     record_path.write_text(json.dumps(record), encoding="utf-8")
 
     with pytest.raises(ValueError, match="focus traversal was not observed"):

@@ -362,6 +362,28 @@ def test_about_legal_has_explicit_overflow_and_reachable_action(qapp):
         assert dialog.content_scroll_area.lineWrapMode() != (
             QtWidgets.QTextEdit.LineWrapMode.NoWrap
         )
+        assert dialog.content_scroll_area.tabChangesFocus()
+        assert dialog.content_scroll_area.accessibleName()
+        assert close_button.objectName() == "about_legal_close_button"
+        assert close_button.accessibleName()
+        assert close_button.focusPolicy() & QtCore.Qt.FocusPolicy.TabFocus
+        dialog.content_scroll_area.setFocus(QtCore.Qt.FocusReason.TabFocusReason)
+        qapp.processEvents()
+        assert qapp.focusWidget() is dialog.content_scroll_area
+        press = QtGui.QKeyEvent(
+            QtCore.QEvent.Type.KeyPress,
+            QtCore.Qt.Key.Key_Tab,
+            QtCore.Qt.KeyboardModifier.NoModifier,
+        )
+        release = QtGui.QKeyEvent(
+            QtCore.QEvent.Type.KeyRelease,
+            QtCore.Qt.Key.Key_Tab,
+            QtCore.Qt.KeyboardModifier.NoModifier,
+        )
+        QtCore.QCoreApplication.sendEvent(dialog, press)
+        QtCore.QCoreApplication.sendEvent(dialog, release)
+        qapp.processEvents()
+        assert qapp.focusWidget() is close_button
     finally:
         dialog.close()
         qapp.processEvents()

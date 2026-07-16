@@ -274,9 +274,11 @@ def _validate_focus_observation(surface_id: str, observation: object) -> None:
         "applicable",
         "attempts",
         "focusable_count",
+        "focusables",
         "initial",
         "initial_descendant",
         "moved",
+        "traversed",
     }:
         raise ValueError("remaining-surface %s focus observation drifted" % surface_id)
     focus = cast(dict[str, object], observation)
@@ -284,18 +286,24 @@ def _validate_focus_observation(surface_id: str, observation: object) -> None:
     if applicable is False:
         if surface_id not in {"analysis-progress", "import-progress", "shared-progress", "startup-splash"}:
             raise ValueError("remaining-surface %s unexpectedly lacks focus traversal" % surface_id)
-        if any(
-            focus[key] is not None
-            for key in ("after_tab", "attempts", "initial")
-        ) or any(
-            focus[key] is not False
-            for key in (
-                "after_tab_descendant",
-                "after_tab_focusable",
-                "initial_descendant",
-                "moved",
+        if (
+            any(
+                focus[key] is not None
+                for key in ("after_tab", "attempts", "initial")
             )
-        ) or focus["focusable_count"] != 0:
+            or any(
+                focus[key] is not False
+                for key in (
+                    "after_tab_descendant",
+                    "after_tab_focusable",
+                    "initial_descendant",
+                    "moved",
+                )
+            )
+            or focus["focusable_count"] != 0
+            or focus["focusables"] != []
+            or focus["traversed"] != []
+        ):
             raise ValueError("remaining-surface %s focus exemption is malformed" % surface_id)
         return
     if applicable is not True:
@@ -309,12 +317,22 @@ def _validate_focus_observation(surface_id: str, observation: object) -> None:
         or focus["attempts"] < 1
         or type(focus["focusable_count"]) is not int
         or focus["focusable_count"] < 2
-        or focus["attempts"] > focus["focusable_count"] + 1
+        or not isinstance(focus["focusables"], list)
+        or len(focus["focusables"]) != focus["focusable_count"]
+        or any(not isinstance(item, str) or not item for item in focus["focusables"])
+        or len(set(focus["focusables"])) != focus["focusable_count"]
+        or focus["attempts"] > focus["focusable_count"] * 2
         or focus["initial_descendant"] is not True
         or focus["after_tab_descendant"] is not True
         or focus["after_tab_focusable"] is not True
         or focus["moved"] is not True
         or focus["initial"] == focus["after_tab"]
+        or not isinstance(focus["traversed"], list)
+        or len(focus["traversed"]) != focus["attempts"] + 1
+        or focus["traversed"][0] != focus["initial"]
+        or focus["traversed"][-1] != focus["after_tab"]
+        or any(not isinstance(item, str) or not item for item in focus["traversed"])
+        or any(item not in focus["focusables"] for item in focus["traversed"])
     ):
         raise ValueError("remaining-surface %s focus traversal was not observed" % surface_id)
 
@@ -443,11 +461,12 @@ def _widget_identity(window, widget) -> str:
     return "%s[%s]" % (type(widget).__name__, siblings.index(widget))
 
 
-def _observe_focus_traversal(app, window, QtCore, QtWidgets, QTest) -> dict[str, object]:
+def _observe_focus_traversal(app, window, QtCore, QtGui, QtWidgets) -> dict[str, object]:
+    tab_focus = QtCore.Qt.FocusPolicy.TabFocus
     focusables = [
         widget
         for widget in window.findChildren(QtWidgets.QWidget)
-        if widget.focusPolicy() != QtCore.Qt.FocusPolicy.NoFocus
+        if widget.focusPolicy() & tab_focus
         and widget.isVisible()
         and widget.isEnabled()
     ]
@@ -459,23 +478,42 @@ def _observe_focus_traversal(app, window, QtCore, QtWidgets, QTest) -> dict[str,
             "applicable": False,
             "attempts": None,
             "focusable_count": 0,
+            "focusables": [],
             "initial": None,
             "initial_descendant": False,
             "moved": False,
+            "traversed": [],
         }
+    window.raise_()
+    window.activateWindow()
+    focusables[0].setFocus(QtCore.Qt.FocusReason.TabFocusReason)
+    app.processEvents()
     initial_widget = app.focusWidget()
+    focusable_identities = [_widget_identity(window, widget) for widget in focusables]
     initial = _widget_identity(window, initial_widget)
     initial_descendant = bool(initial)
     current = initial_widget
     after = ""
     attempts = 0
-    for attempts in range(1, len(focusables) + 2):
-        QTest.keyClick(
-            cast(QtWidgets.QWidget | None, current), QtCore.Qt.Key.Key_Tab
-        )
+    traversed = [initial] if initial else []
+    keys = (
+        (QtCore.Qt.Key.Key_Tab, QtCore.Qt.KeyboardModifier.NoModifier),
+        (QtCore.Qt.Key.Key_Backtab, QtCore.Qt.KeyboardModifier.ShiftModifier),
+    )
+    for attempts in range(1, len(focusables) * 2 + 1):
+        key, modifiers = keys[(attempts - 1) % len(keys)]
+        for event_type in (
+            QtCore.QEvent.Type.KeyPress,
+            QtCore.QEvent.Type.KeyRelease,
+        ):
+            event = QtGui.QKeyEvent(event_type, key, modifiers)
+            # Deliver at the top-level surface so Cocoa cannot consume Tab in a
+            # native child editor before QWidget's focus-chain handling sees it.
+            QtCore.QCoreApplication.sendEvent(window, event)
         app.processEvents()
         current = app.focusWidget()
         after = _widget_identity(window, current)
+        traversed.append(after)
         if after and current is not initial_widget:
             break
     return {
@@ -485,9 +523,11 @@ def _observe_focus_traversal(app, window, QtCore, QtWidgets, QTest) -> dict[str,
         "applicable": True,
         "attempts": attempts,
         "focusable_count": len(focusables),
+        "focusables": focusable_identities,
         "initial": initial or None,
         "initial_descendant": initial_descendant,
         "moved": bool(after) and current is not initial_widget,
+        "traversed": traversed,
     }
 
 
@@ -713,7 +753,7 @@ def _observe_window_contract(window, adaptive_window) -> dict[str, object]:
 
 def _run_scale(scale: float, evidence_root: Path) -> None:
     os.environ.setdefault("RCMS_STUB_BACKEND", "1")
-    from PyQt6 import QtCore, QtWidgets
+    from PyQt6 import QtCore, QtGui, QtWidgets
     from PyQt6.QtTest import QTest
     from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
@@ -747,7 +787,7 @@ def _run_scale(scale: float, evidence_root: Path) -> None:
             observed_contract = _observe_window_contract(window, adaptive_window)
             observed_overflow = _observe_overflow(window, QtWidgets)
             focus = _observe_focus_traversal(
-                app, window, QtCore, QtWidgets, QTest
+                app, window, QtCore, QtGui, QtWidgets
             )
             accessible = True
             for view in window.findChildren(QtWidgets.QAbstractItemView):
