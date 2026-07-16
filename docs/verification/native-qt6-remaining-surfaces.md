@@ -11,6 +11,8 @@ Each retained capture has the closed-world path
 `scale-{factor}/{surface-id}.png`; all 60 paths must be unique.
 Focus, actions, geometry ownership, archetype, and overflow are observed
 from live Qt controls and adaptive controllers rather than copied metadata.
+macOS evidence enables all-control keyboard navigation before Qt starts,
+then requires injected Tab/Backtab events themselves to move focus.
 
 | Surface | Canonical form | Contract | Native evidence |
 | --- | --- | --- | --- |

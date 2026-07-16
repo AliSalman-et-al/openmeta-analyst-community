@@ -149,11 +149,18 @@ def validate_evidence(root: Path = DEFAULT_EVIDENCE_ROOT) -> list[dict[str, obje
     seen_capture_paths: set[str] = set()
     for scale in SCALE_FACTORS:
         record = json.loads(_record_path(root, scale).read_text(encoding="utf-8"))
-        if set(record) != {"qpa", "scale_factor", "surfaces"}:
+        if set(record) != {
+            "qpa",
+            "scale_factor",
+            "surfaces",
+            "tab_focus_behavior",
+        }:
             raise ValueError("remaining-surface evidence record fields drifted")
         qpa = record["qpa"]
         if qpa not in {"windows", "cocoa"}:
             raise ValueError("remaining-surface evidence is not native hosted Qt")
+        if record["tab_focus_behavior"] != "TabFocusAllControls":
+            raise ValueError("remaining-surface evidence lacks all-control keyboard navigation")
         if abs(_number(record["scale_factor"], "scale") - scale) > TOLERANCE:
             raise ValueError("remaining-surface evidence scale does not match")
         surfaces = record["surfaces"]
@@ -278,6 +285,7 @@ def _validate_focus_observation(surface_id: str, observation: object) -> None:
         "initial",
         "initial_descendant",
         "moved",
+        "steps",
         "traversed",
     }:
         raise ValueError("remaining-surface %s focus observation drifted" % surface_id)
@@ -302,6 +310,7 @@ def _validate_focus_observation(surface_id: str, observation: object) -> None:
             )
             or focus["focusable_count"] != 0
             or focus["focusables"] != []
+            or focus["steps"] != []
             or focus["traversed"] != []
         ):
             raise ValueError("remaining-surface %s focus exemption is malformed" % surface_id)
@@ -327,6 +336,8 @@ def _validate_focus_observation(surface_id: str, observation: object) -> None:
         or focus["after_tab_focusable"] is not True
         or focus["moved"] is not True
         or focus["initial"] == focus["after_tab"]
+        or not isinstance(focus["steps"], list)
+        or len(focus["steps"]) != focus["attempts"]
         or not isinstance(focus["traversed"], list)
         or len(focus["traversed"]) != focus["attempts"] + 1
         or focus["traversed"][0] != focus["initial"]
@@ -335,6 +346,29 @@ def _validate_focus_observation(surface_id: str, observation: object) -> None:
         or any(item not in focus["focusables"] for item in focus["traversed"])
     ):
         raise ValueError("remaining-surface %s focus traversal was not observed" % surface_id)
+    steps = cast(list[object], focus["steps"])
+    traversed = cast(list[str], focus["traversed"])
+    for index, raw_step in enumerate(steps):
+        if not isinstance(raw_step, dict) or set(raw_step) != {
+            "direction",
+            "focus",
+            "kind",
+            "returned",
+        }:
+            raise ValueError("remaining-surface %s focus traversal step drifted" % surface_id)
+        step = cast(dict[str, object], raw_step)
+        expected_direction = "forward" if index % 2 == 0 else "backward"
+        if (
+            step["direction"] != expected_direction
+            or step["focus"] != traversed[index + 1]
+            or step["focus"] not in focus["focusables"]
+            or step["kind"] != "key-event"
+            or step["returned"] is not None
+        ):
+            raise ValueError("remaining-surface %s focus traversal step drifted" % surface_id)
+        changed = step["focus"] != traversed[index]
+        if changed != (index == len(steps) - 1):
+            raise ValueError("remaining-surface %s key traversal protocol drifted" % surface_id)
 
 
 def _validate_action_observation(surface_id: str, observation: object) -> None:
@@ -482,6 +516,7 @@ def _observe_focus_traversal(app, window, QtCore, QtGui, QtWidgets) -> dict[str,
             "initial": None,
             "initial_descendant": False,
             "moved": False,
+            "steps": [],
             "traversed": [],
         }
     window.raise_()
@@ -496,12 +531,14 @@ def _observe_focus_traversal(app, window, QtCore, QtGui, QtWidgets) -> dict[str,
     after = ""
     attempts = 0
     traversed = [initial] if initial else []
+    steps = []
     keys = (
         (QtCore.Qt.Key.Key_Tab, QtCore.Qt.KeyboardModifier.NoModifier),
         (QtCore.Qt.Key.Key_Backtab, QtCore.Qt.KeyboardModifier.ShiftModifier),
     )
     for attempts in range(1, len(focusables) * 2 + 1):
         key, modifiers = keys[(attempts - 1) % len(keys)]
+        direction = "forward" if (attempts - 1) % len(keys) == 0 else "backward"
         for event_type in (
             QtCore.QEvent.Type.KeyPress,
             QtCore.QEvent.Type.KeyRelease,
@@ -514,6 +551,14 @@ def _observe_focus_traversal(app, window, QtCore, QtGui, QtWidgets) -> dict[str,
         current = app.focusWidget()
         after = _widget_identity(window, current)
         traversed.append(after)
+        steps.append(
+            {
+                "direction": direction,
+                "focus": after,
+                "kind": "key-event",
+                "returned": None,
+            }
+        )
         if after and current is not initial_widget:
             break
     return {
@@ -527,6 +572,7 @@ def _observe_focus_traversal(app, window, QtCore, QtGui, QtWidgets) -> dict[str,
         "initial": initial or None,
         "initial_descendant": initial_descendant,
         "moved": bool(after) and current is not initial_widget,
+        "steps": steps,
         "traversed": traversed,
     }
 
@@ -771,6 +817,12 @@ def _run_scale(scale: float, evidence_root: Path) -> None:
     sys.excepthook = sys.__excepthook__
     if app.platformName() not in {"windows", "cocoa"}:
         raise RuntimeError("remaining-surface smoke requires qwindows or cocoa")
+    tab_focus_behavior = app.styleHints().tabFocusBehavior().name
+    if tab_focus_behavior != "TabFocusAllControls":
+        raise RuntimeError(
+            "remaining-surface smoke requires all-control keyboard navigation; got %s"
+            % tab_focus_behavior
+        )
     factories = _surface_factories()
     if set(factories) != _remaining_surface_ids():
         raise RuntimeError("native remaining-surface factory inventory drifted")
@@ -845,7 +897,12 @@ def _run_scale(scale: float, evidence_root: Path) -> None:
             window.deleteLater()
             QtWidgets.QApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
             app.processEvents()
-    record = {"qpa": app.platformName(), "scale_factor": scale, "surfaces": records}
+    record = {
+        "qpa": app.platformName(),
+        "scale_factor": scale,
+        "surfaces": records,
+        "tab_focus_behavior": tab_focus_behavior,
+    }
     evidence_root.mkdir(parents=True, exist_ok=True)
     _record_path(evidence_root, scale).write_text(
         json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8"

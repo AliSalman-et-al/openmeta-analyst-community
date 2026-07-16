@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 
 import pytest
-from PyQt6 import QtGui
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -81,6 +81,7 @@ def _write_bundle(root: Path) -> None:
                     "initial": None,
                     "initial_descendant": False,
                     "moved": False,
+                    "steps": [],
                     "traversed": [],
                 }
                 if action_contract == "none"
@@ -95,6 +96,14 @@ def _write_bundle(root: Path) -> None:
                     "initial": "firstControl",
                     "initial_descendant": True,
                     "moved": True,
+                    "steps": [
+                        {
+                            "direction": "forward",
+                            "focus": "secondControl",
+                            "kind": "key-event",
+                            "returned": None,
+                        }
+                    ],
                     "traversed": ["firstControl", "secondControl"],
                 }
             )
@@ -129,18 +138,32 @@ def _write_bundle(root: Path) -> None:
                 "screen_clamped": True,
             }
         native_smoke._record_path(root, scale).write_text(
-            json.dumps({"qpa": "windows", "scale_factor": scale, "surfaces": surfaces}),
+            json.dumps(
+                {
+                    "qpa": "windows",
+                    "scale_factor": scale,
+                    "surfaces": surfaces,
+                    "tab_focus_behavior": "TabFocusAllControls",
+                }
+            ),
             encoding="utf-8",
         )
 
 
 def test_surface_inventory_matches_canonical_forms_factories_tests_and_document():
     payload = inventory_validator.load_and_validate()
+    workflow = (ROOT / ".github/workflows/qt6-macos-feasibility.yml").read_text(
+        encoding="utf-8"
+    )
 
     assert len(payload["forms"]) == 29
     assert inventory_validator.render_markdown(payload) == inventory_validator.DOCUMENT_PATH.read_text(
         encoding="utf-8"
     )
+    keyboard_setup = "defaults write NSGlobalDomain AppleKeyboardUIMode -int 3"
+    native_capture = "uv run python scripts/native_remaining_surfaces_smoke.py"
+    assert keyboard_setup in workflow
+    assert workflow.index(keyboard_setup) < workflow.index(native_capture)
 
 
 def test_surface_inventory_rejects_canonical_form_drift(tmp_path):
@@ -237,6 +260,81 @@ def test_native_remaining_surface_evidence_accepts_cocoa_focus_sequences(tmp_pat
     records = native_smoke.validate_evidence(tmp_path)
 
     assert {record["qpa"] for record in records} == {"cocoa"}
+
+
+def test_focus_observer_does_not_accept_programmatic_fallback_after_consumed_tab(qapp):
+    class TabConsumingDialog(QtWidgets.QDialog):
+        def event(self, event):
+            if (
+                event.type()
+                in {QtCore.QEvent.Type.KeyPress, QtCore.QEvent.Type.KeyRelease}
+                and event.key()
+                in {QtCore.Qt.Key.Key_Tab, QtCore.Qt.Key.Key_Backtab}
+            ):
+                event.accept()
+                return True
+            return super().event(event)
+
+    dialog = TabConsumingDialog()
+    layout = QtWidgets.QVBoxLayout(dialog)
+    first = QtWidgets.QLineEdit(dialog)
+    first.setObjectName("firstControl")
+    second = QtWidgets.QPushButton("Second", dialog)
+    second.setObjectName("secondControl")
+    layout.addWidget(first)
+    layout.addWidget(second)
+    dialog.show()
+    qapp.processEvents()
+    try:
+        observation = native_smoke._observe_focus_traversal(
+            qapp, dialog, QtCore, QtGui, QtWidgets
+        )
+    finally:
+        dialog.close()
+        qapp.processEvents()
+
+    assert observation["moved"] is False
+    assert set(observation["traversed"]) == {"firstControl"}
+    assert {step["kind"] for step in observation["steps"]} == {"key-event"}
+
+
+def test_native_remaining_surface_evidence_rejects_programmatic_focus_movement(
+    tmp_path,
+):
+    _write_bundle(tmp_path)
+    record_path = native_smoke._record_path(tmp_path, 1.0)
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    focus = record["surfaces"]["add-covariate"]["focus"]
+    focus["steps"][0]["kind"] = "focus-next-prev-child"
+    focus["steps"][0]["returned"] = True
+    record_path.write_text(json.dumps(record), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="focus traversal step drifted"):
+        native_smoke.validate_evidence(tmp_path)
+
+
+def test_native_remaining_surface_evidence_rejects_direction_tampering(tmp_path):
+    _write_bundle(tmp_path)
+    record_path = native_smoke._record_path(tmp_path, 1.0)
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    focus = record["surfaces"]["add-covariate"]["focus"]
+    focus["steps"][0]["direction"] = "backward"
+    record_path.write_text(json.dumps(record), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="focus traversal step drifted"):
+        native_smoke.validate_evidence(tmp_path)
+
+
+def test_native_remaining_surface_evidence_rejects_restricted_tab_focus(tmp_path):
+    _write_bundle(tmp_path)
+    record_path = native_smoke._record_path(tmp_path, 1.0)
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    record["qpa"] = "cocoa"
+    record["tab_focus_behavior"] = "TabFocusTextControls"
+    record_path.write_text(json.dumps(record), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="lacks all-control keyboard navigation"):
+        native_smoke.validate_evidence(tmp_path)
 
 
 def test_native_remaining_surface_evidence_rejects_hash_tampering(tmp_path):

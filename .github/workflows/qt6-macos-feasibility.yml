@@ -132,6 +132,8 @@ jobs:
         run: |
           set -euo pipefail
           evidence_root="artifacts/qt6-feasibility/${{ matrix.target }}/remaining-surfaces"
+          defaults write NSGlobalDomain AppleKeyboardUIMode -int 3
+          test "$(defaults read NSGlobalDomain AppleKeyboardUIMode)" = "3"
           uv run python scripts/build_qt6.py generate --build-root "$RCMS_QT6_BUILD_ROOT"
           uv run python scripts/validate_qt6_surface_inventory.py --check-document
           uv run python scripts/native_remaining_surfaces_smoke.py --evidence-root "$evidence_root"
