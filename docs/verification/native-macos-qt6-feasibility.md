@@ -37,6 +37,11 @@ uploaded bundle retains bounded copies of the native Python, PyQt6, Qt6, SIP,
 R, rpy2, `rcc`, and Cocoa probes plus the packaged executable and packaged
 Cocoa plugin. It also retains a complete file/hash deployment inventory and the
 exact PyInstaller build plan, but not the full disposable application bundle.
+Thin and universal Mach-O architectures are read directly from bounded file
+headers and fat-slice tables, including slice-bound, class, byte-order,
+CPU-subtype capability, and declared-versus-contained slice checks. The same
+evidence can therefore be verified on macOS or Windows without trusting
+recorded architectures or requiring `lipo` on the reviewing host.
 The validator recomputes retained sizes, hashes, and architectures, checks the
 deployment has one authoritative `Contents/Frameworks/PyQt6/Qt6` payload and
 one Cocoa plugin, and rejects manual or alternate Qt collection. PyInstaller's

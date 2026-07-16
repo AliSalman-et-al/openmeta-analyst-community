@@ -14,7 +14,7 @@ import re
 import shutil
 import subprocess
 import sys
-from typing import Any, NoReturn, cast
+from typing import Any, BinaryIO, Literal, NoReturn, cast
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -53,6 +53,28 @@ RUNNER_KEYS = {
 MAX_DEPLOYMENT_FILES = 10_000
 MAX_DEPLOYMENT_BYTES = 1_000_000_000
 MAX_RETAINED_NATIVE_BYTES = 100_000_000
+MAX_MACHO_ARCHITECTURES = 16
+MACHO_CPU_ARCHITECTURES = {
+    0x01000007: "x86_64",
+    0x0100000C: "arm64",
+}
+MACHO_CPU_SUBTYPE_MASK = 0xFF000000
+MACHO_CPU_SUBTYPES = {
+    0x01000007: {3: {0, 0x80000000}},
+    0x0100000C: {0: {0}},
+}
+MACHO_THIN_MAGICS: dict[bytes, tuple[Literal["big", "little"], int, bool]] = {
+    b"\xfe\xed\xfa\xce": ("big", 28, False),
+    b"\xce\xfa\xed\xfe": ("little", 28, False),
+    b"\xfe\xed\xfa\xcf": ("big", 32, True),
+    b"\xcf\xfa\xed\xfe": ("little", 32, True),
+}
+MACHO_FAT_MAGICS: dict[bytes, tuple[Literal["big", "little"], int]] = {
+    b"\xca\xfe\xba\xbe": ("big", 20),
+    b"\xbe\xba\xfe\xca": ("little", 20),
+    b"\xca\xfe\xba\xbf": ("big", 32),
+    b"\xbf\xba\xfe\xca": ("little", 32),
+}
 
 
 class EvidenceError(RuntimeError):
@@ -845,9 +867,129 @@ def _run(
     return completed
 
 
+def _macho_cpu_identity(
+    cpu_type: int, raw_subtype: int, path: Path
+) -> tuple[str, int, int]:
+    architecture = MACHO_CPU_ARCHITECTURES.get(cpu_type)
+    if architecture is None:
+        _fail(f"Mach-O file {path} has unsupported CPU type 0x{cpu_type:08x}")
+    base_subtype = raw_subtype & ~MACHO_CPU_SUBTYPE_MASK
+    capabilities = raw_subtype & MACHO_CPU_SUBTYPE_MASK
+    supported_capabilities = MACHO_CPU_SUBTYPES[cpu_type].get(base_subtype)
+    if supported_capabilities is None or capabilities not in supported_capabilities:
+        _fail(
+            f"Mach-O file {path} has unsupported {architecture} CPU subtype "
+            f"0x{raw_subtype:08x}"
+        )
+    return architecture, base_subtype, capabilities
+
+
+def _read_macho_bytes(
+    stream: BinaryIO, path: Path, offset: int, size: int, label: str
+) -> bytes:
+    stream.seek(offset)
+    value = stream.read(size)
+    if len(value) != size:
+        _fail(f"Mach-O file {path} has a truncated {label}")
+    return value
+
+
+def _thin_macho_architecture(
+    header: bytes, available_size: int, path: Path
+) -> tuple[str, int, int]:
+    if len(header) < 12:
+        _fail(f"Mach-O file {path} has a truncated thin header")
+    thin_format = MACHO_THIN_MAGICS.get(header[:4])
+    if thin_format is None:
+        _fail(f"Mach-O file {path} has an unsupported thin magic")
+    byte_order, minimum_header_size, is_64_bit = thin_format
+    if available_size < minimum_header_size:
+        _fail(f"Mach-O file {path} has a truncated thin header")
+    cpu_type = int.from_bytes(header[4:8], byte_order)
+    if bool(cpu_type & 0x01000000) != is_64_bit:
+        _fail(f"Mach-O file {path} has a CPU type inconsistent with its thin class")
+    raw_subtype = int.from_bytes(header[8:12], byte_order)
+    return _macho_cpu_identity(cpu_type, raw_subtype, path)
+
+
 def _archs(path: Path) -> list[str]:
-    output = _run(["lipo", "-archs", str(path)]).stdout.strip().split()
-    return sorted(output)
+    try:
+        file_size = path.stat().st_size
+        with path.open("rb") as stream:
+            header = _read_macho_bytes(stream, path, 0, 8, "header")
+            fat_format = MACHO_FAT_MAGICS.get(header[:4])
+            if fat_format is None:
+                thin_header = header + _read_macho_bytes(
+                    stream, path, 8, 4, "thin header"
+                )
+                return [_thin_macho_architecture(thin_header, file_size, path)[0]]
+            byte_order, entry_size = fat_format
+            architecture_count = int.from_bytes(header[4:8], byte_order)
+            if not 1 <= architecture_count <= MAX_MACHO_ARCHITECTURES:
+                _fail(f"Mach-O file {path} has an invalid fat architecture count")
+            table_end = 8 + architecture_count * entry_size
+            if table_end > file_size:
+                _fail(f"Mach-O file {path} has a truncated fat architecture table")
+            architectures: list[str] = []
+            slice_ranges: list[tuple[int, int]] = []
+            for index in range(architecture_count):
+                entry = _read_macho_bytes(
+                    stream,
+                    path,
+                    8 + index * entry_size,
+                    entry_size,
+                    "fat architecture entry",
+                )
+                declared = _macho_cpu_identity(
+                    int.from_bytes(entry[0:4], byte_order),
+                    int.from_bytes(entry[4:8], byte_order),
+                    path,
+                )
+                field_size = 8 if entry_size == 32 else 4
+                slice_offset = int.from_bytes(entry[8 : 8 + field_size], byte_order)
+                slice_size = int.from_bytes(
+                    entry[8 + field_size : 8 + 2 * field_size], byte_order
+                )
+                alignment_offset = 24 if entry_size == 32 else 16
+                alignment = int.from_bytes(
+                    entry[alignment_offset : alignment_offset + 4], byte_order
+                )
+                if entry_size == 32 and int.from_bytes(entry[28:32], byte_order) != 0:
+                    _fail(f"Mach-O file {path} has a nonzero fat64 reserved field")
+                if (
+                    slice_offset < table_end
+                    or slice_size < 8
+                    or slice_offset > file_size
+                    or slice_size > file_size - slice_offset
+                    or alignment > 63
+                    or slice_offset % (1 << alignment) != 0
+                ):
+                    _fail(f"Mach-O file {path} has an out-of-bounds fat slice")
+                slice_end = slice_offset + slice_size
+                if any(
+                    slice_offset < existing_end and existing_start < slice_end
+                    for existing_start, existing_end in slice_ranges
+                ):
+                    _fail(f"Mach-O file {path} has overlapping fat slices")
+                slice_ranges.append((slice_offset, slice_end))
+                actual = _thin_macho_architecture(
+                    _read_macho_bytes(
+                        stream, path, slice_offset, 12, "fat slice header"
+                    ),
+                    slice_size,
+                    path,
+                )
+                if actual != declared:
+                    _fail(f"Mach-O file {path} has a mismatched fat slice CPU identity")
+                architecture = actual[0]
+                if architecture in architectures:
+                    _fail(f"Mach-O file {path} has a duplicate fat architecture")
+                architectures.append(architecture)
+            return sorted(architectures)
+    except EvidenceError:
+        raise
+    except OSError as error:
+        _fail(f"cannot read Mach-O file {path}: {error}")
 
 
 def _rosetta_translated() -> bool:

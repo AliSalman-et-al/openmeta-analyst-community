@@ -7844,6 +7844,21 @@
       "reason": "Guards the complete Apple Silicon native feasibility evidence contract.", "runtime_class": "subsecond", "size": "small"
     },
     {
+      "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_macho_architecture_parser_reads_thin_and_universal_without_lipo",
+      "reason": "Reads thin 32/64 and fat 32/64 Mach-O headers in both byte orders without requiring the host-only lipo tool.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_macho_architecture_parser_rejects_malformed_or_tampered_files",
+      "reason": "Fails closed on truncated, unknown-CPU, oversized-table, out-of-bounds, mismatched-slice, and duplicate-architecture Mach-O evidence.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_macho_architecture_parser_rejects_subtype_and_fat64_tampering",
+      "reason": "Rejects unsupported CPU base subtypes and capabilities, declared-versus-slice identity mismatches, and nonzero fat64 reserved fields.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
       "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": [], "lane": "fast",
       "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_native_macos_evidence_fails_closed_on_incomplete_or_mismatched_proof[rosetta]",
       "reason": "Rejects Rosetta-translated feasibility evidence.", "runtime_class": "subsecond", "size": "small"
