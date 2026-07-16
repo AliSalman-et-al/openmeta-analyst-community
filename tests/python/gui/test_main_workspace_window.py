@@ -1,12 +1,25 @@
 import os
 import sys
+import json
+from pathlib import Path
+import subprocess
+
+import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 sys.path.insert(0, os.path.abspath("src/rc_metastudio"))
 sys.path.insert(0, os.path.abspath("src/rc_metastudio/forms"))
 
-from PyQt5 import QtCore, QtWidgets
+from PyQt6 import QtCore, QtWidgets
+
+ROOT = Path(__file__).resolve().parents[3]
+os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
+from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+from rc_metastudio.qt6_resources import ensure_application_resources
+
+prepare_generated_ui_imports()
+ensure_application_resources()
 
 
 def test_main_is_a_managed_workspace_with_expanding_table_and_layouted_navigation(qapp):
@@ -15,16 +28,17 @@ def test_main_is_a_managed_workspace_with_expanding_table_and_layouted_navigatio
 
     window = meta_form.MetaForm()
     try:
-        assert window.property("RCMS_window_archetype") == "workspace"
-        assert window.property("RCMS_window_role") == "main"
-        assert window.layout().sizeConstraint() == QtWidgets.QLayout.SetNoConstraint
+        state = adaptive_window.adaptive_window_state(window)
+        assert state.policy.archetype is adaptive_window.WindowArchetype.WORKSPACE
+        assert state.role is adaptive_window.WindowRole.MAIN
+        assert window.layout().sizeConstraint() == QtWidgets.QLayout.SizeConstraint.SetNoConstraint
         assert (
             window.tableView.sizePolicy().horizontalPolicy()
-            == QtWidgets.QSizePolicy.Expanding
+            == QtWidgets.QSizePolicy.Policy.Expanding
         )
         assert (
             window.tableView.sizePolicy().verticalPolicy()
-            == QtWidgets.QSizePolicy.Expanding
+            == QtWidgets.QSizePolicy.Policy.Expanding
         )
         assert (
             window._adaptive_window_controller.policy
@@ -73,7 +87,7 @@ def test_runtime_content_changes_do_not_resize_or_reposition_visible_main(qapp):
         assert "<font" not in window.dataset_file_lbl.toolTip()
         assert (
             window.dataset_file_lbl.sizePolicy().horizontalPolicy()
-            == QtWidgets.QSizePolicy.Ignored
+            == QtWidgets.QSizePolicy.Policy.Ignored
         )
     finally:
         window.hide()
@@ -131,7 +145,7 @@ def test_main_inherits_fonts_and_navigation_icons_from_active_style(qapp):
         )
         assert (
             window.menuAnalysis.style().pixelMetric(
-                QtWidgets.QStyle.PM_SmallIconSize, None, window.menuAnalysis
+                QtWidgets.QStyle.PixelMetric.PM_SmallIconSize, None, window.menuAnalysis
             )
             == 18
         )
@@ -160,7 +174,7 @@ def test_added_covariate_keeps_identity_and_width_through_undo_redo(qapp):
         window.tableView.undoStack.push(command)
         column = window.model.columnCount() - 1
         identity_before = window.model.headerData(
-            column, QtCore.Qt.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
+            column, QtCore.Qt.Orientation.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
         )
         window.tableView.setColumnWidth(column, 277)
 
@@ -169,7 +183,7 @@ def test_added_covariate_keeps_identity_and_width_through_undo_redo(qapp):
         qapp.processEvents()
 
         identity_after = window.model.headerData(
-            column, QtCore.Qt.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
+            column, QtCore.Qt.Orientation.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
         )
         assert identity_after == identity_before
         assert window.tableView.columnWidth(column) == 277
@@ -189,7 +203,7 @@ def test_deleted_covariate_keeps_identity_and_width_through_undo_redo(qapp):
         window.tableView.synchronize_column_widths()
         column = window.model.columnCount() - 1
         identity_before = window.model.headerData(
-            column, QtCore.Qt.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
+            column, QtCore.Qt.Orientation.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
         )
         window.tableView.setColumnWidth(column, 263)
 
@@ -199,7 +213,7 @@ def test_deleted_covariate_keeps_identity_and_width_through_undo_redo(qapp):
         window.tableView.undoStack.undo()
         qapp.processEvents()
         identity_after_undo = window.model.headerData(
-            column, QtCore.Qt.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
+            column, QtCore.Qt.Orientation.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
         )
         assert identity_after_undo == identity_before
         assert window.tableView.columnWidth(column) == 263
@@ -210,7 +224,7 @@ def test_deleted_covariate_keeps_identity_and_width_through_undo_redo(qapp):
         qapp.processEvents()
         assert (
             window.model.headerData(
-                column, QtCore.Qt.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
+                column, QtCore.Qt.Orientation.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
             )
             == identity_before
         )
@@ -226,14 +240,15 @@ def test_returning_normal_workspace_is_not_remaximized_on_first_show(qapp, tmp_p
     import settings
 
     QtCore.QSettings.setPath(
-        QtCore.QSettings.IniFormat, QtCore.QSettings.UserScope, str(tmp_path)
+        QtCore.QSettings.Format.IniFormat, QtCore.QSettings.Scope.UserScope, str(tmp_path)
     )
-    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.IniFormat)
+    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.Format.IniFormat)
     store = QtCore.QSettings()
     store.clear()
-    store.setValue("workspace_layout/schema_version", 1)
+    store.setValue("workspace_layout/schema_version", 2)
     store.setValue(
-        "workspace_layout/main/frame_geometry", QtCore.QRect(40, 30, 640, 480)
+        "workspace_layout/main/frame_geometry",
+        '{"height":480,"width":640,"x":40,"y":30}',
     )
     store.setValue("workspace_layout/main/maximized", False)
     window = QtWidgets.QMainWindow()
@@ -250,3 +265,92 @@ def test_returning_normal_workspace_is_not_remaximized_on_first_show(qapp, tmp_p
         window.hide()
         window.deleteLater()
         qapp.processEvents()
+
+
+@pytest.mark.skipif(
+    sys.platform not in ("win32", "darwin"),
+    reason="Native fractional-scale evidence is collected on qwindows and cocoa.",
+)
+def test_workspace_table_uses_valid_logical_geometry_at_fractional_scale_factors():
+    script = r'''
+import json
+from rc_metastudio import launch
+app, window = launch.start_automation()
+try:
+    window.showNormal()
+    window.resize(1000, 700)
+    app.processEvents()
+    table = window.tableView
+    viewport = table.viewport()
+    image = viewport.grab().toImage()
+    screen = window.windowHandle().screen()
+    evidence = {
+        "platform": app.platformName(),
+        "device_pixel_ratio": screen.devicePixelRatio(),
+        "window": [window.width(), window.height()],
+        "table": [table.width(), table.height()],
+        "viewport": [viewport.width(), viewport.height()],
+        "image": [image.width(), image.height()],
+        "headers": [table.verticalHeader().width(), table.horizontalHeader().height()],
+        "all_columns_positive": all(
+            table.columnWidth(column) > 0
+            for column in range(table.model().columnCount())
+        ),
+        "visible": window.isVisible() and table.isVisible() and viewport.isVisible(),
+    }
+    print("QT6_SCALE_EVIDENCE=" + json.dumps(evidence, sort_keys=True))
+finally:
+    window.current_data_unsaved = False
+    window.close()
+    app.processEvents()
+'''
+    expected_platform = "windows" if sys.platform == "win32" else "cocoa"
+    evidence_by_factor = {}
+    for factor in ("1", "1.25", "1.5", "1.75"):
+        environment = os.environ.copy()
+        environment.pop("QT_QPA_PLATFORM", None)
+        environment["QT_SCALE_FACTOR"] = factor
+        environment["PYTHONPATH"] = os.pathsep.join(
+            (
+                str(ROOT / "src"),
+                str(ROOT / "src" / "rc_metastudio"),
+                environment.get("PYTHONPATH", ""),
+            )
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=ROOT,
+            env=environment,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        assert result.returncode == 0, (
+            f"workspace failed at scale factor {factor}:\n{result.stdout}\n{result.stderr}"
+        )
+        evidence_line = next(
+            line
+            for line in result.stdout.splitlines()
+            if line.startswith("QT6_SCALE_EVIDENCE=")
+        )
+        evidence = json.loads(evidence_line.split("=", 1)[1])
+        evidence_by_factor[factor] = evidence
+        assert evidence["platform"] == expected_platform
+        assert evidence["visible"] is True
+        assert evidence["all_columns_positive"] is True
+        assert all(dimension > 0 for dimension in evidence["viewport"])
+        assert all(dimension > 0 for dimension in evidence["image"])
+        assert all(dimension > 0 for dimension in evidence["headers"])
+        for logical, physical in zip(evidence["viewport"], evidence["image"]):
+            assert physical == pytest.approx(
+                logical * evidence["device_pixel_ratio"], abs=3
+            )
+
+    baseline = evidence_by_factor["1"]
+    for factor, evidence in evidence_by_factor.items():
+        assert evidence["device_pixel_ratio"] == pytest.approx(
+            baseline["device_pixel_ratio"] * float(factor), abs=0.02
+        )
+        assert 0 < evidence["table"][0] <= evidence["window"][0]
+        assert 0 < evidence["table"][1] <= evidence["window"][1]

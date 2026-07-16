@@ -66,6 +66,54 @@ def _minimal_state() -> dict[str, object]:
     }
 
 
+def _group_project(
+    family: str, subtype: str | None, raw_values: list[list[object]]
+) -> dict[str, object]:
+    data_type = {"binary": 0, "continuous": 1, "diagnostic": 2}[family]
+    return {
+        "schema_version": CURRENT_FORMAT_VERSION,
+        "dataset": {
+            "analysis_family": family,
+            "covariates": [],
+            "is_diagnostic": family == "diagnostic",
+            "notes": "",
+            "outcomes": [
+                {
+                    "data_type": data_type,
+                    "follow_ups": ["first"],
+                    "name": "Outcome",
+                    "sub_type": subtype,
+                }
+            ],
+            "studies": [
+                {
+                    "analysis_units": [
+                        {
+                            "entered_effects": {},
+                            "follow_up": "first",
+                            "groups": [
+                                {"id": index, "name": f"Tx {index + 1}", "raw_data": raw}
+                                for index, raw in enumerate(raw_values)
+                            ],
+                            "outcome": "Outcome",
+                        }
+                    ],
+                    "covariates": {},
+                    "id": 0,
+                    "include": True,
+                    "manually_excluded": False,
+                    "name": "Study",
+                    "notes": "",
+                    "sample_size": None,
+                    "year": 2026,
+                }
+            ],
+            "summary": None,
+            "title": "Group contract",
+        },
+    }
+
+
 def _snapshot_project(name: str) -> dict[str, object]:
     snapshot = json.loads((SNAPSHOT_DIR / f"{name}.json").read_text("utf-8"))
     return {"schema_version": CURRENT_FORMAT_VERSION, "dataset": snapshot["dataset"]}
@@ -236,6 +284,59 @@ def test_semantic_validation_rejects_invalid_domain_relationships(
 
     with pytest.raises(ProjectFormatError, match=message):
         save_project(destination, project, _minimal_state())
+
+
+@pytest.mark.fast
+@pytest.mark.small
+@pytest.mark.release_readiness
+@pytest.mark.parametrize(
+    ("family", "subtype", "raw_values"),
+    [
+        ("binary", "proportions", [[1, 10], [2, 20], [3, 30]]),
+        (
+            "continuous",
+            "means",
+            [[10, 1.0, 0.5], [20, 2.0, 0.75], [30, 3.0, 1.0]],
+        ),
+    ],
+    ids=["binary-three-arm", "continuous-three-arm"],
+)
+def test_pairwise_subtypes_preserve_valid_multi_arm_analysis_units(
+    tmp_path: Path,
+    family: str,
+    subtype: str,
+    raw_values: list[list[object]],
+) -> None:
+    destination = tmp_path / f"{family}-multi-arm.rcms"
+    project = _group_project(family, subtype, raw_values)
+
+    save_project(destination, project, _minimal_state())
+
+    assert load_project(destination).project == project
+
+
+@pytest.mark.fast
+@pytest.mark.small
+@pytest.mark.release_readiness
+@pytest.mark.parametrize(
+    ("family", "subtype", "raw_values"),
+    [
+        ("binary", "proportions", [[1, 10]]),
+        ("binary", "proportion", [[1, 10], [2, 20]]),
+        ("diagnostic", None, [[1, 2, 3, 4], [5, 6, 7, 8]]),
+    ],
+    ids=["two-arm-needs-two", "one-arm-stays-exact", "diagnostic-stays-exact"],
+)
+def test_group_subtype_contract_rejects_too_few_or_forbidden_extra_groups(
+    tmp_path: Path,
+    family: str,
+    subtype: str | None,
+    raw_values: list[list[object]],
+) -> None:
+    project = _group_project(family, subtype, raw_values)
+
+    with pytest.raises(ProjectFormatError, match="group count conflicts with subtype"):
+        save_project(tmp_path / "invalid-groups.rcms", project, _minimal_state())
 
 
 @pytest.mark.fast

@@ -283,17 +283,26 @@ def validate_project_semantics(
                     f"study {study_id} unit {unit_index}: duplicate group identifier"
                 )
             subtype = outcome_by_name[outcome_name]["sub_type"]
-            expected_groups = None
+            exact_groups = None
+            minimum_groups = None
             if family == "diagnostic" or subtype in {
                 "proportion",
                 "mean",
                 "reg_coef",
                 "generic_effect",
             }:
-                expected_groups = 1
+                exact_groups = 1
             elif subtype in {"proportions", "means", "smd"}:
-                expected_groups = 2
-            if expected_groups is not None and len(groups) != expected_groups:
+                # These subtypes select pairwise/two-arm analysis semantics, but a
+                # project may contain more than two treatment groups.  Each
+                # comparison still uses two groups; the durable analysis unit must
+                # retain every arm so the workspace can select among all pairs.
+                minimum_groups = 2
+            if exact_groups is not None and len(groups) != exact_groups:
+                raise ProjectSemanticError(
+                    f"study {study_id} unit {unit_index}: group count conflicts with subtype"
+                )
+            if minimum_groups is not None and len(groups) < minimum_groups:
                 raise ProjectSemanticError(
                     f"study {study_id} unit {unit_index}: group count conflicts with subtype"
                 )

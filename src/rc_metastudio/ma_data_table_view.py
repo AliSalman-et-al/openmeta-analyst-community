@@ -60,6 +60,25 @@ def DebugHelper(function):
     return _DebugHelper
 
 
+def _restore_table_selection(table, selected_cells, current_cell):
+    model = table.model()
+    selection_model = table.selectionModel()
+    if model is None or selection_model is None:
+        return
+    selection_model.clearSelection()
+    select = QtCore.QItemSelectionModel.SelectionFlag.Select
+    for row, column in selected_cells:
+        index = model.index(row, column)
+        if index.isValid():
+            selection_model.select(index, select)
+    if current_cell is not None:
+        index = model.index(*current_cell)
+        if index.isValid():
+            selection_model.setCurrentIndex(
+                index, QtCore.QItemSelectionModel.SelectionFlag.NoUpdate
+            )
+
+
 class MADataTable(QtWidgets.QTableView):
     dataDirtied = pyqtSignal()
 
@@ -523,7 +542,11 @@ class MADataTable(QtWidgets.QTableView):
         cur_outcome = self.model().current_outcome
         cur_follow_up = self.model().current_time_point
 
-    def cell_content_changed(self, index, old_val, new_val, study_added):
+    def cell_content_changed(self, edit):
+        index = edit.index
+        old_val = edit.old_value
+        new_val = edit.new_value
+        study_added = edit.added_study_id
         # Only make a cell edit if the old values and new values are different
         try:
             print(("Old val: %s, new val: %s" % (_to_text(old_val), _to_text(new_val))))
@@ -542,6 +565,9 @@ class MADataTable(QtWidgets.QTableView):
 
     def _new_eq_old(self, old, new):
         """None and "" are the same for table-edit comparisons."""
+
+        if hasattr(old, "include") or hasattr(new, "include"):
+            return old == new
 
         blank_vals = meta_globals.EMPTY_VALS
 
@@ -633,7 +659,12 @@ class MADataTable(QtWidgets.QTableView):
             new_content = new_content[:-1]
         new_content = self._normalize_matrix_rows(new_content)
         if not new_content:
-            return
+            return False
+
+        valid, message = self._preflight_paste(upper_left_index, new_content)
+        if not valid:
+            self._report_model_data_error(message)
+            return False
 
         lower_row = upper_left_index.row() + len(new_content)
         lower_col = upper_left_index.column() + len(new_content[0])
@@ -661,7 +692,38 @@ class MADataTable(QtWidgets.QTableView):
             self.column_widths(),
             "paste %s" % new_content,
         )
+        self._last_paste_committed = True
         self.undoStack.push(paste_command)
+        return self._last_paste_committed
+
+    def _preflight_paste(self, upper_left_index, content):
+        model = self.model()
+        if model is None or upper_left_index is None or not upper_left_index.isValid():
+            return False, "Select a valid workspace cell before pasting."
+        if not content or not content[0]:
+            return False, "The clipboard does not contain a rectangular range."
+        width = len(content[0])
+        if any(len(row) != width for row in content):
+            return False, "Clipboard rows must form one rectangular range."
+        if upper_left_index.column() + width > model.columnCount():
+            return False, "Clipboard data extends beyond the workspace columns."
+        if upper_left_index.row() + len(content) > model.rowCount():
+            return False, "Clipboard data extends beyond the workspace rows."
+
+        candidate = type(model)(dataset=copy.deepcopy(model.dataset), add_blank_study=False)
+        candidate.set_state(copy.deepcopy(model.get_stateful_dict()))
+        for row_offset, row in enumerate(content):
+            for column_offset, value in enumerate(row):
+                index = candidate.index(
+                    upper_left_index.row() + row_offset,
+                    upper_left_index.column() + column_offset,
+                )
+                if not candidate.setData(index, value):
+                    return False, (
+                        getattr(candidate, "last_data_error", None)
+                        or "The clipboard data could not be validated."
+                    )
+        return True, None
 
     def copy_contents_in_range(self, upper_left_index, lower_right_index, to_clipboard):
         """
@@ -707,7 +769,7 @@ class MADataTable(QtWidgets.QTableView):
         origin_row, origin_col = upper_left_index.row(), upper_left_index.column()
         source_content = self._normalize_matrix_rows(source_content)
         if not source_content:
-            return
+            return True
 
         if (
             isinstance(source_content[-1], list)
@@ -719,21 +781,28 @@ class MADataTable(QtWidgets.QTableView):
             source_content = source_content[:-1]
             source_content = self._normalize_matrix_rows(source_content)
             if not source_content:
-                return
+                return True
 
         # temporarily disable sorting to prevent automatic sorting of pasted data.
         # (note: this is consistent with Excel's approach.)
-        self.model().blockSignals(True)
-        failed_messages = []
+        original_dataset = copy.deepcopy(self.model().dataset)
+        original_state_dict = copy.deepcopy(self.model().get_stateful_dict())
+        original_model = self.model()
+        original_unsaved = (
+            self.main_gui.current_data_unsaved
+            if self.main_gui is not None
+            else None
+        )
+        original_model.blockSignals(True)
+        failure = None
+        try:
+            for src_row in range(len(source_content)):
+                # do we need to append a row?
+                cur_row_count = self.model().rowCount()
+                if cur_row_count <= origin_row + src_row:
+                    self._add_new_row()
 
-        for src_row in range(len(source_content)):
-            # do we need to append a row?
-            cur_row_count = self.model().rowCount()
-            if cur_row_count <= origin_row + src_row:
-                self._add_new_row()
-
-            for src_col in range(len(source_content[0])):
-                try:
+                for src_col in range(len(source_content[0])):
                     # note that we treat all of the data pasted as
                     # one event; i.e., when undo is called, it undos the
                     # whole paste
@@ -743,14 +812,29 @@ class MADataTable(QtWidgets.QTableView):
                     if not self.model().setData(
                         index, source_content[src_row][src_col]
                     ):
-                        failed_messages.append(self._model_data_error_message())
-                except Exception as e:
-                    print("Exception while pasting: %s" % e)
+                        failure = self._model_data_error_message()
+                        break
+                if failure is not None:
+                    break
+        except Exception as exc:
+            failure = "Exception while pasting: %s" % exc
+        finally:
+            original_model.blockSignals(False)
 
-        self.model().blockSignals(False)
+        if failure is not None:
+            if self.main_gui is not None:
+                self.main_gui.set_model(
+                    original_dataset, state_dict=original_state_dict
+                )
+                self.main_gui.current_data_unsaved = original_unsaved
+            else:
+                original_model.dataset = original_dataset
+                original_model.set_state(original_state_dict)
+                original_model.reset_model()
+            self._report_model_data_error(failure)
+            return False
         self.model().reset_model()
-        if failed_messages:
-            self._report_model_data_error(failed_messages[0])
+        return True
 
     def set_data_in_model(self, index, val):
         if not self.model().setData(index, val):
@@ -938,6 +1022,14 @@ class CommandCellEdit(QUndoCommand):
         self.ma_data_table_view = ma_data_table_view
         self.added_study = added_study
         self.something_else = added_study
+        self.selection = [
+            (selected.row(), selected.column())
+            for selected in ma_data_table_view.selectionModel().selectedIndexes()
+        ]
+        current = ma_data_table_view.currentIndex()
+        self.current_cell = (
+            (current.row(), current.column()) if current.isValid() else None
+        )
 
         debug_params = dict(
             first_call=True,
@@ -976,7 +1068,7 @@ class CommandCellEdit(QUndoCommand):
             # side of things, when the model emits
             # the data edited signal.
             model.blockSignals(True)
-            edit_ok = model.setData(index, self.new_content)
+            edit_ok = self._apply_content(model, index, self.new_content)
             self.added_study = self.ma_data_table_view.model().study_auto_added
             self.ma_data_table_view.model().study_auto_added = None
 
@@ -993,6 +1085,7 @@ class CommandCellEdit(QUndoCommand):
 
         # let everyone know that the data is dirty
         self.ma_data_table_view.dataDirtied.emit()
+        self._restore_selection()
 
     @DebugHelper
     def undo(self):
@@ -1008,7 +1101,9 @@ class CommandCellEdit(QUndoCommand):
         # as in the redo method, we block signals before
         # editing the model data
         model.blockSignals(True)
-        edit_ok = model.setData(index, self.original_content, allow_empty_names=True)
+        edit_ok = self._apply_content(
+            model, index, self.original_content, allow_empty_names=True
+        )
 
         model.blockSignals(False)
         if not edit_ok:
@@ -1022,9 +1117,29 @@ class CommandCellEdit(QUndoCommand):
         self.ma_data_table_view._enable_analysis_menus_if_appropriate()
         self.ma_data_table_view.synchronize_column_widths()
         self.ma_data_table_view.dataDirtied.emit()
+        self._restore_selection()
 
     def _get_index(self):
         return self.ma_data_table_view.model().createIndex(self.row, self.col)
+
+    def _apply_content(self, model, index, content, allow_empty_names=False):
+        if index.column() == model.INCLUDE_STUDY and hasattr(
+            content, "manually_excluded"
+        ):
+            study = model.dataset.studies[index.row()]
+            study.include = bool(content.include)
+            study.manually_excluded = bool(content.manually_excluded)
+            return True
+        return model.setData(
+            index, content, allow_empty_names=allow_empty_names
+        )
+
+    def _restore_selection(self):
+        _restore_table_selection(
+            self.ma_data_table_view,
+            self.selection,
+            self.current_cell,
+        )
 
 
 class CommandPaste(QUndoCommand):
@@ -1052,6 +1167,14 @@ class CommandPaste(QUndoCommand):
         self.metric_changed = None
         self.old_metric = None
         self.new_metric = None
+        self.selection = [
+            (index.row(), index.column())
+            for index in ma_data_table_view.selectionModel().selectedIndexes()
+        ]
+        current = ma_data_table_view.currentIndex()
+        self.current_cell = (
+            (current.row(), current.column()) if current.isValid() else None
+        )
         # is this the first time?
         self.first_call = True
 
@@ -1059,40 +1182,55 @@ class CommandPaste(QUndoCommand):
 
     @DebugHelper
     def redo(self):
-        # cache the original dataset
+        # Snapshot before any row growth so every paste mutation shares one
+        # rollback boundary.
         self.original_dataset = copy.deepcopy(self.ma_data_table_view.model().dataset)
-        self.original_state_dict = copy.copy(
+        self.original_state_dict = copy.deepcopy(
             self.ma_data_table_view.model().get_stateful_dict()
         )
+        self.original_unsaved = self.ma_data_table_view.main_gui.current_data_unsaved
 
-        # paste the data
-        self.ma_data_table_view._add_studies_if_necessary(
-            self.upper_left_coord, self.new_content
-        )
-        self.ma_data_table_view.paste_contents(self.upper_left_coord, self.new_content)
-
-        if self.first_call:
-            # on the first application of the paste, we need to ascertain
-            # whether the metric changed automatically (e.g., because it
-            # looks like tpasted data is single-arm)
-            self.metric_changed, self.old_metric = (
-                self.ma_data_table_view.change_metric_if_appropriate()
+        try:
+            self.ma_data_table_view._add_studies_if_necessary(
+                self.upper_left_coord, self.new_content
             )
+            committed = self.ma_data_table_view.paste_contents(
+                self.upper_left_coord, self.new_content
+            )
+            if not committed:
+                self._rollback_failed_redo()
+                return
 
-            if self.metric_changed:
-                self.new_metric = self.ma_data_table_view.model().current_effect
-                # self.ma_data_table_view.set_metric_in_ui(self.new_metric)
-            self.first_call = False
-        else:
-            # did the metric change on the original paste?
-            # if so re-change it here
-            if self.metric_changed:
+            if self.first_call:
+                # On the first application, record any automatic metric change.
+                self.metric_changed, self.old_metric = (
+                    self.ma_data_table_view.change_metric_if_appropriate()
+                )
+
+                if self.metric_changed:
+                    self.new_metric = self.ma_data_table_view.model().current_effect
+                self.first_call = False
+            elif self.metric_changed:
                 self.ma_data_table_view.set_metric_in_ui(self.new_metric)
 
-        self.ma_data_table_view.model().reset_model()
-        self.ma_data_table_view._enable_analysis_menus_if_appropriate()
-        self.ma_data_table_view.dataDirtied.emit()
-        self.ma_data_table_view.synchronize_column_widths()
+            self.ma_data_table_view.model().reset_model()
+            self.ma_data_table_view._enable_analysis_menus_if_appropriate()
+            self.ma_data_table_view.dataDirtied.emit()
+            self.ma_data_table_view.synchronize_column_widths()
+            self._restore_selection()
+        except Exception as exc:
+            self._rollback_failed_redo("Exception while pasting: %s" % exc)
+
+    def _rollback_failed_redo(self, message=None):
+        self.ma_data_table_view.main_gui.set_model(
+            self.original_dataset, state_dict=self.original_state_dict
+        )
+        self.ma_data_table_view.main_gui.current_data_unsaved = self.original_unsaved
+        self.ma_data_table_view._last_paste_committed = False
+        self.setObsolete(True)
+        self._restore_selection()
+        if message is not None:
+            self.ma_data_table_view._report_model_data_error(message)
 
     @DebugHelper
     def undo(self):
@@ -1111,6 +1249,14 @@ class CommandPaste(QUndoCommand):
         self.ma_data_table_view.model().reset_model()
         self.ma_data_table_view._enable_analysis_menus_if_appropriate()
         self.ma_data_table_view.dataDirtied.emit()
+        self._restore_selection()
+
+    def _restore_selection(self):
+        _restore_table_selection(
+            self.ma_data_table_view,
+            self.selection,
+            self.current_cell,
+        )
 
 
 class CommandEditMAUnit(QUndoCommand):

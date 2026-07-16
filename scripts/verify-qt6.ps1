@@ -31,6 +31,7 @@ try {
         src/rc_metastudio/qt6_resources.py `
         src/rc_metastudio/qt6_ui.py `
         src/rc_metastudio/qt6_macos_feasibility.py `
+        src/rc_metastudio/qt_text.py `
         scripts/build_qt6.py `
         scripts/qt6_port.py
     if ($LASTEXITCODE -ne 0) { throw "Qt6 strict type verification failed." }
@@ -63,6 +64,11 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Project Format test taxonomy manifest validation failed." }
 
     uv run python scripts/validate_test_taxonomy.py `
+        --tests-path tests/python/fast/test_project_adapter.py `
+        --require-covered
+    if ($LASTEXITCODE -ne 0) { throw "Project Adapter test taxonomy manifest validation failed." }
+
+    uv run python scripts/validate_test_taxonomy.py `
         --tests-path tests/python/fast/test_qt6_macos_feasibility.py `
         --require-covered
     if ($LASTEXITCODE -ne 0) { throw "Native macOS feasibility taxonomy validation failed." }
@@ -73,15 +79,38 @@ try {
         --require-covered
     if ($LASTEXITCODE -ne 0) { throw "Qt6 application-shell taxonomy validation failed." }
 
+    foreach ($workspaceTests in @(
+        "tests/python/fast/test_dataset_model_edit_values.py",
+        "tests/python/fast/test_main_workspace_policy.py",
+        "tests/python/fast/test_workspace_model_contracts.py",
+        "tests/python/gui/test_main_workspace_window.py",
+        "tests/python/gui/test_metaform_data_workflows.py"
+    )) {
+        uv run python scripts/validate_test_taxonomy.py `
+            --tests-path $workspaceTests `
+            --require-covered
+        if ($LASTEXITCODE -ne 0) { throw "Qt6 workspace taxonomy validation failed: $workspaceTests" }
+    }
+
     uv run pytest -W error `
         tests/python/fast/test_qt6_build_slice.py `
         tests/python/fast/test_qt6_port_tools.py `
         tests/python/fast/test_project_format.py `
+        tests/python/fast/test_project_adapter.py `
         tests/python/fast/test_qt6_macos_feasibility.py
     if ($LASTEXITCODE -ne 0) { throw "Qt6 vertical-slice tests failed." }
 
     uv run pytest -W error tests/python/gui/test_qt6_application_shell.py
     if ($LASTEXITCODE -ne 0) { throw "Qt6 application-shell tests failed." }
+
+    uv run pytest -W error `
+        tests/python/fast/test_dataset_model_edit_values.py `
+        tests/python/fast/test_dataset_ordering.py `
+        tests/python/fast/test_main_workspace_policy.py `
+        tests/python/fast/test_workspace_model_contracts.py `
+        tests/python/gui/test_main_workspace_window.py `
+        tests/python/gui/test_metaform_data_workflows.py
+    if ($LASTEXITCODE -ne 0) { throw "Qt6 main workspace tests failed." }
 
     $previousQpa = $env:QT_QPA_PLATFORM
     $previousFatalWarnings = $env:QT_FATAL_WARNINGS

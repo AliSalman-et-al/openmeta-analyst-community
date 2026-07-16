@@ -4,6 +4,7 @@
 
 # core libraries
 import copy
+from dataclasses import dataclass
 from functools import cmp_to_key
 
 from PyQt6 import QtCore
@@ -135,18 +136,37 @@ def _to_int(value):
 def _to_double(value):
     if hasattr(value, "toDouble"):
         return value.toDouble()
-    try:
-        return float(value), True
-    except (TypeError, ValueError):
-        return 0.0, False
+    return qt_text.parse_decimal(value)
 
 
-def _to_bool(value):
-    if hasattr(value, "toBool"):
-        return value.toBool()
-    if hasattr(value, "value"):
-        return bool(value.value())
-    return bool(value)
+def _parse_inclusion(value):
+    if isinstance(value, Qt.CheckState):
+        return value is Qt.CheckState.Checked, value in (
+            Qt.CheckState.Checked,
+            Qt.CheckState.Unchecked,
+        )
+    if type(value) is bool:
+        return value, True
+    if type(value) is int and value in (0, 2):
+        return value == 2, True
+    return False, False
+
+
+@dataclass(frozen=True)
+class StudyInclusionState:
+    include: bool
+    manually_excluded: bool
+
+
+@dataclass(frozen=True)
+class WorkspaceEdit:
+    index: QModelIndex
+    old_value: object
+    new_value: object
+    added_study_id: int | None
+    changed_top_left: QModelIndex
+    changed_bottom_right: QModelIndex
+    roles: tuple[int, ...]
 
 
 def DebugHelper(function):
@@ -160,7 +180,7 @@ def DebugHelper(function):
 
 
 class DatasetModel(QAbstractTableModel):
-    pyCellContentChanged = pyqtSignal(object, object, object, object)
+    workspaceEditCommitted = pyqtSignal(WorkspaceEdit)
     outcomeChanged = pyqtSignal()
     followUpChanged = pyqtSignal()
     dataError = pyqtSignal(str)
@@ -285,7 +305,8 @@ class DatasetModel(QAbstractTableModel):
         if column == self.NAME:
             return False
         if column == self.INCLUDE_STUDY:
-            return _to_bool(value)
+            included, valid = _parse_inclusion(value)
+            return valid and included
         if column == self.YEAR:
             return False
 
@@ -410,6 +431,14 @@ class DatasetModel(QAbstractTableModel):
         Summerfield's book)
         """
 
+        if (
+            not index.isValid()
+            or index.model() is not self
+            or not 0 <= index.row() < self.rowCount()
+            or not 0 <= index.column() < self.columnCount()
+        ):
+            return None
+
         # number of digits to show in edit mode. this, I think, is enough.
         NUM_DIGITS_PRECISE = 12
         # by default, we'll use the global NUM_DIGITS; this is the default
@@ -533,8 +562,14 @@ class DatasetModel(QAbstractTableModel):
                     if outcome_val is None:
                         return _item_data("")
 
+                    # Sensitivity and specificity have historically been
+                    # displayed to three decimals. Preserve that presentation
+                    # contract without rounding the stored calculation values.
+                    diagnostic_digits = (
+                        num_digits if num_digits is not None else 3
+                    )
                     return _item_data(
-                        self.format_float(outcome_val, num_digits=num_digits)
+                        self.format_float(outcome_val, num_digits=diagnostic_digits)
                     )  # issue #31
 
             elif column != self.INCLUDE_STUDY and column > max(self.OUTCOMES):
@@ -779,14 +814,50 @@ class DatasetModel(QAbstractTableModel):
 
         For more, see: http://doc.trolltech.com/4.5/qabstracttablemodel.html
         """
+        if role not in (Qt.ItemDataRole.EditRole, Qt.ItemDataRole.CheckStateRole):
+            return self._reject_edit("That data role cannot edit a workspace cell.")
+        if role == Qt.ItemDataRole.CheckStateRole and (
+            not index.isValid()
+            or index.model() is not self
+            or index.column() != self.INCLUDE_STUDY
+        ):
+            return self._reject_edit("Check state applies only to study inclusion.")
+
+        inclusion_value = None
+        if (
+            index.isValid()
+            and index.model() is self
+            and index.column() == self.INCLUDE_STUDY
+        ):
+            inclusion_value, inclusion_valid = _parse_inclusion(value)
+            if not inclusion_valid:
+                return self._reject_edit(
+                    "Study inclusion must be checked or unchecked."
+                )
+
         group_str = self.get_cur_group_str()
         study_added_due_to_edit = None
         self.last_data_error = None
-        if index.isValid() and 0 <= index.row() < self.rowCount():
+        if (
+            index.isValid()
+            and index.model() is self
+            and 0 <= index.row() < self.rowCount()
+            and 0 <= index.column() < self.columnCount()
+        ):
             current_data_type = self.dataset.get_outcome_type(self.current_outcome)
             outcome_subtype = self.dataset.get_outcome_subtype(self.current_outcome)
             column = index.column()
-            old_val = self.data(index)
+            old_val = (
+                StudyInclusionState(
+                    include=bool(self.dataset.studies[index.row()].include),
+                    manually_excluded=bool(
+                        self.dataset.studies[index.row()].manually_excluded
+                    ),
+                )
+                if index.row() < len(self.dataset)
+                and column == self.INCLUDE_STUDY
+                else self.data(index, Qt.ItemDataRole.EditRole)
+            )
 
             if index.row() >= len(self.dataset):
                 if column != self.NAME:
@@ -849,8 +920,11 @@ class DatasetModel(QAbstractTableModel):
                 return self._reject_edit(msg)
             study.year = _to_int(value)[0]
         elif self.current_outcome is not None and column in self.RAW_DATA:
+            normalized_value, numeric_valid = qt_text.normalize_decimal_text(value)
+            if not numeric_valid:
+                return self._reject_edit("Raw data needs to be numeric.")
             data_ok, msg = self._verify_raw_data(
-                _to_text_value(value), column, current_data_type, index
+                normalized_value, column, current_data_type, index
             )
             if not data_ok:
                 # this signal is (-- presumably --) handled by the UI
@@ -875,7 +949,7 @@ class DatasetModel(QAbstractTableModel):
                 pass
 
             adjusted_index = column - adjust_by
-            double_value, converted_ok = _to_double(value)
+            double_value, converted_ok = _to_double(normalized_value)
             val = double_value if converted_ok else ""
             old_ma_unit = copy.deepcopy(ma_unit)
             old_include = study.include
@@ -905,16 +979,19 @@ class DatasetModel(QAbstractTableModel):
                 display_scale_val = None
                 calc_scale_val = None
             else:
+                normalized_value, numeric_valid = qt_text.normalize_decimal_text(value)
+                if not numeric_valid:
+                    return self._reject_edit("Outcomes must be numeric.")
                 # sanity check -- is this a number?
                 data_ok, msg = self._verify_outcome_data(
-                    _to_text_value(value), column, row, current_data_type
+                    normalized_value, column, row, current_data_type
                 )
                 if not data_ok and import_csv == False:
                     return self._reject_edit(msg)
 
                 # the user can also explicitly set the effect size / CIs
                 # Directly entered effects are accepted even if raw data also exist.
-                display_scale_val, converted_ok = _to_double(value)
+                display_scale_val, converted_ok = _to_double(normalized_value)
 
                 print(("Display scale value: %s" % str(display_scale_val)))
 
@@ -1037,13 +1114,13 @@ class DatasetModel(QAbstractTableModel):
                     )
 
         elif column == self.INCLUDE_STUDY:
-            study.include = _to_bool(value)
+            study.include = inclusion_value
             # we keep note if a study was manually
             # excluded; this differs from just being
             # `included' because the latter is TRUE
             # automatically when a study first acquires
             # sufficient data to be included in an MA
-            if not _to_bool(value):
+            if not inclusion_value:
                 study.manually_excluded = True
             else:
                 study.manually_excluded = False
@@ -1066,15 +1143,7 @@ class DatasetModel(QAbstractTableModel):
                         )
             study.covariate_dict[cov_name] = new_value
 
-        self.dataChanged.emit(index, index)
-
-        # tell the view that an entry in the table has changed, and what the old
-        # and new values were. This for undo/redo purposes.
-        new_val = self.data(index)
-
-        self.pyCellContentChanged.emit(index, old_val, new_val, study_added_due_to_edit)
-
-        if not self.is_diag():
+        if not self.is_diag() and column != self.INCLUDE_STUDY:
             group_str = self.get_cur_group_str()
 
             print(group_str)
@@ -1112,6 +1181,45 @@ class DatasetModel(QAbstractTableModel):
                         ]
                     ):
                         study.include = False
+
+        changed_first_column = index.column()
+        changed_last_column = index.column()
+        roles = [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole]
+        if column == self.INCLUDE_STUDY:
+            roles = [Qt.ItemDataRole.CheckStateRole]
+        elif column in self.RAW_DATA or column in self.OUTCOMES:
+            changed_first_column = self.INCLUDE_STUDY
+            changed_last_column = max(self.OUTCOMES or [column])
+            roles = [
+                Qt.ItemDataRole.DisplayRole,
+                Qt.ItemDataRole.EditRole,
+                Qt.ItemDataRole.CheckStateRole,
+                Qt.ItemDataRole.BackgroundRole,
+            ]
+        changed_top_left = self.index(index.row(), changed_first_column)
+        changed_bottom_right = self.index(index.row(), changed_last_column)
+        role_values = [int(item) for item in roles]
+        self.dataChanged.emit(changed_top_left, changed_bottom_right, role_values)
+
+        new_val = (
+            StudyInclusionState(
+                include=bool(study.include),
+                manually_excluded=bool(study.manually_excluded),
+            )
+            if column == self.INCLUDE_STUDY
+            else self.data(index, Qt.ItemDataRole.EditRole)
+        )
+        self.workspaceEditCommitted.emit(
+            WorkspaceEdit(
+                index=QModelIndex(index),
+                old_value=old_val,
+                new_value=new_val,
+                added_study_id=study_added_due_to_edit,
+                changed_top_left=QModelIndex(changed_top_left),
+                changed_bottom_right=QModelIndex(changed_bottom_right),
+                roles=tuple(role_values),
+            )
+        )
         return True
 
     @staticmethod
@@ -1223,6 +1331,15 @@ class DatasetModel(QAbstractTableModel):
         model class. This is responsible for providing header data for the
         respective columns.
         """
+        if orientation == Qt.Orientation.Horizontal:
+            if not 0 <= section < self.columnCount():
+                return None
+        elif orientation == Qt.Orientation.Vertical:
+            if not 0 <= section < self.rowCount():
+                return None
+        else:
+            return None
+
         if orientation == Qt.Orientation.Horizontal and role == WORKSPACE_COLUMN_IDENTITY_ROLE:
             return self.workspace_column_identity(section)
 
@@ -1433,8 +1550,13 @@ class DatasetModel(QAbstractTableModel):
         return WorkspaceColumnIdentity("dataset-column", (section,))
 
     def flags(self, index):
-        if not index.isValid():
-            return Qt.ItemFlag.ItemIsEnabled
+        if (
+            not index.isValid()
+            or index.model() is not self
+            or not 0 <= index.row() < self.rowCount()
+            or not 0 <= index.column() < self.columnCount()
+        ):
+            return Qt.ItemFlag.NoItemFlags
         elif index.column() == self.INCLUDE_STUDY:
             if not self._study_has_entered_data(index.row()):
                 return Qt.ItemFlag(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
@@ -1447,9 +1569,13 @@ class DatasetModel(QAbstractTableModel):
         return Qt.ItemFlag(QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsEditable)
 
     def rowCount(self, index=QModelIndex()):
+        if index.isValid():
+            return 0
         return self.dataset.num_studies() + DUMMY_ROWS
 
     def columnCount(self, index=QModelIndex()):
+        if index.isValid():
+            return 0
         return self._get_col_count()
 
     def get_cov(self, table_col_index):

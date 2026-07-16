@@ -8357,6 +8357,166 @@
       "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
       "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_late_cross_family_open_failure_restores_actual_metric_menu_both_directions",
       "reason": "Proves late binary-to-continuous and continuous-to-binary failures restore the prior metric actions, checked state, enabled state, marker, and model.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_dataset_model_edit_values.py::test_workspace_numeric_edit_accepts_dot_and_comma_decimal_without_value_drift",
+      "reason": "Proves deliberate dot- and comma-decimal workspace input produces the same scientific value.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_dataset_model_edit_values.py::test_workspace_numeric_edit_rejects_ambiguous_decimal_text_without_mutation",
+      "reason": "Proves ambiguous grouping and decimal syntax fails closed without changing the dataset.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_dataset_model_edit_values.py::test_workspace_model_rejects_invalid_index_and_unscoped_roles_once",
+      "reason": "Guards invalid model indexes and unscoped edit roles with one deliberate rejection per request.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_dataset_model_edit_values.py::test_workspace_model_rejects_invalid_headers_and_flags",
+      "reason": "Guards native Qt6 header bounds and requires invalid workspace indexes to expose no item flags.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_dataset_model_edit_values.py::test_workspace_model_rejects_non_owned_indexes_and_valid_parents[foreign]",
+      "reason": "Proves the workspace model rejects indexes owned by another model and exposes no children beneath valid table cells.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_dataset_model_edit_values.py::test_workspace_model_rejects_non_owned_indexes_and_valid_parents[row]",
+      "reason": "Proves forged out-of-range workspace rows are inert and flat table cells cannot parent children.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_dataset_model_edit_values.py::test_workspace_model_rejects_non_owned_indexes_and_valid_parents[column]",
+      "reason": "Proves forged out-of-range workspace columns are inert and flat table cells cannot parent children.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_dataset_model_edit_values.py::test_inclusion_workspace_edit_captures_complete_semantic_state",
+      "reason": "Proves inclusion edit events preserve both inclusion and manual-exclusion semantics for exact undo.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_workspace_model_contracts.py::test_supporting_models_return_none_and_reject_every_invalid_edit",
+      "reason": "Sweeps every supporting Study, Outcome, Follow-Up, Group, and Covariate model for unavailable-role and invalid-edit behavior.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_workspace_model_contracts.py::test_supporting_models_return_none_and_reject_every_invalid_edit[0]",
+      "reason": "Validates group-model invalid index, header, flag, role, and edit contracts.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_workspace_model_contracts.py::test_supporting_models_return_none_and_reject_every_invalid_edit[1]",
+      "reason": "Validates outcome-model invalid index, header, flag, role, and edit contracts.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_workspace_model_contracts.py::test_supporting_models_return_none_and_reject_every_invalid_edit[2]",
+      "reason": "Validates follow-up-model invalid index, header, flag, role, and edit contracts.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_workspace_model_contracts.py::test_supporting_models_return_none_and_reject_every_invalid_edit[3]",
+      "reason": "Validates study-model invalid index, header, flag, role, and edit contracts.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_workspace_model_contracts.py::test_supporting_models_return_none_and_reject_every_invalid_edit[4]",
+      "reason": "Validates covariate-model invalid index, header, flag, role, and edit contracts.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_workspace_model_contracts.py::test_supporting_model_edit_emits_one_narrow_change",
+      "reason": "Proves each supporting workspace model emits one cell-scoped change without a broad model reset.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt", "clipboard"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_clipboard_preserves_platform_newlines_unicode_blanks_and_comma_decimals",
+      "reason": "Exercises the real clipboard seam with CRLF rows, rectangular Unicode data, blanks, and comma-decimal scientific values.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_dataset_model_edit_values.py::test_raw_data_uses_the_shared_strict_decimal_parser",
+      "reason": "Proves raw workspace data accepts deliberate dot or comma decimals and rejects ambiguous or non-finite values without mutation.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_dataset_model_edit_values.py::test_direct_outcomes_use_the_shared_strict_decimal_parser",
+      "reason": "Proves directly entered outcomes use the same strict decimal policy as other scientific workspace values.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_dataset_model_edit_values.py::test_inclusion_edit_accepts_only_explicit_pyqt6_check_states_and_booleans",
+      "reason": "Locks inclusion edits to explicit checked or unchecked PyQt6 states and exact Boolean or numeric equivalents.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_dataset_model_edit_values.py::test_workspace_edit_emits_one_settled_semantic_payload_and_view_range",
+      "reason": "Guards the typed workspace-edit event and its single settled dataChanged range after derived row state is complete.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt", "clipboard"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_invalid_clipboard_paste_is_rejected_before_mutation_or_undo",
+      "reason": "Proves clipboard validation fails before dataset mutation, dirty-state changes, or undo history is created.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt", "clipboard"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_clipboard_paste_rolls_back_if_commit_fails_after_preflight",
+      "reason": "Fault-injects a post-preflight write failure and proves the paste transaction restores data, cleanliness, and undo history.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt", "clipboard"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_multirow_paste_rolls_back_studies_added_before_commit_failure",
+      "reason": "Fault-injects a multi-row paste after study growth and proves exact dataset, selection, cleanliness, and undo rollback.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_inclusion_edit_undo_redo_restores_semantics_selection_and_dirty_state",
+      "reason": "Exercises inclusion editing through the real shell and proves undo and redo restore Boolean semantics, selection, and clean state.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["qt", "subprocess"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_workspace_window.py::test_workspace_table_uses_valid_logical_geometry_at_fractional_scale_factors",
+      "reason": "Renders the real workspace through qwindows or cocoa at 100, 125, 150, and 175 percent scaling and checks logical geometry against physical capture pixels.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["analysis_behavior", "release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_pairwise_subtypes_preserve_valid_multi_arm_analysis_units[binary-three-arm]",
+      "reason": "Proves the durable binary pairwise subtype accepts and preserves all arms in a valid multi-arm analysis unit.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["analysis_behavior", "release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_pairwise_subtypes_preserve_valid_multi_arm_analysis_units[continuous-three-arm]",
+      "reason": "Proves the durable continuous pairwise subtype accepts and preserves all arms in a valid multi-arm analysis unit.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["analysis_behavior", "release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_group_subtype_contract_rejects_too_few_or_forbidden_extra_groups[two-arm-needs-two]",
+      "reason": "Guards pairwise subtypes against analysis units with fewer than two groups.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["analysis_behavior", "release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_group_subtype_contract_rejects_too_few_or_forbidden_extra_groups[one-arm-stays-exact]",
+      "reason": "Guards one-arm subtypes against invalid extra groups while multi-arm pairwise projects remain supported.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["analysis_behavior", "release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_format.py::test_group_subtype_contract_rejects_too_few_or_forbidden_extra_groups[diagnostic-stays-exact]",
+      "reason": "Guards diagnostic analysis units against invalid extra groups.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["analysis_behavior", "release_readiness"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_adapter.py::test_adapter_round_trip_preserves_every_multi_arm_group[binary]",
+      "reason": "Proves the application adapter reconstructs and serializes every binary treatment arm without loss.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["analysis_behavior", "release_readiness"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_project_adapter.py::test_adapter_round_trip_preserves_every_multi_arm_group[continuous]",
+      "reason": "Proves the application adapter reconstructs and serializes every continuous treatment arm without loss.", "runtime_class": "subsecond", "size": "small"
     }
 
   ]

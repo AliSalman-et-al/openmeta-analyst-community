@@ -10,12 +10,217 @@ import test_backend_compat
 
 test_backend_compat.install()
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QColor
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor
 
 import ma_data_table_model
 import ma_dataset
 import meta_globals
+
+
+def test_workspace_numeric_edit_accepts_dot_and_comma_decimal_without_value_drift():
+    model = _diagnostic_model_with_empty_cells()
+    model.dataset.add_covariate(
+        ma_dataset.Covariate("Dose", "continuous"), {"Alpha": 0.0}
+    )
+    model.update_column_indices()
+    index = model.index(0, model.columnCount() - 1)
+
+    assert model.setData(index, "1.25") is True
+    assert model.dataset.studies[0].covariate_dict["Dose"] == 1.25
+    assert model.setData(index, "1,25") is True
+    assert model.dataset.studies[0].covariate_dict["Dose"] == 1.25
+
+
+def test_workspace_numeric_edit_rejects_ambiguous_decimal_text_without_mutation():
+    model = _diagnostic_model_with_empty_cells()
+    model.dataset.add_covariate(
+        ma_dataset.Covariate("Dose", "continuous"), {"Alpha": 5.5}
+    )
+    model.update_column_indices()
+    index = model.index(0, model.columnCount() - 1)
+
+    for invalid in ("1,234.5", "NaN", "Infinity"):
+        assert model.setData(index, invalid) is False
+        assert model.dataset.studies[0].covariate_dict["Dose"] == 5.5
+
+
+def test_raw_data_uses_the_shared_strict_decimal_parser(monkeypatch):
+    model = _continuous_model_with_named_study()
+    monkeypatch.setattr(model, "update_outcome_if_possible", lambda _row: None)
+    index = model.index(0, model.RAW_DATA[0])
+    raw_data = model.get_current_ma_unit_for_study(0).tx_groups[
+        model.current_txs[0]
+    ].raw_data
+
+    assert model.setData(index, "1.25") is True
+    assert raw_data[0] == 1.25
+    assert model.setData(index, "1,25") is True
+    assert raw_data[0] == 1.25
+
+    for invalid in ("1,234.5", "NaN", "Infinity"):
+        assert model.setData(index, invalid) is False
+        assert raw_data[0] == 1.25
+
+
+def test_direct_outcomes_use_the_shared_strict_decimal_parser(monkeypatch):
+    model = _binary_model_with_blank_study()
+    model.dataset.studies[0].name = "Alpha"
+    monkeypatch.setattr(
+        ma_data_table_model.meta_py_r,
+        "binary_convert_scale",
+        lambda value, *args, **kwargs: value,
+    )
+    index = model.index(0, model.OUTCOMES[0])
+    ma_unit = model.get_current_ma_unit_for_study(0)
+    group = model.get_cur_group_str()
+
+    assert model.setData(index, "1.25") is True
+    assert ma_unit.get_entered_effect_and_ci("OR", group)[0] == 1.25
+    assert model.setData(index, "1,25") is True
+    assert ma_unit.get_entered_effect_and_ci("OR", group)[0] == 1.25
+
+    for invalid in ("1,234.5", "NaN", "Infinity"):
+        assert model.setData(index, invalid) is False
+        assert ma_unit.get_entered_effect_and_ci("OR", group)[0] == 1.25
+
+
+def test_workspace_model_rejects_invalid_index_and_unscoped_roles_once():
+    model = _diagnostic_model_with_empty_cells()
+    errors = []
+    model.dataError.connect(errors.append)
+
+    assert model.setData(model.index(-1, -1), "ignored") is False
+    assert model.setData(
+        model.index(0, model.NAME), "ignored", Qt.ItemDataRole.DisplayRole
+    ) is False
+    assert model.setData(
+        model.index(0, model.NAME), Qt.CheckState.Checked, Qt.ItemDataRole.CheckStateRole
+    ) is False
+
+    assert len(errors) == 3
+    assert model.dataset.studies[0].name == "Alpha"
+
+
+def test_workspace_model_rejects_invalid_headers_and_flags():
+    model = _diagnostic_model_with_empty_cells()
+
+    assert model.flags(model.index(-1, -1)) == Qt.ItemFlag.NoItemFlags
+    assert (
+        model.flags(model.createIndex(model.rowCount(), 0))
+        == Qt.ItemFlag.NoItemFlags
+    )
+    assert (
+        model.flags(model.createIndex(0, model.columnCount()))
+        == Qt.ItemFlag.NoItemFlags
+    )
+    for section in (-1, model.columnCount()):
+        assert model.headerData(section, Qt.Orientation.Horizontal) is None
+        assert (
+            model.headerData(
+                section,
+                Qt.Orientation.Horizontal,
+                ma_data_table_model.WORKSPACE_COLUMN_IDENTITY_ROLE,
+            )
+            is None
+        )
+    for section in (-1, model.rowCount()):
+        assert model.headerData(section, Qt.Orientation.Vertical) is None
+
+
+@pytest.mark.parametrize("invalid_kind", ("foreign", "row", "column"))
+def test_workspace_model_rejects_non_owned_indexes_and_valid_parents(invalid_kind):
+    model = _diagnostic_model_with_empty_cells()
+    other_model = _diagnostic_model_with_empty_cells()
+    invalid_indexes = {
+        "foreign": other_model.index(0, 0),
+        "row": model.createIndex(model.rowCount(), 0),
+        "column": model.createIndex(0, model.columnCount()),
+    }
+    invalid = invalid_indexes[invalid_kind]
+    roles = (
+        Qt.ItemDataRole.DisplayRole,
+        Qt.ItemDataRole.EditRole,
+        Qt.ItemDataRole.CheckStateRole,
+        Qt.ItemDataRole.DecorationRole,
+    )
+
+    for role in roles:
+        assert model.data(invalid, role) is None
+    assert model.flags(invalid) == Qt.ItemFlag.NoItemFlags
+    assert model.setData(invalid, "ignored") is False
+
+    parent = model.index(0, model.NAME)
+    assert parent.isValid()
+    assert model.rowCount(parent) == 0
+    assert model.columnCount(parent) == 0
+    assert model.index(0, 0, parent).isValid() is False
+
+
+def test_inclusion_workspace_edit_captures_complete_semantic_state():
+    model = _diagnostic_model_with_empty_cells()
+    study = model.dataset.studies[0]
+    study.include = False
+    study.manually_excluded = False
+    edits = []
+    model.workspaceEditCommitted.connect(edits.append)
+
+    assert model.setData(
+        model.index(0, model.INCLUDE_STUDY),
+        Qt.CheckState.Checked,
+        Qt.ItemDataRole.CheckStateRole,
+    ) is True
+
+    assert len(edits) == 1
+    assert edits[0].old_value == ma_data_table_model.StudyInclusionState(False, False)
+    assert edits[0].new_value == ma_data_table_model.StudyInclusionState(True, False)
+
+
+def test_inclusion_edit_accepts_only_explicit_pyqt6_check_states_and_booleans():
+    model = _diagnostic_model_with_empty_cells()
+    index = model.index(0, model.INCLUDE_STUDY)
+
+    for value, expected in (
+        (Qt.CheckState.Checked, True),
+        (Qt.CheckState.Unchecked, False),
+        (2, True),
+        (0, False),
+        (True, True),
+        (False, False),
+    ):
+        assert model.setData(index, value, Qt.ItemDataRole.CheckStateRole) is True
+        assert model.dataset.studies[0].include is expected
+
+    for invalid in (Qt.CheckState.PartiallyChecked, 1, "2", None):
+        before = model.dataset.studies[0].include
+        assert model.setData(index, invalid, Qt.ItemDataRole.CheckStateRole) is False
+        assert model.dataset.studies[0].include is before
+
+
+def test_workspace_edit_emits_one_settled_semantic_payload_and_view_range(monkeypatch):
+    model = _binary_model_with_blank_study()
+    model.dataset.studies[0].name = "Alpha"
+    index = model.index(0, model.RAW_DATA[0])
+    edits = []
+    changes = []
+    model.workspaceEditCommitted.connect(edits.append)
+    model.dataChanged.connect(
+        lambda top, bottom, roles: changes.append((top, bottom, roles))
+    )
+    monkeypatch.setattr(model, "update_outcome_if_possible", lambda _row: None)
+
+    assert model.setData(index, "1") is True
+
+    assert len(edits) == 1
+    assert len(changes) == 1
+    edit = edits[0]
+    assert edit.index == index
+    assert edit.changed_top_left == model.index(0, model.INCLUDE_STUDY)
+    assert edit.changed_bottom_right == model.index(0, model.OUTCOMES[-1])
+    assert changes[0][0] == edit.changed_top_left
+    assert changes[0][1] == edit.changed_bottom_right
+    assert tuple(changes[0][2]) == edit.roles
+    assert model.dataset.studies[0].include is False
 
 
 def _diagnostic_model_with_empty_cells():
@@ -187,7 +392,7 @@ def test_empty_editable_cells_return_blank_edit_text():
     ]
 
     for column in editable_columns:
-        value = model.data(model.index(0, column), Qt.EditRole)
+        value = model.data(model.index(0, column), Qt.ItemDataRole.EditRole)
 
         assert value == ""
 
@@ -195,11 +400,11 @@ def test_empty_editable_cells_return_blank_edit_text():
 def test_normal_study_cells_do_not_override_view_alternating_row_background():
     model = _continuous_model_with_named_study()
 
-    assert model.data(model.index(0, model.NAME), Qt.BackgroundColorRole) is None
-    assert model.data(model.index(0, model.RAW_DATA[0]), Qt.BackgroundColorRole) is None
+    assert model.data(model.index(0, model.NAME), Qt.ItemDataRole.BackgroundRole) is None
+    assert model.data(model.index(0, model.RAW_DATA[0]), Qt.ItemDataRole.BackgroundRole) is None
     assert model.data(
-        model.index(0, model.OUTCOMES[0]), Qt.BackgroundColorRole
-    ) == QColor(Qt.yellow)
+        model.index(0, model.OUTCOMES[0]), Qt.ItemDataRole.BackgroundRole
+    ) == QColor(Qt.GlobalColor.yellow)
 
 
 def test_one_arm_inactive_raw_data_cells_keep_disabled_background():
@@ -207,9 +412,9 @@ def test_one_arm_inactive_raw_data_cells_keep_disabled_background():
     model.current_effect = "TX Mean"
 
     assert model.data(
-        model.index(0, model.RAW_DATA[3]), Qt.BackgroundColorRole
-    ) == QColor(Qt.gray)
-    assert model.data(model.index(0, model.RAW_DATA[0]), Qt.BackgroundColorRole) is None
+        model.index(0, model.RAW_DATA[3]), Qt.ItemDataRole.BackgroundRole
+    ) == QColor(Qt.GlobalColor.gray)
+    assert model.data(model.index(0, model.RAW_DATA[0]), Qt.ItemDataRole.BackgroundRole) is None
 
 
 def test_empty_new_entry_row_does_not_render_populated_study_chrome():
@@ -221,31 +426,34 @@ def test_empty_new_entry_row_does_not_render_populated_study_chrome():
         model = _model_with_real_study_and_empty_new_entry_row(data_type)
         blank_row = 1
 
-        assert model.headerData(blank_row, Qt.Vertical, Qt.DecorationRole) is None
+        assert model.headerData(blank_row, Qt.Orientation.Vertical, Qt.ItemDataRole.DecorationRole) is None
         assert (
-            model.data(model.index(blank_row, model.INCLUDE_STUDY), Qt.CheckStateRole)
+            model.data(model.index(blank_row, model.INCLUDE_STUDY), Qt.ItemDataRole.CheckStateRole)
             is None
         )
 
         for column in model.OUTCOMES:
             assert (
-                model.data(model.index(blank_row, column), Qt.BackgroundColorRole)
+                model.data(model.index(blank_row, column), Qt.ItemDataRole.BackgroundRole)
                 is None
             )
 
 
-def test_named_new_entry_row_keeps_populated_study_chrome():
+def test_named_new_entry_row_keeps_populated_study_chrome(qapp):
+    import qt6_resources
+
+    qt6_resources.ensure_application_resources()
     model = _model_with_real_study_and_empty_new_entry_row(meta_globals.BINARY)
     model.dataset.studies[1].name = "Beta"
     model.dataset.studies[1].include = True
 
-    assert model.headerData(1, Qt.Vertical, Qt.DecorationRole).isNull() is False
+    assert model.headerData(1, Qt.Orientation.Vertical, Qt.ItemDataRole.DecorationRole).isNull() is False
     assert (
-        model.data(model.index(1, model.INCLUDE_STUDY), Qt.CheckStateRole) == Qt.Checked
+        model.data(model.index(1, model.INCLUDE_STUDY), Qt.ItemDataRole.CheckStateRole) == Qt.CheckState.Checked
     )
     assert model.data(
-        model.index(1, model.OUTCOMES[0]), Qt.BackgroundColorRole
-    ) == QColor(Qt.yellow)
+        model.index(1, model.OUTCOMES[0]), Qt.ItemDataRole.BackgroundRole
+    ) == QColor(Qt.GlobalColor.yellow)
 
 
 def test_raw_data_edit_on_placeholder_row_emits_study_name_error():

@@ -7,13 +7,14 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, os.path.abspath("src"))
 
 import pytest
+from PyQt6.QtWidgets import QDialog
 
 
 REPO_ROOT = os.getcwd()
 
 
 def test_data_table_return_moves_vertically_from_selected_cells():
-    from PyQt5 import QtCore, QtTest
+    from PyQt6 import QtCore, QtTest
 
     import launch
 
@@ -24,20 +25,20 @@ def test_data_table_return_moves_vertically_from_selected_cells():
         model = window.model
 
         table.setCurrentIndex(model.index(0, model.NAME))
-        QtTest.QTest.keyClick(table, QtCore.Qt.Key_Return)
+        QtTest.QTest.keyClick(table, QtCore.Qt.Key.Key_Return)
         assert table.currentIndex() == model.index(1, model.NAME)
 
-        QtTest.QTest.keyClick(table, QtCore.Qt.Key_Enter)
+        QtTest.QTest.keyClick(table, QtCore.Qt.Key.Key_Enter)
         assert table.currentIndex() == model.index(2, model.NAME)
 
-        QtTest.QTest.keyClick(table, QtCore.Qt.Key_Return, QtCore.Qt.ShiftModifier)
+        QtTest.QTest.keyClick(table, QtCore.Qt.Key.Key_Return, QtCore.Qt.KeyboardModifier.ShiftModifier)
         assert table.currentIndex() == model.index(1, model.NAME)
     finally:
         _close_without_prompt(app, window)
 
 
 def test_data_table_return_commits_editor_and_moves_down_same_column():
-    from PyQt5 import QtCore, QtTest, QtWidgets
+    from PyQt6 import QtCore, QtTest, QtWidgets
 
     import launch
 
@@ -54,7 +55,7 @@ def test_data_table_return_commits_editor_and_moves_down_same_column():
         assert editor is not None
 
         editor.setText("Alpha")
-        QtTest.QTest.keyClick(editor, QtCore.Qt.Key_Return)
+        QtTest.QTest.keyClick(editor, QtCore.Qt.Key.Key_Return)
         app.processEvents()
 
         assert _cell_text(model, 0, model.NAME) == "Alpha"
@@ -64,7 +65,7 @@ def test_data_table_return_commits_editor_and_moves_down_same_column():
 
 
 def test_data_table_ctrl_a_selects_all_cells_without_running_analysis(monkeypatch):
-    from PyQt5 import QtCore, QtTest
+    from PyQt6 import QtCore, QtTest
 
     import launch
 
@@ -81,7 +82,7 @@ def test_data_table_ctrl_a_selects_all_cells_without_running_analysis(monkeypatc
         table.setFocus()
         table.setCurrentIndex(model.index(0, model.NAME))
 
-        QtTest.QTest.keyClick(table, QtCore.Qt.Key_A, QtCore.Qt.ControlModifier)
+        QtTest.QTest.keyClick(table, QtCore.Qt.Key.Key_A, QtCore.Qt.KeyboardModifier.ControlModifier)
         app.processEvents()
 
         assert analysis_calls == []
@@ -93,7 +94,7 @@ def test_data_table_ctrl_a_selects_all_cells_without_running_analysis(monkeypatc
 
 
 def test_data_table_delete_and_backspace_clear_selected_cells(monkeypatch):
-    from PyQt5 import QtCore, QtTest
+    from PyQt6 import QtCore, QtTest
 
     import launch
     import ma_data_table_model
@@ -124,7 +125,7 @@ def test_data_table_delete_and_backspace_clear_selected_cells(monkeypatch):
 
         table.setFocus()
         table.setCurrentIndex(model.index(0, model.RAW_DATA[0]))
-        QtTest.QTest.keyClick(table, QtCore.Qt.Key_Delete)
+        QtTest.QTest.keyClick(table, QtCore.Qt.Key.Key_Delete)
         app.processEvents()
 
         assert _cell_text(model, 0, model.RAW_DATA[0]) == ""
@@ -134,7 +135,7 @@ def test_data_table_delete_and_backspace_clear_selected_cells(monkeypatch):
         assert _cell_text(model, 0, model.RAW_DATA[0]) == "41.0"
 
         table.setCurrentIndex(model.index(0, model.RAW_DATA[0]))
-        QtTest.QTest.keyClick(table, QtCore.Qt.Key_Backspace)
+        QtTest.QTest.keyClick(table, QtCore.Qt.Key.Key_Backspace)
         app.processEvents()
 
         assert _cell_text(model, 0, model.RAW_DATA[0]) == ""
@@ -320,13 +321,26 @@ def test_data_table_editing_preserves_project_state_and_round_trips(
         model.add_new_outcome("Readmission", "binary", "proportions")
         model.add_follow_up_to_current_outcome("week 4")
         model.add_covariate("Dose", "continuous", {"Alpha": 5.5})
+        model.set_current_groups(["tx B", "Tx C"])
+        model.set_conf_level(90.0)
 
         meta_form = sys.modules["meta_form"]
+        critical_messages = []
         monkeypatch.setattr(
             meta_form.QFileDialog, "getSaveFileName", lambda **kwargs: (saved_path, "")
         )
-        window.save_as()
-        reopened = meta_form._load_project_pickle(saved_path)
+        monkeypatch.setattr(
+            meta_form.QMessageBox,
+            "critical",
+            lambda *args, **kwargs: critical_messages.append(args),
+        )
+        assert window.save_as() is True
+        assert critical_messages == []
+
+        # Exercise the real project install boundary so both the normalized
+        # dataset and project-scoped workspace selection are covered.
+        assert window.open(file_path=saved_path) is True
+        reopened = window.model.dataset
 
         assert [
             (str(study.name), str(study.year)) for study in reopened.studies[:1]
@@ -338,11 +352,18 @@ def test_data_table_editing_preserves_project_state_and_round_trips(
             ("Dose", 1)
         ]
         assert reopened.studies[0].covariate_dict["Dose"] == 5.5
+        assert window.model.current_outcome == "Mortality"
+        assert window.model.get_current_follow_up_name() == "first"
+        assert window.model.current_txs == ["tx B", "Tx C"]
+        assert window.model.current_effect == "OR"
+        assert window.model.get_global_conf_level() == 90.0
+        assert window.current_data_unsaved is False
+        assert window.tableView.undoStack.isClean()
     finally:
         _close_without_prompt(app, window)
 
 
-def test_copy_paste_undo_and_redo_work_through_real_table_path():
+def test_copy_paste_undo_and_redo_work_through_real_table_path(tmp_path):
     import launch
 
     app, window = launch.start_automation()
@@ -363,17 +384,247 @@ def test_copy_paste_undo_and_redo_work_through_real_table_path():
         assert copied == "1.0\t10.0\t2.0\t12.0"
 
         table.set_data_in_model(model.index(1, model.NAME), _variant("Beta"))
-        table.paste_from_clipboard(model.index(1, model.RAW_DATA[0]))
+        paste_origin = model.index(1, model.RAW_DATA[0])
+        table.setCurrentIndex(paste_origin)
+        table.selectRow(1)
+        table.undoStack.clear()
+        table.undoStack.setClean()
+        window.current_data_unsaved = False
+        table.paste_from_clipboard(paste_origin)
         assert _cell_text(model, 1, model.NAME) == "Beta"
         assert _cell_text(model, 1, model.RAW_DATA[-1]) == "12.0"
+        assert window.current_data_unsaved is True
+        assert table.currentIndex() == paste_origin
 
         window.undo()
         assert _cell_text(window.model, 1, window.model.NAME) == "Beta"
         assert _cell_text(window.model, 1, window.model.RAW_DATA[-1]) == ""
+        assert window.current_data_unsaved is False
+        assert table.currentIndex() == window.model.index(1, window.model.RAW_DATA[0])
 
         window.redo()
         assert _cell_text(window.model, 1, window.model.NAME) == "Beta"
         assert _cell_text(window.model, 1, window.model.RAW_DATA[-1]) == "12.0"
+        assert window.current_data_unsaved is True
+        assert table.currentIndex() == window.model.index(1, window.model.RAW_DATA[0])
+
+        window.out_path = str(tmp_path / "workspace-edits.rcms")
+        assert window.save() is True
+        assert window.current_data_unsaved is False
+
+        window.undo()
+        assert window.current_data_unsaved is True
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_clipboard_preserves_platform_newlines_unicode_blanks_and_comma_decimals():
+    from PyQt6.QtWidgets import QApplication
+
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        model = window.model
+        table = window.tableView
+        QApplication.clipboard().setText(
+            "Étude Ω\t2020\t1\t10\t\t12\r\nBeta\t2021\t2\t20\t3\t30\r\n"
+        )
+
+        table.paste_from_clipboard(model.index(0, model.NAME))
+
+        assert _cell_text(model, 0, model.NAME) == "Étude Ω"
+        assert _cell_text(model, 1, model.NAME) == "Beta"
+        assert _cell_text(model, 0, model.RAW_DATA[2]) == ""
+        assert _cell_text(model, 1, model.RAW_DATA[-1]) == "30.0"
+
+        model.add_covariate("Dose", "continuous", {"Étude Ω": None, "Beta": None})
+        table.synchronize_column_widths()
+        comma_decimal = model.index(0, model.columnCount() - 1)
+        QApplication.clipboard().setText("1,25\r\n")
+        table.paste_from_clipboard(comma_decimal)
+
+        assert model.dataset.studies[0].covariate_dict["Dose"] == 1.25
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_invalid_clipboard_paste_is_rejected_before_mutation_or_undo(monkeypatch):
+    from PyQt6.QtWidgets import QApplication
+
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        model = window.model
+        table = window.tableView
+        table.set_data_in_model(model.index(0, model.NAME), _variant("Alpha"))
+        table.undoStack.clear()
+        table.undoStack.setClean()
+        window.current_data_unsaved = False
+        warnings = []
+        monkeypatch.setattr(
+            sys.modules["meta_form"].QMessageBox,
+            "warning",
+            lambda *args, **kwargs: warnings.append(args),
+        )
+        QApplication.clipboard().setText("1\tnot numeric")
+
+        assert table.paste_from_clipboard(model.index(0, model.RAW_DATA[0])) is False
+
+        assert [_cell_text(model, 0, column) for column in model.RAW_DATA] == [
+            "",
+            "",
+            "",
+            "",
+        ]
+        assert table.undoStack.count() == 0
+        assert table.undoStack.isClean()
+        assert window.current_data_unsaved is False
+        assert warnings[-1][1:] == ("Warning", "Raw data needs to be numeric.")
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_clipboard_paste_rolls_back_if_commit_fails_after_preflight(monkeypatch):
+    from PyQt6.QtWidgets import QApplication
+
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        model = window.model
+        table = window.tableView
+        table.undoStack.clear()
+        table.undoStack.setClean()
+        window.current_data_unsaved = False
+        warnings = []
+        monkeypatch.setattr(
+            sys.modules["meta_form"].QMessageBox,
+            "warning",
+            lambda *args, **kwargs: warnings.append(args),
+        )
+        monkeypatch.setattr(model, "setData", lambda *args, **kwargs: False)
+        model.last_data_error = "Simulated commit failure."
+        QApplication.clipboard().setText("Alpha")
+
+        assert table.paste_from_clipboard(model.index(0, model.NAME)) is False
+
+        assert _cell_text(window.model, 0, window.model.NAME) == ""
+        assert table.undoStack.count() == 0
+        assert table.undoStack.isClean()
+        assert window.current_data_unsaved is False
+        assert warnings[-1][1:] == ("Warning", "Simulated commit failure.")
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_multirow_paste_rolls_back_studies_added_before_commit_failure(monkeypatch):
+    from PyQt6.QtCore import QItemSelectionModel
+    from PyQt6.QtWidgets import QApplication
+
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        model = window.model
+        table = window.tableView
+        origin = model.index(0, model.NAME)
+        table.setCurrentIndex(origin)
+        table.selectionModel().select(
+            origin, QItemSelectionModel.SelectionFlag.Select
+        )
+        original_count = len(model.dataset.studies)
+        original_names = [study.name for study in model.dataset.studies]
+        table.undoStack.clear()
+        table.undoStack.setClean()
+        window.current_data_unsaved = False
+        warnings = []
+        monkeypatch.setattr(
+            sys.modules["meta_form"].QMessageBox,
+            "warning",
+            lambda *args, **kwargs: warnings.append(args),
+        )
+        real_set_data = model.setData
+        calls = 0
+
+        def fail_after_first_write(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                model.last_data_error = "Simulated post-growth commit failure."
+                return False
+            return real_set_data(*args, **kwargs)
+
+        monkeypatch.setattr(model, "setData", fail_after_first_write)
+        QApplication.clipboard().setText("Alpha\r\nBeta\r\nGamma")
+
+        assert table.paste_from_clipboard(origin) is False
+
+        assert calls == 2
+        assert len(window.model.dataset.studies) == original_count
+        assert [study.name for study in window.model.dataset.studies] == original_names
+        assert table.undoStack.count() == 0
+        assert table.undoStack.isClean()
+        assert window.current_data_unsaved is False
+        assert table.currentIndex() == window.model.index(0, window.model.NAME)
+        assert [
+            (index.row(), index.column())
+            for index in table.selectionModel().selectedIndexes()
+        ] == [(0, window.model.NAME)]
+        assert warnings[-1][1:] == (
+            "Warning",
+            "Simulated post-growth commit failure.",
+        )
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_inclusion_edit_undo_redo_restores_semantics_selection_and_dirty_state():
+    from PyQt6.QtCore import Qt
+
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        model = window.model
+        table = window.tableView
+        table.paste_contents(
+            model.index(0, model.NAME), [["Alpha", "2020", "1", "10", "2", "12"]]
+        )
+        inclusion = model.index(0, model.INCLUDE_STUDY)
+        model.dataset.studies[0].include = False
+        model.dataset.studies[0].manually_excluded = False
+        table.setCurrentIndex(inclusion)
+        table.selectRow(0)
+        table.undoStack.clear()
+        table.undoStack.setClean()
+        window.current_data_unsaved = False
+
+        assert model.setData(
+            inclusion, Qt.CheckState.Checked, Qt.ItemDataRole.CheckStateRole
+        ) is True
+        assert model.dataset.studies[0].include is True
+        assert model.dataset.studies[0].manually_excluded is False
+        assert table.undoStack.count() == 1
+        assert window.current_data_unsaved is True
+
+        window.undo()
+        assert window.model.dataset.studies[0].include is False
+        assert window.model.dataset.studies[0].manually_excluded is False
+        assert window.current_data_unsaved is False
+        assert table.currentIndex() == window.model.index(0, window.model.INCLUDE_STUDY)
+
+        window.redo()
+        assert window.model.dataset.studies[0].include is True
+        assert window.model.dataset.studies[0].manually_excluded is False
+        assert window.current_data_unsaved is True
+        assert table.currentIndex() == window.model.index(0, window.model.INCLUDE_STUDY)
     finally:
         _close_without_prompt(app, window)
 
@@ -445,8 +696,20 @@ def test_diagnostic_complete_paste_recomputes_sens_spec_confidence_intervals(
             model.index(0, model.RAW_DATA[0]), [["30", "10", "1", "81"]]
         )
 
+        ma_unit = model.get_current_ma_unit_for_study(0)
+        group_str = model.get_cur_group_str()
         assert _cell_text(model, 0, model.OUTCOMES[0]) == "0.750"
         assert all(_cell_text(model, 0, col) != "" for col in model.OUTCOMES)
+        assert ma_unit.get_entered_effect_and_ci("Sens", group_str) == (
+            0.750,
+            0.588,
+            0.873,
+        )
+        assert ma_unit.get_entered_effect_and_ci("PLR", group_str) == (
+            61.5,
+            8.8,
+            431.0,
+        )
     finally:
         _close_without_prompt(app, window)
 
@@ -656,7 +919,7 @@ def test_invalid_paste_reports_validation_error_when_model_signals_are_blocked(
 
 def test_add_outcome_dialog_rejects_blank_and_duplicate_names(monkeypatch):
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
 
     app, window = launch.start_automation()
     try:
@@ -712,7 +975,7 @@ def test_add_outcome_dialog_rejects_blank_and_duplicate_names(monkeypatch):
 def test_edit_dialog_rejects_blank_outcome_name(monkeypatch):
     import launch
     import edit_dialog
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
 
     app, window = launch.start_automation()
     dialog = None
@@ -753,7 +1016,7 @@ def test_edit_dialog_rejects_blank_outcome_name(monkeypatch):
 def test_edit_dialog_rejects_blank_names_for_other_dataset_entities(monkeypatch):
     import launch
     import edit_dialog
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
 
     app, window = launch.start_automation()
     dialog = None
@@ -839,7 +1102,7 @@ def test_edit_dialog_rejects_blank_names_for_other_dataset_entities(monkeypatch)
 
 def test_add_dialogs_reject_blank_names_for_other_dataset_entities(monkeypatch):
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
 
     app, window = launch.start_automation()
     try:
@@ -908,7 +1171,7 @@ def test_add_dialogs_reject_blank_names_for_other_dataset_entities(monkeypatch):
 
 def test_metaform_dialog_text_slots_accept_pyqt5_line_edit_strings(monkeypatch):
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
 
     app, window = launch.start_automation()
     try:
@@ -1018,7 +1281,7 @@ def test_edit_dataset_rejection_leaves_main_dataset_unchanged(monkeypatch):
 
         def reject_after_editing_copy(dialog):
             dialog.dataset.studies[0].name = "Rejected dataset edit"
-            return dialog.Rejected
+            return QDialog.DialogCode.Rejected
 
         monkeypatch.setattr(edit_dialog.EditDialog, "exec", reject_after_editing_copy)
 
@@ -1039,7 +1302,9 @@ def test_edit_empty_dataset_can_be_cancelled(monkeypatch):
     try:
         original_dataset = window.model.dataset
         monkeypatch.setattr(
-            edit_dialog.EditDialog, "exec", lambda dialog: dialog.Rejected
+            edit_dialog.EditDialog,
+            "exec",
+            lambda dialog: QDialog.DialogCode.Rejected,
         )
 
         window.edit_dataset()
@@ -1058,7 +1323,9 @@ def test_edit_empty_dataset_acceptance_preserves_empty_outcome_state(monkeypatch
     try:
         original_undo_count = window.tableView.undoStack.count()
         monkeypatch.setattr(
-            edit_dialog.EditDialog, "exec", lambda dialog: dialog.Accepted
+            edit_dialog.EditDialog,
+            "exec",
+            lambda dialog: QDialog.DialogCode.Accepted,
         )
 
         window.edit_dataset()
@@ -1084,7 +1351,7 @@ def test_edit_dataset_acceptance_propagates_copied_dataset_mutation(monkeypatch)
 
         def accept_after_renaming_study(dialog):
             dialog.dataset.studies[0].name = renamed_study
-            return dialog.Accepted
+            return QDialog.DialogCode.Accepted
 
         monkeypatch.setattr(
             edit_dialog.EditDialog, "exec", accept_after_renaming_study
@@ -1131,7 +1398,7 @@ def test_metric_selection_and_confidence_level_are_preserved_in_model_state():
 
 
 def test_confidence_level_dialog_rejects_represented_100_percent():
-    from PyQt5.QtWidgets import QApplication
+    from PyQt6.QtWidgets import QApplication
 
     import conf_level_dialog
 

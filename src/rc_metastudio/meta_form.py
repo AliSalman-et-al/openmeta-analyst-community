@@ -164,6 +164,11 @@ class ElidingStatusLabel(QLabel):
         self.setToolTip(self._full_text)
         self._refresh_elision()
 
+    def text(self):
+        """Return the semantic status text, not its width-dependent paint form."""
+
+        return self._full_text
+
     def resizeEvent(self, event):
         super(ElidingStatusLabel, self).resizeEvent(event)
         self._refresh_elision()
@@ -271,6 +276,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.update_dimension()
         self._model_signal_connections = []
         self._setup_connections()
+        self.tableView.undoStack.cleanChanged.connect(self._undo_clean_changed)
         self._configure_standard_shortcuts()
         self.tableView.setSelectionMode(QTableView.SelectionMode.ContiguousSelection)
         self.model.reset_model()
@@ -695,7 +701,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         model = self.tableView.model()
         self._model_signal_connections.append(
             app_error_handler.connect_safely(
-                model.pyCellContentChanged,
+                model.workspaceEditCommitted,
                 self.tableView.cell_content_changed,
                 parent=self,
             )
@@ -833,6 +839,12 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def data_dirtied(self):
         self._notify_user_that_data_is_unsaved()
         self.current_data_unsaved = True
+
+    def _undo_clean_changed(self, is_clean):
+        """Keep project dirty state aligned with the active undo history."""
+        self.current_data_unsaved = not bool(is_clean)
+        if not is_clean:
+            self._notify_user_that_data_is_unsaved()
 
     def meta_subgroup_get_cov(self):
         form = meta_subgroup_form.MetaSubgroupForm(self.model, parent=self)
@@ -1853,6 +1865,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.out_path = destination
         self.model.analysis_source_path = destination
         self.dataset_file_lbl.setText("Open Project: %s" % destination)
+        self.tableView.undoStack.setClean()
         self.current_data_unsaved = False
         if durability_error is not None:
             self._report_durability_uncertain_save(destination, durability_error)
