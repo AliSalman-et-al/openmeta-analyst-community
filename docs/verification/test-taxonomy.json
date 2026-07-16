@@ -8307,6 +8307,56 @@
       "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt"], "lane": "gui",
       "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_adaptive_shell_state_is_typed_without_dynamic_qt_properties",
       "reason": "Proves adaptive shell policy is application-owned typed state rather than dynamic QObject properties.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_structured_project_lifecycle_opens_every_sample_and_round_trips_state",
+      "reason": "Exercises every converted sample through the real shell and proves durable structured data and project state survive Save As and reopen without a sidecar.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_wizard_created_projects_save_as_latest_structured_containers[new_dataset]",
+      "reason": "Proves the real new-project wizard result saves as the latest validated project container.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_wizard_created_projects_save_as_latest_structured_containers[csv_import]",
+      "reason": "Proves the real CSV-import command path saves imported rows as the latest validated project container.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_failed_open_and_save_preserve_current_project_dirty_state_and_recents",
+      "reason": "Proves malformed opens and failed atomic saves preserve the current document, dirty state, and recent-project list while surfacing actionable errors.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_structured_project_restores_nondefault_active_selection_without_normalizing_it",
+      "reason": "Proves a non-first outcome, non-first follow-up, reversed group order, effect, and Confidence Level survive real-shell open, save, and reopen.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_cancelled_save_as_blocks_new_open_recent_and_import_for_unsaved_wizards",
+      "reason": "Proves Save As cancellation aborts every destructive shell action for unsaved New Project and CSV Import work.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_durable_save_and_open_succeed_when_recent_project_bookkeeping_fails",
+      "reason": "Separates durable document success from fallible machine-local recent-list, settings, and menu bookkeeping on save and open.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_open_rolls_back_constructor_rebind_and_ui_initialization_failures",
+      "reason": "Fault-injects candidate construction, table rebind, and UI initialization to prove transactional open restores model references, connections, selection, path, and usability.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_post_replace_durability_failure_commits_save_and_authorizes_next_actions",
+      "reason": "Proves post-replacement directory durability uncertainty is reported truthfully while the installed Save and Save As remain committed and authorize later New and Open actions.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_qt6_application_shell.py::test_late_cross_family_open_failure_restores_actual_metric_menu_both_directions",
+      "reason": "Proves late binary-to-continuous and continuous-to-binary failures restore the prior metric actions, checked state, enabled state, marker, and model.", "runtime_class": "seconds", "size": "medium"
     }
 
   ]

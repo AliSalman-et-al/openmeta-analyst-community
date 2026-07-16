@@ -24,6 +24,7 @@ try {
         src/rc_metastudio/settings.py `
         src/rc_metastudio/qt6_build.py `
         src/rc_metastudio/project_domain.py `
+        src/rc_metastudio/project_adapter.py `
         src/rc_metastudio/project_evidence.py `
         src/rc_metastudio/project_format.py `
         src/rc_metastudio/qt6_port_tools.py `
