@@ -1,15 +1,15 @@
-from PyQt6.QtCore import QEvent, QTimer, Qt, pyqtSignal
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import QDialog, QGraphicsScene
+from PyQt6.QtCore import QEvent, QObject, QTimer, Qt, pyqtSignal
+from PyQt6.QtGui import QCloseEvent, QPixmap, QShowEvent
+from PyQt6.QtWidgets import QDialog, QGraphicsScene, QWidget
 
 import adaptive_window
 import app_error_handler
-import forms.ui_network_view
+import ui_network_view
 from rc_metastudio import meta_py_r
 import settings
 
 
-class ViewDialog(QDialog, forms.ui_network_view.Ui_network_view_dialog):
+class ViewDialog(QDialog, ui_network_view.Ui_network_view_dialog):
     viewportRefitApplied = pyqtSignal()
 
     def __init__(self, model, parent=None):
@@ -31,16 +31,16 @@ class ViewDialog(QDialog, forms.ui_network_view.Ui_network_view_dialog):
 
         self.scene = QGraphicsScene(self)
         self.network_viewer.setScene(self.scene)
-        self.network_viewer.viewport().installEventFilter(self)
+        self._viewport().installEventFilter(self)
         self.populate_cbo_boxes()
         self.setup_signals()
         self.graph_network(self.cur_outcome, self.cur_follow_up)
 
     def setup_signals(self):
-        self.outcome_cbo_box.currentIndexChanged[str].connect(
+        self.outcome_cbo_box.currentTextChanged.connect(
             app_error_handler.safe_slot(self.outcome_changed, parent=self)
         )
-        self.follow_up_cbo_box.currentIndexChanged[str].connect(
+        self.follow_up_cbo_box.currentTextChanged.connect(
             app_error_handler.safe_slot(self.follow_up_changed, parent=self)
         )
 
@@ -95,14 +95,15 @@ class ViewDialog(QDialog, forms.ui_network_view.Ui_network_view_dialog):
         self._network_source_pixmap = QPixmap(pixmap)
         self._network_pixmap_item = None
         if not self._network_source_pixmap.isNull():
-            self._network_pixmap_item = self.scene.addPixmap(
-                self._network_source_pixmap
-            )
-            self._network_pixmap_item.setTransformationMode(
+            item = self.scene.addPixmap(self._network_source_pixmap)
+            if item is None:
+                raise RuntimeError("Qt could not create the Network View pixmap item")
+            item.setTransformationMode(
                 Qt.TransformationMode.SmoothTransformation
             )
+            self._network_pixmap_item = item
             # layout-audit: allow=intrinsic-ratio; reason=scene follows its intrinsic-ratio visual artifact
-            self.scene.setSceneRect(self._network_pixmap_item.boundingRect())
+            self.scene.setSceneRect(item.boundingRect())
         self.schedule_viewport_refit()
 
     def schedule_viewport_refit(self):
@@ -120,7 +121,7 @@ class ViewDialog(QDialog, forms.ui_network_view.Ui_network_view_dialog):
 
     def _fit_network_to_viewport(self):
         item = self._network_pixmap_item
-        viewport = self.network_viewer.viewport()
+        viewport = self._viewport()
         if (
             item is None
             or item.boundingRect().isEmpty()
@@ -133,21 +134,33 @@ class ViewDialog(QDialog, forms.ui_network_view.Ui_network_view_dialog):
         self.network_viewer.fitInView(item, Qt.AspectRatioMode.KeepAspectRatio)
         self.viewportRefitApplied.emit()
 
-    def eventFilter(self, watched, event):
-        if watched is self.network_viewer.viewport() and event.type() in (
+    def eventFilter(  # ty: ignore[invalid-method-override] -- PyQt6 generated-form multiple inheritance
+        self, watched: QObject | None, event: QEvent | None
+    ) -> bool:
+        if event is not None and watched is self._viewport() and event.type() in (
             QEvent.Type.Resize,
             QEvent.Type.Show,
         ):
             self.schedule_viewport_refit()
         return super(ViewDialog, self).eventFilter(watched, event)
 
-    def showEvent(self, event):
+    def showEvent(  # ty: ignore[invalid-method-override] -- PyQt6 generated-form multiple inheritance
+        self, event: QShowEvent | None
+    ) -> None:
         super(ViewDialog, self).showEvent(event)
         self.schedule_viewport_refit()
 
-    def closeEvent(self, event):
+    def closeEvent(  # ty: ignore[invalid-method-override] -- PyQt6 generated-form multiple inheritance
+        self, event: QCloseEvent | None
+    ) -> None:
         settings.save_network_view_placement(self)
         self.scene.clear()
         self._network_pixmap_item = None
         self._network_source_pixmap = QPixmap()
         super(ViewDialog, self).closeEvent(event)
+
+    def _viewport(self) -> QWidget:
+        viewport = self.network_viewer.viewport()
+        if viewport is None:
+            raise RuntimeError("Network graphics view has no viewport")
+        return viewport

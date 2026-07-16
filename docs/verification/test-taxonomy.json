@@ -4,6 +4,13 @@
   "runtime_data_status": "initial static estimate; replace with measured --durations data during audit hardening",
   "schema_version": 1,
   "tests": [
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":["filesystem"],"lane":"fast","nodeid":"tests/python/fast/test_native_results_evidence.py::test_native_results_evidence_json_rejects_nan_and_infinity_constants","reason":"Rejects nonstandard nonfinite JSON numbers before evidence field validation.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":["filesystem","qt"],"lane":"fast","nodeid":"tests/python/fast/test_native_results_evidence.py::test_native_results_evidence_rejects_invalid_numeric_types_ranges_and_mismatches","reason":"Guards strict types, finite ranges, geometry bounds, and DPR consistency for every numeric evidence field.","runtime_class":"seconds","size":"medium"},
+    {"decision":"keep","evidence":["gui_compatibility","analysis_behavior"],"external_dependencies":["qt"],"lane":"gui","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_plot_save_path_browser_cancellation_never_mutates_or_applies","reason":"Guards transactional save-path chooser cancellation for forest and regression editors.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["gui_compatibility","analysis_behavior"],"external_dependencies":["qt"],"lane":"gui","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_plot_save_path_browser_is_accessible_and_keyboard_operable_for_all_editors","reason":"Guards accessible keyboard save-path selection for forest and regression editors.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":["filesystem","qt"],"lane":"fast","nodeid":"tests/python/fast/test_native_results_evidence.py::test_native_results_evidence_accepts_values_on_single_tolerance_boundary","reason":"Guards the inclusive DPR tolerance boundary without permitting chained drift.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":["filesystem","qt"],"lane":"fast","nodeid":"tests/python/fast/test_native_results_evidence.py::test_native_results_evidence_rejects_chained_dpr_drift_reproduction","reason":"Reproduces and rejects chained DPR values spanning a wider band than the authoritative target tolerance.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":["filesystem","qt"],"lane":"fast","nodeid":"tests/python/fast/test_native_results_evidence.py::test_native_results_evidence_uses_exact_capture_dpr_for_physical_geometry","reason":"Guards physical frame conversion from the exact validated capture DPR and rejects nominal-DPR geometry.","runtime_class":"subsecond","size":"small"},
     {
       "decision": "keep",
       "evidence": ["gui_compatibility"],
@@ -8858,7 +8865,125 @@
       "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
       "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_back_calculation_undo_publication_has_one_commit_point[clean_after_insert]",
       "reason": "Proves an injected clean marker prevents post-insertion commit recognition and clears ghost redo history fail closed.", "runtime_class": "seconds", "size": "medium"
-    }
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_plot_editor_apply_signal_fires_exactly_once",
+      "reason": "Guards the native PyQt6 plot-editor Apply signal against missing or duplicate delivery.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_window_presents_summary_references_and_vector_plot_artifacts",
+      "reason": "Exercises the real Results Window navigation, summary, references, descriptor, and native QtSvg display seam.", "runtime_class": "subsecond", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_regenerable_plot_families_expose_native_edit_and_export_actions[Forest Plot-forest-forest]",
+      "reason": "Guards native edit and export actions for the standard Forest Plot family.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_regenerable_plot_families_expose_native_edit_and_export_actions[Cumulative Forest Plot-cumulative_forest-forest]",
+      "reason": "Guards native edit and export actions for cumulative Forest Plot Artifacts.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_regenerable_plot_families_expose_native_edit_and_export_actions[Leave-one-out Forest Plot-leave_one_out_forest-forest]",
+      "reason": "Guards native edit and export actions for leave-one-out Forest Plot Artifacts.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_regenerable_plot_families_expose_native_edit_and_export_actions[Subgroup Forest Plot-subgroup_forest-forest]",
+      "reason": "Guards native edit and export actions for subgroup Forest Plot Artifacts.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_regenerable_plot_families_expose_native_edit_and_export_actions[Diagnostic Forest Plot-forest-forest]",
+      "reason": "Guards native edit and export actions for diagnostic Forest Plot Artifacts.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_regenerable_plot_families_expose_native_edit_and_export_actions[Meta-Regression Bubble Plot-regression-regression]",
+      "reason": "Guards native edit and export actions for Meta-Regression Bubble Plot Artifacts.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_window_regenerates_each_supported_export_format[pdf]",
+      "reason": "Guards Results Window PDF regeneration through the declared plot regenerator.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_window_regenerates_each_supported_export_format[png]",
+      "reason": "Guards Results Window PNG regeneration through the declared plot regenerator.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_window_regenerates_each_supported_export_format[tiff]",
+      "reason": "Guards Results Window TIFF regeneration through the declared plot regenerator.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt", "filesystem"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_window_regenerates_each_supported_export_format[svg]",
+      "reason": "Guards Results Window SVG regeneration through the declared plot regenerator.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_plot_geometry_preserves_fractional_logical_coordinates[1.0]",
+      "reason": "Guards floating-point Results geometry at 100 percent scale.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_plot_geometry_preserves_fractional_logical_coordinates[1.25]",
+      "reason": "Guards floating-point Results geometry at 125 percent scale.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_plot_geometry_preserves_fractional_logical_coordinates[1.5]",
+      "reason": "Guards floating-point Results geometry at 150 percent scale.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_plot_geometry_preserves_fractional_logical_coordinates[1.75]",
+      "reason": "Guards floating-point Results geometry at 175 percent scale.", "runtime_class": "subsecond", "size": "small"
+    },
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":["qt","filesystem"],"lane":"fast","nodeid":"tests/python/fast/test_native_results_evidence.py::test_native_results_capture_fails_closed_after_bounded_attempts[blank]","reason":"Guards fail-closed blank native capture retries.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":["qt","filesystem"],"lane":"fast","nodeid":"tests/python/fast/test_native_results_evidence.py::test_native_results_capture_fails_closed_after_bounded_attempts[minimized]","reason":"Guards fail-closed minimized native capture retries.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":["qt","filesystem"],"lane":"fast","nodeid":"tests/python/fast/test_native_results_evidence.py::test_native_results_capture_fails_closed_after_bounded_attempts[mismatched]","reason":"Guards fail-closed out-of-bounds native capture retries.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":["qt","filesystem"],"lane":"fast","nodeid":"tests/python/fast/test_native_results_evidence.py::test_native_results_capture_retries_blank_desktop_until_frame_is_painted","reason":"Guards bounded compositor capture recovery.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":["qt","filesystem"],"lane":"fast","nodeid":"tests/python/fast/test_native_results_evidence.py::test_native_results_evidence_accepts_exact_nonblank_png_bundle","reason":"Guards the authenticated native Results evidence contract.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":["qt","filesystem"],"lane":"fast","nodeid":"tests/python/fast/test_native_results_evidence.py::test_native_results_evidence_rejects_blank_capture_with_matching_metadata","reason":"Rejects semantically blank evidence despite matching metadata.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":["qt","filesystem"],"lane":"fast","nodeid":"tests/python/fast/test_native_results_evidence.py::test_native_results_evidence_rejects_corrupted_png_even_with_matching_bytes","reason":"Rejects undecodable evidence despite matching metadata.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":["qt","filesystem"],"lane":"fast","nodeid":"tests/python/fast/test_native_results_evidence.py::test_native_results_evidence_rejects_dimension_dpr_hash_and_frame_tampering[device_pixel_ratio-1.25-pixel ratio]","reason":"Rejects native evidence DPR tampering.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":["qt","filesystem"],"lane":"fast","nodeid":"tests/python/fast/test_native_results_evidence.py::test_native_results_evidence_rejects_dimension_dpr_hash_and_frame_tampering[physical_crop-value3-physical frame]","reason":"Rejects native evidence frame tampering.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":["qt","filesystem"],"lane":"fast","nodeid":"tests/python/fast/test_native_results_evidence.py::test_native_results_evidence_rejects_dimension_dpr_hash_and_frame_tampering[pixel_size-value0-pixel size]","reason":"Rejects native evidence dimension tampering.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":["qt","filesystem"],"lane":"fast","nodeid":"tests/python/fast/test_native_results_evidence.py::test_native_results_evidence_rejects_dimension_dpr_hash_and_frame_tampering[sha256-0000000000000000000000000000000000000000000000000000000000000000-hash]","reason":"Rejects native evidence hash tampering.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":["qt","filesystem"],"lane":"fast","nodeid":"tests/python/fast/test_native_results_evidence.py::test_native_results_evidence_rejects_noncanonical_or_non_png_paths[../results.png]","reason":"Rejects traversing evidence paths.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":["qt","filesystem"],"lane":"fast","nodeid":"tests/python/fast/test_native_results_evidence.py::test_native_results_evidence_rejects_noncanonical_or_non_png_paths[./results.png]","reason":"Rejects noncanonical evidence paths.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":["qt","filesystem"],"lane":"fast","nodeid":"tests/python/fast/test_native_results_evidence.py::test_native_results_evidence_rejects_noncanonical_or_non_png_paths[/results.png]","reason":"Rejects absolute evidence paths.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":["qt","filesystem"],"lane":"fast","nodeid":"tests/python/fast/test_native_results_evidence.py::test_native_results_evidence_rejects_noncanonical_or_non_png_paths[results.jpg]","reason":"Rejects non-PNG capture paths.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["gui_compatibility","analysis_behavior"],"external_dependencies":["qt"],"lane":"gui","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_generated_plot_editor_apply_then_cancel_preserves_only_committed_draft[forest-fp_xlabel]","reason":"Guards transactional forest Apply then Cancel semantics.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["gui_compatibility","analysis_behavior"],"external_dependencies":["qt"],"lane":"gui","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_generated_plot_editor_apply_then_cancel_preserves_only_committed_draft[regression-bp_xlabel]","reason":"Guards transactional regression Apply then Cancel semantics.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["gui_compatibility","analysis_behavior"],"external_dependencies":["qt"],"lane":"gui","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_generated_plot_editor_dismissal_never_commits_or_regenerates[cancel-forest-x_lbl_le-fp_xlabel]","reason":"Guards forest Cancel dismissal.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["gui_compatibility","analysis_behavior"],"external_dependencies":["qt"],"lane":"gui","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_generated_plot_editor_dismissal_never_commits_or_regenerates[cancel-regression-x_lbl_le-bp_xlabel]","reason":"Guards regression Cancel dismissal.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["gui_compatibility","analysis_behavior"],"external_dependencies":["qt"],"lane":"gui","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_generated_plot_editor_dismissal_never_commits_or_regenerates[close-forest-x_lbl_le-fp_xlabel]","reason":"Guards forest close dismissal.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["gui_compatibility","analysis_behavior"],"external_dependencies":["qt"],"lane":"gui","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_generated_plot_editor_dismissal_never_commits_or_regenerates[close-regression-x_lbl_le-bp_xlabel]","reason":"Guards regression close dismissal.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["gui_compatibility","analysis_behavior"],"external_dependencies":["qt"],"lane":"gui","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_generated_plot_editor_dismissal_never_commits_or_regenerates[escape-forest-x_lbl_le-fp_xlabel]","reason":"Guards forest Escape dismissal.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["gui_compatibility","analysis_behavior"],"external_dependencies":["qt"],"lane":"gui","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_generated_plot_editor_dismissal_never_commits_or_regenerates[escape-regression-x_lbl_le-bp_xlabel]","reason":"Guards regression Escape dismissal.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["gui_compatibility","analysis_behavior"],"external_dependencies":["qt"],"lane":"gui","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_generated_plot_editor_ok_commits_once_and_accepts[forest]","reason":"Guards forest OK commit semantics.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["gui_compatibility","analysis_behavior"],"external_dependencies":["qt"],"lane":"gui","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_generated_plot_editor_ok_commits_once_and_accepts[regression]","reason":"Guards regression OK commit semantics.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":[],"lane":"fast","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_logical_extent_boundary_rejects_invalid_values[-1.0-1.0]","reason":"Rejects negative logical extents.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":[],"lane":"fast","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_logical_extent_boundary_rejects_invalid_values[1.0--1.0]","reason":"Rejects negative DPR.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":[],"lane":"fast","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_logical_extent_boundary_rejects_invalid_values[1.0-0.0]","reason":"Rejects zero DPR.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":[],"lane":"fast","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_logical_extent_boundary_rejects_invalid_values[1.0-inf]","reason":"Rejects nonfinite DPR.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":[],"lane":"fast","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_logical_extent_boundary_rejects_invalid_values[nan-1.0]","reason":"Rejects nonfinite logical extents.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":[],"lane":"fast","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_logical_extent_boundary_uses_qt_consistent_half_up_rounding[0.0-1.0-0]","reason":"Guards zero physical extent rounding.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":[],"lane":"fast","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_logical_extent_boundary_uses_qt_consistent_half_up_rounding[0.5-1.0-1]","reason":"Guards half-up tie rounding.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":[],"lane":"fast","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_logical_extent_boundary_uses_qt_consistent_half_up_rounding[2.5-1.0-3]","reason":"Guards half-up tie rounding beyond zero.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":[],"lane":"fast","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_logical_extent_boundary_uses_qt_consistent_half_up_rounding[515.0-1.0-515]","reason":"Guards physical conversion at 100 percent.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":[],"lane":"fast","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_logical_extent_boundary_uses_qt_consistent_half_up_rounding[515.0-1.25-644]","reason":"Guards physical conversion at 125 percent.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":[],"lane":"fast","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_logical_extent_boundary_uses_qt_consistent_half_up_rounding[515.0-1.5-773]","reason":"Guards physical conversion at 150 percent.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["release_readiness"],"external_dependencies":[],"lane":"fast","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_logical_extent_boundary_uses_qt_consistent_half_up_rounding[515.0-1.75-901]","reason":"Guards physical conversion at 175 percent.","runtime_class":"subsecond","size":"small"},
+    {"decision":"keep","evidence":["gui_compatibility"],"external_dependencies":["qt"],"lane":"gui","nodeid":"tests/python/gui/test_results_workspace_layout.py::test_plot_color_chooser_is_named_described_and_keyboard_focusable","reason":"Guards accessible keyboard-operable plot color selection.","runtime_class":"subsecond","size":"small"}
 
   ]
 }

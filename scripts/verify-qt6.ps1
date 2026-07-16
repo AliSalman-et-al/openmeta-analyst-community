@@ -36,6 +36,9 @@ try {
         src/rc_metastudio/progress_bar.py `
         src/rc_metastudio/headless_analysis.py `
         src/rc_metastudio/golden_analysis.py `
+        src/rc_metastudio/results_window.py `
+        src/rc_metastudio/network_view.py `
+        src/rc_metastudio/qt_geometry.py `
         src/rc_metastudio/qt6_port_tools.py `
         src/rc_metastudio/qt6_resources.py `
         src/rc_metastudio/qt6_ui.py `
@@ -44,6 +47,7 @@ try {
         scripts/build_qt6.py `
         scripts/qt6_port.py `
         scripts/native_analysis_smoke.py `
+        scripts/native_results_smoke.py `
         scripts/verify_golden_compatibility.py `
         scripts/verify_rcmetar_r_stack.py
     if ($LASTEXITCODE -ne 0) { throw "Qt6 strict type verification failed." }
@@ -129,6 +133,17 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Qt6 analysis taxonomy validation failed: $analysisTests" }
     }
 
+    foreach ($resultsTests in @(
+        "tests/python/fast/test_native_results_evidence.py",
+        "tests/python/gui/test_results_workspace_layout.py",
+        "tests/python/gui/test_network_view_workspace_layout.py"
+    )) {
+        uv run python scripts/validate_test_taxonomy.py `
+            --tests-path $resultsTests `
+            --require-covered
+        if ($LASTEXITCODE -ne 0) { throw "Qt6 Results taxonomy validation failed: $resultsTests" }
+    }
+
     uv run pytest -W error `
         tests/python/fast/test_qt6_build_slice.py `
         tests/python/fast/test_qt6_port_tools.py `
@@ -161,6 +176,12 @@ try {
         tests/analysis_regression/golden/test_golden_baseline_manifest_validation.py
     if ($LASTEXITCODE -ne 0) { throw "Qt6 analysis workflow tests failed." }
 
+    uv run pytest -W error `
+        tests/python/fast/test_native_results_evidence.py `
+        tests/python/gui/test_results_workspace_layout.py `
+        tests/python/gui/test_network_view_workspace_layout.py
+    if ($LASTEXITCODE -ne 0) { throw "Qt6 Results and Network View tests failed." }
+
     powershell -ExecutionPolicy Bypass -File scripts/verify-r-stack-full.ps1
     if ($LASTEXITCODE -ne 0) { throw "Real-R stack and Golden compatibility verification failed." }
 
@@ -180,6 +201,10 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Native Qt6 calculator evidence validation failed." }
         uv run python scripts/native_analysis_smoke.py
         if ($LASTEXITCODE -ne 0) { throw "Native Qt6 analysis workflow smoke failed." }
+        uv run python scripts/native_results_smoke.py
+        if ($LASTEXITCODE -ne 0) { throw "Native Qt6 Results fractional-scale smoke failed." }
+        uv run python scripts/native_results_smoke.py --validate-only
+        if ($LASTEXITCODE -ne 0) { throw "Native Qt6 Results evidence validation failed." }
         uv run rc-metastudio --automation-shell-failure-smoke r-load
         if ($LASTEXITCODE -ne 0) { throw "Native R-load teardown smoke failed." }
         uv run rc-metastudio --automation-shell-failure-smoke meta-form
