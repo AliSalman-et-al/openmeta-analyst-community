@@ -55,7 +55,10 @@ cannot exhaust the Python stack. The authoritative root accepts only canonical
 Qt framework, plugin, translation, and non-executable data shapes. A single
 case-folded payload classifier rejects displaced or duplicate Qt libraries and
 plugins plus PySide6 and shiboken6 runtimes; outside-root aliases are accepted
-only at their observed canonical locations.
+only at their observed canonical locations. The schema-v2 macOS bundle's
+directory aliases are restricted to the exact framework-to-resource
+`translations` link and the reciprocal resource-to-framework `lib` and
+`plugins` links, including their literal link targets and graph-resolved roots.
 Regular aliases must match their same-name canonical Qt component's hash and
 architecture. Native probes
 are capped at 100 MB; the

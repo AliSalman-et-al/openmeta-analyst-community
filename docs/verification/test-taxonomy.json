@@ -7945,8 +7945,23 @@
     },
     {
       "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_pyinstaller_plan_accepts_native_macos_paths_when_validated_on_any_host",
+      "reason": "Proves retained native macOS build-plan paths remain absolute when evidence is reviewed from a Windows host.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_pyinstaller_plan_rejects_unsafe_add_data_sources",
+      "reason": "Rejects relative, drive-relative, ambiguously delimited, wrong-destination, and wrong-resource PyInstaller add-data inputs.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": ["filesystem"], "lane": "fast",
       "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_deployment_inventory_rejects_incoherent_qt_payloads_and_aliases",
       "reason": "Rejects second or alternate Qt payloads, missing authoritative roots, duplicate Cocoa plugins, and hash, architecture, or symlink alias mismatches.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_deployment_inventory_requires_exact_qt_directory_aliases",
+      "reason": "Accepts only the observed Qt translations, library, and plugin directory aliases and rejects wrong-target, escaping, or extra directory aliases.", "runtime_class": "subsecond", "size": "small"
     },
     {
       "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": ["filesystem"], "lane": "fast",

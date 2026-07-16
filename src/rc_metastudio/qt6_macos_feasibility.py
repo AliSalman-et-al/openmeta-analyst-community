@@ -7,7 +7,7 @@ import hashlib
 from importlib import metadata
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import platform
 import posixpath
 import re
@@ -243,6 +243,8 @@ def _classify_macos_qt_payload(path: str) -> str | None:
 
 def _is_allowed_authoritative_qt_path(path: str) -> bool:
     relative = path.removeprefix("Contents/Frameworks/PyQt6/Qt6/")
+    if relative == "translations":
+        return True
     framework = re.fullmatch(
         r"lib/(Qt[A-Za-z0-9]+)\.framework/(.+)", relative
     )
@@ -362,6 +364,32 @@ def _validate_deployment_inventory(
         _fail("deployment inventory contains an alternate or legacy Qt binding")
     authoritative_qt_root = "Contents/Frameworks/PyQt6/Qt6/"
     authoritative_binding_root = "Contents/Frameworks/PyQt6/"
+    qt_directory_aliases = {
+        "Contents/Frameworks/PyQt6/Qt6/translations": (
+            "../../../Resources/PyQt6/Qt6/translations",
+            "Contents/Resources/PyQt6/Qt6/translations",
+        ),
+        "Contents/Resources/PyQt6/Qt6/lib": (
+            "../../../Frameworks/PyQt6/Qt6/lib",
+            "Contents/Frameworks/PyQt6/Qt6/lib",
+        ),
+        "Contents/Resources/PyQt6/Qt6/plugins": (
+            "../../../Frameworks/PyQt6/Qt6/plugins",
+            "Contents/Frameworks/PyQt6/Qt6/plugins",
+        ),
+    }
+    present_qt_directory_aliases = set(records).intersection(qt_directory_aliases)
+    if present_qt_directory_aliases != set(qt_directory_aliases):
+        _fail("deployment inventory has an incomplete Qt directory alias set")
+    for path, (expected_link, expected_resolved) in qt_directory_aliases.items():
+        record = records[path]
+        if record.get("kind") != "symlink":
+            _fail(f"Qt directory alias {path} must be a symlink")
+        if (
+            record.get("link_target") != expected_link
+            or resolved_links.get(path) != expected_resolved
+        ):
+            _fail(f"Qt directory alias {path} targets the wrong canonical root")
     authoritative_files = {
         path: record
         for path, record in records.items()
@@ -462,9 +490,8 @@ def _validate_deployment_inventory(
             elif name in binding_extension_paths:
                 if resolved != binding_extension_paths[name]:
                     _fail(f"PyQt6 alias {path} targets the wrong canonical extension")
-            elif path == "Contents/Resources/PyQt6":
-                if resolved != "Contents/Frameworks/PyQt6":
-                    _fail("PyQt6 resource alias targets the wrong binding root")
+            elif path in qt_directory_aliases:
+                continue
             elif match := re.fullmatch(
                 r"Contents/Frameworks/PyQt6/Qt6/lib/(Qt[A-Za-z0-9]+)\.framework/"
                 r"(Versions/Current|Resources)",
@@ -576,6 +603,10 @@ def _validate_pyinstaller_build_plan(value: object) -> None:
         _fail("PyInstaller build plan does not match the allowlisted invocation")
     if len(arguments) != 19:
         _fail("PyInstaller build plan does not match the allowlisted invocation")
+    add_data_source, separator, add_data_destination = arguments[15].rpartition(":")
+    windows_source = PureWindowsPath(add_data_source)
+    posix_source = PurePosixPath(add_data_source)
+    windows_drive_colons = 1 if re.match(r"^[A-Za-z]:[\\/]", add_data_source) else 0
     if (
         arguments[4:6] != ["--name", "Qt6MacFeasibility"]
         or arguments[6] != "--target-architecture"
@@ -584,13 +615,23 @@ def _validate_pyinstaller_build_plan(value: object) -> None:
         or arguments[10] != "--workpath"
         or arguments[12] != "--specpath"
         or arguments[14] != "--add-data"
-        or not arguments[15].endswith("icons.rcc:resources")
+        or separator != ":"
+        or add_data_destination != "resources"
+        or add_data_source.count(":") != windows_drive_colons
+        or not (posix_source.is_absolute() or windows_source.is_absolute())
+        or (
+            posix_source.name != "icons.rcc"
+            and windows_source.name != "icons.rcc"
+        )
         or arguments[16:18] != ["--copy-metadata", "rpy2"]
         or not arguments[18].endswith("entry.py")
     ):
         _fail("PyInstaller build plan contains unexpected manual inputs")
     for path_argument in (arguments[9], arguments[11], arguments[13], arguments[18]):
-        if not Path(path_argument).is_absolute():
+        if not (
+            PurePosixPath(path_argument).is_absolute()
+            or PureWindowsPath(path_argument).is_absolute()
+        ):
             _fail("PyInstaller build plan paths must be absolute")
 
 

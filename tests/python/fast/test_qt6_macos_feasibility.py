@@ -207,11 +207,32 @@ def _materialize_retained_evidence(evidence: dict, root: Path) -> None:
             "architectures": executable["architectures"],
         },
         {
-            "path": "Contents/Resources/PyQt6",
+            "path": "Contents/Resources/PyQt6/Qt6/translations/qt_en.qm",
+            "kind": "file",
+            "size": 11,
+            "sha256": hashlib.sha256(b"translation").hexdigest(),
+            "architectures": [],
+        },
+        {
+            "path": "Contents/Frameworks/PyQt6/Qt6/translations",
             "kind": "symlink",
-            "size": 20,
-            "link_target": "../Frameworks/PyQt6",
-            "resolved_path": "Contents/Frameworks/PyQt6",
+            "size": 41,
+            "link_target": "../../../Resources/PyQt6/Qt6/translations",
+            "resolved_path": "Contents/Resources/PyQt6/Qt6/translations",
+        },
+        {
+            "path": "Contents/Resources/PyQt6/Qt6/lib",
+            "kind": "symlink",
+            "size": 35,
+            "link_target": "../../../Frameworks/PyQt6/Qt6/lib",
+            "resolved_path": "Contents/Frameworks/PyQt6/Qt6/lib",
+        },
+        {
+            "path": "Contents/Resources/PyQt6/Qt6/plugins",
+            "kind": "symlink",
+            "size": 39,
+            "link_target": "../../../Frameworks/PyQt6/Qt6/plugins",
+            "resolved_path": "Contents/Frameworks/PyQt6/Qt6/plugins",
         },
     ]
     inventory = {
@@ -529,6 +550,59 @@ def test_pyinstaller_plan_rejects_split_equals_and_ambiguous_collection_options(
             validate_evidence(evidence, "macos-arm64", evidence_dir=root)
 
 
+def test_pyinstaller_plan_accepts_native_macos_paths_when_validated_on_any_host(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
+    )
+    evidence = _valid_evidence()
+    _materialize_retained_evidence(evidence, tmp_path)
+    record = evidence["package"]["build_plan"]
+    plan_path = tmp_path / record["retained_path"]
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    arguments = plan["arguments"]
+    arguments[9] = "/Users/runner/work/app/dist"
+    arguments[11] = "/Users/runner/work/app/work"
+    arguments[13] = "/Users/runner/work/app/spec"
+    arguments[15] = "/Users/runner/work/app/icons.rcc:resources"
+    arguments[18] = "/Users/runner/work/app/entry.py"
+    plan_path.write_text(json.dumps(plan, sort_keys=True), encoding="utf-8")
+    record["size"] = plan_path.stat().st_size
+    record["sha256"] = hashlib.sha256(plan_path.read_bytes()).hexdigest()
+
+    validate_evidence(evidence, "macos-arm64", evidence_dir=tmp_path)
+
+
+def test_pyinstaller_plan_rejects_unsafe_add_data_sources(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
+    )
+    unsafe_arguments = [
+        "relative/icons.rcc:resources",
+        r"relative\icons.rcc:resources",
+        r"C:relative\icons.rcc:resources",
+        r"C:\work\icons.rcc:other",
+        "/workspace/icons.rcc:extra:resources",
+        r"C:\work\icons.rcc:extra:resources",
+        "/workspace/not-icons.txt:resources",
+    ]
+    for index, add_data in enumerate(unsafe_arguments):
+        evidence = _valid_evidence()
+        root = tmp_path / str(index)
+        _materialize_retained_evidence(evidence, root)
+        record = evidence["package"]["build_plan"]
+        plan_path = root / record["retained_path"]
+        plan = json.loads(plan_path.read_text(encoding="utf-8"))
+        plan["arguments"][15] = add_data
+        plan_path.write_text(json.dumps(plan, sort_keys=True), encoding="utf-8")
+        record["size"] = plan_path.stat().st_size
+        record["sha256"] = hashlib.sha256(plan_path.read_bytes()).hexdigest()
+
+        with pytest.raises(EvidenceError, match="unexpected manual inputs"):
+            validate_evidence(evidence, "macos-arm64", evidence_dir=root)
+
+
 def test_deployment_inventory_rejects_incoherent_qt_payloads_and_aliases(
     tmp_path, monkeypatch
 ):
@@ -588,8 +662,10 @@ def test_deployment_inventory_rejects_incoherent_qt_payloads_and_aliases(
 
     def escaping_qt_alias(files):
         next(
-            item for item in files if item["path"] == "Contents/Resources/PyQt6"
-        )["resolved_path"] = "Contents/Other/PyQt6"
+            item
+            for item in files
+            if item["path"] == "Contents/Frameworks/PyQt6/Qt6/translations"
+        )["resolved_path"] = "Contents/Other/translations"
 
     def add_qt_file(files, path):
         files.append(
@@ -722,6 +798,100 @@ def test_deployment_inventory_rejects_incoherent_qt_payloads_and_aliases(
         record["sha256"] = hashlib.sha256(inventory_path.read_bytes()).hexdigest()
 
         with pytest.raises(EvidenceError):
+            validate_evidence(evidence, "macos-arm64", evidence_dir=root)
+
+
+def test_deployment_inventory_requires_exact_qt_directory_aliases(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
+    )
+
+    def wrong_target(files):
+        alias = next(
+            item
+            for item in files
+            if item["path"] == "Contents/Frameworks/PyQt6/Qt6/translations"
+        )
+        alias["link_target"] = "plugins"
+        alias["resolved_path"] = "Contents/Frameworks/PyQt6/Qt6/plugins"
+
+    def escaping_target(files):
+        alias = next(
+            item
+            for item in files
+            if item["path"] == "Contents/Frameworks/PyQt6/Qt6/translations"
+        )
+        alias["link_target"] = "../../../../../outside"
+
+    def extra_directory_alias(files):
+        files.append(
+            {
+                "path": "Contents/Frameworks/PyQt6/Qt6/resources",
+                "kind": "symlink",
+                "size": 41,
+                "link_target": "../../../Resources/PyQt6/Qt6/translations",
+                "resolved_path": "Contents/Resources/PyQt6/Qt6/translations",
+            }
+        )
+
+    def missing_one_alias(files):
+        files[:] = [
+            item
+            for item in files
+            if item["path"] != "Contents/Frameworks/PyQt6/Qt6/translations"
+        ]
+
+    def missing_all_aliases(files):
+        aliases = {
+            "Contents/Frameworks/PyQt6/Qt6/translations",
+            "Contents/Resources/PyQt6/Qt6/lib",
+            "Contents/Resources/PyQt6/Qt6/plugins",
+        }
+        files[:] = [item for item in files if item["path"] not in aliases]
+
+    def regular_file_substitution(files):
+        alias = next(
+            item
+            for item in files
+            if item["path"] == "Contents/Frameworks/PyQt6/Qt6/translations"
+        )
+        alias.clear()
+        alias.update(
+            {
+                "path": "Contents/Frameworks/PyQt6/Qt6/translations",
+                "kind": "file",
+                "size": 12,
+                "sha256": hashlib.sha256(b"translations").hexdigest(),
+                "architectures": [],
+            }
+        )
+
+    for index, (mutation, expected_error) in enumerate(
+        [
+            (wrong_target, "targets the wrong canonical root"),
+            (escaping_target, "escapes the virtual bundle"),
+            (extra_directory_alias, "unrecognized payload inside the authoritative"),
+            (missing_one_alias, "incomplete Qt directory alias set"),
+            (missing_all_aliases, "incomplete Qt directory alias set"),
+            (regular_file_substitution, "must be a symlink"),
+        ]
+    ):
+        evidence = _valid_evidence()
+        root = tmp_path / str(index)
+        _materialize_retained_evidence(evidence, root)
+        record = evidence["package"]["inventory"]
+        inventory_path = root / record["retained_path"]
+        inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+        mutation(inventory["files"])
+        inventory["file_count"] = len(inventory["files"])
+        inventory["total_bytes"] = sum(item["size"] for item in inventory["files"])
+        inventory_path.write_text(json.dumps(inventory, sort_keys=True), encoding="utf-8")
+        record["size"] = inventory_path.stat().st_size
+        record["sha256"] = hashlib.sha256(inventory_path.read_bytes()).hexdigest()
+
+        with pytest.raises(EvidenceError, match=expected_error):
             validate_evidence(evidence, "macos-arm64", evidence_dir=root)
 
 
@@ -862,7 +1032,7 @@ def test_deployment_inventory_rejects_noncanonical_resolved_paths(
         alias = next(
             item
             for item in inventory["files"]
-            if item["path"] == "Contents/Resources/PyQt6"
+            if item["path"] == "Contents/Frameworks/PyQt6/Qt6/translations"
         )
         alias["resolved_path"] = forged_path
         inventory_path.write_text(json.dumps(inventory, sort_keys=True), encoding="utf-8")
@@ -914,9 +1084,11 @@ def test_deployment_inventory_resolves_symlink_graph_and_rejects_forgery(
 
     def forged_escape(files):
         alias = next(
-            item for item in files if item["path"] == "Contents/Resources/PyQt6"
+            item
+            for item in files
+            if item["path"] == "Contents/Frameworks/PyQt6/Qt6/translations"
         )
-        alias["link_target"] = "../../../outside"
+        alias["link_target"] = "../../../../../outside"
 
     def wrong_component(files):
         files.append(
@@ -972,15 +1144,19 @@ def test_deployment_inventory_resolves_symlink_graph_and_rejects_forgery(
 
     def absolute_target(files):
         alias = next(
-            item for item in files if item["path"] == "Contents/Resources/PyQt6"
+            item
+            for item in files
+            if item["path"] == "Contents/Frameworks/PyQt6/Qt6/translations"
         )
-        alias["link_target"] = "/Contents/Frameworks/PyQt6"
+        alias["link_target"] = "/Contents/Resources/PyQt6/Qt6/translations"
 
     def normalization_trick(files):
         alias = next(
-            item for item in files if item["path"] == "Contents/Resources/PyQt6"
+            item
+            for item in files
+            if item["path"] == "Contents/Frameworks/PyQt6/Qt6/translations"
         )
-        alias["link_target"] = ".././Frameworks/PyQt6"
+        alias["link_target"] = "../../.././Resources/PyQt6/Qt6/translations"
 
     for index, (mutation, expected_error) in enumerate(
         [
