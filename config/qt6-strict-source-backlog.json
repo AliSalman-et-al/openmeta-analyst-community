@@ -1,0 +1,13 @@
+{
+  "counts_by_rule": {
+    "generated-python-resource": 1,
+    "pyqt5-import": 109,
+    "removed-api": 30,
+    "short-enum": 255,
+    "stale-generator": 30
+  },
+  "finding_count": 425,
+  "findings_sha256": "91c994dc2e06ea832f1df5582bc083160cd460da167c7bb31797f41881ec1d5a",
+  "purpose": "Exact temporary pre-#332 strict-source migration backlog; any drift fails closed.",
+  "schema_version": 1
+}

@@ -8007,6 +8007,206 @@
       "decision": "keep", "evidence": ["release_readiness", "packaging_contract"], "external_dependencies": ["filesystem"], "lane": "fast",
       "nodeid": "tests/python/fast/test_qt6_macos_feasibility.py::test_deployment_inventory_resolves_a_long_symlink_chain_iteratively",
       "reason": "Proves the bounded virtual bundle resolver handles a 1,100-link chain without recursive stack growth.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_codemod_rewrites_imports_moved_classes_and_scoped_enums_with_comments",
+      "reason": "Proves representative binding, moved-class, and scoped-enum rewrites preserve surrounding comments.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_codemod_preserves_explicit_overload_and_ignores_unbound_lookalikes",
+      "reason": "Keeps explicit overload selection and non-Qt lookalikes outside the mechanical rewrite.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_codemod_refuses_ambiguous_enum_and_removed_class_with_locations",
+      "reason": "Requires actionable source locations for every manual migration refusal.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_codemod_is_idempotent_and_report_is_json_serializable",
+      "reason": "Guards the second-run no-diff invariant and machine-readable transformation report.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_mapping_manifest_covers_every_discovered_enum_and_displaced_class",
+      "reason": "Ties the explicit mapping manifest to the immutable pre-port inventory.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_strict_scan_rejects_forbidden_migration_patterns[binding.py-from PyQt5 import QtCore\\n-pyqt5-import]",
+      "reason": "Rejects active PyQt5 imports.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_strict_scan_rejects_forbidden_migration_patterns[compat.py-import qtpy\\n-binding-facade]",
+      "reason": "Rejects Qt binding facades.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_strict_scan_rejects_forbidden_migration_patterns[enum.py-from PyQt6.QtCore import Qt\\nx = Qt.AlignLeft\\n-short-enum]",
+      "reason": "Rejects active short Qt enums.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_strict_scan_rejects_forbidden_migration_patterns[removed.py-from PyQt6.QtCore import QRegExp\\n-removed-api]",
+      "reason": "Rejects removed Qt APIs even under a relabeled PyQt6 import.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_strict_scan_rejects_forbidden_migration_patterns[generated.py-# Form implementation generated from reading ui file\\n-stale-generator]",
+      "reason": "Rejects stale generated Python form modules.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_strict_scan_rejects_forbidden_migration_patterns[runtime.py-from PyQt6.uic import loadUi\\n-runtime-form-loading]",
+      "reason": "Rejects runtime Designer form loading.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_strict_scan_rejects_forbidden_migration_patterns[resource.py-qt_resource_data = b'bytes'\\n-generated-python-resource]",
+      "reason": "Rejects generated Python resource payloads.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_strict_scan_rejects_forbidden_migration_patterns[requirement.txt-PyQt5==5.15.11\\n-pyqt5-requirement]",
+      "reason": "Rejects active PyQt5 dependency declarations.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_strict_scan_has_no_false_positive_for_comments_strings_or_native_scopes",
+      "reason": "Prevents migration prose and native scoped enums from causing policy false positives.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem", "subprocess"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_codemod_cli_writes_a_complete_report_and_second_check_is_empty",
+      "reason": "Exercises transactional CLI writes, retained reporting, and the no-diff check seam.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_dotted_import_without_alias_is_losslessly_refused",
+      "reason": "Prevents dotted-import root binding semantics from leaving broken PyQt5 references.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_manifest_drives_moved_and_removed_module_attribute_diagnostics",
+      "reason": "Covers manifest-derived moved and removed classes through module attribute access.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_parenthesized_per_alias_comments_are_refused_without_trivia_loss",
+      "reason": "Fails closed rather than discarding comments attached to split import aliases.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_qt_bound_method_rewrite_is_safe_and_unrelated_lookalike_is_ignored",
+      "reason": "Limits method rewrites and strict findings to statically Qt-bound receivers.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_shadowed_qt_alias_refuses_every_rewrite_and_leaves_source_unchanged",
+      "reason": "Rejects lexical shadowing before any unsafe enum rewrite can occur.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_file_transaction_rejects_concurrent_edit_and_cleans_temps",
+      "reason": "Refuses source identity drift and leaves no staged transaction payloads.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_file_transaction_rolls_back_prior_replace_and_cleans_temps",
+      "reason": "Proves a later atomic replacement failure rolls back earlier files and cleans temporary payloads.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_file_transaction_rejects_symlink",
+      "reason": "Prevents transaction targets from changing identity through symbolic links.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_dependency_policy_rejects_alternate_bindings_from_requirement_inputs",
+      "reason": "Rejects PySide and compatibility binding declarations in active dependency inputs.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_maintained_lane_scans_authoritative_inputs_and_treats_warnings_as_errors",
+      "reason": "Locks authoritative source and dependency scanning plus warnings-as-errors into the maintained lane.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem", "subprocess"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_report_path_cannot_alias_any_input_and_report_replace_is_atomic",
+      "reason": "Prevents report and input alias clobbering and proves report replacement is atomic on failure.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_qualified_qt5_compatibility_modules_are_rejected",
+      "reason": "Rejects compatibility modules qualified beneath the nominal PyQt6 package.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_unresolved_or_reassigned_exec_is_refused_but_non_qt_instance_is_not",
+      "reason": "Requires constructor proof for exec migration and refuses reassigned or unresolved receivers.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_same_destination_import_rewrite_preserves_every_byte_except_binding_token",
+      "reason": "Proves in-place import migration preserves parenthesization, comments, commas, and newlines byte-for-byte.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_dynamic_binding_imports_are_rejected_without_unrelated_false_positives",
+      "reason": "Rejects constant and ambiguous dynamic Qt binding imports while allowing unrelated import mechanisms.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem", "subprocess"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_strict_output_paths_cannot_alias_expected_snapshot",
+      "reason": "Preflights strict reports and snapshots against normalized, symbolic-link, and hard-link aliases before scanning or writing.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_staged_mode_is_applied_before_final_payload_fsync",
+      "reason": "Orders mode preservation before payload durability and normalizes staging failures transactionally.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_atomic_report_restores_destination_when_directory_fsync_fails[False]",
+      "reason": "Removes a newly created report when its post-replace directory durability check fails.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_atomic_report_restores_destination_when_directory_fsync_fails[True]",
+      "reason": "Restores an existing report when its post-replace directory durability check fails.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_atomic_report_preserves_primary_error_when_restoration_fails",
+      "reason": "Preserves the primary durability error and truthfully annotates a failed restoration without leaving temporary files.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_relative_dynamic_import_packages_are_resolved_or_refused[importlib.import_module(\".QtCore\", \"PyQt5\")-pyqt5-import]",
+      "reason": "Resolves a positional relative import_module target and rejects its PyQt5 binding.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_relative_dynamic_import_packages_are_resolved_or_refused[importlib.import_module(package=\"PyQt6\", name=\".QtCore5Compat\")-binding-facade]",
+      "reason": "Resolves keyword-permuted relative imports and rejects qualified Qt5 compatibility modules.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_relative_dynamic_import_packages_are_resolved_or_refused[importlib.import_module(\".QtCore\")-dynamic-binding-import]",
+      "reason": "Refuses a relative import_module call with no package context.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_relative_dynamic_import_packages_are_resolved_or_refused[importlib.import_module(\".QtCore\", package_name)-dynamic-binding-import]",
+      "reason": "Refuses a relative import_module call with nonconstant package context.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_relative_dynamic_import_packages_are_resolved_or_refused[importlib.import_module(\".QtCore\", \"PyQt6\", package=\"PyQt5\")-dynamic-binding-import]",
+      "reason": "Refuses duplicate positional and keyword package arguments instead of guessing import semantics.", "runtime_class": "subsecond", "size": "small"
     }
 
   ]
