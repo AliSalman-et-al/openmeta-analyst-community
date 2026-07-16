@@ -85,11 +85,11 @@ def _old_qt_module(name):
 
 def _current_qt_value_class(module, name):
     if module == _old_qt_module("QtCore"):
-        from PyQt5 import QtCore
+        from PyQt6 import QtCore
 
         return getattr(QtCore, name, None)
     if module == _old_qt_module("QtGui"):
-        from PyQt5 import QtGui
+        from PyQt6 import QtGui
 
         return getattr(QtGui, name, None)
     return None
@@ -112,7 +112,7 @@ def _construct_variant(value=None):
 
 
 def _construct_byte_array(value=b""):
-    from PyQt5 import QtCore
+    from PyQt6 import QtCore
 
     return QtCore.QByteArray(_to_bytes(value))
 

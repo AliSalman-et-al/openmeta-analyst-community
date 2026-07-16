@@ -53,8 +53,13 @@ During the
 dependency-ordered cutover, `verify-qt6.ps1` scans dependency files with zero
 allowances and every authoritative source module against the exact
 cryptographic backlog in `config/qt6-strict-source-backlog.json`. That temporary
-backlog permits no drift and is replaced by Issue #332's mechanical report;
-Issue #340 makes the final repository-wide zero-finding scan mandatory.
+backlog permits no drift. Issue #332 replaces the nonzero snapshot with a
+zero-finding source state, retains the full mechanical transformation report at
+`docs/verification/qt6-codemod-report.json`, and records every resolved refusal
+and its behavioral owner in `config/qt6-behavioral-handoffs.json`. Issue #340
+makes the final repository-wide zero-finding scan mandatory.
+The empty idempotence pass is retained at
+`docs/verification/qt6-codemod-second-run.json`.
 
 Regenerate that snapshot only as a reviewed migration-backlog change, using the
 same authoritative input root as verification:

@@ -5,10 +5,9 @@
 import copy
 from functools import partial
 
-from PyQt5.QtCore import QEvent, QTimer, Qt
-from PyQt5.QtGui import QKeySequence, QPalette
-from PyQt5.QtWidgets import (
-    QAction,
+from PyQt6.QtCore import QEvent, QTimer, Qt
+from PyQt6.QtGui import QAction, QKeySequence, QPalette, QUndoStack
+from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QMessageBox,
@@ -16,7 +15,6 @@ from PyQt5.QtWidgets import (
     QSizePolicy,
     QStyle,
     QTableWidgetItem,
-    QUndoStack,
     QWidget,
     QWIDGETSIZE_MAX,
 )
@@ -93,10 +91,10 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         table = self.two_by_two_table
         # layout-audit: allow=compact-table-overflow; reason=compact table keeps rows visible and owns excess overflow
         table.setMinimumWidth(0)
-        table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        table.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         table.horizontalHeader().setStretchLastSection(False)
         table.resizeColumnsToContents()
         table.resizeRowsToContents()
@@ -116,7 +114,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         self.effect_cbo_box.setMinimumWidth(0)
         # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
         self.effect_cbo_box.setMaximumWidth(QWIDGETSIZE_MAX)
-        self.effect_cbo_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.effect_cbo_box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._size_line_edit_for_samples(
             self.prevalence_txt_box, ("0.0000", "1.0000")
         )
@@ -125,7 +123,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
     def _size_line_edit_for_samples(line_edit, samples):
         margins = line_edit.textMargins()
         frame = line_edit.style().pixelMetric(
-            QStyle.PM_DefaultFrameWidth, None, line_edit
+            QStyle.PixelMetric.PM_DefaultFrameWidth, None, line_edit
         )
         required = (
             max(line_edit.fontMetrics().horizontalAdvance(value) for value in samples)
@@ -138,14 +136,14 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         line_edit.setMinimumWidth(required)
         # layout-audit: allow=numeric-domain-control; reason=editor width follows representative values from its numeric domain
         line_edit.setMaximumWidth(required)
-        line_edit.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        line_edit.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
     def _configure_focus_revelation(self):
         for widget in self.content_widget.findChildren(QWidget):
             widget.installEventFilter(self)
 
     def eventFilter(self, watched, event):
-        if event.type() == QEvent.FocusIn and self.content_widget.isAncestorOf(watched):
+        if event.type() == QEvent.Type.FocusIn and self.content_widget.isAncestorOf(watched):
             self.content_scroll.ensureWidgetVisible(watched)
         return super(DiagnosticDataForm, self).eventFilter(watched, event)
 
@@ -230,8 +228,8 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         # Add undo/redo actions
         undo = QAction(self)
         redo = QAction(self)
-        undo.setShortcut(QKeySequence.Undo)
-        redo.setShortcut(QKeySequence.Redo)
+        undo.setShortcut(QKeySequence.StandardKey.Undo)
+        redo.setShortcut(QKeySequence.StandardKey.Redo)
         self.addAction(undo)
         self.addAction(redo)
         undo.triggered.connect(
@@ -254,20 +252,20 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
 
     def setup_back_calculation_feedback(self):
         inconsistency_palette = QPalette()
-        inconsistency_palette.setColor(QPalette.WindowText, Qt.red)
+        inconsistency_palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.red)
         self.inconsistencyLabel.setPalette(inconsistency_palette)
         self.inconsistencyLabel.setVisible(False)
 
     def _mark_table_consistent(self):
         self.inconsistencyLabel.setVisible(False)
-        self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(True)
+        self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setEnabled(True)
 
     def _mark_table_invalid(self, message):
         self.inconsistencyLabel.setText(str(message))
         self.inconsistencyLabel.setVisible(True)
         # The rejected edit has already been rolled back to a valid state, so
         # acceptance must remain available while the inline guidance is shown.
-        self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(True)
+        self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setEnabled(True)
         self.content_layout.invalidate()
         self.content_widget.updateGeometry()
         self.content_scroll.ensureWidgetVisible(self.inconsistencyLabel)

@@ -2,16 +2,20 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import sys, time, traceback
-from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtCore import QThread
-from PyQt5.QtGui import QIcon, QPixmap
-from PyQt5.QtWidgets import QSplashScreen
+from PyQt6 import QtCore, QtWidgets
+from PyQt6.QtCore import QThread
+from PyQt6.QtGui import QIcon, QPixmap
+from PyQt6.QtWidgets import QSplashScreen
 
 import os
 
 forms_path = os.path.join(os.path.dirname(__file__), "forms")
 if forms_path not in sys.path:
     sys.path.insert(0, forms_path)
+
+from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+
+prepare_generated_ui_imports()
 
 import meta_py_r_backend
 import meta_globals
@@ -20,7 +24,7 @@ meta_py_r_backend.install_meta_py_r_backend()
 import app_error_handler
 import settings
 import adaptive_window
-import icons_rc  # noqa: F401 - registers canonical Qt image resources
+import qt6_resources
 
 SPLASH_DISPLAY_TIME = 0  # Keep startup smoke tests fast; packaged builds may override.
 APPLICATION_ICON_PATH = ":/misc/meta.png"
@@ -56,8 +60,8 @@ def screen_bounded_splash_pixmap(source, available_logical_size):
     )
     bounded = pixmap.scaled(
         target_physical_size,
-        QtCore.Qt.IgnoreAspectRatio,
-        QtCore.Qt.SmoothTransformation,
+        QtCore.Qt.AspectRatioMode.IgnoreAspectRatio,
+        QtCore.Qt.TransformationMode.SmoothTransformation,
     )
     bounded.setDevicePixelRatio(device_pixel_ratio)
     return bounded
@@ -199,6 +203,7 @@ def load_R_libraries(app, splash=None):
 
 
 def start():
+    qt6_resources.ensure_application_resources()
     app_error_handler.install_global_exception_handler()
     startup_argv = _resolve_startup_argv()
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-smoke":
@@ -280,6 +285,7 @@ def start():
 
 
 def start_automation():
+    qt6_resources.ensure_application_resources()
     app_error_handler.install_global_exception_handler()
     meta_form = _import_meta_form()
     app = app_error_handler.get_or_create_application(sys.argv)
@@ -481,7 +487,7 @@ def _assert_wizard_layout_smoke_page(
     body_rect = parent.contentsRect()
     if body_rect.width() <= 0 or body_rect.height() <= 0:
         raise SystemExit("Wizard layout smoke saw an empty body: %s" % scenario_name)
-    if wizard.wizardStyle() != QtWidgets.QWizard.ModernStyle:
+    if wizard.wizardStyle() != QtWidgets.QWizard.WizardStyle.ModernStyle:
         raise SystemExit("Wizard layout smoke expected ModernStyle: %s" % scenario_name)
     if wizard.property("RCMS_window_archetype") != "workflow":
         raise SystemExit(
@@ -495,10 +501,10 @@ def _assert_wizard_layout_smoke_page(
             % scenario_name
         )
     for button_role in (
-        QtWidgets.QWizard.BackButton,
-        QtWidgets.QWizard.NextButton,
-        QtWidgets.QWizard.FinishButton,
-        QtWidgets.QWizard.CancelButton,
+        QtWidgets.QWizard.WizardButton.BackButton,
+        QtWidgets.QWizard.WizardButton.NextButton,
+        QtWidgets.QWizard.WizardButton.FinishButton,
+        QtWidgets.QWizard.WizardButton.CancelButton,
     ):
         if overflow.isAncestorOf(wizard.button(button_role)):
             raise SystemExit(

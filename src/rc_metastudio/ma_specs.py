@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Method-selection dialog and analysis specification builder."""
 
-from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QColor
-from PyQt5.QtWidgets import (
+from PyQt6 import QtCore, QtWidgets
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -409,7 +409,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         ]
 
     def _update_meta_regression_ok(self):
-        button = self.buttonBox.button(QDialogButtonBox.Ok)
+        button = self.buttonBox.button(QDialogButtonBox.StandardButton.Ok)
         if button is not None:
             button.setEnabled(bool(self._selected_covariates()))
 
@@ -507,9 +507,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                 "Missing Covariate Values",
                 "Some studies do not have values for the selected covariates. "
                 "Run the regression without those studies?",
-                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
-            if choice == QMessageBox.No:
+            if choice == QMessageBox.StandardButton.No:
                 return
 
         metric = self.model.current_effect
@@ -913,7 +913,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self._configure_plot_option_groups()
         if self.parameter_grp_box.layout() is None:
             layout = QGridLayout()
-            layout.setAlignment(Qt.AlignTop)
+            layout.setAlignment(Qt.AlignmentFlag.AlignTop)
             self.parameter_grp_box.setLayout(layout)
 
         cur_grid_row = 0
@@ -1081,7 +1081,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             finput.setRange(0, ANALYSIS_NUMERIC_MAX)
         else:
             finput.setRange(ANALYSIS_NUMERIC_MIN, ANALYSIS_NUMERIC_MAX)
-        finput.setCorrectionMode(QtWidgets.QAbstractSpinBox.CorrectToPreviousValue)
+        finput.setCorrectionMode(QtWidgets.QAbstractSpinBox.CorrectionMode.CorrectToPreviousValue)
 
         # if a default value has been specified, use it
         if name in self.current_defaults:
@@ -1139,7 +1139,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             iinput.setRange(0, ANALYSIS_COUNT_MAX)
         else:
             iinput.setRange(-2147483648, 2147483647)
-        iinput.setCorrectionMode(QtWidgets.QAbstractSpinBox.CorrectToPreviousValue)
+        iinput.setCorrectionMode(QtWidgets.QAbstractSpinBox.CorrectionMode.CorrectToPreviousValue)
 
         # if a default value has been specified, use it
         if name in self.current_defaults:
@@ -1212,7 +1212,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         lbl.setWordWrap(True)
         # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
         lbl.setMinimumWidth(0)
-        lbl.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self.current_widgets.append(lbl)
         layout.addWidget(lbl, cur_grid_row, 0, 1, 2)
 

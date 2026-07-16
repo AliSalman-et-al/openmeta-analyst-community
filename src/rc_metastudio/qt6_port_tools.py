@@ -40,6 +40,7 @@ class MappingManifest:
     removed_apis: Mapping[str, str]
     method_rewrites: Mapping[str, str]
     scoped_enums: Mapping[str, str]
+    class_scoped_enums: Mapping[str, str]
     ambiguous_enums: Mapping[str, str]
 
 
@@ -165,6 +166,7 @@ def load_mapping_manifest(path: Path = DEFAULT_MANIFEST) -> MappingManifest:
         "removed_apis",
         "method_rewrites",
         "scoped_enums",
+        "class_scoped_enums",
         "ambiguous_enums",
     }
     if not isinstance(payload, dict) or set(payload) != expected:
@@ -182,6 +184,9 @@ def load_mapping_manifest(path: Path = DEFAULT_MANIFEST) -> MappingManifest:
         removed_apis=_require_string_map(payload["removed_apis"], "removed_apis"),
         method_rewrites=_require_string_map(payload["method_rewrites"], "method_rewrites"),
         scoped_enums=_require_string_map(payload["scoped_enums"], "scoped_enums"),
+        class_scoped_enums=_require_string_map(
+            payload["class_scoped_enums"], "class_scoped_enums"
+        ),
         ambiguous_enums=_require_string_map(payload["ambiguous_enums"], "ambiguous_enums"),
     )
 
@@ -368,6 +373,8 @@ class _RefusalVisitor(cst.CSTVisitor):
 
     def visit_Attribute(self, node: cst.Attribute) -> None:
         qualified = _qualified_expression(node, self.bindings)
+        if _class_enum_replacement(qualified, self.manifest) is not None:
+            return
         removed_action = _removed_action(qualified, self.manifest)
         if removed_action is not None:
             self._add(node, qualified, removed_action)
@@ -429,6 +436,12 @@ def _moved_target(symbol: str, manifest: MappingManifest) -> str | None:
 
 def _removed_action(symbol: str, manifest: MappingManifest) -> str | None:
     return manifest.removed_apis.get(_normalize_qt5(symbol, manifest))
+
+
+def _class_enum_replacement(
+    symbol: str, manifest: MappingManifest
+) -> str | None:
+    return manifest.class_scoped_enums.get(_normalize_qt5(symbol, manifest))
 
 
 def _alias_text(alias: cst.ImportAlias) -> str:
@@ -757,6 +770,19 @@ class _Qt6Transformer(cst.CSTTransformer):
     def leave_Attribute(
         self, original_node: cst.Attribute, updated_node: cst.Attribute
     ) -> cst.BaseExpression:
+        qualified = _qualified_expression(original_node, self.bindings)
+        class_replacement = _class_enum_replacement(qualified, self.manifest)
+        if class_replacement is not None:
+            expression: cst.BaseExpression = updated_node.value
+            for part in class_replacement.split("."):
+                expression = cst.Attribute(value=expression, attr=cst.Name(part))
+            self._record(
+                original_node,
+                kind="class-scoped-enum",
+                symbol=_dotted_name(original_node),
+                replacement=_dotted_name(expression),
+            )
+            return expression
         if _qt_owner(original_node.value, self.bindings):
             replacement = self.manifest.scoped_enums.get(original_node.attr.value)
             if replacement is not None:
@@ -1009,6 +1035,13 @@ def _scan_python(
             if is_qt and node.attr not in scopes:
                 add(node, "short-enum", f"{owner}.{node.attr}", "use an explicit Qt6 enum scope")
             qualified = f"{resolved}.{node.attr}" if resolved else node.attr
+            if _class_enum_replacement(qualified, manifest) is not None:
+                add(
+                    node,
+                    "short-class-enum",
+                    qualified,
+                    "use the explicit native Qt6 class enum scope",
+                )
             removed_action = _removed_action(qualified, manifest)
             if removed_action is not None:
                 add(node, "removed-api", qualified, removed_action)
@@ -1362,7 +1395,7 @@ def findings_snapshot(findings: Sequence[StrictFinding]) -> dict[str, object]:
         counts[item.rule] = counts.get(item.rule, 0) + 1
     return {
         "schema_version": 1,
-        "purpose": "Exact temporary pre-#332 strict-source migration backlog; any drift fails closed.",
+        "purpose": "Exact strict-source migration state; any drift fails closed.",
         "finding_count": len(findings),
         "counts_by_rule": dict(sorted(counts.items())),
         "findings_sha256": hashlib.sha256(canonical).hexdigest(),

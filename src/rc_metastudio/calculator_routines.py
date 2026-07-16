@@ -4,8 +4,9 @@
 
 import sys
 from functools import partial
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QMessageBox, QSizePolicy, QStyle, QUndoCommand
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QUndoCommand
+from PyQt6.QtWidgets import QMessageBox, QSizePolicy, QStyle
 
 from meta_globals import *
 import meta_py_r
@@ -89,9 +90,9 @@ def set_table_item_editable(item, editable):
         return
     flags = item.flags()
     if editable:
-        flags = flags | Qt.ItemIsEditable
+        flags = flags | Qt.ItemFlag.ItemIsEditable
     else:
-        flags = flags & ~Qt.ItemIsEditable
+        flags = flags & ~Qt.ItemFlag.ItemIsEditable
     item.setFlags(flags)
 
 
@@ -270,7 +271,7 @@ def fit_effect_ci_line_edits_to_contents(
             continue
 
         policy = line_edit.sizePolicy()
-        line_edit.setSizePolicy(QSizePolicy.Fixed, policy.verticalPolicy())
+        line_edit.setSizePolicy(QSizePolicy.Policy.Fixed, policy.verticalPolicy())
 
         if semantic_samples:
             content_width = max(
@@ -279,7 +280,7 @@ def fit_effect_ci_line_edits_to_contents(
             )
             text_margins = line_edit.textMargins()
             frame_width = line_edit.style().pixelMetric(
-                QStyle.PM_DefaultFrameWidth, None, line_edit
+                QStyle.PixelMetric.PM_DefaultFrameWidth, None, line_edit
             )
             required_width = (
                 content_width
@@ -487,7 +488,7 @@ def table_cells_editable(table):
             item = table.item(row, col)
             if item is None:
                 continue
-            if (item.flags() & Qt.ItemIsEditable) == Qt.ItemIsEditable:
+            if (item.flags() & Qt.ItemFlag.ItemIsEditable) == Qt.ItemFlag.ItemIsEditable:
                 cells_uneditable = False
     return cells_uneditable
 

@@ -5,7 +5,7 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from PyQt5.QtCore import (
+from PyQt6.QtCore import (
     QEvent,
     QMargins,
     QObject,
@@ -16,8 +16,8 @@ from PyQt5.QtCore import (
     Qt,
     pyqtSignal,
 )
-from PyQt5.QtGui import QGuiApplication
-from PyQt5.QtWidgets import QApplication, QLayout, QSizePolicy, QWIDGETSIZE_MAX
+from PyQt6.QtGui import QGuiApplication
+from PyQt6.QtWidgets import QApplication, QLayout, QSizePolicy, QWIDGETSIZE_MAX
 
 
 class WindowArchetype(str, Enum):
@@ -249,12 +249,12 @@ class AdaptiveWindowController(QObject):
         window.setProperty("RCMS_window_role", self.role.value)
         # layout-audit: allow=adaptive-window-policy; reason=central adaptive policy owns screen-safe outer geometry
         window.setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX)
-        window.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        window.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         if window.layout() is not None:
             constraint = (
-                QLayout.SetMinimumSize
+                QLayout.SizeConstraint.SetMinimumSize
                 if self.policy.application_owns_geometry
-                else QLayout.SetNoConstraint
+                else QLayout.SizeConstraint.SetNoConstraint
             )
             window.layout().setSizeConstraint(constraint)
         window.installEventFilter(self)
@@ -262,12 +262,12 @@ class AdaptiveWindowController(QObject):
     def eventFilter(self, watched, event):
         if (
             watched is self.window
-            and event.type() in (QEvent.Move, QEvent.Resize)
+            and event.type() in (QEvent.Type.Move, QEvent.Type.Resize)
             and not self.window.isMaximized()
             and not self.window.isFullScreen()
         ):
             self._normal_frame_geometry = QRect(self.window.frameGeometry())
-        if watched is self.window and event.type() == QEvent.Show:
+        if watched is self.window and event.type() == QEvent.Type.Show:
             if self._first_show_pending:
                 self._first_show_pending = False
                 self.apply_first_use_geometry()
@@ -284,7 +284,7 @@ class AdaptiveWindowController(QObject):
         ):
             self._screen_placer(self.window, screen)
         if self.policy.first_use_behavior == FirstUseBehavior.MAXIMIZED:
-            self.window.setWindowState(self.window.windowState() | Qt.WindowMaximized)
+            self.window.setWindowState(self.window.windowState() | Qt.WindowState.WindowMaximized)
             self.refitApplied.emit()
             return
 

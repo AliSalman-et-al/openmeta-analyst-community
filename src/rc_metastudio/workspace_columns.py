@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """User-owned column sizing for persistent workspace tables."""
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QTableView
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QTableView
 
 from workspace_column_identity import (
     WORKSPACE_COLUMN_IDENTITY_ROLE,
@@ -91,7 +91,7 @@ class WorkspaceColumnWidthController(object):
         identities = []
         for column in range(model.columnCount()):
             value = model.headerData(
-                column, Qt.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
+                column, Qt.Orientation.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
             )
             identities.append(
                 WorkspaceColumnIdentity.coerce(

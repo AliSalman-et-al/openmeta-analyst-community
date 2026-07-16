@@ -9,7 +9,7 @@ import tomllib
 
 import pytest
 
-from rc_metastudio import qt6_build
+from rc_metastudio import qt6_build, qt6_resources
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -204,6 +204,138 @@ def test_canonical_form_generation_is_deterministic_and_importable(tmp_path):
     spec.loader.exec_module(module)
     assert module.Ui_AboutLegalDialog.__name__ == "Ui_AboutLegalDialog"
 
+    first_modules = sorted(
+        path.relative_to(first / "generated").as_posix()
+        for path in (first / "generated").rglob("ui_*.py")
+    )
+    second_modules = sorted(
+        path.relative_to(second / "generated").as_posix()
+        for path in (second / "generated").rglob("ui_*.py")
+    )
+    assert len(first_modules) == 29
+    assert first_modules == second_modules
+    for relative in first_modules:
+        first_payload = (first / "generated" / relative).read_bytes()
+        second_payload = (second / "generated" / relative).read_bytes()
+        assert first_payload == second_payload
+        rendered = first_payload.decode("utf-8")
+        assert "from PyQt6" in rendered
+        assert "connectSlotsByName" not in rendered
+        assert "icons_rc" not in rendered
+
+
+def test_canonical_form_manifest_fails_closed_on_drift_and_collisions():
+    discovered = set(
+        Path(path).relative_to(ROOT)
+        for path in (ROOT / "src/rc_metastudio/forms").glob("*.ui")
+    )
+    qt6_build.validate_form_manifest(qt6_build.CANONICAL_FORMS, discovered)
+
+    source, destination = next(iter(qt6_build.CANONICAL_FORMS.items()))
+    missing = dict(qt6_build.CANONICAL_FORMS)
+    missing.pop(source)
+    with pytest.raises(RuntimeError, match="manifest does not match"):
+        qt6_build.validate_form_manifest(missing, discovered)
+
+    extra = dict(qt6_build.CANONICAL_FORMS)
+    extra[Path("src/rc_metastudio/forms/not-canonical.ui")] = Path(
+        "rc_metastudio/forms/ui_not_canonical.py"
+    )
+    with pytest.raises(RuntimeError, match="manifest does not match"):
+        qt6_build.validate_form_manifest(extra, discovered)
+
+    collision = dict(qt6_build.CANONICAL_FORMS)
+    other = next(item for item in collision if item != source)
+    collision[other] = destination
+    with pytest.raises(RuntimeError, match="destination collision"):
+        qt6_build.validate_form_manifest(collision, discovered)
+
+    traversal = dict(qt6_build.CANONICAL_FORMS)
+    traversal[source] = Path("../ui_escape.py")
+    with pytest.raises(RuntimeError, match="non-canonical destination"):
+        qt6_build.validate_form_manifest(traversal, discovered)
+
+
+def test_generated_ui_bootstrap_imports_every_handwritten_qt_module(tmp_path):
+    build_root = tmp_path / "qt6"
+    _run_build("generate", "--build-root", str(build_root))
+    inventory = json.loads(
+        (ROOT / "docs/verification/pre-qt6-baseline/qt-port-inventory.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    modules = [Path(path).stem for path in inventory["handwritten_qt_modules"]]
+    script = """
+import importlib
+import json
+import sys
+import types
+from pathlib import Path
+
+root = Path(sys.argv[1])
+build_root = Path(sys.argv[2])
+modules = json.loads(sys.argv[3])
+report_path = Path(sys.argv[4])
+sys.path.insert(0, str(root / "src/rc_metastudio"))
+from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+layout = prepare_generated_ui_imports(build_root)
+for name in modules:
+    importlib.import_module(name)
+fake_launch = types.ModuleType("launch")
+fake_launch.start = lambda: 0
+sys.modules["launch"] = fake_launch
+from rc_metastudio.__main__ import main
+startup_result = main()
+report_path.write_text(
+    json.dumps({
+        "count": len(modules),
+        "generated_root": str(layout.package_root),
+        "startup_result": startup_result,
+    }),
+    encoding="utf-8",
+)
+"""
+    environment = os.environ.copy()
+    environment["QT_QPA_PLATFORM"] = "offscreen"
+    environment["RCMS_QT6_BUILD_ROOT"] = str(build_root)
+    report_path = tmp_path / "import-report.json"
+    subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            script,
+            str(ROOT),
+            str(build_root),
+            json.dumps(modules),
+            str(report_path),
+        ],
+        cwd=ROOT,
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["count"] == 36
+    assert report["startup_result"] == 0
+    assert Path(report["generated_root"]) == (build_root / "generated/rc_metastudio")
+
+
+def test_generated_ui_bootstrap_rejects_missing_or_tampered_outputs(tmp_path):
+    from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+
+    build_root = tmp_path / "qt6"
+    _run_build("generate", "--build-root", str(build_root))
+    target = build_root / "generated/rc_metastudio/forms/ui_about_legal.py"
+    target.unlink()
+    with pytest.raises(RuntimeError, match="generated form set"):
+        prepare_generated_ui_imports(build_root)
+
+    _run_build("generate", "--build-root", str(build_root))
+    target.write_text("from PyQt5 import QtCore\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="invalid generated Qt6 form"):
+        prepare_generated_ui_imports(build_root)
+
 
 def test_binary_resource_registers_and_exposes_icon_and_svg(tmp_path):
     build_root = tmp_path / "qt6"
@@ -221,6 +353,22 @@ def test_binary_resource_registers_and_exposes_icon_and_svg(tmp_path):
         assert QtCore.QFile(":/icons/actions/about-legal.svg").exists()
     finally:
         assert QtCore.QResource.unregisterResource(str(resource))
+
+
+def test_application_resource_loader_registers_only_the_binary_collection(tmp_path):
+    build_root = tmp_path / "qt6"
+    _run_build("generate", "--build-root", str(build_root))
+    resource = build_root / "resources" / "icons.rcc"
+
+    registration = qt6_resources.register_binary_resource(resource)
+    try:
+        from PyQt6 import QtCore
+
+        assert registration.path == resource.resolve()
+        assert QtCore.QFile(":/misc/meta.png").exists()
+        assert QtCore.QFile(":/icons/actions/about-legal.svg").exists()
+    finally:
+        registration.close()
 
 
 def test_minimal_qt6_window_reports_resources_and_exits_cleanly(tmp_path):

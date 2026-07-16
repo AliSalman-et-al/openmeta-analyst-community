@@ -1,13 +1,7 @@
 {
-  "counts_by_rule": {
-    "generated-python-resource": 1,
-    "pyqt5-import": 109,
-    "removed-api": 30,
-    "short-enum": 255,
-    "stale-generator": 30
-  },
-  "finding_count": 425,
-  "findings_sha256": "91c994dc2e06ea832f1df5582bc083160cd460da167c7bb31797f41881ec1d5a",
-  "purpose": "Exact temporary pre-#332 strict-source migration backlog; any drift fails closed.",
+  "counts_by_rule": {},
+  "finding_count": 0,
+  "findings_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "purpose": "Exact strict-source migration state; any drift fails closed.",
   "schema_version": 1
 }

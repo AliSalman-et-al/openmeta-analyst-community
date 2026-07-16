@@ -1058,7 +1058,7 @@ def _tool_versions():
 
 def _pyqt_version():
     try:
-        from PyQt5 import QtCore
+        from PyQt6 import QtCore
 
         return getattr(QtCore, "PYQT_VERSION_STR", None)
     except Exception:

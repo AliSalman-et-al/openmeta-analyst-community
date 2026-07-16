@@ -3,7 +3,7 @@
 """UI-independent dataset model for studies, outcomes, follow-ups, and groups."""
 
 import pdb
-from PyQt5.QtCore import pyqtRemoveInputHook
+from PyQt6.QtCore import pyqtRemoveInputHook
 import copy
 import uuid
 

@@ -1,5 +1,5 @@
-from PyQt5.QtCore import QEvent
-from PyQt5.QtWidgets import QDialog, QMessageBox, QWidget
+from PyQt6.QtCore import QEvent
+from PyQt6.QtWidgets import QDialog, QMessageBox, QWidget
 
 import forms.ui_diagnostic_metrics
 import app_error_handler
@@ -35,7 +35,7 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
             widget.installEventFilter(self)
 
     def eventFilter(self, watched, event):
-        if event.type() == QEvent.FocusIn and self.content_widget.isAncestorOf(watched):
+        if event.type() == QEvent.Type.FocusIn and self.content_widget.isAncestorOf(watched):
             self.content_scroll.ensureWidgetVisible(watched)
         return super(Diag_Metrics, self).eventFilter(watched, event)
 

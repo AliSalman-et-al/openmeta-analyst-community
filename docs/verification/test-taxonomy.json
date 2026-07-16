@@ -7509,12 +7509,37 @@
       "size": "large"
     },
     {
+      "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_build_slice.py::test_canonical_form_manifest_fails_closed_on_drift_and_collisions",
+      "reason": "Rejects missing, extra, colliding, and unsafe canonical form manifest entries before generation.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["filesystem", "qt", "subprocess"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_build_slice.py::test_generated_ui_bootstrap_imports_every_handwritten_qt_module",
+      "reason": "Imports the entire handwritten Qt inventory through the real generated-form layout and maintained startup boundary.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["filesystem", "qt", "subprocess"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_build_slice.py::test_generated_ui_bootstrap_rejects_missing_or_tampered_outputs",
+      "reason": "Fails source startup before UI imports when generated form content is missing or stale.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
       "decision": "keep",
       "evidence": ["gui_compatibility", "release_readiness"],
       "external_dependencies": ["filesystem", "network", "qt", "subprocess"],
       "lane": "fast",
       "nodeid": "tests/python/fast/test_qt6_build_slice.py::test_binary_resource_registers_and_exposes_icon_and_svg",
       "reason": "Guards official binary QResource registration and canonical PNG and SVG paths.",
+      "runtime_class": "minutes",
+      "size": "large"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["filesystem", "network", "qt", "subprocess"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_build_slice.py::test_application_resource_loader_registers_only_the_binary_collection",
+      "reason": "Guards the handwritten native QResource loader that replaces generated Python resource bytes.",
       "runtime_class": "minutes",
       "size": "large"
     },
@@ -8207,6 +8232,21 @@
       "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
       "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_relative_dynamic_import_packages_are_resolved_or_refused[importlib.import_module(\".QtCore\", \"PyQt6\", package=\"PyQt5\")-dynamic-binding-import]",
       "reason": "Refuses duplicate positional and keyword package arguments instead of guessing import semantics.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_repository_mechanical_cutover_retains_auditable_behavioral_handoffs",
+      "reason": "Guards the repository-wide codemod report, zero strict source state, generated-source deletion, and issue-owned behavioral handoffs.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_codemod_and_strict_scan_cover_class_scoped_qt6_enums",
+      "reason": "Proves the codemod and independent scanner handle native class-scoped Qt6 enum owners.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_port_tools.py::test_class_scoped_enum_manifest_targets_exist_in_locked_pyqt6",
+      "reason": "Validates every authoritative class-enum mapping against the locked PyQt6 runtime.", "runtime_class": "subsecond", "size": "small"
     }
 
   ]

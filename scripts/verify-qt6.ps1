@@ -22,6 +22,8 @@ try {
         src/rc_metastudio/project_evidence.py `
         src/rc_metastudio/project_format.py `
         src/rc_metastudio/qt6_port_tools.py `
+        src/rc_metastudio/qt6_resources.py `
+        src/rc_metastudio/qt6_ui.py `
         src/rc_metastudio/qt6_macos_feasibility.py `
         scripts/build_qt6.py `
         scripts/qt6_port.py

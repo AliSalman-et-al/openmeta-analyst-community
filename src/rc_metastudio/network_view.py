@@ -1,6 +1,6 @@
-from PyQt5.QtCore import QEvent, QTimer, Qt, pyqtSignal
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtWidgets import QDialog, QGraphicsScene
+from PyQt6.QtCore import QEvent, QTimer, Qt, pyqtSignal
+from PyQt6.QtGui import QPixmap
+from PyQt6.QtWidgets import QDialog, QGraphicsScene
 
 import adaptive_window
 import app_error_handler
@@ -15,7 +15,7 @@ class ViewDialog(QDialog, forms.ui_network_view.Ui_network_view_dialog):
     def __init__(self, model, parent=None):
         super(ViewDialog, self).__init__(parent)
         self.setupUi(self)
-        self.setAttribute(Qt.WA_DeleteOnClose, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         adaptive_window.register_adaptive_window(
             self, adaptive_window.WindowRole.NETWORK_VIEW
         )
@@ -74,7 +74,7 @@ class ViewDialog(QDialog, forms.ui_network_view.Ui_network_view_dialog):
             combo_box.setItemData(
                 index,
                 combo_box.itemText(index),
-                Qt.ToolTipRole,
+                Qt.ItemDataRole.ToolTipRole,
             )
         combo_box.setToolTip(combo_box.currentText())
 
@@ -99,7 +99,7 @@ class ViewDialog(QDialog, forms.ui_network_view.Ui_network_view_dialog):
                 self._network_source_pixmap
             )
             self._network_pixmap_item.setTransformationMode(
-                Qt.SmoothTransformation
+                Qt.TransformationMode.SmoothTransformation
             )
             # layout-audit: allow=intrinsic-ratio; reason=scene follows its intrinsic-ratio visual artifact
             self.scene.setSceneRect(self._network_pixmap_item.boundingRect())
@@ -130,13 +130,13 @@ class ViewDialog(QDialog, forms.ui_network_view.Ui_network_view_dialog):
             return
         self.network_viewer.resetTransform()
         # layout-audit: allow=intrinsic-ratio; reason=scene follows its intrinsic-ratio visual artifact
-        self.network_viewer.fitInView(item, Qt.KeepAspectRatio)
+        self.network_viewer.fitInView(item, Qt.AspectRatioMode.KeepAspectRatio)
         self.viewportRefitApplied.emit()
 
     def eventFilter(self, watched, event):
         if watched is self.network_viewer.viewport() and event.type() in (
-            QEvent.Resize,
-            QEvent.Show,
+            QEvent.Type.Resize,
+            QEvent.Type.Show,
         ):
             self.schedule_viewport_refit()
         return super(ViewDialog, self).eventFilter(watched, event)

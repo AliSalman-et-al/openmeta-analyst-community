@@ -2,18 +2,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Custom QTableView with copy, paste, undo, and redo support."""
 
-from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtCore import QRegExp, Qt, pyqtSignal
-from PyQt5.QtWidgets import (
-    QAction,
+from PyQt6 import QtCore, QtWidgets
+from PyQt6.QtCore import QRegularExpression, Qt, pyqtSignal
+from PyQt6.QtGui import QAction, QUndoCommand, QUndoStack
+from PyQt6.QtWidgets import (
     QApplication,
     QItemDelegate,
     QLineEdit,
     QMenu,
     QMessageBox,
     QTableView,
-    QUndoCommand,
-    QUndoStack,
     QWidget,
 )
 
@@ -37,8 +35,8 @@ import qt_text
 import tabular_data
 
 # for issue #169 -- normalizing new lines, e.g., for pasting
-# use QRegExp for Qt regular-expression matching
-_newlines_re = QRegExp("(\r\n|\r|\r)")
+# This Qt6 regular expression site is behavior-owned by the table editing slice.
+_newlines_re = QRegularExpression("(\r\n|\r|\r)")
 
 
 def _connect_action(action, callback):
@@ -99,7 +97,7 @@ class MADataTable(QtWidgets.QTableView):
 
         ### vertical (column) header
         headers = self.horizontalHeader()
-        headers.setContextMenuPolicy(Qt.CustomContextMenu)
+        headers.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         headers.customContextMenuRequested.connect(
             app_error_handler.safe_slot(self.header_context_menu, parent=self)
         )
@@ -262,19 +260,19 @@ class MADataTable(QtWidgets.QTableView):
             )
             context_menu.addAction(action_rename)
             # sorting
-            col_name = _to_text(self.model().headerData(column_clicked, Qt.Horizontal))
+            col_name = _to_text(self.model().headerData(column_clicked, Qt.Orientation.Horizontal))
             action_sort = QAction("Sort Studies by %s" % col_name, self)
             _connect_action(action_sort, lambda: self.sort_by_col(column_clicked))
             context_menu.addAction(action_sort)
         elif column_clicked in raw_data_columns and data_type == "diagnostic":
             # sorting
-            col_name = _to_text(self.model().headerData(column_clicked, Qt.Horizontal))
+            col_name = _to_text(self.model().headerData(column_clicked, Qt.Orientation.Horizontal))
             action_sort = QAction("Sort Studies by %s" % col_name, self)
             _connect_action(action_sort, lambda: self.sort_by_col(column_clicked))
             context_menu.addAction(action_sort)
         elif column_clicked in outcomes_columns:
             # sorting
-            col_name = _to_text(self.model().headerData(column_clicked, Qt.Horizontal))
+            col_name = _to_text(self.model().headerData(column_clicked, Qt.Orientation.Horizontal))
             action_sort = QAction("Sort Studies by %s" % col_name, self)
             _connect_action(action_sort, lambda: self.sort_by_col(column_clicked))
             context_menu.addAction(action_sort)
@@ -318,21 +316,21 @@ class MADataTable(QtWidgets.QTableView):
         self.model().reset_model()
 
     def keyPressEvent(self, event):
-        if event.modifiers() & QtCore.Qt.ControlModifier:
+        if event.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier:
             ## undo/redo
 
-            if event.key() == QtCore.Qt.Key_Z:
+            if event.key() == QtCore.Qt.Key.Key_Z:
                 self.undoStack.undo()
-            elif event.key() == QtCore.Qt.Key_Y:
+            elif event.key() == QtCore.Qt.Key.Key_Y:
                 self.undoStack.redo()
             ### copy/paste
-            elif event.key() == QtCore.Qt.Key_C:
+            elif event.key() == QtCore.Qt.Key.Key_C:
                 # ctrl + c = copy
                 self.copy()
-            elif event.key() == QtCore.Qt.Key_V:
+            elif event.key() == QtCore.Qt.Key.Key_V:
                 # ctrl + v = paste
                 self.paste()
-            elif event.key() == QtCore.Qt.Key_A:
+            elif event.key() == QtCore.Qt.Key.Key_A:
                 self.selectAll()
                 event.accept()
             else:
@@ -342,7 +340,7 @@ class MADataTable(QtWidgets.QTableView):
                 self.main_gui.keyPressEvent(event)
         elif self._is_return_key(event):
             self._move_current_index_vertically(
-                -1 if event.modifiers() & QtCore.Qt.ShiftModifier else 1
+                -1 if event.modifiers() & QtCore.Qt.KeyboardModifier.ShiftModifier else 1
             )
             event.accept()
         elif self._is_clear_key(event):
@@ -357,10 +355,10 @@ class MADataTable(QtWidgets.QTableView):
             QTableView.keyPressEvent(self, event)
 
     def _is_return_key(self, event):
-        return event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter)
+        return event.key() in (QtCore.Qt.Key.Key_Return, QtCore.Qt.Key.Key_Enter)
 
     def _is_clear_key(self, event):
-        return event.key() in (QtCore.Qt.Key_Delete, QtCore.Qt.Key_Backspace)
+        return event.key() in (QtCore.Qt.Key.Key_Delete, QtCore.Qt.Key.Key_Backspace)
 
     def clear_selected_cells(self):
         model = self.model()
@@ -381,7 +379,7 @@ class MADataTable(QtWidgets.QTableView):
             if key in seen:
                 continue
             seen.add(key)
-            if model.flags(index) & Qt.ItemIsEditable:
+            if model.flags(index) & Qt.ItemFlag.ItemIsEditable:
                 editable_indexes.append(index)
 
         if not editable_indexes:
@@ -1217,15 +1215,15 @@ class StudyDelegate(QItemDelegate):
 
     def eventFilter(self, editor, event):
         if (
-            event.type() == QtCore.QEvent.KeyPress
-            and event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter)
-            and not event.modifiers() & QtCore.Qt.ControlModifier
+            event.type() == QtCore.QEvent.Type.KeyPress
+            and event.key() in (QtCore.Qt.Key.Key_Return, QtCore.Qt.Key.Key_Enter)
+            and not event.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier
         ):
-            direction = -1 if event.modifiers() & QtCore.Qt.ShiftModifier else 1
+            direction = -1 if event.modifiers() & QtCore.Qt.KeyboardModifier.ShiftModifier else 1
             table = self._table_for_editor(editor)
             edited_index = table.currentIndex() if table is not None else None
             self.commitData.emit(editor)
-            self.closeEditor.emit(editor, QtWidgets.QAbstractItemDelegate.NoHint)
+            self.closeEditor.emit(editor, QtWidgets.QAbstractItemDelegate.EndEditHint.NoHint)
             if table is not None:
                 QtCore.QTimer.singleShot(
                     0,
@@ -1253,5 +1251,5 @@ class StudyDelegate(QItemDelegate):
 
     def setEditorData(self, editor, index):
         # used to be Qt.DisplayRole
-        text = index.model().data(index, Qt.EditRole)
+        text = index.model().data(index, Qt.ItemDataRole.EditRole)
         editor.setText(_to_text(text))

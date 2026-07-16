@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QDialog, QDialogButtonBox, QMessageBox
+from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QMessageBox
 
 import forms.ui_cov_subgroup_dlg
 import adaptive_controls
@@ -42,7 +42,7 @@ class MetaSubgroupForm(QDialog, forms.ui_cov_subgroup_dlg.Ui_cov_subgroup_dialog
         self.accept()
 
     def _update_ok_button(self):
-        ok_button = self.buttonBox.button(QDialogButtonBox.Ok)
+        ok_button = self.buttonBox.button(QDialogButtonBox.StandardButton.Ok)
         if ok_button is not None:
             ok_button.setEnabled(self.cov_subgroup_cbo_box.count() > 0)
 

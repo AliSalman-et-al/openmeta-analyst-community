@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QDialog
+from PyQt6.QtWidgets import QDialog
 import forms.ui_edit_group_name
 import adaptive_window
 

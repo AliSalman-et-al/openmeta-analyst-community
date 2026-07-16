@@ -17,7 +17,7 @@ import shutil
 import struct
 import subprocess
 import sys
-from typing import Protocol, cast
+from typing import Mapping, Protocol, cast
 import urllib.request
 
 import py7zr
@@ -25,7 +25,37 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 
 
 ROOT = Path(__file__).resolve().parents[2]
-CANONICAL_FORM = Path("src/rc_metastudio/forms/about_legal.ui")
+CANONICAL_FORMS = {
+    Path("src/rc_metastudio/forms/about_legal.ui"): Path("rc_metastudio/forms/ui_about_legal.py"),
+    Path("src/rc_metastudio/forms/binary_data_form2.ui"): Path("rc_metastudio/forms/ui_binary_data_form.py"),
+    Path("src/rc_metastudio/forms/change_cov_type_form.ui"): Path("rc_metastudio/forms/ui_change_cov_type.py"),
+    Path("src/rc_metastudio/forms/change_group_name_dlg.ui"): Path("rc_metastudio/forms/ui_edit_group_name.py"),
+    Path("src/rc_metastudio/forms/choose_back_calc_result_form.ui"): Path("rc_metastudio/forms/ui_choose_back_calc_result_form.py"),
+    Path("src/rc_metastudio/forms/choose_metric_page.ui"): Path("rc_metastudio/forms/ui_choose_metric_page.py"),
+    Path("src/rc_metastudio/forms/conf_level_dialog.ui"): Path("rc_metastudio/forms/ui_conf_level_dialog.py"),
+    Path("src/rc_metastudio/forms/continuous_back_calc_result_form.ui"): Path("rc_metastudio/forms/ui_continuous_back_calc_result_form.py"),
+    Path("src/rc_metastudio/forms/continuous_data_form.ui"): Path("rc_metastudio/forms/ui_continuous_data_form.py"),
+    Path("src/rc_metastudio/forms/cov_reg_dlg2.ui"): Path("rc_metastudio/forms/ui_meta_reg.py"),
+    Path("src/rc_metastudio/forms/cov_subgroup_dlg.ui"): Path("rc_metastudio/forms/ui_cov_subgroup_dlg.py"),
+    Path("src/rc_metastudio/forms/csv_import_page.ui"): Path("rc_metastudio/forms/ui_csv_import_page.py"),
+    Path("src/rc_metastudio/forms/data_type_page.ui"): Path("rc_metastudio/forms/ui_data_type_page.py"),
+    Path("src/rc_metastudio/forms/diagnostic_data_form.ui"): Path("rc_metastudio/forms/ui_diagnostic_data_form.py"),
+    Path("src/rc_metastudio/forms/diagnostic_metrics.ui"): Path("rc_metastudio/forms/ui_diagnostic_metrics.py"),
+    Path("src/rc_metastudio/forms/edit_dialog2.ui"): Path("rc_metastudio/forms/ui_edit_dialog.py"),
+    Path("src/rc_metastudio/forms/edit_forest_plot.ui"): Path("rc_metastudio/forms/ui_edit_forest_plot.py"),
+    Path("src/rc_metastudio/forms/ma_specs2.ui"): Path("rc_metastudio/forms/ui_ma_specs.py"),
+    Path("src/rc_metastudio/forms/meta.ui"): Path("rc_metastudio/ui_meta.py"),
+    Path("src/rc_metastudio/forms/network_view_window.ui"): Path("rc_metastudio/forms/ui_network_view.py"),
+    Path("src/rc_metastudio/forms/new_covariate_dlg.ui"): Path("rc_metastudio/forms/ui_new_covariate.py"),
+    Path("src/rc_metastudio/forms/new_follow_up_dlg.ui"): Path("rc_metastudio/forms/ui_new_follow_up.py"),
+    Path("src/rc_metastudio/forms/new_group_dlg.ui"): Path("rc_metastudio/forms/ui_new_group.py"),
+    Path("src/rc_metastudio/forms/new_outcome_dlg.ui"): Path("rc_metastudio/forms/ui_new_outcome.py"),
+    Path("src/rc_metastudio/forms/new_study_dlg.ui"): Path("rc_metastudio/forms/ui_new_study.py"),
+    Path("src/rc_metastudio/forms/outcome_name_page.ui"): Path("rc_metastudio/forms/ui_outcome_name_page.py"),
+    Path("src/rc_metastudio/forms/results_window.ui"): Path("rc_metastudio/ui_results_window.py"),
+    Path("src/rc_metastudio/forms/running.ui"): Path("rc_metastudio/forms/ui_running.py"),
+    Path("src/rc_metastudio/forms/welcome_page.ui"): Path("rc_metastudio/forms/ui_welcome_page.py"),
+}
 CANONICAL_RESOURCE = Path("src/rc_metastudio/images/icons.qrc")
 DEFAULT_BUILD_ROOT = ROOT / "build" / "qt6"
 
@@ -46,6 +76,40 @@ QT_RCC_PACKAGE_SHA256 = "7f97edc3937fec7383eb865e010ed5128155bf9c80a563abca45086
 QT_RCC_SHA256 = "912f4565e9486243200517be9e7e8dddc76ea63cd426278e944ba36ad8ff14e7"
 QT_RCC_CORE_SHA256 = "fae4778a42e93adc82b831c879c886a05147e9cc26760808d21116be5547259b"
 WINDOWS_X64_PE_MACHINE = 0x8664
+
+
+def validate_form_manifest(
+    manifest: Mapping[Path, Path], discovered: set[Path]
+) -> None:
+    """Reject canonical-form drift and unsafe or colliding build destinations."""
+
+    declared = set(manifest)
+    if declared != discovered:
+        missing = sorted(path.as_posix() for path in discovered - declared)
+        extra = sorted(path.as_posix() for path in declared - discovered)
+        raise RuntimeError(
+            f"Canonical form manifest does not match discovery: missing={missing}, extra={extra}"
+        )
+    destinations = list(manifest.values())
+    if len(destinations) != len(set(destinations)):
+        raise RuntimeError("Canonical form manifest has a destination collision")
+    for destination in destinations:
+        parts = destination.parts
+        canonical = (
+            not destination.is_absolute()
+            and ".." not in parts
+            and destination.suffix == ".py"
+            and destination.name.startswith("ui_")
+            and parts[:1] == ("rc_metastudio",)
+            and (
+                len(parts) == 2
+                or (len(parts) == 3 and parts[1] == "forms")
+            )
+        )
+        if not canonical:
+            raise RuntimeError(
+                f"Canonical form manifest has non-canonical destination: {destination}"
+            )
 
 
 class _GeneratedForm(Protocol):
@@ -243,21 +307,24 @@ def _write_package_marker(path: Path) -> None:
     path.write_text("", encoding="utf-8", newline="\n")
 
 
-def _render_form(build_root: Path) -> Path:
-    module = build_root / "generated/rc_metastudio/forms/ui_about_legal.py"
+def _render_form(build_root: Path, source: Path, destination: Path) -> Path:
+    module = build_root / "generated" / destination
     module.parent.mkdir(parents=True, exist_ok=True)
     temporary = module.with_suffix(".py.tmp")
     _run(
         [
             _resolve_pyuic6(),
-            CANONICAL_FORM.as_posix(),
+            source.as_posix(),
             "--output",
             str(temporary),
         ]
     )
     generated = temporary.read_text(encoding="utf-8")
-    generated = generated.replace(
-        "        QtCore.QMetaObject.connectSlotsByName(AboutLegalDialog)\n", ""
+    generated = "".join(
+        line
+        for line in generated.splitlines(keepends=True)
+        if "QtCore.QMetaObject.connectSlotsByName(" not in line
+        and not line.strip().endswith("import icons_rc")
     )
     module.write_text(generated, encoding="utf-8", newline="\n")
     temporary.unlink()
@@ -284,9 +351,19 @@ def _compile_resource(build_root: Path) -> Path:
 
 
 def generate(build_root: Path) -> tuple[Path, Path]:
-    """Generate the representative canonical form and binary resource."""
+    """Generate every canonical form and the shared binary resource."""
 
-    return _render_form(build_root), _compile_resource(build_root)
+    discovered = {
+        path.relative_to(ROOT)
+        for path in (ROOT / "src/rc_metastudio/forms").glob("*.ui")
+    }
+    validate_form_manifest(CANONICAL_FORMS, discovered)
+    modules = {
+        source: _render_form(build_root, source, destination)
+        for source, destination in CANONICAL_FORMS.items()
+    }
+    representative = modules[Path("src/rc_metastudio/forms/about_legal.ui")]
+    return representative, _compile_resource(build_root)
 
 
 def _load_generated_form(module_path: Path) -> type[_GeneratedForm]:

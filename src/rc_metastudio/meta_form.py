@@ -5,18 +5,16 @@
 import pickle
 import os
 from functools import cmp_to_key
-from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QTextDocument
-from PyQt5.QtWidgets import (
-    QAction,
+from PyQt6 import QtCore, QtWidgets
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QAction, QTextDocument, QUndoCommand
+from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
     QFileDialog,
     QLabel,
     QMessageBox,
     QTableView,
-    QUndoCommand,
 )
 import copy
 
@@ -143,7 +141,7 @@ class ElidingStatusLabel(QLabel):
         # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
         self.setMinimumWidth(0)
         self.setSizePolicy(
-            QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Preferred
+            QtWidgets.QSizePolicy.Policy.Ignored, QtWidgets.QSizePolicy.Policy.Preferred
         )
         self.setText(text)
 
@@ -163,7 +161,7 @@ class ElidingStatusLabel(QLabel):
 
     def _refresh_elision(self):
         width = max(0, self.contentsRect().width())
-        elided = self.fontMetrics().elidedText(self._full_text, Qt.ElideRight, width)
+        elided = self.fontMetrics().elidedText(self._full_text, Qt.TextElideMode.ElideRight, width)
         QLabel.setText(self, elided)
 
 
@@ -237,7 +235,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.cl_label = ElidingStatusLabel(
             _format_confidence_level_status(meta_globals.DEFAULT_CONF_LEVEL)
         )
-        self.cl_label.setAlignment(Qt.AlignRight)
+        self.cl_label.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.statusbar.addWidget(self.cl_label, 1)
 
         # Command-line dataset loading can be added here if headless startup
@@ -263,7 +261,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.update_dimension()
         self._model_signal_connections = []
         self._setup_connections()
-        self.tableView.setSelectionMode(QTableView.ContiguousSelection)
+        self.tableView.setSelectionMode(QTableView.SelectionMode.ContiguousSelection)
         self.model.reset_model()
         ##
         # we hand off a reference of the main gui to the table view
@@ -315,10 +313,10 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def create_new_dataset(self, use_undo_framework=True):
         if self.current_data_unsaved:
             choice = self.prompt_to_save_unsaved_data()
-            if choice == QMessageBox.Yes:
+            if choice == QMessageBox.StandardButton.Yes:
                 if self.save() is False:
                     return
-            elif choice == QMessageBox.No:
+            elif choice == QMessageBox.StandardButton.No:
                 pass
             else:  # cancel
                 return
@@ -399,12 +397,12 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.toggle_menu_options_that_require_dataset(True)
 
     def keyPressEvent(self, event):
-        if event.modifiers() & QtCore.Qt.ControlModifier:
-            if event.key() == QtCore.Qt.Key_S:
+        if event.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier:
+            if event.key() == QtCore.Qt.Key.Key_S:
                 # ctrl + s = save
                 print("saving..")
                 self.save()
-            elif event.key() == QtCore.Qt.Key_O:
+            elif event.key() == QtCore.Qt.Key.Key_O:
                 # ctrl + o = open
                 self.open()
 
@@ -1303,10 +1301,10 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
         if self.current_data_unsaved:
             choice = self.prompt_to_save_unsaved_data()
-            if choice == QMessageBox.Yes:
+            if choice == QMessageBox.StandardButton.Yes:
                 if self.save() is False:
                     return
-            elif choice == QMessageBox.No:
+            elif choice == QMessageBox.StandardButton.No:
                 pass
             else:  # cancel
                 return
@@ -1557,10 +1555,10 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def quit(self):
         if self.current_data_unsaved:
             choice = self.prompt_to_save_unsaved_data()
-            if choice == QMessageBox.Yes:
+            if choice == QMessageBox.StandardButton.Yes:
                 if self.save() is False:
                     return
-            elif choice == QMessageBox.No:
+            elif choice == QMessageBox.StandardButton.No:
                 pass
             else:  # Cancel
                 return
@@ -1574,7 +1572,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             self,
             "Warning",
             "You've made unsaved changes to your data. Do you want to save your changes?",
-            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
         )
         return choice
 

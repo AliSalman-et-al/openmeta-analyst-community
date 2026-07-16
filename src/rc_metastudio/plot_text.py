@@ -1,7 +1,7 @@
 """Publication-oriented limits for user-authored plot text."""
 
-from PyQt5.QtCore import QPoint
-from PyQt5.QtWidgets import QToolTip
+from PyQt6.QtCore import QPoint
+from PyQt6.QtWidgets import QToolTip
 
 PLOT_TEXT_INPUT_LIMIT = 80
 

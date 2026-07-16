@@ -4,8 +4,8 @@ import sys
 import traceback
 from datetime import datetime
 
-from PyQt5.QtCore import QEvent, Qt
-from PyQt5.QtWidgets import QApplication, QMenu, QMessageBox
+from PyQt6.QtCore import QEvent, Qt
+from PyQt6.QtWidgets import QApplication, QMenu, QMessageBox
 
 import settings
 
@@ -23,10 +23,9 @@ _active_context_menu = None
 
 def enable_qt_native_high_dpi():
     """Enable Qt's logical-pixel scaling before constructing an application."""
-    if QApplication.instance() is not None:
-        return
-    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
-    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+    # Qt 6 enables high-DPI scaling and pixmaps natively.  This retained entry
+    # point intentionally has no Qt 5 application attributes to toggle.
+    return None
 
 
 enable_qt_native_high_dpi()
@@ -219,7 +218,7 @@ def popup_context_menu(menu, pos, parent=None, event=None):
 
 
 def should_suppress_context_menu_event(event):
-    return event.type() == QEvent.ContextMenu and is_context_menu_active()
+    return event.type() == QEvent.Type.ContextMenu and is_context_menu_active()
 
 
 def _resolve_parent(parent):

@@ -7,10 +7,9 @@ import forms.ui_data_type_page
 import forms.ui_outcome_name_page
 import forms.ui_welcome_page
 
-from PyQt5.QtCore import QSize, Qt
-from PyQt5.QtGui import QIcon, QPainter, QPixmap
-from PyQt5.QtWidgets import (
-    QAction,
+from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtGui import QAction, QIcon, QPainter, QPixmap
+from PyQt6.QtWidgets import (
     QApplication,
     QFileDialog,
     QAbstractButton,
@@ -189,9 +188,9 @@ class DataTypePage(QWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
         buttons = self._data_type_buttons()
         for button in buttons:
             self._center_button_icon_in_declared_slot(button)
-            button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+            button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
             self._reserve_button_icon_and_text_height(button)
-            button.setFocusPolicy(Qt.StrongFocus)
+            button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         for current, following in zip(buttons, buttons[1:]):
             self.setTabOrder(current, following)
 
@@ -201,11 +200,11 @@ class DataTypePage(QWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
         text_height = line_count * button.fontMetrics().lineSpacing()
         margin = max(
             0,
-            button.style().pixelMetric(QStyle.PM_ButtonMargin, None, button),
+            button.style().pixelMetric(QStyle.PixelMetric.PM_ButtonMargin, None, button),
         )
         frame = max(
             0,
-            button.style().pixelMetric(QStyle.PM_DefaultFrameWidth, None, button),
+            button.style().pixelMetric(QStyle.PixelMetric.PM_DefaultFrameWidth, None, button),
         )
         required = QSize(
             button.sizeHint().width(),
@@ -224,7 +223,7 @@ class DataTypePage(QWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
             return
 
         canvas = QPixmap(icon_size)
-        canvas.fill(Qt.transparent)
+        canvas.fill(Qt.GlobalColor.transparent)
 
         painter = QPainter(canvas)
         try:
@@ -405,7 +404,7 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
         for row in range(self.required_fmt_table.rowCount()):
             for col in range(self.required_fmt_table.columnCount()):
                 self.required_fmt_table.setItem(row, col, QTableWidgetItem(""))
-                self.required_fmt_table.item(row, col).setFlags(Qt.NoItemFlags)
+                self.required_fmt_table.item(row, col).setFlags(Qt.ItemFlag.NoItemFlags)
         qt_layout.configure_compact_table(self.required_fmt_table, stretch_columns=True)
 
     def isComplete(self):
@@ -477,7 +476,7 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
             for row in range(num_rows):
                 for col in range(num_cols):
                     item = QTableWidgetItem(self.imported_data[row][col])
-                    item.setFlags(Qt.NoItemFlags)
+                    item.setFlags(Qt.ItemFlag.NoItemFlags)
                     self.preview_table.setItem(row, col, item)
             self.preview_table.resizeColumnsToContents()
             self.preview_table.resizeRowsToContents()
@@ -689,15 +688,15 @@ Page_Welcome, Page_DataType, Page_ChooseMetric, Page_OutcomeName, Page_CsvImport
 class MainWizard(QWizard):
     def __init__(self, parent=None, path=None, recent_datasets=[]):
         super(MainWizard, self).__init__(parent)
-        self.setWizardStyle(QWizard.ModernStyle)
-        self.setOption(QWizard.NoBackButtonOnStartPage, True)
+        self.setWizardStyle(QWizard.WizardStyle.ModernStyle)
+        self.setOption(QWizard.WizardOption.NoBackButtonOnStartPage, True)
         self.setButtonLayout(
             [
-                QWizard.Stretch,
-                QWizard.BackButton,
-                QWizard.NextButton,
-                QWizard.FinishButton,
-                QWizard.CancelButton,
+                QWizard.WizardButton.Stretch,
+                QWizard.WizardButton.BackButton,
+                QWizard.WizardButton.NextButton,
+                QWizard.WizardButton.FinishButton,
+                QWizard.WizardButton.CancelButton,
             ]
         )
 

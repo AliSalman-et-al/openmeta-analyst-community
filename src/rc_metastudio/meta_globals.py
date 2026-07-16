@@ -8,8 +8,7 @@
 import os
 import math
 
-from PyQt5.QtGui import QColor
-from PyQt5.QtWidgets import QUndoCommand
+from PyQt6.QtGui import QColor, QUndoCommand
 
 APPLICATION_NAME = "RCMetaStudio"
 ORGANIZATION_NAME = "Research Consultancy"

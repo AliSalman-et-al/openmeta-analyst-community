@@ -1,3 +1,4 @@
+import importlib
 import json
 import os
 import stat
@@ -27,7 +28,7 @@ PORT_SCRIPT = ROOT / "scripts/qt6_port.py"
 def test_codemod_rewrites_imports_moved_classes_and_scoped_enums_with_comments():
     source = '''# module comment
 from PyQt5 import QtCore  # binding comment
-from PyQt5.QtWidgets import QAction, QWidget
+from PyQt5.QtWidgets import QAction, QUndoCommand, QUndoStack, QWidget
 
 alignment = QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter  # enum comment
 action = QAction("Run")
@@ -37,7 +38,7 @@ action = QAction("Run")
 
     assert result.code == '''# module comment
 from PyQt6 import QtCore  # binding comment
-from PyQt6.QtGui import QAction
+from PyQt6.QtGui import QAction, QUndoCommand, QUndoStack
 from PyQt6.QtWidgets import QWidget
 
 alignment = QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter  # enum comment
@@ -45,6 +46,8 @@ action = QAction("Run")
 '''
     assert [change.kind for change in result.transformations] == [
         "binding-import",
+        "moved-class-import",
+        "moved-class-import",
         "moved-class-import",
         "binding-import",
         "scoped-enum",
@@ -72,6 +75,30 @@ qt_value = Qt.AlignLeft
     assert "Local.AlignLeft" in result.code
     assert '"Qt.AlignLeft and PyQt5 stay text"' in result.code
     assert "Qt.AlignmentFlag.AlignLeft" in result.code
+
+
+def test_codemod_and_strict_scan_cover_class_scoped_qt6_enums(tmp_path):
+    source = """from PyQt5 import QtCore, QtWidgets
+from PyQt5.QtCore import QEvent
+from PyQt5.QtWidgets import QSizePolicy
+
+events = (QEvent.Show, QtCore.QEvent.Resize)
+policy = QSizePolicy.Expanding
+metric = QtWidgets.QStyle.PM_DefaultFrameWidth
+"""
+
+    migrated = migrate_source(source, filename="class-enums.py")
+
+    assert "QEvent.Type.Show" in migrated.code
+    assert "QtCore.QEvent.Type.Resize" in migrated.code
+    assert "QSizePolicy.Policy.Expanding" in migrated.code
+    assert "QtWidgets.QStyle.PixelMetric.PM_DefaultFrameWidth" in migrated.code
+    assert migrated.refusals == ()
+
+    candidate = tmp_path / "class-enums.py"
+    candidate.write_text(source.replace("PyQt5", "PyQt6"), encoding="utf-8")
+    findings = scan_paths([candidate], root=tmp_path)
+    assert {item.rule for item in findings} == {"short-class-enum"}
 
 
 def test_codemod_refuses_ambiguous_enum_and_removed_class_with_locations():
@@ -121,8 +148,25 @@ def test_mapping_manifest_covers_every_discovered_enum_and_displaced_class():
     assert {path.rsplit(".", 1)[-1] for path in manifest.moved_classes} == {
         "QAction",
         "QGraphicsSvgItem",
+        "QUndoCommand",
+        "QUndoStack",
     }
     assert any(path.endswith(".QRegExp") for path in manifest.removed_apis)
+
+
+def test_class_scoped_enum_manifest_targets_exist_in_locked_pyqt6():
+    manifest = load_mapping_manifest()
+    assert len(manifest.class_scoped_enums) == 59
+    for qt5_symbol, replacement in manifest.class_scoped_enums.items():
+        parts = qt5_symbol.replace("PyQt5", "PyQt6", 1).split(".")
+        owner = importlib.import_module(".".join(parts[:2]))
+        for part in parts[2:-1]:
+            owner = getattr(owner, part)
+        assert not hasattr(owner, parts[-1])
+        target = owner
+        for part in replacement.split("."):
+            target = getattr(target, part)
+        assert target is not None
 
 
 @pytest.mark.parametrize(
@@ -676,3 +720,46 @@ def test_relative_dynamic_import_packages_are_resolved_or_refused(tmp_path, call
     candidate = tmp_path / "relative-import.py"
     candidate.write_text(source, encoding="utf-8")
     assert [item.rule for item in scan_paths([candidate], root=tmp_path)] == [rule]
+
+
+def test_repository_mechanical_cutover_retains_auditable_behavioral_handoffs():
+    inventory = json.loads(
+        (ROOT / "docs/verification/pre-qt6-baseline/qt-port-inventory.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    report = json.loads(
+        (ROOT / "docs/verification/qt6-codemod-report.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    second_run = json.loads(
+        (ROOT / "docs/verification/qt6-codemod-second-run.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    handoffs = json.loads(
+        (ROOT / "config/qt6-behavioral-handoffs.json").read_text(encoding="utf-8")
+    )
+    snapshot = json.loads(
+        (ROOT / "config/qt6-strict-source-backlog.json").read_text(encoding="utf-8")
+    )
+
+    assert len(report["transformations"]) >= 400
+    assert report["refusals"] == []
+    assert second_run == {
+        "changed_files": [],
+        "refusals": [],
+        "schema_version": 1,
+        "transformations": [],
+    }
+    assert len(handoffs["resolved_codemod_refusals"]) == 10
+    assert {item["owner_issue"] for item in handoffs["resolved_codemod_refusals"]} <= {
+        333,
+        335,
+        336,
+        338,
+    }
+    assert snapshot["finding_count"] == 0
+    assert snapshot["counts_by_rule"] == {}
+    assert not any((ROOT / path).exists() for path in inventory["generated_modules"])

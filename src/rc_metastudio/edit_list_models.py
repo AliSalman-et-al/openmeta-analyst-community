@@ -5,7 +5,7 @@
 # import pdb
 
 # core libraries
-from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
+from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
 
 import name_validation
 import qt_text
@@ -56,14 +56,14 @@ class TXGroupsModel(ResettableTableModel):
         print("\ngroup names are: %s" % self.group_list)
         self.reset_model()
 
-    def data(self, index, role=Qt.DisplayRole):
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
         if not index.isValid() or not (0 <= index.row() < len(self.group_list)):
             return None
         group_name = self.group_list[index.row()]
-        if role == Qt.DisplayRole:
+        if role == Qt.ItemDataRole.DisplayRole:
             return group_name
-        elif role == Qt.TextAlignmentRole:
-            return int(Qt.AlignLeft | Qt.AlignVCenter)
+        elif role == Qt.ItemDataRole.TextAlignmentRole:
+            return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         return None
 
     def rowCount(self, index=QModelIndex()):
@@ -72,7 +72,7 @@ class TXGroupsModel(ResettableTableModel):
     def columnCount(self, index=QModelIndex()):
         return 1
 
-    def setData(self, index, value, role=Qt.EditRole):
+    def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
         old_name = self.group_list[index.row()]
         try:
             new_name = name_validation.validate_unique_name(
@@ -90,8 +90,8 @@ class TXGroupsModel(ResettableTableModel):
 
     def flags(self, index):
         if not index.isValid():
-            return Qt.ItemIsEnabled
-        return Qt.ItemFlags(QAbstractTableModel.flags(self, index) | Qt.ItemIsEditable)
+            return Qt.ItemFlag.ItemIsEnabled
+        return Qt.ItemFlag(QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsEditable)
 
 
 class OutcomesModel(ResettableTableModel):
@@ -111,7 +111,7 @@ class OutcomesModel(ResettableTableModel):
         self.outcome_list = self.dataset.get_outcome_names()
         self.reset_model()
 
-    def data(self, index, role=Qt.DisplayRole):
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
         self.outcome_list = self.dataset.get_outcome_names()
         if not index.isValid() or not (0 <= index.row()):
             return None
@@ -120,10 +120,10 @@ class OutcomesModel(ResettableTableModel):
             outcome_name = self.outcome_list[index.row()]
         except:
             pass
-        if role == Qt.DisplayRole:
+        if role == Qt.ItemDataRole.DisplayRole:
             return outcome_name
-        elif role == Qt.TextAlignmentRole:
-            return int(Qt.AlignLeft | Qt.AlignVCenter)
+        elif role == Qt.ItemDataRole.TextAlignmentRole:
+            return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         return None
 
     def rowCount(self, index=QModelIndex()):
@@ -132,7 +132,7 @@ class OutcomesModel(ResettableTableModel):
     def columnCount(self, index=QModelIndex()):
         return 1
 
-    def setData(self, index, value, role=Qt.EditRole):
+    def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
         old_outcome_name = self.outcome_list[index.row()]
         try:
             new_outcome_name = name_validation.validate_unique_name(
@@ -153,8 +153,8 @@ class OutcomesModel(ResettableTableModel):
 
     def flags(self, index):
         if not index.isValid():
-            return Qt.ItemIsEnabled
-        return Qt.ItemFlags(QAbstractTableModel.flags(self, index) | Qt.ItemIsEditable)
+            return Qt.ItemFlag.ItemIsEnabled
+        return Qt.ItemFlag(QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsEditable)
 
 
 class FollowUpsModel(ResettableTableModel):
@@ -181,7 +181,7 @@ class FollowUpsModel(ResettableTableModel):
         self.follow_up_list = self._follow_up_names_for_current_outcome()
         self.reset_model()
 
-    def data(self, index, role=Qt.DisplayRole):
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
         if not index.isValid() or not (0 <= index.row()):
             return None
         follow_up_name = None
@@ -190,10 +190,10 @@ class FollowUpsModel(ResettableTableModel):
         except:
             pass
 
-        if role == Qt.DisplayRole:
+        if role == Qt.ItemDataRole.DisplayRole:
             return follow_up_name
-        elif role == Qt.TextAlignmentRole:
-            return int(Qt.AlignLeft | Qt.AlignVCenter)
+        elif role == Qt.ItemDataRole.TextAlignmentRole:
+            return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         return None
 
     def rowCount(self, index=QModelIndex()):
@@ -202,7 +202,7 @@ class FollowUpsModel(ResettableTableModel):
     def columnCount(self, index=QModelIndex()):
         return 1
 
-    def setData(self, index, value, role=Qt.EditRole):
+    def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
         old_follow_up_name = self.follow_up_list[index.row()]
         try:
             new_follow_up_name = name_validation.validate_unique_name(
@@ -223,8 +223,8 @@ class FollowUpsModel(ResettableTableModel):
 
     def flags(self, index):
         if not index.isValid():
-            return Qt.ItemIsEnabled
-        return Qt.ItemFlags(QAbstractTableModel.flags(self, index) | Qt.ItemIsEditable)
+            return Qt.ItemFlag.ItemIsEnabled
+        return Qt.ItemFlag(QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsEditable)
 
 
 class StudiesModel(ResettableTableModel):
@@ -241,14 +241,14 @@ class StudiesModel(ResettableTableModel):
         self.studies_list = self.dataset.studies
         self.reset_model()
 
-    def data(self, index, role=Qt.DisplayRole):
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
         if not index.isValid() or not (0 <= index.row() < len(self.studies_list)):
             return None
         study_name = self.studies_list[index.row()].name
-        if role == Qt.DisplayRole:
+        if role == Qt.ItemDataRole.DisplayRole:
             return study_name
-        elif role == Qt.TextAlignmentRole:
-            return int(Qt.AlignLeft | Qt.AlignVCenter)
+        elif role == Qt.ItemDataRole.TextAlignmentRole:
+            return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         return None
 
     def rowCount(self, index=QModelIndex()):
@@ -257,7 +257,7 @@ class StudiesModel(ResettableTableModel):
     def columnCount(self, index=QModelIndex()):
         return 1
 
-    def setData(self, index, value, role=Qt.EditRole):
+    def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
         study_object = self.studies_list[index.row()]
         try:
             new_name = name_validation.validate_required_name("study", value)
@@ -270,8 +270,8 @@ class StudiesModel(ResettableTableModel):
 
     def flags(self, index):
         if not index.isValid():
-            return Qt.ItemIsEnabled
-        return Qt.ItemFlags(QAbstractTableModel.flags(self, index) | Qt.ItemIsEditable)
+            return Qt.ItemFlag.ItemIsEnabled
+        return Qt.ItemFlag(QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsEditable)
 
 
 class CovariatesModel(ResettableTableModel):
@@ -288,14 +288,14 @@ class CovariatesModel(ResettableTableModel):
         self.covariates_list = self.dataset.covariates
         self.reset_model()
 
-    def data(self, index, role=Qt.DisplayRole):
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
         if not index.isValid() or not (0 <= index.row() < len(self.covariates_list)):
             return None
         cov_name = self.covariates_list[index.row()].name
-        if role == Qt.DisplayRole:
+        if role == Qt.ItemDataRole.DisplayRole:
             return cov_name
-        elif role == Qt.TextAlignmentRole:
-            return int(Qt.AlignLeft | Qt.AlignVCenter)
+        elif role == Qt.ItemDataRole.TextAlignmentRole:
+            return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         return None
 
     def rowCount(self, index=QModelIndex()):
@@ -304,7 +304,7 @@ class CovariatesModel(ResettableTableModel):
     def columnCount(self, index=QModelIndex()):
         return 1
 
-    def setData(self, index, value, role=Qt.EditRole):
+    def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
         cov_object = self.covariates_list[index.row()]
         try:
             new_name = name_validation.validate_unique_name(
@@ -321,5 +321,5 @@ class CovariatesModel(ResettableTableModel):
 
     def flags(self, index):
         if not index.isValid():
-            return Qt.ItemIsEnabled
-        return Qt.ItemFlags(QAbstractTableModel.flags(self, index) | Qt.ItemIsEditable)
+            return Qt.ItemFlag.ItemIsEnabled
+        return Qt.ItemFlag(QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsEditable)

@@ -6,7 +6,7 @@ import os
 import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
-from PyQt5 import QtCore, QtGui
+from PyQt6 import QtCore, QtGui
 import meta_py_r
 import qt_text
 from workspace_column_identity import WorkspaceColumnWidthState
@@ -354,8 +354,8 @@ def restore_workspace_placement(
             controller.consume_first_use()
         window.setWindowState(
             window.windowState()
-            & ~QtCore.Qt.WindowMaximized
-            & ~QtCore.Qt.WindowFullScreen
+            & ~QtCore.Qt.WindowState.WindowMaximized
+            & ~QtCore.Qt.WindowState.WindowFullScreen
         )
         if controller is not None:
             controller.restore_frame_geometry(geometry)
@@ -367,19 +367,19 @@ def restore_workspace_placement(
         if show_window:
             window.showFullScreen()
         else:
-            window.setWindowState(window.windowState() | QtCore.Qt.WindowFullScreen)
+            window.setWindowState(window.windowState() | QtCore.Qt.WindowState.WindowFullScreen)
     elif placement.maximized or (default_maximized and geometry is None):
         if show_window:
             window.showMaximized()
         else:
-            window.setWindowState(window.windowState() | QtCore.Qt.WindowMaximized)
+            window.setWindowState(window.windowState() | QtCore.Qt.WindowState.WindowMaximized)
     elif show_window:
         window.show()
     else:
         window.setWindowState(
             window.windowState()
-            & ~QtCore.Qt.WindowMaximized
-            & ~QtCore.Qt.WindowFullScreen
+            & ~QtCore.Qt.WindowState.WindowMaximized
+            & ~QtCore.Qt.WindowState.WindowFullScreen
         )
 
 
@@ -629,7 +629,7 @@ def get_base_path(normalize=False):
     because it sees it as an escape character and Qt is fine with / throughout """
 
     base_path = str(
-        QtCore.QStandardPaths.writableLocation(QtCore.QStandardPaths.AppDataLocation)
+        QtCore.QStandardPaths.writableLocation(QtCore.QStandardPaths.StandardLocation.AppDataLocation)
     )
     if normalize:
         base_path = str(QDir.toNativeSeparators(base_path))
@@ -693,7 +693,7 @@ def clear_r_tmp():
 
 def get_user_documents_path():
     docs_path = str(
-        QtCore.QStandardPaths.writableLocation(QtCore.QStandardPaths.DocumentsLocation)
+        QtCore.QStandardPaths.writableLocation(QtCore.QStandardPaths.StandardLocation.DocumentsLocation)
     )
     return docs_path
 

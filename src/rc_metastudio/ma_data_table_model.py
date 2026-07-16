@@ -6,9 +6,9 @@
 import copy
 from functools import cmp_to_key
 
-from PyQt5 import QtCore
-from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
-from PyQt5.QtGui import QColor, QIcon
+from PyQt6 import QtCore
+from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
+from PyQt6.QtGui import QColor, QIcon
 
 # home-grown
 from ma_dataset import Dataset, Outcome, Study, Covariate
@@ -403,7 +403,7 @@ class DatasetModel(QAbstractTableModel):
         # quoted display format.
         return eval(formatted_str + "% float_var")
 
-    def data(self, index, role=Qt.DisplayRole):
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
         """
         Implements the required QTTableModel data method. There is a lot of switching on
         role/index/datatype here, but this seems consistent with the QT paradigm (see
@@ -424,7 +424,7 @@ class DatasetModel(QAbstractTableModel):
         outcome_subtype = self.dataset.get_outcome_subtype(self.current_outcome)
         column = index.column()
 
-        if role in (Qt.DisplayRole, Qt.EditRole):
+        if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole):
             if column == self.NAME:
                 return _item_data(_editable_data(study.name))
             elif column == self.YEAR:
@@ -452,7 +452,7 @@ class DatasetModel(QAbstractTableModel):
                                 and not column in N_columns
                             ):
                                 # issue #151 -- show greater precision on double-click
-                                if role == Qt.EditRole:
+                                if role == Qt.ItemDataRole.EditRole:
                                     # then we're editing, so show greater precision
                                     num_digits = NUM_DIGITS_PRECISE
                                 return _item_data(
@@ -468,7 +468,7 @@ class DatasetModel(QAbstractTableModel):
                     return _item_data("")
             elif column in self.OUTCOMES:
                 # more precision in edit moe -- issue #151
-                if role == Qt.EditRole:
+                if role == Qt.ItemDataRole.EditRole:
                     # then we're editing, so show greater precision
                     num_digits = NUM_DIGITS_PRECISE
 
@@ -560,27 +560,27 @@ class DatasetModel(QAbstractTableModel):
                 else:
                     # factor
                     return _item_data(_to_native_text(cov_value))
-        elif role == Qt.TextAlignmentRole:
-            return _item_data(int(Qt.AlignLeft | Qt.AlignVCenter))
-        elif role == Qt.CheckStateRole:
+        elif role == Qt.ItemDataRole.TextAlignmentRole:
+            return _item_data(int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter))
+        elif role == Qt.ItemDataRole.CheckStateRole:
             # this is where we deal with the inclusion/exclusion of studies
             if column == self.INCLUDE_STUDY and self._study_has_entered_data(
                 index.row()
             ):
-                checked_state = Qt.Unchecked
+                checked_state = Qt.CheckState.Unchecked
                 if index.row() < self.rowCount() - 1 and study.include:
-                    checked_state = Qt.Checked
+                    checked_state = Qt.CheckState.Checked
                 return _item_data(checked_state)
-        elif role == Qt.BackgroundColorRole:
+        elif role == Qt.ItemDataRole.BackgroundRole:
             row_has_entered_data = self._study_has_entered_data(index.row())
             if row_has_entered_data and column in self.OUTCOMES:
-                return _item_data(QColor(Qt.yellow))
+                return _item_data(QColor(Qt.GlobalColor.yellow))
             elif (
                 row_has_entered_data
                 and column in self.RAW_DATA[len(self.RAW_DATA) // 2 :]
                 and self.current_effect in ONE_ARM_METRICS
             ):
-                return _item_data(QColor(Qt.gray))
+                return _item_data(QColor(Qt.GlobalColor.gray))
 
         return _item_data()
 
@@ -770,7 +770,7 @@ class DatasetModel(QAbstractTableModel):
         return True, None
 
     def setData(
-        self, index, value, role=Qt.EditRole, import_csv=False, allow_empty_names=False
+        self, index, value, role=Qt.ItemDataRole.EditRole, import_csv=False, allow_empty_names=False
     ):
         """
         Implementation of the AbstractDataTable method. The view uses this method
@@ -1217,13 +1217,13 @@ class DatasetModel(QAbstractTableModel):
 
         return None  # Only get here if section doesn't match
 
-    def headerData(self, section, orientation, role=Qt.DisplayRole):
+    def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
         """
         Implementation of the abstract method inherited from the base table
         model class. This is responsible for providing header data for the
         respective columns.
         """
-        if orientation == Qt.Horizontal and role == WORKSPACE_COLUMN_IDENTITY_ROLE:
+        if orientation == Qt.Orientation.Horizontal and role == WORKSPACE_COLUMN_IDENTITY_ROLE:
             return self.workspace_column_identity(section)
 
         outcome_type = self.dataset.get_outcome_type(self.current_outcome)
@@ -1232,8 +1232,8 @@ class DatasetModel(QAbstractTableModel):
 
         sectionOK = section < length_dataset
         ############################### TOOLTIPS ###############################
-        if role == Qt.ToolTipRole:
-            if orientation == QtCore.Qt.Horizontal:
+        if role == Qt.ItemDataRole.ToolTipRole:
+            if orientation == QtCore.Qt.Orientation.Horizontal:
                 # return "Horizontal Header %s Tooltip" % str(section)
                 if section == self.INCLUDE_STUDY:
                     return (
@@ -1344,8 +1344,8 @@ class DatasetModel(QAbstractTableModel):
                     return "Use calculator to fill-in missing information"
 
         # For cool calculator icon
-        if role == Qt.DecorationRole:
-            if orientation == Qt.Vertical:
+        if role == Qt.ItemDataRole.DecorationRole:
+            if orientation == Qt.Orientation.Vertical:
                 if sectionOK and self._study_has_entered_data(section):
                     return QIcon(":/icons/table/calculator.svg")
                 else:
@@ -1358,12 +1358,12 @@ class DatasetModel(QAbstractTableModel):
                     # pdb.set_trace()
                     return _item_data()
 
-        if role == Qt.TextAlignmentRole:
-            return _item_data(int(Qt.AlignLeft | Qt.AlignVCenter))
+        if role == Qt.ItemDataRole.TextAlignmentRole:
+            return _item_data(int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter))
 
         ############################# DISPLAY ROLE #############################
-        if role == Qt.DisplayRole:
-            if orientation == Qt.Horizontal:
+        if role == Qt.ItemDataRole.DisplayRole:
+            if orientation == Qt.Orientation.Horizontal:
                 res = self.helper_basic_horizontal_headerData(
                     section,
                     data_type=outcome_type,
@@ -1434,17 +1434,17 @@ class DatasetModel(QAbstractTableModel):
 
     def flags(self, index):
         if not index.isValid():
-            return Qt.ItemIsEnabled
+            return Qt.ItemFlag.ItemIsEnabled
         elif index.column() == self.INCLUDE_STUDY:
             if not self._study_has_entered_data(index.row()):
-                return Qt.ItemFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
-            return Qt.ItemFlags(
-                Qt.ItemIsUserCheckable
-                | Qt.ItemIsEnabled
-                | Qt.ItemIsUserCheckable
-                | Qt.ItemIsSelectable
+                return Qt.ItemFlag(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            return Qt.ItemFlag(
+                Qt.ItemFlag.ItemIsUserCheckable
+                | Qt.ItemFlag.ItemIsEnabled
+                | Qt.ItemFlag.ItemIsUserCheckable
+                | Qt.ItemFlag.ItemIsSelectable
             )
-        return Qt.ItemFlags(QAbstractTableModel.flags(self, index) | Qt.ItemIsEditable)
+        return Qt.ItemFlag(QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsEditable)
 
     def rowCount(self, index=QModelIndex()):
         return self.dataset.num_studies() + DUMMY_ROWS

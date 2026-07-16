@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Semantic sizing policies for values and choices in adaptive forms."""
 
-from PyQt5.QtCore import QEvent, QObject, QPoint, QRect, QTimer, Qt
-from PyQt5.QtGui import QGuiApplication
-from PyQt5.QtWidgets import (
+from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, QTimer, Qt
+from PyQt6.QtGui import QGuiApplication
+from PyQt6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
     QListView,
@@ -53,11 +53,11 @@ class ChoiceControlController(QObject):
     """Keep one choice popup screen-bounded and current with live Qt metrics."""
 
     _METRIC_EVENTS = {
-        QEvent.ApplicationFontChange,
-        QEvent.FontChange,
-        QEvent.PaletteChange,
-        QEvent.Show,
-        QEvent.StyleChange,
+        QEvent.Type.ApplicationFontChange,
+        QEvent.Type.FontChange,
+        QEvent.Type.PaletteChange,
+        QEvent.Type.Show,
+        QEvent.Type.StyleChange,
     }
     if hasattr(QEvent, "ScreenChangeInternal"):
         _METRIC_EVENTS.add(QEvent.ScreenChangeInternal)
@@ -124,14 +124,14 @@ class ChoiceControlController(QObject):
         combo = self.combo
         # layout-audit: allow=content-overflow-control; reason=required choice content may consume available layout width
         combo.setMaximumWidth(QWIDGETSIZE_MAX)
-        combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         combo.setMinimumContentsLength(max(1, int(self.visible_characters)))
-        combo.setSizePolicy(QSizePolicy.Expanding, combo.sizePolicy().verticalPolicy())
+        combo.setSizePolicy(QSizePolicy.Policy.Expanding, combo.sizePolicy().verticalPolicy())
 
         view = combo.view()
-        view.setTextElideMode(Qt.ElideNone)
-        view.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        view.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
+        view.setTextElideMode(Qt.TextElideMode.ElideNone)
+        view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        view.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self._install_complete_value_tooltips()
         self._selected_text_changed(combo.currentText())
 
@@ -139,7 +139,7 @@ class ChoiceControlController(QObject):
         requested_width = self._requested_popup_width()
         if available.isValid():
             frame_extent = 2 * self._popup.style().pixelMetric(
-                QStyle.PM_DefaultFrameWidth, None, self._popup
+                QStyle.PixelMetric.PM_DefaultFrameWidth, None, self._popup
             )
             client_width = max(1, available.width() - frame_extent)
             client_height = max(1, available.height() - frame_extent)
@@ -176,9 +176,9 @@ class ChoiceControlController(QObject):
             default=0,
         )
         chrome = (
-            combo.style().pixelMetric(QStyle.PM_ScrollBarExtent, None, combo)
-            + combo.style().pixelMetric(QStyle.PM_LayoutLeftMargin, None, combo)
-            + combo.style().pixelMetric(QStyle.PM_LayoutRightMargin, None, combo)
+            combo.style().pixelMetric(QStyle.PixelMetric.PM_ScrollBarExtent, None, combo)
+            + combo.style().pixelMetric(QStyle.PixelMetric.PM_LayoutLeftMargin, None, combo)
+            + combo.style().pixelMetric(QStyle.PixelMetric.PM_LayoutRightMargin, None, combo)
         )
         display_width = combo.width() if combo.isVisible() else combo.sizeHint().width()
         return max(display_width, text_width + chrome)
@@ -190,7 +190,7 @@ class ChoiceControlController(QObject):
         column = self.combo.modelColumn()
         for row in range(self.combo.count()):
             index = model.index(row, column, root)
-            model.setData(index, str(self.combo.itemText(row)), Qt.ToolTipRole)
+            model.setData(index, str(self.combo.itemText(row)), Qt.ItemDataRole.ToolTipRole)
 
     def _selected_text_changed(self, text):
         self.combo.setToolTip(str(text))
@@ -362,11 +362,11 @@ def configure_numeric_value_control(control):
     """Use the editor's value range as its Semantic Size Invariant."""
     # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
     control.setMaximumWidth(QWIDGETSIZE_MAX)
-    control.setSizePolicy(QSizePolicy.Minimum, control.sizePolicy().verticalPolicy())
+    control.setSizePolicy(QSizePolicy.Policy.Minimum, control.sizePolicy().verticalPolicy())
 
 
 def configure_text_value_control(control):
     """Allow editable Required Content to consume the available row width."""
     # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
     control.setMaximumWidth(QWIDGETSIZE_MAX)
-    control.setSizePolicy(QSizePolicy.Expanding, control.sizePolicy().verticalPolicy())
+    control.setSizePolicy(QSizePolicy.Policy.Expanding, control.sizePolicy().verticalPolicy())

@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
     QDialogButtonBox,
@@ -117,10 +117,10 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
                 self,
                 "Missing Covariate Values",
                 "Some studies do not have values for the covariate(s) you have selected. Do you want me to run the regression without them (i.e., drop studies with missing values)?",
-                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
 
-            if run_with_missing == QMessageBox.No:
+            if run_with_missing == QMessageBox.StandardButton.No:
                 self.accept()
                 return
 
@@ -149,7 +149,7 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
         ]
 
     def _update_ok_button(self):
-        ok_button = self.buttonBox.button(QDialogButtonBox.Ok)
+        ok_button = self.buttonBox.button(QDialogButtonBox.StandardButton.Ok)
         if ok_button is not None:
             ok_button.setEnabled(bool(self._selected_covariates()))
 

@@ -4,8 +4,9 @@
 
 import random
 from collections import namedtuple
-from PyQt5.QtCore import QByteArray, QEvent, QPoint, QRectF, QTimer, Qt, pyqtSignal
-from PyQt5.QtGui import (
+from PyQt6.QtCore import QByteArray, QEvent, QPoint, QRectF, QTimer, Qt, pyqtSignal
+from PyQt6.QtGui import (
+    QAction,
     QColor,
     QFont,
     QFontDatabase,
@@ -15,9 +16,8 @@ from PyQt5.QtGui import (
     QTextOption,
     QTransform,
 )
-from PyQt5.QtGui import QTextCursor
-from PyQt5.QtWidgets import (
-    QAction,
+from PyQt6.QtGui import QTextCursor
+from PyQt6.QtWidgets import (
     QApplication,
     QColorDialog,
     QDialog,
@@ -98,7 +98,7 @@ QSvgRenderer = None
 def _svg_item_class():
     global QGraphicsSvgItem
     if QGraphicsSvgItem is None:
-        from PyQt5.QtSvg import QGraphicsSvgItem as _QGraphicsSvgItem
+        from PyQt6.QtSvgWidgets import QGraphicsSvgItem as _QGraphicsSvgItem
 
         QGraphicsSvgItem = _QGraphicsSvgItem
     return QGraphicsSvgItem
@@ -107,7 +107,7 @@ def _svg_item_class():
 def _svg_renderer_class():
     global QSvgRenderer
     if QSvgRenderer is None:
-        from PyQt5.QtSvg import QSvgRenderer as _QSvgRenderer
+        from PyQt6.QtSvg import QSvgRenderer as _QSvgRenderer
 
         QSvgRenderer = _QSvgRenderer
     return QSvgRenderer
@@ -172,7 +172,7 @@ class ResponsivePixmapItem(QGraphicsPixmapItem):
     def __init__(self, source_pixmap):
         super(ResponsivePixmapItem, self).__init__()
         self.source_pixmap = QPixmap(source_pixmap)
-        self.setTransformationMode(Qt.SmoothTransformation)
+        self.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
 
     def replace_source(self, source_pixmap):
         self.source_pixmap = QPixmap(source_pixmap)
@@ -202,10 +202,10 @@ class EditPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
         self.style_cbo.currentIndexChanged[str].connect(
             app_error_handler.safe_slot(self._style_changed, parent=self)
         )
-        apply_button = self.buttonBox.button(QDialogButtonBox.Apply)
+        apply_button = self.buttonBox.button(QDialogButtonBox.StandardButton.Apply)
         if apply_button is not None:
             apply_button.clicked.connect(self.applied.emit)
-        ok_button = self.buttonBox.button(QDialogButtonBox.Ok)
+        ok_button = self.buttonBox.button(QDialogButtonBox.StandardButton.Ok)
         if ok_button is not None:
             ok_button.clicked.connect(self.applied.emit)
 
@@ -431,8 +431,8 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self.nav_tree.setItemsExpandable(True)
         # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
         self.nav_tree.setMinimumWidth(0)
-        self.nav_tree.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-        self.graphics_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.nav_tree.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        self.graphics_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.results_nav_splitter.setChildrenCollapsible(False)
         self.results_nav_splitter.setStretchFactor(0, 1)
         self.results_nav_splitter.setStretchFactor(1, 1)
@@ -559,7 +559,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         pixmap = pixmap.scaled(
             max(1, int(round(scaled_width * dpr))),
             max(1, int(round(scaled_height * dpr))),
-            transformMode=Qt.SmoothTransformation,
+            transformMode=Qt.TransformationMode.SmoothTransformation,
         )
         pixmap.setDevicePixelRatio(dpr)
 
@@ -625,7 +625,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         title_font.setBold(True)
         text.setFont(title_font)
         text_option = text.document().defaultTextOption()
-        text_option.setWrapMode(QTextOption.WordWrap)
+        text_option.setWrapMode(QTextOption.WrapMode.WordWrap)
         text.document().setDefaultTextOption(text_option)
         text.setTextWidth(self._text_wrap_width())
         self._wrapped_text_items.append(text)
@@ -662,10 +662,10 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
     def create_text_item(self, text, position, wrap=False):
         txt_item = SelectableResultsTextItem(text, self)
-        txt_item.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+        txt_item.setFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
         if wrap:
             text_option = txt_item.document().defaultTextOption()
-            text_option.setWrapMode(QTextOption.WordWrap)
+            text_option.setWrapMode(QTextOption.WrapMode.WordWrap)
             txt_item.document().setDefaultTextOption(text_option)
             txt_item.setTextWidth(self._text_wrap_width())
             self._wrapped_text_items.append(txt_item)
@@ -675,7 +675,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             "2) Right click again and choose copy."
         )
         txt_item.setTextInteractionFlags(
-            Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard
+            Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard
         )
         self.scene.addItem(txt_item)
         self._layout_items.append(txt_item)
@@ -734,7 +734,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
     def _select_all_text(self, text_item):
         cursor = text_item.textCursor()
-        cursor.select(QTextCursor.Document)
+        cursor.select(QTextCursor.SelectionType.Document)
         text_item.setTextCursor(cursor)
 
     def _copy_text_selection(self, text_item):
@@ -805,7 +805,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                 self._viewport_width_override = None
 
     def eventFilter(self, watched, event):
-        if watched is self.graphics_view.viewport() and event.type() == QEvent.Resize:
+        if watched is self.graphics_view.viewport() and event.type() == QEvent.Type.Resize:
             self._schedule_viewport_refit()
         return super(ResultsWindow, self).eventFilter(watched, event)
 
@@ -908,7 +908,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self.y_coord += item.boundingRect().size().height() + SECTION_SPACING
         #        item.setFlags(QGraphicsItem.ItemIsSelectable|
         #                      QGraphicsItem.ItemIsMovable)
-        item.setFlags(QGraphicsItem.ItemIsSelectable)
+        item.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
 
         # layout-audit: allow=intrinsic-ratio; reason=scene follows its intrinsic-ratio visual artifact
         self.scene.setSceneRect(
@@ -956,7 +956,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         item.setToolTip(
             'To save the image:\nright-click on the image and choose "save image as".'
         )
-        item.setFlags(QGraphicsItem.ItemIsSelectable)
+        item.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
 
         scaled_width, scaled_height = self._fit_vector_plot_to_viewport(item)
 

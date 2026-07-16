@@ -14,7 +14,7 @@
 
 # import pdb
 
-from PyQt5.QtWidgets import QDialog, QMessageBox
+from PyQt6.QtWidgets import QDialog, QMessageBox
 
 import forms.ui_edit_dialog
 import edit_list_models
