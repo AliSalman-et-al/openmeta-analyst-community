@@ -1,3 +1,4 @@
+import json
 import re
 from pathlib import Path
 
@@ -821,7 +822,9 @@ def _windows_runtime_probe(app):
     }
 
 
-def test_windows_deployment_inspector_accepts_one_coherent_x64_qt6_stack(tmp_path):
+def test_windows_deployment_inspector_accepts_one_coherent_x64_qt6_stack(
+    tmp_path, monkeypatch
+):
     inspector = _load_windows_deployment_inspector()
     app = _windows_deployment_fixture(tmp_path)
     versions = {
@@ -863,6 +866,46 @@ def test_windows_deployment_inspector_accepts_one_coherent_x64_qt6_stack(tmp_pat
         "tls/qschannelbackend.dll",
     }
     assert all(item["machine"] == "x86_64" for item in manifest["native_files"])
+
+    runtime_probe_path = tmp_path / "runtime-probe.json"
+    runtime_probe_path.write_text(
+        json.dumps(_windows_runtime_probe(app)), encoding="utf-8"
+    )
+    output = tmp_path / "deployment-manifest.json"
+    captured = {}
+
+    def inspect_from_cli(app_root, **kwargs):
+        captured["app_root"] = app_root
+        captured.update(kwargs)
+        return {"target": "windows-x64", "stack": kwargs["versions"]}
+
+    monkeypatch.setattr(inspector, "inspect_deployment", inspect_from_cli)
+    monkeypatch.setattr(
+        inspector.sys,
+        "argv",
+        [
+            "inspect_windows_deployment.py",
+            "inspect",
+            "--app-root", str(app),
+            "--output", str(output),
+            "--source-commit", "a" * 40,
+            "--runtime-probe", str(runtime_probe_path),
+            "--locked-qt-root", str(app / "_internal" / "PyQt6" / "Qt6"),
+            "--python-version", versions["python"],
+            "--pyqt6-version", versions["pyqt6"],
+            "--qt-version", versions["qt"],
+            "--sip-version", versions["sip"],
+            "--sip-runtime-version", versions["sip_runtime"],
+            "--r-version", versions["r"],
+            "--rpy2-version", versions["rpy2"],
+            "--pyinstaller-version", versions["pyinstaller"],
+        ],
+    )
+
+    assert inspector._main() == 0
+    assert captured["versions"] == versions
+    assert captured["runtime_probe"] == _windows_runtime_probe(app)
+    assert json.loads(output.read_text(encoding="utf-8"))["stack"] == versions
 
 
 def test_windows_deployment_inspector_rejects_legacy_duplicate_and_wrong_architecture(tmp_path):

@@ -636,7 +636,12 @@ def _main() -> int:
     for name in (
         "python", "pyqt6", "qt", "sip", "sip_runtime", "r", "rpy2", "pyinstaller"
     ):
-        inspect_parser.add_argument(f"--{name}-version", required=True)
+        option_name = name.replace("_", "-")
+        inspect_parser.add_argument(
+            f"--{option_name}-version",
+            dest=f"{name}_version",
+            required=True,
+        )
 
     evidence_parser = subparsers.add_parser("evidence")
     evidence_parser.add_argument("--archive", type=Path, required=True)
