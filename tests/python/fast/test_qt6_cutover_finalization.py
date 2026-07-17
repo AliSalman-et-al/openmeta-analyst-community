@@ -1,3 +1,4 @@
+import importlib.util
 import json
 from pathlib import Path
 import subprocess
@@ -17,9 +18,18 @@ from rc_metastudio.qt6_cutover import (
 
 
 ROOT = Path(__file__).resolve().parents[3]
+_IMPORT_AUDIT_SPEC = importlib.util.spec_from_file_location(
+    "qt_import_audit_test", ROOT / "scripts" / "import_qt_modules.py"
+)
+assert _IMPORT_AUDIT_SPEC is not None and _IMPORT_AUDIT_SPEC.loader is not None
+qt_import_audit = importlib.util.module_from_spec(_IMPORT_AUDIT_SPEC)
+_IMPORT_AUDIT_SPEC.loader.exec_module(qt_import_audit)
 
 
-def test_import_and_strict_ty_use_the_identical_closed_qt_module_set():
+def test_import_and_strict_ty_use_the_identical_closed_qt_module_set(
+    monkeypatch, tmp_path
+):
+    real_subprocess_run = subprocess.run
     expected = [path.relative_to(ROOT).as_posix() for path in discover_handwritten_qt_files(ROOT)]
     completed = subprocess.run(
         [sys.executable, "scripts/import_qt_modules.py", "--root", ".", "--list"],
@@ -36,6 +46,140 @@ def test_import_and_strict_ty_use_the_identical_closed_qt_module_set():
     assert "$qtModules = @(uv run python scripts/import_qt_modules.py --root . --list)" in workflow
     assert "ty check" in workflow
     assert "$qtModules" in workflow
+    calls = []
+
+    def complete(command, **kwargs):
+        calls.append((command, kwargs))
+        relative = command[-1]
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=qt_import_audit._success_marker(relative) + "\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(qt_import_audit.subprocess, "run", complete)
+    results = qt_import_audit.import_modules(ROOT, tmp_path)
+    expected = [
+        path.relative_to(ROOT).as_posix()
+        for path in discover_handwritten_qt_files(ROOT)
+    ]
+
+    assert [result["module"] for result in results] == expected
+    assert len(calls) == len(expected) == 45
+    assert sum(path.startswith("scripts/") for path in expected) == 7
+    for (command, kwargs), relative in zip(calls, expected, strict=True):
+        assert command[:4] == [sys.executable, "-W", "error", "-c"]
+        assert command[-1] == relative
+        assert "spec_from_file_location" in command[4]
+        assert "exec_module(module)" in command[4]
+        assert kwargs["env"]["PYTHONWARNINGS"] == "error"
+        assert kwargs["timeout"] == 30
+        assert kwargs["check"] is False
+
+    drift_root = tmp_path / "drift"
+    source = drift_root / "src" / "rc_metastudio"
+    scripts = drift_root / "scripts"
+    source.mkdir(parents=True)
+    scripts.mkdir()
+    (source / "application_surface.py").write_text(
+        "from PyQt6 import QtCore\n", encoding="utf-8"
+    )
+    (scripts / "new_verification_surface.py").write_text(
+        "from PyQt6 import QtGui\n", encoding="utf-8"
+    )
+
+    def fail_new_script(command, **kwargs):
+        relative = command[-1]
+        return subprocess.CompletedProcess(
+            command,
+            int(relative.startswith("scripts/")),
+            stdout=(
+                ""
+                if relative.startswith("scripts/")
+                else qt_import_audit._success_marker(relative) + "\n"
+            ),
+            stderr="new script warning" if relative.startswith("scripts/") else "",
+        )
+
+    monkeypatch.setattr(qt_import_audit.subprocess, "run", fail_new_script)
+    report = tmp_path / "report.json"
+
+    assert (
+        qt_import_audit.main(
+            [
+                "--root",
+                str(drift_root),
+                "--build-root",
+                str(drift_root / "build"),
+                "--report",
+                str(report),
+            ]
+        )
+        == 1
+    )
+    payload = json.loads(report.read_text(encoding="utf-8"))
+    assert [entry["module"] for entry in payload["modules"]] == [
+        "scripts/new_verification_surface.py",
+        "src/rc_metastudio/application_surface.py",
+    ]
+    assert payload["modules"][0]["returncode"] == 1
+
+    monkeypatch.setattr(qt_import_audit.subprocess, "run", real_subprocess_run)
+    real_root = tmp_path / "real-subprocess"
+    package = real_root / "src" / "rc_metastudio"
+    scripts = real_root / "scripts"
+    package.mkdir(parents=True)
+    scripts.mkdir()
+    (package / "__init__.py").write_text("", encoding="utf-8")
+    (package / "qt6_ui.py").write_text(
+        "def prepare_generated_ui_imports():\n    return None\n", encoding="utf-8"
+    )
+    (package / "qt6_resources.py").write_text(
+        "def ensure_application_resources():\n    return None\n", encoding="utf-8"
+    )
+    (scripts / "warning_surface.py").write_text(
+        "from PyQt6 import QtCore\n"
+        "import warnings\n"
+        "warnings.warn('fixture import warning', UserWarning)\n",
+        encoding="utf-8",
+    )
+    (scripts / "early_exit_surface.py").write_text(
+        "from PyQt6 import QtCore\n"
+        "import sys\n"
+        "sys.exit(0)\n",
+        encoding="utf-8",
+    )
+    guarded_main_marker = real_root / "guarded-main-ran"
+    (scripts / "guarded_surface.py").write_text(
+        "from pathlib import Path\n"
+        "from PyQt6 import QtCore\n"
+        "if __name__ == '__main__':\n"
+        f"    Path({str(guarded_main_marker)!r}).write_text('ran', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+
+    real_results = {
+        result["module"]: result
+        for result in qt_import_audit.import_modules(real_root, real_root / "build")
+    }
+
+    assert set(real_results) == {
+        "scripts/early_exit_surface.py",
+        "scripts/guarded_surface.py",
+        "scripts/warning_surface.py",
+    }
+    assert real_results["scripts/warning_surface.py"]["returncode"] != 0
+    assert "fixture import warning" in real_results["scripts/warning_surface.py"][
+        "stderr"
+    ]
+    assert real_results["scripts/early_exit_surface.py"]["returncode"] != 0
+    assert "before its success marker" in real_results[
+        "scripts/early_exit_surface.py"
+    ]["stderr"]
+    assert real_results["scripts/guarded_surface.py"]["returncode"] == 0
+    assert real_results["scripts/guarded_surface.py"]["stderr"] == ""
+    assert not guarded_main_marker.exists()
 
 
 def test_final_cutover_audit_has_zero_active_legacy_findings():

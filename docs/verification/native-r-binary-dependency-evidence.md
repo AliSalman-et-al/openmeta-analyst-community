@@ -23,6 +23,11 @@ the target-specific cache and still emit and validate the policy, binary
 package, installed/loadable package, and HSROC source-exception summaries.
 Caches must never cross `windows-x64`, `macos-x64`, or `macos-arm64`.
 
+The exact Issue #340 cold-installation and warm-cache jobs, package types,
+snapshot, source-exception digest, and distinction between dependency proof and
+full cutover acceptance are recorded in
+[`qt6-hard-cutover.md`](qt6-hard-cutover.md#cold-installation-proof-versus-warm-acceptance).
+
 The dated snapshot fixes the version graph but not immutable package bytes.
 Release qualification therefore promotes the already-built artifact and keeps
 the final artifact digest plus the existing bundled-library load and Mach-O

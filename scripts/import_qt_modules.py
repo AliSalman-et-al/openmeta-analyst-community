@@ -15,26 +15,51 @@ from rc_metastudio.qt6_cutover import (
 )
 
 
+def _success_marker(relative: str) -> str:
+    return "RCMS_QT_WARNINGS_AUDIT_IMPORTED=" + relative
+
+
 def import_modules(root: Path, build_root: Path) -> list[dict[str, object]]:
     root = root.resolve()
     build_root = build_root.resolve()
     generated = build_root / "generated/rc_metastudio"
     bootstrap = """
-import importlib, os, sys
-root, generated, module = sys.argv[1:4]
+import importlib, importlib.util, os, pathlib, sys
+root, generated, relative = sys.argv[1:4]
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 os.environ.setdefault('RCMS_STUB_BACKEND', '1')
-sys.path[:0] = [root + '/src/rc_metastudio', root + '/src']
+sys.path[:0] = [root + '/scripts', root + '/src/rc_metastudio', root + '/src']
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 prepare_generated_ui_imports()
 import rc_metastudio.qt6_resources as resources
 resources.ensure_application_resources()
-importlib.import_module(module)
+path = pathlib.Path(root, relative)
+if relative.startswith('scripts/'):
+    name = '_rcms_qt_warnings_audit_' + path.stem
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError('cannot create isolated import spec for ' + relative)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+else:
+    importlib.import_module(path.stem)
+print('RCMS_QT_WARNINGS_AUDIT_IMPORTED=' + relative, flush=True)
 """
     results: list[dict[str, object]] = []
-    for path in discover_application_qt_modules(root):
+    for path in discover_handwritten_qt_files(root):
+        relative = path.relative_to(root).as_posix()
         completed = subprocess.run(
-            [sys.executable, "-W", "error", "-c", bootstrap, str(root), str(generated), path.stem],
+            [
+                sys.executable,
+                "-W",
+                "error",
+                "-c",
+                bootstrap,
+                str(root),
+                str(generated),
+                relative,
+            ],
             cwd=root,
             env={**os.environ, "PYTHONWARNINGS": "error", "RCMS_QT6_BUILD_ROOT": str(build_root)},
             capture_output=True,
@@ -42,11 +67,18 @@ importlib.import_module(module)
             timeout=30,
             check=False,
         )
+        returncode = completed.returncode
+        stderr = completed.stderr.strip()
+        if returncode == 0 and _success_marker(relative) not in completed.stdout.splitlines():
+            returncode = 1
+            stderr = (
+                stderr + "\n" if stderr else ""
+            ) + "isolated import exited before its success marker"
         results.append(
             {
-                "module": path.relative_to(root).as_posix(),
-                "returncode": completed.returncode,
-                "stderr": completed.stderr.strip(),
+                "module": relative,
+                "returncode": returncode,
+                "stderr": stderr,
             }
         )
     return results
