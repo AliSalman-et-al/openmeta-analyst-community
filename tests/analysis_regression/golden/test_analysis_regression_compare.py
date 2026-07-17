@@ -157,14 +157,53 @@ def test_analysis_regression_comparison_rejects_artifact_content_and_descriptor_
         current = _current()
         baseline_artifact = baseline["curated_golden_set"][0]["artifacts"][0]
         current_artifact = current["curated_golden_set"][0]["artifacts"][0]
+        baseline["curated_golden_set"][0]["tool_versions"] = {"os": "Windows"}
+        current["curated_golden_set"][0]["tool_versions"] = {"os": "Windows"}
         baseline_artifact["bundle_path"] = "artifacts/reference.png"
         current_artifact["bundle_path"] = "artifacts/reference.png"
+        baseline_artifact["sha256"] = "a" * 64
         current_artifact["sha256"] = baseline_artifact["sha256"]
         current_artifact[field] = value
 
         rows = compare_golden_baseline(baseline, current)["rows"]
 
-        assert any(row["classification"] == TEXT_ARTIFACT_DRIFT for row in rows)
+        artifact_row = next(row for row in rows if row["detail"].startswith("Artifact "))
+        assert artifact_row["classification"] == TEXT_ARTIFACT_DRIFT
+        assert "same-platform exact artifact policy (Windows)" in artifact_row["detail"]
+
+
+def test_cross_platform_artifact_policy_validates_identity_and_hash_shape():
+    baseline = _baseline()
+    current = _current()
+    expected = baseline["curated_golden_set"][0]
+    actual = current["curated_golden_set"][0]
+    expected["tool_versions"] = {"os": "Windows"}
+    actual["tool_versions"] = {"os": "Darwin"}
+    expected["artifacts"][0]["sha256"] = "a" * 64
+    actual["artifacts"][0]["sha256"] = "b" * 64
+
+    artifact_row = next(
+        row for row in compare_golden_baseline(baseline, current)["rows"]
+        if row["detail"].startswith("Artifact ")
+    )
+    assert artifact_row["classification"] == PASS
+    assert "cross-platform artifact policy (Windows -> Darwin)" in artifact_row["detail"]
+
+    for mutation in ("missing-hash", "invalid-hash", "descriptor-drift"):
+        candidate = json.loads(json.dumps(current))
+        artifact = candidate["curated_golden_set"][0]["artifacts"][0]
+        if mutation == "missing-hash":
+            artifact.pop("sha256")
+        elif mutation == "invalid-hash":
+            artifact["sha256"] = "not-a-sha256"
+        else:
+            artifact["path"] = "renamed.svg"
+        artifact_row = next(
+            row for row in compare_golden_baseline(baseline, candidate)["rows"]
+            if row["detail"].startswith("Artifact ")
+        )
+        assert artifact_row["classification"] == TEXT_ARTIFACT_DRIFT
+        assert "cross-platform artifact policy (Windows -> Darwin)" in artifact_row["detail"]
 
 
 def test_analysis_regression_comparison_rejects_extra_cases():
@@ -915,7 +954,7 @@ def _baseline():
                         "label": "Forest Plot",
                         "kind": "plot",
                         "path": "reference.png",
-                        "sha256": "abc",
+                        "sha256": "a" * 64,
                     }
                 ],
             }
@@ -949,7 +988,7 @@ def _current(status="success", failure=None):
                 "label": "Forest Plot",
                 "kind": "plot",
                 "path": "reference.png",
-                "sha256": "abc",
+                "sha256": "a" * 64,
             }
         ],
     }

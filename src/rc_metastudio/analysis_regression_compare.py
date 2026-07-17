@@ -93,7 +93,15 @@ def _compare_row(expected, actual, exceptions):
 
     rows = []
     rows.extend(_compare_numbers(expected, actual, accepted))
-    rows.extend(_compare_texts_and_artifacts(expected, actual, accepted))
+    rows.extend(
+        _compare_texts_and_artifacts(
+            expected,
+            actual,
+            accepted,
+            expected_os=_capture_os(expected),
+            actual_os=_capture_os(actual),
+        )
+    )
     return rows or [
         _row(expected, PASS, "Current output matches the curated golden bundle.")
     ]
@@ -196,7 +204,9 @@ def _is_finite_real_number(value):
     )
 
 
-def _compare_texts_and_artifacts(expected, actual, accepted):
+def _compare_texts_and_artifacts(
+    expected, actual, accepted, expected_os=None, actual_os=None
+):
     rows = []
     expected_texts = expected.get("texts", {})
     actual_texts = actual.get("texts", {})
@@ -240,6 +250,7 @@ def _compare_texts_and_artifacts(expected, actual, accepted):
     actual_artifacts = dict(
         (item["label"], item) for item in actual.get("artifacts", [])
     )
+    cross_platform = bool(expected_os and actual_os and expected_os != actual_os)
     for label, expected_artifact in expected_artifacts.items():
         actual_artifact = actual_artifacts.get(label)
         if actual_artifact is None:
@@ -251,21 +262,64 @@ def _compare_texts_and_artifacts(expected, actual, accepted):
                     accepted,
                 )
             )
-        elif _artifact_descriptor(actual_artifact) != _artifact_descriptor(expected_artifact):
-            rows.append(
-                _row(
-                    expected,
-                    _maybe_accepted(TEXT_ARTIFACT_DRIFT, accepted),
-                    "Artifact %s descriptor or content changed." % label,
-                    accepted,
-                )
-            )
         else:
+            expected_descriptor = _artifact_descriptor(expected_artifact)
+            actual_descriptor = _artifact_descriptor(actual_artifact)
+            descriptor_matches = (
+                _artifact_identity_descriptor(actual_descriptor)
+                == _artifact_identity_descriptor(expected_descriptor)
+            )
+            if cross_platform:
+                hashes_valid = _valid_sha256(
+                    expected_descriptor["sha256"]
+                ) and _valid_sha256(actual_descriptor["sha256"])
+                passed = descriptor_matches and hashes_valid
+                detail = (
+                    "Artifact %s descriptor matched; content SHA-256 was "
+                    "validated but byte equality was not required by the "
+                    "cross-platform artifact policy (%s -> %s)."
+                    % (label, expected_os, actual_os)
+                )
+                if not descriptor_matches:
+                    detail = (
+                        "Artifact %s descriptor changed under the cross-platform "
+                        "artifact policy (%s -> %s)."
+                        % (label, expected_os, actual_os)
+                    )
+                elif not hashes_valid:
+                    detail = (
+                        "Artifact %s has a missing or invalid reference/current SHA-256 "
+                        "under the cross-platform artifact policy (%s -> %s)."
+                        % (label, expected_os, actual_os)
+                    )
+            else:
+                passed = (
+                    actual_descriptor == expected_descriptor
+                    and _valid_sha256(expected_descriptor["sha256"])
+                    and _valid_sha256(actual_descriptor["sha256"])
+                )
+                if expected_os and expected_os == actual_os:
+                    detail = (
+                        "Artifact %s descriptor and content matched under the "
+                        "same-platform exact artifact policy (%s)."
+                        % (label, expected_os)
+                    )
+                    if not passed:
+                        detail = (
+                            "Artifact %s descriptor or content changed under the "
+                            "same-platform exact artifact policy (%s)."
+                            % (label, expected_os)
+                        )
+                else:
+                    detail = "Artifact %s descriptor and content matched exactly." % label
+                    if not passed:
+                        detail = "Artifact %s descriptor or content changed." % label
             rows.append(
                 _row(
                     expected,
-                    PASS,
-                    "Artifact %s descriptor and content matched." % label,
+                    PASS if passed else _maybe_accepted(TEXT_ARTIFACT_DRIFT, accepted),
+                    detail,
+                    accepted if not passed else None,
                 )
             )
     for label in sorted(set(actual_artifacts) - set(expected_artifacts)):
@@ -295,6 +349,26 @@ def _artifact_descriptor(artifact):
         "sha256": artifact.get("sha256"),
         "metadata": metadata,
     }
+
+
+def _artifact_identity_descriptor(descriptor):
+    return dict((key, value) for key, value in descriptor.items() if key != "sha256")
+
+
+def _valid_sha256(value):
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _capture_os(bundle):
+    tool_versions = bundle.get("tool_versions", {})
+    if not isinstance(tool_versions, dict):
+        return None
+    value = tool_versions.get("os")
+    return value if isinstance(value, str) and value else None
 
 
 def _normalize_text(value):

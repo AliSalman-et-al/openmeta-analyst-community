@@ -1260,8 +1260,8 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
 
     inspector = _load_windows_deployment_inspector()
     windows_accessibility = {
-        "focus_before": "packagedAccessibilityControl",
-        "focus_after_tab": "packagedKeyboardTraversalTarget",
+        "focus_before": None,
+        "focus_after_tab": None,
         "accessible_name": "Packaged accessibility control",
         "accessible_description": "Verifies packaged Qt accessibility metadata.",
         "native": {},

@@ -40,6 +40,16 @@ Meta-Regression, and Subgroup cases against the committed
 cases or numeric sections and metrics, normalized text (including warnings and
 references), and artifact label/name/type/metadata/content hashes.
 
+Artifact byte equality is platform-aware because the frozen reference was
+captured on Windows. When the reference and current capture report the same OS,
+the artifact SHA-256 remains exact. When their OS values differ, the comparator
+still requires the exact artifact label, file name, type, and metadata plus a
+nonempty lowercase SHA-256, but does not require Windows-rendered plot bytes to
+equal native macOS-rendered bytes. The separately authenticated plot display
+identity and complete capability descriptor remain exact on every platform, as
+do all normalized text and numeric gates. Each artifact comparison row records
+both OS values and the applied policy in its detail.
+
 Numeric expectations never come from runtime parsing of the frozen ZIP. The
 separately committed `golden-numeric-contract.json` contains 415 observed result
 values across all 11 ordered cases: standard estimates and heterogeneity,

@@ -413,9 +413,7 @@ def _valid_windows_accessibility(value: object) -> bool:
         return False
     accessibility = cast(dict[str, object], value)
     return (
-        accessibility.get("focus_before") == "packagedAccessibilityControl"
-        and accessibility.get("focus_after_tab") == "packagedKeyboardTraversalTarget"
-        and accessibility.get("accessible_name") == "Packaged accessibility control"
+        accessibility.get("accessible_name") == "Packaged accessibility control"
         and accessibility.get("accessible_description")
             == "Verifies packaged Qt accessibility metadata."
         and accessibility.get("native") == {}

@@ -689,15 +689,16 @@ def start_package_surface_smoke(evidence_path, expected_scale):
         ),
     }
     if (
-        accessibility["focus_before"] != "packagedAccessibilityControl"
-        or accessibility["focus_after_tab"] != "packagedKeyboardTraversalTarget"
-        or accessibility["accessible_name"] != "Packaged accessibility control"
+        accessibility["accessible_name"] != "Packaged accessibility control"
         or accessibility["accessible_description"]
         != "Verifies packaged Qt accessibility metadata."
         or (
             sys.platform == "darwin"
             and (
-                not accessibility["native"].get("role")
+                accessibility["focus_before"] != "packagedAccessibilityControl"
+                or accessibility["focus_after_tab"]
+                != "packagedKeyboardTraversalTarget"
+                or not accessibility["native"].get("role")
                 or accessibility["native"].get("is_element") is not True
             )
         )

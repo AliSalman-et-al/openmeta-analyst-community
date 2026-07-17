@@ -3718,6 +3718,16 @@
     },
     {
       "decision": "keep",
+      "evidence": ["golden", "analysis_behavior", "release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "golden",
+      "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_cross_platform_artifact_policy_validates_identity_and_hash_shape",
+      "reason": "Guards exact same-platform artifacts and the fail-closed cross-platform native-render hash policy.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
       "evidence": ["golden", "analysis_behavior"],
       "external_dependencies": ["filesystem"],
       "lane": "golden",

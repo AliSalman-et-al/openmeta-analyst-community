@@ -53,7 +53,11 @@ Separate native package processes at 125%, 150%, and 175% exercise the Windows
 platform plugin, clipboard Unicode round-trip, comma-decimal locale parsing,
 compiled Qt resources, required image/SVG formats, Schannel TLS, a loaded Qt
 style, a critical message box, and valid screen DPI/DPR. Each requested scale
-must equal `QT_SCALE_FACTOR`; the frozen probe records that `QT_SCALE_FACTOR` was
+also proves the accessible control's name and description. Focus traversal and
+native accessibility-interface assertions are intentionally reserved for the
+interactive Cocoa package contract because qwindows activation is not reliable
+on a noninteractive hosted runner. Each requested scale must equal
+`QT_SCALE_FACTOR`; the frozen probe records that `QT_SCALE_FACTOR` was
 absent, and observed DPR must equal that unscaled baseline
 DPR multiplied by the request within an absolute 0.05 tolerance. Every
 process has a 15-minute watchdog that terminates its complete process tree and
