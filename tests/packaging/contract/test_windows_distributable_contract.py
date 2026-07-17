@@ -827,6 +827,9 @@ def test_windows_deployment_inspector_accepts_one_coherent_x64_qt6_stack(
 ):
     inspector = _load_windows_deployment_inspector()
     app = _windows_deployment_fixture(tmp_path)
+    qt_root = app / "_internal" / "PyQt6" / "Qt6"
+    _write_pe(qt_root / "plugins" / "imageformats" / "qpdf.dll")
+    _write_pe(app / "R" / "library" / "qpdf" / "libs" / "x64" / "qpdf.dll")
     versions = {
         "python": "3.11.9",
         "pyqt6": "6.11.0",
@@ -843,7 +846,7 @@ def test_windows_deployment_inspector_accepts_one_coherent_x64_qt6_stack(
         versions=versions,
         source_commit="a" * 40,
         runtime_probe=_windows_runtime_probe(app),
-        locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
+        locked_qt_root=qt_root,
     )
 
     assert manifest["target"] == "windows-x64"
@@ -861,6 +864,7 @@ def test_windows_deployment_inspector_accepts_one_coherent_x64_qt6_stack(
         "imageformats/qico.dll",
         "imageformats/qjpeg.dll",
         "imageformats/qsvg.dll",
+        "imageformats/qpdf.dll",
         "iconengines/qsvgicon.dll",
         "styles/qmodernwindowsstyle.dll",
         "tls/qschannelbackend.dll",
@@ -979,7 +983,7 @@ def test_windows_deployment_inspector_rejects_legacy_duplicate_and_wrong_archite
 
     app = _windows_deployment_fixture(tmp_path / "duplicate-plugin")
     _write_pe(app / "_internal" / "plugins" / "qwindows.dll")
-    with pytest.raises(inspector.DeploymentInspectionError, match="must occur exactly once"):
+    with pytest.raises(inspector.DeploymentInspectionError, match="plugin root"):
         inspector.inspect_deployment(
             app, versions=versions, source_commit="a" * 40,
             runtime_probe=_windows_runtime_probe(app),
@@ -1094,7 +1098,7 @@ def test_windows_deployment_inspector_rejects_legacy_duplicate_and_wrong_archite
     _write_pe(locked_extra)
     _write_pe(packaged_extra)
     _write_pe(app / "_internal" / "plugins" / "qnetworklistmanager.dll")
-    with pytest.raises(inspector.DeploymentInspectionError, match="exactly once"):
+    with pytest.raises(inspector.DeploymentInspectionError, match="plugin root"):
         inspector.inspect_deployment(
             app, versions=versions, source_commit="a" * 40,
             runtime_probe=_windows_runtime_probe(app), locked_qt_root=locked_qt,
@@ -1107,6 +1111,16 @@ def test_windows_deployment_inspector_rejects_legacy_duplicate_and_wrong_archite
             app, versions=versions, source_commit="a" * 40,
             runtime_probe=_windows_runtime_probe(app),
             locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
+        )
+
+    app = _windows_deployment_fixture(tmp_path / "alternate-qpdf-plugin-tree")
+    qt_root = app / "_internal" / "PyQt6" / "Qt6"
+    _write_pe(qt_root / "plugins" / "imageformats" / "qpdf.dll")
+    _write_pe(app / "_internal" / "plugins" / "imageformats" / "qpdf.dll")
+    with pytest.raises(inspector.DeploymentInspectionError, match="plugin root"):
+        inspector.inspect_deployment(
+            app, versions=versions, source_commit="a" * 40,
+            runtime_probe=_windows_runtime_probe(app), locked_qt_root=qt_root,
         )
 
     app = _windows_deployment_fixture(tmp_path / "scaled-runtime-probe")

@@ -172,7 +172,11 @@ def inspect_deployment(
     plugin_names.update(path.name.casefold() for path in locked_plugins)
     plugin_occurrences: dict[str, list[Path]] = defaultdict(list)
     for path in all_files:
-        if path.suffix.lower() == ".dll" and path.name.casefold() in plugin_names:
+        if (
+            path.suffix.lower() == ".dll"
+            and path.name.casefold() in plugin_names
+            and path.is_relative_to(qt_root)
+        ):
             plugin_occurrences[path.name.casefold()].append(path)
     duplicate_or_misplaced_plugins = {
         name: [_relative(path, app_root) for path in paths]
