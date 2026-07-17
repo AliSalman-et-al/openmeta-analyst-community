@@ -1,6 +1,8 @@
 import re
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -149,7 +151,8 @@ def test_windows_distributable_contract_is_declared():
         "RCMS_STARTUP_PROJECT_SMOKE",
         "RPY2_CFFI_MODE",
     } <= script["env_writes"]
-    assert {"icons_rc", "rpy2.robjects", "rpy2.rinterface"} <= script["hidden_imports"]
+    assert all(name in spec for name in ("rpy2.robjects", "rpy2.rinterface"))
+    assert '"icons_rc"' not in spec
     assert {
         "RCMetaStudio.exe",
         "sample_projects\\BCG.rcms",
@@ -163,10 +166,11 @@ def test_windows_distributable_contract_is_declared():
     } <= script["paths"]
     assert "doc\\openMA_help.html" not in script["paths"]
     assert "Bundled help" not in script["text"]
-    assert "src\\rc_metastudio\\__main__.py" in script["paths"]
-    assert "src/rc_metastudio/__main__.py" in spec
+    assert "packaging\\pyinstaller\\rc-metastudio.spec" in script["text"]
+    assert "__main__.py" in spec
+    assert (ROOT / "packaging" / "pyinstaller" / "rc-metastudio.spec").exists()
+    assert "sole authoritative" in script["text"]
     assert "src\\rc_metastudio\\launch.py" not in script["text"]
-    assert "src/rc_metastudio/launch.py" not in spec
     assert "tomllib.loads" in script["text"]
     assert (
         'if ($ArchiveRootName) { $ArchiveRootName } else { "RCMetaStudio-$projectVersion-windows-x64" }'
@@ -211,7 +215,7 @@ def test_packaged_smoke_launches_with_positional_project_argument():
     assert relative_order(
         script,
         '$env:RCMS_STARTUP_PROJECT_SMOKE = "1"',
-        "Start-Process -FilePath $exePath -ArgumentList @($samplePath)",
+        "Invoke-BoundedPackageProcess -FilePath $exePath -ArgumentList @($quotedSamplePath)",
     )
 
 
@@ -226,11 +230,11 @@ def test_packaged_smoke_launches_visual_wizard_layout_gate():
         "Invoke-PackagedWizardLayoutSmokeTest -Root $appDir",
     )
     assert (
-        'Start-Process -FilePath $exePath -ArgumentList @("--automation-wizard-layout-smoke")'
+        'Invoke-BoundedPackageProcess -FilePath $exePath -ArgumentList @("--automation-wizard-layout-smoke")'
         in script
     )
     assert '$env:QT_QPA_PLATFORM = "offscreen"' in script
-    assert "WindowStyle Hidden" in script
+    assert '$startArguments.WindowStyle = "Hidden"' in script
     assert "RCMS_AUTOMATION_SMOKE_LOG = $env:RCMS_AUTOMATION_SMOKE_LOG" in script
     assert "$env:RCMS_AUTOMATION_SMOKE_LOG = $smokeLogPath" in script
     assert "automation-wizard-layout-smoke.log" in script
@@ -244,6 +248,7 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
         "change-classifier",
         "qt6-verification",
         "source-fast-targets",
+        "windows-package-qualification",
         "fast-verification-gate",
     } <= workflow["jobs"]
     assert workflow["needs"]["source-fast-targets"] == {"change-classifier"}
@@ -251,10 +256,14 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
         "change-classifier",
         "qt6-verification",
         "source-fast-targets",
+        "windows-package-qualification",
     }
     assert workflow["events"] == {"workflow_dispatch", "push", "pull_request"}
     assert workflow["legacy_uses"] == []
-    assert all(re.fullmatch(r"[0-9a-f]{40}", ref) for _, ref, _ in workflow["uses"])
+    assert all(
+        ref.startswith("./") or re.fullmatch(r"[0-9a-f]{40}", ref)
+        for _, ref, _ in workflow["uses"]
+    )
     assert "src/*" in workflow["text"]
     assert "tests/*" in workflow["text"]
     assert (
@@ -272,6 +281,24 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
     assert workflow["text"].count(
         "needs.change-classifier.outputs.run-windows == 'true'"
     ) == 2
+    assert "needs.change-classifier.outputs.run-windows-package == 'true'" in workflow["text"]
+    for package_input in (
+        "sample_projects/*",
+        "scripts/build_qt6.py",
+        "scripts/verify_package_release.py",
+        "scripts/resolve_package_ci_metadata.py",
+        "scripts/validate_adaptive_layout_evidence.py",
+        "docs/verification/RCMetaR-r-dependencies.json",
+        "delivery/targets.json",
+        "tests/python/fast/test_qt6_cutover_finalization.py",
+        "tests/python/fast/test_qt6_build_slice.py",
+        "tests/python/fast/test_project_format.py",
+        "tests/python/fast/test_qt_text_boundaries.py",
+        "tests/python/gui/test_metaform_automation_launch.py",
+    ):
+        assert package_input in workflow["text"]
+    assert "Required Windows x64 Package Qualification" in workflow["text"]
+    assert "Required Windows x64 package qualification result" in workflow["text"]
     assert "docs/verification/*" in workflow["text"]
     assert ".\\scripts\\verify-smoke.ps1 -Sync" in workflow["text"]
     assert ".\\scripts\\verify-fast.ps1 -StrictTaxonomy" in workflow["text"]
@@ -330,6 +357,7 @@ def test_package_workflow_builds_path_aware_artifacts():
     )
     assert workflow["paths"] == set()
     assert "artifacts/${{ inputs.artifact_name }}.zip" in target["text"]
+    assert "artifacts/${{ inputs.artifact_name }}-evidence.json" in target["text"]
     assert any("RCMetaStudio-macos-x64" in run for run in workflow["text"].splitlines())
     assert any(
         "RCMetaStudio-macos-arm64" in run for run in workflow["text"].splitlines()
@@ -636,7 +664,7 @@ def test_windows_packager_restores_smoke_environment():
     assert relative_order(
         script,
         "$previousEnv = @{",
-        'Start-Process -FilePath $exePath -ArgumentList @("--automation-native-smoke", $samplePath)',
+        'Invoke-BoundedPackageProcess -FilePath $exePath -ArgumentList @("--automation-native-smoke", $quotedSamplePath)',
         "foreach ($name in $previousEnv.Keys)",
     )
 
@@ -649,8 +677,557 @@ def test_windows_packager_uses_clean_directory_copies_for_incremental_builds():
         "function Copy-DirectoryTree",
         'Copy-DirectoryTree -Source (Join-Path $repoRoot "sample_projects")',
     )
+
+
+def test_windows_packager_qualifies_qt6_deployment_and_packaged_surfaces():
+    script = ps_contract("scripts", "build-windows-package.ps1")["text"]
+    spec = read_repo_text("packaging", "pyinstaller", "rc-metastudio.spec")
+
+    assert "windeployqt" not in script.lower()
+    assert "inspect_windows_deployment.py inspect" in script
+    assert "inspect_windows_deployment.py evidence" in script
+    assert "qualification\\deployment-manifest.json" in script
+    assert "qualification\\packaged-smoke.json" in script
+    assert "RCMS_PACKAGE_SMOKE_EVIDENCE" in script
+    assert "--automation-package-surface-smoke" in script
+    runtime_probe_function = script.split(
+        "function Invoke-PackagedRuntimeProbe", 1
+    )[1].split("function Invoke-StrictRDependencyPolicy", 1)[0]
+    assert relative_order(
+        runtime_probe_function,
+        'QT_SCALE_FACTOR = $env:QT_SCALE_FACTOR',
+        'Remove-Item "Env:\\QT_SCALE_FACTOR" -ErrorAction SilentlyContinue',
+        '"--automation-package-runtime-probe", $quotedProbePath',
+        "foreach ($name in $previousEnv.Keys)",
+    )
+    assert "function Invoke-BoundedPackageProcess" in script
+    assert "WaitForExit($TimeoutSeconds * 1000)" in script
+    assert "Start-Process -FilePath taskkill.exe" in script
+    assert '"/PID", $process.Id, "/T", "/F"' in script
+    assert "watchdog cleanup failed" in script
+    assert "$process.WaitForExit(30000)" in script
+    for scale in ('"1.25"', '"1.50"', '"1.75"'):
+        assert scale in script
+    for plugin in (
+        "platforms/qwindows.dll",
+        "imageformats/qjpeg.dll",
+        "imageformats/qsvg.dll",
+        "iconengines/qsvgicon.dll",
+        "styles/qmodernwindowsstyle.dll",
+        "tls/qschannelbackend.dll",
+    ):
+        assert plugin in spec
+    assert 'copy_metadata("rpy2")' in spec
+    assert '(str(binary_resource), "resources")' in spec
+    assert '*(f"forms.{name}" for name in generated_form_modules)' in spec
+    assert 'excludes=["PyQt5", "PySide2", "PySide6", "qtpy"]' in spec
+    assert spec.count("upx=False") == 2
+    assert "upx=True" not in spec
+    assert "upx_exclude" not in spec
     assert relative_order(
         script,
         "function Copy-DirectoryTree",
         'Copy-DirectoryTree -Source $Root -Destination (Join-Path $DestinationRoot "R")',
     )
+
+
+def _load_windows_deployment_inspector():
+    import importlib.util
+
+    path = ROOT / "scripts" / "inspect_windows_deployment.py"
+    spec = importlib.util.spec_from_file_location("inspect_windows_deployment", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _write_pe(path, machine=0x8664):
+    import struct
+
+    payload = bytearray(256)
+    payload[0:2] = b"MZ"
+    payload[0x3C:0x40] = struct.pack("<I", 0x80)
+    payload[0x80:0x84] = b"PE\0\0"
+    payload[0x84:0x86] = struct.pack("<H", machine)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(payload)
+
+
+def _windows_deployment_fixture(tmp_path):
+    app = tmp_path / "RCMetaStudio"
+    qt = app / "_internal" / "PyQt6" / "Qt6"
+    _write_pe(app / "RCMetaStudio.exe")
+    for name in (
+        "Qt6Core.dll",
+        "Qt6Gui.dll",
+        "Qt6Network.dll",
+        "Qt6Svg.dll",
+        "Qt6SvgWidgets.dll",
+        "Qt6Widgets.dll",
+    ):
+        _write_pe(qt / "bin" / name)
+    required = {
+        "platforms": ("qwindows.dll",),
+        "imageformats": ("qico.dll", "qjpeg.dll", "qsvg.dll"),
+        "iconengines": ("qsvgicon.dll",),
+        "styles": ("qmodernwindowsstyle.dll",),
+        "tls": ("qschannelbackend.dll",),
+    }
+    for family, names in required.items():
+        for name in names:
+            _write_pe(qt / "plugins" / family / name)
+    return app
+
+
+def _windows_runtime_probe(app):
+    qt = app / "_internal" / "PyQt6" / "Qt6"
+    return {
+        "schema_version": 1,
+        "frozen": True,
+        "python": {
+            "version": "3.11.9",
+            "executable": str(app / "RCMetaStudio.exe"),
+            "architecture": "AMD64",
+            "bundle_root": str(app / "_internal"),
+        },
+        "qt": {
+            "pyqt_version": "6.11.0",
+            "compiled_qt_version": "6.11.0",
+            "runtime_qt_version": "6.11.1",
+            "sip_runtime_version": "6.15.2",
+            "platform_plugin": "windows",
+            "plugins_path": str(qt / "plugins"),
+            "library_paths": [str(qt / "plugins")],
+            "scale_factor_environment": None,
+            "baseline_device_pixel_ratio": 1.0,
+            "baseline_logical_dpi": 96.0,
+        },
+        "rpy2": {"distribution_version": "3.6.7"},
+        "r": {
+            "version": "4.6.1",
+            "home": str(app / "R"),
+            "library_paths": [str(app / "R" / "library")],
+            "configured_home": str(app / "R"),
+            "configured_library": str(app / "R" / "library"),
+        },
+    }
+
+
+def test_windows_deployment_inspector_accepts_one_coherent_x64_qt6_stack(tmp_path):
+    inspector = _load_windows_deployment_inspector()
+    app = _windows_deployment_fixture(tmp_path)
+    versions = {
+        "python": "3.11.9",
+        "pyqt6": "6.11.0",
+        "qt": "6.11.1",
+        "sip": "13.11.1",
+        "sip_runtime": "6.15.2",
+        "r": "4.6.1",
+        "rpy2": "3.6.7",
+        "pyinstaller": "6.21.0",
+    }
+
+    manifest = inspector.inspect_deployment(
+        app,
+        versions=versions,
+        source_commit="a" * 40,
+        runtime_probe=_windows_runtime_probe(app),
+        locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
+    )
+
+    assert manifest["target"] == "windows-x64"
+    assert manifest["minimum_os"] == "Windows 10 version 1809"
+    assert manifest["collector"] == {
+        "name": "PyInstaller",
+        "version": "6.21.0",
+        "provenance": "build-time-only",
+        "definition": "packaging/pyinstaller/rc-metastudio.spec",
+    }
+    assert manifest["stack"] == versions
+    assert manifest["plugins"]["platforms"] == ["qwindows.dll"]
+    assert set(manifest["qt_plugins"]) == {
+        "platforms/qwindows.dll",
+        "imageformats/qico.dll",
+        "imageformats/qjpeg.dll",
+        "imageformats/qsvg.dll",
+        "iconengines/qsvgicon.dll",
+        "styles/qmodernwindowsstyle.dll",
+        "tls/qschannelbackend.dll",
+    }
+    assert all(item["machine"] == "x86_64" for item in manifest["native_files"])
+
+
+def test_windows_deployment_inspector_rejects_legacy_duplicate_and_wrong_architecture(tmp_path):
+    import shutil
+
+    inspector = _load_windows_deployment_inspector()
+    versions = {
+        "python": "3.11.9",
+        "pyqt6": "6.11.0",
+        "qt": "6.11.1",
+        "sip": "13.11.1",
+        "sip_runtime": "6.15.2",
+        "r": "4.6.1",
+        "rpy2": "3.6.7",
+        "pyinstaller": "6.21.0",
+    }
+
+    app = _windows_deployment_fixture(tmp_path / "legacy")
+    _write_pe(app / "_internal" / "PyQt5" / "Qt5Core.dll")
+    with pytest.raises(inspector.DeploymentInspectionError, match="mixed or legacy"):
+        inspector.inspect_deployment(
+            app, versions=versions, source_commit="a" * 40,
+            runtime_probe=_windows_runtime_probe(app),
+            locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
+        )
+
+    app = _windows_deployment_fixture(tmp_path / "duplicate")
+    _write_pe(app / "other" / "Qt6Core.dll")
+    with pytest.raises(inspector.DeploymentInspectionError, match="duplicate Qt6"):
+        inspector.inspect_deployment(
+            app, versions=versions, source_commit="a" * 40,
+            runtime_probe=_windows_runtime_probe(app),
+            locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
+        )
+
+    app = _windows_deployment_fixture(tmp_path / "architecture")
+    _write_pe(app / "bad.dll", machine=0x014C)
+    with pytest.raises(inspector.DeploymentInspectionError, match="non-x64"):
+        inspector.inspect_deployment(
+            app, versions=versions, source_commit="a" * 40,
+            runtime_probe=_windows_runtime_probe(app),
+            locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
+        )
+
+    for binding in ("PySide2", "PySide6", "qtpy"):
+        app = _windows_deployment_fixture(tmp_path / f"mixed-{binding}")
+        _write_pe(app / "_internal" / binding / "binding.pyd")
+        with pytest.raises(inspector.DeploymentInspectionError, match="mixed or legacy"):
+            inspector.inspect_deployment(
+                app, versions=versions, source_commit="a" * 40,
+                runtime_probe=_windows_runtime_probe(app),
+                locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
+            )
+
+    required_plugin = {
+        "platforms": "qwindows.dll",
+        "imageformats": "qjpeg.dll",
+        "iconengines": "qsvgicon.dll",
+        "styles": "qmodernwindowsstyle.dll",
+        "tls": "qschannelbackend.dll",
+    }
+    for family, name in required_plugin.items():
+        app = _windows_deployment_fixture(tmp_path / f"missing-{family}")
+        (app / "_internal" / "PyQt6" / "Qt6" / "plugins" / family / name).unlink()
+        with pytest.raises(inspector.DeploymentInspectionError, match="missing required Qt"):
+            inspector.inspect_deployment(
+                app, versions=versions, source_commit="a" * 40,
+                runtime_probe=_windows_runtime_probe(app),
+                locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
+            )
+
+    app = _windows_deployment_fixture(tmp_path / "duplicate-plugin")
+    _write_pe(app / "_internal" / "plugins" / "qwindows.dll")
+    with pytest.raises(inspector.DeploymentInspectionError, match="must occur exactly once"):
+        inspector.inspect_deployment(
+            app, versions=versions, source_commit="a" * 40,
+            runtime_probe=_windows_runtime_probe(app),
+            locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
+        )
+
+    for generated in ("forms/ui_dialog.py", "icons_rc.pyc"):
+        app = _windows_deployment_fixture(tmp_path / ("generated-" + generated.replace("/", "-")))
+        path = app / generated
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("generated", encoding="utf-8")
+        with pytest.raises(inspector.DeploymentInspectionError, match="generated sources"):
+            inspector.inspect_deployment(
+                app, versions=versions, source_commit="a" * 40,
+                runtime_probe=_windows_runtime_probe(app),
+                locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
+            )
+
+    app = _windows_deployment_fixture(tmp_path / "stack-mismatch")
+    mismatched = dict(versions, qt="6.11.0")
+    with pytest.raises(inspector.DeploymentInspectionError, match="differs from the locked"):
+        inspector.inspect_deployment(
+            app, versions=mismatched, source_commit="a" * 40,
+            runtime_probe=_windows_runtime_probe(app),
+            locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
+        )
+
+    app = _windows_deployment_fixture(tmp_path / "misplaced-library")
+    source = app / "_internal" / "PyQt6" / "Qt6" / "bin" / "Qt6Network.dll"
+    destination = app / "_internal" / "other" / source.name
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    source.replace(destination)
+    with pytest.raises(inspector.DeploymentInspectionError, match="outside the authoritative"):
+        inspector.inspect_deployment(
+            app, versions=versions, source_commit="a" * 40,
+            runtime_probe=_windows_runtime_probe(app),
+            locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
+        )
+
+    app = _windows_deployment_fixture(tmp_path / "runtime-probe-mismatch")
+    probe = _windows_runtime_probe(app)
+    probe["qt"]["runtime_qt_version"] = "6.11.0"
+    with pytest.raises(inspector.DeploymentInspectionError, match="frozen Qt runtime"):
+        inspector.inspect_deployment(
+            app, versions=versions, source_commit="a" * 40,
+            runtime_probe=probe,
+            locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
+        )
+
+    app = _windows_deployment_fixture(tmp_path / "locked-identity-mismatch")
+    locked_qt = tmp_path / "locked-qt"
+    shutil.copytree(app / "_internal" / "PyQt6" / "Qt6", locked_qt)
+    with (locked_qt / "bin" / "Qt6Core.dll").open("ab") as stream:
+        stream.write(b"different")
+    with pytest.raises(inspector.DeploymentInspectionError, match="identity differs"):
+        inspector.inspect_deployment(
+            app, versions=versions, source_commit="a" * 40,
+            runtime_probe=_windows_runtime_probe(app), locked_qt_root=locked_qt,
+        )
+
+    app = _windows_deployment_fixture(tmp_path / "locked-plugin-mismatch")
+    locked_qt = tmp_path / "locked-plugin-qt"
+    shutil.copytree(app / "_internal" / "PyQt6" / "Qt6", locked_qt)
+    with (locked_qt / "plugins" / "platforms" / "qwindows.dll").open("ab") as stream:
+        stream.write(b"different")
+    with pytest.raises(inspector.DeploymentInspectionError, match="plugin identity differs"):
+        inspector.inspect_deployment(
+            app, versions=versions, source_commit="a" * 40,
+            runtime_probe=_windows_runtime_probe(app), locked_qt_root=locked_qt,
+        )
+
+    app = _windows_deployment_fixture(tmp_path / "extra-qt-library")
+    locked_qt = tmp_path / "extra-qt-library-locked"
+    shutil.copytree(app / "_internal" / "PyQt6" / "Qt6", locked_qt)
+    _write_pe(app / "_internal" / "PyQt6" / "Qt6" / "bin" / "Qt6Concurrent.dll")
+    with pytest.raises(inspector.DeploymentInspectionError, match="library identity differs"):
+        inspector.inspect_deployment(
+            app, versions=versions, source_commit="a" * 40,
+            runtime_probe=_windows_runtime_probe(app), locked_qt_root=locked_qt,
+        )
+
+    app = _windows_deployment_fixture(tmp_path / "extra-plugin")
+    locked_qt = tmp_path / "extra-plugin-locked"
+    shutil.copytree(app / "_internal" / "PyQt6" / "Qt6", locked_qt)
+    _write_pe(app / "_internal" / "PyQt6" / "Qt6" / "plugins" / "networkinformation" / "qnetworklistmanager.dll")
+    with pytest.raises(inspector.DeploymentInspectionError, match="plugin identity differs"):
+        inspector.inspect_deployment(
+            app, versions=versions, source_commit="a" * 40,
+            runtime_probe=_windows_runtime_probe(app), locked_qt_root=locked_qt,
+        )
+
+    app = _windows_deployment_fixture(tmp_path / "mismatched-non-required-plugin")
+    locked_qt = tmp_path / "mismatched-non-required-plugin-locked"
+    shutil.copytree(app / "_internal" / "PyQt6" / "Qt6", locked_qt)
+    locked_extra = locked_qt / "plugins" / "networkinformation" / "qnetworklistmanager.dll"
+    _write_pe(locked_extra)
+    packaged_extra = app / "_internal" / "PyQt6" / "Qt6" / "plugins" / "networkinformation" / "qnetworklistmanager.dll"
+    _write_pe(packaged_extra)
+    with packaged_extra.open("ab") as stream:
+        stream.write(b"different")
+    with pytest.raises(inspector.DeploymentInspectionError, match="plugin identity differs"):
+        inspector.inspect_deployment(
+            app, versions=versions, source_commit="a" * 40,
+            runtime_probe=_windows_runtime_probe(app), locked_qt_root=locked_qt,
+        )
+
+    app = _windows_deployment_fixture(tmp_path / "duplicate-non-required-plugin")
+    locked_qt = tmp_path / "duplicate-non-required-plugin-locked"
+    shutil.copytree(app / "_internal" / "PyQt6" / "Qt6", locked_qt)
+    locked_extra = locked_qt / "plugins" / "networkinformation" / "qnetworklistmanager.dll"
+    packaged_extra = app / "_internal" / "PyQt6" / "Qt6" / "plugins" / "networkinformation" / "qnetworklistmanager.dll"
+    _write_pe(locked_extra)
+    _write_pe(packaged_extra)
+    _write_pe(app / "_internal" / "plugins" / "qnetworklistmanager.dll")
+    with pytest.raises(inspector.DeploymentInspectionError, match="exactly once"):
+        inspector.inspect_deployment(
+            app, versions=versions, source_commit="a" * 40,
+            runtime_probe=_windows_runtime_probe(app), locked_qt_root=locked_qt,
+        )
+
+    app = _windows_deployment_fixture(tmp_path / "misplaced-unknown-plugin")
+    _write_pe(app / "_internal" / "plugins" / "qcustomplugin.dll")
+    with pytest.raises(inspector.DeploymentInspectionError, match="outside the authoritative plugin"):
+        inspector.inspect_deployment(
+            app, versions=versions, source_commit="a" * 40,
+            runtime_probe=_windows_runtime_probe(app),
+            locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
+        )
+
+    app = _windows_deployment_fixture(tmp_path / "scaled-runtime-probe")
+    probe = _windows_runtime_probe(app)
+    probe["qt"]["scale_factor_environment"] = "1.25"
+    with pytest.raises(inspector.DeploymentInspectionError, match="frozen Qt runtime"):
+        inspector.inspect_deployment(
+            app, versions=versions, source_commit="a" * 40,
+            runtime_probe=probe,
+            locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
+        )
+
+
+def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tmp_path):
+    import json
+    import zipfile
+
+    inspector = _load_windows_deployment_inspector()
+    archive = tmp_path / "RCMetaStudio-windows-x64.zip"
+    runtime_probe = tmp_path / "runtime-probe.json"
+    runtime_value = {"frozen": True}
+    runtime_probe.write_text(json.dumps(runtime_value), encoding="utf-8")
+    runtime_canonical = json.dumps(runtime_value, sort_keys=True, separators=(",", ":")) + "\n"
+    import hashlib
+    deployment = tmp_path / "deployment-manifest.json"
+    deployment.write_text(
+        json.dumps(
+            {
+                "target": "windows-x64",
+                "stack": inspector.EXPECTED_VERSIONS,
+                "runtime_probe_canonical_sha256": hashlib.sha256(runtime_canonical.encode()).hexdigest(),
+            }
+        ),
+        encoding="utf-8",
+    )
+    smoke = tmp_path / "packaged-smoke.json"
+    smoke_log = tmp_path / "packaged-smoke.log"
+    smoke_log.write_text(
+        "\n".join(
+            (
+                "packaged-workflow:evidence-written",
+                "packaged-runtime-probe:passed",
+                "packaged-workflow:post-close",
+                "packaged-surface:scale-1.25-passed",
+                "packaged-surface:scale-1.50-passed",
+                "packaged-surface:scale-1.75-passed",
+                "startup-project:normal-entry-point-passed",
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    smoke.write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "workflows": {
+                    "automation_entry_point": True,
+                    "converted_sample": "amino.rcms",
+                    "representative_edit": True,
+                    "real_r_analysis": True,
+                    "result_text": True,
+                    "expected_summary_sha256": inspector.EXPECTED_SUMMARY_SHA256,
+                    "summary_sha256": inspector.EXPECTED_SUMMARY_SHA256,
+                    "svg_sha256": {"Forest Plot": "a" * 64},
+                    "locale_variants": [
+                        {
+                            "locale": "en_US", "input": "7.0", "canonical_value": 7.0,
+                            "summary_sha256": inspector.EXPECTED_SUMMARY_SHA256,
+                            "svg_sha256": {"Forest Plot": "a" * 64},
+                        },
+                        {
+                            "locale": "de_DE", "input": "7,0", "canonical_value": 7.0,
+                            "summary_sha256": inspector.EXPECTED_SUMMARY_SHA256,
+                            "svg_sha256": {"Forest Plot": "a" * 64},
+                        },
+                    ],
+                    "save_reopen": True,
+                    "analysis_after_reopen": True,
+                },
+                "execution": {
+                    "automation_exit_code": 0,
+                    "positional_user_entry_exit_code": 0,
+                    "scale_exit_codes": {"1.25": 0, "1.50": 0, "1.75": 0},
+                    "post_close_marker": True,
+                    "clean_exit": True,
+                },
+                "scales": [
+                    {
+                        "requested": scale,
+                        "qt_scale_factor": scale,
+                        "device_pixel_ratio": float(scale),
+                        "baseline_device_pixel_ratio": 1.0,
+                        "expected_device_pixel_ratio": float(scale),
+                        "dpr_tolerance": 0.05,
+                        "clipboard": True,
+                        "critical_dialog": True,
+                        "binary_resources": True,
+                        "locale": "de_DE",
+                        "platform_plugin": "windows",
+                        "tls_backends": ["schannel"],
+                        "active_style": "windows11",
+                        "available_styles": ["Windows11", "Windows"],
+                        "image_formats": ["ico", "jpeg", "svg"],
+                    }
+                    for scale in ("1.25", "1.50", "1.75")
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    root = "RCMetaStudio-0.1.2-windows-x64"
+    embedded = {
+        "qualification/deployment-manifest.json": deployment,
+        "qualification/runtime-probe.json": runtime_probe,
+        "qualification/packaged-smoke.json": smoke,
+        "qualification/packaged-smoke.log": smoke_log,
+    }
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.writestr(f"{root}/RCMetaStudio.exe", b"MZ")
+        for relative, source in embedded.items():
+            bundle.writestr(f"{root}/{relative}", source.read_bytes())
+    archive_report = inspector.inspect_archive(
+        archive, archive_root_name=root, embedded_files=embedded
+    )
+    archive_inspection = tmp_path / "archive-inspection.json"
+    archive_inspection.write_text(json.dumps(archive_report), encoding="utf-8")
+
+    evidence = inspector.write_qualification_evidence(
+        archive=archive,
+        deployment_manifest=deployment,
+        smoke_evidence=smoke,
+        smoke_log=smoke_log,
+        runtime_probe=runtime_probe,
+        archive_inspection=archive_inspection,
+        output=tmp_path / "evidence.json",
+    )
+
+    assert evidence["passed"] is True
+    assert evidence["artifact"]["sha256"] == inspector.sha256_file(archive)
+    assert evidence["runner"]["runner_arch"]
+    assert evidence["logs"][0]["sha256"] == inspector.sha256_file(smoke_log)
+
+    mutated = json.loads(smoke.read_text(encoding="utf-8"))
+    mutated["scales"][0]["device_pixel_ratio"] = 1.0
+    smoke.write_text(json.dumps(mutated), encoding="utf-8")
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.writestr(f"{root}/RCMetaStudio.exe", b"MZ")
+        for relative, source in embedded.items():
+            bundle.writestr(f"{root}/{relative}", source.read_bytes())
+    archive_report = inspector.inspect_archive(
+        archive, archive_root_name=root, embedded_files=embedded
+    )
+    archive_inspection.write_text(json.dumps(archive_report), encoding="utf-8")
+    with pytest.raises(inspector.DeploymentInspectionError, match="incomplete"):
+        inspector.write_qualification_evidence(
+            archive=archive, deployment_manifest=deployment, smoke_evidence=smoke,
+            smoke_log=smoke_log, runtime_probe=runtime_probe,
+            archive_inspection=archive_inspection, output=tmp_path / "mutated.json",
+        )
+
+    for member_names in (
+        (f"{root}/../escape.txt",),
+        (f"{root}\\qualification\\runtime-probe.json",),
+        (f"{root}/A.txt", f"{root}/a.txt"),
+    ):
+        bad_archive = tmp_path / ("bad-" + str(len(member_names)) + ".zip")
+        with zipfile.ZipFile(bad_archive, "w") as bundle:
+            for name in member_names:
+                bundle.writestr(name, b"bad")
+        with pytest.raises(inspector.DeploymentInspectionError):
+            inspector.inspect_archive(
+                bad_archive, archive_root_name=root, embedded_files=embedded
+            )

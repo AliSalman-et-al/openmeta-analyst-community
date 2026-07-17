@@ -14,13 +14,14 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $pinnedCranRepo = "https://packagemanager.posit.co/cran/2026-07-16"
-$appSourceDir = Join-Path (Join-Path $repoRoot "src") "rc_metastudio"
 $artifactDir = Join-Path $repoRoot "artifacts"
 $distRoot = Join-Path $repoRoot "build\windows-package\dist"
 $workRoot = Join-Path $repoRoot "build\windows-package\work"
 $appDir = Join-Path $distRoot "RCMetaStudio"
 $archiveStagingRoot = Join-Path $workRoot "zip-staging"
 $zipPath = Join-Path $artifactDir "$ArtifactName.zip"
+$qualificationEvidencePath = Join-Path $artifactDir "$ArtifactName-evidence.json"
+$archiveInspectionPath = Join-Path $artifactDir "$ArtifactName-archive-inspection.json"
 $tmpZipPath = "$zipPath.tmp"
 if (-not $RPackageCacheRoot) {
     $RPackageCacheRoot = Join-Path $artifactDir "r-library-cache"
@@ -54,6 +55,50 @@ function Get-ProjectVersion {
 function Assert-PathExists {
     param([string]$Path, [string]$Description)
     if (-not (Test-Path $Path)) { throw "$Description was not found at '$Path'." }
+}
+
+function Assert-WindowsPackageHost {
+    $osVersion = [Environment]::OSVersion.Version
+    if ($osVersion.Major -lt 10 -or $osVersion.Build -lt 17763) {
+        throw "Windows package qualification requires Windows 10 version 1809 (build 17763) or later; got $osVersion."
+    }
+    if ($env:PROCESSOR_ARCHITECTURE -ne "AMD64") {
+        throw "Windows package qualification requires an x64 host; got '$env:PROCESSOR_ARCHITECTURE'."
+    }
+}
+
+function Invoke-BoundedPackageProcess {
+    param(
+        [string]$FilePath,
+        [string[]]$ArgumentList,
+        [int]$TimeoutSeconds = 900,
+        [switch]$Visible
+    )
+    $startArguments = @{
+        FilePath = $FilePath
+        ArgumentList = $ArgumentList
+        PassThru = $true
+    }
+    if (-not $Visible) { $startArguments.WindowStyle = "Hidden" }
+    $process = Start-Process @startArguments
+    try {
+        if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+            $cleanup = Start-Process -FilePath taskkill.exe -ArgumentList @(
+                "/PID", $process.Id, "/T", "/F"
+            ) -Wait -PassThru -WindowStyle Hidden
+            $cleanupExitCode = $cleanup.ExitCode
+            $cleanup.Dispose()
+            if ($cleanupExitCode -ne 0 -or -not $process.WaitForExit(30000)) {
+                throw "Packaged process watchdog cleanup failed (taskkill=$cleanupExitCode): $FilePath $($ArgumentList -join ' ')"
+            }
+            throw "Packaged process exceeded its $TimeoutSeconds-second watchdog and its process tree was terminated: $FilePath $($ArgumentList -join ' ')"
+        }
+        $process.WaitForExit()
+        return $process.ExitCode
+    }
+    finally {
+        $process.Dispose()
+    }
 }
 
 function Copy-DirectoryTree {
@@ -100,20 +145,48 @@ function Invoke-PackagedAppSmokeTest {
     param([string]$Root)
     $exePath = Join-Path $Root "RCMetaStudio.exe"
     $samplePath = Join-Path $Root "sample_projects\amino.rcms"
+    $smokeEvidencePath = Join-Path $Root "qualification\packaged-smoke.json"
+    $smokeLogPath = Join-Path $Root "qualification\packaged-smoke.log"
+    $quotedSamplePath = '"{0}"' -f $samplePath
+    $quotedSmokeEvidencePath = '"{0}"' -f $smokeEvidencePath
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $smokeEvidencePath) | Out-Null
     $previousEnv = @{
         RCMS_REQUIRE_IN_PROCESS_RPY2 = $env:RCMS_REQUIRE_IN_PROCESS_RPY2
         RCMS_STARTUP_PROJECT_SMOKE = $env:RCMS_STARTUP_PROJECT_SMOKE
         RPY2_CFFI_MODE = $env:RPY2_CFFI_MODE
+        RCMS_PACKAGE_SMOKE_EVIDENCE = $env:RCMS_PACKAGE_SMOKE_EVIDENCE
+        RCMS_AUTOMATION_SMOKE_LOG = $env:RCMS_AUTOMATION_SMOKE_LOG
+        QT_SCALE_FACTOR = $env:QT_SCALE_FACTOR
+        RCMS_PACKAGE_BASELINE_DPR = $env:RCMS_PACKAGE_BASELINE_DPR
     }
     try {
         $env:RCMS_REQUIRE_IN_PROCESS_RPY2 = "1"
         $env:RPY2_CFFI_MODE = "ABI"
-        $process = Start-Process -FilePath $exePath -ArgumentList @("--automation-native-smoke", $samplePath) -Wait -PassThru -WindowStyle Hidden
-        if ($process.ExitCode -ne 0) { throw "Packaged app smoke test failed while opening '$samplePath' with exit code $($process.ExitCode)." }
+        $env:RCMS_PACKAGE_SMOKE_EVIDENCE = $smokeEvidencePath
+        $env:RCMS_AUTOMATION_SMOKE_LOG = $smokeLogPath
+        $runtimeProbePath = Join-Path $Root "qualification\runtime-probe.json"
+        $env:RCMS_PACKAGE_BASELINE_DPR = (& $PythonExe -c "import json,sys; print(json.load(open(sys.argv[1], encoding='utf-8'))['qt']['baseline_device_pixel_ratio'])" $runtimeProbePath).Trim()
+        if ($LASTEXITCODE -ne 0 -or -not $env:RCMS_PACKAGE_BASELINE_DPR) { throw "Could not read packaged baseline DPR." }
+        $env:QT_SCALE_FACTOR = "1.25"
+        $exitCode = Invoke-BoundedPackageProcess -FilePath $exePath -ArgumentList @("--automation-native-smoke", $quotedSamplePath)
+        if ($exitCode -ne 0) { throw "Packaged app smoke test failed while opening '$samplePath' with exit code $exitCode." }
+
+        foreach ($scale in @("1.25", "1.50", "1.75")) {
+            $env:QT_SCALE_FACTOR = $scale
+            $surfaceExitCode = Invoke-BoundedPackageProcess -FilePath $exePath -ArgumentList @(
+                "--automation-package-surface-smoke", $quotedSmokeEvidencePath, $scale
+            )
+            if ($surfaceExitCode -ne 0) {
+                throw "Packaged Qt surface smoke failed at scale $scale with exit code $surfaceExitCode."
+            }
+        }
 
         $env:RCMS_STARTUP_PROJECT_SMOKE = "1"
-        $startupProcess = Start-Process -FilePath $exePath -ArgumentList @($samplePath) -Wait -PassThru -WindowStyle Hidden
-        if ($startupProcess.ExitCode -ne 0) { throw "Packaged startup project smoke test failed while opening '$samplePath' with exit code $($startupProcess.ExitCode)." }
+        $startupExitCode = Invoke-BoundedPackageProcess -FilePath $exePath -ArgumentList @($quotedSamplePath)
+        if ($startupExitCode -ne 0) { throw "Packaged startup project smoke test failed while opening '$samplePath' with exit code $startupExitCode." }
+        & $PythonExe scripts\inspect_windows_deployment.py finalize-smoke `
+            --smoke-evidence $smokeEvidencePath --smoke-log $smokeLogPath
+        if ($LASTEXITCODE -ne 0) { throw "Packaged smoke finalization failed after clean process exits." }
     }
     finally {
         foreach ($name in $previousEnv.Keys) {
@@ -155,11 +228,11 @@ function Invoke-PackagedAdaptiveLayoutEvidence {
             $env:RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG = $logPath
             $quotedOutputDir = '"{0}"' -f $outputDir
             $quotedSamplePath = '"{0}"' -f $samplePath
-            $process = Start-Process -FilePath $exePath -ArgumentList @(
+            $exitCode = Invoke-BoundedPackageProcess -FilePath $exePath -ArgumentList @(
                 "--automation-adaptive-layout-evidence", $quotedOutputDir, $quotedSamplePath
-            ) -Wait -PassThru
-            if ($process.ExitCode -ne 0) {
-                $message = "Native adaptive-layout evidence failed at scale $($scale.Value) with exit code $($process.ExitCode)."
+            ) -Visible
+            if ($exitCode -ne 0) {
+                $message = "Native adaptive-layout evidence failed at scale $($scale.Value) with exit code $exitCode."
                 if (Test-Path $logPath) {
                     $message = $message + " " + (Get-Content -Raw -LiteralPath $logPath).Trim()
                 }
@@ -196,9 +269,9 @@ function Invoke-PackagedWizardLayoutSmokeTest {
     try {
         $env:QT_QPA_PLATFORM = "offscreen"
         $env:RCMS_AUTOMATION_SMOKE_LOG = $smokeLogPath
-        $process = Start-Process -FilePath $exePath -ArgumentList @("--automation-wizard-layout-smoke") -Wait -PassThru -WindowStyle Hidden
-        if ($process.ExitCode -ne 0) {
-            $message = "Packaged wizard layout smoke test failed with exit code $($process.ExitCode)."
+        $exitCode = Invoke-BoundedPackageProcess -FilePath $exePath -ArgumentList @("--automation-wizard-layout-smoke")
+        if ($exitCode -ne 0) {
+            $message = "Packaged wizard layout smoke test failed with exit code $exitCode."
             if (Test-Path $smokeLogPath) {
                 $message = $message + " " + (Get-Content -Raw -LiteralPath $smokeLogPath).Trim()
             }
@@ -239,7 +312,7 @@ function Assert-ZipLayout {
         foreach ($entryName in $entryNames.Keys) {
             if (-not $entryName.StartsWith("$ArchiveRootName\")) { throw "Created ZIP entry is outside '$ArchiveRootName': $entryName" }
         }
-        foreach ($requiredEntry in @("RCMetaStudio.exe", "sample_projects\BCG.rcms", "sample_projects\amino.rcms", "R\bin\x64\R.dll", "R\library\RCMetaR\DESCRIPTION", "LaunchRCMetaStudio.bat")) {
+        foreach ($requiredEntry in @("RCMetaStudio.exe", "sample_projects\BCG.rcms", "sample_projects\amino.rcms", "R\bin\x64\R.dll", "R\library\RCMetaR\DESCRIPTION", "LaunchRCMetaStudio.bat", "qualification\deployment-manifest.json")) {
             $requiredEntry = Join-Path $ArchiveRootName $requiredEntry
             if (-not $entryNames.ContainsKey($requiredEntry)) { throw "Created ZIP is missing '$requiredEntry'." }
         }
@@ -313,6 +386,40 @@ function Test-RDependencyPackages {
     $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','metafor','lme4','pdftools','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }; if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
     & $RscriptExe -e $verify
     return ($LASTEXITCODE -eq 0)
+}
+
+function Invoke-PackagedRuntimeProbe {
+    param([string]$Root)
+    $exePath = Join-Path $Root "RCMetaStudio.exe"
+    $probePath = Join-Path $Root "qualification\runtime-probe.json"
+    $smokeLogPath = Join-Path $Root "qualification\packaged-smoke.log"
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $probePath) | Out-Null
+    $previousEnv = @{
+        RPY2_CFFI_MODE = $env:RPY2_CFFI_MODE
+        RCMS_REQUIRE_IN_PROCESS_RPY2 = $env:RCMS_REQUIRE_IN_PROCESS_RPY2
+        RCMS_AUTOMATION_SMOKE_LOG = $env:RCMS_AUTOMATION_SMOKE_LOG
+        QT_SCALE_FACTOR = $env:QT_SCALE_FACTOR
+    }
+    try {
+        Remove-Item "Env:\QT_SCALE_FACTOR" -ErrorAction SilentlyContinue
+        $env:RPY2_CFFI_MODE = "ABI"
+        $env:RCMS_REQUIRE_IN_PROCESS_RPY2 = "1"
+        $env:RCMS_AUTOMATION_SMOKE_LOG = $smokeLogPath
+        $quotedProbePath = '"{0}"' -f $probePath
+        $exitCode = Invoke-BoundedPackageProcess -FilePath $exePath -ArgumentList @(
+            "--automation-package-runtime-probe", $quotedProbePath
+        )
+        if ($exitCode -ne 0 -or -not (Test-Path $probePath)) {
+            throw "Frozen packaged runtime probe failed with exit code $exitCode."
+        }
+    }
+    finally {
+        foreach ($name in $previousEnv.Keys) {
+            if ($null -eq $previousEnv[$name]) { Remove-Item "Env:\$name" -ErrorAction SilentlyContinue }
+            else { Set-Item "Env:\$name" $previousEnv[$name] }
+        }
+    }
+    return $probePath
 }
 
 function Invoke-StrictRDependencyPolicy {
@@ -472,6 +579,7 @@ if (-not $SkipDependencyInstall) {
 }
 
 $PythonExe = Resolve-CommandOrRepoPath -Path $PythonExe
+Assert-WindowsPackageHost
 
 & $PythonExe -c "import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 11) else 1)"
 if ($LASTEXITCODE -ne 0) { throw "Windows packaging requires the locked Python 3.11 runtime." }
@@ -497,25 +605,29 @@ if (-not $SkipClean) {
 }
 if (Test-Path $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
 if (Test-Path $tmpZipPath) { Remove-Item -LiteralPath $tmpZipPath -Force }
+if (Test-Path $qualificationEvidencePath) { Remove-Item -LiteralPath $qualificationEvidencePath -Force }
+if (Test-Path $archiveInspectionPath) { Remove-Item -LiteralPath $archiveInspectionPath -Force }
 New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 $resolvedRRuntimeRoot = Resolve-RRuntimeRoot
-
+$pyQtRoot = (& $PythonExe -c "from pathlib import Path; import PyQt6; print(Path(PyQt6.__file__).resolve().parent)").Trim()
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path $pyQtRoot)) { throw "Could not resolve the locked PyQt6 runtime root." }
 Push-Location $repoRoot
+$previousPyQtRoot = $env:RCMS_PYQT_ROOT
+$previousQt6BuildRoot = $env:RCMS_QT6_BUILD_ROOT
 try {
+    # packaging/pyinstaller/rc-metastudio.spec is the sole authoritative
+    # PyInstaller collection definition. This wrapper only supplies build roots.
     $env:RPY2_CFFI_MODE = "ABI"
+    $env:RCMS_PYQT_ROOT = $pyQtRoot
+    $qt6PackageBuildRoot = Join-Path $workRoot "qt6-input"
+    & $PythonExe scripts\build_qt6.py generate --build-root $qt6PackageBuildRoot
+    if ($LASTEXITCODE -ne 0) { throw "Qt6 package form/resource generation failed." }
+    $env:RCMS_QT6_BUILD_ROOT = $qt6PackageBuildRoot
     $pyInstallerArgs = @(
         "--noconfirm",
-        "--windowed",
-        "--name", "RCMetaStudio",
-        "--icon", "src\rc_metastudio\images\rc-metastudio-app-icon.ico",
         "--distpath", $distRoot,
         "--workpath", $workRoot,
-        "--paths", $appSourceDir,
-        "--paths", (Join-Path $appSourceDir "forms"),
-        "--hidden-import", "icons_rc",
-        "--hidden-import", "rpy2.robjects",
-        "--hidden-import", "rpy2.rinterface",
-        "src\rc_metastudio\__main__.py"
+        "packaging\pyinstaller\rc-metastudio.spec"
     )
     if (-not $SkipClean) {
         $pyInstallerArgs = @("--clean") + $pyInstallerArgs
@@ -525,6 +637,10 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "PyInstaller build failed." }
 }
 finally {
+    if ($null -eq $previousPyQtRoot) { Remove-Item Env:\RCMS_PYQT_ROOT -ErrorAction SilentlyContinue }
+    else { $env:RCMS_PYQT_ROOT = $previousPyQtRoot }
+    if ($null -eq $previousQt6BuildRoot) { Remove-Item Env:\RCMS_QT6_BUILD_ROOT -ErrorAction SilentlyContinue }
+    else { $env:RCMS_QT6_BUILD_ROOT = $previousQt6BuildRoot }
     Pop-Location
 }
 
@@ -541,6 +657,26 @@ start "" "%APP_DIR%RCMetaStudio.exe" "%APP_DIR%sample_projects\amino.rcms"
 '@ | Set-Content -Path (Join-Path $appDir "LaunchRCMetaStudio.bat") -Encoding ASCII
 
 Assert-AppLayout -Root $appDir
+$runtimeProbePath = Invoke-PackagedRuntimeProbe -Root $appDir
+$deploymentManifestPath = Join-Path $appDir "qualification\deployment-manifest.json"
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $deploymentManifestPath) | Out-Null
+$sourceCommit = (& git rev-parse HEAD).Trim()
+$pythonVersion = (& $PythonExe -c "import platform; print(platform.python_version())").Trim()
+$pyQtVersion = (& $PythonExe -c "import importlib.metadata as m; print(m.version('PyQt6'))").Trim()
+$qtVersion = (& $PythonExe -c "import importlib.metadata as m; print(m.version('PyQt6-Qt6'))").Trim()
+$sipVersion = (& $PythonExe -c "import importlib.metadata as m; print(m.version('PyQt6-sip'))").Trim()
+$sipRuntimeVersion = (& $PythonExe -c "from PyQt6 import sip; print(sip.SIP_VERSION_STR)").Trim()
+$rpy2Version = (& $PythonExe -c "import importlib.metadata as m; print(m.version('rpy2'))").Trim()
+$rVersion = (& (Join-Path $resolvedRRuntimeRoot "bin\Rscript.exe") -e "cat(as.character(getRversion()))").Trim()
+Write-Step "Inspecting coherent Windows x64 deployment"
+& $PythonExe scripts\inspect_windows_deployment.py inspect `
+    --app-root $appDir --output $deploymentManifestPath --source-commit $sourceCommit `
+    --runtime-probe $runtimeProbePath --locked-qt-root (Join-Path $pyQtRoot "Qt6") `
+    --python-version $pythonVersion --pyqt6-version $pyQtVersion --qt-version $qtVersion `
+    --sip-version $sipVersion --sip-runtime-version $sipRuntimeVersion `
+    --r-version $rVersion --rpy2-version $rpy2Version `
+    --pyinstaller-version $requiredPyInstallerVersion
+if ($LASTEXITCODE -ne 0) { throw "Windows deployment inspection failed." }
 if (-not $SkipSmoke) {
     Write-Step "Running packaged Windows smoke checks"
     Invoke-PackagedAppSmokeTest -Root $appDir
@@ -552,4 +688,20 @@ if ($CaptureAdaptiveLayoutEvidence) {
 }
 Compress-AppDirectory -SourceDirectory $appDir -ArchiveStagingRoot $archiveStagingRoot -ArchiveRootDirectory $archiveRootDir -DestinationPath $zipPath
 Assert-ZipLayout -Path $zipPath -ArchiveRootName $archiveRootName
+if (-not $SkipSmoke) {
+    & $PythonExe scripts\inspect_windows_deployment.py archive `
+        --archive $zipPath --archive-root-name $archiveRootName `
+        --deployment-manifest $deploymentManifestPath --runtime-probe $runtimeProbePath `
+        --smoke-evidence (Join-Path $appDir "qualification\packaged-smoke.json") `
+        --smoke-log (Join-Path $appDir "qualification\packaged-smoke.log") `
+        --output $archiveInspectionPath
+    if ($LASTEXITCODE -ne 0) { throw "Final Windows ZIP inspection failed." }
+    & $PythonExe scripts\inspect_windows_deployment.py evidence `
+        --archive $zipPath --deployment-manifest $deploymentManifestPath `
+        --smoke-evidence (Join-Path $appDir "qualification\packaged-smoke.json") `
+        --smoke-log (Join-Path $appDir "qualification\packaged-smoke.log") `
+        --runtime-probe $runtimeProbePath --archive-inspection $archiveInspectionPath `
+        --output $qualificationEvidencePath
+    if ($LASTEXITCODE -ne 0) { throw "Windows package qualification evidence generation failed." }
+}
 Write-Host "Created $zipPath"

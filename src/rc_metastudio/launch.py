@@ -1,8 +1,14 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import hashlib
+import json
+import platform
 import sys, time, traceback
-from PyQt6 import QtCore, QtWidgets
+import tempfile
+from pathlib import Path
+from typing import Any, cast
+from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import QThread
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import QSplashScreen
@@ -30,6 +36,7 @@ SPLASH_DISPLAY_TIME = 0  # Keep startup smoke tests fast; packaged builds may ov
 APPLICATION_ICON_PATH = ":/misc/meta.png"
 AUTOMATION_SMOKE_LOG_ENV = "RCMS_AUTOMATION_SMOKE_LOG"
 ADAPTIVE_LAYOUT_EVIDENCE_LOG_ENV = "RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG"
+PACKAGED_SUMMARY_SHA256 = "3091a4826fbb4b05055670d9c770bc0f92a45dbde2a7578282c9821a66f7268f"
 
 
 def screen_bounded_splash_pixmap(source, available_logical_size):
@@ -233,7 +240,21 @@ def start():
             if len(startup_argv) > 2
             else os.path.join("sample_projects", "amino.rcms")
         )
-        return start_automation_smoke(sample_path, require_native_window=True)
+        return _run_automation_smoke(
+            lambda: start_automation_smoke(sample_path, require_native_window=True)
+        )
+    if len(startup_argv) > 1 and startup_argv[1] == "--automation-package-surface-smoke":
+        if len(startup_argv) != 4:
+            raise SystemExit(
+                "--automation-package-surface-smoke requires an evidence path and scale."
+            )
+        return _run_automation_smoke(
+            lambda: start_package_surface_smoke(startup_argv[2], startup_argv[3])
+        )
+    if len(startup_argv) > 1 and startup_argv[1] == "--automation-package-runtime-probe":
+        if len(startup_argv) != 3:
+            raise SystemExit("--automation-package-runtime-probe requires an output path.")
+        return _run_automation_smoke(lambda: start_package_runtime_probe(startup_argv[2]))
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-wizard-layout-smoke":
         return _run_automation_smoke(start_wizard_layout_smoke)
     if (
@@ -375,6 +396,7 @@ def _configure_application(app):
 
 
 def start_automation_smoke(sample_path, require_native_window=False):
+    _write_automation_smoke_log("packaged-workflow:start")
     app, meta = start_automation()
     try:
         if require_native_window:
@@ -399,6 +421,7 @@ def start_automation_smoke(sample_path, require_native_window=False):
         if not meta.open(sample_path):
             raise SystemExit("Could not open smoke-test project: %s" % sample_path)
         app.processEvents()
+        _write_automation_smoke_log("packaged-workflow:sample-opened")
         model = meta.tableView.model()
         if model is None or model.rowCount() < 1:
             raise SystemExit(
@@ -411,11 +434,296 @@ def start_automation_smoke(sample_path, require_native_window=False):
         # paint error aborts the process, failing the smoke test with a non-zero
         # exit code rather than shipping a build that crashes on first render.
         _force_table_paint(app, meta)
-        _assert_standard_binary_summary_is_formatted(meta)
+        workflow = _exercise_packaged_project_workflow(app, meta, sample_path)
+        _write_automation_smoke_log("packaged-workflow:save-reopen-complete")
+        evidence_path = os.environ.get("RCMS_PACKAGE_SMOKE_EVIDENCE")
+        if evidence_path:
+            evidence = {
+                "schema_version": 1,
+                "passed": True,
+                "platform_plugin": app.platformName().lower(),
+                "workflows": workflow,
+                "scales": [],
+            }
+            Path(evidence_path).write_text(
+                json.dumps(evidence, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            _write_automation_smoke_log("packaged-workflow:evidence-written")
     finally:
         meta.close()
         app.processEvents()
+    _write_automation_smoke_log("packaged-workflow:post-close")
     return 0
+
+
+def start_package_surface_smoke(evidence_path, expected_scale):
+    """Exercise native package-only Qt surfaces at a requested scale factor."""
+    app_error_handler.install_global_exception_handler()
+    app = app_error_handler.get_or_create_application(sys.argv)
+    _configure_application(app)
+    qt6_resources.ensure_application_resources()
+    from PyQt6 import QtNetwork
+    platform_name = app.platformName().lower()
+    if sys.platform == "win32" and platform_name != "windows":
+        raise SystemExit("Package surface smoke did not load qwindows.")
+
+    clipboard = app.clipboard()
+    clipboard_text = "RC MetaStudio clipboard – München – 1,25"
+    clipboard.setText(clipboard_text)
+    if clipboard.text() != clipboard_text:
+        raise SystemExit("Package surface smoke clipboard round-trip failed.")
+
+    locale = QtCore.QLocale(QtCore.QLocale.Language.German)
+    value, valid = locale.toDouble("1,25")
+    if not valid or value != 1.25:
+        raise SystemExit("Package surface smoke locale parsing failed.")
+
+    if QIcon(":/icons/actions/copy.svg").isNull() or QPixmap(":/misc/meta.png").isNull():
+        raise SystemExit("Package surface smoke could not load binary resources.")
+    tls_backends = list(QtNetwork.QSslSocket.availableBackends())
+    if "schannel" not in [backend.lower() for backend in tls_backends]:
+        raise SystemExit("Package surface smoke did not load the Schannel TLS backend.")
+    available_styles = list(QtWidgets.QStyleFactory.keys())
+    if not available_styles or app.style() is None:
+        raise SystemExit("Package surface smoke found no Qt style plugin/style.")
+    image_formats = sorted(value.data().decode("ascii").lower() for value in QtGui.QImageReader.supportedImageFormats())
+    if not {"ico", "jpeg", "svg"} <= set(image_formats):
+        raise SystemExit("Package surface smoke did not load required image/SVG plugins.")
+
+    dialog = QtWidgets.QMessageBox(
+        QtWidgets.QMessageBox.Icon.Critical,
+        "Packaged critical dialog",
+        "Deployment smoke diagnostic",
+        QtWidgets.QMessageBox.StandardButton.Ok,
+    )
+    dialog.show()
+    app.processEvents()
+    if not dialog.isVisible() or dialog.icon() != QtWidgets.QMessageBox.Icon.Critical:
+        raise SystemExit("Package surface smoke could not show a critical dialog.")
+    dialog.close()
+    app.processEvents()
+
+    primary = app.primaryScreen()
+    if primary is None or primary.devicePixelRatio() <= 0 or primary.logicalDotsPerInch() <= 0:
+        raise SystemExit("Package surface smoke found invalid display metrics.")
+
+    requested_scale = float(expected_scale)
+    environment_scale = float(os.environ.get("QT_SCALE_FACTOR", "0"))
+    observed_dpr = float(primary.devicePixelRatio())
+    baseline_dpr = float(os.environ.get("RCMS_PACKAGE_BASELINE_DPR", "0"))
+    expected_dpr = baseline_dpr * requested_scale
+    tolerance = 0.05
+    if abs(environment_scale - requested_scale) > 1e-9:
+        raise SystemExit("Package surface smoke scale environment differs from request.")
+    if baseline_dpr <= 0 or abs(observed_dpr - expected_dpr) > tolerance:
+        raise SystemExit(
+            "Package surface smoke observed DPR %.4f, expected %.4f ± %.4f."
+            % (observed_dpr, expected_dpr, tolerance)
+        )
+
+    path = Path(evidence_path)
+    evidence = json.loads(path.read_text(encoding="utf-8"))
+    evidence.setdefault("scales", []).append(
+        {
+            "requested": expected_scale,
+            "qt_scale_factor": os.environ.get("QT_SCALE_FACTOR"),
+            "device_pixel_ratio": observed_dpr,
+            "baseline_device_pixel_ratio": baseline_dpr,
+            "expected_device_pixel_ratio": expected_dpr,
+            "dpr_tolerance": tolerance,
+            "logical_dpi": primary.logicalDotsPerInch(),
+            "clipboard": True,
+            "critical_dialog": True,
+            "binary_resources": True,
+            "tls_backends": tls_backends,
+            "active_style": app.style().objectName(),
+            "available_styles": available_styles,
+            "image_formats": image_formats,
+            "locale": "de_DE",
+            "platform_plugin": platform_name,
+        }
+    )
+    path.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _write_automation_smoke_log("packaged-surface:scale-%s-passed" % expected_scale)
+    return 0
+
+
+def start_package_runtime_probe(output_path):
+    """Report the runtime actually loaded by the assembled frozen executable."""
+    import importlib.metadata
+
+    from PyQt6 import sip
+
+    import r_runtime
+
+    configured = r_runtime.configure_bundled_r_environment()
+    from rpy2 import robjects
+
+    app = app_error_handler.get_or_create_application(sys.argv)
+    _configure_application(app)
+    primary = app.primaryScreen()
+    if primary is None:
+        raise SystemExit("Frozen runtime probe found no primary screen.")
+    r_home_values = cast(Any, robjects.r("normalizePath(R.home(), winslash='/', mustWork=TRUE)"))
+    r_version_values = cast(Any, robjects.r("as.character(getRversion())"))
+    r_library_values = cast(Any, robjects.r("normalizePath(.libPaths(), winslash='/', mustWork=TRUE)"))
+    r_home = str(r_home_values[0])
+    r_version = str(r_version_values[0])
+    r_library_paths = [str(value) for value in r_library_values]
+    probe = {
+        "schema_version": 1,
+        "frozen": bool(getattr(sys, "frozen", False)),
+        "python": {
+            "version": platform.python_version(),
+            "executable": str(Path(sys.executable).resolve()),
+            "architecture": platform.machine(),
+            "bundle_root": str(Path(getattr(sys, "_MEIPASS", "")).resolve()),
+        },
+        "qt": {
+            "pyqt_version": QtCore.PYQT_VERSION_STR,
+            "compiled_qt_version": QtCore.QT_VERSION_STR,
+            "runtime_qt_version": QtCore.qVersion(),
+            "sip_runtime_version": sip.SIP_VERSION_STR,
+            "platform_plugin": app.platformName().lower(),
+            "plugins_path": QtCore.QLibraryInfo.path(QtCore.QLibraryInfo.LibraryPath.PluginsPath),
+            "library_paths": list(app.libraryPaths()),
+            "scale_factor_environment": os.environ.get("QT_SCALE_FACTOR"),
+            "baseline_device_pixel_ratio": float(primary.devicePixelRatio()),
+            "baseline_logical_dpi": float(primary.logicalDotsPerInch()),
+        },
+        "rpy2": {"distribution_version": importlib.metadata.version("rpy2")},
+        "r": {
+            "version": r_version,
+            "home": r_home,
+            "library_paths": r_library_paths,
+            "configured_home": configured.get("R_HOME"),
+            "configured_library": configured.get("R_LIBS"),
+        },
+    }
+    Path(output_path).write_text(
+        json.dumps(probe, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    _write_automation_smoke_log("packaged-runtime-probe:passed")
+    return 0
+
+
+def _exercise_packaged_project_workflow(app, meta, sample_path):
+    import project_format
+
+    model = meta.tableView.model()
+    study_index = model.index(0, model.NAME)
+    edited_name = "Packaged Smoke – München"
+    if not model.setData(study_index, edited_name):
+        raise SystemExit("Packaged smoke could not edit representative data.")
+    if model.data(study_index, QtCore.Qt.ItemDataRole.DisplayRole) != edited_name:
+        raise SystemExit("Packaged smoke edit did not round-trip through the model.")
+
+    save_root = Path(tempfile.mkdtemp(prefix="rcms-packaged-smoke-"))
+    raw_index = model.index(0, model.RAW_DATA[0])
+    original_raw = model.data(raw_index, QtCore.Qt.ItemDataRole.DisplayRole)
+    numeric_value = float(str(original_raw).replace(",", "."))
+    dot_text = "%.1f" % numeric_value
+    comma_text = dot_text.replace(".", ",")
+
+    variants = []
+    for locale_name, numeric_text, destination in (
+        ("en_US", dot_text, save_root / "dot-decimal.rcms"),
+        ("de_DE", comma_text, save_root / "comma-decimal.rcms"),
+    ):
+        locale = QtCore.QLocale(locale_name)
+        parsed_value, parsed = locale.toDouble(numeric_text)
+        if not parsed or parsed_value != numeric_value:
+            raise SystemExit("Packaged smoke could not parse the %s locale boundary." % locale_name)
+        if locale_name == "de_DE":
+            if not meta.open(os.path.abspath(sample_path)):
+                raise SystemExit("Packaged smoke could not reset the locale comparison project.")
+            model = meta.tableView.model()
+            study_index = model.index(0, model.NAME)
+            raw_index = model.index(0, model.RAW_DATA[0])
+            if not model.setData(study_index, edited_name):
+                raise SystemExit("Packaged smoke could not repeat the representative edit.")
+        if not model.setData(raw_index, numeric_text):
+            raise SystemExit("Packaged smoke rejected %s numeric input." % locale_name)
+        result = _assert_standard_binary_summary_is_formatted(meta)
+        identity = _packaged_result_identity(result)
+        _write_automation_smoke_log("packaged-workflow:analysis-%s-complete" % locale_name)
+        meta.out_path = str(destination)
+        if meta.save() is not True or not destination.is_file():
+            raise SystemExit("Packaged smoke could not save the %s project." % locale_name)
+        variants.append(
+            {
+                "locale": locale_name,
+                "input": numeric_text,
+                "canonical_value": numeric_value,
+                "summary_sha256": identity["summary_sha256"],
+                "svg_sha256": identity["svg_sha256"],
+                "path": destination,
+            }
+        )
+
+    dot_project = project_format.load_project(variants[0]["path"]).project
+    comma_project = project_format.load_project(variants[1]["path"]).project
+    if dot_project != comma_project:
+        raise SystemExit("Dot/comma packaged inputs did not persist canonically.")
+    if variants[0]["summary_sha256"] != variants[1]["summary_sha256"]:
+        raise SystemExit("Dot/comma packaged analyses produced different result text.")
+    if variants[0]["svg_sha256"] != variants[1]["svg_sha256"]:
+        raise SystemExit("Dot/comma packaged analyses produced different SVG content.")
+
+    saved_path = variants[1]["path"]
+    if not meta.open(str(saved_path)):
+        raise SystemExit("Packaged smoke could not reopen the saved project.")
+    reopened = meta.tableView.model()
+    reopened_index = reopened.index(0, reopened.NAME)
+    if reopened.data(reopened_index, QtCore.Qt.ItemDataRole.DisplayRole) != edited_name:
+        raise SystemExit("Packaged smoke save/reopen lost the representative edit.")
+    reopened_identity = _packaged_result_identity(
+        _assert_standard_binary_summary_is_formatted(meta)
+    )
+    if reopened_identity["summary_sha256"] != variants[1]["summary_sha256"]:
+        raise SystemExit("Reopened packaged analysis changed result text.")
+    if reopened_identity["svg_sha256"] != variants[1]["svg_sha256"]:
+        raise SystemExit("Reopened packaged analysis changed SVG content.")
+    return {
+        "automation_entry_point": True,
+        "converted_sample": Path(sample_path).name,
+        "representative_edit": True,
+        "real_r_analysis": True,
+        "result_text": True,
+        "expected_summary_sha256": PACKAGED_SUMMARY_SHA256,
+        "summary_sha256": reopened_identity["summary_sha256"],
+        "svg_sha256": reopened_identity["svg_sha256"],
+        "locale_variants": [
+            {key: value for key, value in variant.items() if key != "path"}
+            for variant in variants
+        ],
+        "save_reopen": True,
+        "analysis_after_reopen": True,
+    }
+
+
+def _packaged_result_identity(result):
+    summary = result.get("texts", {}).get("Summary", "").replace("\r\n", "\n")
+    summary_sha256 = hashlib.sha256(summary.encode("utf-8")).hexdigest()
+    if summary_sha256 != PACKAGED_SUMMARY_SHA256:
+        raise SystemExit(
+            "Packaged summary identity mismatch: %s != %s"
+            % (summary_sha256, PACKAGED_SUMMARY_SHA256)
+        )
+    display_images = result.get("display_images", {})
+    svg_hashes = {}
+    for label, raw_path in sorted(display_images.items()):
+        path = Path(raw_path)
+        if path.suffix.lower() != ".svg":
+            continue
+        payload = path.read_bytes() if path.is_file() else b""
+        if b"<svg" not in payload[:4096].lower():
+            raise SystemExit("Packaged smoke analysis produced an invalid SVG: %s" % path)
+        svg_hashes[label] = hashlib.sha256(payload).hexdigest()
+    if not svg_hashes:
+        raise SystemExit("Packaged smoke analysis produced no display SVG.")
+    return {"summary_sha256": summary_sha256, "svg_sha256": svg_hashes}
 
 
 def start_shell_smoke(require_native_window=False):
@@ -704,6 +1012,7 @@ def _assert_opened_project_for_startup_smoke(app, meta, sample_path, opened):
                 "Startup project opened without table rows: %s" % sample_path
             )
         _force_table_paint(app, meta)
+        _write_automation_smoke_log("startup-project:normal-entry-point-passed")
     finally:
         meta.close()
         app.processEvents()
@@ -769,6 +1078,7 @@ def _assert_standard_binary_summary_is_formatted(meta):
         raise SystemExit(
             "Packaged summary smoke test saw raw R list output: %s" % ", ".join(leaked)
         )
+    return result
 
 
 def _force_table_paint(app, meta):

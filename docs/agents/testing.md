@@ -84,6 +84,37 @@ Build the Windows package only when packaging evidence is needed:
 powershell -ExecutionPolicy Bypass -File .\scripts\package-windows.ps1 -ArtifactName RCMetaStudio-windows-x64
 ```
 
+Pull requests that change a direct Windows assembly or qualification input must
+pass the required `Required Windows x64 Package Qualification` job. The
+classifier includes the package workflows and specifications, Python/R locks,
+application source, bundled sample projects, R sources and dependency policy,
+delivery-target metadata, Qt generation and package-verification scripts, the
+deployment inspector, packaging contracts, and the packaged `MetaForm`
+automation-launch test, along with the focused project-format, Qt text-boundary,
+Qt build-slice, and cutover-finalization tests invoked by release verification.
+Keep that classifier synchronized whenever the package script or release
+verifier gains another direct input.
+
+The job retains the distributable ZIP plus the deployment manifest, frozen
+runtime probe, packaged smoke evidence/log, archive-inspection report, and final
+qualification evidence. The runtime probe is collected with `QT_SCALE_FACTOR`
+absent; later 125%, 150%, and 175% subprocesses prove their requested scale
+against that unscaled baseline. UPX is disabled for the frozen executable and
+collected payload so Qt DLL and plugin bytes remain identical to the locked
+wheel on every host. This deliberately favors reproducibility over a smaller
+ZIP. Run the fast local package contracts before
+requesting the hosted artifact build:
+
+```powershell
+uv run pytest -q tests/packaging/contract
+```
+
+The hosted job is intentionally more expensive because it assembles bundled R,
+builds the frozen application, runs real-R GUI analysis, and inspects the final
+ZIP. Its uv, R dependency, and package inputs are cached, so avoid manual reruns
+when neither code nor cache state changed; local contracts are the quick feedback
+loop, not a substitute for the required hosted artifact proof.
+
 On macOS, use the package script for the matching host architecture:
 
 ```bash

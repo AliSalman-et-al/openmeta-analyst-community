@@ -5895,5 +5895,10 @@ def test_native_packaged_smoke_requires_expected_plugin_and_visible_window(monke
     monkeypatch.setattr(
         launch, "_assert_standard_binary_summary_is_formatted", lambda _meta: None
     )
+    monkeypatch.setattr(
+        launch,
+        "_exercise_packaged_project_workflow",
+        lambda _app, _meta, _sample: {},
+    )
 
     assert launch.start_automation_smoke("sample.rcms", require_native_window=True) == 0

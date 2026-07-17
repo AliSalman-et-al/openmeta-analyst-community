@@ -25,6 +25,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       run-windows: ${{ steps.classify.outputs.run-windows }}
+      run-windows-package: ${{ steps.classify.outputs.run-windows-package }}
       reason: ${{ steps.classify.outputs.reason }}
 
     steps:
@@ -40,18 +41,21 @@ jobs:
           set -euo pipefail
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             echo "run-windows=true" >> "$GITHUB_OUTPUT"
+            echo "run-windows-package=true" >> "$GITHUB_OUTPUT"
             echo "reason=manual dispatch" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           if [ "$EVENT_NAME" = "push" ]; then
             echo "run-windows=true" >> "$GITHUB_OUTPUT"
+            echo "run-windows-package=true" >> "$GITHUB_OUTPUT"
             echo "reason=push to ${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           changed_files="$(gh api --paginate "repos/$REPOSITORY/pulls/$PR_NUMBER/files" --jq '.[].filename')"
           run_windows=false
+          run_windows_package=false
           reason="no Qt6 integration verification inputs changed"
           while IFS= read -r file; do
             case "$file" in
@@ -63,7 +67,17 @@ jobs:
             esac
           done <<< "$changed_files"
 
+          while IFS= read -r file; do
+            case "$file" in
+              .github/workflows/fast-verification.yml|.github/workflows/package-target.yml|packaging/*|pyproject.toml|uv.lock|sample_projects/*|r/*|scripts/build-windows-package.ps1|scripts/package-windows.ps1|scripts/inspect_windows_deployment.py|scripts/install-r-deps.R|scripts/r_binary_policy.R|scripts/r_dependency_policy.py|scripts/build_qt6.py|scripts/verify_package_release.py|scripts/resolve_package_ci_metadata.py|scripts/validate_adaptive_layout_evidence.py|docs/verification/RCMetaR-r-dependencies.json|delivery/targets.json|src/*|tests/packaging/*|tests/python/fast/test_qt6_cutover_finalization.py|tests/python/fast/test_qt6_build_slice.py|tests/python/fast/test_project_format.py|tests/python/fast/test_qt_text_boundaries.py|tests/python/gui/test_metaform_automation_launch.py)
+                run_windows_package=true
+                break
+                ;;
+            esac
+          done <<< "$changed_files"
+
           echo "run-windows=$run_windows" >> "$GITHUB_OUTPUT"
+          echo "run-windows-package=$run_windows_package" >> "$GITHUB_OUTPUT"
           echo "reason=$reason" >> "$GITHUB_OUTPUT"
           echo "$reason"
 
@@ -246,12 +260,24 @@ jobs:
         if: ${{ always() }}
         run: uv cache prune --ci
 
+  windows-package-qualification:
+    name: Required Windows x64 Package Qualification
+    needs: change-classifier
+    if: ${{ needs.change-classifier.outputs.run-windows-package == 'true' }}
+    uses: ./.github/workflows/package-target.yml
+    with:
+      runner: windows-latest
+      target_os: windows
+      artifact_name: RCMetaStudio-windows-x64
+      archive_platform: windows-x64
+
   fast-verification-gate:
     name: Qt6 Integration Verification Gate
     needs:
       - change-classifier
       - qt6-verification
       - source-fast-targets
+      - windows-package-qualification
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -264,6 +290,8 @@ jobs:
           REASON: ${{ needs.change-classifier.outputs.reason }}
           QT6_RESULT: ${{ needs.qt6-verification.result }}
           SOURCE_FAST_RESULT: ${{ needs.source-fast-targets.result }}
+          RUN_WINDOWS_PACKAGE: ${{ needs.change-classifier.outputs.run-windows-package }}
+          WINDOWS_PACKAGE_RESULT: ${{ needs.windows-package-qualification.result }}
         run: |
           set -euo pipefail
           echo "Qt6 integration verification classifier: $REASON"
@@ -277,6 +305,10 @@ jobs:
           fi
           if [ "$SOURCE_FAST_RESULT" != "success" ]; then
             echo "Three-target source smoke and Fast Verification result: $SOURCE_FAST_RESULT" >&2
+            exit 1
+          fi
+          if [ "$RUN_WINDOWS_PACKAGE" = "true" ] && [ "$WINDOWS_PACKAGE_RESULT" != "success" ]; then
+            echo "Required Windows x64 package qualification result: $WINDOWS_PACKAGE_RESULT" >&2
             exit 1
           fi
           echo "Native Qt6 vertical-slice verification passed."

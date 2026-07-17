@@ -96,6 +96,66 @@
     },
     {
       "decision": "keep",
+      "evidence": [
+        "packaging_contract",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_windows_distributable_contract.py::test_windows_packager_qualifies_qt6_deployment_and_packaged_surfaces",
+      "reason": "Guards the sole-collector, required-plugin, watchdog, and fractional-scale Windows package contract.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "packaging_contract",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_windows_distributable_contract.py::test_windows_deployment_inspector_accepts_one_coherent_x64_qt6_stack",
+      "reason": "Proves the fail-closed deployment inspector accepts the locked coherent Windows x64 Qt6 stack.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "packaging_contract",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_windows_distributable_contract.py::test_windows_deployment_inspector_rejects_legacy_duplicate_and_wrong_architecture",
+      "reason": "Proves legacy, duplicate, and wrong-architecture native payloads fail Windows qualification.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": [
+        "packaging_contract",
+        "release_readiness"
+      ],
+      "external_dependencies": [
+        "filesystem"
+      ],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_windows_distributable_contract.py::test_windows_qualification_evidence_authenticates_complete_packaged_smoke",
+      "reason": "Proves retained qualification evidence authenticates the artifact and complete native smoke matrix.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
       "evidence": ["gui_compatibility", "analysis_behavior"],
       "external_dependencies": ["qt"],
       "lane": "gui",
