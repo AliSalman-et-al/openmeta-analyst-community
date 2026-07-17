@@ -63,6 +63,7 @@ def test_native_calculator_capture_falls_back_when_screen_grab_is_null(tmp_path,
         def __init__(self, widget):
             self.widget = widget
             self.widget_capture_calls = 0
+            self.widget_render_calls = 0
 
         def screen(self):
             return NullScreen()
@@ -72,7 +73,20 @@ def test_native_calculator_capture_falls_back_when_screen_grab_is_null(tmp_path,
 
         def grab(self):
             self.widget_capture_calls += 1
-            return self.widget.grab()
+            return QtGui.QPixmap()
+
+        def width(self):
+            return self.widget.width()
+
+        def height(self):
+            return self.widget.height()
+
+        def devicePixelRatioF(self):
+            return self.widget.devicePixelRatioF()
+
+        def render(self, painter):
+            self.widget_render_calls += 1
+            self.widget.render(painter)
 
     try:
         proxy = RenderableDialogProxy(dialog)
@@ -81,13 +95,14 @@ def test_native_calculator_capture_falls_back_when_screen_grab_is_null(tmp_path,
 
         assert dialog.isVisible()
         assert label.isVisible()
-        assert method == "QWidget.grab fallback"
+        assert method == "QWidget.render(QImage) fallback"
         assert proxy.widget_capture_calls == 1
+        assert proxy.widget_render_calls == 1
         assert not pixmap.isNull()
         ratio = pixmap.devicePixelRatio()
         assert abs((pixmap.width() / ratio) - dialog.width()) <= 1
         assert abs((pixmap.height() / ratio) - dialog.height()) <= 1
-        rendered = pixmap.toImage()
+        rendered = pixmap
         sampled_colors = {
             rendered.pixelColor(x, y).rgba()
             for x in range(0, rendered.width(), max(1, rendered.width() // 12))
@@ -101,19 +116,60 @@ def test_native_calculator_capture_falls_back_when_screen_grab_is_null(tmp_path,
         qapp.processEvents()
 
 
+def test_native_calculator_teardown_disables_auto_quit_and_restores_on_error():
+    smoke = _load_native_calculator_smoke()
+    events = []
+
+    class FakeApplication:
+        def quitOnLastWindowClosed(self):
+            events.append("read-auto-quit")
+            return True
+
+        def setQuitOnLastWindowClosed(self, enabled):
+            events.append(("set-auto-quit", enabled))
+
+    class FailingWindow:
+        current_data_unsaved = True
+
+        def close(self):
+            events.append("close")
+            raise RuntimeError("close failed")
+
+    window = FailingWindow()
+    with pytest.raises(RuntimeError, match="close failed"):
+        smoke.close_automation_window(FakeApplication(), window)
+
+    assert window.current_data_unsaved is False
+    assert events == [
+        "read-auto-quit",
+        ("set-auto-quit", False),
+        "close",
+        ("set-auto-quit", True),
+    ]
+
+
 def test_native_calculator_evidence_is_relocatable_and_tamper_evident(tmp_path):
     smoke = _load_native_calculator_smoke()
     source = tmp_path / "source"
     source.mkdir()
     records = []
-    for calculator in ("binary", "continuous", "diagnostic"):
-        payload = (calculator + " screenshot").encode()
+    capture_methods = (
+        "QScreen.grabWindow",
+        "QWidget.grab fallback",
+        "QWidget.render(QImage) fallback",
+    )
+    for calculator, capture_method in zip(
+        ("binary", "continuous", "diagnostic"), capture_methods, strict=True
+    ):
         image = source / (calculator + ".png")
-        image.write_bytes(payload)
+        rendered = QtGui.QImage(12, 8, QtGui.QImage.Format.Format_ARGB32)
+        rendered.fill(QtGui.QColor("#2d72d9"))
+        assert rendered.save(str(image), "PNG")
+        payload = image.read_bytes()
         records.append(
             {
                 "calculator": calculator,
-                "capture_method": "QScreen.grabWindow",
+                "capture_method": capture_method,
                 "image": image.name,
                 "image_size": len(payload),
                 "image_sha256": hashlib.sha256(payload).hexdigest(),
@@ -126,6 +182,18 @@ def test_native_calculator_evidence_is_relocatable_and_tamper_evident(tmp_path):
     assert smoke.validate_evidence_bundle(relocated) == records
 
     manifest = relocated / "evidence.json"
+    tampered = json.loads(manifest.read_text(encoding="utf-8"))
+    forged = b"not a PNG despite matching manifest integrity"
+    forged_image = relocated / tampered[0]["image"]
+    forged_image.write_bytes(forged)
+    tampered[0]["image_size"] = len(forged)
+    tampered[0]["image_sha256"] = hashlib.sha256(forged).hexdigest()
+    manifest.write_text(json.dumps(tampered), encoding="utf-8")
+    with pytest.raises(ValueError, match="image is not a PNG"):
+        smoke.validate_evidence_bundle(relocated)
+
+    shutil.copy2(source / "binary.png", relocated / "binary.png")
+    shutil.copy2(source / "evidence.json", manifest)
     tampered = json.loads(manifest.read_text(encoding="utf-8"))
     tampered[0]["capture_method"] = "untrusted screenshot"
     manifest.write_text(json.dumps(tampered), encoding="utf-8")
@@ -147,8 +215,9 @@ def test_native_calculator_evidence_is_relocatable_and_tamper_evident(tmp_path):
         smoke.validate_evidence_bundle(relocated)
 
     shutil.copy2(source / "evidence.json", manifest)
-    original_size = (relocated / "binary.png").stat().st_size
-    (relocated / "binary.png").write_bytes(b"x" * original_size)
+    hash_tampered = bytearray((relocated / "binary.png").read_bytes())
+    hash_tampered[-1] ^= 1
+    (relocated / "binary.png").write_bytes(hash_tampered)
     with pytest.raises(ValueError, match="SHA256 does not match"):
         smoke.validate_evidence_bundle(relocated)
 

@@ -8696,7 +8696,12 @@
     {
       "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["filesystem", "qt"], "lane": "fast",
       "nodeid": "tests/python/fast/test_calculator_qt6.py::test_native_calculator_capture_falls_back_when_screen_grab_is_null",
-      "reason": "Forces a null hosted screen grab and proves the visible widget-render fallback produces an intact PNG.", "runtime_class": "subsecond", "size": "small"
+      "reason": "Forces null screen and widget grabs and proves software rendering of a visible styled dialog produces an intact nontrivial PNG.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_native_calculator_teardown_disables_auto_quit_and_restores_on_error",
+      "reason": "Proves native smoke teardown suppresses last-window auto-quit before close, restores state on failure, and performs no post-close event pump.", "runtime_class": "subsecond", "size": "small"
     },
     {
       "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",

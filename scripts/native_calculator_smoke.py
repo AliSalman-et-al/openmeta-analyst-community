@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import math
 import os
 from pathlib import Path
 from pathlib import PurePosixPath
@@ -35,13 +36,45 @@ def _sha256(path: Path) -> str:
 
 def capture_visible_calculator(
     dialog: QtWidgets.QDialog,
-) -> tuple[QtGui.QPixmap, str]:
+) -> tuple[QtGui.QPixmap | QtGui.QImage, str]:
     """Capture a visible calculator even when hosted screen capture is unavailable."""
     screen = required(dialog.screen(), "calculator screen")
     pixmap = screen.grabWindow(dialog.winId())
     if not pixmap.isNull():
         return pixmap, "QScreen.grabWindow"
-    return dialog.grab(), "QWidget.grab fallback"
+    pixmap = dialog.grab()
+    if not pixmap.isNull():
+        return pixmap, "QWidget.grab fallback"
+
+    ratio = max(1.0, dialog.devicePixelRatioF())
+    image = QtGui.QImage(
+        max(1, math.ceil(dialog.width() * ratio)),
+        max(1, math.ceil(dialog.height() * ratio)),
+        QtGui.QImage.Format.Format_ARGB32_Premultiplied,
+    )
+    image.setDevicePixelRatio(ratio)
+    image.fill(QtCore.Qt.GlobalColor.transparent)
+    painter = QtGui.QPainter(image)
+    if not painter.isActive():
+        raise RuntimeError("failed to allocate software calculator capture")
+    try:
+        dialog.render(painter)
+    finally:
+        painter.end()
+    return image, "QWidget.render(QImage) fallback"
+
+
+def close_automation_window(
+    app: QtWidgets.QApplication, window: QtWidgets.QWidget
+) -> None:
+    """Close without triggering last-window quit or pumping teardown events."""
+    previous_auto_quit = app.quitOnLastWindowClosed()
+    app.setQuitOnLastWindowClosed(False)
+    try:
+        setattr(window, "current_data_unsaved", False)
+        window.close()
+    finally:
+        app.setQuitOnLastWindowClosed(previous_auto_quit)
 
 
 def validate_evidence_bundle(evidence_root: Path) -> list[dict[str, object]]:
@@ -64,6 +97,7 @@ def validate_evidence_bundle(evidence_root: Path) -> list[dict[str, object]]:
         if record.get("capture_method") not in {
             "QScreen.grabWindow",
             "QWidget.grab fallback",
+            "QWidget.render(QImage) fallback",
         }:
             raise ValueError("calculator capture method is invalid")
         relative_text = record.get("image")
@@ -84,6 +118,9 @@ def validate_evidence_bundle(evidence_root: Path) -> list[dict[str, object]]:
             raise ValueError("calculator image path escapes the evidence root")
         if not image_path.is_file():
             raise ValueError("calculator image is missing: %s" % relative_text)
+        with image_path.open("rb") as image_handle:
+            if image_handle.read(8) != b"\x89PNG\r\n\x1a\n":
+                raise ValueError("calculator image is not a PNG: %s" % relative_text)
         expected_size = record.get("image_size")
         if not isinstance(expected_size, int) or expected_size <= 0:
             raise ValueError("calculator image size must be a positive integer")
@@ -247,6 +284,10 @@ def main() -> int:
                         raise RuntimeError(
                             "failed to capture visible %s calculator" % data_type
                         )
+                    if image_path.read_bytes()[:8] != b"\x89PNG\r\n\x1a\n":
+                        raise RuntimeError(
+                            "calculator capture is not an intact PNG: %s" % data_type
+                        )
                     captured.append(
                         {
                             "action": action,
@@ -310,9 +351,7 @@ def main() -> int:
         raise
     finally:
         _write_evidence(evidence_path, evidence)
-        window.current_data_unsaved = False
-        window.close()
-        app.processEvents()
+        close_automation_window(app, window)
 
     validate_evidence_bundle(evidence_root)
     print(evidence_path.read_text(encoding="utf-8"))
