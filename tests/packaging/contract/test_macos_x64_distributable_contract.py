@@ -1,3 +1,4 @@
+import errno
 import importlib.util
 import json
 import os
@@ -10,6 +11,7 @@ import zipfile
 from pathlib import Path
 
 import pytest
+import yaml
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -77,7 +79,10 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec():
 
 def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
     build = text("scripts/build-macos-package.sh")
-    workflow = text(".github/workflows/package-target.yml")
+    workflow_text = text(".github/workflows/package-target.yml")
+    workflow = yaml.safe_load(workflow_text)
+    steps = workflow["jobs"]["package"]["steps"]
+    steps_by_name = {step["name"]: step for step in steps}
 
     for command in ("inspect", "finalize-smoke", "archive", "evidence"):
         assert f'inspect_macos_deployment.py" {command}' in build
@@ -94,9 +99,28 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
     assert build.index('if [ "$skip_clean" -eq 0 ]') < build.index(
         'rm -rf "$qualification_root"'
     ) < build.index('mkdir -p "$qualification_root"')
-    assert "${{ inputs.artifact_name }}-evidence" in workflow
-    assert "*-archive-inspection.json" in workflow
-    assert "packaged-smoke*.log" in workflow
+    assert "${{ inputs.artifact_name }}-evidence" in workflow_text
+    assert "*-archive-inspection.json" in workflow_text
+    assert "packaged-smoke*.log" in workflow_text
+    sdk_cache = steps_by_name["Cache official Qt SDK on macOS"]
+    assert sdk_cache["if"] == "${{ inputs.target_os == 'macos' }}"
+    assert sdk_cache["id"] == "macos_qt_sdk_cache"
+    assert sdk_cache["with"] == {
+        "path": "build/qt-sdk",
+        "key": "qt-sdk-6.11.1-${{ inputs.archive_platform }}",
+    }
+    sdk_install = steps_by_name["Install official Qt SDK on macOS"]
+    assert sdk_install["if"] == (
+        "${{ inputs.target_os == 'macos' && "
+        "steps.macos_qt_sdk_cache.outputs.cache-hit != 'true' }}"
+    )
+    assert "uv run aqt install-qt mac desktop 6.11.1 clang_64" in sdk_install["run"]
+    rcc_resolve = steps_by_name["Resolve official Qt rcc on macOS"]
+    assert rcc_resolve["if"] == "${{ inputs.target_os == 'macos' }}"
+    assert "qt6_macos_feasibility.py resolve-rcc" in rcc_resolve["run"]
+    assert '--sdk-root "$PWD/build/qt-sdk/6.11.1/macos"' in rcc_resolve["run"]
+    assert '--github-env "$GITHUB_ENV"' in rcc_resolve["run"]
+    assert steps.index(rcc_resolve) < steps.index(steps_by_name["Build macOS package"])
 
 
 def test_macos_surface_smoke_exercises_native_acceptance_surfaces():
@@ -108,6 +132,8 @@ def test_macos_surface_smoke_exercises_native_acceptance_surfaces():
     assert '"accessibility": accessibility' in launch
     assert "DontUseNativeDialog" in launch
     assert "isNativeMenuBar" in launch
+    assert "accessible_control.setFocus()" in launch
+    assert "accessible_control.setFocus(QtCore.Qt.FocusReason" not in launch
 
 
 def test_macho_parser_rejects_arm_and_universal_payloads_for_x64(tmp_path):
@@ -403,6 +429,24 @@ def test_bounded_process_times_out(tmp_path):
     assert code == 124
 
 
+def test_process_group_probe_interprets_posix_errnos(monkeypatch):
+    runner = load_bounded_runner()
+
+    def raise_errno(value):
+        def failing_killpg(_process_group_id, _signal):
+            raise OSError(value, os.strerror(value))
+        return failing_killpg
+
+    monkeypatch.setattr(runner, "_killpg", raise_errno(errno.ESRCH))
+    assert runner._process_group_exists(123) is False
+    monkeypatch.setattr(runner, "_killpg", raise_errno(errno.EPERM))
+    assert runner._process_group_exists(123) is True
+    monkeypatch.setattr(runner, "_killpg", raise_errno(errno.EINVAL))
+    with pytest.raises(OSError) as exc_info:
+        runner._process_group_exists(123)
+    assert exc_info.value.errno == errno.EINVAL
+
+
 @pytest.mark.skipif(os.name != "posix", reason="POSIX process-group contract")
 def test_bounded_process_kills_stubborn_grandchild(tmp_path):
     runner = load_bounded_runner()
@@ -466,7 +510,8 @@ def test_package_classifier_and_gate_cover_all_direct_macos_inputs():
     direct_inputs = [
         "scripts/validate_test_taxonomy.py", "scripts/verify_rcmetar_r_stack.py",
         "docs/verification/test-taxonomy.json", "scripts/delivery.py",
-        "scripts/inspect_macos_deployment.py", "packaging/pyinstaller/rc-metastudio-macos.spec",
+        "scripts/inspect_macos_deployment.py", "scripts/qt6_macos_feasibility.py",
+        "packaging/pyinstaller/rc-metastudio-macos.spec",
     ]
     assert all(policy.requires_package_qualification([path]) for path in direct_inputs)
     assert policy.requires_package_qualification(["docs/user-guide.md"]) is False

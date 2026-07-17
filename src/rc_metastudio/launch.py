@@ -664,7 +664,7 @@ def start_package_surface_smoke(evidence_path, expected_scale):
         or (sys.platform == "darwin" and native_menu["is_native"] is not True)
     ):
         raise SystemExit("Package surface smoke could not exercise the native menu bar.")
-    accessible_control.setFocus(QtCore.Qt.FocusReason.OtherFocusReason)
+    accessible_control.setFocus()
     app.processEvents()
     focus_before = app.focusWidget()
     for event_type in (QtCore.QEvent.Type.KeyPress, QtCore.QEvent.Type.KeyRelease):

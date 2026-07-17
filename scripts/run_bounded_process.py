@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import os
 from pathlib import Path
 import signal
@@ -22,8 +23,12 @@ def _process_group_exists(process_group_id: int) -> bool:
     try:
         _killpg(process_group_id, 0)
         return True
-    except ProcessLookupError:
-        return False
+    except OSError as exc:
+        if exc.errno == errno.ESRCH:
+            return False
+        if exc.errno == errno.EPERM:
+            return True
+        raise
 
 
 def _wait_for_group_exit(process_group_id: int, timeout_seconds: float) -> bool:

@@ -30,6 +30,7 @@ PACKAGE_INPUT_PATTERNS = (
     "scripts/build-macos-package.sh",
     "scripts/package-macos.sh",
     "scripts/inspect_macos_deployment.py",
+    "scripts/qt6_macos_feasibility.py",
     "scripts/run_bounded_process.py",
     "scripts/package_input_policy.py",
     "scripts/install-r-deps.R",

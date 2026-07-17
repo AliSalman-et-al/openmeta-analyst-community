@@ -385,12 +385,21 @@ def test_package_workflow_builds_path_aware_artifacts():
         "build/windows-package/dist/RCMetaStudio/automation-wizard-layout-smoke.log"
         in target["text"]
     )
-    assert all("RCMS_CRAN_REPO_KEY" in key for key in target["cache_keys"])
+    r_cache_keys = [
+        key for key in target["cache_keys"]
+        if key.startswith("bundled-r-library-v4-")
+    ]
+    qt_cache_keys = [
+        key for key in target["cache_keys"]
+        if key.startswith("qt-sdk-")
+    ]
+    assert len(r_cache_keys) == 1
+    assert all("RCMS_CRAN_REPO_KEY" in key for key in r_cache_keys)
     assert workflow["restore_keys"] == []
-    assert all(key.startswith("bundled-r-library-v4-") for key in target["cache_keys"])
+    assert qt_cache_keys == ["qt-sdk-6.11.1-${{ inputs.archive_platform }}"]
     assert "use-public-rspm: true" in target["text"]
     assert all(
-        "steps.package-metadata.outputs.r-version" in key for key in target["cache_keys"]
+        "steps.package-metadata.outputs.r-version" in key for key in r_cache_keys
     )
     assert "-RRuntimeRoot" in target["text"]
     assert "--r-runtime-root" in target["text"]
