@@ -45,6 +45,11 @@ EXPECTED_VERSIONS = {
 EXPECTED_SUMMARY_SHA256 = "78294820c83cd94c19dfdca8c24b6a96cdc8b6f1319a5cd1bedffacde73851e2"
 FORBIDDEN_GENERATED_SOURCE_SUFFIXES = {".py", ".pyc", ".pyo", ".ui", ".qrc"}
 FORBIDDEN_BINDINGS = ("pyqt5", "pyside2", "pyside6", "qtpy")
+REQUIRED_PROJECT_SCHEMAS = {
+    "manifest.schema.json",
+    "project.schema.json",
+    "state.schema.json",
+}
 
 
 class DeploymentInspectionError(RuntimeError):
@@ -134,6 +139,21 @@ def inspect_deployment(
         raise DeploymentInspectionError(
             "development-only generated sources are forbidden: "
             + ", ".join(generated_sources)
+        )
+
+    project_schema_root = (
+        app_root / "_internal" / "rc_metastudio" / "project_schemas" / "v1"
+    )
+    project_schemas = {
+        path.name: sha256_file(path)
+        for path in project_schema_root.glob("*.schema.json")
+        if path.is_file()
+    }
+    missing_project_schemas = sorted(REQUIRED_PROJECT_SCHEMAS - set(project_schemas))
+    if missing_project_schemas:
+        raise DeploymentInspectionError(
+            "missing required project schema resources: "
+            + ", ".join(missing_project_schemas)
         )
 
     qt_root = _qt_root(app_root)
@@ -312,6 +332,7 @@ def inspect_deployment(
             _relative(path, plugins_root): sha256_file(path) for path in packaged_plugins
         },
         "qt_libraries": dict(sorted(qt_libraries.items())),
+        "project_schema_resources": dict(sorted(project_schemas.items())),
         "native_files": native_manifest,
         "locked_qt_payload_sha256": dict(sorted(locked_payload_hashes.items())),
         "runtime_probe_canonical_sha256": hashlib.sha256(
@@ -326,7 +347,15 @@ def _normalized_path(value: str) -> Path:
 
 
 def _validate_runtime_probe(runtime_probe: dict, *, app_root: Path, qt_root: Path) -> None:
-    expected_keys = {"schema_version", "frozen", "python", "qt", "rpy2", "r"}
+    expected_keys = {
+        "schema_version",
+        "frozen",
+        "python",
+        "qt",
+        "rpy2",
+        "project_schemas",
+        "r",
+    }
     if set(runtime_probe) != expected_keys or runtime_probe.get("schema_version") != 1:
         raise DeploymentInspectionError("frozen runtime probe schema is invalid")
     if runtime_probe.get("frozen") is not True:
@@ -357,6 +386,13 @@ def _validate_runtime_probe(runtime_probe: dict, *, app_root: Path, qt_root: Pat
         raise DeploymentInspectionError("frozen Qt runtime probe does not match the assembled artifact")
     if runtime_probe.get("rpy2", {}).get("distribution_version") != EXPECTED_VERSIONS["rpy2"]:
         raise DeploymentInspectionError("frozen rpy2 runtime probe differs from the lock")
+    if runtime_probe.get("project_schemas") != {
+        "version": 1,
+        "validated_members": ["manifest.json", "project.json", "state.json"],
+    }:
+        raise DeploymentInspectionError(
+            "frozen runtime did not validate the required project schemas"
+        )
     r = runtime_probe.get("r", {})
     expected_r_home = app_root / "R"
     expected_r_library = expected_r_home / "library"

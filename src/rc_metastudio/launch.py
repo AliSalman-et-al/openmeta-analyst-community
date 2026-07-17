@@ -449,7 +449,7 @@ def start_automation_smoke(sample_path, require_native_window=False):
             )
         sample_path = os.path.abspath(sample_path)
         _write_automation_smoke_log("packaged-workflow:project-open:start")
-        if not meta.open(sample_path):
+        if not meta.open(sample_path, raise_on_error=True):
             raise SystemExit("Could not open smoke-test project: %s" % sample_path)
         _write_automation_smoke_log("packaged-workflow:project-open:return")
         app.processEvents()
@@ -617,8 +617,12 @@ def start_package_runtime_probe(output_path):
 
     from PyQt6 import sip
 
+    import project_format
     import r_runtime
 
+    project_schema_members = ["manifest.json", "project.json", "state.json"]
+    for member in project_schema_members:
+        project_format._schema(1, member)
     configured = r_runtime.configure_bundled_r_environment()
     from rpy2 import robjects
 
@@ -655,6 +659,10 @@ def start_package_runtime_probe(output_path):
             "baseline_logical_dpi": float(primary.logicalDotsPerInch()),
         },
         "rpy2": {"distribution_version": importlib.metadata.version("rpy2")},
+        "project_schemas": {
+            "version": 1,
+            "validated_members": project_schema_members,
+        },
         "r": {
             "version": r_version,
             "home": r_home,
@@ -698,7 +706,7 @@ def _exercise_packaged_project_workflow(app, meta, sample_path):
         if not parsed or parsed_value != numeric_value:
             raise SystemExit("Packaged smoke could not parse the %s locale boundary." % locale_name)
         if locale_name == "de_DE":
-            if not meta.open(os.path.abspath(sample_path)):
+            if not meta.open(os.path.abspath(sample_path), raise_on_error=True):
                 raise SystemExit("Packaged smoke could not reset the locale comparison project.")
             model = meta.tableView.model()
             study_index = model.index(0, model.NAME)
@@ -734,7 +742,7 @@ def _exercise_packaged_project_workflow(app, meta, sample_path):
         raise SystemExit("Dot/comma packaged analyses produced different SVG content.")
 
     saved_path = variants[1]["path"]
-    if not meta.open(str(saved_path)):
+    if not meta.open(str(saved_path), raise_on_error=True):
         raise SystemExit("Packaged smoke could not reopen the saved project.")
     reopened = meta.tableView.model()
     reopened_index = reopened.index(0, reopened.NAME)

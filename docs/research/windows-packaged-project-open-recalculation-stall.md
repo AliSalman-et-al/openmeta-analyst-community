@@ -93,6 +93,49 @@ for the next hosted discriminator. Retaining stdout, stderr, and a periodic
 output will make a future timeout actionable even if it occurs at a different
 boundary.
 
+### Hosted follow-up: missing frozen schema resources
+
+The added diagnostics made the next hosted failure decisive. In run
+[`29586424908`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29586424908),
+Windows package job
+[`87904466825`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29586424908/job/87904466825)
+again reached the unchanged 900-second child watchdog. Diagnostic artifact
+[`8409923144`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29586424908/artifacts/8409923144)
+records `packaged-workflow:shell-created` and
+`packaged-workflow:project-open:start`, but never
+`packaged-workflow:project-open:return`. Its repeating fault-handler stack is
+blocked in `QMessageBox.critical()` inside `MetaForm.open()`'s project-load
+exception handler.
+
+Inspection of the frozen bundle found none of the three required v1 schema
+files (`manifest.schema.json`, `project.schema.json`, and
+`state.schema.json`). `project_format._schema()` loads those files through
+`importlib.resources.files("rc_metastudio.project_schemas")`, while the
+authoritative PyInstaller specification had collected only the compiled icon
+resource and rpy2 metadata. The resulting `FileNotFoundError` was translated to
+a `ProjectFormatError`, then the normal interactive open boundary displayed a
+modal critical dialog. Because packaged automation has no user to dismiss that
+dialog, the resource error was hidden until the watchdog expired.
+
+The production correction keeps PyInstaller as the sole collection definition
+and adds the three JSON schemas to its data inventory at
+`_internal/rc_metastudio/project_schemas/v1`, the exact path used by the frozen
+`importlib.resources` reader. Deployment inspection now rejects any package
+missing one of those resources and records their hashes in the manifest. A
+local clean PyInstaller 6.21 build confirmed all three files at that frozen
+path and in the analysis inventory. The frozen runtime probe now loads and
+validates all three schemas through `project_format._schema()` and records the
+validated members; a local frozen probe completed with that evidence, while the
+deployment inspector rejects a probe that omits any member.
+
+Normal interactive project-open failures still display the existing critical
+dialog. Packaged automation explicitly requests exception propagation instead,
+so the formatted project error and chained traceback are written to retained
+diagnostics and the process exits immediately. The same fail-fast mode is used
+for the initial sample open, locale-reset open, and saved-project reopen, which
+prevents any of those unattended automation boundaries from becoming another
+900-second modal wait.
+
 ### Local packaged reproduction
 
 The local packaged control used:

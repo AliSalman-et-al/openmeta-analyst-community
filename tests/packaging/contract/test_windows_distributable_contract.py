@@ -753,6 +753,9 @@ def test_windows_packager_qualifies_qt6_deployment_and_packaged_surfaces():
         assert plugin in spec
     assert 'copy_metadata("rpy2")' in spec
     assert '(str(binary_resource), "resources")' in spec
+    assert 'project_schema_root = app_source / "project_schemas" / "v1"' in spec
+    assert 'project_schema_root.glob("*.schema.json")' in spec
+    assert 'str(Path("rc_metastudio") / "project_schemas" / "v1")' in spec
     assert '*(f"forms.{name}" for name in generated_form_modules)' in spec
     assert 'excludes=["PyQt5", "PySide2", "PySide6", "qtpy"]' in spec
     assert spec.count("upx=False") == 2
@@ -811,6 +814,11 @@ def _windows_deployment_fixture(tmp_path):
     for family, names in required.items():
         for name in names:
             _write_pe(qt / "plugins" / family / name)
+    schema_root = app / "_internal" / "rc_metastudio" / "project_schemas" / "v1"
+    source_schema_root = ROOT / "src" / "rc_metastudio" / "project_schemas" / "v1"
+    schema_root.mkdir(parents=True)
+    for source in source_schema_root.glob("*.schema.json"):
+        (schema_root / source.name).write_bytes(source.read_bytes())
     return app
 
 
@@ -838,6 +846,10 @@ def _windows_runtime_probe(app):
             "baseline_logical_dpi": 96.0,
         },
         "rpy2": {"distribution_version": "3.6.7"},
+        "project_schemas": {
+            "version": 1,
+            "validated_members": ["manifest.json", "project.json", "state.json"],
+        },
         "r": {
             "version": "4.6.1",
             "home": str(app / "R"),
@@ -896,6 +908,32 @@ def test_windows_deployment_inspector_accepts_one_coherent_x64_qt6_stack(
         "tls/qschannelbackend.dll",
     }
     assert all(item["machine"] == "x86_64" for item in manifest["native_files"])
+    assert set(manifest["project_schema_resources"]) == {
+        "manifest.schema.json",
+        "project.schema.json",
+        "state.schema.json",
+    }
+
+    missing_schema = (
+        app
+        / "_internal"
+        / "rc_metastudio"
+        / "project_schemas"
+        / "v1"
+        / "project.schema.json"
+    )
+    missing_schema.unlink()
+    with pytest.raises(
+        inspector.DeploymentInspectionError,
+        match="missing required project schema resources",
+    ):
+        inspector.inspect_deployment(
+            app,
+            versions=versions,
+            source_commit="a" * 40,
+            runtime_probe=_windows_runtime_probe(app),
+            locked_qt_root=qt_root,
+        )
 
     runtime_probe_path = tmp_path / "runtime-probe.json"
     runtime_probe_path.write_text(
@@ -1055,6 +1093,21 @@ def test_windows_deployment_inspector_rejects_legacy_duplicate_and_wrong_archite
     with pytest.raises(inspector.DeploymentInspectionError, match="frozen Qt runtime"):
         inspector.inspect_deployment(
             app, versions=versions, source_commit="a" * 40,
+            runtime_probe=probe,
+            locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
+        )
+
+    app = _windows_deployment_fixture(tmp_path / "schema-runtime-probe-mismatch")
+    probe = _windows_runtime_probe(app)
+    probe["project_schemas"]["validated_members"].remove("state.json")
+    with pytest.raises(
+        inspector.DeploymentInspectionError,
+        match="runtime did not validate the required project schemas",
+    ):
+        inspector.inspect_deployment(
+            app,
+            versions=versions,
+            source_commit="a" * 40,
             runtime_probe=probe,
             locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
         )

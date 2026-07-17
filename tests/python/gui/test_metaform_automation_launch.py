@@ -5893,6 +5893,7 @@ def test_native_packaged_smoke_requires_expected_plugin_and_visible_window(monke
 
     phases = []
     close_states = []
+    open_modes = []
 
     class Model:
         def rowCount(self):
@@ -5915,7 +5916,8 @@ def test_native_packaged_smoke_requires_expected_plugin_and_visible_window(monke
         def isVisible(self):
             return True
 
-        def open(self, _path):
+        def open(self, _path, raise_on_error=False):
+            open_modes.append(raise_on_error)
             return True
 
         def close(self):
@@ -5940,6 +5942,7 @@ def test_native_packaged_smoke_requires_expected_plugin_and_visible_window(monke
 
     assert launch.start_automation_smoke("sample.rcms", require_native_window=True) == 0
     assert close_states == [False]
+    assert open_modes == [True]
     assert phases == [
         "packaged-workflow:start",
         "packaged-workflow:shell:application:configured",

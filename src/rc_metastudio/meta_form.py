@@ -1562,7 +1562,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             "<font color='Blue'>%s</font>" % self.model.get_current_follow_up_name()
         )
 
-    def open(self, file_path=None):
+    def open(self, file_path=None, raise_on_error=False):
         """
         Open a validated structured project and restore its durable working state.
 
@@ -1599,6 +1599,8 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         except Exception as e:
             msg = _format_open_project_error(file_path, e)
             print(msg)
+            if raise_on_error:
+                raise RuntimeError(msg) from e
             QMessageBox.critical(self, "Could Not Open Project", msg)
             return None
 
@@ -1620,6 +1622,8 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                 app_error_handler.log_exception(type(e), e, e.__traceback__)
             except Exception:
                 pass
+            if raise_on_error:
+                raise RuntimeError(msg) from e
             QMessageBox.critical(self, "Could Not Open Project", msg)
             return None
         self.out_path = file_path

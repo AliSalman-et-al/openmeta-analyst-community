@@ -14,6 +14,14 @@ qt6_build_root = Path(os.environ["RCMS_QT6_BUILD_ROOT"]).resolve()
 generated_package = qt6_build_root / "generated" / "rc_metastudio"
 generated_forms = generated_package / "forms"
 binary_resource = qt6_build_root / "resources" / "icons.rcc"
+project_schema_root = app_source / "project_schemas" / "v1"
+project_schema_data = [
+    (
+        str(path),
+        str(Path("rc_metastudio") / "project_schemas" / "v1"),
+    )
+    for path in sorted(project_schema_root.glob("*.schema.json"))
+]
 generated_form_modules = sorted(path.stem for path in generated_forms.glob("ui_*.py"))
 required_plugins = (
     "platforms/qwindows.dll",
@@ -41,7 +49,11 @@ a = Analysis(
         str(app_source / "forms"),
     ],
     binaries=qt_plugin_binaries,
-    datas=[*copy_metadata("rpy2"), (str(binary_resource), "resources")],
+    datas=[
+        *copy_metadata("rpy2"),
+        (str(binary_resource), "resources"),
+        *project_schema_data,
+    ],
     hiddenimports=[
         "rpy2.robjects",
         "rpy2.rinterface",
