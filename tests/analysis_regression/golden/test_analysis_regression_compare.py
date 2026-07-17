@@ -133,6 +133,47 @@ def test_analysis_regression_comparison_classifies_non_numeric_result_drift():
     assert row["id"] == "amino-binary-random"
 
 
+def test_cross_platform_text_normalization_is_limited_to_tau_squared_header():
+    baseline = _baseline()
+    current = _current()
+    expected = baseline["curated_golden_set"][0]
+    actual = current["curated_golden_set"][0]
+    expected["tool_versions"] = {"os": "Windows"}
+    actual["tool_versions"] = {"os": "Darwin"}
+    expected["texts"]["Summary"] = (
+        "Heterogeneity\n t²     Q(df=18)  Het. p-value     I²\n"
+        " 0.378    33.360         0.015  46.0%"
+    )
+    actual["texts"]["Summary"] = expected["texts"]["Summary"].replace("t²", "τ²")
+
+    text_row = next(
+        row for row in compare_golden_baseline(baseline, current)["rows"]
+        if row["detail"].startswith("Text section Summary")
+    )
+    assert text_row["classification"] == PASS
+    assert "Windows -> Darwin: t² <-> τ²" in text_row["detail"]
+
+    same_platform = json.loads(json.dumps(current))
+    same_platform["curated_golden_set"][0]["tool_versions"]["os"] = "Windows"
+    same_platform_row = next(
+        row for row in compare_golden_baseline(baseline, same_platform)["rows"]
+        if row["detail"].startswith("Text section Summary")
+    )
+    assert same_platform_row["classification"] == TEXT_ARTIFACT_DRIFT
+
+    for changed_text in (
+        actual["texts"]["Summary"].replace("33.360", "99.999"),
+        "Narrative τ² meaning",
+    ):
+        drifted = json.loads(json.dumps(current))
+        drifted["curated_golden_set"][0]["texts"]["Summary"] = changed_text
+        drifted_row = next(
+            row for row in compare_golden_baseline(baseline, drifted)["rows"]
+            if row["detail"].startswith("Text section Summary")
+        )
+        assert drifted_row["classification"] == TEXT_ARTIFACT_DRIFT
+
+
 def test_analysis_regression_comparison_rejects_warning_and_reference_tampering():
     for section in ("Warnings", "References"):
         baseline = _baseline()

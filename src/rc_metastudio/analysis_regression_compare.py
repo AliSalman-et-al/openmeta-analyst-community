@@ -2,6 +2,7 @@ import argparse
 import json
 import math
 import os
+import re
 import sys
 
 
@@ -208,6 +209,7 @@ def _compare_texts_and_artifacts(
     expected, actual, accepted, expected_os=None, actual_os=None
 ):
     rows = []
+    cross_platform = bool(expected_os and actual_os and expected_os != actual_os)
     expected_texts = expected.get("texts", {})
     actual_texts = actual.get("texts", {})
     for section in expected_texts:
@@ -220,21 +222,41 @@ def _compare_texts_and_artifacts(
                     accepted,
                 )
             )
-        elif _normalize_text(actual_texts[section]) != _normalize_text(
-            expected_texts[section]
-        ):
-            rows.append(
-                _row(
-                    expected,
-                    _maybe_accepted(TEXT_ARTIFACT_DRIFT, accepted),
-                    "Text section %s changed." % section,
-                    accepted,
-                )
-            )
         else:
-            rows.append(
-                _row(expected, PASS, "Text section %s matched." % section)
+            expected_text = _normalize_text(
+                expected_texts[section], cross_platform=cross_platform
             )
+            actual_text = _normalize_text(
+                actual_texts[section], cross_platform=cross_platform
+            )
+            raw_text_differs = _normalize_text(
+                actual_texts[section]
+            ) != _normalize_text(expected_texts[section])
+            if actual_text != expected_text:
+                rows.append(
+                    _row(
+                        expected,
+                        _maybe_accepted(TEXT_ARTIFACT_DRIFT, accepted),
+                        "Text section %s changed." % section,
+                        accepted,
+                    )
+                )
+            elif cross_platform and raw_text_differs:
+                rows.append(
+                    _row(
+                        expected,
+                        PASS,
+                        (
+                            "Text section %s matched after cross-platform "
+                            "heterogeneity-header normalization (%s -> %s: t² <-> τ²)."
+                            % (section, expected_os, actual_os)
+                        ),
+                    )
+                )
+            else:
+                rows.append(
+                    _row(expected, PASS, "Text section %s matched." % section)
+                )
     for section in sorted(set(actual_texts) - set(expected_texts)):
         rows.append(
             _row(
@@ -250,7 +272,6 @@ def _compare_texts_and_artifacts(
     actual_artifacts = dict(
         (item["label"], item) for item in actual.get("artifacts", [])
     )
-    cross_platform = bool(expected_os and actual_os and expected_os != actual_os)
     for label, expected_artifact in expected_artifacts.items():
         actual_artifact = actual_artifacts.get(label)
         if actual_artifact is None:
@@ -371,9 +392,16 @@ def _capture_os(bundle):
     return value if isinstance(value, str) and value else None
 
 
-def _normalize_text(value):
+def _normalize_text(value, cross_platform=False):
     lines = str(value).replace("\r\n", "\n").replace("\r", "\n").split("\n")
-    return "\n".join(line.rstrip() for line in lines).strip()
+    normalized = "\n".join(line.rstrip() for line in lines).strip()
+    if cross_platform:
+        normalized = re.sub(
+            r"(?m)^(\s*)τ²(?=\s+Q(?:\(|\s))",
+            r"\1t²",
+            normalized,
+        )
+    return normalized
 
 
 def _accepted_exception(row_id, exceptions):

@@ -3701,6 +3701,16 @@
       "evidence": ["golden", "analysis_behavior"],
       "external_dependencies": ["filesystem"],
       "lane": "golden",
+      "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_cross_platform_text_normalization_is_limited_to_tau_squared_header",
+      "reason": "Limits Windows-Darwin tau-squared transliteration normalization to the heterogeneity header while preserving substantive text drift detection.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["golden", "analysis_behavior"],
+      "external_dependencies": ["filesystem"],
+      "lane": "golden",
       "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_analysis_regression_comparison_rejects_warning_and_reference_tampering",
       "reason": "Guards normalized warning and reference text against frozen-baseline tampering.",
       "runtime_class": "subsecond",

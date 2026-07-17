@@ -50,6 +50,14 @@ identity and complete capability descriptor remain exact on every platform, as
 do all normalized text and numeric gates. Each artifact comparison row records
 both OS values and the applied policy in its detail.
 
+Text remains exact after newline and trailing-space normalization, with one
+cross-platform rendering normalization: in the heterogeneity table header only,
+Windows R's transliterated Latin `t²` and Darwin R's Unicode Greek `τ²` are
+treated as the same tau-squared label when the capture OS values differ. The
+same glyph change still fails on the same OS, and occurrences outside the
+`τ²  Q(...)` header plus every surrounding word and value remain exact. A row
+that uses this rule names both OS values and the exact glyph mapping.
+
 Numeric expectations never come from runtime parsing of the frozen ZIP. The
 separately committed `golden-numeric-contract.json` contains 415 observed result
 values across all 11 ordered cases: standard estimates and heterogeneity,
