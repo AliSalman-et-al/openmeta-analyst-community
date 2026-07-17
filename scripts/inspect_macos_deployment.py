@@ -422,7 +422,10 @@ def _validate_runtime_probe(probe: dict, app_root: Path) -> None:
         or float(qt.get("baseline_logical_dpi", 0)) <= 0
     ):
         raise MacOSDeploymentInspectionError("frozen Qt probe does not match the Cocoa deployment")
-    if probe.get("rpy2", {}).get("distribution_version") != EXPECTED_VERSIONS["rpy2"]:
+    if probe.get("rpy2") != {
+        "distribution_version": EXPECTED_VERSIONS["rpy2"],
+        "cffi_mode": "ABI",
+    }:
         raise MacOSDeploymentInspectionError("frozen rpy2 probe differs from the lock")
     if probe.get("project_schemas") != {
         "version": 1,
@@ -543,6 +546,30 @@ def validate_r_framework_inventory(records: object) -> None:
             )
 
 
+def validate_rpy2_abi_payload(records: object) -> None:
+    """Require ABI support code and reject the API-mode native extension."""
+    if not isinstance(records, list) or not all(isinstance(item, dict) for item in records):
+        raise MacOSDeploymentInspectionError("rpy2 inventory is not a record list")
+    typed_records = cast(list[dict[str, Any]], records)
+    if any(
+        "_rinterface_cffi_api" in str(record.get("path", "")).lower()
+        for record in typed_records
+    ):
+        raise MacOSDeploymentInspectionError(
+            "deployment contains the forbidden rpy2 API-mode native bridge"
+        )
+    abi_native = [
+        record
+        for record in typed_records
+        if "architectures" in record
+        and "/rpy2/rinterface_lib/_bufferprotocol" in str(record.get("path", "")).lower()
+    ]
+    if len(abi_native) != 1:
+        raise MacOSDeploymentInspectionError(
+            "deployment must contain exactly one rpy2 ABI bridge support extension"
+        )
+
+
 def inspect_deployment(
     app_root: Path,
     *,
@@ -634,6 +661,7 @@ def inspect_deployment(
 
     lowered_paths = [record["path"].lower() for record in records]
     validate_r_framework_inventory(records)
+    validate_rpy2_abi_payload(records)
     if any(any(token in path for token in ("pyqt5", "pyside2", "pyside6", "shiboken6", "qt5")) for path in lowered_paths):
         raise MacOSDeploymentInspectionError("deployment contains a legacy or alternate Qt binding")
     required_plugins = {

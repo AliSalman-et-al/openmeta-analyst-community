@@ -840,7 +840,10 @@ def start_package_runtime_probe(output_path):
             "baseline_device_pixel_ratio": float(primary.devicePixelRatio()),
             "baseline_logical_dpi": float(primary.logicalDotsPerInch()),
         },
-        "rpy2": {"distribution_version": importlib.metadata.version("rpy2")},
+        "rpy2": {
+            "distribution_version": importlib.metadata.version("rpy2"),
+            "cffi_mode": os.environ.get("RPY2_CFFI_MODE"),
+        },
         "project_schemas": {
             "version": 1,
             "validated_members": project_schema_members,

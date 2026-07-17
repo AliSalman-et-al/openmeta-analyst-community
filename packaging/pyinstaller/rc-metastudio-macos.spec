@@ -46,7 +46,13 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=["PyQt5", "PySide2", "PySide6", "qtpy"],
+    excludes=[
+        "PyQt5",
+        "PySide2",
+        "PySide6",
+        "qtpy",
+        "_rinterface_cffi_api",
+    ],
     noarchive=False,
     optimize=0,
 )

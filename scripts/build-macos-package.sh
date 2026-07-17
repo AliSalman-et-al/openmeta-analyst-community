@@ -294,6 +294,10 @@ if [ ! -x "$app_root/RCMetaStudio" ]; then
   echo "RCMetaStudio executable was not created at $app_root/RCMetaStudio." >&2
   exit 1
 fi
+if find "$app_bundle" -name '_rinterface_cffi_api*' -print -quit | grep -q .; then
+  echo "PyInstaller collected the forbidden rpy2 API-mode native bridge." >&2
+  exit 1
+fi
 
 step "Bundling sample projects and R runtime"
 resources_root="$app_bundle/Contents/Resources"
@@ -361,8 +365,33 @@ if [ ! -x "$rscript" ] || [ ! -x "$r_binary" ]; then
   exit 1
 fi
 
+r_source_relative() {
+  local source_path="$1"
+  case "$source_path" in
+    "$r_runtime_root"/*)
+      printf '%s\n' "${source_path#"$r_runtime_root"/}"
+      ;;
+    /Library/Frameworks/R.framework/Versions/*/Resources/*)
+      printf '%s\n' "${source_path#*/Resources/}"
+      ;;
+    /Library/Frameworks/R.framework/Resources/*)
+      printf '%s\n' "${source_path#/Library/Frameworks/R.framework/Resources/}"
+      ;;
+    /Library/Frameworks/R.framework/R|/Library/Frameworks/R.framework/Versions/*/R)
+      printf '%s\n' "lib/libR.dylib"
+      ;;
+    /Library/Frameworks/R.framework/*)
+      return 2
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 relocate_bundled_r_runtime() {
   local binary dylib_id dependency source_relative target loader_dir relative_target
+  local mapping_status
   local macho_manifest="$work_root/bundled-r-mach-o-files.list"
 
   # Spawning `file` for every file in a complete R installation is extremely
@@ -392,28 +421,32 @@ PY
   while IFS= read -r -d '' binary; do
     macho_count=$((macho_count + 1))
     dylib_id="$(otool -D "$binary" 2>/dev/null | awk 'NR > 1 && $1 ~ /^\// { print $1; exit }' || true)"
-    case "$dylib_id" in
-      "$r_runtime_root"/*)
-        source_relative="${dylib_id#"$r_runtime_root"/}"
-        install_name_tool -id "@rpath/$source_relative" "$binary"
-        ;;
-      /Library/Frameworks/R.framework/Versions/*/Resources/*)
-        source_relative="${dylib_id#*/Resources/}"
-        install_name_tool -id "@rpath/$source_relative" "$binary"
-        ;;
-    esac
+    if source_relative="$(r_source_relative "$dylib_id")"; then
+      target="$r_home/$source_relative"
+      if [ ! -e "$target" ]; then
+        echo "Bundled R install-ID target is missing for $binary: $dylib_id" >&2
+        exit 1
+      fi
+      install_name_tool -id "@rpath/$source_relative" "$binary"
+    else
+      mapping_status=$?
+      if [ "$mapping_status" -eq 2 ]; then
+        echo "Unsupported source R framework install ID for $binary: $dylib_id" >&2
+        exit 1
+      fi
+    fi
     while IFS= read -r dependency; do
-      case "$dependency" in
-        "$r_runtime_root"/*)
-          source_relative="${dependency#"$r_runtime_root"/}"
-          ;;
-        /Library/Frameworks/R.framework/Versions/*/Resources/*)
-          source_relative="${dependency#*/Resources/}"
-          ;;
-        *)
+      if source_relative="$(r_source_relative "$dependency")"; then
+        :
+      else
+        mapping_status=$?
+        if [ "$mapping_status" -eq 2 ]; then
+          echo "Unsupported source R framework dependency for $binary: $dependency" >&2
+          exit 1
+        else
           continue
-          ;;
-      esac
+        fi
+      fi
       target="$r_home/$source_relative"
       if [ ! -e "$target" ]; then
         echo "Bundled R dependency target is missing for $binary: $dependency" >&2
@@ -432,10 +465,11 @@ PY
 
   local dependency_report
   dependency_report="$(while IFS= read -r -d '' binary; do
+    otool -D "$binary" 2>/dev/null || true
     otool -L "$binary"
   done < "$macho_manifest")"
   if printf '%s\n' "$dependency_report" | grep -F "$r_runtime_root/" \
-    || printf '%s\n' "$dependency_report" | grep -E '/Library/Frameworks/R\.framework/.*/Resources|R\.framework/Resources'; then
+    || printf '%s\n' "$dependency_report" | grep -F '/Library/Frameworks/R.framework/'; then
     echo "Bundled R runtime retains an absolute source-framework dependency." >&2
     exit 1
   fi

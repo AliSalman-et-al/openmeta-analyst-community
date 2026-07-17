@@ -4,8 +4,10 @@ import importlib.util
 import json
 import os
 import plistlib
+import shutil
 import stat
 import struct
+import subprocess
 import sys
 import zipfile
 from pathlib import Path
@@ -133,9 +135,10 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec():
     assert "Analysis(" in spec
     assert "BUNDLE(" in spec
     assert 'target_arch=os.environ.get("RCMS_TARGET_ARCHITECTURE", "x86_64")' in spec
-    assert '"PyQt5", "PySide2", "PySide6", "qtpy"' in spec
+    assert all(f'"{name}"' in spec for name in ("PyQt5", "PySide2", "PySide6", "qtpy"))
     assert "project_schema_data" in spec
     assert "generated_form_modules" in spec
+    assert '"_rinterface_cffi_api"' in spec
     assert '"LSMinimumSystemVersion": "13.0"' in spec
 
 
@@ -181,6 +184,19 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
     assert "R.framework/Resources/bin/Rscript" not in build
     assert 'f"{framework}/Versions/Current": framework_version' in build
     assert 'f"{framework}/Resources": "Versions/Current/Resources"' in build
+    assert "r_source_relative()" in build
+    assert build.count('r_source_relative "$') == 2
+    assert "/Library/Frameworks/R.framework/Resources/*)" in build
+    assert "/Library/Frameworks/R.framework/Versions/*/Resources/*)" in build
+    assert "/Library/Frameworks/R.framework/R|" in build
+    assert "Unsupported source R framework dependency" in build
+    assert "Unsupported source R framework install ID" in build
+    assert "grep -F '/Library/Frameworks/R.framework/'" in build
+    assert "find \"$app_bundle\" -name '_rinterface_cffi_api*'" in build
+    assert "forbidden rpy2 API-mode native bridge" in build
+    assert '"cffi_mode": os.environ.get("RPY2_CFFI_MODE")' in text(
+        "src/rc_metastudio/launch.py"
+    )
     assert "codesign --force --deep" not in build
     signer = text("scripts/sign-notarize-macos-package.sh")
     assert 'scripts/sign_macos_app.py "$app"' in signer
@@ -217,6 +233,81 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
     assert '--sdk-root "$PWD/build/qt-sdk/6.11.1/macos"' in rcc_resolve["run"]
     assert '--github-env "$GITHUB_ENV"' in rcc_resolve["run"]
     assert steps.index(rcc_resolve) < steps.index(steps_by_name["Build macOS package"])
+
+
+def test_r_relocation_maps_versioned_and_canonical_framework_load_commands():
+    bash = shutil.which("bash")
+    if bash is None:
+        pytest.skip("bash is required to execute the production relocation mapper")
+    build = text("scripts/build-macos-package.sh")
+    start = build.index("r_source_relative() {")
+    end = build.index("\n}\n\nrelocate_bundled_r_runtime()", start) + 3
+    function = build[start:end]
+    runtime_root = "/Library/Frameworks/R.framework/Versions/4.6/Resources"
+    paths = [
+        f"{runtime_root}/lib/libR.dylib",
+        "/Library/Frameworks/R.framework/Versions/4.6/Resources/lib/libR.dylib",
+        "/Library/Frameworks/R.framework/Resources/lib/libR.dylib",
+        "/Library/Frameworks/R.framework/R",
+        "/Library/Frameworks/R.framework/Versions/4.6/R",
+        "/Library/Frameworks/R.framework/PrivateHeaders/unsupported.h",
+        "/usr/lib/libSystem.B.dylib",
+    ]
+    command = function + r'''
+r_runtime_root="$1"
+shift
+for path in "$@"; do
+  if relative="$(r_source_relative "$path")"; then
+    printf '0:%s\n' "$relative"
+  else
+    printf '%s:\n' "$?"
+  fi
+done
+'''
+    completed = subprocess.run(
+        [bash, "-c", command, "relocation-test", runtime_root, *paths],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.stdout.splitlines() == [
+        "0:lib/libR.dylib",
+        "0:lib/libR.dylib",
+        "0:lib/libR.dylib",
+        "0:lib/libR.dylib",
+        "0:lib/libR.dylib",
+        "2:",
+        "1:",
+    ]
+
+
+def test_macos_inventory_allows_only_the_rpy2_abi_native_bridge():
+    inspector = load_inspector()
+    abi_record = {
+        "path": (
+            "Contents/Frameworks/rpy2/rinterface_lib/"
+            "_bufferprotocol.cpython-311-darwin.so"
+        ),
+        "kind": "file",
+        "architectures": ["x86_64"],
+    }
+    inspector.validate_rpy2_abi_payload([abi_record])
+
+    api_record = {
+        "path": "Contents/Frameworks/_rinterface_cffi_api.abi3.so",
+        "kind": "file",
+        "architectures": ["arm64"],
+    }
+    with pytest.raises(
+        inspector.MacOSDeploymentInspectionError,
+        match="forbidden rpy2 API-mode native bridge",
+    ):
+        inspector.validate_rpy2_abi_payload([abi_record, api_record])
+    with pytest.raises(
+        inspector.MacOSDeploymentInspectionError,
+        match="exactly one rpy2 ABI bridge support extension",
+    ):
+        inspector.validate_rpy2_abi_payload([])
 
 
 def test_macos_surface_smoke_exercises_native_acceptance_surfaces():
