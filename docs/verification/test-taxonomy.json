@@ -8719,6 +8719,16 @@
       "reason": "Forces the Qt save method to fail and proves Pillow encodes recognizable RGBA capture bytes as an explicit PNG.", "runtime_class": "subsecond", "size": "small"
     },
     {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_verified_hard_exit_flushes_marker_before_success_exit",
+      "reason": "Proves the verification-only success boundary writes and flushes its terminal marker, flushes stderr, and exits with status zero in exact order.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": [], "lane": "fast",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_verified_process_does_not_mask_failure_or_nonzero_status",
+      "reason": "Proves nonzero verification results are preserved and exceptions propagate before the success-only terminal boundary can run.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
       "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["qt"], "lane": "fast",
       "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_native_user_settings_are_immediately_readable_without_sync",
       "reason": "On Windows, proves production NativeFormat UserScope registry writes are visible through a second QSettings instance without RegFlushKey.", "runtime_class": "subsecond", "size": "small"

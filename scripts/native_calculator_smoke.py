@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 from pathlib import PurePosixPath
 import sys
+from typing import Callable, TextIO
 
 os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 
@@ -420,9 +421,39 @@ def main() -> int:
         faulthandler.cancel_dump_traceback_later()
 
 
+def verified_hard_exit(
+    status: int,
+    *,
+    stdout: TextIO | None = None,
+    stderr: TextIO | None = None,
+    disable_fault_handler: Callable[[], object] = faulthandler.disable,
+    exit_process: Callable[[int], object] = os._exit,
+) -> int:
+    """End a fully verified smoke without running unsafe native finalizers."""
+    if status != 0:
+        return status
+    output = sys.stdout if stdout is None else stdout
+    errors = sys.stderr if stderr is None else stderr
+    output.write("RCMS_NATIVE_CALCULATOR_PHASE verified-hard-exit\n")
+    output.flush()
+    errors.flush()
+    disable_fault_handler()
+    exit_process(0)
+    raise RuntimeError("verified hard-exit function unexpectedly returned")
+
+
+def run_verified_process(
+    *,
+    run_smoke: Callable[[], int] = main,
+    terminal: Callable[[int], int] = verified_hard_exit,
+) -> int:
+    """Run verification before entering its success-only terminal boundary."""
+    return terminal(run_smoke())
+
+
 if __name__ == "__main__":
     if sys.argv[1:] == ["--validate-only"]:
         root = Path(__file__).resolve().parents[1]
         validate_evidence_bundle(root / "build/qt6-verification/native-calculators")
         raise SystemExit(0)
-    raise SystemExit(main())
+    raise SystemExit(run_verified_process())

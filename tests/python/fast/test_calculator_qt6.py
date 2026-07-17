@@ -173,6 +173,86 @@ def test_native_calculator_backend_contract_fails_closed_for_loaded_rpy2(monkeyp
         smoke.install_native_stub_backend()
 
 
+def test_verified_hard_exit_flushes_marker_before_success_exit():
+    smoke = _load_native_calculator_smoke()
+    events = []
+
+    class RecordingStream:
+        def __init__(self, name):
+            self.name = name
+
+        def write(self, value):
+            events.append((self.name + "-write", value))
+            return len(value)
+
+        def flush(self):
+            events.append(self.name + "-flush")
+
+    class ExpectedExit(BaseException):
+        pass
+
+    def exit_process(code):
+        events.append(("exit", code))
+        raise ExpectedExit
+
+    with pytest.raises(ExpectedExit):
+        smoke.verified_hard_exit(
+            0,
+            stdout=RecordingStream("stdout"),
+            stderr=RecordingStream("stderr"),
+            disable_fault_handler=lambda: events.append("disable-faulthandler"),
+            exit_process=exit_process,
+        )
+
+    assert events == [
+        (
+            "stdout-write",
+            "RCMS_NATIVE_CALCULATOR_PHASE verified-hard-exit\n",
+        ),
+        "stdout-flush",
+        "stderr-flush",
+        "disable-faulthandler",
+        ("exit", 0),
+    ]
+
+
+def test_verified_process_does_not_mask_failure_or_nonzero_status():
+    smoke = _load_native_calculator_smoke()
+    terminal_calls = []
+    hard_exit_calls = []
+
+    assert (
+        smoke.verified_hard_exit(
+            7,
+            disable_fault_handler=lambda: hard_exit_calls.append("disable"),
+            exit_process=lambda status: hard_exit_calls.append(status),
+        )
+        == 7
+    )
+    assert hard_exit_calls == []
+
+    def terminal(status):
+        terminal_calls.append(status)
+        return status
+
+    assert smoke.run_verified_process(run_smoke=lambda: 7, terminal=terminal) == 7
+    assert terminal_calls == [7]
+
+    def fail_before_terminal():
+        raise RuntimeError("verification failed")
+
+    def unexpected_terminal(status):
+        terminal_calls.append(status)
+        return status
+
+    with pytest.raises(RuntimeError, match="verification failed"):
+        smoke.run_verified_process(
+            run_smoke=fail_before_terminal,
+            terminal=unexpected_terminal,
+        )
+    assert terminal_calls == [7]
+
+
 def test_native_calculator_teardown_disables_auto_quit_and_restores_on_error():
     smoke = _load_native_calculator_smoke()
     events = []

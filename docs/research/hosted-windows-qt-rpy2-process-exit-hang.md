@@ -1,12 +1,29 @@
 # Hosted Windows Qt/rpy2 process-exit hang
 
 **Date:** 2026-07-17
-**Scope:** Issue #340, `scripts/native_calculator_smoke.py`, hosted Windows job
-`87833066350` in run [`29564204598`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29564204598).
+**Scope:** Issue #340, `scripts/native_calculator_smoke.py`, hosted Windows jobs
+`87833066350` in run [`29564204598`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29564204598)
+and the follow-up run [`29566914772`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29566914772).
 
 ## Executive finding
 
-The latest failure is a real five-minute child-process hang, not a job timeout
+The follow-up hosted run `29566914772` proved that the registry and harness
+fixes removed the five-minute hang: the stub backend was installed, every
+calculator was captured and Pillow-encoded, the former settings-sync boundary
+returned, the window closed, evidence validation returned, and `main()`
+returned. Only then did Windows report an access violation with `<no Python
+frame>` during interpreter finalization, and the child exited `-1`. This places
+the remaining failure after all application and verification work, inside
+native interpreter teardown rather than a Python smoke assertion.
+
+The final fix therefore uses the repository's established verification-only
+terminal boundary: after successful evidence validation and printing, emit a
+flushed `verified-hard-exit` marker, flush both standard streams, disable the
+now-complete fault handler, and call `os._exit(0)`. Exceptions and nonzero
+results do not enter this boundary, the `--validate-only` path retains normal
+interpreter exit, and production application shutdown is unchanged.
+
+The initial failure was a real five-minute child-process hang, not a job timeout
 that should be solved by increasing `timeout-minutes`. The per-command watchdog
 worked: it reported `Native Qt6 calculator smoke timed out after 300 seconds`,
 killed the child process tree, and returned exit code 124. In the same run,
@@ -40,6 +57,15 @@ before importing the legacy GUI modules. The hosted log proves this with
 shutdown hazard, but it is now ranked behind the exact registry-flush boundary.
 
 ## Evidence from the failing run and repository
+
+The follow-up hosted run adds the decisive evidence that the smoke printed, in
+order, `backend-installed`, every capture and encoding return, both sides of
+the former settings-sync boundary, `close-return`, `validation-return`, the
+complete evidence manifest, and `main-return`. The subsequent fatal Windows
+access violation contained `<no Python frame>` and produced exit `-1`. A Python
+exception, failed assertion, blocked `QSettings.sync()`, live calculator, image
+plugin call, or incomplete evidence bundle is therefore no longer consistent
+with the observed endpoint.
 
 1. The calculator completed its behavioral assertions through the binary edit,
    model update, and main-window close handler. The last burst at
