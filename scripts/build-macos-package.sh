@@ -196,6 +196,13 @@ archive_staging_root="$work_root/zip-staging"
 zip_path="$artifact_dir/$artifact_name.zip"
 tmp_zip_path="$zip_path.tmp"
 r_package_cache_root="${r_package_cache_root:-$artifact_dir/r-library-cache}"
+pinned_cran_repo="https://packagemanager.posit.co/cran/2026-07-16"
+cran_repo="${RCMS_CRAN_REPO:-$pinned_cran_repo}"
+if [ "$cran_repo" != "$pinned_cran_repo" ]; then
+  echo "RCMS_CRAN_REPO must match the manifest snapshot: $pinned_cran_repo" >&2
+  exit 1
+fi
+export RCMS_CRAN_REPO="$pinned_cran_repo"
 
 if [ "$skip_dependency_install" -eq 0 ]; then
   step "Syncing locked verification environment"
@@ -442,17 +449,27 @@ sha256_stdin_12() {
 
 r_dependency_policy_hash="$({
   printf '%s' "$(sha256_file "$repo_root/scripts/install-r-deps.R")"
+  printf '%s' "$(sha256_file "$repo_root/scripts/r_binary_policy.R")"
+  printf '%s' "$(sha256_file "$repo_root/scripts/r_dependency_policy.py")"
   printf '%s' "$(sha256_file "$repo_root/docs/verification/RCMetaR-r-dependencies.json")"
   printf '%s' "$(sha256_file "$repo_root/r/RCMetaR/DESCRIPTION")"
-  printf '%s' "${RCMS_CRAN_REPO:-https://cloud.r-project.org}"
+  printf '%s' "$RCMS_CRAN_REPO"
 } | sha256_stdin_12)"
-r_package_cache_key="${r_version_cache_key}-rdeps-${r_dependency_policy_hash}"
+r_package_cache_key="${r_version_cache_key}-${architecture}-rdeps-v2-${r_dependency_policy_hash}"
 cache_library="$r_package_cache_root/$r_package_cache_key/library"
 
 test_r_dependency_packages() {
   local library="$1"
   [ -d "$library" ] || return 1
   R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" "$rscript" -e "lib <- normalizePath('$library', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','metafor','lme4','pdftools','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)" >/dev/null 2>&1
+}
+
+run_strict_r_dependency_policy() {
+  local library="$1"
+  mkdir -p "$library"
+  R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" \
+    RCMS_CRAN_REPO="$pinned_cran_repo" RCMS_POLICY_PYTHON="$python_exe" \
+    "$rscript" "$repo_root/scripts/install-r-deps.R"
 }
 
 test_bundled_r_packages() {
@@ -491,12 +508,14 @@ install_local_r_packages() {
   R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$r_binary" CMD INSTALL --library="$r_lib" "$package_build_root/RCMetaR"
 }
 
-if test_r_dependency_packages "$cache_library"; then
+if [ -d "$cache_library" ]; then
+  step "Validating cached bundled R dependencies with the strict shared policy"
+  run_strict_r_dependency_policy "$cache_library"
   echo "Using cached bundled R library from $cache_library"
   copy_r_library_packages "$cache_library" "$r_lib"
 else
   step "Installing bundled R package dependencies"
-  R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$rscript" "$repo_root/scripts/install-r-deps.R"
+  run_strict_r_dependency_policy "$r_lib"
   if test_r_dependency_packages "$r_lib"; then
     echo "Caching bundled R dependency library at $cache_library"
     copy_r_library "$r_lib" "$cache_library"

@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -82,6 +83,25 @@ def test_RCMetaR_r_manifests_validate():
 
     assert result.returncode == 0, result.stderr
     assert "validated RCMetaR R dependency and drift manifests" in result.stdout
+    manifest = json.loads((REPO_ROOT / DEPENDENCY_MANIFEST).read_text(encoding="utf-8"))
+    policy = manifest["binary_package_policy"]
+    assert manifest["target_runtime"]["r"] == "4.6.1"
+    assert policy["repository"] == "https://packagemanager.posit.co/cran/2026-07-16"
+    assert policy["normal_install_type"] == "binary"
+    assert policy["source_fallback"] is False
+    assert len(policy["required_normal_packages"]) == 54
+    assert policy["source_exceptions"] == [
+        {
+            "name": "HSROC",
+            "version": "2.1.9",
+            "url": "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz",
+            "sha256": "5476fa76d7723717e203925a1da442813e3645790ef9b633a145cbc04a08b874",
+            "dependencies": ["lattice", "coda", "MASS", "MCMCpack"],
+            "install_type": "source",
+            "repos": None,
+            "dependencies_install": False,
+        }
+    ]
 
 
 def test_direct_and_app_bundle_dependencies_must_stay_separate(tmp_path):
@@ -152,6 +172,13 @@ def test_cran_archive_dependencies_must_pin_exact_versions(tmp_path):
     assert result.returncode == 1
     assert "archived CRAN packages must declare an exact version" in result.stderr
 
+    manifest = json.loads((REPO_ROOT / DEPENDENCY_MANIFEST).read_text(encoding="utf-8"))
+    manifest["binary_package_policy"]["source_exceptions"][0]["sha256"] = "0" * 64
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    result = run_validator(root)
+    assert result.returncode == 1
+    assert "sole pinned source exception" in result.stderr
+
 
 def test_installed_version_report_parses_rscript_output(monkeypatch):
     import importlib.util
@@ -221,11 +248,6 @@ def test_default_r_dependency_install_uses_script_file_and_archive_triples(
     assert spec.loader is not None
     spec.loader.exec_module(verifier)
 
-    monkeypatch.setattr(
-        verifier,
-        "direct_dependency_policy",
-        lambda root: (["metafor", "testthat"], {"HSROC": "2.1.9"}),
-    )
     captured = {}
 
     def fake_run_streamed(command, cwd, env):
@@ -235,6 +257,7 @@ def test_default_r_dependency_install_uses_script_file_and_archive_triples(
         captured["command"] = command
         captured["cwd"] = cwd
         captured["env"] = env
+        captured["source"] = install_script.read_text(encoding="utf-8")
 
     monkeypatch.setattr(verifier, "run_streamed", fake_run_streamed)
 
@@ -243,23 +266,135 @@ def test_default_r_dependency_install_uses_script_file_and_archive_triples(
         REPO_ROOT,
         Path("Rscript"),
         library,
-        "https://cloud.r-project.org",
+        "https://packagemanager.posit.co/cran/2026-07-16",
         {"R_LIBS_USER": str(library)},
     )
 
     assert captured["cwd"] == REPO_ROOT
     assert captured["env"]["R_LIBS_USER"] == str(library)
     assert captured["command"][0] == Path("Rscript")
-    assert captured["command"][2:5] == [
-        library,
-        "https://cloud.r-project.org",
-        "MCMCpack,coda,metafor,testthat",
-    ]
-    assert captured["command"][5:] == [
-        "HSROC",
-        "2.1.9",
-        "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz",
-    ]
+    assert captured["command"][2:] == [REPO_ROOT, library]
+    assert captured["env"]["RCMS_CRAN_REPO"].endswith("/cran/2026-07-16")
+    assert captured["env"]["RCMS_POLICY_PYTHON"] == sys.executable
+    source = captured["source"]
+    assert "r_binary_policy.R" in source
+    assert "install_rcms_binary_packages" in source
+    assert "install_rcms_source_exception" in source
+
+
+def test_native_r_binary_policy_fails_closed_without_source_fallback(tmp_path):
+    rscript = shutil.which("Rscript")
+    if rscript is None and sys.platform == "win32":
+        candidate = Path("C:/Program Files/R/R-4.6.1/bin/Rscript.exe")
+        rscript = str(candidate) if candidate.is_file() else None
+    assert rscript is not None, "Rscript 4.6.1 is required by the Fast verification environment"
+
+    helper = (REPO_ROOT / "scripts" / "r_binary_policy.R").as_posix()
+    root = REPO_ROOT.as_posix()
+    library = tmp_path.as_posix()
+    r_code = f"""
+source({json.dumps(helper)})
+policy <- load_rcms_r_binary_policy({json.dumps(root)})
+expect_error <- function(expression, pattern) {{
+  error <- tryCatch({{ force(expression); NULL }}, error = identity)
+  if (is.null(error) || !grepl(pattern, conditionMessage(error), fixed = TRUE)) {{
+    stop("Expected error containing '", pattern, "'")
+  }}
+}}
+expect_error(assert_rcms_binary_runtime(policy, r_version = "4.6.0"), "requires R 4.6.1")
+expect_error(assert_rcms_binary_runtime(policy, arch = "unsupported"), "Unsupported R binary target")
+expect_error(assert_rcms_binary_runtime(policy, pkg_type = "source"), "Unexpected native R binary type")
+
+empty_db <- matrix(character(), nrow = 0, ncol = 3,
+  dimnames = list(character(), c("Depends", "Imports", "LinkingTo")))
+install_called <- FALSE
+expect_error(
+  install_rcms_binary_packages(
+    policy,
+    {json.dumps(library)},
+    database = empty_db,
+    install_binary = function(...) {{ install_called <<- TRUE }}
+  ),
+  "Required native R binaries unavailable"
+)
+if (install_called) stop("missing binary preflight attempted an install")
+
+binary_type <- NULL
+binary_dependencies <- NULL
+installed_packages <- "root"
+globally_available_packages <- c("root", "transitive")
+binary_policy <- policy
+binary_policy$normal_packages <- "root"
+binary_db <- matrix("", nrow = 2, ncol = 3,
+  dimnames = list(c("root", "transitive"), c("Depends", "Imports", "LinkingTo")))
+binary_db["root", "Imports"] <- "transitive"
+install_rcms_binary_packages(
+  binary_policy,
+  {json.dumps(library)},
+  database = binary_db,
+  install_binary = function(packages, lib, dependencies, type) {{
+    binary_type <<- type
+    binary_dependencies <<- dependencies
+    installed_packages <<- union(installed_packages, packages)
+  }},
+  installed_in_target = function() installed_packages,
+  package_loadable = function(package) package %in% installed_packages
+)
+if (!identical(binary_type, "binary")) stop("ordinary package install was not binary-only")
+if (!identical(binary_dependencies, FALSE)) stop("closure install attempted dependency resolution")
+if (!"transitive" %in% installed_packages) {{
+  stop("globally available transitive dependency was not installed into the target library")
+}}
+
+installed_packages <- "root"
+evidence <- tempfile()
+Sys.setenv(RCMS_R_BINARY_EVIDENCE = evidence)
+expect_error(
+  install_rcms_binary_packages(
+    binary_policy,
+    {json.dumps(library)},
+    database = binary_db,
+    install_binary = function(...) NULL,
+    installed_in_target = function() installed_packages,
+    package_loadable = function(package) package %in% globally_available_packages
+  ),
+  "Complete binary closure missing from target library"
+)
+if (file.exists(evidence) && file.info(evidence)$size > 0) {{
+  stop("incomplete target-local closure emitted cacheable evidence")
+}}
+Sys.unsetenv("RCMS_R_BINARY_EVIDENCE")
+
+tamper_policy <- policy
+tamper_policy$source_exception$dependencies <- "stats"
+source_called <- FALSE
+expect_error(
+  install_rcms_source_exception(
+    tamper_policy,
+    {json.dumps(library)},
+    download = function(url, destination, ...) writeBin(charToRaw("tampered"), destination),
+    install_source = function(...) {{ source_called <<- TRUE }},
+    sha256 = function(path) paste(rep("0", 64), collapse = "")
+  ),
+  "SHA256 mismatch"
+)
+if (source_called) stop("digest mismatch attempted the HSROC source install")
+"""
+    env = dict(os.environ)
+    env["RCMS_POLICY_PYTHON"] = sys.executable
+    env["RCMS_CRAN_REPO"] = "https://packagemanager.posit.co/cran/2026-07-16"
+    policy_test = tmp_path / "native-binary-policy-test.R"
+    policy_test.write_text(r_code, encoding="utf-8")
+    result = subprocess.run(
+        [rscript, str(policy_test)],
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_default_r_verifier_resolves_rscript_from_r_home(tmp_path):

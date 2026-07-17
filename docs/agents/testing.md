@@ -48,10 +48,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-smoke.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-fast.ps1
 ```
 
-The hosted Windows Native Qt6 Vertical Slice has a 45-minute ceiling because it
-runs the complete Qt6 verifier, including native UI evidence and the isolated R
-stack. This is a failure ceiling rather than a performance target; the lane must
-not use the shorter Smoke/Fast budget.
+The hosted Windows Native Qt6 Vertical Slice has a 45-minute ceiling. Its native
+smoke subprocesses also have bounded watchdogs so a stuck Qt teardown fails with
+the exact command and timeout while preserving streamed output and any evidence
+already written. The workflow ceiling remains a failure boundary for the full
+Qt6 verifier, not a performance target.
 
 The first clean run downloads the immutable official Qt 6.11.1 Windows x64
 `qtbase` package used only for its matching `rcc` and `Qt6Core.dll`. The package,
@@ -75,7 +76,7 @@ Run Full R Stack Evidence before R Stack changes:
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-r-stack-full.ps1
 ```
 
-Smoke/Fast Default R Evidence uses `artifacts\r-default-library-cache`; Full R Stack Evidence and packaging use `artifacts\r-library-cache`. Keeping those caches separate prevents fast verification from restoring the larger bundled-R packaging cache. Set `RCMS_CRAN_REPO` to choose a faster reliable CRAN-compatible mirror when needed. The package wrappers resolve one source R runtime and pass that same runtime into R Stack Evidence and artifact assembly, so the dependency cache can be reused before only the local `RCMetaR` package is reinstalled into the bundle.
+Smoke/Fast Default R Evidence uses `artifacts\r-default-library-cache`; Full R Stack Evidence and packaging use `artifacts\r-library-cache`. Keeping those caches separate prevents fast verification from restoring the larger bundled-R packaging cache. Native binary dependencies are pinned to the dated Public PPM snapshot `https://packagemanager.posit.co/cran/2026-07-16`; `RCMS_CRAN_REPO` may repeat that exact value, but mismatched overrides are rejected. The package wrappers resolve one source R runtime and pass that same runtime into R Stack Evidence and artifact assembly, so the dependency cache can be reused before only the local `RCMetaR` package is reinstalled into the bundle.
 
 Build the Windows package only when packaging evidence is needed:
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import subprocess
 import sys
@@ -12,7 +13,7 @@ from pathlib import Path
 VERIFICATION_DIR = Path("docs") / "verification"
 DEPENDENCY_MANIFEST = VERIFICATION_DIR / "RCMetaR-r-dependencies.json"
 DRIFT_MANIFEST = VERIFICATION_DIR / "RCMetaR-statistical-drift.json"
-EXPECTED_R_TARGET = "4.6.0"
+EXPECTED_R_TARGET = "4.6.1"
 
 DIRECT_DEPENDENCY_REQUIRED_FIELDS = {
     "name",
@@ -83,6 +84,7 @@ def validate_dependency_manifest(manifest: dict) -> list[str]:
             "manifest",
             "schema_version",
             "target_runtime",
+            "binary_package_policy",
             "package_metadata",
             "empty_scope_rationale",
             "direct_RCMetaR_dependencies",
@@ -95,8 +97,8 @@ def validate_dependency_manifest(manifest: dict) -> list[str]:
         raise ValidationError(
             f"{DEPENDENCY_MANIFEST}: manifest must be RCMetaR-r-dependencies"
         )
-    if manifest["schema_version"] != 1:
-        raise ValidationError(f"{DEPENDENCY_MANIFEST}: schema_version must be 1")
+    if manifest["schema_version"] != 2:
+        raise ValidationError(f"{DEPENDENCY_MANIFEST}: schema_version must be 2")
     target_runtime = manifest["target_runtime"]
     if (
         not isinstance(target_runtime, dict)
@@ -105,9 +107,9 @@ def validate_dependency_manifest(manifest: dict) -> list[str]:
         raise ValidationError(
             f"{DEPENDENCY_MANIFEST}: target_runtime.r must be {EXPECTED_R_TARGET}"
         )
-    if target_runtime.get("cran_policy") != "latest-compatible":
+    if target_runtime.get("cran_policy") != "dated-native-binary-only":
         raise ValidationError(
-            f"{DEPENDENCY_MANIFEST}: target_runtime.cran_policy must be latest-compatible"
+            f"{DEPENDENCY_MANIFEST}: target_runtime.cran_policy must be dated-native-binary-only"
         )
 
     package_metadata = manifest["package_metadata"]
@@ -269,6 +271,16 @@ def validate(root: Path) -> list[str]:
         load_json(root, DEPENDENCY_MANIFEST)
     )
     validate_drift_manifest(load_json(root, DRIFT_MANIFEST))
+    helper = Path(__file__).resolve().parent / "r_dependency_policy.py"
+    spec = importlib.util.spec_from_file_location("rcms_r_dependency_policy", helper)
+    if spec is None or spec.loader is None:
+        raise ValidationError(f"cannot load binary dependency policy helper: {helper}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    try:
+        module.load_policy(root / DEPENDENCY_MANIFEST)
+    except module.PolicyError as exc:
+        raise ValidationError(str(exc)) from exc
     return direct_dependencies
 
 

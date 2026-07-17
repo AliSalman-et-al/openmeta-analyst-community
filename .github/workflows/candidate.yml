@@ -81,6 +81,7 @@ jobs:
       - uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
         with:
           r-version: 4.6.1
+          use-public-rspm: true
       - id: metadata
         run: uv run python scripts/resolve_package_ci_metadata.py
       - name: Build Windows unsigned candidate

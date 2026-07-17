@@ -11,7 +11,7 @@ import sys
 
 os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 
-from PyQt6 import QtCore, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 from rc_metastudio.qt6_resources import ensure_application_resources
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
@@ -33,6 +33,17 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def capture_visible_calculator(
+    dialog: QtWidgets.QDialog,
+) -> tuple[QtGui.QPixmap, str]:
+    """Capture a visible calculator even when hosted screen capture is unavailable."""
+    screen = required(dialog.screen(), "calculator screen")
+    pixmap = screen.grabWindow(dialog.winId())
+    if not pixmap.isNull():
+        return pixmap, "QScreen.grabWindow"
+    return dialog.grab(), "QWidget.grab fallback"
+
+
 def validate_evidence_bundle(evidence_root: Path) -> list[dict[str, object]]:
     """Validate a native calculator evidence bundle after download or relocation."""
     evidence_root = evidence_root.resolve()
@@ -50,6 +61,11 @@ def validate_evidence_bundle(evidence_root: Path) -> list[dict[str, object]]:
         raise ValueError("native calculator evidence must cover all calculators")
 
     for record in calculator_records:
+        if record.get("capture_method") not in {
+            "QScreen.grabWindow",
+            "QWidget.grab fallback",
+        }:
+            raise ValueError("calculator capture method is invalid")
         relative_text = record.get("image")
         if not isinstance(relative_text, str) or not relative_text:
             raise ValueError("calculator image path must be a non-empty string")
@@ -226,7 +242,7 @@ def main() -> int:
                     app.processEvents()
 
                     image_path = evidence_root / (data_type + ".png")
-                    pixmap = required(dialog.screen(), "calculator screen").grabWindow(dialog.winId())
+                    pixmap, capture_method = capture_visible_calculator(dialog)
                     if pixmap.isNull() or not pixmap.save(str(image_path), "PNG"):
                         raise RuntimeError(
                             "failed to capture visible %s calculator" % data_type
@@ -235,6 +251,7 @@ def main() -> int:
                         {
                             "action": action,
                             "calculator": data_type,
+                            "capture_method": capture_method,
                             "default_accept": True,
                             "dialog": expected_type.__name__,
                             "expected_result": expected_result,

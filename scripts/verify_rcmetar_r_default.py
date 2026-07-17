@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import shutil
@@ -16,7 +17,8 @@ from pathlib import Path
 RCMetaR_PACKAGE = Path("r") / "RCMetaR"
 DEFAULT_R_VERIFIER = Path("scripts") / "verify_rcmetar_r_default.py"
 R_MANIFEST_VALIDATOR = Path("scripts") / "validate_rcmetar_r_manifests.py"
-DEFAULT_CRAN_REPO = "https://cloud.r-project.org"
+R_BINARY_POLICY = Path("scripts") / "r_binary_policy.R"
+R_POLICY_LOADER = Path("scripts") / "r_dependency_policy.py"
 
 
 class DefaultREvidenceError(Exception):
@@ -161,13 +163,13 @@ def _windows_registry_r_homes() -> list[Path]:
 
 
 def _common_rscript_candidates(env: dict[str, str] | None = None) -> list[Path]:
-    env = env or os.environ
+    resolved_env = dict(os.environ) if env is None else env
     candidates: list[Path] = []
-    if env.get("RCMS_RSCRIPT"):
-        candidates.append(Path(env["RCMS_RSCRIPT"]))
+    if resolved_env.get("RCMS_RSCRIPT"):
+        candidates.append(Path(resolved_env["RCMS_RSCRIPT"]))
     for variable in ("RCMS_R_HOME", "R_HOME"):
-        candidates.extend(_rscript_paths_for_r_home(env.get(variable)))
-    r_home = _r_home_from_r_command(env)
+        candidates.extend(_rscript_paths_for_r_home(resolved_env.get(variable)))
+    r_home = _r_home_from_r_command(resolved_env)
     candidates.extend(_rscript_paths_for_r_home(r_home))
     for r_home in _windows_registry_r_homes():
         candidates.extend(_rscript_paths_for_r_home(r_home))
@@ -175,19 +177,19 @@ def _common_rscript_candidates(env: dict[str, str] | None = None) -> list[Path]:
 
 
 def resolve_rscript(name: str, env: dict[str, str] | None = None) -> Path | None:
-    env = env or os.environ
+    resolved_env = dict(os.environ) if env is None else env
     explicit = name and name != "Rscript"
     if explicit:
         requested = Path(name)
         if requested.exists():
             return requested.resolve()
-        resolved = shutil.which(name, path=env.get("PATH"))
+        resolved = shutil.which(name, path=resolved_env.get("PATH"))
         return Path(resolved).resolve() if resolved else None
 
-    for candidate in _common_rscript_candidates(env):
+    for candidate in _common_rscript_candidates(resolved_env):
         if candidate.exists():
             return candidate.resolve()
-    resolved = shutil.which(name or "Rscript", path=env.get("PATH"))
+    resolved = shutil.which(name or "Rscript", path=resolved_env.get("PATH"))
     if resolved:
         return Path(resolved).resolve()
     return None
@@ -235,7 +237,15 @@ def resolve_r_exe(root: Path, rscript: Path, env: dict[str, str]) -> Path:
 
 
 def r_version_key(root: Path, rscript: Path, env: dict[str, str]) -> str:
-    result = run([rscript, "-e", "cat(paste0('R-', getRversion()))"], cwd=root, env=env)
+    result = run(
+        [
+            rscript,
+            "-e",
+            "cat(paste0('R-', getRversion(), '-', R.version$arch, '-', .Platform$pkgType))",
+        ],
+        cwd=root,
+        env=env,
+    )
     require_success(result, "R version resolution")
     return "".join(
         character if character.isalnum() or character in "._-" else "_"
@@ -249,6 +259,8 @@ def dependency_cache_key(
     digest = hashlib.sha256()
     for relative_path in (
         DEFAULT_R_VERIFIER,
+        R_BINARY_POLICY,
+        R_POLICY_LOADER,
         Path("docs") / "verification" / "RCMetaR-r-dependencies.json",
         RCMetaR_PACKAGE / "DESCRIPTION",
     ):
@@ -272,6 +284,21 @@ def direct_archive_versions(root: Path) -> dict[str, str]:
     }
 
 
+def binary_dependency_policy(root: Path) -> dict:
+    helper = root / R_POLICY_LOADER
+    spec = importlib.util.spec_from_file_location("rcms_r_dependency_policy", helper)
+    if spec is None or spec.loader is None:
+        raise DefaultREvidenceError(f"cannot load R dependency policy helper: {helper}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    try:
+        return module.load_policy(
+            root / "docs" / "verification" / "RCMetaR-r-dependencies.json"
+        )
+    except module.PolicyError as exc:
+        raise DefaultREvidenceError(str(exc)) from exc
+
+
 def direct_dependency_policy(root: Path) -> tuple[list[str], dict[str, str]]:
     manifest = json.loads(
         (
@@ -293,96 +320,37 @@ def direct_dependency_policy(root: Path) -> tuple[list[str], dict[str, str]]:
 def install_direct_dependencies(
     root: Path, rscript: Path, library: Path, cran_repo: str, env: dict[str, str]
 ) -> None:
-    cran_packages, archive_packages = direct_dependency_policy(root)
-    archive_url_by_package = {
-        "HSROC": "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz"
-    }
-    archive_cran_dependencies = {
-        "HSROC": ["coda", "MCMCpack"],
-    }
-    cran_packages = sorted(
-        {
-            *cran_packages,
-            *(
-                dependency
-                for package in archive_packages
-                for dependency in archive_cran_dependencies.get(package, [])
-            ),
-        }
-    )
+    policy = binary_dependency_policy(root)
+    if cran_repo != policy["repository"]:
+        raise DefaultREvidenceError(
+            f"R dependency repository must match the manifest snapshot: {policy['repository']}"
+        )
     r_code = """
 args <- commandArgs(trailingOnly = TRUE)
-lib <- normalizePath(args[[1]], winslash = "/", mustWork = FALSE)
-repo <- args[[2]]
-cran <- strsplit(args[[3]], ",", fixed = TRUE)[[1]]
-cran <- cran[nzchar(cran)]
-archive_args <- args[-(1:3)]
-
+repo_root <- normalizePath(args[[1]], winslash = "/", mustWork = TRUE)
+lib <- normalizePath(args[[2]], winslash = "/", mustWork = FALSE)
 dir.create(lib, recursive = TRUE, showWarnings = FALSE)
 .libPaths(c(lib, .libPaths()))
-options(repos = c(CRAN = repo), timeout = 600, install.packages.check.source = "no")
-
-installed_names <- function() {
-  rownames(utils::installed.packages(lib.loc = lib))
-}
-
-missing <- setdiff(cran, installed_names())
-if (length(missing)) {
-  message("Installing CRAN packages into Default R Evidence cache: ", paste(missing, collapse = ", "))
-  utils::install.packages(
-    missing,
-    lib = lib,
-    dependencies = NA,
-    type = if (.Platform$OS.type == "windows") "binary" else "source"
-  )
-}
-
-missing <- setdiff(cran, installed_names())
-if (length(missing)) {
-  stop("CRAN packages still missing after install: ", paste(missing, collapse = ", "))
-}
-
-if (length(archive_args)) {
-  if (length(archive_args) %% 3 != 0) {
-    stop("Archive package arguments must be package/version/url triples")
-  }
-  for (index in seq(1, length(archive_args), by = 3)) {
-    package <- archive_args[[index]]
-    expected <- archive_args[[index + 1]]
-    url <- archive_args[[index + 2]]
-    installed <- utils::installed.packages(lib.loc = lib)
-    if (!package %in% rownames(installed) || installed[package, "Version"] != expected) {
-      message("Installing archived package into Default R Evidence cache: ", package, " ", expected)
-      utils::install.packages(url, lib = lib, repos = NULL, type = "source")
-    }
-    installed <- utils::installed.packages(lib.loc = lib)
-    if (!package %in% rownames(installed)) {
-      stop(package, " was not installed from ", url)
-    }
-    actual <- installed[package, "Version"]
-    if (actual != expected) {
-      stop(package, " installed at version ", actual, ", expected ", expected)
-    }
-  }
-}
+source(file.path(repo_root, "scripts", "r_binary_policy.R"), local = TRUE)
+policy <- load_rcms_r_binary_policy(repo_root)
+install_rcms_binary_packages(policy, lib)
+install_rcms_source_exception(policy, lib)
 """
-    archive_args: list[str] = []
-    for name, version in sorted(archive_packages.items()):
-        archive_args.extend([name, version, archive_url_by_package[name]])
     with tempfile.TemporaryDirectory(prefix="RCMetaR-default-r-install-") as temp_name:
         install_script = Path(temp_name) / "install-default-r-deps.R"
         install_script.write_text(r_code, encoding="utf-8")
+        install_env = dict(env)
+        install_env["RCMS_POLICY_PYTHON"] = sys.executable
+        install_env["RCMS_CRAN_REPO"] = policy["repository"]
         run_streamed(
             [
                 rscript,
                 install_script,
+                root,
                 library,
-                cran_repo,
-                ",".join(cran_packages),
-                *archive_args,
             ],
             cwd=root,
-            env=env,
+            env=install_env,
         )
 
 
@@ -436,8 +404,15 @@ def verify(args: argparse.Namespace) -> None:
         str(Path(args.python).resolve()) if Path(args.python).exists() else args.python
     )
     base_env = dict(os.environ)
-    cran_repo = args.cran_repo or base_env.get("RCMS_CRAN_REPO") or DEFAULT_CRAN_REPO
+    policy = binary_dependency_policy(root)
+    configured_repo = args.cran_repo or base_env.get("RCMS_CRAN_REPO")
+    if configured_repo and configured_repo != policy["repository"]:
+        raise DefaultREvidenceError(
+            f"R dependency repository must match the manifest snapshot: {policy['repository']}"
+        )
+    cran_repo = policy["repository"]
     base_env["RCMS_CRAN_REPO"] = cran_repo
+    base_env["RCMS_POLICY_PYTHON"] = python
 
     manifest_result = run(
         [python, R_MANIFEST_VALIDATOR, "--root", root], cwd=root, env=base_env
@@ -462,6 +437,12 @@ def verify(args: argparse.Namespace) -> None:
         base_env["R_LIBS"] = str(cache_library)
         base_env["R_LIBS_USER"] = str(cache_library)
 
+    if args.install_missing and args.r_library_cache_root:
+        step("Preflighting manifest-owned native binary policy and dependency cache")
+        install_direct_dependencies(
+            root, rscript, Path(base_env["R_LIBS_USER"]), cran_repo, base_env
+        )
+
     report = installed_version_report(root, python, rscript, base_env)
     missing = sorted(
         name for name, version in report["packages"].items() if version is None
@@ -485,10 +466,6 @@ def verify(args: argparse.Namespace) -> None:
             + "; Default R Evidence limited to manifest validation"
         )
         if args.install_missing and args.r_library_cache_root:
-            step(message + "; installing direct R dependencies into cache")
-            install_direct_dependencies(
-                root, rscript, Path(base_env["R_LIBS_USER"]), cran_repo, base_env
-            )
             report = installed_version_report(root, python, rscript, base_env)
             missing = sorted(
                 name for name, version in report["packages"].items() if version is None

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 from importlib import metadata
 import json
 import os
@@ -16,13 +17,14 @@ from pathlib import Path
 
 RCMetaR_PACKAGE = Path("r") / "RCMetaR"
 R_DEP_INSTALLER = Path("scripts") / "install-r-deps.R"
+R_BINARY_POLICY = Path("scripts") / "r_binary_policy.R"
+R_POLICY_LOADER = Path("scripts") / "r_dependency_policy.py"
 R_SMOKE_TEST = Path("scripts") / "analysis-smoke-test.R"
 R_MANIFEST_VALIDATOR = Path("scripts") / "validate_rcmetar_r_manifests.py"
 BRIDGE_TESTS = (
     Path("tests") / "r_stack" / "test_inprocess_rpy2_backend.py",
     Path("tests") / "python" / "fast" / "test_rcmetar_r_manifest_validation.py",
 )
-DEFAULT_CRAN_REPO = "https://cloud.r-project.org"
 REQUIRED_RPY2_IDENTITIES = {
     "rpy2": "3.6.7",
     "rpy2-rinterface": "3.6.6",
@@ -288,7 +290,11 @@ def file_digest(path: Path) -> str:
 
 def r_version_key(rscript: Path, root: Path, env: dict[str, str]) -> str:
     result = subprocess.run(
-        [str(rscript), "-e", "cat(paste0('R-', getRversion()))"],
+        [
+            str(rscript),
+            "-e",
+            "cat(paste0('R-', getRversion(), '-', R.version$arch, '-', .Platform$pkgType))",
+        ],
         cwd=root,
         env=env,
         text=True,
@@ -310,12 +316,29 @@ def dependency_cache_key(
     digest = hashlib.sha256()
     for relative_path in (
         R_DEP_INSTALLER,
+        R_BINARY_POLICY,
+        R_POLICY_LOADER,
         Path("docs") / "verification" / "RCMetaR-r-dependencies.json",
         RCMetaR_PACKAGE / "DESCRIPTION",
     ):
         digest.update(file_digest(root / relative_path).encode("ascii"))
     digest.update(cran_repo.encode("utf-8"))
     return f"{r_version_key(rscript, root, env)}-rdeps-{digest.hexdigest()[:12]}"
+
+
+def binary_dependency_policy(root: Path) -> dict:
+    helper = root / R_POLICY_LOADER
+    spec = importlib.util.spec_from_file_location("rcms_r_dependency_policy", helper)
+    if spec is None or spec.loader is None:
+        raise VerificationError(f"cannot load R dependency policy helper: {helper}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    try:
+        return module.load_policy(
+            root / "docs" / "verification" / "RCMetaR-r-dependencies.json"
+        )
+    except module.PolicyError as exc:
+        raise VerificationError(str(exc)) from exc
 
 
 def copy_library(source: Path, destination: Path) -> None:
@@ -338,6 +361,7 @@ def ensure_dependency_library(
         r_library.mkdir(parents=True)
         install_env = isolated_r_env(env, r_library)
         install_env["RCMS_CRAN_REPO"] = cran_repo
+        install_env["RCMS_POLICY_PYTHON"] = python
         step(f"Installing R dependencies into isolated library at {r_library}")
         run([rscript, R_DEP_INSTALLER], cwd=root, env=install_env)
         verify_manifest_versions(root, python, rscript, install_env)
@@ -350,6 +374,8 @@ def ensure_dependency_library(
         try:
             cache_env = isolated_r_env(env, cache_library)
             cache_env["RCMS_CRAN_REPO"] = cran_repo
+            cache_env["RCMS_POLICY_PYTHON"] = python
+            run([rscript, R_DEP_INSTALLER], cwd=root, env=cache_env)
             verify_manifest_versions(root, python, rscript, cache_env)
             step(f"Using cached R dependency library at {cache_library}")
         except VerificationError:
@@ -362,6 +388,7 @@ def ensure_dependency_library(
     cache_library.mkdir(parents=True, exist_ok=True)
     cache_env = isolated_r_env(env, cache_library)
     cache_env["RCMS_CRAN_REPO"] = cran_repo
+    cache_env["RCMS_POLICY_PYTHON"] = python
     step(f"Installing R dependencies into cache library at {cache_library}")
     run([rscript, R_DEP_INSTALLER], cwd=root, env=cache_env)
     verify_manifest_versions(root, python, rscript, cache_env)
@@ -438,8 +465,15 @@ def verify(args: argparse.Namespace) -> None:
     )
     rscript = resolve_rscript(args.rscript)
     base_env = dict(os.environ)
-    cran_repo = args.cran_repo or base_env.get("RCMS_CRAN_REPO") or DEFAULT_CRAN_REPO
+    policy = binary_dependency_policy(root)
+    configured_repo = args.cran_repo or base_env.get("RCMS_CRAN_REPO")
+    if configured_repo and configured_repo != policy["repository"]:
+        raise VerificationError(
+            f"R dependency repository must match the manifest snapshot: {policy['repository']}"
+        )
+    cran_repo = policy["repository"]
     base_env["RCMS_CRAN_REPO"] = cran_repo
+    base_env["RCMS_POLICY_PYTHON"] = python
 
     verify_rpy2_identities()
 

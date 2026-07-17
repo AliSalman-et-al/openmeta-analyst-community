@@ -7,16 +7,18 @@ import sys
 from pathlib import Path
 
 import pytest
-from PyQt6 import QtCore
+from PyQt6 import QtCore, QtGui
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QHeaderView,
+    QLabel,
     QLineEdit,
     QSizePolicy,
     QStyle,
     QTableWidget,
     QTableWidgetItem,
+    QVBoxLayout,
 )
 
 
@@ -39,6 +41,66 @@ def _load_native_calculator_smoke():
     return module
 
 
+def test_native_calculator_capture_falls_back_when_screen_grab_is_null(tmp_path, qapp):
+    smoke = _load_native_calculator_smoke()
+
+    dialog = QDialog()
+    dialog.setObjectName("fallbackCaptureDialog")
+    dialog.resize(280, 140)
+    layout = QVBoxLayout(dialog)
+    label = QLabel("RC MetaStudio fallback capture 42", dialog)
+    label.setObjectName("recognizableFallbackContent")
+    label.setStyleSheet("background: #d31f45; color: #ffffff; font-size: 18px;")
+    layout.addWidget(label)
+    dialog.show()
+    qapp.processEvents()
+
+    class NullScreen:
+        def grabWindow(self, _window_id):
+            return QtGui.QPixmap()
+
+    class RenderableDialogProxy:
+        def __init__(self, widget):
+            self.widget = widget
+            self.widget_capture_calls = 0
+
+        def screen(self):
+            return NullScreen()
+
+        def winId(self):
+            return self.widget.winId()
+
+        def grab(self):
+            self.widget_capture_calls += 1
+            return self.widget.grab()
+
+    try:
+        proxy = RenderableDialogProxy(dialog)
+        pixmap, method = smoke.capture_visible_calculator(proxy)
+        image = tmp_path / "fallback.png"
+
+        assert dialog.isVisible()
+        assert label.isVisible()
+        assert method == "QWidget.grab fallback"
+        assert proxy.widget_capture_calls == 1
+        assert not pixmap.isNull()
+        ratio = pixmap.devicePixelRatio()
+        assert abs((pixmap.width() / ratio) - dialog.width()) <= 1
+        assert abs((pixmap.height() / ratio) - dialog.height()) <= 1
+        rendered = pixmap.toImage()
+        sampled_colors = {
+            rendered.pixelColor(x, y).rgba()
+            for x in range(0, rendered.width(), max(1, rendered.width() // 12))
+            for y in range(0, rendered.height(), max(1, rendered.height() // 8))
+        }
+        assert len(sampled_colors) > 2
+        assert pixmap.save(str(image), "PNG")
+        assert image.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+    finally:
+        dialog.close()
+        qapp.processEvents()
+
+
 def test_native_calculator_evidence_is_relocatable_and_tamper_evident(tmp_path):
     smoke = _load_native_calculator_smoke()
     source = tmp_path / "source"
@@ -51,6 +113,7 @@ def test_native_calculator_evidence_is_relocatable_and_tamper_evident(tmp_path):
         records.append(
             {
                 "calculator": calculator,
+                "capture_method": "QScreen.grabWindow",
                 "image": image.name,
                 "image_size": len(payload),
                 "image_sha256": hashlib.sha256(payload).hexdigest(),
@@ -63,6 +126,13 @@ def test_native_calculator_evidence_is_relocatable_and_tamper_evident(tmp_path):
     assert smoke.validate_evidence_bundle(relocated) == records
 
     manifest = relocated / "evidence.json"
+    tampered = json.loads(manifest.read_text(encoding="utf-8"))
+    tampered[0]["capture_method"] = "untrusted screenshot"
+    manifest.write_text(json.dumps(tampered), encoding="utf-8")
+    with pytest.raises(ValueError, match="capture method is invalid"):
+        smoke.validate_evidence_bundle(relocated)
+
+    shutil.copy2(source / "evidence.json", manifest)
     tampered = json.loads(manifest.read_text(encoding="utf-8"))
     tampered[0]["image"] = "../binary.png"
     manifest.write_text(json.dumps(tampered), encoding="utf-8")

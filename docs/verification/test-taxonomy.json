@@ -4,6 +4,7 @@
   "runtime_data_status": "initial static estimate; replace with measured --durations data during audit hardening",
   "schema_version": 1,
   "tests": [
+    {"decision":"keep","evidence":["r_stack","release_readiness"],"external_dependencies":["r"],"lane":"fast","nodeid":"tests/python/fast/test_rcmetar_r_manifest_validation.py::test_native_r_binary_policy_fails_closed_without_source_fallback","reason":"Exercises wrong runtime and package type rejection, missing-binary preflight, binary-only normal installation, and digest rejection before the sole source exception.","runtime_class":"seconds","size":"medium"},
     {"decision":"keep","evidence":["release_readiness"],"external_dependencies":["filesystem"],"lane":"fast","nodeid":"tests/python/fast/test_qt6_build_slice.py::test_macos_official_rcc_requires_pinned_version_and_host_slice","reason":"Guards the pinned official macOS rcc version and requires a native host architecture slice without depending on a Windows PE fixture.","runtime_class":"subsecond","size":"small"},
     {"decision":"keep","evidence":["release_readiness"],"external_dependencies":["filesystem"],"lane":"fast","nodeid":"tests/python/fast/test_native_remaining_surfaces_evidence.py::test_surface_inventory_matches_canonical_forms_factories_tests_and_document","reason":"Guards the exact canonical form, runtime factory, executable test, and generated-document inventory.","runtime_class":"subsecond","size":"small"},
     {"decision":"keep","evidence":["release_readiness"],"external_dependencies":["filesystem"],"lane":"fast","nodeid":"tests/python/fast/test_native_remaining_surfaces_evidence.py::test_surface_inventory_rejects_canonical_form_drift","reason":"Fails closed when the 29-form canonical inventory drifts.","runtime_class":"subsecond","size":"small"},
@@ -46,6 +47,36 @@
       "nodeid": "tests/python/gui/test_analysis_configuration_layout.py::test_method_parameters_declares_scroll_body_with_actions_outside",
       "reason": "Guards the Method and Parameters Overflow Boundary and reachable primary actions.",
       "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["subprocess"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_build_slice.py::test_native_smoke_timeout_runner_streams_output_and_fails_closed",
+      "reason": "Proves a stuck native smoke is terminated at its command boundary after preserving streamed diagnostics.",
+      "runtime_class": "seconds",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["subprocess"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_build_slice.py::test_timeout_runner_reports_taskkill_failure",
+      "reason": "Proves Windows timeout teardown reports taskkill process-tree failure instead of silently degrading to parent-only termination.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["subprocess"],
+      "lane": "fast",
+      "nodeid": "tests/python/fast/test_qt6_build_slice.py::test_timeout_runner_kills_sigterm_ignoring_grandchild",
+      "reason": "Proves POSIX timeout teardown kills SIGTERM-ignoring process-group descendants after the direct parent exits.",
+      "runtime_class": "seconds",
       "size": "small"
     },
     {
@@ -8661,6 +8692,11 @@
       "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["filesystem"], "lane": "fast",
       "nodeid": "tests/python/fast/test_calculator_qt6.py::test_native_calculator_evidence_is_relocatable_and_tamper_evident",
       "reason": "Proves downloaded native calculator evidence uses portable paths and fails closed on path, size, or digest tampering.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["filesystem", "qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_native_calculator_capture_falls_back_when_screen_grab_is_null",
+      "reason": "Forces a null hosted screen grab and proves the visible widget-render fallback produces an intact PNG.", "runtime_class": "subsecond", "size": "small"
     },
     {
       "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",

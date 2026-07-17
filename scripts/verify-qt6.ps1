@@ -6,6 +6,24 @@ param(
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 
+function Invoke-NativeSmokeCommand {
+    param(
+        [Parameter(Mandatory = $true)][string]$Label,
+        [Parameter(Mandatory = $true)][string[]]$Command,
+        [int]$TimeoutSeconds = 300
+    )
+    $runnerArguments = @(
+        "run", "python", "scripts/run_with_timeout.py",
+        "--timeout-seconds", $TimeoutSeconds,
+        "--label", $Label,
+        "--"
+    ) + $Command
+    & uv @runnerArguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Label failed with exit code $LASTEXITCODE."
+    }
+}
+
 Push-Location $repoRoot
 try {
     if ($Sync) {
@@ -213,29 +231,41 @@ try {
     Remove-Item Env:QT_QPA_PLATFORM -ErrorAction SilentlyContinue
     $env:QT_FATAL_WARNINGS = "1"
     try {
-        uv run python scripts/build_qt6.py native-smoke --build-root $BuildRoot --exit-after-ms 100
-        if ($LASTEXITCODE -ne 0) { throw "Native qwindows Qt6 smoke failed." }
+        Invoke-NativeSmokeCommand -Label "Native qwindows Qt6 smoke" -Command @(
+            "uv", "run", "python", "scripts/build_qt6.py", "native-smoke",
+            "--build-root", $BuildRoot, "--exit-after-ms", "100"
+        )
         $env:RCMS_STUB_BACKEND = "1"
-        uv run rc-metastudio --automation-native-shell-smoke
-        if ($LASTEXITCODE -ne 0) { throw "Native RC MetaStudio Qt6 shell smoke failed." }
-        uv run python scripts/native_calculator_smoke.py
-        if ($LASTEXITCODE -ne 0) { throw "Native Qt6 calculator smoke failed." }
-        uv run python scripts/native_calculator_smoke.py --validate-only
-        if ($LASTEXITCODE -ne 0) { throw "Native Qt6 calculator evidence validation failed." }
-        uv run python scripts/native_analysis_smoke.py
-        if ($LASTEXITCODE -ne 0) { throw "Native Qt6 analysis workflow smoke failed." }
-        uv run python scripts/native_results_smoke.py
-        if ($LASTEXITCODE -ne 0) { throw "Native Qt6 Results fractional-scale smoke failed." }
-        uv run python scripts/native_results_smoke.py --validate-only
-        if ($LASTEXITCODE -ne 0) { throw "Native Qt6 Results evidence validation failed." }
-        uv run python scripts/native_remaining_surfaces_smoke.py
-        if ($LASTEXITCODE -ne 0) { throw "Native Qt6 remaining-surface smoke failed." }
-        uv run python scripts/native_remaining_surfaces_smoke.py --validate-only
-        if ($LASTEXITCODE -ne 0) { throw "Native Qt6 remaining-surface evidence validation failed." }
-        uv run rc-metastudio --automation-shell-failure-smoke r-load
-        if ($LASTEXITCODE -ne 0) { throw "Native R-load teardown smoke failed." }
-        uv run rc-metastudio --automation-shell-failure-smoke meta-form
-        if ($LASTEXITCODE -ne 0) { throw "Native MetaForm teardown smoke failed." }
+        Invoke-NativeSmokeCommand -Label "Native RC MetaStudio Qt6 shell smoke" -Command @(
+            "uv", "run", "rc-metastudio", "--automation-native-shell-smoke"
+        )
+        Invoke-NativeSmokeCommand -Label "Native Qt6 calculator smoke" -Command @(
+            "uv", "run", "python", "scripts/native_calculator_smoke.py"
+        )
+        Invoke-NativeSmokeCommand -Label "Native Qt6 calculator evidence validation" -Command @(
+            "uv", "run", "python", "scripts/native_calculator_smoke.py", "--validate-only"
+        )
+        Invoke-NativeSmokeCommand -Label "Native Qt6 analysis workflow smoke" -Command @(
+            "uv", "run", "python", "scripts/native_analysis_smoke.py"
+        )
+        Invoke-NativeSmokeCommand -Label "Native Qt6 Results fractional-scale smoke" -Command @(
+            "uv", "run", "python", "scripts/native_results_smoke.py"
+        )
+        Invoke-NativeSmokeCommand -Label "Native Qt6 Results evidence validation" -Command @(
+            "uv", "run", "python", "scripts/native_results_smoke.py", "--validate-only"
+        )
+        Invoke-NativeSmokeCommand -Label "Native Qt6 remaining-surface smoke" -Command @(
+            "uv", "run", "python", "scripts/native_remaining_surfaces_smoke.py"
+        )
+        Invoke-NativeSmokeCommand -Label "Native Qt6 remaining-surface evidence validation" -Command @(
+            "uv", "run", "python", "scripts/native_remaining_surfaces_smoke.py", "--validate-only"
+        )
+        Invoke-NativeSmokeCommand -Label "Native R-load teardown smoke" -Command @(
+            "uv", "run", "rc-metastudio", "--automation-shell-failure-smoke", "r-load"
+        )
+        Invoke-NativeSmokeCommand -Label "Native MetaForm teardown smoke" -Command @(
+            "uv", "run", "rc-metastudio", "--automation-shell-failure-smoke", "meta-form"
+        )
     }
     finally {
         if ($null -ne $previousQpa) { $env:QT_QPA_PLATFORM = $previousQpa }

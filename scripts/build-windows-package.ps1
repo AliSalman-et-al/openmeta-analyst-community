@@ -13,6 +13,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+$pinnedCranRepo = "https://packagemanager.posit.co/cran/2026-07-16"
 $appSourceDir = Join-Path (Join-Path $repoRoot "src") "rc_metastudio"
 $artifactDir = Join-Path $repoRoot "artifacts"
 $distRoot = Join-Path $repoRoot "build\windows-package\dist"
@@ -286,12 +287,16 @@ function Get-RPackageCacheKey {
     param([string]$RscriptExe)
     $version = & $RscriptExe -e "cat(paste0('R-', getRversion()))"
     if ($LASTEXITCODE -ne 0 -or -not $version) { throw "Could not determine R runtime version." }
-    $cranRepo = if ($env:RCMS_CRAN_REPO) { $env:RCMS_CRAN_REPO } else { "https://cloud.r-project.org" }
+    $cranRepo = if ($env:RCMS_CRAN_REPO) { $env:RCMS_CRAN_REPO } else { $pinnedCranRepo }
     $installDeps = Join-Path $repoRoot "scripts\install-r-deps.R"
+    $binaryPolicy = Join-Path $repoRoot "scripts\r_binary_policy.R"
+    $policyLoader = Join-Path $repoRoot "scripts\r_dependency_policy.py"
     $manifest = Join-Path $repoRoot "docs\verification\RCMetaR-r-dependencies.json"
     $description = Join-Path $repoRoot "r\RCMetaR\DESCRIPTION"
     $hashInput = @(
         (Get-Sha256FileHash -Path $installDeps)
+        (Get-Sha256FileHash -Path $binaryPolicy)
+        (Get-Sha256FileHash -Path $policyLoader)
         (Get-Sha256FileHash -Path $manifest)
         (Get-Sha256FileHash -Path $description)
         $cranRepo
@@ -299,7 +304,7 @@ function Get-RPackageCacheKey {
     $policyHash = [System.BitConverter]::ToString(
         [System.Security.Cryptography.SHA256]::Create().ComputeHash([System.Text.Encoding]::UTF8.GetBytes($hashInput))
     ).Replace("-", "").Substring(0, 12).ToLowerInvariant()
-    return (($version.Trim() + "-rdeps-" + $policyHash) -replace "[^A-Za-z0-9_.-]", "_")
+    return (($version.Trim() + "-rdeps-v2-" + $policyHash) -replace "[^A-Za-z0-9_.-]", "_")
 }
 
 function Test-RDependencyPackages {
@@ -308,6 +313,17 @@ function Test-RDependencyPackages {
     $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','metafor','lme4','pdftools','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }; if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1)"
     & $RscriptExe -e $verify
     return ($LASTEXITCODE -eq 0)
+}
+
+function Invoke-StrictRDependencyPolicy {
+    param([string]$RscriptExe, [string]$Library)
+    New-Item -ItemType Directory -Force -Path $Library | Out-Null
+    $env:R_LIBS = $Library
+    $env:R_LIBS_USER = $Library
+    $env:RCMS_CRAN_REPO = $pinnedCranRepo
+    $env:RCMS_POLICY_PYTHON = $PythonExe
+    & $RscriptExe (Join-Path $repoRoot "scripts\install-r-deps.R")
+    if ($LASTEXITCODE -ne 0) { throw "Strict R dependency policy validation failed for '$Library'." }
 }
 
 function Test-BundledRPackages {
@@ -410,23 +426,29 @@ function Install-BundledRPackages {
         (Join-Path $Root "Library\usr\bin")
         $env:Path
     ) -join ";"
+    if ($env:RCMS_CRAN_REPO -and $env:RCMS_CRAN_REPO -ne $pinnedCranRepo) {
+        throw "RCMS_CRAN_REPO must match the manifest snapshot: $pinnedCranRepo"
+    }
+    $env:RCMS_CRAN_REPO = $pinnedCranRepo
 
     $rPackageCacheKey = Get-RPackageCacheKey -RscriptExe $rscriptExe
     $cacheLibrary = Join-Path (Join-Path $RPackageCacheRoot $rPackageCacheKey) "library"
-    if (Test-RDependencyPackages -RscriptExe $rscriptExe -Library $cacheLibrary) {
+    if (Test-Path $cacheLibrary) {
+        Write-Step "Validating cached bundled R dependencies with the strict shared policy"
+        Invoke-StrictRDependencyPolicy -RscriptExe $rscriptExe -Library $cacheLibrary
         Write-Host "Using cached bundled R library from $cacheLibrary"
         Copy-RLibraryPackages -Source $cacheLibrary -Destination $rLibrary
     }
     else {
         Write-Step "Installing bundled R package dependencies"
-        $installDeps = Join-Path $repoRoot "scripts\install-r-deps.R"
-        & $rscriptExe $installDeps
-        if ($LASTEXITCODE -ne 0) { throw "R dependency install failed." }
+        Invoke-StrictRDependencyPolicy -RscriptExe $rscriptExe -Library $rLibrary
         if (Test-RDependencyPackages -RscriptExe $rscriptExe -Library $rLibrary) {
             Write-Host "Caching bundled R dependency library at $cacheLibrary"
             Copy-RLibrary -Source $rLibrary -Destination $cacheLibrary
         }
     }
+    $env:R_LIBS = $rLibrary
+    $env:R_LIBS_USER = $rLibrary
 
     Write-Step "Installing local RCMetaR package"
     Install-LocalRPackagesFromSource -Root $Root

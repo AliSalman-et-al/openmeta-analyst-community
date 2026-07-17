@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import time
 import tomllib
 
 import pytest
@@ -488,6 +489,9 @@ def test_qt6_generation_and_type_checks_have_a_maintained_entry_point():
     assert "--require-covered" in workflow
     assert "native-smoke" in workflow
     assert "Remove-Item Env:QT_QPA_PLATFORM" in workflow
+    assert "scripts/run_with_timeout.py" in workflow
+    assert workflow.count("Invoke-NativeSmokeCommand -Label") == 11
+    assert "[int]$TimeoutSeconds = 300" in workflow
 
     hosted = (ROOT / ".github/workflows/fast-verification.yml").read_text(
         encoding="utf-8"
@@ -503,6 +507,7 @@ def test_qt6_generation_and_type_checks_have_a_maintained_entry_point():
     assert hosted.count("--require-r-evidence") == 2
     assert "macos-x64" in hosted
     assert "macos-arm64" in hosted
+    assert "timeout-minutes: 45" in hosted
 
     for verification_script in (
         "scripts/verify-smoke.ps1",
@@ -516,3 +521,95 @@ def test_qt6_generation_and_type_checks_have_a_maintained_entry_point():
         assert "build/qt6-verification" in source.replace("\\", "/")
         assert "RCMS_QT6_BUILD_ROOT" in source
         assert "PYTHONPATH" in source
+
+
+def test_native_smoke_timeout_runner_streams_output_and_fails_closed():
+    runner = ROOT / "scripts" / "run_with_timeout.py"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(runner),
+            "--timeout-seconds",
+            "1",
+            "--label",
+            "deterministic timeout smoke",
+            "--",
+            sys.executable,
+            "-u",
+            "-c",
+            "import time; print('streamed-before-timeout', flush=True); time.sleep(30)",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+
+    assert completed.returncode == 124
+    assert "streamed-before-timeout" in completed.stdout
+    assert "deterministic timeout smoke timed out after 1 seconds" in completed.stderr
+    assert sys.executable in completed.stderr
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows taskkill contract")
+def test_timeout_runner_reports_taskkill_failure(monkeypatch):
+    runner_path = ROOT / "scripts" / "run_with_timeout.py"
+    spec = importlib.util.spec_from_file_location("timeout_runner_test", runner_path)
+    assert spec is not None and spec.loader is not None
+    runner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runner)
+
+    class FakeProcess:
+        pid = 424242
+
+    def fail_taskkill(command, **_kwargs):
+        return subprocess.CompletedProcess(command, 5, "", "Access is denied")
+
+    monkeypatch.setattr(runner.subprocess, "run", fail_taskkill)
+    with pytest.raises(RuntimeError, match="taskkill /T /F failed.*Access is denied"):
+        runner._terminate_process_tree(FakeProcess())
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX process-group teardown contract")
+def test_timeout_runner_kills_sigterm_ignoring_grandchild(tmp_path):
+    runner = ROOT / "scripts" / "run_with_timeout.py"
+    marker = tmp_path / "escaped-grandchild.txt"
+    grandchild = (
+        "import pathlib,signal,time; "
+        "signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+        "time.sleep(2); "
+        f"pathlib.Path({str(marker)!r}).write_text('escaped', encoding='utf-8')"
+    )
+    parent = (
+        "import subprocess,sys,time; "
+        f"subprocess.Popen([sys.executable, '-c', {grandchild!r}]); "
+        "time.sleep(0.5); print('grandchild-ready', flush=True); time.sleep(30)"
+    )
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(runner),
+            "--timeout-seconds",
+            "1",
+            "--label",
+            "process group smoke",
+            "--",
+            sys.executable,
+            "-u",
+            "-c",
+            parent,
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+
+    assert completed.returncode == 124
+    assert "grandchild-ready" in completed.stdout
+    deadline = time.monotonic() + 2.5
+    while time.monotonic() < deadline and not marker.exists():
+        time.sleep(0.05)
+    assert not marker.exists()

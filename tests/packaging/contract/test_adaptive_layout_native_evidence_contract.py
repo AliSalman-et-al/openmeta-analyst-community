@@ -5,7 +5,6 @@
 import hashlib
 import importlib.util
 import json
-import platform
 from pathlib import Path
 
 import pytest
@@ -185,7 +184,9 @@ def _write_validator_fixture(tmp_path, validator):
         "schema_version": 2,
         "platform_plugin": "windows",
         "scale_factor_environment": "1.0",
-        "machine": platform.machine(),
+        # This fixture exercises the Windows x64 release-evidence contract even
+        # when the contract suite itself runs on an Apple Silicon host.
+        "machine": "x86_64",
         "surfaces": surfaces,
         "unavailable_scenarios": [],
         "intrinsic_artifact": {

@@ -192,7 +192,7 @@ def test_windows_r_cache_reinstalls_local_packages_after_cache_restore():
 
     assert relative_order(
         script,
-        "Test-RDependencyPackages -RscriptExe $rscriptExe -Library $cacheLibrary",
+        "Invoke-StrictRDependencyPolicy -RscriptExe $rscriptExe -Library $cacheLibrary",
         "Copy-RLibraryPackages -Source $cacheLibrary -Destination $rLibrary",
         "Install-LocalRPackagesFromSource -Root $Root",
     )
@@ -305,6 +305,9 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
     assert "qt6_macos_feasibility.py resolve-rcc" in workflow["text"]
     assert '--sdk-root "$PWD/build/qt-sdk/6.11.1/macos"' in workflow["text"]
     assert '--github-env "$GITHUB_ENV"' in workflow["text"]
+    assert workflow["env"]["RCMS_CRAN_REPO"] == "https://packagemanager.posit.co/cran/2026-07-16"
+    assert "r-default-evidence-v2-${{ matrix.target }}-r-4.6.1-public-ppm-2026-07-16" in workflow["text"]
+    assert "use-public-rspm: true" in workflow["text"]
 
 
 def test_package_workflow_builds_path_aware_artifacts():
@@ -316,7 +319,8 @@ def test_package_workflow_builds_path_aware_artifacts():
         "macos-package-intel",
         "macos-package-arm64",
     } <= workflow["jobs"]
-    assert target["env"]["RCMS_CRAN_REPO"] == "https://cloud.r-project.org"
+    assert target["env"]["RCMS_CRAN_REPO"] == "https://packagemanager.posit.co/cran/2026-07-16"
+    assert target["env"]["RCMS_CRAN_REPO_KEY"] == "public-ppm-2026-07-16"
     assert workflow["events"] == {"workflow_dispatch"}
     assert workflow["legacy_uses"] == []
     pinned_uses = workflow["uses"] + target["uses"]
@@ -336,7 +340,8 @@ def test_package_workflow_builds_path_aware_artifacts():
     )
     assert all("RCMS_CRAN_REPO_KEY" in key for key in target["cache_keys"])
     assert workflow["restore_keys"] == []
-    assert all(key.startswith("bundled-r-library-v3-") for key in target["cache_keys"])
+    assert all(key.startswith("bundled-r-library-v4-") for key in target["cache_keys"])
+    assert "use-public-rspm: true" in target["text"]
     assert all(
         "steps.package-metadata.outputs.r-version" in key for key in target["cache_keys"]
     )
@@ -530,27 +535,27 @@ def test_shared_package_verifier_names_only_existing_qt6_test_paths():
 
 def test_shared_r_dependency_installer_is_used_by_packagers():
     installer = read_repo_text("scripts", "install-r-deps.R")
+    policy_runtime = read_repo_text("scripts", "r_binary_policy.R")
+    policy_loader = read_repo_text("scripts", "r_dependency_policy.py")
     windows = ps_contract("scripts", "build-windows-package.ps1")
     macos = sh_contract("scripts", "build-macos-package.sh")
 
-    cran_default = re.search(
-        r'Sys.getenv\("RCMS_CRAN_REPO",\s+"([^"]+)"\)', installer
-    ).group(1)
-    archive_url = re.search(r'HSROC\s+=\s+"([^"]+)"', installer).group(1)
-
-    assert cran_default == "https://cloud.r-project.org"
-    assert archive_url.endswith("/Archive/HSROC/HSROC_2.1.9.tar.gz")
-    assert "cran_package_install_types <- function()" in installer
-    assert '.Platform$pkgType != "source"' in installer
-    assert 'return(c("binary", "source"))' in installer
-    assert (
-        "install.packages(missing, lib = lib, dependencies = NA, type = package_install_type)"
-        in installer
-    )
-    assert 'Sys.info()[["sysname"]]' not in installer
+    assert "load_rcms_r_binary_policy" in installer
+    assert "install_rcms_binary_packages" in installer
+    assert "install_rcms_source_exception" in installer
+    assert 'type = "binary"' in policy_runtime
+    assert 'type = "source"' in policy_runtime
+    assert "type = \"both\"" not in policy_runtime
+    assert "available.packages" in policy_runtime
+    assert "Required native R binaries unavailable" in policy_runtime
+    assert "install.packages.compile.from.source = \"never\"" in policy_runtime
+    assert "HSROC source archive SHA256 mismatch" in policy_runtime
+    assert "HSROC 2.1.9 must be the sole pinned source exception" in policy_loader
+    assert "https://packagemanager.posit.co/cran/2026-07-16" in policy_loader
     assert {
         "Get-RPackageCacheKey",
         "Get-Sha256FileHash",
+        "Invoke-StrictRDependencyPolicy",
         "Test-RDependencyPackages",
     } <= windows["functions"]
     assert "docs\\verification\\RCMetaR-r-dependencies.json" in windows["paths"]
@@ -558,6 +563,22 @@ def test_shared_r_dependency_installer_is_used_by_packagers():
     assert "RCMetaR/DESCRIPTION" in macos["text"]
     assert "RCMS_CRAN_REPO" in windows["text"]
     assert "RCMS_CRAN_REPO" in macos["text"]
+    assert "RCMS_POLICY_PYTHON" in windows["text"]
+    assert "RCMS_POLICY_PYTHON" in macos["text"]
+    assert "RCMS_CRAN_REPO must match the manifest snapshot" in windows["text"]
+    assert "RCMS_CRAN_REPO must match the manifest snapshot" in macos["text"]
+    assert relative_order(
+        windows["text"],
+        "if (Test-Path $cacheLibrary)",
+        "Invoke-StrictRDependencyPolicy -RscriptExe $rscriptExe -Library $cacheLibrary",
+        "Copy-RLibraryPackages -Source $cacheLibrary -Destination $rLibrary",
+    )
+    assert relative_order(
+        macos["text"],
+        'if [ -d "$cache_library" ]',
+        'run_strict_r_dependency_policy "$cache_library"',
+        'copy_r_library_packages "$cache_library" "$r_lib"',
+    )
 
 
 def test_macos_packager_resolves_relative_python_before_changing_directory():
