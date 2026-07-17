@@ -301,8 +301,17 @@ def test_automation_launch_shows_main_window_maximized():
 
 def test_open_project_preserves_main_window_state_without_duplicate_windows(monkeypatch):
     import launch
+    import ma_data_table_model
+    import project_adapter
+    import project_format
 
     app, window = launch.start_automation()
+    recalculations = []
+    monkeypatch.setattr(
+        ma_data_table_model.DatasetModel,
+        "try_to_update_outcomes",
+        lambda model: recalculations.append(model),
+    )
     meta_form = sys.modules["meta_form"]
     critical_messages = []
     monkeypatch.setattr(
@@ -326,6 +335,7 @@ def test_open_project_preserves_main_window_state_without_duplicate_windows(monk
         # without driving the separate interactive save-confirmation contract.
         window.current_data_unsaved = False
         project_path = _sample_project_path("amino.rcms")
+        expected_dataset = project_format.load_project(project_path).project["dataset"]
         assert window.open(project_path) is True, critical_messages
         app.processEvents()
 
@@ -338,6 +348,11 @@ def test_open_project_preserves_main_window_state_without_duplicate_windows(monk
         assert window.isMaximized()
         assert window.tableView.model() is window.model
         assert window.model.rowCount() >= 20
+        assert recalculations == []
+        observed_dataset = project_adapter.dataset_to_project(window.model.dataset)[
+            "dataset"
+        ]
+        assert observed_dataset == expected_dataset
     finally:
         # This test owns window identity, not the interactive save prompt.
         window.current_data_unsaved = False
@@ -5255,7 +5270,20 @@ def test_load_r_libraries_runs_against_stub_bridge():
             pass
 
     # Must not raise AttributeError: module 'meta_py_r' has no attribute 'get_R_libpaths'
-    launch.load_R_libraries(app, _Splash())
+    phases = []
+    launch.load_R_libraries(app, _Splash(), phase_callback=phases.append)
+    assert phases == [
+        "r-library-paths:start",
+        "r-library-paths:complete",
+        "r-library:metafor:start",
+        "r-library:metafor:complete",
+        "r-library:RCMetaR:start",
+        "r-library:RCMetaR:complete",
+        "r-library:igraph:start",
+        "r-library:igraph:complete",
+        "r-library:grid:start",
+        "r-library:grid:complete",
+    ]
 
 
 def test_stub_backend_exposes_data_entry_imputation_methods():
@@ -5863,6 +5891,9 @@ def _dataset_summary(dataset):
 def test_native_packaged_smoke_requires_expected_plugin_and_visible_window(monkeypatch):
     import launch
 
+    phases = []
+    close_states = []
+
     class Model:
         def rowCount(self):
             return 1
@@ -5888,9 +5919,15 @@ def test_native_packaged_smoke_requires_expected_plugin_and_visible_window(monke
             return True
 
         def close(self):
-            pass
+            close_states.append(self.current_data_unsaved)
 
-    monkeypatch.setattr(launch, "start_automation", lambda: (App(), Meta()))
+    def start_automation(phase_callback=None):
+        if phase_callback is not None:
+            phase_callback("application:configured")
+        return App(), Meta()
+
+    monkeypatch.setattr(launch, "start_automation", start_automation)
+    monkeypatch.setattr(launch, "_write_automation_smoke_log", phases.append)
     monkeypatch.setattr(launch, "_force_table_paint", lambda _app, _meta: None)
     monkeypatch.setattr(
         launch, "_assert_standard_binary_summary_is_formatted", lambda _meta: None
@@ -5902,3 +5939,35 @@ def test_native_packaged_smoke_requires_expected_plugin_and_visible_window(monke
     )
 
     assert launch.start_automation_smoke("sample.rcms", require_native_window=True) == 0
+    assert close_states == [False]
+    assert phases == [
+        "packaged-workflow:start",
+        "packaged-workflow:shell:application:configured",
+        "packaged-workflow:shell-created",
+        "packaged-workflow:project-open:start",
+        "packaged-workflow:project-open:return",
+        "packaged-workflow:sample-opened",
+        "packaged-workflow:paint:start",
+        "packaged-workflow:paint:complete",
+        "packaged-workflow:project-exercise:start",
+        "packaged-workflow:project-exercise:complete",
+        "packaged-workflow:save-reopen-complete",
+        "packaged-workflow:post-close",
+    ]
+
+    trace = object()
+    stopped_traces = []
+    monkeypatch.setattr(launch, "_start_automation_hang_trace", lambda: trace)
+    monkeypatch.setattr(
+        launch,
+        "_stop_automation_hang_trace",
+        stopped_traces.append,
+    )
+
+    def fail_start_automation(phase_callback=None):
+        raise RuntimeError("injected startup failure")
+
+    monkeypatch.setattr(launch, "start_automation", fail_start_automation)
+    with pytest.raises(RuntimeError, match="injected startup failure"):
+        launch.start_automation_smoke("sample.rcms", require_native_window=True)
+    assert stopped_traces == [trace]

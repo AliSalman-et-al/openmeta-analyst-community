@@ -101,7 +101,7 @@ jobs:
             build/windows-package/dist/RCMetaStudio/qualification/deployment-manifest.json
             build/windows-package/dist/RCMetaStudio/qualification/runtime-probe.json
             build/windows-package/dist/RCMetaStudio/qualification/packaged-smoke.json
-            build/windows-package/dist/RCMetaStudio/qualification/packaged-smoke.log
+            build/windows-package/dist/RCMetaStudio/qualification/packaged-smoke*.log
             artifacts/*-archive-inspection.json
             artifacts/*-evidence.json
           if-no-files-found: ignore

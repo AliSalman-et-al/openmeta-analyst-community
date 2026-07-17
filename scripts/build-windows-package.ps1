@@ -72,12 +72,22 @@ function Invoke-BoundedPackageProcess {
         [string]$FilePath,
         [string[]]$ArgumentList,
         [int]$TimeoutSeconds = 900,
+        [string]$StandardOutputPath,
+        [string]$StandardErrorPath,
         [switch]$Visible
     )
     $startArguments = @{
         FilePath = $FilePath
         ArgumentList = $ArgumentList
         PassThru = $true
+    }
+    if ($StandardOutputPath) {
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $StandardOutputPath) | Out-Null
+        $startArguments.RedirectStandardOutput = $StandardOutputPath
+    }
+    if ($StandardErrorPath) {
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $StandardErrorPath) | Out-Null
+        $startArguments.RedirectStandardError = $StandardErrorPath
     }
     if (-not $Visible) { $startArguments.WindowStyle = "Hidden" }
     $process = Start-Process @startArguments
@@ -178,6 +188,9 @@ function Invoke-PackagedAppSmokeTest {
     $samplePath = Join-Path $Root "sample_projects\amino.rcms"
     $smokeEvidencePath = Join-Path $Root "qualification\packaged-smoke.json"
     $smokeLogPath = Join-Path $Root "qualification\packaged-smoke.log"
+    $smokeStdoutPath = Join-Path $Root "qualification\packaged-smoke.stdout.log"
+    $smokeStderrPath = Join-Path $Root "qualification\packaged-smoke.stderr.log"
+    $hangTracePath = Join-Path $Root "qualification\packaged-smoke.hang-trace.log"
     $quotedSamplePath = '"{0}"' -f $samplePath
     $quotedSmokeEvidencePath = '"{0}"' -f $smokeEvidencePath
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $smokeEvidencePath) | Out-Null
@@ -187,6 +200,7 @@ function Invoke-PackagedAppSmokeTest {
         RPY2_CFFI_MODE = $env:RPY2_CFFI_MODE
         RCMS_PACKAGE_SMOKE_EVIDENCE = $env:RCMS_PACKAGE_SMOKE_EVIDENCE
         RCMS_AUTOMATION_SMOKE_LOG = $env:RCMS_AUTOMATION_SMOKE_LOG
+        RCMS_AUTOMATION_HANG_TRACE = $env:RCMS_AUTOMATION_HANG_TRACE
         QT_SCALE_FACTOR = $env:QT_SCALE_FACTOR
         RCMS_PACKAGE_BASELINE_DPR = $env:RCMS_PACKAGE_BASELINE_DPR
     }
@@ -195,11 +209,14 @@ function Invoke-PackagedAppSmokeTest {
         $env:RPY2_CFFI_MODE = "ABI"
         $env:RCMS_PACKAGE_SMOKE_EVIDENCE = $smokeEvidencePath
         $env:RCMS_AUTOMATION_SMOKE_LOG = $smokeLogPath
+        $env:RCMS_AUTOMATION_HANG_TRACE = $hangTracePath
         $runtimeProbePath = Join-Path $Root "qualification\runtime-probe.json"
         $env:RCMS_PACKAGE_BASELINE_DPR = (& $PythonExe -c "import json,sys; print(json.load(open(sys.argv[1], encoding='utf-8'))['qt']['baseline_device_pixel_ratio'])" $runtimeProbePath).Trim()
         if ($LASTEXITCODE -ne 0 -or -not $env:RCMS_PACKAGE_BASELINE_DPR) { throw "Could not read packaged baseline DPR." }
         $env:QT_SCALE_FACTOR = "1.25"
-        $exitCode = Invoke-BoundedPackageProcess -FilePath $exePath -ArgumentList @("--automation-native-smoke", $quotedSamplePath)
+        $exitCode = Invoke-BoundedPackageProcess -FilePath $exePath `
+            -ArgumentList @("--automation-native-smoke", $quotedSamplePath) `
+            -StandardOutputPath $smokeStdoutPath -StandardErrorPath $smokeStderrPath
         if ($exitCode -ne 0) { throw "Packaged app smoke test failed while opening '$samplePath' with exit code $exitCode." }
 
         foreach ($scale in @("1.25", "1.50", "1.75")) {

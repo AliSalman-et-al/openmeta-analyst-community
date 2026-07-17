@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import faulthandler
 import hashlib
 import json
 import platform
@@ -36,7 +37,7 @@ SPLASH_DISPLAY_TIME = 0  # Keep startup smoke tests fast; packaged builds may ov
 APPLICATION_ICON_PATH = ":/misc/meta.png"
 AUTOMATION_SMOKE_LOG_ENV = "RCMS_AUTOMATION_SMOKE_LOG"
 ADAPTIVE_LAYOUT_EVIDENCE_LOG_ENV = "RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG"
-PACKAGED_SUMMARY_SHA256 = "3091a4826fbb4b05055670d9c770bc0f92a45dbde2a7578282c9821a66f7268f"
+PACKAGED_SUMMARY_SHA256 = "78294820c83cd94c19dfdca8c24b6a96cdc8b6f1319a5cd1bedffacde73851e2"
 
 
 def screen_bounded_splash_pixmap(source, available_logical_size):
@@ -177,7 +178,12 @@ def _resolve_startup_argv(argv=None, native_argv=None, frozen=None):
     return resolved
 
 
-def load_R_libraries(app, splash=None):
+def _emit_automation_phase(phase_callback, phase):
+    if phase_callback is not None:
+        phase_callback(phase)
+
+
+def load_R_libraries(app, splash=None, phase_callback=None):
     """Loads the R libraries while updating the splash screen"""
     from rc_metastudio import meta_py_r
 
@@ -186,22 +192,32 @@ def load_R_libraries(app, splash=None):
             splash.showMessage(message)
         app.processEvents()
 
+    _emit_automation_phase(phase_callback, "r-library-paths:start")
     meta_py_r.get_R_libpaths()  # print the lib paths
+    _emit_automation_phase(phase_callback, "r-library-paths:complete")
     rloader = meta_py_r.RlibLoader()
 
     _status("Loading R libraries\n..")
 
     _status("Loading metafor\n....")
+    _emit_automation_phase(phase_callback, "r-library:metafor:start")
     rloader.load_metafor()
+    _emit_automation_phase(phase_callback, "r-library:metafor:complete")
 
     _status("Loading RCMetaR\n........")
+    _emit_automation_phase(phase_callback, "r-library:RCMetaR:start")
     rloader.load_RCMetaR()
+    _emit_automation_phase(phase_callback, "r-library:RCMetaR:complete")
 
     _status("Loading igraph\n............")
+    _emit_automation_phase(phase_callback, "r-library:igraph:start")
     rloader.load_igraph()
+    _emit_automation_phase(phase_callback, "r-library:igraph:complete")
 
     _status("Loading grid\n................")
+    _emit_automation_phase(phase_callback, "r-library:grid:start")
     rloader.load_grid()
+    _emit_automation_phase(phase_callback, "r-library:grid:complete")
 
     import meta_form
 
@@ -300,19 +316,26 @@ def start():
         _dispose_new_top_levels(app, baseline_ids)
 
 
-def start_automation():
+def start_automation(phase_callback=None):
     qt6_resources.ensure_application_resources()
     app_error_handler.install_global_exception_handler()
     meta_form = _import_meta_form()
     app = app_error_handler.get_or_create_application(sys.argv)
     _configure_application(app)
+    _emit_automation_phase(phase_callback, "application:configured")
     baseline_ids = _top_level_ids(app)
     try:
         settings.setup_directories()
+        _emit_automation_phase(phase_callback, "settings:ready")
         if os.environ.get("RCMS_REQUIRE_IN_PROCESS_RPY2") == "1":
-            load_R_libraries(app, None)
+            _emit_automation_phase(phase_callback, "r-libraries:start")
+            load_R_libraries(app, None, phase_callback=phase_callback)
+            _emit_automation_phase(phase_callback, "r-libraries:complete")
+        _emit_automation_phase(phase_callback, "meta-form:create:start")
         meta = meta_form.MetaForm()
+        _emit_automation_phase(phase_callback, "meta-form:create:complete")
         _show_main_window(meta)
+        _emit_automation_phase(phase_callback, "main-window:shown")
         return app, meta
     except BaseException:
         _dispose_new_top_levels(app, baseline_ids)
@@ -397,8 +420,15 @@ def _configure_application(app):
 
 def start_automation_smoke(sample_path, require_native_window=False):
     _write_automation_smoke_log("packaged-workflow:start")
-    app, meta = start_automation()
+    hang_trace = _start_automation_hang_trace()
+    meta = None
     try:
+        app, meta = start_automation(
+            phase_callback=lambda phase: _write_automation_smoke_log(
+                "packaged-workflow:shell:%s" % phase
+            )
+        )
+        _write_automation_smoke_log("packaged-workflow:shell-created")
         if require_native_window:
             platform_name = app.platformName().lower()
             expected = "windows" if sys.platform == "win32" else "cocoa"
@@ -418,8 +448,10 @@ def start_automation_smoke(sample_path, require_native_window=False):
                 % platform_name
             )
         sample_path = os.path.abspath(sample_path)
+        _write_automation_smoke_log("packaged-workflow:project-open:start")
         if not meta.open(sample_path):
             raise SystemExit("Could not open smoke-test project: %s" % sample_path)
+        _write_automation_smoke_log("packaged-workflow:project-open:return")
         app.processEvents()
         _write_automation_smoke_log("packaged-workflow:sample-opened")
         model = meta.tableView.model()
@@ -433,8 +465,12 @@ def start_automation_smoke(sample_path, require_native_window=False):
         # This catches paint-time model/data regressions in the packaged build. A
         # paint error aborts the process, failing the smoke test with a non-zero
         # exit code rather than shipping a build that crashes on first render.
+        _write_automation_smoke_log("packaged-workflow:paint:start")
         _force_table_paint(app, meta)
+        _write_automation_smoke_log("packaged-workflow:paint:complete")
+        _write_automation_smoke_log("packaged-workflow:project-exercise:start")
         workflow = _exercise_packaged_project_workflow(app, meta, sample_path)
+        _write_automation_smoke_log("packaged-workflow:project-exercise:complete")
         _write_automation_smoke_log("packaged-workflow:save-reopen-complete")
         evidence_path = os.environ.get("RCMS_PACKAGE_SMOKE_EVIDENCE")
         if evidence_path:
@@ -451,10 +487,36 @@ def start_automation_smoke(sample_path, require_native_window=False):
             )
             _write_automation_smoke_log("packaged-workflow:evidence-written")
     finally:
-        meta.close()
-        app.processEvents()
+        try:
+            if meta is not None:
+                # Automation owns this disposable window.  Never let an earlier
+                # smoke failure become an unattended save-confirmation dialog that
+                # masks the real error until the outer watchdog expires.
+                meta.current_data_unsaved = False
+                meta.close()
+                app.processEvents()
+        finally:
+            _stop_automation_hang_trace(hang_trace)
     _write_automation_smoke_log("packaged-workflow:post-close")
     return 0
+
+
+def _start_automation_hang_trace():
+    path = os.environ.get("RCMS_AUTOMATION_HANG_TRACE")
+    if not path:
+        return None
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    trace = open(path, "a", encoding="utf-8")
+    faulthandler.dump_traceback_later(60, repeat=True, file=trace)
+    return trace
+
+
+def _stop_automation_hang_trace(trace):
+    if trace is None:
+        return
+    faulthandler.cancel_dump_traceback_later()
+    trace.flush()
+    trace.close()
 
 
 def start_package_surface_smoke(evidence_path, expected_scale):

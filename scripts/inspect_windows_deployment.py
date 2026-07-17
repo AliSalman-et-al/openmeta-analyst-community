@@ -42,7 +42,7 @@ EXPECTED_VERSIONS = {
     "rpy2": "3.6.7",
     "pyinstaller": "6.21.0",
 }
-EXPECTED_SUMMARY_SHA256 = "3091a4826fbb4b05055670d9c770bc0f92a45dbde2a7578282c9821a66f7268f"
+EXPECTED_SUMMARY_SHA256 = "78294820c83cd94c19dfdca8c24b6a96cdc8b6f1319a5cd1bedffacde73851e2"
 FORBIDDEN_GENERATED_SOURCE_SUFFIXES = {".py", ".pyc", ".pyo", ".ui", ".qrc"}
 FORBIDDEN_BINDINGS = ("pyqt5", "pyside2", "pyside6", "qtpy")
 
@@ -414,6 +414,11 @@ def write_qualification_evidence(
     log_text = smoke_log.read_text(encoding="utf-8")
     required_log_markers = {
         "packaged-runtime-probe:passed",
+        "packaged-workflow:shell-created",
+        "packaged-workflow:project-open:start",
+        "packaged-workflow:project-open:return",
+        "packaged-workflow:paint:complete",
+        "packaged-workflow:project-exercise:complete",
         "packaged-workflow:evidence-written",
         "packaged-workflow:post-close",
         "packaged-surface:scale-1.25-passed",

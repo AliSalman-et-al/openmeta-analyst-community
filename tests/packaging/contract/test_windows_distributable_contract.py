@@ -672,7 +672,7 @@ def test_windows_packager_restores_smoke_environment():
     assert relative_order(
         script,
         "$previousEnv = @{",
-        'Invoke-BoundedPackageProcess -FilePath $exePath -ArgumentList @("--automation-native-smoke", $quotedSamplePath)',
+        "Invoke-BoundedPackageProcess -FilePath $exePath",
         "foreach ($name in $previousEnv.Keys)",
     )
 
@@ -709,6 +709,15 @@ def test_windows_packager_qualifies_qt6_deployment_and_packaged_surfaces():
         "foreach ($name in $previousEnv.Keys)",
     )
     assert "function Invoke-BoundedPackageProcess" in script
+    assert "$startArguments.RedirectStandardOutput = $StandardOutputPath" in script
+    assert "$startArguments.RedirectStandardError = $StandardErrorPath" in script
+    assert "RCMS_AUTOMATION_HANG_TRACE" in script
+    assert "packaged-smoke.stdout.log" in script
+    assert "packaged-smoke.stderr.log" in script
+    assert "packaged-smoke.hang-trace.log" in script
+    assert "packaged-smoke*.log" in read_repo_text(
+        ".github", "workflows", "package-target.yml"
+    )
     assert "function Remove-BundledRInstallerResidue" in script
     assert "(?i)^unins000\\..+$" in script
     assert "Remove-Item -LiteralPath $file.FullName -Force" in script
@@ -1180,6 +1189,11 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
             (
                 "packaged-workflow:evidence-written",
                 "packaged-runtime-probe:passed",
+                "packaged-workflow:shell-created",
+                "packaged-workflow:project-open:start",
+                "packaged-workflow:project-open:return",
+                "packaged-workflow:paint:complete",
+                "packaged-workflow:project-exercise:complete",
                 "packaged-workflow:post-close",
                 "packaged-surface:scale-1.25-passed",
                 "packaged-surface:scale-1.50-passed",

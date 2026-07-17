@@ -1057,6 +1057,17 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         current datatype.
         """
 
+        # Clearing a checked QAction emits ``toggled(False)`` while Qt tears the
+        # old submenu down.  Those actions are connected to ``metric_selected``,
+        # which would otherwise recalculate every study just because a restored
+        # project's menu is being rebuilt.  A document open must preserve the
+        # persisted effects rather than treating menu destruction as a user edit.
+        for menu_action in self.menuMetric.actions():
+            menu_action.blockSignals(True)
+            submenu = menu_action.menu()
+            if submenu is not None:
+                for action in submenu.actions():
+                    action.blockSignals(True)
         self.menuMetric.clear()
         self.menuMetric.setDisabled(False)
 
@@ -1098,13 +1109,17 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             if metric == metric_to_check or (metric_to_check is None and i == 0):
                 # arbitrarily check the first metric in the case that none
                 # is specificied
+                metric_action.blockSignals(True)
                 metric_action.setChecked(True)
+                metric_action.blockSignals(False)
 
         # now add the one-arm metrics
         for metric in one_arm_metrics:
             metric_action = self.add_metric_action(metric, self.oneArmMetricMenu)
             if metric == metric_to_check:
+                metric_action.blockSignals(True)
                 metric_action.setChecked(True)
+                metric_action.blockSignals(False)
 
     def add_sub_metric_menu(self, name):
         sub_menu = QtWidgets.QMenu(str(name), self.menuMetric)
@@ -1594,6 +1609,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                 state_dict,
                 check_for_appropriate_metric=not restored_selection,
                 preserve_state_selection=restored_selection,
+                recalculate_outcomes=False,
             )
             self.model.analysis_source_path = file_path
             self.dataset_file_lbl.setText("Open Project: %s" % file_path)
@@ -1726,6 +1742,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         state_dict=None,
         check_for_appropriate_metric=False,
         preserve_state_selection=False,
+        recalculate_outcomes=True,
     ):
         ##
         # we explicitly append a blank study to the
@@ -1766,11 +1783,14 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         #        else:
         #            self.action_cum_ma.setEnabled(True)
 
-        self.model_updated(preserve_selection=preserve_state_selection)
+        self.model_updated(
+            preserve_selection=preserve_state_selection,
+            recalculate_outcomes=recalculate_outcomes,
+        )
         self.data_dirtied()
         print("ok -- model set.")
 
-    def model_updated(self, preserve_selection=False):
+    def model_updated(self, preserve_selection=False, recalculate_outcomes=True):
         """Call me when the model is changed."""
         if preserve_selection:
             group_names = self.model.dataset.get_group_names()
@@ -1786,7 +1806,11 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             self.model.update_current_outcome()
             self.model.update_current_time_points()
 
-        if self.model.current_outcome is not None and not self.model.is_diag():
+        if (
+            recalculate_outcomes
+            and self.model.current_outcome is not None
+            and not self.model.is_diag()
+        ):
             self.model.try_to_update_outcomes()
 
         # This is kind of subtle. We have to reconnect
