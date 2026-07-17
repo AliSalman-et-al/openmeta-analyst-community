@@ -24,6 +24,11 @@ POLICY_INPUTS = (
     "scripts/inspect_windows_deployment.py",
     "packaging/pyinstaller/rc-metastudio.spec",
     "scripts/build-macos-package.sh",
+    "scripts/package-macos.sh",
+    "scripts/inspect_macos_deployment.py",
+    "scripts/run_bounded_process.py",
+    "scripts/package_input_policy.py",
+    "packaging/pyinstaller/rc-metastudio-macos.spec",
 )
 
 

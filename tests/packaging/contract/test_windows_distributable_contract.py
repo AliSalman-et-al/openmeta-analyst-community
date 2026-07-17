@@ -1,4 +1,5 @@
 import json
+import importlib.util
 import re
 from pathlib import Path
 
@@ -250,6 +251,7 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
         "qt6-verification",
         "source-fast-targets",
         "windows-package-qualification",
+        "macos-x64-package-qualification",
         "fast-verification-gate",
     } <= workflow["jobs"]
     assert workflow["needs"]["source-fast-targets"] == {"change-classifier"}
@@ -258,6 +260,7 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
         "qt6-verification",
         "source-fast-targets",
         "windows-package-qualification",
+        "macos-x64-package-qualification",
     }
     assert workflow["events"] == {"workflow_dispatch", "push", "pull_request"}
     assert workflow["legacy_uses"] == []
@@ -298,7 +301,14 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
         "tests/python/fast/test_qt_text_boundaries.py",
         "tests/python/gui/test_metaform_automation_launch.py",
     ):
-        assert package_input in workflow["text"]
+        policy_path = ROOT / "scripts" / "package_input_policy.py"
+        policy_spec = importlib.util.spec_from_file_location(
+            "package_input_policy_for_contract", policy_path
+        )
+        assert policy_spec is not None and policy_spec.loader is not None
+        policy = importlib.util.module_from_spec(policy_spec)
+        policy_spec.loader.exec_module(policy)
+        assert policy.requires_package_qualification([package_input])
     assert "Required Windows x64 Package Qualification" in workflow["text"]
     assert "Required Windows x64 package qualification result" in workflow["text"]
     assert "docs/verification/*" in workflow["text"]
@@ -485,15 +495,18 @@ def test_macos_distributable_contract_is_declared():
         "configure_relocatable_r_launchers",
         "relocate_bundled_r_runtime",
     } <= script["functions"]
-    assert {"--windowed", "--target-architecture", "--osx-bundle-identifier"} <= script[
-        "pyinstaller_options"
-    ]
+    macos_spec = read_repo_text(
+        "packaging", "pyinstaller", "rc-metastudio-macos.spec"
+    )
+    assert "BUNDLE(" in macos_spec
+    assert 'target_arch=os.environ.get("RCMS_TARGET_ARCHITECTURE", "x86_64")' in macos_spec
+    assert "RCMS_BUNDLE_IDENTIFIER" in macos_spec
     assert {
-        "QT_QPA_PLATFORM",
         "RCMS_REQUIRE_IN_PROCESS_RPY2",
         "RCMS_STARTUP_PROJECT_SMOKE",
         "RPY2_CFFI_MODE",
     } <= script["env_names"]
+    assert "env -u QT_QPA_PLATFORM" in script["text"]
     assert {
         "sample_projects/amino.rcms",
         "R/library/RCMetaR/DESCRIPTION",
@@ -502,11 +515,12 @@ def test_macos_distributable_contract_is_declared():
     assert "doc/openMA_help.html" not in script["app_paths"]
     assert "Bundling sample projects, help, and R runtime" not in script["text"]
     assert "scripts/install-r-deps.R" in script["text"]
-    assert "src/rc_metastudio/__main__.py" in script["text"]
+    assert 'app_source / "__main__.py"' in macos_spec
     assert "src/rc_metastudio/launch.py" not in script["text"]
     assert 'bundle_identifier="org.researchconsultancy.rc-metastudio"' in script["text"]
-    assert (
-        "--archive-root-name must be a single portable directory name" in script["text"]
+    assert "inspect_macos_deployment.py\" validate-root" in script["text"]
+    assert "archive root must be one portable directory name" in read_repo_text(
+        "scripts", "inspect_macos_deployment.py"
     )
     assert "tomllib.loads" in script["text"]
     assert 'archive_root_name="${archive_root_name:-RCMetaStudio-$resolved_project_version-macos-$architecture}"' in script["text"]
@@ -514,8 +528,9 @@ def test_macos_distributable_contract_is_declared():
     assert (
         'copy_tree "$app_bundle" "$archive_root_dir/RCMetaStudio.app"' in script["text"]
     )
-    assert 'cd "$archive_staging_root"' in script["text"]
-    assert 'zip -qry "$tmp_zip_path" "$archive_root_name"' in script["text"]
+    assert 'ditto -c -k --norsrc --keepParent "$archive_root_dir" "$tmp_zip_path"' in script[
+        "text"
+    ]
     assert (
         'name for name in names if name and not name.startswith(f"{archive_root_name}/")'
         in script["text"]
@@ -624,7 +639,8 @@ def test_macos_packager_resolves_relative_python_before_changing_directory():
     assert relative_order(
         script,
         'python_exe="$(repo_path "$python_exe")"',
-        'cd "$repo_root"\n  pyinstaller_args=(',
+        'cd "$repo_root"\n  qt6_package_build_root=',
+        'pyinstaller_args=(',
         '"$python_exe" -m PyInstaller',
     )
 

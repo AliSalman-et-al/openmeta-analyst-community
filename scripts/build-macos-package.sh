@@ -68,7 +68,6 @@ done
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
-app_source_dir="$repo_root/src/rc_metastudio"
 artifact_dir="$repo_root/artifacts"
 
 step() {
@@ -195,6 +194,18 @@ app_root="$app_bundle/Contents/MacOS"
 archive_staging_root="$work_root/zip-staging"
 zip_path="$artifact_dir/$artifact_name.zip"
 tmp_zip_path="$zip_path.tmp"
+qualification_root="$work_root/qualification"
+runtime_probe_path="$qualification_root/runtime-probe.json"
+deployment_manifest_path="$qualification_root/deployment-manifest.json"
+smoke_evidence_path="$qualification_root/packaged-smoke.json"
+smoke_log_path="$qualification_root/packaged-smoke.log"
+smoke_stdout_path="$qualification_root/packaged-smoke.stdout.log"
+smoke_stderr_path="$qualification_root/packaged-smoke.stderr.log"
+hang_trace_path="$qualification_root/packaged-smoke.hang-trace.log"
+launchservices_marker_path="$qualification_root/launchservices-completion.json"
+launchservices_pid_path="$qualification_root/launchservices.pid"
+archive_inspection_path="$artifact_dir/$artifact_name-archive-inspection.json"
+qualification_evidence_path="$artifact_dir/$artifact_name-evidence.json"
 r_package_cache_root="${r_package_cache_root:-$artifact_dir/r-library-cache}"
 pinned_cran_repo="https://packagemanager.posit.co/cran/2026-07-16"
 cran_repo="${RCMS_CRAN_REPO:-$pinned_cran_repo}"
@@ -219,10 +230,8 @@ fi
 
 resolved_project_version="$(project_version)"
 archive_root_name="${archive_root_name:-RCMetaStudio-$resolved_project_version-macos-$architecture}"
-if [[ -z "$archive_root_name" || "$archive_root_name" == *"/"* || "$archive_root_name" == *"\\"* ]]; then
-  echo "--archive-root-name must be a single portable directory name." >&2
-  exit 2
-fi
+"$python_exe" "$repo_root/scripts/inspect_macos_deployment.py" validate-root \
+  --archive-root-name "$archive_root_name"
 archive_root_dir="$archive_staging_root/$archive_root_name"
 
 "$python_exe" - <<'PY'
@@ -250,31 +259,33 @@ fi
 if [ "$skip_clean" -eq 0 ]; then
   rm -rf "$dist_root" "$work_root"
 fi
-rm -rf "$zip_path" "$tmp_zip_path"
+rm -rf "$qualification_root"
+rm -rf "$zip_path" "$tmp_zip_path" "$archive_inspection_path" "$qualification_evidence_path"
 mkdir -p "$artifact_dir"
+mkdir -p "$qualification_root"
 require_free_space_gb "$repo_root" 6
 
 (
   cd "$repo_root"
+  qt6_package_build_root="$work_root/qt6-input"
+  "$python_exe" scripts/build_qt6.py generate --build-root "$qt6_package_build_root"
+  export RCMS_QT6_BUILD_ROOT="$qt6_package_build_root"
+  export RCMS_BUNDLE_IDENTIFIER="$bundle_identifier"
+  export RCMS_PROJECT_VERSION="$resolved_project_version"
+  export RCMS_TARGET_ARCHITECTURE="$pyinstaller_target_architecture"
+  export RPY2_CFFI_MODE=ABI
   pyinstaller_args=(
     --noconfirm
-    --windowed
-    --name RCMetaStudio
-    --target-architecture "$pyinstaller_target_architecture"
-    --osx-bundle-identifier "$bundle_identifier"
     --distpath "$dist_root"
     --workpath "$work_root"
-    --paths "$app_source_dir"
-    --paths "$app_source_dir/forms"
-    --hidden-import icons_rc
-    --hidden-import rpy2.robjects
-    --hidden-import rpy2.rinterface
-    "src/rc_metastudio/__main__.py"
+    "packaging/pyinstaller/rc-metastudio-macos.spec"
   )
   if [ "$skip_clean" -eq 0 ]; then
     pyinstaller_args=(--clean "${pyinstaller_args[@]}")
   fi
-  step "Building ad-hoc macOS app bundle with PyInstaller"
+  # The spec is the sole collection definition. This wrapper supplies only
+  # deterministic build/output roots and the locked generated Qt inputs.
+  step "Building ad-hoc macOS app bundle with the authoritative PyInstaller spec"
   R_HOME="$r_runtime_root" RPY2_CFFI_MODE=ABI "$python_exe" -m PyInstaller "${pyinstaller_args[@]}"
 )
 
@@ -590,11 +601,82 @@ run_adaptive_layout_evidence() {
   done
 }
 
+run_packaged_process() {
+  env -u QT_QPA_PLATFORM \
+    RCMS_REQUIRE_IN_PROCESS_RPY2=1 \
+    RPY2_CFFI_MODE=ABI \
+    RCMS_R_HOME="$r_home" \
+    RCMS_R_LIBS="$r_lib" \
+    "$python_exe" "$repo_root/scripts/run_bounded_process.py" \
+      --timeout-seconds 900 \
+      --stdout "$smoke_stdout_path" \
+      --stderr "$smoke_stderr_path" \
+      -- "$@"
+}
+
+step "Applying and verifying the replaceable ad-hoc app-bundle signature"
+codesign --force --deep --options runtime --sign - "$app_bundle"
+codesign --verify --deep --strict --verbose=2 "$app_bundle"
+
+step "Probing the frozen macOS runtime"
+RCMS_AUTOMATION_SMOKE_LOG="$smoke_log_path" \
+  run_packaged_process "$app_root/RCMetaStudio" \
+    --automation-package-runtime-probe "$runtime_probe_path"
+if [ ! -s "$runtime_probe_path" ]; then
+  echo "Frozen macOS runtime probe did not produce evidence." >&2
+  exit 1
+fi
+
 if [ "$skip_smoke" -eq 0 ]; then
   sample_path="$app_root/sample_projects/amino.rcms"
-  step "Running packaged macOS smoke checks"
-  env -u QT_QPA_PLATFORM RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=ABI RCMS_R_HOME="$r_home" RCMS_R_LIBS="$r_lib" "$app_root/RCMetaStudio" --automation-native-smoke "$sample_path"
-  QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}" RCMS_STARTUP_PROJECT_SMOKE=1 RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=ABI RCMS_R_HOME="$r_home" RCMS_R_LIBS="$r_lib" "$app_root/RCMetaStudio" "$sample_path"
+  baseline_dpr="$("$python_exe" - "$runtime_probe_path" <<'PY'
+import json
+import sys
+print(json.load(open(sys.argv[1], encoding="utf-8"))["qt"]["baseline_device_pixel_ratio"])
+PY
+)"
+  step "Running packaged macOS workflow smoke"
+  QT_SCALE_FACTOR=1.25 \
+    RCMS_PACKAGE_BASELINE_DPR="$baseline_dpr" \
+    RCMS_PACKAGE_SMOKE_EVIDENCE="$smoke_evidence_path" \
+    RCMS_AUTOMATION_SMOKE_LOG="$smoke_log_path" \
+    RCMS_AUTOMATION_HANG_TRACE="$hang_trace_path" \
+    run_packaged_process "$app_root/RCMetaStudio" --automation-native-smoke "$sample_path"
+
+  for scale in "1.25" "1.50" "1.75"; do
+    step "Running packaged Cocoa surface smoke at scale $scale"
+    QT_SCALE_FACTOR="$scale" \
+      RCMS_PACKAGE_BASELINE_DPR="$baseline_dpr" \
+      RCMS_AUTOMATION_SMOKE_LOG="$smoke_log_path" \
+      run_packaged_process "$app_root/RCMetaStudio" \
+        --automation-package-surface-smoke "$smoke_evidence_path" "$scale"
+  done
+
+  step "Opening the converted sample through the normal LaunchServices app entry point"
+  rm -f "$launchservices_marker_path" "$launchservices_pid_path"
+  env -u QT_QPA_PLATFORM \
+    RCMS_REQUIRE_IN_PROCESS_RPY2=1 \
+    RPY2_CFFI_MODE=ABI \
+    RCMS_R_HOME="$r_home" \
+    RCMS_R_LIBS="$r_lib" \
+    RCMS_STARTUP_PROJECT_SMOKE=1 \
+    RCMS_AUTOMATION_SMOKE_LOG="$smoke_log_path" \
+    RCMS_STARTUP_COMPLETION_MARKER="$launchservices_marker_path" \
+    RCMS_AUTOMATION_PID_FILE="$launchservices_pid_path" \
+    "$python_exe" "$repo_root/scripts/run_bounded_process.py" \
+      --timeout-seconds 900 \
+      --stdout "$smoke_stdout_path" --stderr "$smoke_stderr_path" \
+      --owned-pid-file "$launchservices_pid_path" \
+      -- open -W -n "$app_bundle" --args \
+        --automation-startup-project-smoke \
+        --automation-startup-completion-marker "$launchservices_marker_path" \
+        --automation-pid-file "$launchservices_pid_path" \
+        --automation-smoke-log "$smoke_log_path" \
+        "$sample_path"
+  "$python_exe" "$repo_root/scripts/inspect_macos_deployment.py" finalize-smoke \
+    --smoke-evidence "$smoke_evidence_path" --smoke-log "$smoke_log_path" \
+    --launchservices-marker "$launchservices_marker_path"
+  rm -f "$launchservices_pid_path"
 fi
 if [ "$capture_adaptive_layout_evidence" -eq 1 ]; then
   if [ "$architecture" != "x64" ]; then
@@ -605,21 +687,41 @@ if [ "$capture_adaptive_layout_evidence" -eq 1 ]; then
   run_adaptive_layout_evidence
 fi
 
+source_commit="$(git rev-parse HEAD)"
+python_version="$("$python_exe" -c 'import platform; print(platform.python_version())')"
+pyqt6_version="$("$python_exe" -c 'import importlib.metadata as m; print(m.version("PyQt6"))')"
+qt_version="$("$python_exe" -c 'import importlib.metadata as m; print(m.version("PyQt6-Qt6"))')"
+sip_version="$("$python_exe" -c 'import importlib.metadata as m; print(m.version("PyQt6-sip"))')"
+sip_runtime_version="$("$python_exe" -c 'from PyQt6 import sip; print(sip.SIP_VERSION_STR)')"
+rpy2_version="$("$python_exe" -c 'import importlib.metadata as m; print(m.version("rpy2"))')"
+r_version="$("$rscript" -e 'cat(as.character(getRversion()))')"
+locked_qt_root="$("$python_exe" -c 'from pathlib import Path; import PyQt6; print(Path(PyQt6.__file__).resolve().parent / "Qt6")')"
+step "Inspecting the coherent Intel-only macOS deployment"
+"$python_exe" "$repo_root/scripts/inspect_macos_deployment.py" inspect \
+  --app-root "$app_bundle" --output "$deployment_manifest_path" \
+  --source-commit "$source_commit" --runtime-probe "$runtime_probe_path" \
+  --locked-qt-root "$locked_qt_root" \
+  --python-version "$python_version" --pyqt6-version "$pyqt6_version" \
+  --qt-version "$qt_version" --sip-version "$sip_version" \
+  --sip-runtime-version "$sip_runtime_version" --r-version "$r_version" \
+  --rpy2-version "$rpy2_version" --pyinstaller-version 6.21.0
+
 (
   step "Creating macOS artifact ZIP"
   rm -rf "$archive_staging_root"
   copy_tree "$app_bundle" "$archive_root_dir/RCMetaStudio.app"
-  cd "$archive_staging_root"
-  zip -qry "$tmp_zip_path" "$archive_root_name"
+  copy_tree "$qualification_root" "$archive_root_dir/qualification"
+  ditto -c -k --norsrc --keepParent "$archive_root_dir" "$tmp_zip_path"
 )
 mv "$tmp_zip_path" "$zip_path"
 
-python3 - "$zip_path" "$archive_root_name" <<'PY'
+python3 - "$zip_path" "$archive_root_name" "$skip_smoke" <<'PY'
 import sys
 import zipfile
 
 zip_path = sys.argv[1]
 archive_root_name = sys.argv[2].rstrip("/")
+skip_smoke = sys.argv[3] == "1"
 required = [
     f"{archive_root_name}/RCMetaStudio.app/Contents/MacOS/RCMetaStudio",
     f"{archive_root_name}/RCMetaStudio.app/Contents/MacOS/sample_projects/BCG.rcms",
@@ -627,7 +729,18 @@ required = [
     f"{archive_root_name}/RCMetaStudio.app/Contents/MacOS/R/bin/Rscript",
     f"{archive_root_name}/RCMetaStudio.app/Contents/MacOS/R/library/RCMetaR/DESCRIPTION",
     f"{archive_root_name}/RCMetaStudio.app/Contents/MacOS/LaunchRCMetaStudio.command",
+    f"{archive_root_name}/qualification/deployment-manifest.json",
+    f"{archive_root_name}/qualification/runtime-probe.json",
 ]
+if not skip_smoke:
+    required.extend([
+        f"{archive_root_name}/qualification/packaged-smoke.json",
+        f"{archive_root_name}/qualification/packaged-smoke.log",
+        f"{archive_root_name}/qualification/launchservices-completion.json",
+        f"{archive_root_name}/qualification/packaged-smoke.stdout.log",
+        f"{archive_root_name}/qualification/packaged-smoke.stderr.log",
+        f"{archive_root_name}/qualification/packaged-smoke.hang-trace.log",
+    ])
 with zipfile.ZipFile(zip_path) as archive:
     names = set(archive.namelist())
 outside_root = [
@@ -642,5 +755,26 @@ missing = [path for path in required if path not in names]
 if missing:
     raise SystemExit("Created ZIP is missing: " + ", ".join(missing))
 PY
+
+if [ "$skip_smoke" -eq 0 ]; then
+  "$python_exe" "$repo_root/scripts/inspect_macos_deployment.py" archive \
+    --archive "$zip_path" --archive-root-name "$archive_root_name" \
+    --deployment-manifest "$deployment_manifest_path" \
+    --runtime-probe "$runtime_probe_path" \
+    --smoke-evidence "$smoke_evidence_path" --smoke-log "$smoke_log_path" \
+    --smoke-stdout "$smoke_stdout_path" --smoke-stderr "$smoke_stderr_path" \
+    --hang-trace "$hang_trace_path" \
+    --launchservices-marker "$launchservices_marker_path" \
+    --output "$archive_inspection_path"
+  "$python_exe" "$repo_root/scripts/inspect_macos_deployment.py" evidence \
+    --archive "$zip_path" --deployment-manifest "$deployment_manifest_path" \
+    --runtime-probe "$runtime_probe_path" \
+    --smoke-evidence "$smoke_evidence_path" --smoke-log "$smoke_log_path" \
+    --smoke-stdout "$smoke_stdout_path" --smoke-stderr "$smoke_stderr_path" \
+    --hang-trace "$hang_trace_path" \
+    --launchservices-marker "$launchservices_marker_path" \
+    --archive-inspection "$archive_inspection_path" \
+    --output "$qualification_evidence_path"
+fi
 
 echo "Created $zip_path"

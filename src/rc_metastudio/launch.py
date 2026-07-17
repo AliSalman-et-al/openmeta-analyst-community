@@ -153,11 +153,28 @@ def _startup_project_path(argv):
         arg = args[index]
         if arg in ("--automation-smoke", "--automation-native-smoke"):
             return None
+        if arg in {
+            "--automation-startup-completion-marker",
+            "--automation-pid-file",
+            "--automation-smoke-log",
+        }:
+            index += 2
+            continue
         if arg.startswith("-"):
             index += 1
             continue
         return arg
     return None
+
+
+def _argument_value(argv, option):
+    args = list(argv or [])
+    if option not in args:
+        return None
+    index = args.index(option)
+    if index + 1 >= len(args):
+        raise SystemExit("%s requires a value." % option)
+    return args[index + 1]
 
 
 def _resolve_startup_argv(argv=None, native_argv=None, frozen=None):
@@ -229,7 +246,14 @@ def load_R_libraries(app, splash=None, phase_callback=None):
 def start():
     qt6_resources.ensure_application_resources()
     app_error_handler.install_global_exception_handler()
+    pid_path = os.environ.get("RCMS_AUTOMATION_PID_FILE")
     startup_argv = _resolve_startup_argv()
+    pid_path = _argument_value(startup_argv, "--automation-pid-file") or pid_path
+    if pid_path:
+        Path(pid_path).write_text(str(os.getpid()) + "\n", encoding="utf-8")
+    smoke_log = _argument_value(startup_argv, "--automation-smoke-log")
+    if smoke_log:
+        os.environ[AUTOMATION_SMOKE_LOG_ENV] = smoke_log
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-smoke":
         sample_path = (
             startup_argv[2]
@@ -301,9 +325,18 @@ def start():
         meta = _create_interactive_shell(app, meta_form.MetaForm, load_R_libraries)
         if startup_project_path:
             opened = meta.open(startup_project_path)
-            if os.environ.get("RCMS_STARTUP_PROJECT_SMOKE") == "1":
+            if (
+                os.environ.get("RCMS_STARTUP_PROJECT_SMOKE") == "1"
+                or "--automation-startup-project-smoke" in startup_argv
+            ):
                 return _assert_opened_project_for_startup_smoke(
-                    app, meta, startup_project_path, opened
+                    app,
+                    meta,
+                    startup_project_path,
+                    opened,
+                    completion_marker=_argument_value(
+                        startup_argv, "--automation-startup-completion-marker"
+                    ),
                 )
         else:
             if os.environ.get("RCMS_STARTUP_PROJECT_SMOKE") == "1":
@@ -519,6 +552,49 @@ def _stop_automation_hang_trace(trace):
     trace.close()
 
 
+def _native_accessibility_observation(widget):
+    """Read the platform accessibility object exposed for a packaged control."""
+    if sys.platform != "darwin":
+        return {
+            "role": "qt-focusable-control",
+            "label": widget.accessibleName(),
+            "is_element": widget.focusPolicy()
+            != QtCore.Qt.FocusPolicy.NoFocus,
+        }
+
+    import ctypes
+
+    objc = ctypes.CDLL("/usr/lib/libobjc.A.dylib")
+    objc.sel_registerName.argtypes = [ctypes.c_char_p]
+    objc.sel_registerName.restype = ctypes.c_void_p
+    message = objc.objc_msgSend
+
+    def selector(name):
+        return objc.sel_registerName(name.encode("ascii"))
+
+    def object_message(receiver, name):
+        message.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        message.restype = ctypes.c_void_p
+        return message(ctypes.c_void_p(receiver), selector(name))
+
+    def text_message(receiver, name):
+        value = object_message(receiver, name)
+        if not value:
+            return ""
+        raw = object_message(value, "UTF8String")
+        return ctypes.cast(raw, ctypes.c_char_p).value.decode("utf-8") if raw else ""
+
+    native_view = int(widget.winId())
+    role = text_message(native_view, "accessibilityRole")
+    label = text_message(native_view, "accessibilityLabel")
+    message.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+    message.restype = ctypes.c_bool
+    is_element = bool(
+        message(ctypes.c_void_p(native_view), selector("isAccessibilityElement"))
+    )
+    return {"role": role, "label": label, "is_element": is_element}
+
+
 def start_package_surface_smoke(evidence_path, expected_scale):
     """Exercise native package-only Qt surfaces at a requested scale factor."""
     app_error_handler.install_global_exception_handler()
@@ -529,6 +605,8 @@ def start_package_surface_smoke(evidence_path, expected_scale):
     platform_name = app.platformName().lower()
     if sys.platform == "win32" and platform_name != "windows":
         raise SystemExit("Package surface smoke did not load qwindows.")
+    if sys.platform == "darwin" and platform_name != "cocoa":
+        raise SystemExit("Package surface smoke did not load Cocoa.")
 
     clipboard = app.clipboard()
     clipboard_text = "RC MetaStudio clipboard – München – 1,25"
@@ -544,14 +622,100 @@ def start_package_surface_smoke(evidence_path, expected_scale):
     if QIcon(":/icons/actions/copy.svg").isNull() or QPixmap(":/misc/meta.png").isNull():
         raise SystemExit("Package surface smoke could not load binary resources.")
     tls_backends = list(QtNetwork.QSslSocket.availableBackends())
-    if "schannel" not in [backend.lower() for backend in tls_backends]:
+    if sys.platform == "win32" and "schannel" not in [backend.lower() for backend in tls_backends]:
         raise SystemExit("Package surface smoke did not load the Schannel TLS backend.")
+    if sys.platform == "darwin" and not tls_backends:
+        raise SystemExit("Package surface smoke did not load a TLS backend.")
     available_styles = list(QtWidgets.QStyleFactory.keys())
     if not available_styles or app.style() is None:
         raise SystemExit("Package surface smoke found no Qt style plugin/style.")
     image_formats = sorted(value.data().decode("ascii").lower() for value in QtGui.QImageReader.supportedImageFormats())
     if not {"ico", "jpeg", "svg"} <= set(image_formats):
         raise SystemExit("Package surface smoke did not load required image/SVG plugins.")
+
+    native_window = QtWidgets.QMainWindow()
+    native_window.setWindowTitle("RC MetaStudio package surfaces")
+    menu_bar = cast(QtWidgets.QMenuBar, native_window.menuBar())
+    menu = cast(QtWidgets.QMenu, menu_bar.addMenu("Package smoke"))
+    menu.addAction("Verified action")
+    accessible_control = QtWidgets.QPushButton("Accessible package control", native_window)
+    accessible_control.setObjectName("packagedAccessibilityControl")
+    accessible_control.setAccessibleName("Packaged accessibility control")
+    accessible_control.setAccessibleDescription("Verifies packaged Qt accessibility metadata.")
+    accessible_control.setAttribute(QtCore.Qt.WidgetAttribute.WA_NativeWindow, True)
+    next_control = QtWidgets.QLineEdit(native_window)
+    next_control.setObjectName("packagedKeyboardTraversalTarget")
+    body = QtWidgets.QWidget(native_window)
+    body_layout = QtWidgets.QVBoxLayout(body)
+    body_layout.addWidget(accessible_control)
+    body_layout.addWidget(next_control)
+    native_window.setCentralWidget(body)
+    native_window.setTabOrder(accessible_control, next_control)
+    native_window.show()
+    app.processEvents()
+    native_menu = {
+        "is_native": bool(menu_bar.isNativeMenuBar()),
+        "menu_count": len(menu_bar.actions()),
+        "action_count": len(menu.actions()),
+    }
+    if (
+        native_menu["menu_count"] < 1
+        or native_menu["action_count"] < 1
+        or (sys.platform == "darwin" and native_menu["is_native"] is not True)
+    ):
+        raise SystemExit("Package surface smoke could not exercise the native menu bar.")
+    accessible_control.setFocus(QtCore.Qt.FocusReason.OtherFocusReason)
+    app.processEvents()
+    focus_before = app.focusWidget()
+    for event_type in (QtCore.QEvent.Type.KeyPress, QtCore.QEvent.Type.KeyRelease):
+        app.sendEvent(
+            accessible_control,
+            QtGui.QKeyEvent(
+                event_type,
+                QtCore.Qt.Key.Key_Tab,
+                QtCore.Qt.KeyboardModifier.NoModifier,
+            ),
+        )
+    app.processEvents()
+    focus_after = app.focusWidget()
+    accessibility = {
+        "focus_before": focus_before.objectName() if focus_before else None,
+        "focus_after_tab": focus_after.objectName() if focus_after else None,
+        "native": _native_accessibility_observation(accessible_control),
+    }
+    if (
+        accessibility["focus_before"] != "packagedAccessibilityControl"
+        or accessibility["focus_after_tab"] != "packagedKeyboardTraversalTarget"
+        or not accessibility["native"].get("role")
+        or accessibility["native"].get("is_element") is not True
+    ):
+        raise SystemExit("Package surface smoke could not exercise accessibility metadata.")
+
+    file_dialog = QtWidgets.QFileDialog(native_window, "Packaged native file dialog")
+    file_dialog.setFileMode(QtWidgets.QFileDialog.FileMode.ExistingFile)
+    file_dialog.setOption(QtWidgets.QFileDialog.Option.DontUseNativeDialog, False)
+    file_dialog_observation = {"visible_before_cancel": False}
+
+    def observe_and_cancel_file_dialog():
+        file_dialog_observation["visible_before_cancel"] = file_dialog.isVisible()
+        file_dialog.reject()
+
+    QtCore.QTimer.singleShot(100, observe_and_cancel_file_dialog)
+    file_dialog_result = file_dialog.exec()
+    native_file_dialog = {
+        "dont_use_native_dialog": file_dialog.testOption(
+            QtWidgets.QFileDialog.Option.DontUseNativeDialog
+        ),
+        "visible_before_cancel": file_dialog_observation["visible_before_cancel"],
+        "result": int(file_dialog_result),
+        "rejected_value": int(QtWidgets.QDialog.DialogCode.Rejected),
+    }
+    if (
+        native_file_dialog["dont_use_native_dialog"] is not False
+        or native_file_dialog["visible_before_cancel"] is not True
+        or native_file_dialog["result"] != native_file_dialog["rejected_value"]
+    ):
+        raise SystemExit("Package surface smoke could not exercise the native file dialog.")
 
     dialog = QtWidgets.QMessageBox(
         QtWidgets.QMessageBox.Icon.Critical,
@@ -564,6 +728,7 @@ def start_package_surface_smoke(evidence_path, expected_scale):
     if not dialog.isVisible() or dialog.icon() != QtWidgets.QMessageBox.Icon.Critical:
         raise SystemExit("Package surface smoke could not show a critical dialog.")
     dialog.close()
+    native_window.close()
     app.processEvents()
 
     primary = app.primaryScreen()
@@ -598,6 +763,9 @@ def start_package_surface_smoke(evidence_path, expected_scale):
             "clipboard": True,
             "critical_dialog": True,
             "binary_resources": True,
+            "native_menu": native_menu,
+            "native_file_dialog": native_file_dialog,
+            "accessibility": accessibility,
             "tls_backends": tls_backends,
             "active_style": app.style().objectName(),
             "available_styles": available_styles,
@@ -1071,7 +1239,9 @@ def _flush_gui_events(app):
         app.processEvents()
 
 
-def _assert_opened_project_for_startup_smoke(app, meta, sample_path, opened):
+def _assert_opened_project_for_startup_smoke(
+    app, meta, sample_path, opened, completion_marker=None
+):
     try:
         if not opened:
             raise SystemExit("Could not open startup project: %s" % sample_path)
@@ -1086,6 +1256,26 @@ def _assert_opened_project_for_startup_smoke(app, meta, sample_path, opened):
     finally:
         meta.close()
         app.processEvents()
+    completion_marker = completion_marker or os.environ.get(
+        "RCMS_STARTUP_COMPLETION_MARKER"
+    )
+    if completion_marker:
+        Path(completion_marker).write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "pid": os.getpid(),
+                    "platform_plugin": app.platformName().lower(),
+                    "project": Path(sample_path).name,
+                    "post_close": True,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        _write_automation_smoke_log("startup-project:launchservices-completion-written")
     return 0
 
 

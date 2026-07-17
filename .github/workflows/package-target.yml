@@ -89,6 +89,18 @@ jobs:
           retention-days: 30
           compression-level: 0
 
+      - name: Upload macOS qualification evidence
+        if: ${{ inputs.target_os == 'macos' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ inputs.artifact_name }}-evidence
+          path: |
+            artifacts/${{ inputs.artifact_name }}-evidence.json
+            artifacts/${{ inputs.artifact_name }}-archive-inspection.json
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
       - name: Upload Windows packaging diagnostics
         if: ${{ failure() && inputs.target_os == 'windows' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -116,6 +128,9 @@ jobs:
           path: |
             build/macos-package/x64/work/RCMetaStudio/warn-RCMetaStudio.txt
             build/macos-package/x64/work/RCMetaStudio/xref-RCMetaStudio.html
+            build/macos-package/x64/work/qualification/*
+            artifacts/*-archive-inspection.json
+            artifacts/*-evidence.json
           if-no-files-found: ignore
           retention-days: 14
           compression-level: 0

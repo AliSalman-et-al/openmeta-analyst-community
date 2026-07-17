@@ -122,6 +122,19 @@ bash ./scripts/package-macos.sh --architecture x64
 bash ./scripts/package-macos.sh --architecture arm64
 ```
 
+Packaging-relevant pull requests now require the native macOS Intel x64
+qualification alongside Windows. The Intel job retains the distributable ZIP,
+Mach-O deployment/dependency manifest, frozen runtime probe, packaged workflow
+and Cocoa-surface evidence, logs, archive-inspection record, and final evidence
+binding. Local cross-platform contracts are the fast feedback seam:
+
+```powershell
+uv run pytest -q tests/packaging/contract/test_macos_x64_distributable_contract.py
+```
+
+Only a native `macos-15-intel` run can satisfy the final architecture, Cocoa,
+bundle-signature, and packaged-R evidence contract.
+
 The hosted pull-request path currently runs the Windows Qt6 vertical slice when
 source, tests, dependency files, or its verification inputs change. Broader
 source, R, and packaging gates return as the corresponding Qt6 tickets land.
