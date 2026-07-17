@@ -341,18 +341,27 @@ phase log, stdout/stderr, and fault-handler trace are therefore not merely
 observability improvements: together with non-interactive cleanup they ensure
 the next hosted failure, if any, terminates with the actual cause.
 
-## Confidence and remaining uncertainty
+## Accepted hosted closure
 
-Confidence is **high** that unconditional open-time outcome recalculation is a
-real, avoidable performance defect and that the local packaged timeout is in
-that path. Confidence is **moderate-to-high** that it is the same active block
-on the hosted runner: the retained hosted marker is too coarse to prove this
-alone, but the same frozen workflow, sample, real-R requirement, source call
-graph, and locally observed non-terminating work align.
+Run
+[`29596284816`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29596284816)
+is the accepted final discriminator. Package job
+[`87937396242`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29596284816/job/87937396242)
+passed in 16 minutes 33 seconds against exact implementation head
+`87edffe1578aa4e1f15c3d02edf8c686401a8755` (distinct from GitHub's merge ref
+`6063a0b70fba8ae24f8d745980e8bf420b284b39`). Package artifact
+[`8413562830`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29596284816/artifacts/8413562830)
+and qualification artifact
+[`8413563381`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29596284816/artifacts/8413563381)
+retain the passing frozen runtime, deployment, smoke, scaling, archive, and
+hash-bound evidence.
 
-The next hosted run should be treated as the final discriminator. If it still
-hangs before `project-open:start`, the new R-library and shell-construction
-markers plus fault-handler stack will identify that independent block. If it
-reaches `project-open:start` but not `project-open:return`, the retained Python
-stack and stdout should confirm or disprove the recalculation path without any
-further timeout increase.
+The final ZIP is 390,212,938 bytes with SHA-256
+`933083c9dca4584be7e2dd32ea2ad40d3efb4964907586dffa10fd12f2178a07`, archive
+root `RCMetaStudio-0.1.2-windows-x64`, and 13,991 members. Evidence passed on
+`win25-vs2026`, Windows X64 `10.0.26100`; all packaged workflows and 1.25/1.50/1.75
+scale smokes passed, and embedded evidence hashes matched the retained inputs.
+The package used PPM binaries with only the pinned HSROC source exception, and
+packaged-smoke start through ZIP creation took about 66 seconds. This closes the
+recalculation, missing-schema/modal, and redirected-exit-code hypotheses with
+hosted artifact proof rather than timeout adjustment.

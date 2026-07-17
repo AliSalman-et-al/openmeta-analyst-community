@@ -75,6 +75,32 @@ workflow uploads it beside the uncompressed ZIP. On failure it additionally
 retains the PyInstaller warning/cross-reference reports and any deployment,
 smoke, or layout logs written before the failure.
 
+## Accepted hosted qualification
+
+Issue #341 qualification was accepted on GitHub Actions run
+[`29596284816`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29596284816),
+package job
+[`87937396242`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29596284816/job/87937396242),
+which passed in 16 minutes 33 seconds. The exact tested implementation head was
+`87edffe1578aa4e1f15c3d02edf8c686401a8755`; GitHub's separate pull-request
+merge ref was `6063a0b70fba8ae24f8d745980e8bf420b284b39`.
+
+- Package artifact
+  [`8413562830`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29596284816/artifacts/8413562830);
+  qualification artifact
+  [`8413563381`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29596284816/artifacts/8413563381).
+- ZIP: 390,212,938 bytes; SHA-256
+  `933083c9dca4584be7e2dd32ea2ad40d3efb4964907586dffa10fd12f2178a07`.
+- Archive root: `RCMetaStudio-0.1.2-windows-x64`; 13,991 members.
+- Evidence host: `win25-vs2026`, Windows X64 `10.0.26100`.
+- Packaged open/edit/real-R analysis/locale/save-reopen workflows and native
+  1.25, 1.50, and 1.75 scale smokes all passed.
+- Embedded deployment, runtime-probe, smoke, and log hashes matched their
+  retained qualification inputs exactly.
+- R dependency policy used Posit Package Manager binaries, with only the pinned
+  HSROC source exception. Packaged-smoke start through ZIP creation took about
+  66 seconds.
+
 Run the complete hosted gate with:
 
 ```powershell
