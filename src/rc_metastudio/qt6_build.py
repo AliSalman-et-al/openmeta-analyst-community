@@ -120,11 +120,38 @@ def _run(command: list[str], *, cwd: Path = ROOT) -> None:
     subprocess.run(command, cwd=cwd, check=True)
 
 
+def _belongs_to_selected_python_environment(
+    candidate: Path, scripts_directory: Path
+) -> bool:
+    selected_scripts = scripts_directory.resolve()
+    return (
+        candidate.parent.resolve() == selected_scripts
+        and candidate.resolve().parent == selected_scripts
+    )
+
+
 def _resolve_pyuic6() -> str:
+    scripts_directory = Path(sys.executable).absolute().parent
+    entrypoint_name = "pyuic6.exe" if os.name == "nt" else "pyuic6"
+    adjacent = scripts_directory / entrypoint_name
+    if adjacent.is_file():
+        if _belongs_to_selected_python_environment(adjacent, scripts_directory):
+            return str(adjacent)
+        raise RuntimeError(
+            "pyuic6 adjacent to the selected interpreter resolves outside the "
+            f"locked Python environment: {adjacent}"
+        )
+
     executable = shutil.which("pyuic6")
     if executable is None:
         raise RuntimeError("pyuic6 is not available from the locked PyQt6 environment")
-    return executable
+    candidate = Path(executable).absolute()
+    if not _belongs_to_selected_python_environment(candidate, scripts_directory):
+        raise RuntimeError(
+            "pyuic6 resolved outside the selected locked Python environment: "
+            f"{candidate} (expected {scripts_directory})"
+        )
+    return str(candidate)
 
 
 def _sha256(path: Path) -> str:

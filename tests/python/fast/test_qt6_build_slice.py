@@ -30,7 +30,9 @@ def _run_build(*arguments: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_qt6_runtime_and_verification_tools_are_exactly_locked():
+def test_qt6_runtime_and_verification_tools_are_exactly_locked(
+    tmp_path, monkeypatch
+):
     metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     lock = tomllib.loads((ROOT / "uv.lock").read_text(encoding="utf-8"))
     dependencies = set(metadata["project"]["dependencies"])
@@ -50,6 +52,41 @@ def test_qt6_runtime_and_verification_tools_are_exactly_locked():
     assert locked_versions["pyqt6-qt6"] == "6.11.1"
     assert locked_versions["pyqt6-sip"] == "13.11.1"
     assert "pyqt5" not in locked_versions
+
+    scripts_directory = tmp_path / ("Scripts" if os.name == "nt" else "bin")
+    interpreter = scripts_directory / ("python.exe" if os.name == "nt" else "python")
+    pyuic6 = scripts_directory / ("pyuic6.exe" if os.name == "nt" else "pyuic6")
+    scripts_directory.mkdir(parents=True)
+    interpreter.write_bytes(b"locked interpreter")
+    pyuic6.write_bytes(b"locked entrypoint")
+    monkeypatch.setattr(qt6_build.sys, "executable", str(interpreter))
+    monkeypatch.setattr(qt6_build.shutil, "which", lambda _name: None)
+
+    assert qt6_build._resolve_pyuic6() == str(pyuic6)
+
+    pyuic6.unlink()
+    with pytest.raises(RuntimeError, match="not available from the locked"):
+        qt6_build._resolve_pyuic6()
+
+    outside = tmp_path / "unselected" / pyuic6.name
+    outside.parent.mkdir()
+    outside.write_bytes(b"other entrypoint")
+    monkeypatch.setattr(qt6_build.shutil, "which", lambda _name: str(outside))
+    with pytest.raises(RuntimeError, match="outside the selected locked"):
+        qt6_build._resolve_pyuic6()
+
+    pyuic6.write_bytes(b"adjacent reparse fixture")
+    original_resolve = Path.resolve
+    outside_resolved = outside.resolve()
+
+    def resolve_as_foreign_target(path, *args, **kwargs):
+        if path == pyuic6:
+            return outside_resolved
+        return original_resolve(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "resolve", resolve_as_foreign_target)
+    with pytest.raises(RuntimeError, match="adjacent.*resolves outside"):
+        qt6_build._resolve_pyuic6()
 
 
 def _official_rcc() -> Path:
