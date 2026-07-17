@@ -102,6 +102,8 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
     assert "${{ inputs.artifact_name }}-evidence" in workflow_text
     assert "*-archive-inspection.json" in workflow_text
     assert "packaged-smoke*.log" in workflow_text
+    assert '2>&1 | tee "$shared_verification_log"' in text("scripts/package-macos.sh")
+    assert "shared-release-verification.log" in workflow_text
     sdk_cache = steps_by_name["Cache official Qt SDK on macOS"]
     assert sdk_cache["if"] == "${{ inputs.target_os == 'macos' }}"
     assert sdk_cache["id"] == "macos_qt_sdk_cache"
@@ -134,6 +136,7 @@ def test_macos_surface_smoke_exercises_native_acceptance_surfaces():
     assert "isNativeMenuBar" in launch
     assert "accessible_control.setFocus()" in launch
     assert "accessible_control.setFocus(QtCore.Qt.FocusReason" not in launch
+    assert 'if sys.platform == "darwin" else {}' in launch
 
 
 def test_macho_parser_rejects_arm_and_universal_payloads_for_x64(tmp_path):
@@ -479,7 +482,13 @@ def test_macos_surface_evidence_rejects_observation_mutations():
         "platform_plugin": "cocoa", "clipboard": True, "critical_dialog": True,
         "binary_resources": True, "native_menu": {"is_native": True, "menu_count": 1, "action_count": 1},
         "native_file_dialog": {"dont_use_native_dialog": False, "visible_before_cancel": True, "result": 0, "rejected_value": 0},
-        "accessibility": {"focus_before": "packagedAccessibilityControl", "focus_after_tab": "packagedKeyboardTraversalTarget", "native": {"role": "AXButton", "is_element": True}},
+        "accessibility": {
+            "focus_before": "packagedAccessibilityControl",
+            "focus_after_tab": "packagedKeyboardTraversalTarget",
+            "accessible_name": "Packaged accessibility control",
+            "accessible_description": "Verifies packaged Qt accessibility metadata.",
+            "native": {"role": "AXButton", "is_element": True},
+        },
         "available_styles": ["macOS"], "active_style": "macos", "tls_backends": ["cert-only"],
         "image_formats": ["jpeg", "svg"], "baseline_device_pixel_ratio": 1.0,
         "dpr_tolerance": 0.05,
@@ -496,7 +505,13 @@ def test_macos_surface_evidence_rejects_observation_mutations():
     mutations = [
         ("native_menu", {"is_native": False, "menu_count": 1, "action_count": 1}),
         ("native_file_dialog", {"dont_use_native_dialog": False, "visible_before_cancel": False, "result": 0, "rejected_value": 0}),
-        ("accessibility", {"focus_before": "packagedAccessibilityControl", "focus_after_tab": None, "native": {"role": "", "is_element": False}}),
+        ("accessibility", {
+            "focus_before": "packagedAccessibilityControl",
+            "focus_after_tab": "packagedKeyboardTraversalTarget",
+            "accessible_name": "Packaged accessibility control",
+            "accessible_description": "Verifies packaged Qt accessibility metadata.",
+            "native": {"role": "", "is_element": False},
+        }),
     ]
     for key, value in mutations:
         mutated = [dict(item) for item in records]

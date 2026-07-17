@@ -681,13 +681,26 @@ def start_package_surface_smoke(evidence_path, expected_scale):
     accessibility = {
         "focus_before": focus_before.objectName() if focus_before else None,
         "focus_after_tab": focus_after.objectName() if focus_after else None,
-        "native": _native_accessibility_observation(accessible_control),
+        "accessible_name": accessible_control.accessibleName(),
+        "accessible_description": accessible_control.accessibleDescription(),
+        "native": (
+            _native_accessibility_observation(accessible_control)
+            if sys.platform == "darwin" else {}
+        ),
     }
     if (
         accessibility["focus_before"] != "packagedAccessibilityControl"
         or accessibility["focus_after_tab"] != "packagedKeyboardTraversalTarget"
-        or not accessibility["native"].get("role")
-        or accessibility["native"].get("is_element") is not True
+        or accessibility["accessible_name"] != "Packaged accessibility control"
+        or accessibility["accessible_description"]
+        != "Verifies packaged Qt accessibility metadata."
+        or (
+            sys.platform == "darwin"
+            and (
+                not accessibility["native"].get("role")
+                or accessibility["native"].get("is_element") is not True
+            )
+        )
     ):
         raise SystemExit("Package surface smoke could not exercise accessibility metadata.")
 

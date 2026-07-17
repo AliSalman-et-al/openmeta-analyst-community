@@ -461,7 +461,7 @@ def verify_manifest_versions(
 def verify(args: argparse.Namespace) -> None:
     root = args.root.resolve()
     python = (
-        str(Path(args.python).resolve()) if Path(args.python).exists() else args.python
+        str(Path(args.python).absolute()) if Path(args.python).exists() else args.python
     )
     rscript = resolve_rscript(args.rscript)
     base_env = dict(os.environ)

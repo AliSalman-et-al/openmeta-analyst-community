@@ -121,9 +121,12 @@ uv sync --locked
 
 if [ "$skip_tests" -eq 0 ]; then
   step "Running shared release-package verification"
+  shared_verification_log="$repo_root/build/macos-package/$architecture/shared-release-verification.log"
+  mkdir -p "$(dirname "$shared_verification_log")"
   "$python_exe" scripts/verify_package_release.py \
     --rscript "$r_runtime_root/bin/Rscript" \
-    --r-library-cache-root "$r_package_cache_root"
+    --r-library-cache-root "$r_package_cache_root" \
+    2>&1 | tee "$shared_verification_log"
 fi
 
 build_args=(

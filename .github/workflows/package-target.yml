@@ -151,6 +151,7 @@ jobs:
           path: |
             build/macos-package/x64/work/RCMetaStudio/warn-RCMetaStudio.txt
             build/macos-package/x64/work/RCMetaStudio/xref-RCMetaStudio.html
+            build/macos-package/x64/shared-release-verification.log
             build/macos-package/x64/work/qualification/*
             build/qt-sdk/*-rcc.json
             artifacts/*-archive-inspection.json

@@ -401,7 +401,7 @@ def install_and_load_RCMetaR(root: Path, rscript: Path, env: dict[str, str]) -> 
 def verify(args: argparse.Namespace) -> None:
     root = args.root.resolve()
     python = (
-        str(Path(args.python).resolve()) if Path(args.python).exists() else args.python
+        str(Path(args.python).absolute()) if Path(args.python).exists() else args.python
     )
     base_env = dict(os.environ)
     policy = binary_dependency_policy(root)

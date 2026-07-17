@@ -1,3 +1,5 @@
+import argparse
+import importlib.util
 import json
 import os
 import re
@@ -22,6 +24,66 @@ APP_SRC = REPO_ROOT / "src" / "rc_metastudio"
 LEGACY_EXPORT_PATTERN = re.compile(
     r"^([A-Za-z][A-Za-z0-9._]*)\s*<-\s*function\s*\(", re.MULTILINE
 )
+
+
+def test_r_verifiers_preserve_symlinked_python_identity(monkeypatch, tmp_path):
+    base_python = tmp_path / "uv-python-dir" / "python3.11"
+    base_python.parent.mkdir()
+    base_python.write_bytes(b"base interpreter")
+    venv_python = tmp_path / ".venv" / "bin" / "python"
+    venv_python.parent.mkdir(parents=True)
+    try:
+        venv_python.symlink_to(base_python)
+    except OSError as exc:
+        pytest.skip(f"symlink creation is unavailable: {exc}")
+    expected_python = str(venv_python.absolute())
+
+    class StopAfterFirstChild(Exception):
+        pass
+
+    for script_name in ("verify_rcmetar_r_stack.py", "verify_rcmetar_r_default.py"):
+        spec = importlib.util.spec_from_file_location(
+            f"symlink_identity_{script_name.removesuffix('.py')}",
+            REPO_ROOT / "scripts" / script_name,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        captured = {}
+
+        def stop_after_first_child(command, *, cwd, env):
+            captured["command"] = command
+            captured["env"] = env
+            raise StopAfterFirstChild
+
+        with monkeypatch.context() as patch:
+            patch.setattr(
+                module,
+                "binary_dependency_policy",
+                lambda _root: {
+                    "repository": "https://packagemanager.posit.co/cran/2026-07-16"
+                },
+            )
+            if hasattr(module, "verify_rpy2_identities"):
+                patch.setattr(module, "verify_rpy2_identities", lambda: None)
+            patch.setattr(module, "run", stop_after_first_child)
+            args = argparse.Namespace(
+                root=REPO_ROOT,
+                python=str(venv_python),
+                rscript="Rscript",
+                pytest_runner="uv",
+                work_dir=None,
+                r_library_cache_root=None,
+                cran_repo=None,
+                require_r=False,
+                require_installed_packages=False,
+                install_missing=False,
+            )
+            with pytest.raises(StopAfterFirstChild):
+                module.verify(args)
+
+        assert captured["command"][0] == expected_python
+        assert captured["env"]["RCMS_POLICY_PYTHON"] == expected_python
 LEGACY_ALIAS_PATTERN = re.compile(
     r"^([A-Za-z][A-Za-z0-9._]*)\s*<-\s*([A-Za-z][A-Za-z0-9._]*)\s*$", re.MULTILINE
 )

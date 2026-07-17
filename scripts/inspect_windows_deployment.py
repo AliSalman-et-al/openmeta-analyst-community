@@ -13,6 +13,7 @@ import unicodedata
 import zipfile
 from collections import defaultdict
 from pathlib import Path
+from typing import cast
 
 
 PE_X64_MACHINE = 0x8664
@@ -407,6 +408,20 @@ def _validate_runtime_probe(runtime_probe: dict, *, app_root: Path, qt_root: Pat
         raise DeploymentInspectionError("frozen R runtime probe does not use the bundled R runtime/library")
 
 
+def _valid_windows_accessibility(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    accessibility = cast(dict[str, object], value)
+    return (
+        accessibility.get("focus_before") == "packagedAccessibilityControl"
+        and accessibility.get("focus_after_tab") == "packagedKeyboardTraversalTarget"
+        and accessibility.get("accessible_name") == "Packaged accessibility control"
+        and accessibility.get("accessible_description")
+            == "Verifies packaged Qt accessibility metadata."
+        and accessibility.get("native") == {}
+    )
+
+
 def write_qualification_evidence(
     *,
     archive: Path,
@@ -489,6 +504,7 @@ def write_qualification_evidence(
             not all(item.get(check) is True for check in ("clipboard", "critical_dialog", "binary_resources"))
             or item.get("locale") != "de_DE"
             or item.get("platform_plugin") != "windows"
+            or not _valid_windows_accessibility(item.get("accessibility"))
             or "schannel" not in [str(value).lower() for value in item.get("tls_backends", [])]
             or not item.get("active_style")
             or not item.get("available_styles")
@@ -559,17 +575,22 @@ def write_qualification_evidence(
 
 
 def _valid_locale_variants(variants: object, workflows: dict) -> bool:
-    if not isinstance(variants, list) or len(variants) != 2:
+    if (
+        not isinstance(variants, list)
+        or len(variants) != 2
+        or not all(isinstance(item, dict) for item in variants)
+    ):
         return False
-    if [item.get("locale") for item in variants] != ["en_US", "de_DE"]:
+    typed_variants = cast(list[dict[str, object]], variants)
+    if [item.get("locale") for item in typed_variants] != ["en_US", "de_DE"]:
         return False
-    if "." not in str(variants[0].get("input")) or "," not in str(variants[1].get("input")):
+    if "." not in str(typed_variants[0].get("input")) or "," not in str(typed_variants[1].get("input")):
         return False
     return (
-        variants[0].get("canonical_value") == variants[1].get("canonical_value")
-        and variants[0].get("summary_sha256") == variants[1].get("summary_sha256") == EXPECTED_SUMMARY_SHA256
-        and variants[0].get("svg_sha256") == variants[1].get("svg_sha256") == workflows.get("svg_sha256")
-        and _valid_sha256_map(variants[0].get("svg_sha256"))
+        typed_variants[0].get("canonical_value") == typed_variants[1].get("canonical_value")
+        and typed_variants[0].get("summary_sha256") == typed_variants[1].get("summary_sha256") == EXPECTED_SUMMARY_SHA256
+        and typed_variants[0].get("svg_sha256") == typed_variants[1].get("svg_sha256") == workflows.get("svg_sha256")
+        and _valid_sha256_map(typed_variants[0].get("svg_sha256"))
     )
 
 

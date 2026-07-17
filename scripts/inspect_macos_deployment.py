@@ -779,6 +779,9 @@ def validate_macos_surface_records(scales: object) -> None:
             and file_dialog.get("result") == file_dialog.get("rejected_value") == 0
             and accessibility.get("focus_before") == "packagedAccessibilityControl"
             and accessibility.get("focus_after_tab") == "packagedKeyboardTraversalTarget"
+            and accessibility.get("accessible_name") == "Packaged accessibility control"
+            and accessibility.get("accessible_description")
+                == "Verifies packaged Qt accessibility metadata."
             and native_accessibility.get("is_element") is True
             and bool(native_accessibility.get("role"))
             and item.get("available_styles") and item.get("active_style")

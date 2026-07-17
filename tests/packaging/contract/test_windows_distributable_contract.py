@@ -1259,6 +1259,18 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
     import zipfile
 
     inspector = _load_windows_deployment_inspector()
+    windows_accessibility = {
+        "focus_before": "packagedAccessibilityControl",
+        "focus_after_tab": "packagedKeyboardTraversalTarget",
+        "accessible_name": "Packaged accessibility control",
+        "accessible_description": "Verifies packaged Qt accessibility metadata.",
+        "native": {},
+    }
+    assert inspector._valid_windows_accessibility(windows_accessibility)
+    assert not inspector._valid_windows_accessibility({
+        **windows_accessibility,
+        "accessible_description": "",
+    })
     archive = tmp_path / "RCMetaStudio-windows-x64.zip"
     runtime_probe = tmp_path / "runtime-probe.json"
     runtime_value = {"frozen": True}
@@ -1346,6 +1358,7 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
                         "binary_resources": True,
                         "locale": "de_DE",
                         "platform_plugin": "windows",
+                        "accessibility": windows_accessibility,
                         "tls_backends": ["schannel"],
                         "active_style": "windows11",
                         "available_styles": ["Windows11", "Windows"],
