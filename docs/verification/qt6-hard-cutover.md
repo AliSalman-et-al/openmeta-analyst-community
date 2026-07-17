@@ -42,33 +42,39 @@ cannot substitute for either native Cocoa architecture.
 ## Issue #340 hosted acceptance record
 
 The hard cutover passed at
-[commit `41f4674007dbd42e167c01abc26442b242fad939`](https://github.com/AliSalman-et-al/rc-metastudio/commit/41f4674007dbd42e167c01abc26442b242fad939)
-in [GitHub Actions run `29568513989`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29568513989).
+[commit `87e364211889ae0c2455d3fa3494603ed739836c`](https://github.com/AliSalman-et-al/rc-metastudio/commit/87e364211889ae0c2455d3fa3494603ed739836c)
+in [GitHub Actions run `29570846208`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29570846208).
 All required jobs and the integration gate succeeded:
 
 | Required target | Job | Elapsed result |
 | --- | --- | --- |
-| Windows native Qt6 vertical slice | [`87846585933`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29568513989/job/87846585933) | Passed in 12m54s |
-| Windows x64 source smoke and Fast Verification | [`87846585986`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29568513989/job/87846585986) | Passed in 4m50s |
-| macOS Intel x64 source smoke and Fast Verification | [`87846585990`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29568513989/job/87846585990) | Passed in 6m23s |
-| macOS Apple Silicon ARM64 source smoke and Fast Verification | [`87846586005`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29568513989/job/87846586005) | Passed in 3m24s |
-| Required-lane integration gate | [`87849045973`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29568513989/job/87849045973) | Passed |
+| Qt6 verification change classifier | [`87853992919`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29570846208/job/87853992919) | Passed |
+| Windows native Qt6 vertical slice | [`87854012519`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29570846208/job/87854012519) | Passed in 15m12s |
+| Windows x64 source smoke and Fast Verification | [`87854012512`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29570846208/job/87854012512) | Passed in 4m55s |
+| macOS Intel x64 source smoke and Fast Verification | [`87854012503`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29570846208/job/87854012503) | Passed in 5m01s |
+| macOS Apple Silicon ARM64 source smoke and Fast Verification | [`87854012485`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29570846208/job/87854012485) | Passed in 2m26s |
+| Required-lane integration gate | [`87856892344`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29570846208/job/87856892344) | Passed |
 
-The Windows raw log records calculator `main-return` followed by
-`verified-hard-exit`, with no fatal Python or access-violation diagnostic. The
-same job then reported `validated 15 remaining native Qt6 surfaces at 1.0,
-1.25, 1.5, 1.75`, proving that the terminal calculator boundary did not skip
-the downstream remaining-surface gate.
+The Windows raw log records `Imported 45 handwritten Qt modules with warnings
+fatal.` at 09:42:28, proving the isolated warnings-as-errors execution audit
+covered the complete strict Qt-bearing inventory. It records calculator
+`main-return` followed by `verified-hard-exit` at 09:55:47, with no fatal Python
+or access-violation diagnostic. At 09:56:12 the same job reported `validated 15
+remaining native Qt6 surfaces at 1.0, 1.25, 1.5, 1.75`, proving that the
+terminal calculator boundary did not skip the downstream remaining-surface
+gate.
 
 ### Retained native evidence
 
 | Artifact | Hosted identity and archive integrity | Independent content validation |
 | --- | --- | --- |
-| `native-calculator-evidence` | [ID `8402384977`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29568513989/artifacts/8402384977); 36,855 bytes; `sha256:086df2769e8659b200e8144e43251c3a0ce8fe40359f508dae6b89cb39f88bf5` | Extracted bundle contains three PNGs plus `evidence.json`; `validate_evidence_bundle` accepted exactly three calculator records. |
-| `native-remaining-surface-evidence` | [ID `8402385378`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29568513989/artifacts/8402385378); 777,471 bytes; `sha256:18ee8af7f30a4809cb2558fffab03f879538d2a42f71d1cfe9f62cd8f4dd75b3` | Extracted bundle contains 64 files and passed the four-scale, 15-surface validator. |
+| `native-calculator-evidence` | [ID `8403347571`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29570846208/artifacts/8403347571); 36,855 bytes; `sha256:b13dd3a71a3d1d30ab17c877da010a5d66630443556f8beb6085d4899a6033e2` | Extracted bundle contains three PNGs plus `evidence.json`; `validate_evidence_bundle` accepted exactly three calculator records. |
+| `native-remaining-surface-evidence` | [ID `8403348289`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29570846208/artifacts/8403348289); 778,474 bytes; `sha256:0126a75fe29d183504b8d27216c73cdf3e1dbe72535fa7f097595f6d21b3f4df` | Extracted bundle contains 64 files; the validator accepted all four scale manifests and all 15 surfaces. |
 
 The SHA256 values are the uploaded ZIP digests reported by GitHub Actions;
-content validation was performed after extraction and is a separate check.
+content validation was performed after extraction and is a separate check. The
+two extracted bundles contain 68 files in total: four calculator files and 64
+remaining-surface files.
 
 ### Cold installation proof versus warm acceptance
 
@@ -89,7 +95,7 @@ That earlier run is not the cutover acceptance run: its pre-fix Windows native
 job failed during calculator process exit, so its integration gate also failed.
 It is retained only as proof of cold installation and cache population.
 
-The successful final run `29568513989` is the distinct warm-cache proof. All
+The successful final run `29570846208` is the distinct warm-cache proof. All
 three source lanes restored their target-specific Default R caches and still
 revalidated the dated Public PPM snapshot `2026-07-16`, the 139-package binary
 closure, their platform-specific package type above, and the sole permitted
