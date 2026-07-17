@@ -136,6 +136,55 @@ for the initial sample open, locale-reset open, and saved-project reopen, which
 prevents any of those unattended automation boundaries from becoming another
 900-second modal wait.
 
+### Hosted follow-up: successful app, lost PowerShell exit code
+
+The third hosted run
+[`29589586666`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29589586666),
+Windows job
+[`87915081757`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29589586666/job/87915081757),
+failed after 13 minutes 24 seconds rather than at the watchdog. Diagnostic
+artifact
+[`8410838085`](https://github.com/AliSalman-et-al/rc-metastudio/actions/runs/29589586666/artifacts/8410838085)
+proves that the frozen application itself passed: runtime probe, project-open
+return, paint, both locale analyses, project exercise, save/reopen, evidence
+write, and post-close are all present; `packaged-smoke.json` exists and the hang
+trace is empty. The wrapper nevertheless reported `exit code .`, showing that
+`Invoke-BoundedPackageProcess` returned PowerShell `$null` after the successful
+redirected GUI process exited.
+
+PowerShell documents that `Start-Process -PassThru` returns a
+[`System.Diagnostics.Process`](https://learn.microsoft.com/powershell/module/microsoft.powershell.management/start-process)
+object. The .NET process contract explains that Windows retains exit metadata
+while an open process handle exists, that `ExitCode` requires a valid handle,
+and that redirected completion should be followed by parameterless
+[`WaitForExit()`](https://learn.microsoft.com/dotnet/api/system.diagnostics.process.waitforexit)
+before reading the code; see also
+[`Process.ExitCode`](https://learn.microsoft.com/dotnet/api/system.diagnostics.process.exitcode)
+and
+[`Process.HasExited`](https://learn.microsoft.com/dotnet/api/system.diagnostics.process.hasexited).
+The bounded helper now acquires `Process.Handle` immediately after
+`Start-Process`, preserves the existing finite watchdog, calls parameterless
+`WaitForExit()` and `Refresh()` after successful completion, rejects a missing
+code explicitly, returns an exact integer, and disposes the process only after
+the code is captured.
+
+A repository PowerShell self-test extracts the actual helper implementation,
+runs redirected zero- and nonzero-exit children, verifies both completed output
+streams, and requires exact integer codes 0 and 7. An additional local run used
+the same helper against the frozen windowed `RCMetaStudio.exe` runtime probe
+with redirected stdout/stderr and captured exact exit code 0.
+
+Lifecycle hardening extends to exceptional paths. Handle acquisition now occurs
+inside the outer process-ownership `try/finally`; an invalid or failed handle
+cannot bypass child termination and `Process.Dispose()`. The self-test injects
+that failure and verifies both cleanup and disposal. Timeout still uses
+`taskkill /PID ... /T /F`, but no longer invokes it with unbounded `-Wait`.
+The cleanup process has its own 30-second wait, a guarded handle and exit-code
+read, a 5-second forced-termination wait, and unconditional disposal. The
+self-test also drives a real timed-out child and requires fail-closed cleanup
+within 15 seconds. Thus the application watchdog remains unchanged while its
+cleanup machinery is itself bounded and leak-resistant.
+
 ### Local packaged reproduction
 
 The local packaged control used:

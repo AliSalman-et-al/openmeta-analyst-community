@@ -36,6 +36,7 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     manifest = delivery.load(manifest_path)
     assert manifest["channel"] == "candidate"
     assert set(manifest["policy_inputs"]) == set(delivery.POLICY_INPUTS)
+    assert "scripts/test-bounded-package-process.ps1" in delivery.POLICY_INPUTS
 
     for target in delivery.targets():
         previous = delivery.release_identity_digest(manifest)

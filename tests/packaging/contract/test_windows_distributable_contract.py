@@ -286,6 +286,7 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
     for package_input in (
         "sample_projects/*",
         "scripts/build_qt6.py",
+        "scripts/test-bounded-package-process.ps1",
         "scripts/verify_package_release.py",
         "scripts/resolve_package_ci_metadata.py",
         "scripts/validate_adaptive_layout_evidence.py",
@@ -709,6 +710,21 @@ def test_windows_packager_qualifies_qt6_deployment_and_packaged_surfaces():
         "foreach ($name in $previousEnv.Keys)",
     )
     assert "function Invoke-BoundedPackageProcess" in script
+    assert "$processHandle = $process.Handle" in script
+    assert "$process.Refresh()" in script
+    assert "exited without a readable exit code" in script
+    assert "test-bounded-package-process.ps1" in script
+    assert "function Stop-BoundedPackageProcessTree" in script
+    assert "taskkill exceeded its $TimeoutMilliseconds-millisecond cleanup bound" in script
+    assert "-Wait -PassThru" not in script
+    process_test = read_repo_text("scripts", "test-bounded-package-process.ps1")
+    assert "Invoke-BoundedPackageProcess" in process_test
+    assert "@(0, 7)" in process_test
+    assert "Redirected stdout did not complete" in process_test
+    assert "Redirected stderr did not complete" in process_test
+    assert "exceeded its 1-second watchdog" in process_test
+    assert "RcmsThrowingHandleProcess" in process_test
+    assert "Handle acquisition failure did not trigger child cleanup" in process_test
     assert "$startArguments.RedirectStandardOutput = $StandardOutputPath" in script
     assert "$startArguments.RedirectStandardError = $StandardErrorPath" in script
     assert "RCMS_AUTOMATION_HANG_TRACE" in script
@@ -737,7 +753,7 @@ def test_windows_packager_qualifies_qt6_deployment_and_packaged_surfaces():
     )
     assert "WaitForExit($TimeoutSeconds * 1000)" in script
     assert "Start-Process -FilePath taskkill.exe" in script
-    assert '"/PID", $process.Id, "/T", "/F"' in script
+    assert '"/PID", $ProcessId, "/T", "/F"' in script
     assert "watchdog cleanup failed" in script
     assert "$process.WaitForExit(30000)" in script
     for scale in ('"1.25"', '"1.50"', '"1.75"'):

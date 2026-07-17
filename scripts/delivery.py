@@ -20,6 +20,7 @@ POLICY_INPUTS = (
     "r/RCMetaR/DESCRIPTION",
     "delivery/targets.json",
     "scripts/build-windows-package.ps1",
+    "scripts/test-bounded-package-process.ps1",
     "scripts/inspect_windows_deployment.py",
     "packaging/pyinstaller/rc-metastudio.spec",
     "scripts/build-macos-package.sh",
