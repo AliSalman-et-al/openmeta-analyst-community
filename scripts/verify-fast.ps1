@@ -106,6 +106,17 @@ try {
         Write-Step "Skipping dependency sync for warm local verification"
     }
 
+    $qtBuildRoot = Join-Path $repoRoot "build\qt6-verification"
+    Write-Step "Generating canonical Qt6 forms and resources"
+    uv run python scripts\build_qt6.py generate --build-root $qtBuildRoot
+    if ($LASTEXITCODE -ne 0) { throw "Qt6 generation failed." }
+    $env:RCMS_QT6_BUILD_ROOT = $qtBuildRoot
+    $generatedPackage = Join-Path $qtBuildRoot "generated\rc_metastudio"
+    $generatedForms = Join-Path $generatedPackage "forms"
+    $pythonPathEntries = @($generatedPackage, $generatedForms)
+    if ($env:PYTHONPATH) { $pythonPathEntries += $env:PYTHONPATH }
+    $env:PYTHONPATH = $pythonPathEntries -join [IO.Path]::PathSeparator
+
     Write-Step "Validating Comprehensive Golden Baseline manifests"
     uv run python scripts\validate_golden_baseline_manifests.py
     if ($LASTEXITCODE -ne 0) { throw "Golden baseline manifest validation failed." }

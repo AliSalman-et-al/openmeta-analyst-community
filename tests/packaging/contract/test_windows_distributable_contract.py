@@ -291,6 +291,16 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
         in workflow["text"]
     )
     assert "timeout-minutes: 20" in workflow["text"]
+    assert workflow["text"].count("fetch-depth: 0") == 2
+    assert "brew install libpng pkg-config" in workflow["text"]
+    assert 'libpng_prefix="$(brew --prefix libpng)"' in workflow["text"]
+    for variable in ("CPPFLAGS", "LDFLAGS", "PKG_CONFIG_PATH"):
+        assert f"{variable}=" in workflow["text"]
+    assert "qt-sdk-6.11.1-${{ matrix.target }}" in workflow["text"]
+    assert "uv run aqt install-qt mac desktop 6.11.1 clang_64" in workflow["text"]
+    assert "qt6_macos_feasibility.py resolve-rcc" in workflow["text"]
+    assert '--sdk-root "$PWD/build/qt-sdk/6.11.1/macos"' in workflow["text"]
+    assert '--github-env "$GITHUB_ENV"' in workflow["text"]
 
 
 def test_package_workflow_builds_path_aware_artifacts():

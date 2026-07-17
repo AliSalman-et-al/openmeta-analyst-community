@@ -77,6 +77,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
@@ -140,6 +142,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
@@ -160,6 +164,17 @@ jobs:
           path: artifacts/r-default-library-cache
           key: r-default-evidence-v1-${{ matrix.target }}-r-4.6.1-${{ hashFiles('scripts/install-r-deps.R', 'docs/verification/RCMetaR-r-dependencies.json', 'r/RCMetaR/DESCRIPTION') }}
 
+      - name: Provision macOS native R build libraries
+        if: ${{ matrix.platform == 'macos' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install libpng pkg-config
+          libpng_prefix="$(brew --prefix libpng)"
+          echo "CPPFLAGS=-I$libpng_prefix/include ${CPPFLAGS:-}" >> "$GITHUB_ENV"
+          echo "LDFLAGS=-L$libpng_prefix/lib ${LDFLAGS:-}" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=$libpng_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" >> "$GITHUB_ENV"
+
       - name: Provision Default R Evidence on Windows
         if: ${{ matrix.platform == 'windows' }}
         shell: powershell
@@ -175,6 +190,36 @@ jobs:
           set -euo pipefail
           uv sync --locked
           uv run python scripts/verify_rcmetar_r_default.py --rscript "$(command -v Rscript)" --require-r --require-installed-packages --install-missing --r-library-cache-root artifacts/r-default-library-cache
+
+      - name: Cache official Qt rcc package on Windows
+        if: ${{ matrix.platform == 'windows' }}
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: build\qt-rcc
+          key: qt-rcc-6.11.1-windows-x64-7f97edc3937fec7383eb865e010ed5128155bf9c80a563abca450860f3e9bef5
+
+      - name: Cache official Qt SDK on macOS
+        if: ${{ matrix.platform == 'macos' }}
+        id: macos_qt_sdk_cache
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: build/qt-sdk
+          key: qt-sdk-6.11.1-${{ matrix.target }}
+
+      - name: Install official Qt SDK on macOS
+        if: ${{ matrix.platform == 'macos' && steps.macos_qt_sdk_cache.outputs.cache-hit != 'true' }}
+        shell: bash
+        run: uv run aqt install-qt mac desktop 6.11.1 clang_64 --outputdir "$PWD/build/qt-sdk"
+
+      - name: Resolve official Qt rcc on macOS
+        if: ${{ matrix.platform == 'macos' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run python scripts/qt6_macos_feasibility.py resolve-rcc \
+            --sdk-root "$PWD/build/qt-sdk/6.11.1/macos" \
+            --github-env "$GITHUB_ENV" \
+            --diagnostic "build/qt-sdk/${{ matrix.target }}-rcc.json"
 
       - name: Run source smoke and Fast Verification on Windows
         if: ${{ matrix.platform == 'windows' }}

@@ -459,3 +459,16 @@ def test_qt6_generation_and_type_checks_have_a_maintained_entry_point():
     assert hosted.count("--require-r-evidence") == 2
     assert "macos-x64" in hosted
     assert "macos-arm64" in hosted
+
+    for verification_script in (
+        "scripts/verify-smoke.ps1",
+        "scripts/verify-fast.ps1",
+        "scripts/verify-smoke.sh",
+        "scripts/verify-fast.sh",
+    ):
+        source = (ROOT / verification_script).read_text(encoding="utf-8")
+        assert "build_qt6.py" in source
+        assert "generate" in source
+        assert "build/qt6-verification" in source.replace("\\", "/")
+        assert "RCMS_QT6_BUILD_ROOT" in source
+        assert "PYTHONPATH" in source
