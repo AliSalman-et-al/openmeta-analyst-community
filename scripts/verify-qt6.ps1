@@ -16,44 +16,16 @@ try {
     uv run python scripts/build_qt6.py generate --build-root $BuildRoot
     if ($LASTEXITCODE -ne 0) { throw "Qt6 form or resource generation failed." }
 
+    $qtModules = @(uv run python scripts/import_qt_modules.py --root . --list)
+    if ($LASTEXITCODE -ne 0 -or $qtModules.Count -eq 0) {
+        throw "Handwritten Qt module discovery failed."
+    }
     uv run ty check `
-        --extra-search-path src/rc_metastudio `
-        --extra-search-path scripts `
         --extra-search-path "$BuildRoot/generated/rc_metastudio" `
         --extra-search-path "$BuildRoot/generated/rc_metastudio/forms" `
-        src/rc_metastudio/launch.py `
-        src/rc_metastudio/settings.py `
-        src/rc_metastudio/qt6_build.py `
-        src/rc_metastudio/project_domain.py `
-        src/rc_metastudio/project_adapter.py `
-        src/rc_metastudio/project_evidence.py `
-        src/rc_metastudio/project_format.py `
-        src/rc_metastudio/analysis_adapter.py `
-        src/rc_metastudio/analysis_regression_compare.py `
-        src/rc_metastudio/ma_specs.py `
-        src/rc_metastudio/meta_reg_form.py `
-        src/rc_metastudio/meta_subgroup_form.py `
-        src/rc_metastudio/conf_level_dialog.py `
-        src/rc_metastudio/progress_bar.py `
-        src/rc_metastudio/headless_analysis.py `
-        src/rc_metastudio/golden_analysis.py `
-        src/rc_metastudio/results_window.py `
-        src/rc_metastudio/network_view.py `
-        src/rc_metastudio/qt_geometry.py `
-        src/rc_metastudio/qt6_port_tools.py `
-        src/rc_metastudio/qt6_resources.py `
-        src/rc_metastudio/qt6_ui.py `
-        src/rc_metastudio/qt6_macos_feasibility.py `
-        src/rc_metastudio/qt_text.py `
-        src/rc_metastudio/adaptive_controls.py `
-        scripts/build_qt6.py `
-        scripts/qt6_port.py `
-        scripts/native_analysis_smoke.py `
-        scripts/native_results_smoke.py `
-        scripts/native_remaining_surfaces_smoke.py `
-        scripts/validate_qt6_surface_inventory.py `
-        scripts/verify_golden_compatibility.py `
-        scripts/verify_rcmetar_r_stack.py
+        --extra-search-path src/rc_metastudio `
+        --extra-search-path scripts `
+        $qtModules
     if ($LASTEXITCODE -ne 0) { throw "Qt6 strict type verification failed." }
 
     $dependencyInputs = @("pyproject.toml", "uv.lock")
@@ -67,6 +39,22 @@ try {
         --report "$BuildRoot/strict-source-findings.json" `
         src/rc_metastudio
     if ($LASTEXITCODE -ne 0) { throw "Qt6 authoritative source backlog drifted." }
+
+    uv run python -W error -m rc_metastudio.qt6_cutover
+    if ($LASTEXITCODE -ne 0) { throw "Qt6 final zero-legacy audit failed." }
+
+    uv run python scripts/import_qt_modules.py `
+        --build-root $BuildRoot `
+        --report "$BuildRoot/qt-module-imports.json"
+    if ($LASTEXITCODE -ne 0) { throw "Warnings-as-errors Qt module import audit failed." }
+
+    $codemodSources = Get-ChildItem src/rc_metastudio -File -Filter *.py |
+        Where-Object { $_.Name -notin @("qt6_port_tools.py", "qt6_cutover.py") } |
+        ForEach-Object { $_.FullName }
+    uv run python -W error scripts/qt6_port.py codemod --check `
+        --report docs/verification/qt6-codemod-second-run.json `
+        $codemodSources
+    if ($LASTEXITCODE -ne 0) { throw "Qt6 second codemod run was not empty." }
 
     uv run python scripts/validate_qt6_surface_inventory.py --check-document
     if ($LASTEXITCODE -ne 0) { throw "Native Qt6 surface inventory validation failed." }
@@ -175,7 +163,8 @@ try {
         tests/python/fast/test_project_format.py `
         tests/python/fast/test_project_adapter.py `
         tests/python/fast/test_qt6_macos_feasibility.py `
-        tests/python/fast/test_native_remaining_surfaces_evidence.py
+        tests/python/fast/test_native_remaining_surfaces_evidence.py `
+        tests/python/fast/test_qt6_cutover_finalization.py
     if ($LASTEXITCODE -ne 0) { throw "Qt6 vertical-slice tests failed." }
 
     uv run pytest -W error tests/python/gui/test_qt6_application_shell.py

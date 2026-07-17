@@ -826,26 +826,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             if self._first_show_refit_pending:
                 self._first_show_refit_pending = False
                 self._set_restored_splitter_sizes()
-                splitter_extent = self.results_nav_splitter.width()
-                screen = self.screen()
-                if self.isMaximized() and screen is not None:
-                    window_chrome_width = max(0, self.width() - splitter_extent)
-                    splitter_extent = min(
-                        splitter_extent,
-                        screen.availableGeometry().width() - window_chrome_width,
-                    )
-                splitter_extent = max(
-                    2, splitter_extent - self.results_nav_splitter.handleWidth()
-                )
-                proportion_total = sum(self._restored_splitter_proportions)
-                content_proportion = (
-                    self._restored_splitter_proportions[1] / proportion_total
-                )
-                self._viewport_width_override = max(
-                    1,
-                    int(splitter_extent * content_proportion)
-                    - (2 * self.graphics_view.frameWidth()),
-                )
+                self._viewport_width_override = self._layout_viewport_width()
             try:
                 self._refit_viewport_items()
             finally:
@@ -1210,7 +1191,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             # where to save the graphic?
             file_path, _selected_filter = QFileDialog.getSaveFileName(
                 self,
-                "RC MetaStudio -- save plot as",
+                "Save Plot As",
                 default_path,
             )
 
@@ -1225,7 +1206,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             default_path = ".".join([artifact.title.replace(" ", "_"), "png"])
             file_path, _selected_filter = QFileDialog.getSaveFileName(
                 self,
-                "RC MetaStudio -- save plot as",
+                "Save Plot As",
                 default_path,
             )
             if file_path != "":

@@ -193,10 +193,12 @@ class CovModel(QAbstractTableModel):
             return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         return None
 
-    def rowCount(self, index=QModelIndex()):
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        del parent
         return len(self.included_studies)  # don't show blank study!
 
-    def columnCount(self, index=QModelIndex()):
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        del parent
         return 3  # study, orig_val, new_val
 
     def setData(self, index, value, role=Qt.ItemDataRole.EditRole):

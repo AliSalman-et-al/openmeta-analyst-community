@@ -2,11 +2,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Main RC MetaStudio desktop window."""
 
+from __future__ import annotations
+
 import os
 from functools import cmp_to_key
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction, QKeySequence, QTextDocument, QUndoCommand
+from PyQt6.QtGui import QAction, QCloseEvent, QKeyEvent, QKeySequence, QResizeEvent, QTextDocument, QUndoCommand
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
@@ -16,6 +18,7 @@ from PyQt6.QtWidgets import (
     QTableView,
 )
 import copy
+from typing import cast
 
 ## hand-rolled modules
 import ui_meta
@@ -35,6 +38,7 @@ import project_adapter
 import project_format
 import tabular_data
 from settings import *
+from runtime_types import required
 
 # additional forms
 import add_new_dialogs
@@ -154,7 +158,9 @@ class ElidingStatusLabel(QLabel):
         )
         self.setText(text)
 
-    def setText(self, text):
+    def setText(  # ty: ignore[invalid-method-override] -- PyQt6's QLabel overload stubs conflict with this semantic text override.
+        self, text: str | None
+    ) -> None:
         text = qt_text.to_native_text(text)
         if "<" in text and ">" in text:
             document = QTextDocument()
@@ -169,7 +175,9 @@ class ElidingStatusLabel(QLabel):
 
         return self._full_text
 
-    def resizeEvent(self, event):
+    def resizeEvent(  # ty: ignore[invalid-method-override] -- PyQt6's QLabel and QWidget stubs conflict for this runtime-supported override.
+        self, event: QResizeEvent | None
+    ) -> None:
         super(ElidingStatusLabel, self).resizeEvent(event)
         self._refresh_elision()
 
@@ -208,6 +216,9 @@ class ImportProgress(QDialog, forms.ui_running.Ui_running):
 
 
 class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
+    model: ma_data_table_model.DatasetModel
+    tableView: ma_data_table_view.MADataTable
+
     def __init__(self, parent=None):
         # We follow the advice given by Mark Summerfield in his Python QT book:
         # Namely, we use multiple inheritance to gain access to the ui. We take
@@ -255,7 +266,6 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
         # Command-line dataset loading can be added here if headless startup
         # needs to open a project directly in the GUI.
-        self.model = None
         self.new_dataset()
 
         # flag maintaining whether the current dataset
@@ -284,7 +294,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         # we hand off a reference of the main gui to the table view
         # so that it can do things like pass suitable events 'up'
         # to the main form
-        self.tableView.main_gui = self
+        self.tableView.main_gui = cast(ma_data_table_view.MainGuiProtocol, self)
         self.tableView.synchronize_column_widths()
 
         self.out_path = None  # path to output file
@@ -314,7 +324,11 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             wizard_data = start_up_wizard.get_results()
             self._handle_wizard_results(wizard_data)
 
-    def closeEvent(self, event):
+    def closeEvent(  # ty: ignore[invalid-method-override] -- PyQt6's QMainWindow and QWidget stubs conflict for this runtime-supported override.
+        self, event: QCloseEvent | None
+    ) -> None:
+        if event is None:
+            return
         if not self._confirm_close():
             event.ignore()
             return
@@ -368,7 +382,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             "current_index": (current.row(), current.column()),
             "selection": [
                 (index.row(), index.column())
-                for index in self.tableView.selectionModel().selectedIndexes()
+                for index in required(self.tableView.selectionModel(), "workspace selection model").selectedIndexes()
             ],
         }
 
@@ -468,7 +482,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             )
 
         def restore_selection():
-            selection_model = self.tableView.selectionModel()
+            selection_model = required(self.tableView.selectionModel(), "workspace selection model")
             selection_model.clearSelection()
             for row, column in previous["selection"]:
                 selection_model.select(
@@ -561,9 +575,10 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     ):
 
         data_model = ma_dataset.Dataset(title=name, is_diag=is_diag)
-        if self.model is not None:
+        existing_model = getattr(self, "model", None)
+        if existing_model is not None:
             if use_undo_framework:
-                original_dataset = copy.deepcopy(self.model.dataset)
+                original_dataset = copy.deepcopy(existing_model.dataset)
                 old_state_dict = self.tableView.model().get_stateful_dict()
                 undo_f = lambda: self.set_model(original_dataset, old_state_dict)
                 redo_f = lambda: self.set_model(data_model)
@@ -626,7 +641,11 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def enable_menu_options_that_require_dataset(self):
         self.toggle_menu_options_that_require_dataset(True)
 
-    def keyPressEvent(self, event):
+    def keyPressEvent(  # ty: ignore[invalid-method-override] -- PyQt6's QMainWindow and QWidget stubs conflict for this runtime-supported override.
+        self, event: QKeyEvent | None
+    ) -> None:
+        if event is None:
+            return
         if event.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier:
             if event.key() == QtCore.Qt.Key.Key_S:
                 # ctrl + s = save
@@ -648,7 +667,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self._model_signal_connections = []
 
     def data_error(self, msg):
-        QMessageBox.warning(self.parent(), "Warning", msg)
+        QMessageBox.warning(self, "Warning", msg)
 
     def set_edit_focus(self, index):
         """sets edit focus to the row,col specified by index."""
@@ -1002,7 +1021,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
             # update the new state dict to reflect the currently selected
             # outcomes, etc.
-            outcome_model = edit_window.outcome_list.model()
+            outcome_model = edit_window.outcomes_model
             edited_outcomes = outcome_model.outcome_list
             if outcome_model.current_outcome is not None:
                 new_state_dict["current_outcome"] = outcome_model.current_outcome
@@ -1017,7 +1036,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             new_state_dict["current_time_point"] = max(
                 edit_window.follow_up_list.currentIndex().row(), 0
             )
-            grp_list = edit_window.group_list.model().group_list
+            grp_list = edit_window.groups_model.group_list
 
             if len(grp_list) >= 2:
                 new_state_dict["current_txs"] = grp_list[:2]
@@ -1125,8 +1144,10 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         data_type = self.tableView.model().get_current_outcome_type(get_str=False)
         if data_type in (meta_globals.BINARY, meta_globals.CONTINUOUS):
             # then there are sub-menus (one-group, two-group)
-            for sub_menu in self.menuMetric.actions():
-                sub_menu = sub_menu.menu()
+            for menu_action in self.menuMetric.actions():
+                sub_menu = menu_action.menu()
+                if sub_menu is None:
+                    continue
                 for action in sub_menu.actions():
                     action.blockSignals(True)
                     action.setChecked(False)
@@ -1953,10 +1974,12 @@ class CommandImportCSV(QUndoCommand):
         description="Import a CSV file",
     ):
         super(CommandImportCSV, self).__init__(description)
+        if main_form is None:
+            raise ValueError("CSV import requires a main form")
         self.imported_data = _normalize_imported_csv_rows(imported_data or [])
-        self.covariate_names = covariate_names
-        self.covariate_types = covariate_types
-        self.main_form = main_form
+        self.covariate_names = list(covariate_names or [])
+        self.covariate_types = list(covariate_types or [])
+        self.main_form: MetaForm = main_form
 
         # Undo / redo stuff
         self.original_dataset = original_dataset

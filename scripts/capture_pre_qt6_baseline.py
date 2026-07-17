@@ -111,7 +111,13 @@ def _run(root: Path, *args: str) -> str:
 
 def _tracked(root: Path, *patterns: str) -> list[str]:
     output = _run(root, "git", "ls-files", "--", *patterns)
-    return sorted(line.replace("\\", "/") for line in output.splitlines() if line)
+    return sorted(
+        relative
+        for line in output.splitlines()
+        if line
+        for relative in (line.replace("\\", "/"),)
+        if (root / relative).is_file()
+    )
 
 
 def _tracked_at(root: Path, commit: str, *patterns: str) -> list[str]:

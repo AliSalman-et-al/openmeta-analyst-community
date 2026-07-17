@@ -100,6 +100,7 @@ def install_stub_meta_py_r():
     meta_py_r.get_available_methods = _analysis_unavailable
     meta_py_r.get_params = _analysis_unavailable
     meta_py_r.get_method_description = _analysis_unavailable
+    meta_py_r.get_analysis_plot_capabilities = lambda *args, **kwargs: []
     meta_py_r.run_binary_ma = _analysis_unavailable
     meta_py_r.run_continuous_ma = _analysis_unavailable
     meta_py_r.run_diagnostic_multi = _analysis_unavailable

@@ -208,14 +208,15 @@ class DatasetModel(QAbstractTableModel):
 
     headers = ["include", "study name", "year"]
 
-    def __init__(self, filename="", dataset=None, add_blank_study=True):
+    dataset: Dataset
+
+    def __init__(self, filename="", dataset: Dataset | None = None, add_blank_study=True):
         super(DatasetModel, self).__init__()
 
         self.conf_level = self.set_conf_level(DEFAULT_CONF_LEVEL)
 
-        self.dataset = dataset
-        if dataset is None:
-            self.dataset = Dataset()
+        self.dataset = dataset if dataset is not None else Dataset()
+        self.analysis_source_path: str | None = None
 
         if add_blank_study:
             # include an extra blank study to begin with
@@ -495,7 +496,11 @@ class DatasetModel(QAbstractTableModel):
                         return _item_data("")
                 else:
                     return _item_data("")
-            elif column in self.OUTCOMES:
+            elif (
+                self.current_outcome is not None
+                and self.get_current_follow_up_name() is not None
+                and column in self.OUTCOMES
+            ):
                 # more precision in edit moe -- issue #151
                 if role == Qt.ItemDataRole.EditRole:
                     # then we're editing, so show greater precision
@@ -521,6 +526,8 @@ class DatasetModel(QAbstractTableModel):
                                 x, eff, convert_to="display.scale"
                             )
                         )
+                    else:
+                        raise ValueError(f"Unsupported outcome type: {current_data_type!r}")
 
                     if (
                         current_data_type == CONTINUOUS
@@ -655,6 +662,8 @@ class DatasetModel(QAbstractTableModel):
 
         # Event counts cannot exceed the matching group sample sizes.
         msg = "Number of events cannot be greater than number of samples."
+        if index_of_s is None:
+            raise ValueError("Raw-data validation requires a model index")
         (row, col) = (index_of_s.row(), index_of_s.column())
         if data_type == BINARY:
             if col in [3, 5]:  # col is TxA or TxB
@@ -702,6 +711,7 @@ class DatasetModel(QAbstractTableModel):
             x, self.current_effect, convert_to="display.scale"
         )
 
+        prev_est, prev_lower, prev_upper = None, None, None
         if data_type in [BINARY, CONTINUOUS]:
             prev_est, prev_lower, prev_upper = ma_unit.get_effect_and_ci(
                 self.current_effect, group_str, self.get_mult()
@@ -781,6 +791,7 @@ class DatasetModel(QAbstractTableModel):
                 return calc_fncs.between_bounds(est=est, low=low, high=high)
 
             good_result = None
+            msg = ""
             if val_str == "est":
                 (good_result, msg) = is_between_bounds(est=float(s))
             elif val_str == "lower":
@@ -974,6 +985,7 @@ class DatasetModel(QAbstractTableModel):
 
             row = index.row()
 
+            converted_ok = False
             if qt_text.is_blank(value):
                 delete_value = True
                 display_scale_val = None
@@ -1568,13 +1580,13 @@ class DatasetModel(QAbstractTableModel):
             )
         return Qt.ItemFlag(QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsEditable)
 
-    def rowCount(self, index=QModelIndex()):
-        if index.isValid():
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        if parent.isValid():
             return 0
         return self.dataset.num_studies() + DUMMY_ROWS
 
-    def columnCount(self, index=QModelIndex()):
-        if index.isValid():
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        if parent.isValid():
             return 0
         return self._get_col_count()
 
@@ -2152,6 +2164,7 @@ class DatasetModel(QAbstractTableModel):
             self.current_effect in BINARY_ONE_ARM_METRICS + CONTINUOUS_ONE_ARM_METRICS
         )
         ma_unit = self.get_current_ma_unit_for_study(study_index)
+        n1 = None
 
         ####
         # previously we were always setting this to false here,
@@ -2461,12 +2474,17 @@ class DatasetModel(QAbstractTableModel):
 
         """
 
-        if None not in [study, study_index]:
+        if study is not None and study_index is not None:
             if study != self.dataset.studies[study_index]:
                 raise ValueError("study and study index don't match")
 
         if study is None:  # you can specify a study OR a study index
+            if study_index is None:
+                raise ValueError("study or study_index must be specified")
             study = self.dataset.studies[study_index]
+
+        if outcome is None or follow_up is None:
+            raise ValueError("outcome and follow_up must be specified")
 
         # first check to see that the current outcome is contained in this study
         if not outcome in study.outcomes_to_follow_ups:
@@ -2488,8 +2506,8 @@ class DatasetModel(QAbstractTableModel):
             )
 
         # finally, make sure the studies contain the currently selected tx groups; if not, add them
+        ma_unit = study.outcomes_to_follow_ups[outcome][follow_up]
         if tx_groups is not None:
-            ma_unit = study.outcomes_to_follow_ups[outcome][follow_up]
             for tx_group in tx_groups:
                 if not tx_group in ma_unit.get_group_names():
                     ma_unit.add_group(tx_group)
@@ -2526,7 +2544,7 @@ class DatasetModel(QAbstractTableModel):
             if current_data_type in [BINARY, CONTINUOUS]:
                 if current_data_type == BINARY:
                     convert_to_display_scale = binary_display_scale
-                elif current_data_type == CONTINUOUS:
+                else:
                     convert_to_display_scale = continuous_display_scale
                 x.calculate_display_effect_and_ci(
                     effect,

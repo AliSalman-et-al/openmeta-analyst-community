@@ -495,9 +495,7 @@ def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
         def get_outcome_type(self, _outcome, get_str=False):
             return "binary"
 
-    network_view.meta_py_r.ma_dataset_to_simple_network = (  # ty: ignore[invalid-assignment] -- controlled native smoke backend
-        lambda **_kwargs: str(network_image)
-    )
+    setattr(network_view.meta_py_r, "ma_dataset_to_simple_network", lambda **_kwargs: str(network_image))
     network = network_view.ViewDialog(Model())
     results_image = evidence_root / ("results-%s.png" % slug)
     network_capture = evidence_root / ("network-%s.png" % slug)

@@ -425,7 +425,7 @@ def _surface_factories():
         def __init__(self, _dataset, _covariate):
             super().__init__(2, 3)
 
-    change_cov_type_form.CovModel = PreviewModel  # ty: ignore[invalid-assignment]
+    setattr(change_cov_type_form, "CovModel", PreviewModel)
     return {
         "about-legal": about_legal_dialog.AboutLegalDialog,
         "change-covariate-type": lambda: change_cov_type_form.ChangeCovTypeForm(object(), object()),

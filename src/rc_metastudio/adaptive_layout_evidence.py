@@ -15,6 +15,8 @@ from pathlib import Path
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 
+import adaptive_window
+
 
 EVIDENCE_SCHEMA_VERSION = 2
 CONSTRAINED_WORKSPACE = QtCore.QSize(800, 600)
@@ -464,7 +466,10 @@ def _pixmap_has_pixel_variation(pixmap):
 def _exercise_main_workspace(window):
     if window.tableView.viewport().width() < 1 or window.tableView.viewport().height() < 1:
         raise RuntimeError("Main Workspace table viewport is not reachable.")
-    if window.windowIcon().isNull() and QtWidgets.QApplication.instance().windowIcon().isNull():
+    application = QtWidgets.QApplication.instance()
+    if not isinstance(application, QtWidgets.QApplication):
+        raise RuntimeError("Native package evidence requires QApplication")
+    if window.windowIcon().isNull() and application.windowIcon().isNull():
         raise RuntimeError("Native package evidence did not load the application icon.")
 
 

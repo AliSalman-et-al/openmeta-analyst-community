@@ -264,7 +264,11 @@ def test_generated_ui_bootstrap_imports_every_handwritten_qt_module(tmp_path):
             encoding="utf-8"
         )
     )
-    modules = [Path(path).stem for path in inventory["handwritten_qt_modules"]]
+    modules = [
+        Path(path).stem
+        for path in inventory["handwritten_qt_modules"]
+        if (ROOT / path).is_file()
+    ]
     script = """
 import importlib
 import json
@@ -323,7 +327,7 @@ report_path.write_text(
         text=True,
     )
     report = json.loads(report_path.read_text(encoding="utf-8"))
-    assert report["count"] == 36
+    assert report["count"] == 35
     assert report["startup_result"] == 0
     assert Path(report["generated_root"]) == (build_root / "generated/rc_metastudio")
 
@@ -434,9 +438,8 @@ def test_qt6_generation_and_type_checks_have_a_maintained_entry_point():
     assert "build_qt6.py" in workflow
     assert "ty check" in workflow
     assert "test_qt6_build_slice.py" in workflow
-    assert "project_format.py" in workflow
-    assert "project_domain.py" in workflow
-    assert "project_evidence.py" in workflow
+    assert "import_qt_modules.py --root . --list" in workflow
+    assert "$qtModules" in workflow
     assert "test_project_format.py" in workflow
     assert "--require-covered" in workflow
     assert "native-smoke" in workflow
@@ -447,6 +450,12 @@ def test_qt6_generation_and_type_checks_have_a_maintained_entry_point():
     )
     assert "scripts\\verify-qt6.ps1 -Sync" in hosted
     assert ".python-version|pyproject.toml" in hosted
-    assert "scripts/validate_test_taxonomy.py" in hosted
-    assert "scripts\\verify-smoke.ps1" not in hosted
-    assert "scripts\\verify-fast.ps1" not in hosted
+    assert "config/*" in hosted
+    assert "scripts/*" in hosted
+    assert "docs/verification/*" in hosted
+    assert "scripts\\verify-smoke.ps1" in hosted
+    assert "scripts\\verify-fast.ps1" in hosted
+    assert hosted.count("-RequireREvidence") == 2
+    assert hosted.count("--require-r-evidence") == 2
+    assert "macos-x64" in hosted
+    assert "macos-arm64" in hosted

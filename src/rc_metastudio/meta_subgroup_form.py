@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QMessageBox
 
-import forms.ui_cov_subgroup_dlg  # ty: ignore[unresolved-import]
+import forms.ui_cov_subgroup_dlg
 import adaptive_controls
 import adaptive_window
 import app_error_handler

@@ -2,9 +2,9 @@ import os
 import inspect
 import sys
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone
 
-from PyQt6.QtCore import QEvent, Qt
+from PyQt6.QtCore import QEvent, QObject, Qt
 from PyQt6.QtWidgets import QApplication, QMenu, QMessageBox
 
 import settings
@@ -39,7 +39,7 @@ def exception_log_path():
 
 def log_exception(exc_type, exc_value, exc_traceback):
     path = exception_log_path()
-    timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     with open(path, "a", encoding="utf-8") as log_file:
         log_file.write("\n[%s] Unhandled exception\n" % timestamp)
         traceback.print_exception(exc_type, exc_value, exc_traceback, file=log_file)
@@ -231,9 +231,11 @@ def _resolve_parent(parent):
 
 
 class SafeApplication(QApplication):
-    def notify(self, receiver, event):
+    def notify(  # ty: ignore[invalid-method-override] -- PyQt6 exposes conflicting QApplication notify stubs across QtCore and QtWidgets.
+        self, receiver: QObject | None, event: QEvent | None
+    ) -> bool:
         try:
-            if should_suppress_context_menu_event(event):
+            if event is not None and should_suppress_context_menu_event(event):
                 event.accept()
                 return True
             return super(SafeApplication, self).notify(receiver, event)

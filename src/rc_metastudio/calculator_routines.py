@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import QMessageBox, QSizePolicy, QStyle
 from meta_globals import *
 from rc_metastudio import meta_py_r
 import qt_text
+from runtime_types import required
 
 
 _EFFECT_CI_BASE_MINIMUM_WIDTHS = WeakKeyDictionary()
@@ -131,8 +132,8 @@ class ConsistencyChecker:
         assert not table_2x2 is None, "No table argument passed."
 
         self.inconsistent = False
-        self.inconsistent_action = fn_inconsistent
-        self.consistent_action = fn_consistent
+        self.inconsistent_action = required(fn_inconsistent, "inconsistency callback")
+        self.consistent_action = required(fn_consistent, "consistency callback")
         self.table = table_2x2
 
     def run(self):
@@ -459,15 +460,15 @@ class CommandFieldChanged(QUndoCommand):
         if self.just_created:
             self.just_created = False
             if self.refresh_on_initial_redo:
-                self.parent.enable_back_calculation_btn()
+                required(self.parent, "calculator command owner").enable_back_calculation_btn()
         else:
             print("Restoring new ma_unit")
-            self.restore_new_f()
+            required(self.restore_new_f, "calculator redo callback")()
             # self.parent.enable_back_calculation_btn() ##
 
     def undo(self):
         print("Restoring old ma_unit")
-        self.restore_old_f()
+        required(self.restore_old_f, "calculator undo callback")()
         # self.parent.enable_back_calculation_btn() ##
 
 
@@ -545,6 +546,8 @@ def evaluate(
         QMessageBox.warning(parent, "Warning", "Must be numeric!")
         raise Exception("error")
     if not opt_cmp_fn:  # est, lower, upper
+        if ci_param is None:
+            raise ValueError("ci_param is required for confidence-bound validation")
         (good_result, msg) = is_between_bounds(**{ci_param: new_text})
         if not good_result:
             QMessageBox.warning(parent, "Warning", msg)

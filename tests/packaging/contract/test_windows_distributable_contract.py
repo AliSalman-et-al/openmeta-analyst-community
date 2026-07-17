@@ -184,7 +184,7 @@ def test_windows_distributable_contract_is_declared():
         in script["text"]
     )
     assert 'if (-not $entryName.StartsWith("$ArchiveRootName\\"))' in script["text"]
-    assert "$ArchiveRootName\\_internal\\PyQt5\\" in script["text"]
+    assert "$ArchiveRootName\\_internal\\PyQt6\\" in script["text"]
 
 
 def test_windows_r_cache_reinstalls_local_packages_after_cache_restore():
@@ -242,54 +242,52 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
 
     assert {
         "change-classifier",
-        "smoke-verification",
-        "fast-verification",
+        "qt6-verification",
+        "source-fast-targets",
         "fast-verification-gate",
     } <= workflow["jobs"]
-    assert workflow["needs"]["smoke-verification"] == {"change-classifier"}
-    assert workflow["needs"]["fast-verification"] == {
-        "change-classifier",
-        "smoke-verification",
-    }
+    assert workflow["needs"]["source-fast-targets"] == {"change-classifier"}
     assert workflow["needs"]["fast-verification-gate"] == {
         "change-classifier",
-        "smoke-verification",
-        "fast-verification",
+        "qt6-verification",
+        "source-fast-targets",
     }
-    assert workflow["env"]["RCMS_CRAN_REPO"] == "https://cloud.r-project.org"
     assert workflow["events"] == {"workflow_dispatch", "push", "pull_request"}
     assert workflow["legacy_uses"] == []
     assert all(re.fullmatch(r"[0-9a-f]{40}", ref) for _, ref, _ in workflow["uses"])
     assert "src/*" in workflow["text"]
     assert "tests/*" in workflow["text"]
-    assert "docs/verification/RCMetaR-r-dependencies.json" in workflow["text"]
-    assert "docs/verification/test-taxonomy.json" in workflow["text"]
-    assert ".\\scripts\\verify-smoke.ps1 -Sync -RequireREvidence" in workflow["runs"]
     assert (
-        ".\\scripts\\verify-fast.ps1 -Sync -RequireREvidence -StrictTaxonomy"
-        in workflow["runs"]
+        ".github/workflows/*|.python-version|pyproject.toml|uv.lock|config/*|"
+        "docs/verification/*|r/*|scripts/*|src/*|tests/*"
+        in workflow["text"]
     )
-    assert workflow["restore_keys"] == []
-    assert workflow["cache_paths"] == {"artifacts\\r-default-library-cache"}
-    assert all(
-        key.startswith("default-r-evidence-library-v2-windows-")
-        for key in workflow["cache_keys"]
-    )
-    assert all(
-        "scripts/verify_rcmetar_r_default.py" in key for key in workflow["cache_keys"]
-    )
-    assert all(
-        "steps.r-cache-key.outputs.version" in key for key in workflow["cache_keys"]
-    )
-    assert "Fast Verification Change Classifier" in workflow["text"]
-    assert "Fast Verification Gate" in workflow["text"]
+    for critical_input in (
+        "config/qt6-ty-ignore-allowlist.json",
+        "scripts/import_qt_modules.py",
+        "src/rc_metastudio/qt6_cutover.py",
+    ):
+        top_level = critical_input.split("/", 1)[0]
+        assert f"{top_level}/*" in workflow["text"]
+    assert workflow["text"].count(
+        "needs.change-classifier.outputs.run-windows == 'true'"
+    ) == 2
+    assert "docs/verification/*" in workflow["text"]
+    assert ".\\scripts\\verify-smoke.ps1 -Sync" in workflow["text"]
+    assert ".\\scripts\\verify-fast.ps1 -StrictTaxonomy" in workflow["text"]
+    assert "bash ./scripts/verify-smoke.sh --sync" in workflow["text"]
+    assert "bash ./scripts/verify-fast.sh --strict-taxonomy" in workflow["text"]
+    for target in ("windows-x64", "macos-x64", "macos-arm64"):
+        assert target in workflow["text"]
+    assert "Qt6 Verification Change Classifier" in workflow["text"]
+    assert "Qt6 Integration Verification Gate" in workflow["text"]
     assert "pull-requests: read" in workflow["text"]
     assert "gh api --paginate" in workflow["text"]
     assert "branches:" in workflow["text"]
     assert "- master" in workflow["text"]
     assert 'if [ "$EVENT_NAME" = "push" ]; then' in workflow["text"]
     assert (
-        "No fast verification inputs changed; Windows lanes intentionally skipped."
+        "No Qt6 verification inputs changed; Windows lane intentionally skipped."
         in workflow["text"]
     )
     assert "timeout-minutes: 20" in workflow["text"]
@@ -497,6 +495,23 @@ def test_local_macos_package_script_uses_shared_build_script():
         'build_args+=(--archive-root-name "$archive_root_name")',
         'bash "$repo_root/scripts/build-macos-package.sh"',
     )
+
+
+def test_shared_package_verifier_names_only_existing_qt6_test_paths():
+    import importlib.util
+
+    path = ROOT / "scripts" / "verify_package_release.py"
+    spec = importlib.util.spec_from_file_location("verify_package_release", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    assert module.PACKAGE_TEST_PATHS
+    assert all((ROOT / test_path).exists() for test_path in module.PACKAGE_TEST_PATHS)
+    assert all("pyqt5" not in test_path.lower() for test_path in module.PACKAGE_TEST_PATHS)
+    source = path.read_text(encoding="utf-8")
+    assert '"scripts/build_qt6.py"' in source
+    assert 'os.environ["RCMS_QT6_BUILD_ROOT"]' in source
 
 
 def test_shared_r_dependency_installer_is_used_by_packagers():

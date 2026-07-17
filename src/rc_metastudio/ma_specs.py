@@ -23,7 +23,7 @@ import copy
 import hashlib
 import os
 
-import forms.ui_ma_specs  # ty: ignore[unresolved-import]
+import forms.ui_ma_specs
 import adaptive_controls
 import adaptive_window
 import analysis_adapter
@@ -222,7 +222,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         apply_default_forest_arm_labels(self)
         if _text_value(self.image_path) == "":
             self.image_path.setText(analysis_output_path("forest.png"))
-        self.current_param_vals = external_params or {}
+        self.current_param_vals: dict[str, object] = dict(external_params or {})
         self.meta_f_str = meta_f_str
         self.is_meta_regression = meta_f_str == "meta-regression"
         self.model = model
@@ -264,10 +264,11 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             self.setup_fields_for_one_arm()
 
         self.current_widgets = []
-        self.current_method = None
-        self.current_params = None
-        self.current_defaults = None
-        self.var_order = None
+        self.current_method = ""
+        self.current_params: dict[str, object] = {}
+        self.current_defaults: dict[str, object] = {}
+        self.param_d: dict[str, object] = {}
+        self.var_order: list[str] | None = None
 
         ####
         # the following are variables for the case of diagnostic
@@ -288,7 +289,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         # details have already been acquired (i.e,. those in
         # the above dictionary) are not included in the diag_metrics
         # list -- we do not explicitly check for this here.
-        self.diag_metrics = diag_metrics
+        self.diag_metrics: tuple[str, ...] = tuple(diag_metrics or ())
         self._combined_diagnostic = False
         self._shared_diagnostic_param_specs = {
             "conf.level": ("float", self.conf_level, None),
@@ -327,9 +328,10 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                 if root_layout is None:
                     return hint
                 margins = root_layout.contentsMargins()
-                scrollbar_width = (
-                    self.content_scroll_area.verticalScrollBar().sizeHint().width()
-                )
+                scrollbar = self.content_scroll_area.verticalScrollBar()
+                if scrollbar is None:
+                    return hint
+                scrollbar_width = scrollbar.sizeHint().width()
                 hint.setWidth(
                     max(
                         hint.width(),
@@ -720,6 +722,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
     def analysis_requests(self):
         """Return typed requests represented by the current user configuration."""
         add_plot_params(self)
+        workflow = self.meta_f_str or "standard"
         if self.data_type != "diagnostic":
             metric = str(self.model.current_effect)
             self.current_param_vals["measure"] = metric
@@ -727,7 +730,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             return (
                 analysis_adapter.make_analysis_request(
                     data_type=self.data_type,
-                    workflow=self.meta_f_str,
+                    workflow=workflow,
                     method=self.current_method,
                     metric=metric,
                     parameters=parameters,
@@ -739,7 +742,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         return tuple(
             analysis_adapter.make_analysis_request(
                 data_type=self.data_type,
-                workflow=self.meta_f_str,
+                workflow=workflow,
                 method=method,
                 metric=str(parameters["measure"]),
                 parameters=parameters,
@@ -766,15 +769,18 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.show_4.setEnabled(False)
 
     def method_changed(self):
-        if self.parameter_grp_box.layout() is not None:
+        parameter_layout = self.parameter_grp_box.layout()
+        if parameter_layout is not None:
             print(
                 (
                     "Layout items count before: %d"
-                    % self.parameter_grp_box.layout().count()
+                    % parameter_layout.count()
                 )
             )
         self.clear_param_ui()
         self.current_widgets = []
+        if self.available_method_d is None:
+            raise RuntimeError("Analysis methods have not been initialized")
         self.current_method = self.available_method_d[
             str(self.method_cbo_box.currentText())
         ]
@@ -912,9 +918,10 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             )
 
     def clear_param_ui(self):
+        parameter_layout = self.parameter_grp_box.layout()
         for widget in self.current_widgets:
-            if self.parameter_grp_box.layout() is not None:
-                self.parameter_grp_box.layout().removeWidget(widget)
+            if parameter_layout is not None:
+                parameter_layout.removeWidget(widget)
             widget.setParent(None)
             widget.deleteLater()
             widget = None
@@ -1161,7 +1168,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                 else (
                     validate_analysis_count(name, self.current_defaults[name])
                     if _is_count_analysis_param(name)
-                    else int(self.current_defaults[name])
+                    else _coerce_integer_default(name, self.current_defaults[name])
                 )
             )
             iinput.setValue(value)
@@ -1328,6 +1335,8 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
     def _rebuild_shared_diagnostic_params(self):
         layout = self.shared_diagnostic_params_box.layout()
+        if not isinstance(layout, QGridLayout):
+            raise RuntimeError("Shared diagnostic parameters require a grid layout")
         for widget in self._shared_diagnostic_widgets:
             layout.removeWidget(widget)
             widget.deleteLater()
@@ -1583,6 +1592,13 @@ def _is_count_analysis_param(name):
     return name in (
         ANALYSIS_POSITIVE_INTEGER_PARAMS | ANALYSIS_NON_NEGATIVE_INTEGER_PARAMS
     )
+
+
+def _coerce_integer_default(name: str, value: object) -> int:
+    """Convert a persisted integer default after validating its concrete type."""
+    if not isinstance(value, (str, bytes, bytearray, int, float)):
+        raise TypeError(f"Invalid integer default for {name}: {value!r}")
+    return int(value)
 
 
 def _is_integer_analysis_param(name):
@@ -1925,7 +1941,7 @@ def _writeout_test_data(meta_f_str, method, params, results, diag=False):
 
 ####
 # simple progress bar
-import forms.ui_running  # ty: ignore[unresolved-import]
+import forms.ui_running
 
 
 class MetaProgress(QDialog, forms.ui_running.Ui_running):

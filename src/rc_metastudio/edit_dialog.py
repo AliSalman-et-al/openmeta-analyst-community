@@ -14,6 +14,9 @@
 
 # import pdb
 
+from typing import Protocol, cast
+
+from PyQt6.QtGui import QShowEvent
 from PyQt6.QtWidgets import QDialog, QMessageBox
 
 import forms.ui_edit_dialog
@@ -31,13 +34,17 @@ from settings import (
 )
 
 
+class EditDialogOwner(Protocol):
+    model: ma_data_table_model.DatasetModel
+
+
 class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
     def __init__(self, dataset, parent=None):
         super(EditDialog, self).__init__(parent)
         self.setupUi(self)
         self._configure_icon_actions()
         self.setModal(True)
-        adaptive_window.register_adaptive_window(
+        self._adaptive_window_controller = adaptive_window.register_adaptive_window(
             self, adaptive_window.WindowRole.EDIT_DATASET
         )
         restored_state = restore_edit_dataset_window_state(self)
@@ -48,17 +55,20 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         self.dataset_structure_splitter.setStretchFactor(2, 1)
 
         ### outcomes
+        if parent is None:
+            raise RuntimeError("EditDialog requires its owning MetaForm")
+        owner = cast(EditDialogOwner, parent)
         self.outcomes_model = edit_list_models.OutcomesModel(dataset=dataset)
         self.outcome_list.setModel(self.outcomes_model)
         try:
             index_of_outcome_to_select = self.outcomes_model.outcome_list.index(
-                parent.model.current_outcome
+                owner.model.current_outcome
             )
             outcome_index = self.outcomes_model.createIndex(
                 index_of_outcome_to_select, 0
             )
             self.outcome_list.setCurrentIndex(outcome_index)
-            self.selected_outcome = parent.model.current_outcome
+            self.selected_outcome = owner.model.current_outcome
             self.remove_outcome_btn.setEnabled(True)
         except:
             # no outcomes.
@@ -72,7 +82,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         )
         self.follow_up_list.setModel(self.follow_ups_model)
         if self.selected_outcome is not None:
-            self.selected_follow_up = parent.model.get_current_follow_up_name()
+            self.selected_follow_up = owner.model.get_current_follow_up_name()
             index_of_follow_up_to_select = self.follow_ups_model.follow_up_list.index(
                 self.selected_follow_up
             )
@@ -128,7 +138,11 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
             "remove",
         )
 
-    def showEvent(self, event):
+    def showEvent(  # ty: ignore[invalid-method-override] -- verified PyQt6 generated-form MRO stub conflict; runtime QDialog accepts QShowEvent
+        self, event: QShowEvent | None
+    ) -> None:
+        if event is None:
+            return
         super(EditDialog, self).showEvent(event)
         if self._pending_restored_frame_geometry is not None:
             self._adaptive_window_controller.restore_frame_geometry(
@@ -151,9 +165,9 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         )
         self._pending_splitter_proportions = None
 
-    def done(self, result):
+    def done(self, a0: int) -> None:
         save_edit_dataset_window_state(self)
-        super(EditDialog, self).done(result)
+        super(EditDialog, self).done(a0)
 
     def _setup_connections(self):
         for model in [
@@ -234,26 +248,26 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         if form.exec():
             try:
                 new_group_name = ma_data_table_model.validate_new_group_name(
-                    self.group_list.model().dataset, form.group_name_le.text()
+                    self.groups_model.dataset, form.group_name_le.text()
                 )
             except ValueError as exc:
                 QMessageBox.warning(self, "Warning", str(exc))
                 return
-            self.group_list.model().dataset.add_group(
+            self.groups_model.dataset.add_group(
                 new_group_name, self.selected_outcome
             )
-            self.group_list.model().refresh_group_list(
+            self.groups_model.refresh_group_list(
                 self.selected_outcome, self.selected_follow_up
             )
 
     def remove_group(self):
         index = self.group_list.currentIndex()
-        selected_group = self.group_list.model().group_list[index.row()]
-        self.group_list.model().dataset.delete_group(selected_group)
-        self.group_list.model().refresh_group_list(
+        selected_group = self.groups_model.group_list[index.row()]
+        self.groups_model.dataset.delete_group(selected_group)
+        self.groups_model.refresh_group_list(
             self.selected_outcome, self.selected_follow_up
         )
-        self.group_list.model().reset_model()
+        self.groups_model.reset_model()
 
     def group_selected(self, index):
         self.disable_remove_buttons()
@@ -268,7 +282,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
             # display it
             try:
                 new_outcome_name = ma_data_table_model.validate_new_outcome_name(
-                    self.outcome_list.model().dataset, form.outcome_name_le.text()
+                    self.outcomes_model.dataset, form.outcome_name_le.text()
                 )
             except ValueError as exc:
                 QMessageBox.warning(self, "Warning", str(exc))
@@ -277,55 +291,55 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
             # unicode encoding
             data_type = str(form.datatype_cbo_box.currentText())
             data_type = meta_globals.STR_TO_TYPE_DICT[data_type.lower()]
-            self.outcome_list.model().dataset.add_outcome(
+            self.outcomes_model.dataset.add_outcome(
                 ma_dataset.Outcome(new_outcome_name, data_type)
             )
 
-            self.outcome_list.model().refresh_outcome_list()
-            self.outcome_list.model().current_outcome = new_outcome_name
+            self.outcomes_model.refresh_outcome_list()
+            self.outcomes_model.current_outcome = new_outcome_name
 
     def get_selected_outcome(self):
         index = self.outcome_list.currentIndex()
-        if index.row() < 0 or index.row() > len(self.outcome_list.model().outcome_list):
+        if index.row() < 0 or index.row() > len(self.outcomes_model.outcome_list):
             return None
-        return self.outcome_list.model().outcome_list[index.row()]
+        return self.outcomes_model.outcome_list[index.row()]
 
     def get_selected_covariate(self):
         index = self.covariate_list.currentIndex()
         if index.row() < 0:
             return None
-        return self.covariate_list.model().covariates_list[index.row()]
+        return self.covariates_model.covariates_list[index.row()]
 
     def remove_outcome(self):
         self.selected_outcome = self.get_selected_outcome()
-        self.outcome_list.model().dataset.remove_outcome(self.selected_outcome)
-        self.outcome_list.model().refresh_outcome_list()
-        self.outcome_list.model().reset_model()
+        self.outcomes_model.dataset.remove_outcome(self.selected_outcome)
+        self.outcomes_model.refresh_outcome_list()
+        self.outcomes_model.reset_model()
         # now update the selected outcome
         self.selected_outcome = self.get_selected_outcome()
         # update the follow-ups list as appropriate
         if self.selected_outcome is not None:
-            self.follow_up_list.model().current_outcome = self.selected_outcome
+            self.follow_ups_model.current_outcome = self.selected_outcome
             print("\ncurrent outcome updated. is now: %s" % self.selected_outcome)
-            self.follow_up_list.model().refresh_follow_up_list()
+            self.follow_ups_model.refresh_follow_up_list()
             self.selected_follow_up = self.get_selected_follow_up()
             ## also update the groups and follow-up lists
-            self.group_list.model().refresh_group_list(
+            self.groups_model.refresh_group_list(
                 self.selected_outcome, self.selected_follow_up
             )
         else:
             ## the assumption in this case is that all outcomes have been deleted
             # so we clear the follow up and group lists.
-            self.follow_up_list.model().follow_up_list = []
-            self.follow_up_list.model().reset_model()
-            self.group_list.model().group_list = []
-            self.group_list.model().reset_model()
+            self.follow_ups_model.follow_up_list = []
+            self.follow_ups_model.reset_model()
+            self.groups_model.group_list = []
+            self.groups_model.reset_model()
 
     def outcome_selected(self, index):
         self.selected_outcome = self.get_selected_outcome()
-        self.follow_up_list.model().current_outcome = self.selected_outcome
-        self.follow_up_list.model().refresh_follow_up_list()
-        self.group_list.model().refresh_group_list(
+        self.follow_ups_model.current_outcome = self.selected_outcome
+        self.follow_ups_model.refresh_follow_up_list()
+        self.groups_model.refresh_group_list(
             self.selected_outcome, self.selected_follow_up
         )
         ## update
@@ -338,28 +352,28 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         if form.exec():
             try:
                 follow_up_lbl = ma_data_table_model.validate_new_global_follow_up_name(
-                    self.follow_up_list.model().dataset,
+                    self.follow_ups_model.dataset,
                     form.follow_up_name_le.text(),
                 )
             except ValueError as exc:
                 QMessageBox.warning(self, "Warning", str(exc))
                 return
-            self.follow_up_list.model().dataset.add_follow_up(follow_up_lbl)
-            self.follow_up_list.model().current_outcome = self.selected_outcome
-            self.follow_up_list.model().refresh_follow_up_list()
+            self.follow_ups_model.dataset.add_follow_up(follow_up_lbl)
+            self.follow_ups_model.current_outcome = self.selected_outcome
+            self.follow_ups_model.refresh_follow_up_list()
 
     def get_selected_follow_up(self):
         index = self.follow_up_list.currentIndex()
         print("index is: %s" % index.row())
         print(
             "here is the current follow-up list: %s"
-            % self.follow_up_list.model().follow_up_list
+            % self.follow_ups_model.follow_up_list
         )
-        return self.follow_up_list.model().follow_up_list[index.row()]
+        return self.follow_ups_model.follow_up_list[index.row()]
 
     def get_selected_study(self):
         index = self.study_list.currentIndex().row()
-        return self.study_list.model().dataset.studies[index]
+        return self.studies_model.dataset.studies[index]
 
     def study_selected(self):
         self.remove_study_btn.setEnabled(True)
@@ -373,26 +387,26 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         if form.exec():
             try:
                 new_covariate_name = ma_data_table_model.validate_new_covariate_name(
-                    self.covariate_list.model().dataset, form.covariate_name_le.text()
+                    self.covariates_model.dataset, form.covariate_name_le.text()
                 )
             except ValueError as exc:
                 QMessageBox.warning(self, "Warning", str(exc))
                 return
             new_covariate_type = str(form.datatype_cbo_box.currentText())
             cov_obj = ma_dataset.Covariate(new_covariate_name, new_covariate_type)
-            self.covariate_list.model().dataset.add_covariate(cov_obj)
-            self.covariate_list.model().update_covariates_list()
+            self.covariates_model.dataset.add_covariate(cov_obj)
+            self.covariates_model.update_covariates_list()
 
     def remove_covariate(self):
         cov_obj = self.get_selected_covariate()
-        self.covariate_list.model().dataset.remove_covariate(cov_obj)
-        self.covariate_list.model().update_covariates_list()
+        self.covariates_model.dataset.remove_covariate(cov_obj)
+        self.covariates_model.update_covariates_list()
 
     def remove_follow_up(self):
         self.selected_follow_up = self.get_selected_follow_up()
-        self.follow_up_list.model().dataset.remove_follow_up(self.selected_follow_up)
-        self.follow_up_list.model().current_outcome = self.selected_outcome
-        self.follow_up_list.model().refresh_follow_up_list()
+        self.follow_ups_model.dataset.remove_follow_up(self.selected_follow_up)
+        self.follow_ups_model.current_outcome = self.selected_outcome
+        self.follow_ups_model.refresh_follow_up_list()
 
     def follow_up_selected(self, index):
         self.disable_remove_buttons()
@@ -400,10 +414,10 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         # follow-ups for a given outcome, since this would be meaningless.
         # thus we check if there is only follow-up; if so, disable
         # (or rather, don't enable) the remove button
-        if len(self.follow_up_list.model().follow_up_list) > 1:
+        if len(self.follow_ups_model.follow_up_list) > 1:
             self.remove_follow_up_btn.setEnabled(True)
         self.selected_follow_up = self.get_selected_follow_up()
-        self.group_list.model().refresh_group_list(
+        self.groups_model.refresh_group_list(
             self.selected_outcome, self.selected_follow_up
         )
 
@@ -423,12 +437,12 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
             except ValueError as exc:
                 QMessageBox.warning(self, "Warning", str(exc))
                 return
-            study_id = self.study_list.model().dataset.max_study_id() + 1
+            study_id = self.studies_model.dataset.max_study_id() + 1
             new_study = ma_dataset.Study(study_id, name=study_name)
-            self.study_list.model().dataset.add_study(new_study)
-            self.study_list.model().update_study_list()
+            self.studies_model.dataset.add_study(new_study)
+            self.studies_model.update_study_list()
 
     def remove_study(self):
         study = self.get_selected_study()
-        self.study_list.model().dataset.studies.remove(study)
-        self.study_list.model().update_study_list()
+        self.studies_model.dataset.studies.remove(study)
+        self.studies_model.update_study_list()

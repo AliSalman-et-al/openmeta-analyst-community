@@ -38,7 +38,7 @@ def test_audit_rejects_unmanaged_content_geometry_and_legacy_helpers(
     )
     source = tmp_path / "src" / "rc_metastudio" / "bad.py"
     source.write_text(
-        """from PyQt5.QtGui import QFont
+        """from PyQt6.QtGui import QFont
 
 class Bad:
     def __init__(self):
@@ -105,7 +105,7 @@ widget.setStyleSheet(EXCEPTION_STYLE)
     aliased = nested.parent / "aliased_font.py"
     aliased.write_text(
         """def qt_font():
-    from PyQt5.QtGui import QFont as Font
+    from PyQt6.QtGui import QFont as Font
     if use_domain_font:
         Font = domain_font_factory
     return Font('Consolas', 12)
@@ -118,15 +118,15 @@ def locally_shadowed():
     return Font('Consolas', 12)
 
 def qtgui_alias():
-    import PyQt5.QtGui as Gui
+    import PyQt6.QtGui as Gui
     return Gui.QFont('Consolas', 12)
 
 def from_pyqt_alias():
-    from PyQt5 import QtGui as Gui
+    from PyQt6 import QtGui as Gui
     return Gui.QFont('Consolas', 12)
 
 def pyqt_alias():
-    import PyQt5 as Qt
+    import PyQt6 as Qt
     return Qt.QtGui.QFont('Consolas', 12)
 """,
         encoding="utf-8",
@@ -202,7 +202,7 @@ def test_audit_allows_qt_chrome_and_scroll_area_content_geometry(tmp_path, monke
     )
     source = tmp_path / "src" / "rc_metastudio" / "network_view.py"
     source.write_text(
-        """from PyQt5.QtGui import QFont, QFontDatabase
+        """from PyQt6.QtGui import QFont, QFontDatabase
 
 class Allowed:
     def __init__(self):

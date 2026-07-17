@@ -744,7 +744,9 @@ def get_sample_projects_path():
     if getattr(sys, "frozen", False):
         app_root = os.path.dirname(sys.executable)
     else:
-        app_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+        app_root = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), os.pardir, os.pardir)
+        )
     return os.path.join(app_root, "sample_projects")
 
 

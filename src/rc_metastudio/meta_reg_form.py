@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
 )
 
-import forms.ui_meta_reg  # ty: ignore[unresolved-import]
+import forms.ui_meta_reg
 import adaptive_window
 import app_error_handler
 from rc_metastudio import meta_py_r
@@ -20,7 +20,7 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
         super(MetaRegForm, self).__init__(parent)
         self.model = model
         self.setupUi(self)
-        self.covs_and_check_boxes = None
+        self.covs_and_check_boxes = []
         self._populate_chk_boxes()
         self._update_ok_button()
 
@@ -156,14 +156,6 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
         ok_button = self.buttonBox.button(QDialogButtonBox.StandardButton.Ok)
         if ok_button is not None:
             ok_button.setEnabled(bool(self._selected_covariates()))
-
-    def _populate_combo_box(self):
-        studies = self.model.get_studies(only_if_included=True)
-
-        for cov in self.model.dataset.covariates:
-            cov_vals = [study.covariate_dict[cov.name] for study in studies]
-            if not None in cov_vals:
-                self.cov_cbo_box.addItem(cov.name)
 
     def _populate_chk_boxes(self):
         self.covs_and_check_boxes = []

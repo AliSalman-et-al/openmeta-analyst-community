@@ -38,15 +38,10 @@ The shell smoke constructs the real `MetaForm`, exercises its menu surface,
 processes events, and verifies the owned window is deleted on close with Qt
 warnings fatal inside the controlled process.
 
-The historical Smoke Verification Lane, Fast Verification Lane, GUI suite,
-Default R Evidence, and packaging-contract aggregate remain preserved but are
-temporarily unavailable after the Qt6 Hard Cutover because their source and
-tests still import PyQt5. They are not mandatory CI paths during this interval.
-They return to the maintained path after the dependency-ordered source/test
-port is integrated and the zero-legacy gate in Issue #340 is green. Do not
-restore PyQt5 or introduce a binding selector to run them in the interim.
-
-The former commands remain documented here as unavailable integration targets:
+The Smoke Verification Lane, Fast Verification Lane, GUI suite, Default R
+Evidence, and packaging-contract aggregate are native PyQt6 verification paths.
+Source smoke and Fast Verification run on Windows x64, macOS Intel x64, and
+macOS ARM64 for Qt-affecting changes:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-smoke.ps1
@@ -112,8 +107,9 @@ Two mechanisms guard this class of bug; keep both working when touching table mo
 delegates:
 
 - `tests/python/gui/test_metaform_automation_launch.py::test_table_paint_roles_do_not_raise_across_all_cells`
-  sweeps every cell and header section against all paint roles in-process, turning a
-  paint-time abort into a clean test failure. Extend it when a model gains new roles.
+  sweeps every cell and header section against the maintained Qt6 paint roles
+  in-process, turning a paint-time abort into a clean test failure. Extend it when a
+  model gains new roles.
 - The packaged smoke test (`launch.start_automation_smoke` via `Invoke-PackagedAppSmokeTest`)
   calls `load_R_libraries` and forces a real paint pass (`_force_table_paint`) so both
   R-bridge and paint regressions fail the build gate with a non-zero exit instead of

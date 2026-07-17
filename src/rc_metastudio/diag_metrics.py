@@ -1,4 +1,4 @@
-from PyQt6.QtCore import QEvent
+from PyQt6.QtCore import QEvent, QObject
 from PyQt6.QtWidgets import QDialog, QMessageBox, QWidget
 
 import forms.ui_diagnostic_metrics
@@ -19,7 +19,7 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
             self, adaptive_window.WindowRole.TRANSACTIONAL
         )
         self.model = model
-        self.parent = parent
+        self.owner = parent
         self.external_params = external_params
         self.meta_f_str = meta_f_str
         self.btn_ok.pressed.connect(app_error_handler.safe_slot(self.ok, parent=self))
@@ -34,8 +34,15 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
         for widget in self.content_widget.findChildren(QWidget):
             widget.installEventFilter(self)
 
-    def eventFilter(self, watched, event):
-        if event.type() == QEvent.Type.FocusIn and self.content_widget.isAncestorOf(watched):
+    def eventFilter(  # ty: ignore[invalid-method-override] -- PyQt6's QDialog stub rejects this runtime-supported QObject override.
+        self, watched: QObject | None, event: QEvent | None
+    ) -> bool:
+        if (
+            isinstance(watched, QWidget)
+            and event is not None
+            and event.type() == QEvent.Type.FocusIn
+            and self.content_widget.isAncestorOf(watched)
+        ):
             self.content_scroll.ensureWidgetVisible(watched)
         return super(Diag_Metrics, self).eventFilter(watched, event)
 
@@ -58,7 +65,8 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
         # error-handling builder (the same path the binary/continuous case
         # uses). This keeps construction failures from propagating out of this
         # Qt slot and being silently swallowed by the event loop. See issue #53.
-        builder = getattr(self.parent, "_build_analysis_specs_dialog", None)
+        parent = self.parentWidget()
+        builder = getattr(parent, "_build_analysis_specs_dialog", None)
         if builder is not None:
             form = builder(
                 meta_f_str=self.meta_f_str,
@@ -69,7 +77,7 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
         else:
             form = ma_specs.MA_Specs(
                 self.model,
-                parent=self.parent,
+                parent=parent,
                 meta_f_str=self.meta_f_str,
                 external_params=self.external_params,
                 diag_metrics=selected_metrics,

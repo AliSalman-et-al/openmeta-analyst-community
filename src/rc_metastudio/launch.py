@@ -725,6 +725,8 @@ def _assert_standard_binary_summary_is_formatted(meta):
         conf_level=meta.model.get_global_conf_level(),
     )
     try:
+        if specs.available_method_d is None:
+            raise SystemExit("Packaged summary smoke test found no analysis methods.")
         if "binary.random" not in set(specs.available_method_d.values()):
             raise SystemExit(
                 "Packaged summary smoke test could not find binary.random."

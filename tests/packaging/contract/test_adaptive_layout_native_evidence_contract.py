@@ -9,7 +9,7 @@ import platform
 from pathlib import Path
 
 import pytest
-from PyQt5 import QtGui
+from PyQt6 import QtGui
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -118,7 +118,7 @@ def _write_validator_fixture(tmp_path, validator):
     screenshots.mkdir()
 
     def write_nonblank_png(path, size):
-        image = QtGui.QImage(size[0], size[1], QtGui.QImage.Format_ARGB32)
+        image = QtGui.QImage(size[0], size[1], QtGui.QImage.Format.Format_ARGB32)
         image.fill(QtGui.QColor("white"))
         painter = QtGui.QPainter(image)
         painter.fillRect(

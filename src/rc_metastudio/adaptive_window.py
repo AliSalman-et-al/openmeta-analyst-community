@@ -277,7 +277,11 @@ class AdaptiveWindowController(QObject):
             window.layout().setSizeConstraint(constraint)
         window.installEventFilter(self)
 
-    def eventFilter(self, watched, event):
+    def eventFilter(  # ty: ignore[invalid-method-override] -- PyQt6's QObject stub rejects this runtime-supported filter override.
+        self, watched: QObject | None, event: QEvent | None
+    ) -> bool:
+        if event is None:
+            return super().eventFilter(watched, event)
         if (
             watched is self.window
             and event.type() in (QEvent.Type.Move, QEvent.Type.Resize)

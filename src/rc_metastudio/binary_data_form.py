@@ -5,7 +5,7 @@
 import copy
 from functools import partial
 
-from PyQt6.QtCore import QEvent, QTimer, Qt
+from PyQt6.QtCore import QEvent, QObject, QTimer, Qt
 from PyQt6.QtGui import QAction, QBrush, QColor, QKeySequence, QPalette, QUndoStack
 from PyQt6.QtWidgets import (
     QDialog,
@@ -28,6 +28,7 @@ import forms.ui_binary_data_form
 import forms.ui_choose_back_calc_result_form
 import app_error_handler
 import adaptive_window
+from runtime_types import required
 
 # this is the maximum size of a residual that we're willing to accept
 # when computing 2x2 data
@@ -84,28 +85,33 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         self.enable_back_calculation_btn()
         self.raw_data_table.setCurrentCell(0, 0)
         self.raw_data_table.setFocus()
-        self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setDefault(True)
+        required(
+            self.buttonBox.button(QDialogButtonBox.StandardButton.Ok),
+            "binary calculator OK button",
+        ).setDefault(True)
         self._request_content_refit()
 
     def _configure_raw_data_table(self):
         table = self.raw_data_table
         table.setHorizontalHeaderLabels(["Event", "No Event", "Total"])
         table.setVerticalHeaderLabels(["Group 1", "Group 2", "Total"])
-        table.horizontalHeader().setVisible(True)
-        table.verticalHeader().setVisible(True)
-        table.horizontalHeader().setHighlightSections(False)
-        table.verticalHeader().setHighlightSections(False)
+        horizontal_header = required(table.horizontalHeader(), "binary table header")
+        vertical_header = required(table.verticalHeader(), "binary row header")
+        horizontal_header.setVisible(True)
+        vertical_header.setVisible(True)
+        horizontal_header.setHighlightSections(False)
+        vertical_header.setHighlightSections(False)
         table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         # layout-audit: allow=compact-table-overflow; reason=compact table keeps rows visible and owns excess overflow
         table.setMinimumWidth(0)
         table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        table.horizontalHeader().setStretchLastSection(False)
+        horizontal_header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        horizontal_header.setStretchLastSection(False)
         table.resizeColumnsToContents()
         table.resizeRowsToContents()
         table_height = (
-            table.horizontalHeader().sizeHint().height()
+            horizontal_header.sizeHint().height()
             + sum(table.rowHeight(row) for row in range(table.rowCount()))
             + 2 * table.frameWidth()
         )
@@ -130,21 +136,23 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
 
     def _grow_raw_data_column_to_contents(self, column):
         table = self.raw_data_table
-        header = table.horizontalHeader()
-        required = max(
+        header = required(table.horizontalHeader(), "binary table header")
+        required_width = max(
             header.sectionSizeHint(column),
             table.sizeHintForColumn(column),
         )
-        if required > table.columnWidth(column):
-            header.resizeSection(column, required)
+        if required_width > table.columnWidth(column):
+            header.resizeSection(column, required_width)
 
     def _configure_focus_revelation(self):
         """Reveal focused calculator controls within this dialog's overflow."""
         for widget in self.content_widget.findChildren(QWidget):
             widget.installEventFilter(self)
 
-    def eventFilter(self, watched, event):
-        if event.type() == QEvent.Type.FocusIn and self.content_widget.isAncestorOf(watched):
+    def eventFilter(  # ty: ignore[invalid-method-override] -- PyQt6's QDialog stub rejects this runtime-supported QObject override.
+        self, watched: QObject | None, event: QEvent | None
+    ) -> bool:
+        if isinstance(watched, QWidget) and event is not None and event.type() == QEvent.Type.FocusIn and self.content_widget.isAncestorOf(watched):
             self.content_scroll.ensureWidgetVisible(watched)
         return super(BinaryDataForm2, self).eventFilter(watched, event)
 
@@ -365,13 +373,13 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
 
     def _mark_table_consistent(self):
         self.inconsistencyLabel.setVisible(False)
-        self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setEnabled(True)
+        required(self.buttonBox.button(QDialogButtonBox.StandardButton.Ok), "binary calculator OK button").setEnabled(True)
         self._request_content_refit()
 
     def _mark_table_invalid(self, message):
         self.inconsistencyLabel.setText(str(message))
         self.inconsistencyLabel.setVisible(True)
-        self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setEnabled(False)
+        required(self.buttonBox.button(QDialogButtonBox.StandardButton.Ok), "binary calculator OK button").setEnabled(False)
         self._request_content_refit()
         self.inconsistencyLabel.updateGeometry()
         content_layout = self.content_widget.layout()
@@ -485,11 +493,11 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             combo.fontMetrics().horizontalAdvance(combo.itemText(index))
             for index in range(combo.count())
         )
-        scrollbar_width = combo.style().pixelMetric(
+        scrollbar_width = required(combo.style(), "binary metric combo style").pixelMetric(
             QStyle.PixelMetric.PM_ScrollBarExtent, None, combo
         )
         # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
-        combo.view().setMinimumWidth(text_width + scrollbar_width + 24)
+        required(combo.view(), "binary metric combo popup").setMinimumWidth(text_width + scrollbar_width + 24)
 
     def get_effect_names(self):
         return self.ma_unit.get_effect_names()
@@ -526,6 +534,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         for row in (1, 2):
             for col in range(3):
                 item = self.raw_data_table.item(row, col)
+                item = required(item, f"binary table cell ({row}, {col})")
                 if curr_effect_is_one_arm:
                     item.setBackground(QBrush(QColor(Qt.GlobalColor.gray)))
                 else:
@@ -771,7 +780,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         try:
             # Test if entered data is valid (a number)
             warning_msg = self._cell_data_not_valid(
-                self.raw_data_table.item(row, col).text()
+                required(self.raw_data_table.item(row, col), f"binary table cell ({row}, {col})").text()
             )
             if warning_msg:
                 raise ValueError(warning_msg)
@@ -780,7 +789,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             self._mark_table_consistent()
         except Exception as e:
             msg = e.args[0]
-            QMessageBox.warning(self.parent(), "Warning", msg)  # popup warning
+            QMessageBox.warning(self, "Warning", msg)  # popup warning
             self.restore_ma_unit_and_table(
                 old_ma_unit, old_table
             )  # brings things back to the way they were
@@ -792,7 +801,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             self.try_to_update_cur_outcome()  # update metric in ma_unit and in table
         except Exception as e:
             msg = "Could not compute study effects from the edited raw data: %s" % e
-            QMessageBox.warning(self.parent(), "Warning", msg)
+            QMessageBox.warning(self, "Warning", msg)
             self.restore_ma_unit_and_table(old_ma_unit, old_table)
             return
 
@@ -862,7 +871,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             if self.raw_data_table.item(row, col) == None:
                 self.raw_data_table.setItem(row, col, QTableWidgetItem(str_val))
             else:
-                self.raw_data_table.item(row, col).setText(str_val)
+                required(self.raw_data_table.item(row, col), f"binary table cell ({row}, {col})").setText(str_val)
             calc_fncs.set_table_item_editable(
                 self.raw_data_table.item(row, col),
                 self._raw_count_cell_is_editable(row, col),
@@ -905,7 +914,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
     def _get_int(self, i, j):
         """Get value from cell specified by row=i, col=j as an integer"""
         if not self._is_empty(i, j):
-            text = self.raw_data_table.item(i, j).text()
+            text = required(self.raw_data_table.item(i, j), f"binary table cell ({i}, {j})").text()
             try:
                 val = int(text)
             except ValueError:
@@ -1077,8 +1086,10 @@ class ChooseBackCalcResultForm(
 
         self._layout_controller.request_content_refit()
 
-    def eventFilter(self, watched, event):
-        if event.type() == QEvent.Type.FocusIn and self.content_widget.isAncestorOf(watched):
+    def eventFilter(  # ty: ignore[invalid-method-override] -- PyQt6's QDialog stub rejects this runtime-supported QObject override.
+        self, watched: QObject | None, event: QEvent | None
+    ) -> bool:
+        if isinstance(watched, QWidget) and event is not None and event.type() == QEvent.Type.FocusIn and self.content_widget.isAncestorOf(watched):
             self.content_scroll.ensureWidgetVisible(watched)
         return super(ChooseBackCalcResultForm, self).eventFilter(watched, event)
 

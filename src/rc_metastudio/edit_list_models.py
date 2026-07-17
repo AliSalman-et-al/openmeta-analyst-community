@@ -9,6 +9,13 @@ from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
 
 import name_validation
 import qt_text
+from ma_dataset import Dataset
+
+
+def _require_dataset(dataset: Dataset | None) -> Dataset:
+    if dataset is None:
+        raise ValueError("edit-list models require a Dataset")
+    return dataset
 
 
 def _to_native_text(value):
@@ -24,6 +31,7 @@ def _without_current_name(names, current_name):
 
 class ResettableTableModel(QAbstractTableModel):
     dataError = pyqtSignal(str)
+    dataset: Dataset
 
     def reset_model(self):
         self.beginResetModel()
@@ -78,7 +86,7 @@ class TXGroupsModel(ResettableTableModel):
 
     def __init__(self, filename="", dataset=None, outcome=None, follow_up=None):
         super(TXGroupsModel, self).__init__()
-        self.dataset = dataset
+        self.dataset = _require_dataset(dataset)
         self.current_outcome = outcome
         self.current_follow_up = follow_up
         self.refresh_group_list(outcome, follow_up)
@@ -100,13 +108,13 @@ class TXGroupsModel(ResettableTableModel):
             return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         return None
 
-    def rowCount(self, index=QModelIndex()):
-        if index.isValid():
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        if parent.isValid():
             return 0
         return len(self.group_list)
 
-    def columnCount(self, index=QModelIndex()):
-        if index.isValid():
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        if parent.isValid():
             return 0
         return 1
 
@@ -144,7 +152,7 @@ class OutcomesModel(ResettableTableModel):
 
     def __init__(self, filename="", dataset=None):
         super(OutcomesModel, self).__init__()
-        self.dataset = dataset
+        self.dataset = _require_dataset(dataset)
         self.current_outcome = None
         self.outcome_list = self.dataset.get_outcome_names()
 
@@ -163,13 +171,13 @@ class OutcomesModel(ResettableTableModel):
             return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         return None
 
-    def rowCount(self, index=QModelIndex()):
-        if index.isValid():
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        if parent.isValid():
             return 0
         return len(self.outcome_list)
 
-    def columnCount(self, index=QModelIndex()):
-        if index.isValid():
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        if parent.isValid():
             return 0
         return 1
 
@@ -211,7 +219,7 @@ class FollowUpsModel(ResettableTableModel):
 
     def __init__(self, filename="", dataset=None, outcome=None):
         super(FollowUpsModel, self).__init__()
-        self.dataset = dataset
+        self.dataset = _require_dataset(dataset)
         ## we maintain a current outcome string variable because
         # the follow-ups are outcome specific
         self.current_outcome = outcome
@@ -237,13 +245,13 @@ class FollowUpsModel(ResettableTableModel):
             return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         return None
 
-    def rowCount(self, index=QModelIndex()):
-        if index.isValid():
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        if parent.isValid():
             return 0
         return len(self.follow_up_list)
 
-    def columnCount(self, index=QModelIndex()):
-        if index.isValid():
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        if parent.isValid():
             return 0
         return 1
 
@@ -282,7 +290,7 @@ class StudiesModel(ResettableTableModel):
 
     def __init__(self, filename="", dataset=None):
         super(StudiesModel, self).__init__()
-        self.dataset = dataset
+        self.dataset = _require_dataset(dataset)
         self.update_study_list()
 
     def update_study_list(self):
@@ -299,13 +307,13 @@ class StudiesModel(ResettableTableModel):
             return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         return None
 
-    def rowCount(self, index=QModelIndex()):
-        if index.isValid():
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        if parent.isValid():
             return 0
         return len(self.studies_list)
 
-    def columnCount(self, index=QModelIndex()):
-        if index.isValid():
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        if parent.isValid():
             return 0
         return 1
 
@@ -335,7 +343,7 @@ class CovariatesModel(ResettableTableModel):
 
     def __init__(self, filename="", dataset=None):
         super(CovariatesModel, self).__init__()
-        self.dataset = dataset
+        self.dataset = _require_dataset(dataset)
         self.update_covariates_list()
 
     def update_covariates_list(self):
@@ -352,13 +360,13 @@ class CovariatesModel(ResettableTableModel):
             return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         return None
 
-    def rowCount(self, index=QModelIndex()):
-        if index.isValid():
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        if parent.isValid():
             return 0
         return len(self.covariates_list)
 
-    def columnCount(self, index=QModelIndex()):
-        if index.isValid():
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        if parent.isValid():
             return 0
         return 1
 

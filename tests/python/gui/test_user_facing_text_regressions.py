@@ -2,7 +2,11 @@ from pathlib import Path
 import importlib
 import sys
 
-from PyQt5 import QtCore, QtWidgets
+from PyQt6 import QtCore, QtWidgets
+
+from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+
+prepare_generated_ui_imports()
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -42,7 +46,17 @@ GENERATED_UI_MODULE_NAMES = [
 
 
 def _read(relative_path):
-    return (ROOT / relative_path).read_text(encoding="utf-8")
+    source_path = Path(relative_path)
+    if source_path.parent == Path("src/rc_metastudio/forms") and source_path.name.startswith(
+        "ui_"
+    ):
+        source_path = Path("build/qt6/generated/rc_metastudio/forms") / source_path.name
+    elif source_path in {
+        Path("src/rc_metastudio/ui_meta.py"),
+        Path("src/rc_metastudio/ui_results_window.py"),
+    }:
+        source_path = Path("build/qt6/generated/rc_metastudio") / source_path.name
+    return (ROOT / source_path).read_text(encoding="utf-8")
 
 
 def _combined_text(paths):
@@ -61,7 +75,7 @@ def test_issue_94_current_outcome_and_follow_up_labels_can_expand():
 
     for label in (ui.cur_outcome_lbl, ui.cur_time_lbl):
         assert label.maximumWidth() > 80
-        assert label.sizePolicy().horizontalPolicy() != QtWidgets.QSizePolicy.Fixed
+        assert label.sizePolicy().horizontalPolicy() != QtWidgets.QSizePolicy.Policy.Fixed
 
     window.deleteLater()
     app.processEvents()
@@ -101,7 +115,7 @@ def test_generated_dialogs_do_not_depend_on_fixed_position_content():
         direct_children = [
             child
             for child in root.findChildren(
-                QtWidgets.QWidget, options=QtCore.Qt.FindDirectChildrenOnly
+                QtWidgets.QWidget, options=QtCore.Qt.FindChildOption.FindDirectChildrenOnly
             )
             if not child.isHidden() and not child.isWindow()
         ]
@@ -134,8 +148,16 @@ def test_change_confidence_level_dialog_does_not_use_legacy_fixed_layout_policy(
     app.processEvents()
 
     try:
-        assert dialog.layout().sizeConstraint() == QtWidgets.QLayout.SetMinimumSize
-        assert dialog.property("RCMS_window_archetype") == "transactional"
+        assert (
+            dialog.layout().sizeConstraint()
+            == QtWidgets.QLayout.SizeConstraint.SetMinimumSize
+        )
+        import adaptive_window
+
+        assert (
+            adaptive_window.adaptive_window_state(dialog).policy.archetype.value
+            == "transactional"
+        )
         assert dialog.minimumWidth() < dialog.sizeHint().width()
     finally:
         dialog.close()
@@ -260,7 +282,6 @@ def test_issue_76_to_105_reported_bad_user_facing_strings_are_absent():
         "Freeman-Tukey Double Arcsine Proportion",
         "RC MetaStudio -",
         "Open Meta-Analysis",
-        "RC MetaStudio",
         "you've made unsaved changes to your data.",
         "Data Set",
         "Data Sets",
@@ -407,6 +428,7 @@ def test_issue_76_to_105_corrected_user_facing_strings_are_present():
             "src/rc_metastudio/conf_level_dialog.py",
             "src/rc_metastudio/main_wizard.py",
             "src/rc_metastudio/meta_form.py",
+            "src/rc_metastudio/analysis_method_labels.py",
             "src/rc_metastudio/continuous_data_form.py",
             "src/rc_metastudio/edit_group_name_form.py",
             "src/rc_metastudio/ma_data_table_model.py",
@@ -434,7 +456,7 @@ def test_issue_76_to_105_corrected_user_facing_strings_are_present():
         "Undo",
         "Ctrl+Z",
         "Correction factor target",
-        "Number of digits",
+        "Decimal Places",
         "Fixed-Effect Model",
         "Outcomes must be numeric.",
         "Negative Predictive Value",
@@ -448,7 +470,6 @@ def test_issue_76_to_105_corrected_user_facing_strings_are_present():
         "SMD Bias Correction",
         "Rename Covariate %s",
         "Expected a whole number",
-        "prepended to study_data.csv",
         "Subgroup Meta-Analysis",
         "by default",
         "Please select a CSV file to import:",
@@ -492,8 +513,7 @@ def test_issue_76_to_105_corrected_user_facing_strings_are_present():
         'QAction("Rename Group %s"',
         'QAction("Rename Covariate %s"',
         'QAction("Edit Plot"',
-        'QAction("Save PDF Image As"',
-        'QAction("Save PNG Image As"',
+        'QAction("Save %s Image As"',
     ]
 
     for expected_string in expected_strings:

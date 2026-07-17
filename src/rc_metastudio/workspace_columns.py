@@ -47,7 +47,10 @@ class WorkspaceColumnWidthController(object):
 
     def synchronize_schema(self):
         """Restore known sections and content-fit only previously unseen ones."""
-        model = self.table.model()
+        # The controller is constructed before the workspace installs its
+        # DatasetModel, so query the Qt base class without invoking the
+        # workspace view's maintained-model contract.
+        model = QTableView.model(self.table)
         if model is None:
             return
         keys = self._schema_keys()
@@ -85,7 +88,7 @@ class WorkspaceColumnWidthController(object):
             self._widths[keys[logical_index]] = int(new_size)
 
     def _schema_keys(self):
-        model = self.table.model()
+        model = QTableView.model(self.table)
         if model is None:
             return []
         identities = []

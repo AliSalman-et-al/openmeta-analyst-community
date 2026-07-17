@@ -7,8 +7,10 @@ import forms.ui_data_type_page
 import forms.ui_outcome_name_page
 import forms.ui_welcome_page
 
+from typing import TypedDict
+
 from PyQt6.QtCore import QSize, Qt, QTimer
-from PyQt6.QtGui import QAction, QIcon, QPainter, QPixmap
+from PyQt6.QtGui import QAction, QCloseEvent, QHideEvent, QIcon, QPainter, QPixmap, QShowEvent
 from PyQt6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -33,7 +35,24 @@ from ma_data_table_model import DatasetModel
 from settings import get_default_open_directory
 
 
-class WelcomePage(QWizardPage, forms.ui_welcome_page.Ui_WizardPage):
+class DatasetInfo(TypedDict, total=False):
+    arms: str | None
+    data_type: str | None
+    sub_type: str | None
+    effect: str | None
+    metric_choices: list[str]
+    name: str | None
+
+
+class MainWizardPage(QWizardPage):
+    def wizard(self) -> "MainWizard":
+        wizard = super().wizard()
+        if not isinstance(wizard, MainWizard):
+            raise RuntimeError("RC MetaStudio wizard pages require MainWizard ownership")
+        return wizard
+
+
+class WelcomePage(MainWizardPage, forms.ui_welcome_page.Ui_WizardPage):
     def __init__(self, parent=None, recent_datasets=[]):
         super(WelcomePage, self).__init__(parent)
         self.setupUi(self)
@@ -114,7 +133,10 @@ class WelcomePage(QWizardPage, forms.ui_welcome_page.Ui_WizardPage):
 
         # we use the sender method to see which menu item was
         # triggered
-        dataset_path = (action_item or self.sender()).text()
+        action = action_item or self.sender()
+        if not isinstance(action, QAction):
+            raise RuntimeError("recent-project selection requires a QAction sender")
+        dataset_path = action.text()
         dataset_path = qt_text.to_native_text(dataset_path)
         self.selected_dataset = dataset_path
         self.wizard().set_selected_dataset(self.selected_dataset)
@@ -149,13 +171,13 @@ class WelcomePage(QWizardPage, forms.ui_welcome_page.Ui_WizardPage):
 ################################################################################
 
 
-class DataTypePage(QWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
+class DataTypePage(MainWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
     def __init__(self, parent=None):
         super(DataTypePage, self).__init__(parent)
         self.setupUi(self)
 
         self.selected_datatype = None
-        self.summary = dict(
+        self.summary: DatasetInfo = dict(
             arms=None,
             data_type=None,
             sub_type=None,
@@ -301,17 +323,17 @@ class DataTypePage(QWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
             return False
 
     def nextId(self):
-        if (
-            self.wizard().get_dataset_info()
-            and self.wizard().get_dataset_info()["data_type"] == "diagnostic"
-        ):
+        if self.buttonGroup.checkedButton() is None:
+            return Page_ChooseMetric
+        dataset_info = self.wizard().get_dataset_info()
+        if dataset_info is not None and dataset_info["data_type"] == "diagnostic":
             return Page_OutcomeName
         else:  # normal case
             return Page_ChooseMetric
 
 
 ###############################################################################
-class ChooseMetricPage(QWizardPage, forms.ui_choose_metric_page.Ui_WizardPage):
+class ChooseMetricPage(MainWizardPage, forms.ui_choose_metric_page.Ui_WizardPage):
     def __init__(self, parent=None):
         super(ChooseMetricPage, self).__init__(parent)
         self.setupUi(self)
@@ -321,9 +343,10 @@ class ChooseMetricPage(QWizardPage, forms.ui_choose_metric_page.Ui_WizardPage):
         )
 
     def initializePage(self):
-        data_type = self.wizard().get_dataset_info()["data_type"]
-        metric_choices = self.wizard().get_dataset_info()["metric_choices"]
-        default_effect = self.wizard().get_dataset_info()["effect"]
+        dataset_info = self.wizard().require_dataset_info()
+        data_type = dataset_info["data_type"]
+        metric_choices = dataset_info["metric_choices"]
+        default_effect = dataset_info["effect"]
 
         # Add metric choices to combo box
         self.metric_cbo_box.blockSignals(True)
@@ -366,7 +389,7 @@ def _qt_item_text(value):
     return qt_text.to_native_text(value)
 
 
-class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
+class CsvImportPage(MainWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
     def __init__(self, parent=None):
         super(CsvImportPage, self).__init__(parent)
         self.setupUi(self)
@@ -405,7 +428,10 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
         for row in range(self.required_fmt_table.rowCount()):
             for col in range(self.required_fmt_table.columnCount()):
                 self.required_fmt_table.setItem(row, col, QTableWidgetItem(""))
-                self.required_fmt_table.item(row, col).setFlags(Qt.ItemFlag.NoItemFlags)
+                item = self.required_fmt_table.item(row, col)
+                if item is None:
+                    raise RuntimeError("CSV format preview item was not created")
+                item.setFlags(Qt.ItemFlag.NoItemFlags)
         qt_layout.configure_compact_table(self.required_fmt_table, stretch_columns=True)
 
     def isComplete(self):
@@ -526,9 +552,10 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
         ** Must be updated if header_data() is ma_data_table_model is changed
         """
 
-        data_type = self.wizard().get_dataset_info()["data_type"]
-        data_subtype = self.wizard().get_dataset_info()["sub_type"]
-        effect = self.wizard().get_dataset_info()["effect"]
+        dataset_info = self.wizard().require_dataset_info()
+        data_type = dataset_info["data_type"]
+        data_subtype = dataset_info["sub_type"]
+        effect = dataset_info["effect"]
         raw_cols, outcome_cols = DatasetModel.get_column_indices(
             data_type, data_subtype
         )
@@ -663,7 +690,7 @@ class CsvImportPage(QWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
 
 
 ################################################################################
-class OutcomeNamePage(QWizardPage, forms.ui_outcome_name_page.Ui_WizardPage):
+class OutcomeNamePage(MainWizardPage, forms.ui_outcome_name_page.Ui_WizardPage):
     def __init__(self, parent=None):
         super(OutcomeNamePage, self).__init__(parent)
         self.setupUi(self)
@@ -701,7 +728,8 @@ class MainWizard(QWizard):
             ]
         )
 
-        self.info_d = {}
+        self.info_d: dict[str, object] = {}
+        self._outcome_info: DatasetInfo | None = None
         self.info_d["path"] = path
         self.setPage(Page_Welcome, WelcomePage(recent_datasets=recent_datasets))
         self.setPage(Page_DataType, DataTypePage())
@@ -725,16 +753,21 @@ class MainWizard(QWizard):
         self._focus_reveal_connected = False
         self.currentIdChanged.connect(self._schedule_default_action_sync)
         for page_id in self.pageIds():
-            self.page(page_id).completeChanged.connect(
-                self._schedule_default_action_sync
-            )
+            page = self.page(page_id)
+            if page is None:
+                raise RuntimeError(f"MainWizard is missing registered page {page_id}")
+            page.completeChanged.connect(self._schedule_default_action_sync)
 
-    def showEvent(self, event):
+    def showEvent(  # ty: ignore[invalid-method-override] -- PyQt6's QWizard and inherited QDialog stubs conflict for this runtime-supported override.
+        self, event: QShowEvent | None
+    ) -> None:
         """Scope focus observation to the wizard's visible lifetime."""
+        if event is None:
+            return
         super(MainWizard, self).showEvent(event)
         self._schedule_default_action_sync()
         app = QApplication.instance()
-        if app is not None and not self._focus_reveal_connected:
+        if isinstance(app, QApplication) and not self._focus_reveal_connected:
             app.focusChanged.connect(self._reveal_focused_control)
             self._focus_reveal_connected = True
 
@@ -760,19 +793,27 @@ class MainWizard(QWizard):
                 button.setDefault(True)
                 break
 
-    def hideEvent(self, event):
+    def hideEvent(  # ty: ignore[invalid-method-override] -- PyQt6's QWizard and inherited QWidget stubs conflict for this runtime-supported override.
+        self, event: QHideEvent | None
+    ) -> None:
         self._disconnect_focus_reveal()
+        if event is None:
+            return
         super(MainWizard, self).hideEvent(event)
 
-    def closeEvent(self, event):
+    def closeEvent(  # ty: ignore[invalid-method-override] -- PyQt6's QWizard and inherited QDialog stubs conflict for this runtime-supported override.
+        self, event: QCloseEvent | None
+    ) -> None:
         self._disconnect_focus_reveal()
+        if event is None:
+            return
         super(MainWizard, self).closeEvent(event)
 
     def _disconnect_focus_reveal(self):
         if not self._focus_reveal_connected:
             return
         app = QApplication.instance()
-        if app is not None:
+        if isinstance(app, QApplication):
             try:
                 app.focusChanged.disconnect(self._reveal_focused_control)
             except (TypeError, RuntimeError):
@@ -785,7 +826,8 @@ class MainWizard(QWizard):
         if page is None or current is None:
             return
         overflow = page.findChild(QScrollArea, "pageScrollArea")
-        if overflow is not None and overflow.widget().isAncestorOf(current):
+        overflow_content = overflow.widget() if overflow is not None else None
+        if overflow is not None and overflow_content is not None and overflow_content.isAncestorOf(current):
             overflow.ensureWidgetVisible(current)
 
     def set_wizard_path(self, path):
@@ -797,14 +839,16 @@ class MainWizard(QWizard):
         else:
             return None
 
-    def set_dataset_info(self, outcome_info):
-        self.info_d["outcome_info"] = outcome_info
+    def set_dataset_info(self, outcome_info: DatasetInfo) -> None:
+        self._outcome_info = outcome_info
 
-    def get_dataset_info(self):
-        if "outcome_info" in self.info_d:
-            return self.info_d["outcome_info"]
-        else:
-            return None
+    def get_dataset_info(self) -> DatasetInfo | None:
+        return self._outcome_info
+
+    def require_dataset_info(self) -> DatasetInfo:
+        if self._outcome_info is None:
+            raise RuntimeError("dataset information has not been selected")
+        return self._outcome_info
 
     def set_selected_dataset(self, dataset):
         self.info_d["selected_dataset"] = dataset
@@ -816,10 +860,10 @@ class MainWizard(QWizard):
             return None
 
     def set_effect(self, effect_name):
-        self.info_d["outcome_info"]["effect"] = effect_name
+        self.require_dataset_info()["effect"] = effect_name
 
     def get_effect(self):
-        return self.info_d["outcome_info"]["effect"]
+        return self.require_dataset_info()["effect"]
 
     def set_csv_data(self, csv_data):
         self.info_d["csv_data"] = csv_data
@@ -831,14 +875,18 @@ class MainWizard(QWizard):
             return None
 
     def get_results(self):
-        information = {}
-        information["path"] = self.get_wizard_path()
-        information["outcome_info"] = self.get_dataset_info()
-        # set outcome name
-        if information["outcome_info"] is not None:
-            information["outcome_info"]["name"] = _qt_item_text(
-                self.field("outcomeName")
+        information: dict[str, object] = {}
+        path = self.get_wizard_path()
+        outcome_info = self.get_dataset_info()
+        if path in {"new_dataset", "csv_import"} and outcome_info is None:
+            raise RuntimeError(
+                f"dataset information is required for the {path!r} wizard path"
             )
+        information["path"] = path
+        information["outcome_info"] = outcome_info
+        # set outcome name
+        if outcome_info is not None:
+            outcome_info["name"] = _qt_item_text(self.field("outcomeName"))
         information["selected_dataset"] = self.get_selected_dataset()
         information["csv_data"] = self.get_csv_data()
 

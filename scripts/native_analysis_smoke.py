@@ -65,12 +65,12 @@ def main() -> int:
     backend = ma_specs.meta_py_r
     backend.ma_dataset_to_simple_binary_robj = lambda *args, **kwargs: None
     backend.get_available_methods = lambda **kwargs: {"Random": "binary.random"}
-    backend.get_params = lambda method: (  # ty: ignore[invalid-assignment]
+    setattr(backend, "get_params", lambda method: (
         {"conf.level": "float"},
         {"conf.level": 95.0},
         ["conf.level"],
         {},
-    )
+    ))
     backend.get_method_description = lambda method: "Random-effects analysis"
     backend.get_analysis_plot_capabilities = lambda *args, **kwargs: []
 
@@ -152,13 +152,11 @@ def main() -> int:
         RuntimeError("native backend failure")
     )
     original_critical = ma_specs.QMessageBox.critical
-    ma_specs.QMessageBox.critical = (  # ty: ignore[invalid-assignment]
-        lambda *_args, **_kwargs: None
-    )
+    setattr(ma_specs.QMessageBox, "critical", lambda *_args, **_kwargs: None)
     try:
         failing.run_ma()
     finally:
-        ma_specs.QMessageBox.critical = original_critical
+        setattr(ma_specs.QMessageBox, "critical", original_critical)
     failing_progress = failing.findChild(ma_specs.MetaProgress)
     if failing_progress is None:
         raise RuntimeError("failed analysis did not create MetaProgress")

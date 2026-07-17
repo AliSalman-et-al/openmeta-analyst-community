@@ -87,7 +87,7 @@ function Get-Sha256FileHash {
 function Assert-AppLayout {
     param([string]$Root)
     Assert-PathExists -Path (Join-Path $Root "RCMetaStudio.exe") -Description "RCMetaStudio executable"
-    Assert-PathExists -Path (Join-Path $Root "_internal\PyQt5") -Description "Bundled PyQt5 runtime"
+    Assert-PathExists -Path (Join-Path $Root "_internal\PyQt6") -Description "Bundled PyQt6 runtime"
     Assert-PathExists -Path (Join-Path $Root "sample_projects\BCG.rcms") -Description "Bundled sample project"
     Assert-PathExists -Path (Join-Path $Root "sample_projects\amino.rcms") -Description "Bundled GUI slice sample project"
     Assert-PathExists -Path (Join-Path $Root "R\bin\x64\R.dll") -Description "Bundled R runtime"
@@ -242,14 +242,14 @@ function Assert-ZipLayout {
             $requiredEntry = Join-Path $ArchiveRootName $requiredEntry
             if (-not $entryNames.ContainsKey($requiredEntry)) { throw "Created ZIP is missing '$requiredEntry'." }
         }
-        $hasPyQt5Runtime = $false
+        $hasPyQt6Runtime = $false
         foreach ($entryName in $entryNames.Keys) {
-            if ($entryName.StartsWith("$ArchiveRootName\_internal\PyQt5\")) {
-                $hasPyQt5Runtime = $true
+            if ($entryName.StartsWith("$ArchiveRootName\_internal\PyQt6\")) {
+                $hasPyQt6Runtime = $true
                 break
             }
         }
-        if (-not $hasPyQt5Runtime) { throw "Created ZIP is missing bundled PyQt5 runtime." }
+        if (-not $hasPyQt6Runtime) { throw "Created ZIP is missing bundled PyQt6 runtime." }
     }
     finally {
         $zip.Dispose()
@@ -452,7 +452,7 @@ if (-not $SkipDependencyInstall) {
 $PythonExe = Resolve-CommandOrRepoPath -Path $PythonExe
 
 & $PythonExe -c "import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 11) else 1)"
-if ($LASTEXITCODE -ne 0) { throw "Windows packaging requires Python 3.11 to match the CI runtime and PyQt5 wheel support." }
+if ($LASTEXITCODE -ne 0) { throw "Windows packaging requires the locked Python 3.11 runtime." }
 
 $projectVersion = Get-ProjectVersion -PythonExe $PythonExe
 $archiveRootName = if ($ArchiveRootName) { $ArchiveRootName } else { "RCMetaStudio-$projectVersion-windows-x64" }

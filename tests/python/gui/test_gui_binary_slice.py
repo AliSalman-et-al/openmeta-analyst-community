@@ -112,7 +112,7 @@ def test_representative_projects_round_trip_without_byte_identical_expectations(
             )
 
             window.save_as()
-            reopened = meta_form._load_project_pickle(saved_path)
+            reopened = meta_form._load_project(saved_path)
 
             assert _dataset_summary(reopened) == expected
         finally:

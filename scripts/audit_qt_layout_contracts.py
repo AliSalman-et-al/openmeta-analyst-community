@@ -647,9 +647,9 @@ def _qfont_definitions(tree, node_scopes, node_conditions):
             for imported in node.names:
                 provenance = (
                     "qfont"
-                    if node.module == "PyQt5.QtGui" and imported.name == "QFont"
+                    if node.module == "PyQt6.QtGui" and imported.name == "QFont"
                     else "qtgui"
-                    if node.module == "PyQt5" and imported.name == "QtGui"
+                    if node.module == "PyQt6" and imported.name == "QtGui"
                     else "other"
                 )
                 definitions.setdefault(scope, {}).setdefault(
@@ -660,9 +660,9 @@ def _qfont_definitions(tree, node_scopes, node_conditions):
                 bound_name = imported.asname or imported.name.split(".")[0]
                 provenance = (
                     "qtgui"
-                    if imported.name == "PyQt5.QtGui" and imported.asname
-                    else "pyqt5"
-                    if imported.name in {"PyQt5", "PyQt5.QtGui"}
+                    if imported.name == "PyQt6.QtGui" and imported.asname
+                    else "pyqt6"
+                    if imported.name in {"PyQt6", "PyQt6.QtGui"}
                     else "other"
                 )
                 definitions.setdefault(scope, {}).setdefault(bound_name, []).append(
@@ -723,7 +723,7 @@ def _is_qfont_constructor(call, definitions, node_scopes, scope_parents):
         return "qfont" in provenance
     if chain[1:] == ["QFont"]:
         return "qtgui" in provenance
-    return chain[1:] == ["QtGui", "QFont"] and "pyqt5" in provenance
+    return chain[1:] == ["QtGui", "QFont"] and "pyqt6" in provenance
 
 
 STYLESHEET_FONT_RE = re.compile(

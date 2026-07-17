@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import QDialog
 
 # import pdb
-import forms.ui_running  # ty: ignore[unresolved-import]
+import forms.ui_running
 import adaptive_window
 
 

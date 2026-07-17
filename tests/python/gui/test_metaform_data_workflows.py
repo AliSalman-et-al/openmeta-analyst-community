@@ -1572,7 +1572,7 @@ def test_add_dialogs_reject_blank_names_for_other_dataset_entities(monkeypatch):
         _close_without_prompt(app, window)
 
 
-def test_metaform_dialog_text_slots_accept_pyqt5_line_edit_strings(monkeypatch):
+def test_metaform_dialog_text_slots_accept_native_pyqt6_line_edit_strings(monkeypatch):
     import launch
     from PyQt6 import QtWidgets
 

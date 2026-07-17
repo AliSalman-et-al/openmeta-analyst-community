@@ -8,8 +8,9 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+from typing import NoReturn
 
-from PyQt5 import QtGui
+from PyQt6 import QtGui
 
 
 EXPECTED_SCENARIOS = (
@@ -36,7 +37,7 @@ CAPABILITY_QUALIFIED_SCENARIOS = {
 }
 
 
-def _fail(message):
+def _fail(message: str) -> NoReturn:
     raise ValueError("Invalid adaptive-layout evidence: %s" % message)
 
 
@@ -56,7 +57,7 @@ def _read_nonblank_png(path, expected_size=None):
     actual = [image.width(), image.height()]
     if expected_size is not None and actual != list(expected_size):
         _fail("%s has pixel size %s, expected %s" % (path.name, actual, expected_size))
-    converted = image.convertToFormat(QtGui.QImage.Format_ARGB32)
+    converted = image.convertToFormat(QtGui.QImage.Format.Format_ARGB32)
     first = converted.pixel(0, 0)
     varied = False
     for y in range(0, converted.height(), max(1, converted.height() // 32)):
@@ -139,6 +140,8 @@ def _validate_unavailable_scenario(record, expected_scale):
     if record.get("reason") != "required native frame exceeds available screen geometry":
         _fail("%s has an invalid unavailable reason" % name)
     expected_client = EXPECTED_SCENARIO_CONTRACTS[name][1]
+    if expected_client is None:
+        _fail("%s has no exact client contract" % name)
     if record.get("requested_client_size") != expected_client:
         _fail("%s has the wrong unavailable client request" % name)
     margins = record.get("frame_margins")

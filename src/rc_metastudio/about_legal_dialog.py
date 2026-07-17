@@ -34,6 +34,8 @@ class AboutLegalDialog(QDialog, forms.ui_about_legal.Ui_AboutLegalDialog):
         self.content_scroll_area.setAccessibleName("About and legal information")
         self.content_scroll_area.setTabChangesFocus(True)
         close_button = self.buttonBox.button(QDialogButtonBox.StandardButton.Close)
+        if close_button is None:
+            raise RuntimeError("About dialog is missing its Close button")
         close_button.setObjectName("about_legal_close_button")
         close_button.setAccessibleName("Close About and Legal")
         close_button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
