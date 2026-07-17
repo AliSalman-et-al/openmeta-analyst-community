@@ -669,7 +669,9 @@ def test_macos_packager_relocates_every_bundled_r_macho_before_use():
     script = sh_contract("scripts", "build-macos-package.sh")["text"]
 
     assert 'local macho_manifest="$work_root/bundled-r-mach-o-files.list"' in script
-    assert "MACH_O_MAGICS = {" in script
+    assert "from rc_metastudio.qt6_macos_feasibility import is_macho_candidate" in script
+    assert "MACH_O_MAGICS" not in script
+    assert "if is_macho_candidate(path):" in script
     assert 'sys.stdout.buffer.write(os.fsencode(path) + b"\\0")' in script
     assert 'done < "$macho_manifest"' in script
     assert 'find "$r_home" -type f -print0' not in script

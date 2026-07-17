@@ -59,6 +59,42 @@ def thin_macho(cpu_type: int, cpu_subtype: int) -> bytes:
     return b"\xcf\xfa\xed\xfe" + struct.pack("<II", cpu_type, cpu_subtype) + b"\0" * 20
 
 
+def minimal_java_class(
+    *, class_name: bytes = b"Example", major: int = 52, minor: int = 0,
+    attribute_body: bytes | None = None,
+) -> bytes:
+    constants = (
+        b"\x01" + struct.pack(">H", len(class_name)) + class_name
+        + b"\x07\x00\x01"
+        + b"\x01" + struct.pack(">H", len(b"java/lang/Object")) + b"java/lang/Object"
+        + b"\x07\x00\x03"
+    )
+    constant_pool_count = 5
+    attributes = struct.pack(">H", 0)
+    if attribute_body is not None:
+        attribute_name = b"TestAttribute"
+        constants += b"\x01" + struct.pack(">H", len(attribute_name)) + attribute_name
+        constant_pool_count = 6
+        attributes = (
+            struct.pack(">HHI", 1, 5, len(attribute_body)) + attribute_body
+        )
+    return (
+        b"\xca\xfe\xba\xbe"
+        + struct.pack(">HHH", minor, major, constant_pool_count)
+        + constants
+        + struct.pack(">HHHHHH", 0x0021, 2, 4, 0, 0, 0)
+        + attributes
+    )
+
+
+def fat_x64_macho() -> bytes:
+    thin = thin_macho(0x01000007, 3)
+    offset = 4096
+    header = struct.pack(">II", 0xCAFEBABE, 1)
+    architecture = struct.pack(">IIIII", 0x01000007, 3, offset, len(thin), 12)
+    return header + architecture + b"\0" * (offset - len(header) - len(architecture)) + thin
+
+
 def test_macos_x64_uses_one_authoritative_pyinstaller_spec():
     build = text("scripts/build-macos-package.sh")
     spec = text("packaging/pyinstaller/rc-metastudio-macos.spec")
@@ -93,6 +129,8 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
     assert "RCMS_PACKAGE_SMOKE_EVIDENCE" in build
     assert "RCMS_AUTOMATION_HANG_TRACE" in build
     assert "run_bounded_process.py" in build
+    assert "from rc_metastudio.qt6_macos_feasibility import is_macho_candidate" in build
+    assert "MACH_O_MAGICS" not in build
     assert 'open -W -n "$app_bundle" --args' in build
     assert "--automation-startup-completion-marker" in build
     assert 'codesign --force --deep --options runtime --sign - "$app_bundle"' in build
@@ -151,6 +189,86 @@ def test_macho_parser_rejects_arm_and_universal_payloads_for_x64(tmp_path):
     inspector.require_x64_macho(x64)
     with pytest.raises(inspector.MacOSDeploymentInspectionError, match="x86_64-only"):
         inspector.require_x64_macho(arm)
+
+
+def test_macho_discriminator_excludes_java_without_trusting_extensions(
+    monkeypatch, tmp_path
+):
+    inspector = load_inspector()
+    import rc_metastudio.qt6_macos_feasibility as feasibility
+
+    java_class = tmp_path / "getsp.class"
+    disguised_java = tmp_path / "libjava.dylib"
+    java_class.write_bytes(minimal_java_class())
+    disguised_java.write_bytes(minimal_java_class())
+    for path in (java_class, disguised_java):
+        assert feasibility.is_valid_java_class(path)
+        assert not feasibility.is_macho_candidate(path)
+
+    preview_class = tmp_path / "preview.class"
+    preview_class.write_bytes(minimal_java_class(major=56, minor=0xFFFF))
+    assert feasibility.is_valid_java_class(preview_class)
+    assert not feasibility.is_macho_candidate(preview_class)
+
+    malformed_java_payloads = {
+        "preview-before-java-12": minimal_java_class(major=55, minor=0xFFFF),
+        "nonzero-legacy-minor": minimal_java_class(major=46, minor=1),
+        "raw-nul": minimal_java_class(class_name=b"Exa\x00ple"),
+        "bad-continuation": minimal_java_class(class_name=b"Ex\xc2mple"),
+        "overlong-non-null": minimal_java_class(class_name=b"Ex\xc0\x81ple"),
+        "four-byte-standard-utf8": minimal_java_class(class_name=b"\xf0\x90\x80\x80abc"),
+    }
+    for name, payload in malformed_java_payloads.items():
+        malformed_java = tmp_path / f"{name}.class"
+        malformed_java.write_bytes(payload)
+        assert not feasibility.is_valid_java_class(malformed_java)
+        assert feasibility.is_macho_candidate(malformed_java)
+
+    large_attribute = tmp_path / "large-attribute.class"
+    large_attribute.write_bytes(minimal_java_class(attribute_body=b"x" * 1_000_000))
+    original_read = feasibility._read_java_bytes
+
+    def reject_unbounded_read(stream, size, label):
+        assert size < 100_000, f"attribute body was materialized: {size}"
+        return original_read(stream, size, label)
+
+    monkeypatch.setattr(feasibility, "_read_java_bytes", reject_unbounded_read)
+    assert feasibility.is_valid_java_class(large_attribute)
+    assert not feasibility.is_macho_candidate(large_attribute)
+
+    thin_with_java_extension = tmp_path / "native.class"
+    thin_with_java_extension.write_bytes(thin_macho(0x01000007, 3))
+    assert feasibility.is_macho_candidate(thin_with_java_extension)
+    assert inspector.macho_architectures(thin_with_java_extension) == ["x86_64"]
+
+    fat_with_java_extension = tmp_path / "universal.class"
+    fat_with_java_extension.write_bytes(fat_x64_macho())
+    assert feasibility.is_macho_candidate(fat_with_java_extension)
+    assert inspector.macho_architectures(fat_with_java_extension) == ["x86_64"]
+
+    malformed_collision = tmp_path / "malformed.class"
+    malformed_collision.write_bytes(b"\xca\xfe\xba\xbe\x00\x00\x00\x01")
+    assert not feasibility.is_valid_java_class(malformed_collision)
+    assert feasibility.is_macho_candidate(malformed_collision)
+    with pytest.raises(inspector.MacOSDeploymentInspectionError, match="truncated"):
+        inspector.macho_architectures(malformed_collision)
+
+    unreadable = tmp_path / "unreadable"
+    unreadable.write_bytes(thin_macho(0x01000007, 3))
+    original_open = Path.open
+
+    def deny_target(path, *args, **kwargs):
+        if path == unreadable:
+            raise PermissionError("denied by test")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", deny_target)
+    with pytest.raises(PermissionError, match="denied by test"):
+        feasibility.is_macho_candidate(unreadable)
+    with pytest.raises(
+        inspector.MacOSDeploymentInspectionError, match="cannot classify"
+    ):
+        inspector._is_macho(unreadable)
 
 
 def test_archive_inspection_rejects_case_collisions(tmp_path):

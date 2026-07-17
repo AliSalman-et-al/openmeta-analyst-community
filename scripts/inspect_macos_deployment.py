@@ -17,7 +17,11 @@ from typing import Any, cast
 import unicodedata
 import zipfile
 
-from rc_metastudio.qt6_macos_feasibility import EvidenceError, _archs
+from rc_metastudio.qt6_macos_feasibility import (
+    EvidenceError,
+    _archs,
+    is_macho_candidate,
+)
 
 
 EXPECTED_VERSIONS = {
@@ -31,11 +35,6 @@ EXPECTED_VERSIONS = {
     "pyinstaller": "6.21.0",
 }
 EXPECTED_SUMMARY_SHA256 = "78294820c83cd94c19dfdca8c24b6a96cdc8b6f1319a5cd1bedffacde73851e2"
-MACHO_MAGICS = {
-    b"\xfe\xed\xfa\xce", b"\xce\xfa\xed\xfe", b"\xfe\xed\xfa\xcf",
-    b"\xcf\xfa\xed\xfe", b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca",
-    b"\xca\xfe\xba\xbf", b"\xbf\xba\xfe\xca",
-}
 MAX_FILES = 25_000
 MAX_BYTES = 3_000_000_000
 MAX_ARCHIVE_MEMBERS = 30_000
@@ -89,10 +88,11 @@ def require_x64_macho(path: Path) -> list[str]:
 
 def _is_macho(path: Path) -> bool:
     try:
-        with path.open("rb") as stream:
-            return stream.read(4) in MACHO_MAGICS
-    except OSError:
-        return False
+        return is_macho_candidate(path)
+    except OSError as exc:
+        raise MacOSDeploymentInspectionError(
+            f"cannot classify packaged native payload {path}: {exc}"
+        ) from exc
 
 
 def _resolved_inside(path: Path, root: Path) -> Path:

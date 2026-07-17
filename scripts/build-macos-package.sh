@@ -314,24 +314,16 @@ relocate_bundled_r_runtime() {
 
   # Spawning `file` for every file in a complete R installation is extremely
   # expensive on GitHub's macOS runners. Scan the tree once in one process,
-  # using the Mach-O and universal-binary magic numbers, then reuse the
-  # resulting NUL-delimited manifest for both mutation and verification.
+  # structurally excluding valid JVM ClassFiles from the CAFEBABE fat-Mach-O
+  # magic collision, then reuse the NUL-delimited manifest for mutation and
+  # verification. Malformed collisions remain candidates and fail in _archs/otool.
   "$python_exe" - "$r_home" > "$macho_manifest" <<'PY'
 import os
 from pathlib import Path
 import stat
 import sys
 
-MACH_O_MAGICS = {
-    b"\xfe\xed\xfa\xce",  # MH_MAGIC
-    b"\xce\xfa\xed\xfe",  # MH_CIGAM
-    b"\xfe\xed\xfa\xcf",  # MH_MAGIC_64
-    b"\xcf\xfa\xed\xfe",  # MH_CIGAM_64
-    b"\xca\xfe\xba\xbe",  # FAT_MAGIC
-    b"\xbe\xba\xfe\xca",  # FAT_CIGAM
-    b"\xca\xfe\xba\xbf",  # FAT_MAGIC_64
-    b"\xbf\xba\xfe\xca",  # FAT_CIGAM_64
-}
+from rc_metastudio.qt6_macos_feasibility import is_macho_candidate
 
 root = Path(sys.argv[1])
 for directory, _, filenames in os.walk(root):
@@ -339,9 +331,8 @@ for directory, _, filenames in os.walk(root):
         path = Path(directory, filename)
         if not stat.S_ISREG(path.lstat().st_mode):
             continue
-        with path.open("rb") as handle:
-            if handle.read(4) in MACH_O_MAGICS:
-                sys.stdout.buffer.write(os.fsencode(path) + b"\0")
+        if is_macho_candidate(path):
+            sys.stdout.buffer.write(os.fsencode(path) + b"\0")
 PY
 
   local macho_count=0
