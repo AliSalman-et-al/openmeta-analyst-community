@@ -7,7 +7,6 @@ import plistlib
 import stat
 import struct
 import sys
-import types
 import zipfile
 from pathlib import Path
 
@@ -57,20 +56,6 @@ def load_macos_signer():
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
-
-
-def load_settings_without_r(monkeypatch):
-    """Load the path settings without initializing the embedded R bridge."""
-    import rc_metastudio
-
-    stub = types.ModuleType("rc_metastudio.meta_py_r")
-    monkeypatch.setitem(sys.modules, "rc_metastudio.meta_py_r", stub)
-    monkeypatch.setitem(sys.modules, "meta_py_r", stub)
-    monkeypatch.setattr(rc_metastudio, "meta_py_r", stub, raising=False)
-    monkeypatch.delitem(sys.modules, "rc_metastudio.settings", raising=False)
-    import rc_metastudio.settings as settings
-
-    return settings
 
 
 def zip_info(name: str, mode: int) -> zipfile.ZipInfo:
@@ -256,11 +241,14 @@ def test_frozen_runtime_discovers_r_in_macos_framework(monkeypatch, tmp_path):
         tmp_path / "RCMetaStudio.app" / "Contents" / "Frameworks"
         / "R.framework" / "Resources"
     )
+    macos_root.mkdir(parents=True)
     (r_home / "bin").mkdir(parents=True)
     (r_home / "library" / "RCMetaR").mkdir(parents=True)
+    isolated_environment = dict(os.environ)
     for name in ("RCMS_R_HOME", "RCMS_R_LIBS", "R_HOME", "R_LIBS", "R_LIBS_USER"):
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
+        isolated_environment.pop(name, None)
+    monkeypatch.setattr(r_runtime.os, "environ", isolated_environment)
+    monkeypatch.setattr(r_runtime, "_DLL_DIRECTORY_HANDLES", [])
 
     configured = r_runtime.configure_bundled_r_environment(str(macos_root))
 
@@ -269,7 +257,7 @@ def test_frozen_runtime_discovers_r_in_macos_framework(monkeypatch, tmp_path):
 
 
 def test_frozen_macos_sample_projects_use_bundle_resources(monkeypatch):
-    settings = load_settings_without_r(monkeypatch)
+    import rc_metastudio.settings as settings
 
     monkeypatch.setattr(settings.sys, "frozen", True, raising=False)
     monkeypatch.setattr(settings.sys, "platform", "darwin")
@@ -277,13 +265,13 @@ def test_frozen_macos_sample_projects_use_bundle_resources(monkeypatch):
         settings.sys, "executable", "/Applications/RCMetaStudio.app/Contents/MacOS/RCMetaStudio"
     )
 
-    assert settings.get_sample_projects_path().replace("\\", "/") == (
+    assert settings.get_sample_projects_path() == (
         "/Applications/RCMetaStudio.app/Contents/Resources/sample_projects"
     )
 
 
 def test_frozen_windows_sample_projects_remain_colocated(monkeypatch):
-    settings = load_settings_without_r(monkeypatch)
+    import rc_metastudio.settings as settings
 
     monkeypatch.setattr(settings.sys, "frozen", True, raising=False)
     monkeypatch.setattr(settings.sys, "platform", "win32")

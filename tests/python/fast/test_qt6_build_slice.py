@@ -392,7 +392,7 @@ report_path.write_text(
     environment["QT_QPA_PLATFORM"] = "offscreen"
     environment["RCMS_QT6_BUILD_ROOT"] = str(build_root)
     report_path = tmp_path / "import-report.json"
-    subprocess.run(
+    completed = subprocess.run(
         [
             sys.executable,
             "-c",
@@ -404,9 +404,14 @@ report_path.write_text(
         ],
         cwd=ROOT,
         env=environment,
-        check=True,
+        check=False,
         capture_output=True,
         text=True,
+    )
+    assert completed.returncode == 0, (
+        "generated UI bootstrap failed\n"
+        f"stdout:\n{completed.stdout}\n"
+        f"stderr:\n{completed.stderr}"
     )
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert report["count"] == 35

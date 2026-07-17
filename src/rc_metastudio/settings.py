@@ -6,10 +6,11 @@ import os
 import sys
 import json
 import math
+import ntpath
+import posixpath
 from collections.abc import Mapping
 from dataclasses import dataclass
 from PyQt6 import QtCore, QtGui
-from rc_metastudio import meta_py_r
 import qt_text
 from workspace_column_identity import WorkspaceColumnWidthState
 
@@ -743,15 +744,24 @@ def add_file_to_recent_files(fpath):
 
 def get_sample_projects_path():
     if getattr(sys, "frozen", False):
-        app_root = os.path.dirname(sys.executable)
-        if sys.platform == "darwin":
-            return os.path.normpath(
-                os.path.join(app_root, os.pardir, "Resources", "sample_projects")
-            )
-    else:
-        app_root = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), os.pardir, os.pardir)
+        path_module = (
+            posixpath
+            if sys.platform == "darwin"
+            else ntpath
+            if sys.platform == "win32"
+            else os.path
         )
+        app_root = path_module.dirname(sys.executable)
+        if sys.platform == "darwin":
+            return path_module.normpath(
+                path_module.join(
+                    app_root, path_module.pardir, "Resources", "sample_projects"
+                )
+            )
+        return path_module.join(app_root, "sample_projects")
+    app_root = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), os.pardir, os.pardir)
+    )
     return os.path.join(app_root, "sample_projects")
 
 
@@ -789,6 +799,8 @@ def setup_directories():
     # Create the application data root and managed analysis scratch folder.
     base_path = make_base_path()
     make_r_tmp()
+
+    from rc_metastudio import meta_py_r
 
     meta_py_r.reset_Rs_working_dir()  # set working directory on R side
     os.chdir(os.path.normpath(base_path))  # set working directory on python side
