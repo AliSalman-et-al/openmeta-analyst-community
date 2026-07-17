@@ -48,6 +48,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-smoke.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-fast.ps1
 ```
 
+The hosted Windows Native Qt6 Vertical Slice has a 45-minute ceiling because it
+runs the complete Qt6 verifier, including native UI evidence and the isolated R
+stack. This is a failure ceiling rather than a performance target; the lane must
+not use the shorter Smoke/Fast budget.
+
 The first clean run downloads the immutable official Qt 6.11.1 Windows x64
 `qtbase` package used only for its matching `rcc` and `Qt6Core.dll`. The package,
 compiler, companion DLL, version, and PE architecture are pinned and validated

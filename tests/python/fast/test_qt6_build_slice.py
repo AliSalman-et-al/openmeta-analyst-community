@@ -56,6 +56,13 @@ def _official_rcc() -> Path:
     return ROOT / "build/qt-rcc/6.11.1/msvc2022_64/bin/rcc.exe"
 
 
+WINDOWS_RCC_TEST = pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="validates the pinned Windows PE rcc package",
+)
+
+
+@WINDOWS_RCC_TEST
 def test_matching_official_rcc_identity_is_accepted():
     qt6_build.validate_rcc(_official_rcc())
     archive = ROOT / "build/qt-rcc/cache" / qt6_build.QT_RCC_PACKAGE
@@ -63,6 +70,7 @@ def test_matching_official_rcc_identity_is_accepted():
     assert archive.stat().st_size == qt6_build.QT_RCC_PACKAGE_SIZE
 
 
+@WINDOWS_RCC_TEST
 def test_rcc_digest_and_configured_tool_identity_fail_closed(tmp_path, monkeypatch):
     official = _official_rcc()
     candidate = tmp_path / "bin/rcc.exe"
@@ -79,6 +87,7 @@ def test_rcc_digest_and_configured_tool_identity_fail_closed(tmp_path, monkeypat
         qt6_build._resolve_rcc()
 
 
+@WINDOWS_RCC_TEST
 def test_rcc_wrong_architecture_is_rejected_even_with_matching_digest(tmp_path):
     official = _official_rcc()
     candidate = tmp_path / "bin/rcc.exe"
@@ -96,9 +105,44 @@ def test_rcc_wrong_architecture_is_rejected_even_with_matching_digest(tmp_path):
         qt6_build.validate_rcc(candidate, expected_digest=digest)
 
 
+@WINDOWS_RCC_TEST
 def test_rcc_wrong_version_is_rejected():
     with pytest.raises(RuntimeError, match="version mismatch"):
         qt6_build.validate_rcc(_official_rcc(), expected_version="6.11.0")
+
+
+def test_macos_official_rcc_requires_pinned_version_and_host_slice(
+    tmp_path, monkeypatch
+):
+    rcc = tmp_path / "Qt SDK" / "libexec" / "rcc"
+    rcc.parent.mkdir(parents=True)
+    rcc.write_bytes(b"official macOS rcc fixture")
+    responses = {
+        "version": "rcc 6.11.1",
+        "architectures": "arm64 x86_64",
+    }
+
+    def completed(command, **_kwargs):
+        stdout = (
+            responses["architectures"]
+            if command[0] == "lipo"
+            else responses["version"]
+        )
+        return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(qt6_build.subprocess, "run", completed)
+    monkeypatch.setattr(qt6_build.platform, "machine", lambda: "arm64")
+
+    qt6_build.validate_macos_rcc(rcc)
+
+    responses["version"] = "rcc 6.11.0"
+    with pytest.raises(RuntimeError, match="version mismatch"):
+        qt6_build.validate_macos_rcc(rcc)
+
+    responses["version"] = "rcc 6.11.1"
+    responses["architectures"] = "x86_64"
+    with pytest.raises(RuntimeError, match="architecture mismatch"):
+        qt6_build.validate_macos_rcc(rcc)
 
 
 class _DownloadResponse:

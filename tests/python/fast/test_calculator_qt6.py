@@ -648,7 +648,20 @@ def test_binary_effect_fields_follow_metric_display_domains(qapp, monkeypatch):
         calculator_routines.helper_set_current_effect(
             FakeMAUnit(), fields, metric, "Group 1-Group 2", "binary", mult=1.96
         )
-        widths[metric] = fields["effect"].width()
+        field = fields["effect"]
+        widths[metric] = field.minimumWidth()
+        margins = field.textMargins()
+        frame = field.style().pixelMetric(
+            QStyle.PixelMetric.PM_DefaultFrameWidth, None, field
+        )
+        for sample in calculator_routines.binary_effect_display_samples(metric):
+            required = (
+                field.fontMetrics().horizontalAdvance(sample)
+                + margins.left()
+                + margins.right()
+                + (2 * frame)
+            )
+            assert field.minimumWidth() >= required
 
     assert widths["OR"] > widths["RD"]
     assert widths["OR"] > widths["PR"]

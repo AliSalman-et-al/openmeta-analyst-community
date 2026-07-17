@@ -69,7 +69,7 @@ jobs:
     needs: change-classifier
     if: ${{ needs.change-classifier.outputs.run-windows == 'true' }}
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     defaults:
       run:
         shell: powershell
@@ -171,6 +171,9 @@ jobs:
           set -euo pipefail
           brew install libpng pkg-config
           libpng_prefix="$(brew --prefix libpng)"
+          mkdir -p "$HOME/.R"
+          printf 'CPPFLAGS += -I%s/include\nLDFLAGS += -L%s/lib\n' \
+            "$libpng_prefix" "$libpng_prefix" >> "$HOME/.R/Makevars"
           echo "CPPFLAGS=-I$libpng_prefix/include ${CPPFLAGS:-}" >> "$GITHUB_ENV"
           echo "LDFLAGS=-L$libpng_prefix/lib ${LDFLAGS:-}" >> "$GITHUB_ENV"
           echo "PKG_CONFIG_PATH=$libpng_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" >> "$GITHUB_ENV"

@@ -335,7 +335,10 @@ def binary_effect_display_samples(metric, digits=CALC_NUM_DIGITS):
     if metric in signed_unit_metrics:
         return ("-1." + ("0" * digits), "1." + ("0" * digits))
     if metric == "AS":
-        return ("-1.5708", "1.5708")
+        # Keep a signed-unit value in the semantic sample set. It is inside the
+        # arcsine domain and prevents native proportional fonts from making the
+        # field narrower than the signed-unit metrics when users switch scales.
+        return ("-1.5708", "-1.0000", "1.5708")
     if metric in positive_ratio_metrics:
         # Ratios are positive and unbounded, so use the exact text produced by
         # the renderer at the largest accepted finite binary64 value.

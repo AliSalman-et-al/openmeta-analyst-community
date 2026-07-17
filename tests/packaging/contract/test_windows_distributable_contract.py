@@ -290,10 +290,14 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
         "No Qt6 verification inputs changed; Windows lane intentionally skipped."
         in workflow["text"]
     )
-    assert "timeout-minutes: 20" in workflow["text"]
+    assert "timeout-minutes: 45" in workflow["text"]
     assert workflow["text"].count("fetch-depth: 0") == 2
     assert "brew install libpng pkg-config" in workflow["text"]
     assert 'libpng_prefix="$(brew --prefix libpng)"' in workflow["text"]
+    assert 'mkdir -p "$HOME/.R"' in workflow["text"]
+    assert '>> "$HOME/.R/Makevars"' in workflow["text"]
+    assert "CPPFLAGS += -I%s/include" in workflow["text"]
+    assert "LDFLAGS += -L%s/lib" in workflow["text"]
     for variable in ("CPPFLAGS", "LDFLAGS", "PKG_CONFIG_PATH"):
         assert f"{variable}=" in workflow["text"]
     assert "qt-sdk-6.11.1-${{ matrix.target }}" in workflow["text"]
