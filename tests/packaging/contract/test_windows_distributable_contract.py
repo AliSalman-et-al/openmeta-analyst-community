@@ -356,6 +356,13 @@ def test_package_workflow_builds_path_aware_artifacts():
         for _, ref, _ in pinned_uses
     )
     assert workflow["paths"] == set()
+    assert re.search(
+        r"- name: Check out repository\s+"
+        r"uses: actions/checkout@[0-9a-f]{40} # v6\s+"
+        r"with:\s+fetch-depth: 0",
+        target["text"],
+    )
+    assert target["text"].count("fetch-depth: 0") == 1
     assert "artifacts/${{ inputs.artifact_name }}.zip" in target["text"]
     assert "artifacts/${{ inputs.artifact_name }}-evidence.json" in target["text"]
     assert any("RCMetaStudio-macos-x64" in run for run in workflow["text"].splitlines())
