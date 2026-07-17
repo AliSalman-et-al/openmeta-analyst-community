@@ -112,6 +112,37 @@ function Copy-DirectoryTree {
     $global:LASTEXITCODE = 0
 }
 
+function Remove-BundledRInstallerResidue {
+    param([string]$Root)
+    $rRoot = Join-Path $Root "R"
+    $requiredRuntimeFiles = @(
+        (Join-Path $rRoot "bin\R.exe")
+        (Join-Path $rRoot "bin\Rscript.exe")
+        (Join-Path $rRoot "bin\x64\R.dll")
+    )
+    foreach ($requiredRuntimeFile in $requiredRuntimeFiles) {
+        Assert-PathExists -Path $requiredRuntimeFile -Description "Portable bundled R runtime file"
+    }
+
+    $installerResidue = @(
+        Get-ChildItem -LiteralPath $rRoot -Recurse -File |
+            Where-Object { $_.Name -match '(?i)^unins000\..+$' }
+    )
+    foreach ($file in $installerResidue) {
+        Remove-Item -LiteralPath $file.FullName -Force
+    }
+    $remainingResidue = @(
+        Get-ChildItem -LiteralPath $rRoot -Recurse -File |
+            Where-Object { $_.Name -match '(?i)^unins000\..+$' }
+    )
+    if ($remainingResidue.Count -ne 0) {
+        throw "Windows R installer residue remained in the portable bundle: $($remainingResidue.FullName -join ', ')"
+    }
+    foreach ($requiredRuntimeFile in $requiredRuntimeFiles) {
+        Assert-PathExists -Path $requiredRuntimeFile -Description "Portable bundled R runtime file after installer-residue removal"
+    }
+}
+
 function Get-Sha256FileHash {
     param([string]$Path)
     $resolvedPath = (Resolve-Path -LiteralPath $Path).ProviderPath
@@ -647,6 +678,7 @@ finally {
 Copy-DirectoryTree -Source (Join-Path $repoRoot "sample_projects") -Destination (Join-Path $appDir "sample_projects")
 Write-Step "Bundling R runtime and packages"
 Copy-RRuntime -Root $resolvedRRuntimeRoot -DestinationRoot $appDir
+Remove-BundledRInstallerResidue -Root $appDir
 Install-BundledRPackages -Root $appDir
 
 @'

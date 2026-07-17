@@ -709,6 +709,23 @@ def test_windows_packager_qualifies_qt6_deployment_and_packaged_surfaces():
         "foreach ($name in $previousEnv.Keys)",
     )
     assert "function Invoke-BoundedPackageProcess" in script
+    assert "function Remove-BundledRInstallerResidue" in script
+    assert "(?i)^unins000\\..+$" in script
+    assert "Remove-Item -LiteralPath $file.FullName -Force" in script
+    assert "Windows R installer residue remained in the portable bundle" in script
+    for required_r_file in (
+        '"bin\\R.exe"',
+        '"bin\\Rscript.exe"',
+        '"bin\\x64\\R.dll"',
+    ):
+        assert required_r_file in script
+    assert relative_order(
+        script,
+        "Copy-RRuntime -Root $resolvedRRuntimeRoot -DestinationRoot $appDir",
+        "Remove-BundledRInstallerResidue -Root $appDir",
+        "Install-BundledRPackages -Root $appDir",
+        "Inspecting coherent Windows x64 deployment",
+    )
     assert "WaitForExit($TimeoutSeconds * 1000)" in script
     assert "Start-Process -FilePath taskkill.exe" in script
     assert '"/PID", $process.Id, "/T", "/F"' in script
