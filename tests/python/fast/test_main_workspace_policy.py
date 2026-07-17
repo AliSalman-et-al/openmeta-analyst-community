@@ -1,11 +1,58 @@
 import os
 import sys
+import uuid
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 sys.path.insert(0, os.path.abspath("src/rc_metastudio"))
 
 from PyQt6 import QtCore, QtGui, QtWidgets
+
+import pytest
+
+
+def test_save_settings_never_constructs_or_syncs_qsettings(monkeypatch, capsys):
+    import settings
+
+    capsys.readouterr()
+
+    class UnexpectedSettings:
+        def __init__(self):
+            raise AssertionError("save_settings must not construct QSettings")
+
+    monkeypatch.setattr(settings, "QSettings", UnexpectedSettings)
+
+    settings.save_settings()
+
+    assert capsys.readouterr().out.splitlines() == [
+        "saved settings",
+        "RCMS_SETTINGS_PHASE before-former-sync",
+        "RCMS_SETTINGS_PHASE after-former-sync",
+    ]
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows registry contract")
+def test_native_user_settings_are_immediately_readable_without_sync():
+    identity = uuid.uuid4().hex
+    organization = "RCMetaStudio-QSettings-Test-" + identity
+    application = "Issue340-" + identity
+    key = "hosted-exit/immediate-readback"
+    expected = "visible-without-RegFlushKey-" + identity
+    constructor = (
+        QtCore.QSettings.Format.NativeFormat,
+        QtCore.QSettings.Scope.UserScope,
+        organization,
+        application,
+    )
+    writer = QtCore.QSettings(*constructor)
+    reader = QtCore.QSettings(*constructor)
+    try:
+        writer.setValue(key, expected)
+
+        assert reader.value(key, type=str) == expected
+    finally:
+        writer.remove(key)
+        reader.remove(key)
 
 
 class IdentityTableModel(QtGui.QStandardItemModel):

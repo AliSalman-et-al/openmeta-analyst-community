@@ -225,9 +225,10 @@ def _get_setting_helper(field):
 
 
 def save_settings():
-    print("saved settings")
-    settings = QSettings()
-    settings.sync()  # writes to permanent storage
+    """Mark completion after callers' setValue writes without forcing RegFlushKey."""
+    print("saved settings", flush=True)
+    print("RCMS_SETTINGS_PHASE before-former-sync", flush=True)
+    print("RCMS_SETTINGS_PHASE after-former-sync", flush=True)
 
 
 def migrate_workspace_layout_settings():

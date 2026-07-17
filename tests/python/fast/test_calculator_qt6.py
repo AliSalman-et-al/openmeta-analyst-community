@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from PIL import Image
 from PyQt6 import QtCore, QtGui
 from PyQt6.QtWidgets import (
     QDialog,
@@ -109,11 +110,67 @@ def test_native_calculator_capture_falls_back_when_screen_grab_is_null(tmp_path,
             for y in range(0, rendered.height(), max(1, rendered.height() // 8))
         }
         assert len(sampled_colors) > 2
-        assert pixmap.save(str(image), "PNG")
+        smoke.encode_capture_png(pixmap, image)
         assert image.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+        with Image.open(image) as encoded:
+            encoded.load()
+            assert encoded.format == "PNG"
+            assert encoded.mode == "RGBA"
+            assert len(encoded.getcolors(maxcolors=encoded.width * encoded.height)) > 2
     finally:
         dialog.close()
         qapp.processEvents()
+
+
+def test_native_calculator_png_encoding_never_calls_qt_save(tmp_path):
+    smoke = _load_native_calculator_smoke()
+
+    class SaveFailingImage(QtGui.QImage):
+        def save(self, *args, **kwargs):
+            raise AssertionError("Qt image encoding must not be used")
+
+    source = SaveFailingImage(7, 5, QtGui.QImage.Format.Format_RGBA8888)
+    source.fill(QtGui.QColor("#d31f45"))
+    source.setPixelColor(0, 0, QtGui.QColor("#2d72d9"))
+    image_path = tmp_path / "pillow-encoded.png"
+
+    smoke.encode_capture_png(source, image_path)
+
+    with Image.open(image_path) as encoded:
+        encoded.load()
+        assert encoded.format == "PNG"
+        assert encoded.mode == "RGBA"
+        assert encoded.size == (7, 5)
+        assert encoded.getpixel((0, 0)) == (45, 114, 217, 255)
+        assert encoded.getpixel((6, 4)) == (211, 31, 69, 255)
+
+
+def test_native_calculator_installs_stub_before_legacy_gui_imports(monkeypatch):
+    smoke = _load_native_calculator_smoke()
+    source = (ROOT / "scripts" / "native_calculator_smoke.py").read_text(
+        encoding="utf-8"
+    )
+
+    install_at = source.index("\n    install_native_stub_backend()\n")
+    for gui_import in (
+        "import binary_data_form",
+        "import continuous_data_form",
+        "import diagnostic_data_form",
+    ):
+        assert install_at < source.index(gui_import)
+
+    monkeypatch.delitem(sys.modules, "rpy2.rinterface", raising=False)
+    backend = smoke.install_native_stub_backend()
+    assert backend._oma_stub_backend is True
+    assert "rpy2.rinterface" not in sys.modules
+
+
+def test_native_calculator_backend_contract_fails_closed_for_loaded_rpy2(monkeypatch):
+    smoke = _load_native_calculator_smoke()
+    monkeypatch.setitem(sys.modules, "rpy2.rinterface", object())
+
+    with pytest.raises(RuntimeError, match="rpy2.rinterface"):
+        smoke.install_native_stub_backend()
 
 
 def test_native_calculator_teardown_disables_auto_quit_and_restores_on_error():

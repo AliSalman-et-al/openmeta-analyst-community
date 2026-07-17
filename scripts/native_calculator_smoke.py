@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import faulthandler
 import json
 import hashlib
 import math
@@ -12,11 +13,16 @@ import sys
 
 os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 
+from PIL import Image
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 from rc_metastudio.qt6_resources import ensure_application_resources
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 from rc_metastudio.runtime_types import required
+
+
+def _phase(name: str) -> None:
+    print("RCMS_NATIVE_CALCULATOR_PHASE " + name, flush=True)
 
 
 def _write_evidence(path: Path, evidence: list[dict[str, object]]) -> None:
@@ -64,6 +70,45 @@ def capture_visible_calculator(
     return image, "QWidget.render(QImage) fallback"
 
 
+def encode_capture_png(
+    capture: QtGui.QPixmap | QtGui.QImage, path: Path
+) -> None:
+    """Encode a Qt capture through Pillow without invoking Qt image plugins."""
+    if capture.isNull():
+        raise RuntimeError("cannot encode a null calculator capture")
+    image = capture.toImage() if isinstance(capture, QtGui.QPixmap) else capture
+    rgba = image.convertToFormat(QtGui.QImage.Format.Format_RGBA8888)
+    if rgba.isNull():
+        raise RuntimeError("failed to convert calculator capture to RGBA8888")
+    bits = rgba.bits()
+    bits.setsize(rgba.sizeInBytes())
+    raw_bytes = bits.asstring(rgba.sizeInBytes())
+    encoded = Image.frombytes(
+        "RGBA",
+        (rgba.width(), rgba.height()),
+        raw_bytes,
+        "raw",
+        "RGBA",
+        rgba.bytesPerLine(),
+        1,
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    encoded.save(path, format="PNG")
+
+
+def install_native_stub_backend():
+    """Install and verify the calculator smoke's non-R backend boundary."""
+    from rc_metastudio import meta_py_r_backend
+
+    backend = meta_py_r_backend.install_stub_meta_py_r()
+    if getattr(backend, "_oma_stub_backend", False) is not True:
+        raise RuntimeError("native calculator smoke did not install the stub backend")
+    if "rpy2.rinterface" in sys.modules:
+        raise RuntimeError("rpy2.rinterface loaded before native calculator GUI imports")
+    _phase("backend-installed")
+    return backend
+
+
 def close_automation_window(
     app: QtWidgets.QApplication, window: QtWidgets.QWidget
 ) -> None:
@@ -72,7 +117,9 @@ def close_automation_window(
     app.setQuitOnLastWindowClosed(False)
     try:
         setattr(window, "current_data_unsaved", False)
+        _phase("close-entry")
         window.close()
+        _phase("close-return")
     finally:
         app.setQuitOnLastWindowClosed(previous_auto_quit)
 
@@ -134,11 +181,12 @@ def validate_evidence_bundle(evidence_root: Path) -> list[dict[str, object]]:
     return evidence
 
 
-def main() -> int:
+def _run_main() -> int:
     prepare_generated_ui_imports()
     ensure_application_resources()
     repo_root = Path(__file__).resolve().parents[1]
     sys.path.append(str(repo_root / "src" / "rc_metastudio"))
+    install_native_stub_backend()
 
     import binary_data_form
     import continuous_data_form
@@ -279,11 +327,12 @@ def main() -> int:
                     app.processEvents()
 
                     image_path = evidence_root / (data_type + ".png")
+                    _phase("capture-entry-" + data_type)
                     pixmap, capture_method = capture_visible_calculator(dialog)
-                    if pixmap.isNull() or not pixmap.save(str(image_path), "PNG"):
-                        raise RuntimeError(
-                            "failed to capture visible %s calculator" % data_type
-                        )
+                    _phase("capture-return-" + data_type)
+                    _phase("encoding-entry-" + data_type)
+                    encode_capture_png(pixmap, image_path)
+                    _phase("encoding-return-" + data_type)
                     if image_path.read_bytes()[:8] != b"\x89PNG\r\n\x1a\n":
                         raise RuntimeError(
                             "calculator capture is not an intact PNG: %s" % data_type
@@ -353,9 +402,22 @@ def main() -> int:
         _write_evidence(evidence_path, evidence)
         close_automation_window(app, window)
 
+    _phase("validation-entry")
     validate_evidence_bundle(evidence_root)
+    _phase("validation-return")
     print(evidence_path.read_text(encoding="utf-8"))
     return 0
+
+
+def main() -> int:
+    faulthandler.enable()
+    faulthandler.dump_traceback_later(30, repeat=True)
+    try:
+        result = _run_main()
+        _phase("main-return")
+        return result
+    finally:
+        faulthandler.cancel_dump_traceback_later()
 
 
 if __name__ == "__main__":

@@ -8704,6 +8704,31 @@
       "reason": "Proves native smoke teardown suppresses last-window auto-quit before close, restores state on failure, and performs no post-close event pump.", "runtime_class": "subsecond", "size": "small"
     },
     {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_native_calculator_backend_contract_fails_closed_for_loaded_rpy2",
+      "reason": "Fails closed when real rpy2 has entered the calculator smoke process despite the required stub backend boundary.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["analysis_behavior", "release_readiness"], "external_dependencies": ["filesystem", "qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_native_calculator_installs_stub_before_legacy_gui_imports",
+      "reason": "Guards stub installation and verification before every calculator legacy GUI import so the native smoke cannot initialize embedded R.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["filesystem", "qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_calculator_qt6.py::test_native_calculator_png_encoding_never_calls_qt_save",
+      "reason": "Forces the Qt save method to fail and proves Pillow encodes recognizable RGBA capture bytes as an explicit PNG.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_native_user_settings_are_immediately_readable_without_sync",
+      "reason": "On Windows, proves production NativeFormat UserScope registry writes are visible through a second QSettings instance without RegFlushKey.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
+      "decision": "keep", "evidence": ["release_readiness"], "external_dependencies": ["qt"], "lane": "fast",
+      "nodeid": "tests/python/fast/test_main_workspace_policy.py::test_save_settings_never_constructs_or_syncs_qsettings",
+      "reason": "Guards the settings completion marker against constructing QSettings or entering the Windows whole-hive RegFlushKey boundary.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
       "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
       "nodeid": "tests/python/gui/test_binary_data_transactional_layout.py::test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction",
       "reason": "Proves cancelling the real binary back-calculation chooser preserves table, copied model, outer dialog, and undo state exactly.", "runtime_class": "seconds", "size": "medium"
