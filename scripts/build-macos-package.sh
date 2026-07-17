@@ -204,6 +204,7 @@ smoke_stderr_path="$qualification_root/packaged-smoke.stderr.log"
 hang_trace_path="$qualification_root/packaged-smoke.hang-trace.log"
 launchservices_marker_path="$qualification_root/launchservices-completion.json"
 launchservices_pid_path="$qualification_root/launchservices.pid"
+signing_inventory_path="$qualification_root/ad-hoc-signing-inventory.json"
 archive_inspection_path="$artifact_dir/$artifact_name-archive-inspection.json"
 qualification_evidence_path="$artifact_dir/$artifact_name-evidence.json"
 r_package_cache_root="${r_package_cache_root:-$artifact_dir/r-library-cache}"
@@ -295,10 +296,62 @@ if [ ! -x "$app_root/RCMetaStudio" ]; then
 fi
 
 step "Bundling sample projects and R runtime"
-copy_tree "$repo_root/sample_projects" "$app_root/sample_projects"
-copy_tree "$r_runtime_root" "$app_root/R"
+resources_root="$app_bundle/Contents/Resources"
+sample_root="$resources_root/sample_projects"
+copy_tree "$repo_root/sample_projects" "$sample_root"
+r_framework="$app_bundle/Contents/Frameworks/R.framework"
+r_version="$("$r_runtime_root/bin/Rscript" -e 'cat(as.character(getRversion()))')"
+r_framework_version="$("$python_exe" - "$r_version" <<'PY'
+import sys
 
-r_home="$app_root/R"
+from rc_metastudio.r_runtime import macos_r_framework_version
+
+print(macos_r_framework_version(sys.argv[1]))
+PY
+)"
+case "$r_framework_version" in
+  [0-9]*.[0-9]*) ;;
+  *) echo "Cannot derive the bundled R framework version." >&2; exit 1 ;;
+esac
+r_version_root="$r_framework/Versions/$r_framework_version"
+copy_tree "$r_runtime_root" "$r_version_root/Resources"
+ln -s "$r_framework_version" "$r_framework/Versions/Current"
+ln -s "Versions/Current/Resources" "$r_framework/Resources"
+if [ ! -f "$r_version_root/Resources/lib/libR.dylib" ]; then
+  echo "Bundled R framework is missing Resources/lib/libR.dylib." >&2
+  exit 1
+fi
+ln -s "Resources/lib/libR.dylib" "$r_version_root/R"
+ln -s "Versions/Current/R" "$r_framework/R"
+"$python_exe" - "$r_version_root/Resources/Info.plist" "$r_framework_version" <<'PY'
+from pathlib import Path
+import plistlib
+import sys
+
+path = Path(sys.argv[1])
+version = sys.argv[2]
+info = {}
+if path.is_file():
+    with path.open("rb") as stream:
+        loaded = plistlib.load(stream)
+    if isinstance(loaded, dict):
+        info.update(loaded)
+info.update({
+    "CFBundleDevelopmentRegion": "English",
+    "CFBundleExecutable": "R",
+    "CFBundleIdentifier": "org.r-project.R",
+    "CFBundleInfoDictionaryVersion": "6.0",
+    "CFBundleName": "R",
+    "CFBundlePackageType": "FMWK",
+    "CFBundleShortVersionString": version,
+    "CFBundleVersion": version,
+})
+path.parent.mkdir(parents=True, exist_ok=True)
+with path.open("wb") as stream:
+    plistlib.dump(info, stream, sort_keys=True)
+PY
+
+r_home="$r_framework/Resources"
 r_lib="$r_home/library"
 rscript="$r_home/bin/Rscript"
 r_binary="$r_home/bin/R"
@@ -538,24 +591,25 @@ configure_relocatable_r_launchers
 step "Relocating completed bundled R runtime dependencies"
 relocate_bundled_r_runtime
 
-cat > "$app_root/LaunchRCMetaStudio.command" <<'SH'
+cat > "$resources_root/LaunchRCMetaStudio.command" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+R_DIR="$APP_DIR/../Frameworks/R.framework/Resources"
 export RPY2_CFFI_MODE=ABI
-export RCMS_R_HOME="$APP_DIR/R"
-export RCMS_R_LIBS="$APP_DIR/R/library"
-exec "$APP_DIR/RCMetaStudio" "$APP_DIR/sample_projects/amino.rcms"
+export RCMS_R_HOME="$R_DIR"
+export RCMS_R_LIBS="$R_DIR/library"
+exec "$APP_DIR/../MacOS/RCMetaStudio" "$APP_DIR/sample_projects/amino.rcms"
 SH
-chmod +x "$app_root/LaunchRCMetaStudio.command"
+chmod +x "$resources_root/LaunchRCMetaStudio.command"
 
 for required_path in \
   "$app_root/RCMetaStudio" \
-  "$app_root/sample_projects/BCG.rcms" \
-  "$app_root/sample_projects/amino.rcms" \
-  "$app_root/R/bin/Rscript" \
-  "$app_root/R/library/RCMetaR/DESCRIPTION" \
-  "$app_root/LaunchRCMetaStudio.command"
+  "$sample_root/BCG.rcms" \
+  "$sample_root/amino.rcms" \
+  "$r_home/bin/Rscript" \
+  "$r_home/library/RCMetaR/DESCRIPTION" \
+  "$resources_root/LaunchRCMetaStudio.command"
 do
   if [ ! -e "$required_path" ]; then
     echo "Packaged macOS app is missing $required_path." >&2
@@ -565,7 +619,7 @@ done
 
 run_adaptive_layout_evidence() {
   local evidence_root="$repo_root/build/macos-package/$architecture/adaptive-layout-evidence/macos-$architecture"
-  local sample_path="$app_root/sample_projects/amino.rcms"
+  local sample_path="$sample_root/amino.rcms"
   rm -rf "$evidence_root"
   mkdir -p "$evidence_root"
   for scale in "1.0" "1.5"; do
@@ -606,8 +660,9 @@ run_packaged_process() {
 }
 
 step "Applying and verifying the replaceable ad-hoc app-bundle signature"
-codesign --force --deep --options runtime --sign - "$app_bundle"
-codesign --verify --deep --strict --verbose=2 "$app_bundle"
+"$python_exe" "$repo_root/scripts/sign_macos_app.py" "$app_bundle" \
+  --identity - \
+  --inventory-output "$signing_inventory_path"
 
 step "Probing the frozen macOS runtime"
 RCMS_AUTOMATION_SMOKE_LOG="$smoke_log_path" \
@@ -619,7 +674,7 @@ if [ ! -s "$runtime_probe_path" ]; then
 fi
 
 if [ "$skip_smoke" -eq 0 ]; then
-  sample_path="$app_root/sample_projects/amino.rcms"
+  sample_path="$sample_root/amino.rcms"
   baseline_dpr="$("$python_exe" - "$runtime_probe_path" <<'PY'
 import json
 import sys
@@ -685,12 +740,12 @@ qt_version="$("$python_exe" -c 'import importlib.metadata as m; print(m.version(
 sip_version="$("$python_exe" -c 'import importlib.metadata as m; print(m.version("PyQt6-sip"))')"
 sip_runtime_version="$("$python_exe" -c 'from PyQt6 import sip; print(sip.SIP_VERSION_STR)')"
 rpy2_version="$("$python_exe" -c 'import importlib.metadata as m; print(m.version("rpy2"))')"
-r_version="$("$rscript" -e 'cat(as.character(getRversion()))')"
 locked_qt_root="$("$python_exe" -c 'from pathlib import Path; import PyQt6; print(Path(PyQt6.__file__).resolve().parent / "Qt6")')"
 step "Inspecting the coherent Intel-only macOS deployment"
 "$python_exe" "$repo_root/scripts/inspect_macos_deployment.py" inspect \
   --app-root "$app_bundle" --output "$deployment_manifest_path" \
   --source-commit "$source_commit" --runtime-probe "$runtime_probe_path" \
+  --signing-inventory "$signing_inventory_path" \
   --locked-qt-root "$locked_qt_root" \
   --python-version "$python_version" --pyqt6-version "$pyqt6_version" \
   --qt-version "$qt_version" --sip-version "$sip_version" \
@@ -706,23 +761,38 @@ step "Inspecting the coherent Intel-only macOS deployment"
 )
 mv "$tmp_zip_path" "$zip_path"
 
-python3 - "$zip_path" "$archive_root_name" "$skip_smoke" <<'PY'
+python3 - "$zip_path" "$archive_root_name" "$skip_smoke" "$r_framework_version" <<'PY'
+import stat
 import sys
 import zipfile
 
 zip_path = sys.argv[1]
 archive_root_name = sys.argv[2].rstrip("/")
 skip_smoke = sys.argv[3] == "1"
+framework_version = sys.argv[4]
+framework = f"{archive_root_name}/RCMetaStudio.app/Contents/Frameworks/R.framework"
+version_root = f"{framework}/Versions/{framework_version}"
+resources = f"{version_root}/Resources"
 required = [
     f"{archive_root_name}/RCMetaStudio.app/Contents/MacOS/RCMetaStudio",
-    f"{archive_root_name}/RCMetaStudio.app/Contents/MacOS/sample_projects/BCG.rcms",
-    f"{archive_root_name}/RCMetaStudio.app/Contents/MacOS/sample_projects/amino.rcms",
-    f"{archive_root_name}/RCMetaStudio.app/Contents/MacOS/R/bin/Rscript",
-    f"{archive_root_name}/RCMetaStudio.app/Contents/MacOS/R/library/RCMetaR/DESCRIPTION",
-    f"{archive_root_name}/RCMetaStudio.app/Contents/MacOS/LaunchRCMetaStudio.command",
+    f"{archive_root_name}/RCMetaStudio.app/Contents/Resources/sample_projects/BCG.rcms",
+    f"{archive_root_name}/RCMetaStudio.app/Contents/Resources/sample_projects/amino.rcms",
+    f"{resources}/bin/Rscript",
+    f"{resources}/library/RCMetaR/DESCRIPTION",
+    f"{resources}/Info.plist",
+    f"{resources}/lib/libR.dylib",
+    f"{archive_root_name}/qualification/ad-hoc-signing-inventory.json",
+    f"{archive_root_name}/RCMetaStudio.app/Contents/Resources/LaunchRCMetaStudio.command",
     f"{archive_root_name}/qualification/deployment-manifest.json",
     f"{archive_root_name}/qualification/runtime-probe.json",
 ]
+expected_links = {
+    f"{framework}/Versions/Current": framework_version,
+    f"{framework}/Resources": "Versions/Current/Resources",
+    f"{version_root}/R": "Resources/lib/libR.dylib",
+    f"{framework}/R": "Versions/Current/R",
+}
+required.extend(expected_links)
 if not skip_smoke:
     required.extend([
         f"{archive_root_name}/qualification/packaged-smoke.json",
@@ -734,6 +804,18 @@ if not skip_smoke:
     ])
 with zipfile.ZipFile(zip_path) as archive:
     names = set(archive.namelist())
+    info_by_name = {info.filename: info for info in archive.infolist()}
+    for path, target in expected_links.items():
+        if path not in info_by_name:
+            continue
+        info = info_by_name[path]
+        mode = info.external_attr >> 16
+        if (
+            not stat.S_ISLNK(mode)
+            or stat.S_IMODE(mode) != 0o777
+            or archive.read(path).decode("utf-8") != target
+        ):
+            raise SystemExit(f"Created ZIP has a noncanonical R framework alias: {path}")
 outside_root = [
     name for name in names if name and not name.startswith(f"{archive_root_name}/")
 ]
@@ -751,6 +833,7 @@ if [ "$skip_smoke" -eq 0 ]; then
   "$python_exe" "$repo_root/scripts/inspect_macos_deployment.py" archive \
     --archive "$zip_path" --archive-root-name "$archive_root_name" \
     --deployment-manifest "$deployment_manifest_path" \
+    --signing-inventory "$signing_inventory_path" \
     --runtime-probe "$runtime_probe_path" \
     --smoke-evidence "$smoke_evidence_path" --smoke-log "$smoke_log_path" \
     --smoke-stdout "$smoke_stdout_path" --smoke-stderr "$smoke_stderr_path" \
@@ -759,6 +842,7 @@ if [ "$skip_smoke" -eq 0 ]; then
     --output "$archive_inspection_path"
   "$python_exe" "$repo_root/scripts/inspect_macos_deployment.py" evidence \
     --archive "$zip_path" --deployment-manifest "$deployment_manifest_path" \
+    --signing-inventory "$signing_inventory_path" \
     --runtime-probe "$runtime_probe_path" \
     --smoke-evidence "$smoke_evidence_path" --smoke-log "$smoke_log_path" \
     --smoke-stdout "$smoke_stdout_path" --smoke-stderr "$smoke_stderr_path" \

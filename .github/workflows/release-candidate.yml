@@ -163,11 +163,15 @@ jobs:
           if (-not $assembled) { throw "Missing assembled stage result." }
           Copy-Item -LiteralPath $assembled.FullName -Destination "signed/records/$env:TARGET.assembled.json"
           $input = uv run python scripts/delivery.py digest --json $assembled.FullName
-          uv run python scripts/delivery.py stage-result --target "$env:TARGET" --stage signed --commit "$env:SOURCE_SHA" --input-digest "$input" --output-file "signed/$env:ARTIFACT" --result "signed/records/$env:TARGET.signed.json"
+          if ($env:TARGET -eq 'macos-x64') {
+            uv run python scripts/delivery.py stage-result --target "$env:TARGET" --stage signed --commit "$env:SOURCE_SHA" --input-digest "$input" --output-file "signed/$env:ARTIFACT" --output-file "signed/$env:ARTIFACT.signing-inventory.json" --result "signed/records/$env:TARGET.signed.json"
+          } else {
+            uv run python scripts/delivery.py stage-result --target "$env:TARGET" --stage signed --commit "$env:SOURCE_SHA" --input-digest "$input" --output-file "signed/$env:ARTIFACT" --result "signed/records/$env:TARGET.signed.json"
+          }
           $previous = "signed/records/$env:TARGET.signed.json"
           if ($env:TARGET -eq 'macos-x64') {
             $input = uv run python scripts/delivery.py digest --json $previous
-            uv run python scripts/delivery.py stage-result --target "$env:TARGET" --stage notarized --commit "$env:SOURCE_SHA" --input-digest "$input" --output-file "signed/$env:ARTIFACT" --result "signed/records/$env:TARGET.notarized.json"
+            uv run python scripts/delivery.py stage-result --target "$env:TARGET" --stage notarized --commit "$env:SOURCE_SHA" --input-digest "$input" --output-file "signed/$env:ARTIFACT" --output-file "signed/$env:ARTIFACT.signing-inventory.json" --result "signed/records/$env:TARGET.notarized.json"
             $previous = "signed/records/$env:TARGET.notarized.json"
           }
           $input = uv run python scripts/delivery.py digest --json $previous
@@ -261,9 +265,10 @@ jobs:
           python scripts/delivery.py promote --manifest "$manifest" --from-channel candidate --channel rc --output release/release-set-rc.json
           cp release/targets/attested-windows-x64/RCMetaStudio-windows-x64.zip release/
           cp release/targets/attested-macos-x64/RCMetaStudio-macos-x64.zip release/
+          cp release/targets/attested-macos-x64/RCMetaStudio-macos-x64.zip.signing-inventory.json release/
           cp release/targets/attested-windows-x64/windows-x64.cdx.json release/
           cp release/targets/attested-macos-x64/macos-x64.cdx.json release/
-          python scripts/delivery.py checksums --files release/RCMetaStudio-windows-x64.zip --files release/RCMetaStudio-macos-x64.zip --files release/windows-x64.cdx.json --files release/macos-x64.cdx.json --output release/SHA256SUMS
+          python scripts/delivery.py checksums --files release/RCMetaStudio-windows-x64.zip --files release/RCMetaStudio-macos-x64.zip --files release/RCMetaStudio-macos-x64.zip.signing-inventory.json --files release/windows-x64.cdx.json --files release/macos-x64.cdx.json --output release/SHA256SUMS
       - name: Publish immutable RC
         env:
           GH_TOKEN: ${{ github.token }}
@@ -278,4 +283,4 @@ jobs:
           else
             tag_args=(--target "${{ inputs.source_sha }}")
           fi
-          gh release create "$TAG" release/RCMetaStudio-*.zip release/*.cdx.json release/SHA256SUMS release/release-set-rc.json "${tag_args[@]}" --prerelease --title "RC MetaStudio ${{ inputs.version }}" --notes "Immutable signed release candidate. Verify SHA256SUMS and GitHub artifact attestations before promotion."
+          gh release create "$TAG" release/RCMetaStudio-*.zip release/*.signing-inventory.json release/*.cdx.json release/SHA256SUMS release/release-set-rc.json "${tag_args[@]}" --prerelease --title "RC MetaStudio ${{ inputs.version }}" --notes "Immutable signed release candidate. Verify SHA256SUMS and GitHub artifact attestations before promotion."

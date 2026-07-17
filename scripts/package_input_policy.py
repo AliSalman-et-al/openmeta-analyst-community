@@ -11,6 +11,7 @@ import sys
 PACKAGE_INPUT_PATTERNS = (
     ".github/workflows/fast-verification.yml",
     ".github/workflows/package-target.yml",
+    ".github/workflows/release-candidate.yml",
     "packaging/*",
     "pyproject.toml",
     "uv.lock",
@@ -30,6 +31,8 @@ PACKAGE_INPUT_PATTERNS = (
     "scripts/build-macos-package.sh",
     "scripts/package-macos.sh",
     "scripts/inspect_macos_deployment.py",
+    "scripts/sign_macos_app.py",
+    "scripts/sign-notarize-macos-package.sh",
     "scripts/qt6_macos_feasibility.py",
     "scripts/run_bounded_process.py",
     "scripts/package_input_policy.py",

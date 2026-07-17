@@ -516,11 +516,10 @@ def test_macos_distributable_contract_is_declared():
         "RPY2_CFFI_MODE",
     } <= script["env_names"]
     assert "env -u QT_QPA_PLATFORM" in script["text"]
-    assert {
-        "sample_projects/amino.rcms",
-        "R/library/RCMetaR/DESCRIPTION",
-        "LaunchRCMetaStudio.command",
-    } <= script["app_paths"]
+    assert "$sample_root/amino.rcms" in script["text"]
+    assert "$resources_root/LaunchRCMetaStudio.command" in script["text"]
+    assert "$app_bundle/Contents/Frameworks/R.framework" in script["text"]
+    assert "$r_home/library/RCMetaR/DESCRIPTION" in script["text"]
     assert "doc/openMA_help.html" not in script["app_paths"]
     assert "Bundling sample projects, help, and R runtime" not in script["text"]
     assert "scripts/install-r-deps.R" in script["text"]
@@ -660,7 +659,7 @@ def test_macos_packager_copies_resolved_r_runtime_contents():
     assert relative_order(
         script,
         'r_runtime_root="$(resolve_existing_dir "$r_runtime_root" "Source R runtime")"',
-        'copy_tree "$r_runtime_root" "$app_root/R"',
+        'copy_tree "$r_runtime_root" "$r_version_root/Resources"',
         'if [ ! -x "$rscript" ] || [ ! -x "$r_binary" ]; then',
     )
 
@@ -685,12 +684,12 @@ def test_macos_packager_relocates_every_bundled_r_macho_before_use():
     assert 'exec "$R_HOME/bin/exec/R" --no-echo --no-restore "$@"' in script
     assert relative_order(
         script,
-        'copy_tree "$r_runtime_root" "$app_root/R"',
+        'copy_tree "$r_runtime_root" "$r_version_root/Resources"',
         "install_local_r_packages",
         'if ! test_bundled_r_packages "$r_lib"',
         'step "Configuring relocatable bundled R launchers"',
         'step "Relocating completed bundled R runtime dependencies"',
-        'cat > "$app_root/LaunchRCMetaStudio.command"',
+        'cat > "$resources_root/LaunchRCMetaStudio.command"',
     )
 
 

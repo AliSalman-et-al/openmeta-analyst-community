@@ -744,6 +744,10 @@ def add_file_to_recent_files(fpath):
 def get_sample_projects_path():
     if getattr(sys, "frozen", False):
         app_root = os.path.dirname(sys.executable)
+        if sys.platform == "darwin":
+            return os.path.normpath(
+                os.path.join(app_root, os.pardir, "Resources", "sample_projects")
+            )
     else:
         app_root = os.path.abspath(
             os.path.join(os.path.dirname(__file__), os.pardir, os.pardir)

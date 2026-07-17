@@ -20,6 +20,15 @@ Posit Public Package Manager supplies native Intel binaries for the complete
 dependency closure; the pinned HSROC 2.1.9 archive is the sole source-package
 exception. The R launchers and Mach-O install names are relocated before the
 app is used.
+The complete R runtime is a nested `Contents/Frameworks/R.framework`. Its
+`Versions/<R-version>/Resources` directory is R_HOME, `Versions/Current` and
+the top-level `Resources` use canonical framework links, and the framework's
+`R` executable link resolves to the bundled `Resources/lib/libR.dylib` named by
+its `FMWK` Info.plist. Sample projects and the convenience launcher remain
+under the app's `Contents/Resources`; `Contents/MacOS` retains only the actual
+`RCMetaStudio` entry executable. Every R Mach-O remains in the explicit signing
+and deployment inventories, and the complete framework is signed as nested
+code after its native descendants.
 
 `scripts/inspect_macos_deployment.py` inspects the final, ad-hoc-signed app. It
 parses every Mach-O header and accepts only the exact thin `x86_64` slice,
@@ -65,14 +74,37 @@ manifest/probe/smoke/log that differs from its inspected source. The separate
 qualification record binds the ZIP hash and size, architecture/dependency
 manifest, runtime probe, smoke evidence and log, archive inspection, and GitHub
 runner/image/OS identity. Failure uploads retain PyInstaller diagnostics and
-every qualification file written before the failure.
+every qualification file written before the failure, including the explicit
+signing inventory once signing succeeds.
 
-After assembly, the app receives a replaceable ad-hoc signature with the
-hardened-runtime option and no entitlements. Strict deep verification and
-flag/entitlement inspection happen before the runtime probe and every smoke, so
-the exercised bytes have the same hardened-runtime policy as the archived app.
-This qualifies the structure for future Developer ID signing and notarization. Developer ID
-signing, notarization, stapling, and universal2 assembly remain outside #342.
+After assembly, `scripts/sign_macos_app.py` classifies every regular Mach-O
+file, validates real nested code bundles from their `Info.plist` and native
+`CFBundleExecutable`, and signs that fixed inventory inside-out before signing
+the outer app. It never asks `codesign --deep` to discover signing targets, so
+dotted R data directories and executable scripts remain resources rather than
+heuristically inferred code bundles. Any unreadable payload, malformed bundle
+that contains native code, or inventory drift during signing fails closed.
+This follows Apple's guidance to keep app data in Resources, package native
+runtime code as a valid nested framework, sign nested code
+inside-out, and reserve `--deep` for verification. Apple documents that
+directories containing periods in code locations are interpreted as bundles;
+the old `Contents/MacOS/R` layout therefore caused recursive signing to
+misclassify rmarkdown's `navigation-1.1` CSS/JavaScript resource directory
+([TN2206](https://developer.apple.com/library/archive/technotes/tn2206/)).
+
+The same explicit signer applies either the replaceable ad-hoc identity used by
+package qualification or a timestamped Developer ID identity in the future
+release stage. The ad-hoc inventory is embedded in the qualification ZIP and
+hash-bound by both archive inspection and final evidence; the Developer ID
+inventory is retained beside the signed ZIP, bound into the immutable delivery
+stage chain, checksummed, and published with the release candidate. Every
+classified Mach-O and real nested bundle receives the
+hardened-runtime option and individual strict verification; the outer app also
+receives strict deep verification after its resource seal is created.
+Flag/entitlement inspection happens before the runtime probe and every smoke,
+so the exercised bytes have the same hardened-runtime policy as the archived
+app. Developer ID signing, notarization, stapling, and universal2 assembly
+remain outside #342.
 
 ## Hosted acceptance record
 

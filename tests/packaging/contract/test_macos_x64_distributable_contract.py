@@ -1,12 +1,13 @@
 import errno
+import hashlib
 import importlib.util
 import json
 import os
-import signal
+import plistlib
 import stat
 import struct
 import sys
-import time
+import types
 import zipfile
 from pathlib import Path
 
@@ -46,6 +47,30 @@ def load_package_policy():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def load_macos_signer():
+    path = ROOT / "scripts/sign_macos_app.py"
+    spec = importlib.util.spec_from_file_location("sign_macos_app", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_settings_without_r(monkeypatch):
+    """Load the path settings without initializing the embedded R bridge."""
+    import rc_metastudio
+
+    stub = types.ModuleType("rc_metastudio.meta_py_r")
+    monkeypatch.setitem(sys.modules, "rc_metastudio.meta_py_r", stub)
+    monkeypatch.setitem(sys.modules, "meta_py_r", stub)
+    monkeypatch.setattr(rc_metastudio, "meta_py_r", stub, raising=False)
+    monkeypatch.delitem(sys.modules, "rc_metastudio.settings", raising=False)
+    import rc_metastudio.settings as settings
+
+    return settings
 
 
 def zip_info(name: str, mode: int) -> zipfile.ZipInfo:
@@ -95,6 +120,22 @@ def fat_x64_macho() -> bytes:
     return header + architecture + b"\0" * (offset - len(header) - len(architecture)) + thin
 
 
+def macos_code_bundle(
+    root: Path, *, executable_name: str, framework: bool = False
+) -> Path:
+    if framework:
+        executable = root / "Versions" / "A" / executable_name
+        info = root / "Versions" / "A" / "Resources" / "Info.plist"
+    else:
+        executable = root / "Contents" / "MacOS" / executable_name
+        info = root / "Contents" / "Info.plist"
+    executable.parent.mkdir(parents=True, exist_ok=True)
+    executable.write_bytes(thin_macho(0x01000007, 3))
+    info.parent.mkdir(parents=True, exist_ok=True)
+    info.write_bytes(plistlib.dumps({"CFBundleExecutable": executable_name}))
+    return executable
+
+
 def test_macos_x64_uses_one_authoritative_pyinstaller_spec():
     build = text("scripts/build-macos-package.sh")
     spec = text("packaging/pyinstaller/rc-metastudio-macos.spec")
@@ -133,7 +174,37 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
     assert "MACH_O_MAGICS" not in build
     assert 'open -W -n "$app_bundle" --args' in build
     assert "--automation-startup-completion-marker" in build
-    assert 'codesign --force --deep --options runtime --sign - "$app_bundle"' in build
+    assert '"$repo_root/scripts/sign_macos_app.py" "$app_bundle"' in build
+    assert "--identity -" in build
+    assert 'copy_tree "$r_runtime_root" "$r_version_root/Resources"' in build
+    assert 'copy_tree "$r_runtime_root" "$app_root/R"' not in build
+    assert "from rc_metastudio.r_runtime import macos_r_framework_version" in build
+    assert "v$minor" not in build
+    assert 'expected_r_home = app_root / "Contents/Frameworks/R.framework/Resources"' in text(
+        "scripts/inspect_macos_deployment.py"
+    )
+    assert 'ln -s "Resources/lib/libR.dylib" "$r_version_root/R"' in build
+    assert 'ln -s "$r_framework_version" "$r_framework/Versions/Current"' in build
+    assert 'ln -s "Versions/Current/Resources" "$r_framework/Resources"' in build
+    assert 'ln -s "Versions/Current/R" "$r_framework/R"' in build
+    assert '"CFBundlePackageType": "FMWK"' in build
+    assert (
+        'python3 - "$zip_path" "$archive_root_name" "$skip_smoke" '
+        '"$r_framework_version"' in build
+    )
+    assert 'f"{resources}/bin/Rscript"' in build
+    assert "R.framework/Resources/bin/Rscript" not in build
+    assert 'f"{framework}/Versions/Current": framework_version' in build
+    assert 'f"{framework}/Resources": "Versions/Current/Resources"' in build
+    assert "codesign --force --deep" not in build
+    signer = text("scripts/sign-notarize-macos-package.sh")
+    assert 'scripts/sign_macos_app.py "$app"' in signer
+    assert "find \"$app\" -type f" not in signer
+    assert "codesign --force --deep" not in signer
+    assert 'signing_inventory="${output}.signing-inventory.json"' in signer
+    release_workflow = text(".github/workflows/release-candidate.yml")
+    assert "$env:ARTIFACT.signing-inventory.json" in release_workflow
+    assert "release/*.signing-inventory.json" in release_workflow
     assert build.index('if [ "$skip_clean" -eq 0 ]') < build.index(
         'rm -rf "$qualification_root"'
     ) < build.index('mkdir -p "$qualification_root"')
@@ -175,6 +246,50 @@ def test_macos_surface_smoke_exercises_native_acceptance_surfaces():
     assert "accessible_control.setFocus()" in launch
     assert "accessible_control.setFocus(QtCore.Qt.FocusReason" not in launch
     assert 'if sys.platform == "darwin" else {}' in launch
+
+
+def test_frozen_runtime_discovers_r_in_macos_framework(monkeypatch, tmp_path):
+    from rc_metastudio import r_runtime
+
+    macos_root = tmp_path / "RCMetaStudio.app" / "Contents" / "MacOS"
+    r_home = (
+        tmp_path / "RCMetaStudio.app" / "Contents" / "Frameworks"
+        / "R.framework" / "Resources"
+    )
+    (r_home / "bin").mkdir(parents=True)
+    (r_home / "library" / "RCMetaR").mkdir(parents=True)
+    for name in ("RCMS_R_HOME", "RCMS_R_LIBS", "R_HOME", "R_LIBS", "R_LIBS_USER"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
+
+    configured = r_runtime.configure_bundled_r_environment(str(macos_root))
+
+    assert Path(configured["R_HOME"]).resolve() == r_home.resolve()
+    assert Path(configured["R_LIBS"]).resolve() == (r_home / "library").resolve()
+
+
+def test_frozen_macos_sample_projects_use_bundle_resources(monkeypatch):
+    settings = load_settings_without_r(monkeypatch)
+
+    monkeypatch.setattr(settings.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(settings.sys, "platform", "darwin")
+    monkeypatch.setattr(
+        settings.sys, "executable", "/Applications/RCMetaStudio.app/Contents/MacOS/RCMetaStudio"
+    )
+
+    assert settings.get_sample_projects_path().replace("\\", "/") == (
+        "/Applications/RCMetaStudio.app/Contents/Resources/sample_projects"
+    )
+
+
+def test_frozen_windows_sample_projects_remain_colocated(monkeypatch):
+    settings = load_settings_without_r(monkeypatch)
+
+    monkeypatch.setattr(settings.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(settings.sys, "platform", "win32")
+    monkeypatch.setattr(settings.sys, "executable", r"C:\RCMetaStudio\RCMetaStudio.exe")
+
+    assert settings.get_sample_projects_path() == r"C:\RCMetaStudio\sample_projects"
 
 
 def test_macho_parser_rejects_arm_and_universal_payloads_for_x64(tmp_path):
@@ -271,6 +386,164 @@ def test_macho_discriminator_excludes_java_without_trusting_extensions(
         inspector._is_macho(unreadable)
 
 
+def test_explicit_codesign_plan_ignores_dotted_resources_and_covers_native_code(
+    tmp_path
+):
+    signer = load_macos_signer()
+    app = tmp_path / "RCMetaStudio.app"
+    app_executable = macos_code_bundle(app, executable_name="RCMetaStudio")
+    r_framework = app / "Contents" / "Frameworks" / "R.framework"
+    r_executable = macos_code_bundle(r_framework, executable_name="R", framework=True)
+    r_library = (
+        r_framework / "Versions" / "A" / "Resources" / "lib" / "libR.dylib"
+    )
+    r_library.parent.mkdir(parents=True)
+    r_library.write_bytes(thin_macho(0x01000007, 3))
+    qt_framework = app / "Contents" / "Frameworks" / "QtCore.framework"
+    framework_executable = macos_code_bundle(
+        qt_framework, executable_name="QtCore", framework=True
+    )
+    dotted_resource = (
+        app / "Contents" / "Resources" / "R" / "library" / "rmarkdown"
+        / "rmd" / "h" / "navigation-1.1"
+    )
+    dotted_resource.mkdir(parents=True)
+    for resource_name in (
+        "codefolding-lua.css",
+        "codefolding.js",
+        "sourceembed.js",
+        "tabsets.js",
+    ):
+        (dotted_resource / resource_name).write_text("data", encoding="utf-8")
+    resource_bundle = dotted_resource / "assets.bundle"
+    resource_bundle.mkdir()
+    (resource_bundle / "Info.plist").write_text("not bundle metadata", encoding="utf-8")
+
+    plan = signer.build_signing_plan(app)
+
+    assert set(plan.native_files) == {
+        app_executable,
+        r_executable,
+        r_library,
+        framework_executable,
+    }
+    assert set(plan.nested_bundles) == {qt_framework, r_framework}
+    assert dotted_resource not in plan.signing_targets
+    assert resource_bundle not in plan.signing_targets
+    assert all(dotted_resource not in path.parents for path in plan.signing_targets)
+
+
+def test_explicit_codesign_signs_inside_out_and_verifies_fail_closed(
+    monkeypatch, tmp_path
+):
+    signer = load_macos_signer()
+    app = tmp_path / "RCMetaStudio.app"
+    app_executable = macos_code_bundle(app, executable_name="RCMetaStudio")
+    native = app / "Contents" / "Frameworks" / "libR.dylib"
+    native.parent.mkdir(parents=True)
+    native.write_bytes(thin_macho(0x01000007, 3))
+    framework = app / "Contents" / "Frameworks" / "QtCore.framework"
+    framework_executable = macos_code_bundle(
+        framework, executable_name="QtCore", framework=True
+    )
+    calls = []
+    monkeypatch.setattr(signer, "_run_codesign", lambda arguments: calls.append(arguments))
+
+    plan = signer.sign_and_verify(app, identity="Developer ID Application: Example")
+
+    sign_calls = [call for call in calls if "--sign" in call]
+    signed_targets = [Path(call[-1]) for call in sign_calls]
+    assert set(signed_targets[:-2]) == {app_executable, native, framework_executable}
+    assert signed_targets[-2:] == [framework, app]
+    assert signed_targets.index(framework_executable) < signed_targets.index(framework)
+    assert signed_targets.index(framework) < signed_targets.index(app)
+    assert all("--deep" not in call for call in sign_calls)
+    assert all("--options" in call and "runtime" in call for call in sign_calls)
+    assert all("--timestamp" in call for call in sign_calls)
+    assert set(plan.native_files) == {app_executable, native, framework_executable}
+
+    verify_calls = [call for call in calls if "--verify" in call]
+    assert any("--deep" in call and Path(call[-1]) == app for call in verify_calls)
+    individually_verified = {
+        Path(call[-1]) for call in verify_calls if "--deep" not in call
+    }
+    assert individually_verified == {
+        app_executable,
+        native,
+        framework_executable,
+        framework,
+        app,
+    }
+
+    calls.clear()
+    signer.sign_and_verify(app, identity="-")
+    ad_hoc_sign_calls = [call for call in calls if "--sign" in call]
+    assert all("--timestamp" not in call for call in ad_hoc_sign_calls)
+
+    def reject_verification(arguments):
+        if "--verify" in arguments:
+            raise signer.MacOSSigningError("verification rejected")
+
+    monkeypatch.setattr(signer, "_run_codesign", reject_verification)
+    with pytest.raises(signer.MacOSSigningError, match="verification rejected"):
+        signer.sign_and_verify(app, identity="-")
+
+
+def test_explicit_codesign_rejects_native_inventory_drift(monkeypatch, tmp_path):
+    signer = load_macos_signer()
+    app = tmp_path / "RCMetaStudio.app"
+    macos_code_bundle(app, executable_name="RCMetaStudio")
+    injected = app / "Contents" / "MacOS" / "late.dylib"
+    calls = 0
+
+    def mutate_after_first_sign(arguments):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            injected.write_bytes(thin_macho(0x01000007, 3))
+
+    monkeypatch.setattr(signer, "_run_codesign", mutate_after_first_sign)
+
+    with pytest.raises(signer.MacOSSigningError, match="inventory changed"):
+        signer.sign_and_verify(app, identity="-")
+
+
+def test_explicit_codesign_rejects_malformed_native_bundle(tmp_path):
+    signer = load_macos_signer()
+    old_layout = tmp_path / "OldLayout.app"
+    macos_code_bundle(old_layout, executable_name="RCMetaStudio")
+    old_r_data = old_layout / "Contents" / "MacOS" / "R" / "library" / "data.txt"
+    old_r_data.parent.mkdir(parents=True)
+    old_r_data.write_text("data", encoding="utf-8")
+    with pytest.raises(signer.MacOSSigningError, match="non-code payload"):
+        signer.build_signing_plan(old_layout)
+
+    app = tmp_path / "RCMetaStudio.app"
+    macos_code_bundle(app, executable_name="RCMetaStudio")
+    malformed = app / "Contents" / "PlugIns" / "Broken.bundle"
+    native = malformed / "Contents" / "MacOS" / "Broken"
+    native.parent.mkdir(parents=True)
+    native.write_bytes(thin_macho(0x01000007, 3))
+
+    with pytest.raises(signer.MacOSSigningError, match="malformed nested code bundle"):
+        signer.build_signing_plan(app)
+
+
+def test_explicit_codesign_rejects_loose_native_code_in_resources(tmp_path):
+    signer = load_macos_signer()
+    app = tmp_path / "RCMetaStudio.app"
+    macos_code_bundle(app, executable_name="RCMetaStudio")
+    loose_native = app / "Contents" / "Resources" / "R" / "lib" / "libR.dylib"
+    loose_native.parent.mkdir(parents=True)
+    loose_native.write_bytes(thin_macho(0x01000007, 3))
+
+    with pytest.raises(
+        signer.MacOSSigningError,
+        match="Contents/Resources contains native code outside a validated nested code bundle",
+    ):
+        signer.build_signing_plan(app)
+
+
 def test_archive_inspection_rejects_case_collisions(tmp_path):
     inspector = load_inspector()
     archive = tmp_path / "package.zip"
@@ -280,6 +553,158 @@ def test_archive_inspection_rejects_case_collisions(tmp_path):
 
     with pytest.raises(inspector.MacOSDeploymentInspectionError, match="case-colliding"):
         inspector.inspect_archive(archive, archive_root_name="root", embedded_files={})
+
+
+def test_archive_inspection_enforces_canonical_r_framework_symlinks_and_members(
+    tmp_path,
+):
+    inspector = load_inspector()
+    assert inspector.macos_r_framework_version("4.6.1") == "4.6"
+    framework = "Contents/Frameworks/R.framework"
+    version_root = f"{framework}/Versions/4.6"
+    resources = f"{version_root}/Resources"
+    payloads = {
+        "Contents/MacOS/RCMetaStudio": b"app",
+        f"{resources}/bin/Rscript": b"rscript",
+        f"{resources}/library/RCMetaR/DESCRIPTION": b"package",
+        f"{resources}/Info.plist": b"plist",
+        f"{resources}/lib/libR.dylib": b"libR",
+    }
+    link_targets = {
+        f"{framework}/Versions/Current": "4.6",
+        f"{framework}/Resources": "Versions/Current/Resources",
+        f"{version_root}/R": "Resources/lib/libR.dylib",
+        f"{framework}/R": "Versions/Current/R",
+    }
+    resolved_links = {
+        f"{framework}/Versions/Current": version_root,
+        f"{framework}/Resources": resources,
+        f"{version_root}/R": f"{resources}/lib/libR.dylib",
+        f"{framework}/R": f"{resources}/lib/libR.dylib",
+    }
+
+    def make_records(*, missing: str | None = None, wrong_link: str | None = None):
+        records = []
+        for path, payload in payloads.items():
+            if path == missing:
+                continue
+            record = {
+                "path": path,
+                "kind": "file",
+                "size": len(payload),
+                "mode": 0o755 if path.endswith(("RCMetaStudio", "Rscript")) else 0o644,
+                "sha256": hashlib.sha256(payload).hexdigest(),
+            }
+            if path in {
+                "Contents/MacOS/RCMetaStudio",
+                f"{resources}/lib/libR.dylib",
+            }:
+                record["architectures"] = ["x86_64"]
+            records.append(record)
+        for path, target in link_targets.items():
+            actual_target = "Versions/4.5/Resources" if path == wrong_link else target
+            records.append({
+                "path": path,
+                "kind": "symlink",
+                "size": len(actual_target),
+                "mode": 0o777,
+                "link_target": actual_target,
+                "resolved_path": resolved_links[path],
+            })
+        return records
+
+    def write_fixture(name: str, records: list[dict]):
+        archive = tmp_path / f"{name}.zip"
+        manifest = tmp_path / f"{name}-deployment.json"
+        signing = tmp_path / f"{name}-signing.json"
+        native_files = sorted(
+            record["path"] for record in records if "architectures" in record
+        )
+        signing_payload = {
+            "schema_version": 1,
+            "app": "RCMetaStudio.app",
+            "identity": "ad-hoc",
+            "native_files": native_files,
+            "nested_bundles": [framework],
+            "verification": {"individual_strict": True, "outer_deep_strict": True},
+        }
+        signing.write_text(json.dumps(signing_payload), encoding="utf-8")
+        manifest.write_text(
+            json.dumps({
+                "target": "macos-x64",
+                "signing_inventory": {
+                    "path": "qualification/ad-hoc-signing-inventory.json",
+                    "sha256": hashlib.sha256(signing.read_bytes()).hexdigest(),
+                    "identity": "ad-hoc",
+                    "native_files": native_files,
+                    "nested_bundles": [framework],
+                },
+                "inventory": {"files": records},
+            }),
+            encoding="utf-8",
+        )
+        with zipfile.ZipFile(archive, "w") as bundle:
+            bundle.writestr(
+                zip_info(
+                    "root/qualification/deployment-manifest.json",
+                    stat.S_IFREG | 0o644,
+                ),
+                manifest.read_bytes(),
+            )
+            bundle.writestr(
+                zip_info(
+                    "root/qualification/ad-hoc-signing-inventory.json",
+                    stat.S_IFREG | 0o644,
+                ),
+                signing.read_bytes(),
+            )
+            for record in records:
+                payload = (
+                    record["link_target"].encode("utf-8")
+                    if record["kind"] == "symlink"
+                    else payloads[record["path"]]
+                )
+                bundle.writestr(
+                    zip_info(
+                        f"root/RCMetaStudio.app/{record['path']}",
+                        (stat.S_IFLNK if record["kind"] == "symlink" else stat.S_IFREG)
+                        | record["mode"],
+                    ),
+                    payload,
+                )
+        return archive, manifest, signing
+
+    valid = write_fixture("valid", make_records())
+    assert inspector.inspect_archive(
+        valid[0],
+        archive_root_name="root",
+        embedded_files={
+            "qualification/deployment-manifest.json": valid[1],
+            "qualification/ad-hoc-signing-inventory.json": valid[2],
+        },
+    )["target"] == "macos-x64"
+
+    missing = write_fixture(
+        "missing-versioned-rscript",
+        make_records(missing=f"{resources}/bin/Rscript"),
+    )
+    wrong = write_fixture(
+        "wrong-resources-link",
+        make_records(wrong_link=f"{framework}/Resources"),
+    )
+    for fixture, expected in (
+        (missing, "missing its concrete versioned member"),
+        (wrong, "alias is missing or noncanonical"),
+    ):
+        with pytest.raises(inspector.MacOSDeploymentInspectionError, match=expected):
+            inspector.inspect_archive(
+                fixture[0],
+                archive_root_name="root",
+                embedded_files={
+                    "qualification/deployment-manifest.json": fixture[1],
+                    "qualification/ad-hoc-signing-inventory.json": fixture[2],
+                },
+            )
 
 
 def test_smoke_finalizer_requires_the_post_close_marker(tmp_path):
@@ -490,10 +915,23 @@ def test_archive_rejects_traversal_oversize_symlink_and_mode_mutations(tmp_path,
     monkeypatch.setattr(inspector, "MAX_ARCHIVE_UNCOMPRESSED_BYTES", 3_000_000_000)
 
     manifest = tmp_path / "deployment-manifest.json"
+    signing = tmp_path / "ad-hoc-signing-inventory.json"
     payload = b"executable"
-    manifest.write_text(json.dumps({"inventory": {"files": [{
+    signing_payload = {
+        "schema_version": 1, "app": "RCMetaStudio.app", "identity": "ad-hoc",
+        "native_files": ["Contents/MacOS/RCMetaStudio"], "nested_bundles": [],
+        "verification": {"individual_strict": True, "outer_deep_strict": True},
+    }
+    signing.write_text(json.dumps(signing_payload), encoding="utf-8")
+    signing_sha = __import__("hashlib").sha256(signing.read_bytes()).hexdigest()
+    manifest.write_text(json.dumps({"signing_inventory": {
+        "path": "qualification/ad-hoc-signing-inventory.json",
+        "sha256": signing_sha, "identity": "ad-hoc",
+        "native_files": ["Contents/MacOS/RCMetaStudio"], "nested_bundles": [],
+    }, "inventory": {"files": [{
         "path": "Contents/MacOS/RCMetaStudio", "kind": "file", "size": len(payload),
         "mode": 0o755, "sha256": __import__("hashlib").sha256(payload).hexdigest(),
+        "architectures": ["x86_64"],
     }]}}), encoding="utf-8")
     for name, mode, expected in (
         ("symlink.zip", stat.S_IFLNK | 0o755, "ZIP file differs"),
@@ -501,14 +939,62 @@ def test_archive_rejects_traversal_oversize_symlink_and_mode_mutations(tmp_path,
     ):
         archive = tmp_path / name
         with zipfile.ZipFile(archive, "w") as bundle:
-            bundle.writestr(zip_info("root/qualification/deployment-manifest.json", stat.S_IFREG | 0o644), manifest.read_bytes())
-            bundle.writestr(zip_info("root/RCMetaStudio.app/Contents/MacOS/RCMetaStudio", mode), payload)
+                bundle.writestr(zip_info("root/qualification/deployment-manifest.json", stat.S_IFREG | 0o644), manifest.read_bytes())
+                bundle.writestr(zip_info("root/qualification/ad-hoc-signing-inventory.json", stat.S_IFREG | 0o644), signing.read_bytes())
+                bundle.writestr(zip_info("root/RCMetaStudio.app/Contents/MacOS/RCMetaStudio", mode), payload)
         with pytest.raises(inspector.MacOSDeploymentInspectionError, match=expected):
             inspector.inspect_archive(
                 archive,
                 archive_root_name="root",
-                embedded_files={"qualification/deployment-manifest.json": manifest},
+                embedded_files={
+                    "qualification/deployment-manifest.json": manifest,
+                    "qualification/ad-hoc-signing-inventory.json": signing,
+                },
             )
+
+    missing_signing = tmp_path / "missing-signing.zip"
+    with zipfile.ZipFile(missing_signing, "w") as bundle:
+        bundle.writestr(zip_info("root/qualification/deployment-manifest.json", stat.S_IFREG | 0o644), manifest.read_bytes())
+        bundle.writestr(zip_info("root/RCMetaStudio.app/Contents/MacOS/RCMetaStudio", stat.S_IFREG | 0o755), payload)
+    with pytest.raises(inspector.MacOSDeploymentInspectionError, match="missing or changed"):
+        inspector.inspect_archive(
+            missing_signing, archive_root_name="root",
+            embedded_files={
+                "qualification/deployment-manifest.json": manifest,
+                "qualification/ad-hoc-signing-inventory.json": signing,
+            },
+        )
+
+    tampered_signing = tmp_path / "tampered-signing.zip"
+    with zipfile.ZipFile(tampered_signing, "w") as bundle:
+        bundle.writestr(zip_info("root/qualification/deployment-manifest.json", stat.S_IFREG | 0o644), manifest.read_bytes())
+        bundle.writestr(zip_info("root/qualification/ad-hoc-signing-inventory.json", stat.S_IFREG | 0o644), b"{}")
+        bundle.writestr(zip_info("root/RCMetaStudio.app/Contents/MacOS/RCMetaStudio", stat.S_IFREG | 0o755), payload)
+    with pytest.raises(inspector.MacOSDeploymentInspectionError, match="missing or changed"):
+        inspector.inspect_archive(
+            tampered_signing, archive_root_name="root",
+            embedded_files={
+                "qualification/deployment-manifest.json": manifest,
+                "qualification/ad-hoc-signing-inventory.json": signing,
+            },
+        )
+
+    drift_signing = tmp_path / "drift-signing.json"
+    drift_payload = {**signing_payload, "native_files": []}
+    drift_signing.write_text(json.dumps(drift_payload), encoding="utf-8")
+    drift_archive = tmp_path / "drift-signing.zip"
+    with zipfile.ZipFile(drift_archive, "w") as bundle:
+        bundle.writestr(zip_info("root/qualification/deployment-manifest.json", stat.S_IFREG | 0o644), manifest.read_bytes())
+        bundle.writestr(zip_info("root/qualification/ad-hoc-signing-inventory.json", stat.S_IFREG | 0o644), drift_signing.read_bytes())
+        bundle.writestr(zip_info("root/RCMetaStudio.app/Contents/MacOS/RCMetaStudio", stat.S_IFREG | 0o755), payload)
+    with pytest.raises(inspector.MacOSDeploymentInspectionError, match="authoritative native deployment"):
+        inspector.inspect_archive(
+            drift_archive, archive_root_name="root",
+            embedded_files={
+                "qualification/deployment-manifest.json": manifest,
+                "qualification/ad-hoc-signing-inventory.json": drift_signing,
+            },
+        )
 
 
 def test_archive_root_rejects_dot_dot_and_nonportable_names():
@@ -644,6 +1130,8 @@ def test_package_classifier_and_gate_cover_all_direct_macos_inputs():
         "scripts/validate_test_taxonomy.py", "scripts/verify_rcmetar_r_stack.py",
         "docs/verification/test-taxonomy.json", "scripts/delivery.py",
         "scripts/inspect_macos_deployment.py", "scripts/qt6_macos_feasibility.py",
+        "scripts/sign_macos_app.py", "scripts/sign-notarize-macos-package.sh",
+        ".github/workflows/release-candidate.yml",
         "packaging/pyinstaller/rc-metastudio-macos.spec",
     ]
     assert all(policy.requires_package_qualification([path]) for path in direct_inputs)

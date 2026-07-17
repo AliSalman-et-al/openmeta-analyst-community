@@ -14,6 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS_PATH = ROOT / "delivery" / "targets.json"
 POLICY_INPUTS = (
+    ".github/workflows/release-candidate.yml",
     "uv.lock",
     "pyproject.toml",
     "docs/verification/RCMetaR-r-dependencies.json",
@@ -26,6 +27,8 @@ POLICY_INPUTS = (
     "scripts/build-macos-package.sh",
     "scripts/package-macos.sh",
     "scripts/inspect_macos_deployment.py",
+    "scripts/sign_macos_app.py",
+    "scripts/sign-notarize-macos-package.sh",
     "scripts/qt6_macos_feasibility.py",
     "scripts/run_bounded_process.py",
     "scripts/package_input_policy.py",
@@ -233,17 +236,55 @@ def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description=__doc__)
     commands = root.add_subparsers(required=True)
     init = commands.add_parser("init")
-    init.add_argument("--version", required=True); init.add_argument("--commit", required=True)
-    init.add_argument("--repository", required=True); init.add_argument("--trust-profile", choices=("unsigned-community", "trusted-signed"), default="unsigned-community"); init.add_argument("--output", required=True); init.set_defaults(func=init_release)
-    inv = commands.add_parser("inventory"); inv.add_argument("--root", required=True); inv.add_argument("--output", required=True); inv.set_defaults(func=inventory)
-    bom = commands.add_parser("sbom"); bom.add_argument("--inventory", required=True); bom.add_argument("--version", required=True); bom.add_argument("--output", required=True); bom.set_defaults(func=sbom)
-    stage = commands.add_parser("stage-result"); stage.add_argument("--target", required=True); stage.add_argument("--stage", required=True)
-    stage.add_argument("--commit", required=True); stage.add_argument("--input-digest", required=True); stage.add_argument("--output-file", action="append", required=True); stage.add_argument("--result", required=True); stage.set_defaults(func=stage_result)
-    attach_parser = commands.add_parser("attach"); attach_parser.add_argument("--manifest", required=True); attach_parser.add_argument("--result", required=True); attach_parser.set_defaults(func=attach)
-    verify_parser = commands.add_parser("verify"); verify_parser.add_argument("--manifest", required=True); verify_parser.set_defaults(func=verify)
-    promote_parser = commands.add_parser("promote"); promote_parser.add_argument("--manifest", required=True); promote_parser.add_argument("--from-channel", required=True); promote_parser.add_argument("--channel", required=True); promote_parser.add_argument("--version"); promote_parser.add_argument("--output", required=True); promote_parser.set_defaults(func=promote)
-    sums = commands.add_parser("checksums"); sums.add_argument("--files", action="append", required=True); sums.add_argument("--output", required=True); sums.set_defaults(func=checksums)
-    digest_parser = commands.add_parser("digest"); digest_parser.add_argument("--json", required=True); digest_parser.add_argument("--release-identity", action="store_true"); digest_parser.set_defaults(func=print_digest)
+    init.add_argument("--version", required=True)
+    init.add_argument("--commit", required=True)
+    init.add_argument("--repository", required=True)
+    init.add_argument(
+        "--trust-profile",
+        choices=("unsigned-community", "trusted-signed"),
+        default="unsigned-community",
+    )
+    init.add_argument("--output", required=True)
+    init.set_defaults(func=init_release)
+    inv = commands.add_parser("inventory")
+    inv.add_argument("--root", required=True)
+    inv.add_argument("--output", required=True)
+    inv.set_defaults(func=inventory)
+    bom = commands.add_parser("sbom")
+    bom.add_argument("--inventory", required=True)
+    bom.add_argument("--version", required=True)
+    bom.add_argument("--output", required=True)
+    bom.set_defaults(func=sbom)
+    stage = commands.add_parser("stage-result")
+    stage.add_argument("--target", required=True)
+    stage.add_argument("--stage", required=True)
+    stage.add_argument("--commit", required=True)
+    stage.add_argument("--input-digest", required=True)
+    stage.add_argument("--output-file", action="append", required=True)
+    stage.add_argument("--result", required=True)
+    stage.set_defaults(func=stage_result)
+    attach_parser = commands.add_parser("attach")
+    attach_parser.add_argument("--manifest", required=True)
+    attach_parser.add_argument("--result", required=True)
+    attach_parser.set_defaults(func=attach)
+    verify_parser = commands.add_parser("verify")
+    verify_parser.add_argument("--manifest", required=True)
+    verify_parser.set_defaults(func=verify)
+    promote_parser = commands.add_parser("promote")
+    promote_parser.add_argument("--manifest", required=True)
+    promote_parser.add_argument("--from-channel", required=True)
+    promote_parser.add_argument("--channel", required=True)
+    promote_parser.add_argument("--version")
+    promote_parser.add_argument("--output", required=True)
+    promote_parser.set_defaults(func=promote)
+    sums = commands.add_parser("checksums")
+    sums.add_argument("--files", action="append", required=True)
+    sums.add_argument("--output", required=True)
+    sums.set_defaults(func=checksums)
+    digest_parser = commands.add_parser("digest")
+    digest_parser.add_argument("--json", required=True)
+    digest_parser.add_argument("--release-identity", action="store_true")
+    digest_parser.set_defaults(func=print_digest)
     return root
 
 

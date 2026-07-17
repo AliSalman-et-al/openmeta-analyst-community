@@ -38,6 +38,9 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     assert set(manifest["policy_inputs"]) == set(delivery.POLICY_INPUTS)
     assert "scripts/test-bounded-package-process.ps1" in delivery.POLICY_INPUTS
     assert "scripts/qt6_macos_feasibility.py" in delivery.POLICY_INPUTS
+    assert "scripts/sign_macos_app.py" in delivery.POLICY_INPUTS
+    assert "scripts/sign-notarize-macos-package.sh" in delivery.POLICY_INPUTS
+    assert ".github/workflows/release-candidate.yml" in delivery.POLICY_INPUTS
 
     for target in delivery.targets():
         previous = delivery.release_identity_digest(manifest)

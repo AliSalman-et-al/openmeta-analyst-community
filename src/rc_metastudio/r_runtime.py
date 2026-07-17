@@ -4,11 +4,20 @@ import sys
 _DLL_DIRECTORY_HANDLES = []
 
 
+def macos_r_framework_version(r_version: str) -> str:
+    """Return the stable major.minor directory name for an R framework."""
+    parts = r_version.split(".")
+    if len(parts) < 2 or not all(part.isdigit() for part in parts):
+        raise ValueError(f"invalid R version for a macOS framework: {r_version!r}")
+    return ".".join(parts[:2])
+
+
 def configure_bundled_r_environment(app_root=None):
     root = app_root or _app_root()
     r_home = _first_existing(
         [
             os.environ.get("RCMS_R_HOME"),
+            os.path.join(root, "..", "Frameworks", "R.framework", "Resources"),
             os.path.join(root, "R"),
         ],
         required_child=os.path.join("bin"),
@@ -32,6 +41,10 @@ def configure_bundled_r_environment(app_root=None):
     r_libs = _first_existing(
         [
             os.environ.get("RCMS_R_LIBS"),
+            os.path.join(r_home, "library") if r_home else None,
+            os.path.join(
+                root, "..", "Frameworks", "R.framework", "Resources", "library"
+            ),
             os.path.join(root, "R", "library"),
         ],
         required_child=os.path.join("RCMetaR"),
