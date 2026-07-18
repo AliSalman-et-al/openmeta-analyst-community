@@ -40,20 +40,9 @@ jobs:
     if: ${{ inputs.build_macos }}
     uses: ./.github/workflows/package-target.yml
     with:
-      runner: macos-15-intel
-      target_os: macos
       artifact_name: RCMetaStudio-macos-x64
-      archive_platform: macos-x64
 
-  macos-package-arm64:
-    if: ${{ inputs.build_macos_arm64 }}
-    uses: ./.github/workflows/package-target.yml
-    with:
-      runner: macos-15
-      target_os: macos
-      artifact_name: RCMetaStudio-macos-arm64
-      archive_platform: macos-arm64
-      macos_architecture: arm64
+  # Apple Silicon qualification is intentionally deferred to Issue #343.
 
   macos-direct-r-spike:
     if: ${{ inputs.build_macos_direct_r_spike }}

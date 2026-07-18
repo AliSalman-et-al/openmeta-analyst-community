@@ -7,6 +7,10 @@ packaging because it answers one bounded question before broad source
 conversion: can the exact locked Qt6, R, rpy2, and PyInstaller chain work
 natively on both supported Mac architectures?
 
+This remains a small, supplementary architecture proof. It does not replace
+issue #342's full Intel distributable build, archive inspection, launch
+qualification, or release evidence.
+
 ## Evidence contract
 
 Each matrix leg runs on its native GitHub-hosted architecture and fails before
@@ -25,10 +29,23 @@ The source proof generates the representative Designer form, compiles and
 registers the binary resource, renders its SVG icon, shows a real Cocoa dialog,
 and exits cleanly. A real in-process rpy2 call evaluates
 `sum(c(1.25, 2.5, 3.75))` and must return 7.5. The same form, resource, SVG, R
-call, and Cocoa launch then run from a thin one-directory PyInstaller app.
-PyInstaller receives the application entry point and resource as inputs and is
-the sole Qt dependency collector; no manual Qt framework or plugin copy is
-permitted.
+call, and Cocoa launch then run from a thin one-directory PyInstaller app. The
+workflow rebuilds the locked rpy2 API bridge from source against the native R,
+proves its architecture, single R edge, API mode, and real calculation, and
+rejects an ABI bridge.
+
+Before packaging, the proof privately copies the official `R.framework`,
+applies the maintained non-X11 product quarantine, relocates its Mach-O graph,
+and emits the same explicit staged-framework TOC used by production packaging.
+The dedicated `qt6-macos-feasibility.spec` is the one allowlisted PyInstaller
+definition. It removes R binaries inferred by PyInstaller's host dependency
+walk by exact staged-framework membership, then adds the authoritative TOC;
+PyInstaller remains the sole Qt dependency collector, with no manual Qt
+framework or plugin copy. The API bridge is relocated first against staging
+and then against the bundled framework. A post-app graph gate requires one
+target-native API bridge, no ABI bridge, one private `libR`, and an R edge that
+resolves inside `Contents/Frameworks/R.framework`. The frozen entry point sets
+that framework's `Resources` directory as `R_HOME` before importing rpy2.
 
 The evidence record includes an exact nested OS, runner-image, and machine
 identity; Rosetta status; locked versions; source paths; Mach-O architecture
@@ -37,6 +54,11 @@ uploaded bundle retains bounded copies of the native Python, PyQt6, Qt6, SIP,
 R, rpy2, `rcc`, and Cocoa probes plus the packaged executable and packaged
 Cocoa plugin. It also retains a complete file/hash deployment inventory and the
 exact PyInstaller build plan, but not the full disposable application bundle.
+Retained diagnostics include the non-X11 R quarantine profile, durable frozen
+launch phase markers, and the validated packaged R graph, alongside source and
+packaged smoke reports and the PyInstaller build log. The deployment inventory
+must contain the private `libR`, `Renviron`, and headers and rejects flattened
+R compiler-runtime copies outside the framework.
 Thin and universal Mach-O architectures are read directly from bounded file
 headers and fat-slice tables, including slice-bound, class, byte-order,
 CPU-subtype capability, and declared-versus-contained slice checks. The same
@@ -78,7 +100,11 @@ separate best-effort upload retains setup and identity diagnostics without
 allowing an artifact-service failure or cache cleanup to replace the primary
 setup error.
 
-## Acceptance record
+## Historical acceptance record
+
+The following run accepted the original issue #329 contract. It predates the
+explicit private-R/API packaging extension above and is not acceptance evidence
+for the current contract or for issue #342.
 
 The gate passed for source commit
 `a943b196daed17283cf925ab2199250e0db7dff0` on
@@ -107,6 +133,8 @@ does not enable Rosetta, switch bindings, copy Qt manually, or downgrade the
 proof to offscreen execution.
 
 The workflow and validator can be checked on Windows, but successful native
-evidence cannot be produced there. Issue #329 is complete only after both
-GitHub matrix legs have run successfully and their retained evidence has been
-reviewed; repository code alone is not a substitute for those results.
+evidence cannot be produced there. A change to this contract is accepted only
+after both GitHub matrix legs have run successfully and their retained evidence
+has been reviewed; repository code alone is not a substitute for those
+results. That acceptance supplements rather than closes issue #342's full
+Intel package qualification.

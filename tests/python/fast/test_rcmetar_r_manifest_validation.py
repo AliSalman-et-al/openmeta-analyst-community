@@ -391,21 +391,35 @@ expect_error(
 )
 if (install_called) stop("missing binary preflight attempted an install")
 
-one_archive <- tempfile(fileext = ".zip")
+platform <- assert_rcms_binary_runtime(policy)
+archive_extension <- rcms_binary_archive_extension(platform)
+one_archive <- tempfile(fileext = paste0(".", archive_extension))
 file.create(one_archive)
 one_row_no_dimnames <- matrix(c("root", one_archive), nrow = 1L)
-if (!identical(normalize_rcms_downloaded_archives(one_row_no_dimnames, 1L), one_archive)) {{
+if (!identical(normalize_rcms_downloaded_archives(one_row_no_dimnames, 1L, platform), one_archive)) {{
   stop("one-row download result without dimnames was not normalized positionally")
 }}
-two_archives <- c(tempfile(fileext = ".zip"), tempfile(fileext = ".zip"))
+two_archives <- c(
+  tempfile(fileext = paste0(".", archive_extension)),
+  tempfile(fileext = paste0(".", archive_extension))
+)
 file.create(two_archives)
 multi_row <- matrix(c("root", two_archives[[1]], "transitive", two_archives[[2]]), nrow = 2L, byrow = TRUE)
-if (!identical(normalize_rcms_downloaded_archives(multi_row, 2L), two_archives)) {{
+if (!identical(normalize_rcms_downloaded_archives(multi_row, 2L, platform), two_archives)) {{
   stop("multi-row download result was not normalized positionally")
 }}
 expect_error(
-  normalize_rcms_downloaded_archives(matrix(c("missing", tempfile()), nrow = 1L), 1L),
+  normalize_rcms_downloaded_archives(matrix(c("missing", tempfile()), nrow = 1L), 1L, platform),
   "PPM retained binary archive is missing"
+)
+mismatched_extension <- if (identical(archive_extension, "zip")) ".tgz" else ".zip"
+mismatched_archive <- tempfile(fileext = mismatched_extension)
+file.create(mismatched_archive)
+expect_error(
+  normalize_rcms_downloaded_archives(
+    matrix(c("wrong-format", mismatched_archive), nrow = 1L), 1L, platform
+  ),
+  paste0("non-.", archive_extension, " archive")
 )
 
 binary_type <- NULL

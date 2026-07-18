@@ -31,22 +31,49 @@ def fixture_runtime(tmp_path: Path) -> Path:
     library = root / "lib/libR.dylib"
     library.parent.mkdir(parents=True, exist_ok=True)
     library.write_bytes(b"Mach-O libR")
-    for relative in ("library/tcltk/libs/tcltk.so", "modules/R_X11.so", "modules/R_de.so", "library/grDevices/libs/cairo.so"):
+    for relative in (
+        "library/tcltk/libs/tcltk.so",
+        "modules/R_X11.so",
+        "modules/R_de.so",
+        "library/grDevices/libs/cairo.so",
+    ):
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(relative.encode())
     return root
 
 
-def configure_machos(monkeypatch, profile, root: Path, *, fifth: bool = False, non_tcl_opt_r: bool = False):
+def configure_machos(
+    monkeypatch,
+    profile,
+    root: Path,
+    *,
+    fifth: bool = False,
+    non_tcl_opt_r: bool = False,
+):
     records = {
         "bin/exec/R": [],
         "bin/Rscript": [],
         "lib/libR.dylib": [],
-        "library/tcltk/libs/tcltk.so": ["/opt/R/x86_64/lib/libtcl8.6.dylib", "/opt/R/x86_64/lib/libtk8.6.dylib", "/opt/X11/lib/libX11.6.dylib", "/opt/X11/lib/libXss.1.dylib", "/opt/X11/lib/libXext.6.dylib"],
-        "modules/R_X11.so": [f"/opt/X11/lib/lib{name}.6.dylib" for name in ("SM", "ICE", "X11", "Xext", "Xrender", "Xt", "Xmu")],
-        "modules/R_de.so": [f"/opt/X11/lib/lib{name}.6.dylib" for name in ("SM", "ICE", "X11", "Xext", "Xrender", "Xt", "Xmu")],
-        "library/grDevices/libs/cairo.so": [f"/opt/X11/lib/lib{name}.6.dylib" for name in ("Xrender", "SM", "ICE", "X11", "Xext")],
+        "library/tcltk/libs/tcltk.so": [
+            "/opt/R/x86_64/lib/libtcl8.6.dylib",
+            "/opt/R/x86_64/lib/libtk8.6.dylib",
+            "/opt/X11/lib/libX11.6.dylib",
+            "/opt/X11/lib/libXss.1.dylib",
+            "/opt/X11/lib/libXext.6.dylib",
+        ],
+        "modules/R_X11.so": [
+            f"/opt/X11/lib/lib{name}.6.dylib"
+            for name in ("SM", "ICE", "X11", "Xext", "Xrender", "Xt", "Xmu")
+        ],
+        "modules/R_de.so": [
+            f"/opt/X11/lib/lib{name}.6.dylib"
+            for name in ("SM", "ICE", "X11", "Xext", "Xrender", "Xt", "Xmu")
+        ],
+        "library/grDevices/libs/cairo.so": [
+            f"/opt/X11/lib/lib{name}.6.dylib"
+            for name in ("Xrender", "SM", "ICE", "X11", "Xext")
+        ],
     }
     if fifth:
         extra = root / "library/extra/libs/extra.so"
@@ -57,15 +84,27 @@ def configure_machos(monkeypatch, profile, root: Path, *, fifth: bool = False, n
         extra = root / "library/extra/libs/extra.so"
         extra.parent.mkdir(parents=True, exist_ok=True)
         extra.write_bytes(b"extra")
-        records["library/extra/libs/extra.so"] = ["/opt/R/x86_64/lib/libgfortran.5.dylib"]
-    monkeypatch.setattr(profile, "is_macho", lambda path: path.relative_to(root).as_posix() in records)
-    monkeypatch.setattr(profile, "macho_record", lambda path, _: {
-        "relative_path": path.relative_to(root).as_posix(), "sha256": "a" * 64,
-        "architectures": ["x86_64"], "install_id": None,
-        "load_commands": records[path.relative_to(root).as_posix()],
-    })
+        records["library/extra/libs/extra.so"] = [
+            "/opt/R/x86_64/lib/libgfortran.5.dylib"
+        ]
+    monkeypatch.setattr(
+        profile, "is_macho", lambda path: path.relative_to(root).as_posix() in records
+    )
+    monkeypatch.setattr(
+        profile,
+        "macho_record",
+        lambda path, _: {
+            "relative_path": path.relative_to(root).as_posix(),
+            "sha256": "a" * 64,
+            "architectures": ["x86_64"],
+            "install_id": None,
+            "load_commands": records[path.relative_to(root).as_posix()],
+        },
+    )
     monkeypatch.setattr(profile, "hard_dependency_closure", lambda *_: ["RCMetaR"])
-    monkeypatch.setattr(profile, "manifest_roots", lambda _: (["RCMetaR"], set(), "b" * 64))
+    monkeypatch.setattr(
+        profile, "manifest_roots", lambda _: (["RCMetaR"], set(), "b" * 64)
+    )
 
 
 def configure_official_launcher(
@@ -104,7 +143,12 @@ def test_profile_removes_exact_surfaces_and_records_evidence(monkeypatch, tmp_pa
     configure_machos(monkeypatch, profile, root)
     profile.profile(root, evidence, tmp_path / "manifest.json", "4.6.1", "x86_64")
     data = json.loads(evidence.read_text())
-    assert data["post_profile_exclusions"] == ["library/grDevices/libs/cairo.so", "library/tcltk", "modules/R_X11.so", "modules/R_de.so"]
+    assert data["post_profile_exclusions"] == [
+        "library/grDevices/libs/cairo.so",
+        "library/tcltk",
+        "modules/R_X11.so",
+        "modules/R_de.so",
+    ]
     assert not (root / "library/tcltk").exists()
     assert len(data["excluded_surfaces"]) == 4
 
@@ -113,8 +157,16 @@ def test_profile_rejects_unexpected_x11_owner(monkeypatch, tmp_path):
     profile = load_profile()
     root = fixture_runtime(tmp_path)
     configure_machos(monkeypatch, profile, root, fifth=True)
-    with pytest.raises(profile.ProfileError, match="unexpected optional-R"):
-        profile.profile(root, tmp_path / "profile.json", tmp_path / "manifest.json", "4.6.1", "x86_64")
+    with pytest.raises(
+        profile.ProfileError, match="escaped the declared product exclusions"
+    ):
+        profile.profile(
+            root,
+            tmp_path / "profile.json",
+            tmp_path / "manifest.json",
+            "4.6.1",
+            "x86_64",
+        )
 
 
 def test_profile_allows_non_tcl_opt_r_for_relocation(monkeypatch, tmp_path):
@@ -123,7 +175,10 @@ def test_profile_allows_non_tcl_opt_r_for_relocation(monkeypatch, tmp_path):
     evidence = tmp_path / "profile.json"
     configure_machos(monkeypatch, profile, root, non_tcl_opt_r=True)
     profile.profile(root, evidence, tmp_path / "manifest.json", "4.6.1", "x86_64")
-    assert "library/extra/libs/extra.so" in json.loads(evidence.read_text())["allowed_non_tcl_opt_r_dependencies"]
+    assert (
+        "library/extra/libs/extra.so"
+        in json.loads(evidence.read_text())["allowed_non_tcl_opt_r_dependencies"]
+    )
 
 
 def test_profile_rejects_missing_hard_dependency(tmp_path):
@@ -135,20 +190,37 @@ def test_profile_rejects_missing_hard_dependency(tmp_path):
 
 
 @pytest.mark.parametrize("missing_library", ["libXss", "libXext"])
-def test_profile_rejects_changed_exclusion_dependency_family(monkeypatch, tmp_path, missing_library):
+def test_profile_rejects_changed_exclusion_dependency_family(
+    monkeypatch, tmp_path, missing_library
+):
     profile = load_profile()
     root = fixture_runtime(tmp_path)
     configure_machos(monkeypatch, profile, root)
     original = profile.macho_record
-    monkeypatch.setattr(profile, "macho_record", lambda path, parent: {
-        **original(path, parent),
-        "load_commands": (
-            [command for command in original(path, parent)["load_commands"] if missing_library not in command]
-            if path.name == "tcltk.so" else original(path, parent)["load_commands"]
-        ),
-    })
+    monkeypatch.setattr(
+        profile,
+        "macho_record",
+        lambda path, parent: {
+            **original(path, parent),
+            "load_commands": (
+                [
+                    command
+                    for command in original(path, parent)["load_commands"]
+                    if missing_library not in command
+                ]
+                if path.name == "tcltk.so"
+                else original(path, parent)["load_commands"]
+            ),
+        },
+    )
     with pytest.raises(profile.ProfileError, match="changed dependency families"):
-        profile.profile(root, tmp_path / "profile.json", tmp_path / "manifest.json", "4.6.1", "x86_64")
+        profile.profile(
+            root,
+            tmp_path / "profile.json",
+            tmp_path / "manifest.json",
+            "4.6.1",
+            "x86_64",
+        )
 
 
 def test_tree_identity_authenticates_content_and_symlink_targets(tmp_path):
@@ -173,15 +245,31 @@ def test_profile_rejects_non_thin_excluded_macho(monkeypatch, tmp_path):
     root = fixture_runtime(tmp_path)
     configure_machos(monkeypatch, profile, root)
     original = profile.macho_record
-    monkeypatch.setattr(profile, "macho_record", lambda path, parent: {
-        **original(path, parent),
-        "architectures": (["x86_64", "arm64"] if path.name == "R_de.so" else original(path, parent)["architectures"]),
-    })
+    monkeypatch.setattr(
+        profile,
+        "macho_record",
+        lambda path, parent: {
+            **original(path, parent),
+            "architectures": (
+                ["x86_64", "arm64"]
+                if path.name == "R_de.so"
+                else original(path, parent)["architectures"]
+            ),
+        },
+    )
     with pytest.raises(profile.ProfileError, match="not x86_64-only"):
-        profile.profile(root, tmp_path / "profile.json", tmp_path / "manifest.json", "4.6.1", "x86_64")
+        profile.profile(
+            root,
+            tmp_path / "profile.json",
+            tmp_path / "manifest.json",
+            "4.6.1",
+            "x86_64",
+        )
 
 
-def test_profile_classifies_launcher_separately_from_canonical_lib_r(monkeypatch, tmp_path):
+def test_profile_classifies_launcher_separately_from_canonical_lib_r(
+    monkeypatch, tmp_path
+):
     profile = load_profile()
     root = fixture_runtime(tmp_path)
     configure_machos(monkeypatch, profile, root)
@@ -226,10 +314,18 @@ def test_profile_rejects_official_layout_without_canonical_lib_r(monkeypatch, tm
     (root / "lib/libR.dylib").unlink()
     configure_machos(monkeypatch, profile, root)
     with pytest.raises(profile.ProfileError, match="canonical source lib/libR.dylib"):
-        profile.profile(root, tmp_path / "profile.json", tmp_path / "manifest.json", "4.6.1", "x86_64")
+        profile.profile(
+            root,
+            tmp_path / "profile.json",
+            tmp_path / "manifest.json",
+            "4.6.1",
+            "x86_64",
+        )
 
 
-def test_profile_rejects_reversed_launcher_and_executable_classification(monkeypatch, tmp_path):
+def test_profile_rejects_reversed_launcher_and_executable_classification(
+    monkeypatch, tmp_path
+):
     profile = load_profile()
     classifier_root = tmp_path / "classifier"
     classifier_root.mkdir()
@@ -259,15 +355,28 @@ def test_profile_rejects_reversed_launcher_and_executable_classification(monkeyp
     root = fixture_runtime(tmp_path)
     configure_machos(monkeypatch, profile, root)
     original = profile.is_macho
-    monkeypatch.setattr(profile, "is_macho", lambda path: True if path == root / "bin/R" else original(path))
-    with pytest.raises(profile.ProfileError, match="bin/R must be the expected non-Mach-O launcher"):
-        profile.profile(root, tmp_path / "profile.json", tmp_path / "manifest.json", "4.6.1", "x86_64")
+    monkeypatch.setattr(
+        profile,
+        "is_macho",
+        lambda path: True if path == root / "bin/R" else original(path),
+    )
+    with pytest.raises(
+        profile.ProfileError, match="bin/R must be the expected non-Mach-O launcher"
+    ):
+        profile.profile(
+            root,
+            tmp_path / "profile.json",
+            tmp_path / "manifest.json",
+            "4.6.1",
+            "x86_64",
+        )
 
     official_root = fixture_runtime(tmp_path / "official-non-macho")
     configure_machos(monkeypatch, profile, official_root)
     configure_official_launcher(monkeypatch, profile, official_root, macho=True)
     with pytest.raises(
-        profile.ProfileError, match="official source bin/R must be the expected non-Mach-O"
+        profile.ProfileError,
+        match="official source bin/R must be the expected non-Mach-O",
     ):
         profile.profile(
             official_root,
@@ -277,6 +386,15 @@ def test_profile_rejects_reversed_launcher_and_executable_classification(monkeyp
             "x86_64",
             official_framework_layout=True,
         )
+
+
+def test_profile_does_not_send_java_classfiles_to_otool(monkeypatch, tmp_path):
+    profile = load_profile()
+    class_file = tmp_path / "getsp.class"
+    # JVM class files deliberately share FAT_MAGIC.  Their extension is part of
+    # the official R share payload, not an optional product exclusion.
+    class_file.write_bytes(b"\xca\xfe\xba\xbe\x00\x00\x00\x3d")
+    assert profile.is_macho(class_file) is False
 
     wrong_alias_root = fixture_runtime(tmp_path / "official-wrong-alias")
     configure_machos(monkeypatch, profile, wrong_alias_root)
@@ -301,25 +419,45 @@ def test_profile_rejects_wrong_architecture_r_executable(monkeypatch, tmp_path):
     root = fixture_runtime(tmp_path)
     configure_machos(monkeypatch, profile, root)
     original = profile.macho_record
-    monkeypatch.setattr(profile, "macho_record", lambda path, parent: {
-        **original(path, parent),
-        "architectures": (["arm64"] if path == root / "bin/exec/R" else original(path, parent)["architectures"]),
-    })
-    with pytest.raises(profile.ProfileError, match="bin/exec/R executable must be x86_64-only"):
-        profile.profile(root, tmp_path / "profile.json", tmp_path / "manifest.json", "4.6.1", "x86_64")
+    monkeypatch.setattr(
+        profile,
+        "macho_record",
+        lambda path, parent: {
+            **original(path, parent),
+            "architectures": (
+                ["arm64"]
+                if path == root / "bin/exec/R"
+                else original(path, parent)["architectures"]
+            ),
+        },
+    )
+    with pytest.raises(
+        profile.ProfileError, match="bin/exec/R executable must be x86_64-only"
+    ):
+        profile.profile(
+            root,
+            tmp_path / "profile.json",
+            tmp_path / "manifest.json",
+            "4.6.1",
+            "x86_64",
+        )
 
     official_root = fixture_runtime(tmp_path / "official-wrong-arch")
     configure_machos(monkeypatch, profile, official_root)
     configure_official_launcher(monkeypatch, profile, official_root)
     original = profile.macho_record
-    monkeypatch.setattr(profile, "macho_record", lambda path, parent: {
-        **original(path, parent),
-        "architectures": (
-            ["arm64"]
-            if path == official_root / "bin/Rscript"
-            else original(path, parent)["architectures"]
-        ),
-    })
+    monkeypatch.setattr(
+        profile,
+        "macho_record",
+        lambda path, parent: {
+            **original(path, parent),
+            "architectures": (
+                ["arm64"]
+                if path == official_root / "bin/Rscript"
+                else original(path, parent)["architectures"]
+            ),
+        },
+    )
     with pytest.raises(
         profile.ProfileError, match="bin/Rscript executable must be x86_64-only"
     ):

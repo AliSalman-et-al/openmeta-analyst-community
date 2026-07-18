@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 from importlib import metadata
 import json
 import os
@@ -14,7 +15,7 @@ import re
 import shutil
 import subprocess
 import sys
-from typing import Any, BinaryIO, Literal, NoReturn, cast
+from typing import Any, BinaryIO, Callable, Literal, NoReturn, cast
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -27,8 +28,16 @@ EXPECTED_VERSIONS = {
     "rpy2": "3.6.7",
     "pyinstaller": "6.21.0",
 }
+QT_RCC_VERSION = EXPECTED_VERSIONS["qt"]
 TARGET_MACHINES = {"macos-x64": "x86_64", "macos-arm64": "arm64"}
-DIAGNOSTIC_KEYS = {"source_smoke", "pyinstaller_build", "packaged_smoke"}
+DIAGNOSTIC_KEYS = {
+    "r_profile_quarantine",
+    "source_smoke",
+    "pyinstaller_build",
+    "packaged_smoke",
+    "packaged_phases",
+    "packaged_r_graph",
+}
 NATIVE_COMPONENT_KEYS = {
     "python",
     "pyqt6_qtcore",
@@ -638,6 +647,26 @@ def _validate_deployment_inventory(
         _fail("deployment inventory is missing the PyQt6 QtCore extension")
     if not any("rinterface" in path for path in lowered):
         _fail("deployment inventory is missing the packaged rpy2 native bridge")
+    private_lib_r = "Contents/Frameworks/R.framework/Resources/lib/libR.dylib"
+    lib_r_paths = [
+        path
+        for path, record in records.items()
+        if Path(path).name == "libR.dylib" and record["kind"] == "file"
+    ]
+    if lib_r_paths != [private_lib_r]:
+        _fail("deployment inventory must contain one private framework-owned libR")
+    for required_r_member in (
+        "Contents/Frameworks/R.framework/Resources/etc/Renviron",
+        "Contents/Frameworks/R.framework/Resources/include/R.h",
+    ):
+        if required_r_member not in records:
+            _fail("deployment inventory has an incomplete private R_HOME")
+    flattened_compiler_runtime = re.compile(
+        r"^Contents/Frameworks/lib(?:gfortran|quadmath|gcc_s)[^.]*[.]dylib$",
+        re.IGNORECASE,
+    )
+    if any(flattened_compiler_runtime.match(path) for path in records):
+        _fail("deployment inventory contains a flattened R compiler runtime")
     cocoa_paths = [
         path
         for path, record in records.items()
@@ -813,48 +842,20 @@ def _validate_pyinstaller_build_plan(value: object) -> None:
     }
     if normalized_options & collection_options:
         _fail("PyInstaller build plan contains a manual Qt collection mechanism")
-    expected_options = [
-        "--noconfirm",
-        "--clean",
-        "--windowed",
-        "--onedir",
-        "--name",
-        "--target-architecture",
-        "--distpath",
-        "--workpath",
-        "--specpath",
-        "--add-data",
-        "--copy-metadata",
-    ]
+    expected_options = ["--noconfirm", "--clean", "--distpath", "--workpath"]
     if [argument for argument in arguments if argument.startswith("--")] != expected_options:
         _fail("PyInstaller build plan does not match the allowlisted invocation")
-    if len(arguments) != 19:
+    if len(arguments) != 7:
         _fail("PyInstaller build plan does not match the allowlisted invocation")
-    add_data_source, separator, add_data_destination = arguments[15].rpartition(":")
-    windows_source = PureWindowsPath(add_data_source)
-    posix_source = PurePosixPath(add_data_source)
-    windows_drive_colons = 1 if re.match(r"^[A-Za-z]:[\\/]", add_data_source) else 0
     if (
-        arguments[4:6] != ["--name", "Qt6MacFeasibility"]
-        or arguments[6] != "--target-architecture"
-        or arguments[7] not in {"x86_64", "arm64"}
-        or arguments[8] != "--distpath"
-        or arguments[10] != "--workpath"
-        or arguments[12] != "--specpath"
-        or arguments[14] != "--add-data"
-        or separator != ":"
-        or add_data_destination != "resources"
-        or add_data_source.count(":") != windows_drive_colons
-        or not (posix_source.is_absolute() or windows_source.is_absolute())
-        or (
-            posix_source.name != "icons.rcc"
-            and windows_source.name != "icons.rcc"
+        arguments[:3] != ["--noconfirm", "--clean", "--distpath"]
+        or arguments[4] != "--workpath"
+        or not arguments[6].replace("\\", "/").endswith(
+            "packaging/pyinstaller/qt6-macos-feasibility.spec"
         )
-        or arguments[16:18] != ["--copy-metadata", "rpy2"]
-        or not arguments[18].endswith("entry.py")
     ):
         _fail("PyInstaller build plan contains unexpected manual inputs")
-    for path_argument in (arguments[9], arguments[11], arguments[13], arguments[18]):
+    for path_argument in (arguments[3], arguments[5], arguments[6]):
         if not (
             PurePosixPath(path_argument).is_absolute()
             or PureWindowsPath(path_argument).is_absolute()
@@ -963,6 +964,10 @@ def validate_evidence(
         key: EXPECTED_VERSIONS[key] for key in ("pyqt6", "qt", "r", "rpy2")
     }:
         _fail("packaged dependency identities do not match the locked stack")
+    if package.get("r_home") != "Contents/Frameworks/R.framework/Resources":
+        _fail("packaged smoke did not report its private framework-owned R_HOME")
+    if package.get("rpy2_mode") != "API":
+        _fail("packaged smoke did not prove the rpy2 API mode")
     for key in (
         "visible",
         "resource_registered",
@@ -1289,6 +1294,40 @@ def discover_macos_rcc(sdk_root: Path) -> Path:
     return candidates.pop()
 
 
+def validate_macos_rcc(
+    rcc: Path,
+    *,
+    expected_version: str = QT_RCC_VERSION,
+    command_runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+    host_machine: Callable[[], str] = platform.machine,
+) -> list[str]:
+    """Validate an official macOS SDK rcc without importing Qt build dependencies."""
+    completed = command_runner(
+        [str(rcc), "--version"], check=True, capture_output=True, text=True
+    )
+    reported = completed.stdout.strip() or completed.stderr.strip()
+    if reported != f"rcc {expected_version}":
+        raise RuntimeError(
+            f"rcc version mismatch: expected 'rcc {expected_version}', got {reported!r}"
+        )
+    architectures = command_runner(
+        ["/usr/bin/lipo", "-archs", str(rcc)], check=True, capture_output=True, text=True
+    ).stdout.split()
+    supported = {"x86_64", "arm64"}
+    if (
+        not architectures
+        or len(architectures) != len(set(architectures))
+        or any(architecture not in supported for architecture in architectures)
+    ):
+        raise RuntimeError(f"rcc has invalid architecture slices: {architectures!r}")
+    host = host_machine().lower()
+    if host not in architectures:
+        raise RuntimeError(
+            f"rcc architecture mismatch: host {host!r}, slices {architectures!r}"
+        )
+    return sorted(architectures)
+
+
 def append_github_env(github_env: Path, name: str, value: str) -> None:
     """Append one safe, exact UTF-8 GitHub environment-file assignment."""
 
@@ -1302,19 +1341,24 @@ def append_github_env(github_env: Path, name: str, value: str) -> None:
 
 
 def resolve_macos_rcc(
-    sdk_root: Path, github_env: Path, diagnostic: Path
+    sdk_root: Path,
+    github_env: Path,
+    diagnostic: Path,
+    *,
+    command_runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+    host_machine: Callable[[], str] = platform.machine,
 ) -> dict[str, object]:
     """Validate, record, and export the exact official SDK ``rcc`` executable."""
 
-    from rc_metastudio.qt6_build import validate_macos_rcc
-
     rcc = discover_macos_rcc(sdk_root)
-    validate_macos_rcc(rcc)
+    architectures = validate_macos_rcc(
+        rcc, command_runner=command_runner, host_machine=host_machine
+    )
     record: dict[str, object] = {
         "path": str(rcc),
         "version": EXPECTED_VERSIONS["qt"],
         "sha256": _sha256(rcc),
-        "architectures": _archs(rcc),
+        "architectures": architectures,
     }
     diagnostic.parent.mkdir(parents=True, exist_ok=True)
     diagnostic.write_text(
@@ -1479,11 +1523,31 @@ import os
 from pathlib import Path
 import sys
 from importlib import metadata
+
+phases = Path(os.environ["RCMS_FEASIBILITY_PHASES"])
+def phase(name):
+    with phases.open("a", encoding="utf-8") as stream:
+        stream.write(json.dumps({"phase": name}) + "\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+
+phase("python-entry")
+root = Path(getattr(sys, "_MEIPASS", Path(__file__).parent))
+r_home = root / "R.framework" / "Resources"
+if not (r_home / "lib/libR.dylib").is_file() or not (r_home / "etc/Renviron").is_file():
+    raise SystemExit(f"private bundled R_HOME is incomplete: {r_home}")
+os.environ["R_HOME"] = str(r_home)
+os.environ["R_SHARE_DIR"] = str(r_home / "share")
+os.environ["R_INCLUDE_DIR"] = str(r_home / "include")
+os.environ["R_DOC_DIR"] = str(r_home / "doc")
+phase("private-r-owned")
 from PyQt6 import QtCore, QtGui, QtWidgets
+phase("qt-imported")
 from generated_form import Ui_AboutLegalDialog
 import rpy2.robjects as ro
+from rpy2.rinterface_lib import openrlib
+phase("rpy2-api-imported")
 
-root = Path(getattr(sys, "_MEIPASS", Path(__file__).parent))
 resource = root / "resources" / "icons.rcc"
 registered = QtCore.QResource.registerResource(str(resource))
 app = QtWidgets.QApplication(["qt6-macos-feasibility"])
@@ -1500,6 +1564,8 @@ report = {
     "resource_registered": registered,
     "svg_rendered": not svg.isNull(),
     "r_result": float(ro.r("sum(c(1.25, 2.5, 3.75))")[0]),
+    "r_home": str(r_home),
+    "rpy2_mode": openrlib.cffi_mode.name,
     "cocoa_plugin": str(cocoa),
     "dependencies": {
         "pyqt6": QtCore.PYQT_VERSION_STR,
@@ -1512,8 +1578,108 @@ QtCore.QTimer.singleShot(100, app.quit)
 exit_code = app.exec()
 report["clean_exit"] = exit_code == 0 and QtCore.QResource.unregisterResource(str(resource))
 Path(os.environ["RCMS_FEASIBILITY_REPORT"]).write_text(json.dumps(report, sort_keys=True), encoding="utf-8")
+phase("clean-exit")
 raise SystemExit(exit_code)
 '''
+
+
+def _prepare_private_r_framework(
+    build_root: Path, evidence_dir: Path, architecture: str
+) -> tuple[Path, Path]:
+    r_home = Path(
+        subprocess.check_output(["R", "RHOME"], text=True).strip()
+    ).resolve(strict=True)
+    source_framework = next(
+        (parent for parent in (r_home, *r_home.parents) if parent.name == "R.framework"),
+        None,
+    )
+    if source_framework is None:
+        raise RuntimeError(f"R RHOME is not inside the official R.framework: {r_home}")
+    staged_framework = build_root / "staged/R.framework"
+    staged_framework.parent.mkdir(parents=True)
+    shutil.copytree(source_framework, staged_framework, symlinks=True)
+    staged_resources = staged_framework / "Resources"
+    _run(
+        [
+            sys.executable,
+            str(ROOT / "scripts/profile_macos_embedded_r_runtime.py"),
+            "quarantine",
+            "--resources",
+            str(staged_resources),
+            "--evidence",
+            str(evidence_dir / "r-profile-quarantine.json"),
+            "--dependency-manifest",
+            str(ROOT / "docs/verification/RCMetaR-r-dependencies.json"),
+            "--r-version",
+            EXPECTED_VERSIONS["r"],
+            "--architecture",
+            architecture,
+            "--source-resources",
+            str(r_home),
+            "--official-framework-layout",
+        ]
+    )
+    _run(
+        [
+            sys.executable,
+            str(ROOT / "scripts/configure_macos_r_launchers.py"),
+            "--resources",
+            str(staged_resources),
+            "--runtime-only",
+        ]
+    )
+    _run(
+        [
+            "bash",
+            str(ROOT / "scripts/relocate_macos_r_runtime.sh"),
+            "--resources",
+            str(staged_resources),
+            "--architecture",
+            architecture,
+            "--python",
+            sys.executable,
+            "--allowed-root",
+            str(build_root),
+            "--normalizer",
+            str(ROOT / "scripts/normalize_macos_macho.py"),
+        ]
+    )
+    bridge_spec = importlib.util.find_spec("_rinterface_cffi_api")
+    if bridge_spec is None or bridge_spec.origin is None:
+        raise RuntimeError("locked rpy2 API bridge is unavailable")
+    bridge = Path(bridge_spec.origin).resolve(strict=True)
+    _run(
+        [
+            sys.executable,
+            str(ROOT / "scripts/macos_embedded_r_adapter.py"),
+            "relocate-bridge",
+            "--framework",
+            str(staged_framework),
+            "--bridge",
+            str(bridge),
+            "--architecture",
+            architecture,
+            "--output",
+            str(evidence_dir / "source-rpy2-relocation.json"),
+        ]
+    )
+    toc = evidence_dir / "feasibility-r-toc.json"
+    _run(
+        [
+            sys.executable,
+            str(ROOT / "scripts/macos_embedded_r_adapter.py"),
+            "finalize-toc",
+            "--framework",
+            str(staged_framework),
+            "--architecture",
+            architecture,
+            "--output",
+            str(evidence_dir / "feasibility-r-framework.json"),
+            "--toc-output",
+            str(toc),
+        ]
+    )
+    return staged_framework, toc
 
 
 def run_feasibility(target: str, evidence_dir: Path) -> dict[str, Any]:
@@ -1555,33 +1721,25 @@ def run_feasibility(target: str, evidence_dir: Path) -> dict[str, Any]:
 
     generated = build_root / "source/generated/rc_metastudio/forms/ui_about_legal.py"
     resource = build_root / "source/resources/icons.rcc"
+    target_arch = "x86_64" if target == "macos-x64" else "arm64"
+    staged_r_framework, r_toc = _prepare_private_r_framework(
+        build_root, evidence_dir, target_arch
+    )
     work = build_root / "package-source"
     work.mkdir()
     shutil.copy2(generated, work / "generated_form.py")
     (work / "entry.py").write_text(PACKAGED_ENTRY, encoding="utf-8", newline="\n")
     pyinstaller_log = evidence_dir / "pyinstaller-build.log"
-    target_arch = "x86_64" if target == "macos-x64" else "arm64"
+    feasibility_spec = ROOT / "packaging/pyinstaller/qt6-macos-feasibility.spec"
     pyinstaller_arguments = [
-            "--noconfirm",
-            "--clean",
-            "--windowed",
-            "--onedir",
-            "--name",
-            "Qt6MacFeasibility",
-            "--target-architecture",
-            target_arch,
-            "--distpath",
-            str(build_root / "dist"),
-            "--workpath",
-            str(build_root / "work"),
-            "--specpath",
-            str(build_root),
-            "--add-data",
-            f"{resource}:resources",
-            "--copy-metadata",
-            "rpy2",
-            str(work / "entry.py"),
-        ]
+        "--noconfirm",
+        "--clean",
+        "--distpath",
+        str(build_root / "dist"),
+        "--workpath",
+        str(build_root / "work"),
+        str(feasibility_spec),
+    ]
     build_plan_path = evidence_dir / "pyinstaller-build-plan.json"
     build_plan = {
         "schema_version": 1,
@@ -1594,6 +1752,15 @@ def run_feasibility(target: str, evidence_dir: Path) -> dict[str, Any]:
         encoding="utf-8",
         newline="\n",
     )
+    environment.update(
+        {
+            "RCMS_FEASIBILITY_ENTRY": str(work / "entry.py"),
+            "RCMS_FEASIBILITY_RESOURCE": str(resource),
+            "RCMS_FEASIBILITY_R_FRAMEWORK": str(staged_r_framework),
+            "RCMS_FEASIBILITY_R_TOC": str(r_toc),
+            "RCMS_TARGET_ARCHITECTURE": target_arch,
+        }
+    )
     _run(
         [sys.executable, "-m", "PyInstaller", *pyinstaller_arguments],
         environment=environment,
@@ -1603,13 +1770,55 @@ def run_feasibility(target: str, evidence_dir: Path) -> dict[str, Any]:
         build_root
         / "dist/Qt6MacFeasibility.app/Contents/MacOS/Qt6MacFeasibility"
     )
+    app_root = build_root / "dist/Qt6MacFeasibility.app"
+    packaged_bridges = list(app_root.rglob("_rinterface_cffi_api*.so"))
+    if len(packaged_bridges) != 1:
+        raise RuntimeError(
+            f"packaged feasibility app must contain one rpy2 API bridge: {packaged_bridges}"
+        )
+    _run(
+        [
+            sys.executable,
+            str(ROOT / "scripts/macos_embedded_r_adapter.py"),
+            "relocate-bridge",
+            "--framework",
+            str(app_root / "Contents/Frameworks/R.framework"),
+            "--bridge",
+            str(packaged_bridges[0]),
+            "--architecture",
+            target_arch,
+            "--output",
+            str(evidence_dir / "packaged-rpy2-relocation.json"),
+        ]
+    )
+    packaged_r_graph = evidence_dir / "packaged-r-graph.json"
+    _run(
+        [
+            sys.executable,
+            str(ROOT / "scripts/macos_embedded_r_adapter.py"),
+            "post-app",
+            "--app",
+            str(app_root),
+            "--architecture",
+            target_arch,
+            "--output",
+            str(packaged_r_graph),
+        ]
+    )
     packaged_report = evidence_dir / "packaged-smoke.json"
+    packaged_phases = evidence_dir / "packaged-phases.jsonl"
     package_environment = environment.copy()
     package_environment["RCMS_FEASIBILITY_REPORT"] = str(packaged_report)
+    package_environment["RCMS_FEASIBILITY_PHASES"] = str(packaged_phases)
     _run([str(executable)], environment=package_environment)
     package = json.loads(packaged_report.read_text(encoding="utf-8"))
     plugin = Path(package["cocoa_plugin"])
-    app_root = build_root / "dist/Qt6MacFeasibility.app"
+    private_r_home = app_root / "Contents/Frameworks/R.framework/Resources"
+    if Path(package.get("r_home", "")) != private_r_home:
+        raise RuntimeError("packaged smoke did not own its explicit private R_HOME")
+    if package.get("rpy2_mode") != "API":
+        raise RuntimeError("packaged smoke did not load the rpy2 API bridge")
+    package["r_home"] = private_r_home.relative_to(app_root).as_posix()
     if not plugin.is_file() or app_root not in plugin.parents:
         raise RuntimeError(f"Cocoa plugin was not collected inside the app: {plugin}")
     package["cocoa_plugin"] = plugin.relative_to(app_root).as_posix()
@@ -1678,9 +1887,12 @@ def run_feasibility(target: str, evidence_dir: Path) -> dict[str, Any]:
         "native_components": components,
     }
     for key, path in {
+        "r_profile_quarantine": evidence_dir / "r-profile-quarantine.json",
         "source_smoke": source_log,
         "pyinstaller_build": pyinstaller_log,
         "packaged_smoke": packaged_report,
+        "packaged_phases": packaged_phases,
+        "packaged_r_graph": packaged_r_graph,
     }.items():
         evidence["diagnostics"][key] = {
             "path": path.name,

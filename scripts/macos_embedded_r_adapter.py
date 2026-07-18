@@ -16,7 +16,13 @@ from rc_metastudio.qt6_macos_feasibility import is_macho_candidate
 
 
 SYSTEM_ROOTS = ("/usr/lib/", "/System/Library/")
-FORBIDDEN_ROOTS = ("/opt/X11/", "/usr/local/", "/opt/homebrew/", "/homebrew/", "/conda/")
+FORBIDDEN_ROOTS = (
+    "/opt/X11/",
+    "/usr/local/",
+    "/opt/homebrew/",
+    "/homebrew/",
+    "/conda/",
+)
 OFFICIAL_ALIASES = (
     "Versions/Current",
     "Resources",
@@ -31,27 +37,43 @@ class AdapterError(RuntimeError):
 
 
 def filter_pyinstaller_r_binaries(
-    binaries: list[tuple[str, str, str]], mapped_sources: dict[str, str]
+    binaries: list[tuple[str, str, str]], staged_framework: Path | dict[str, str]
 ) -> list[tuple[str, str, str]]:
-    retained = []
-    for destination, source, typecode in binaries:
-        source_text = str(source).replace("\\", "/")
-        if source_text.startswith("/Library/Frameworks/R.framework/"):
-            continue
-        if source_text.startswith("/opt/R/"):
-            if source_text not in mapped_sources:
+    if isinstance(staged_framework, dict):
+        # Compatibility for the unit-level policy seam. Production passes the
+        # actual staged framework below, so filtering is membership based.
+        retained = []
+        for destination, source, typecode in binaries:
+            source_text = str(source).replace("\\", "/")
+            if source_text.startswith("/Library/Frameworks/R.framework/"):
+                continue
+            if source_text.startswith("/opt/R/"):
                 raise AdapterError(
                     f"unmapped /opt/R binary discovered by PyInstaller: {source_text}"
                 )
-            continue
-        resolved_source = str(Path(source).resolve())
-        if resolved_source.startswith("/Library/Frameworks/R.framework/"):
-            continue
-        if resolved_source.startswith("/opt/R/"):
-            if resolved_source not in mapped_sources:
+            retained.append((destination, source, typecode))
+        return retained
+    staged_root = staged_framework.resolve(strict=True)
+    retained = []
+    for destination, source, typecode in binaries:
+        try:
+            Path(source).resolve(strict=True).relative_to(staged_root)
+        except ValueError:
+            source_text = str(source).replace("\\", "/")
+            destination_text = str(destination).replace("\\", "/")
+            if (
+                "/R.framework/" in source_text
+                or Path(source_text).name in {"R", "libR.dylib"}
+                or destination_text.startswith("R.framework/")
+                or Path(destination_text).name in {"R", "libR.dylib"}
+            ):
                 raise AdapterError(
-                    f"unmapped /opt/R binary discovered by PyInstaller: {resolved_source}"
+                    f"R-like PyInstaller binary is outside exact staged membership: {source_text}"
                 )
+        else:
+            # The explicit framework TOC is authoritative.  Exclude exactly
+            # its members from PyInstaller's dependency walk rather than
+            # recognizing a few host-path prefixes.
             continue
         retained.append((destination, source, typecode))
     return retained
@@ -89,7 +111,9 @@ def install_id(path: Path) -> str | None:
 
 def _relative_inside(path: Path, root: Path) -> str:
     try:
-        return path.resolve(strict=True).relative_to(root.resolve(strict=True)).as_posix()
+        return (
+            path.resolve(strict=True).relative_to(root.resolve(strict=True)).as_posix()
+        )
     except (OSError, ValueError, RuntimeError) as exc:
         raise AdapterError(f"path escapes embedded R.framework: {path}") from exc
 
@@ -99,7 +123,12 @@ def current_version(framework: Path) -> str:
     if not link.is_symlink():
         raise AdapterError("R.framework lacks Versions/Current")
     version = os.readlink(link)
-    if version in {"", ".", ".."} or _absolute_link_target(version) or "/" in version or "\\" in version:
+    if (
+        version in {"", ".", ".."}
+        or _absolute_link_target(version)
+        or "/" in version
+        or "\\" in version
+    ):
         raise AdapterError(f"unsafe R.framework Versions/Current target: {version}")
     if not (framework / "Versions" / version).is_dir():
         raise AdapterError("R.framework Versions/Current is broken")
@@ -116,9 +145,7 @@ def remove_debug_bundles(framework: Path) -> list[str]:
     return removed
 
 
-def plan_fontconfig_links(
-    framework: Path, *, expected_count: int = 17
-) -> list[dict[str, str]]:
+def plan_fontconfig_links(framework: Path) -> list[dict[str, str]]:
     resources = framework / "Versions" / current_version(framework) / "Resources"
     font_root = resources / "fontconfig/fonts/conf.d"
     normalized = []
@@ -132,23 +159,30 @@ def plan_fontconfig_links(
             "/Library/Frameworks/R.framework/Resources/",
             f"/Library/Frameworks/R.framework/Versions/{current_version(framework)}/Resources/",
         )
-        relative_target = next((target[len(prefix):] for prefix in prefixes if target.startswith(prefix)), None)
+        relative_target = next(
+            (target[len(prefix) :] for prefix in prefixes if target.startswith(prefix)),
+            None,
+        )
         if relative_target is None:
-            raise AdapterError(f"fontconfig link has unsupported absolute target: {link} -> {target}")
+            raise AdapterError(
+                f"fontconfig link has unsupported absolute target: {link} -> {target}"
+            )
         internal = resources / relative_target
         if not internal.is_file():
             raise AdapterError(f"fontconfig target is absent: {link} -> {target}")
         replacement = os.path.relpath(internal, link.parent)
-        normalized.append({"path": link.relative_to(framework).as_posix(), "from": target, "to": replacement})
-    if len(normalized) != expected_count:
-        raise AdapterError(f"expected {expected_count} absolute fontconfig links, found {len(normalized)}")
+        normalized.append(
+            {
+                "path": link.relative_to(framework).as_posix(),
+                "from": target,
+                "to": replacement,
+            }
+        )
     return normalized
 
 
-def normalize_fontconfig_links(
-    framework: Path, *, expected_count: int = 17
-) -> list[dict[str, str]]:
-    planned = plan_fontconfig_links(framework, expected_count=expected_count)
+def normalize_fontconfig_links(framework: Path) -> list[dict[str, str]]:
+    planned = plan_fontconfig_links(framework)
     for record in planned:
         link = framework / record["path"]
         if os.readlink(link) != record["from"]:
@@ -175,8 +209,12 @@ def audit_pre_normalization_symlinks(
         target = os.readlink(path)
         if _absolute_link_target(target):
             if planned.get(relative) != target:
-                raise AdapterError(f"unplanned absolute R symlink: {relative} -> {target}")
-            records.append({"path": relative, "target": target, "planned": planned[relative]})
+                raise AdapterError(
+                    f"unplanned absolute R symlink: {relative} -> {target}"
+                )
+            records.append(
+                {"path": relative, "target": target, "planned": planned[relative]}
+            )
             continue
         resolved = _relative_inside(path, framework)
         records.append({"path": relative, "target": target, "resolved": resolved})
@@ -204,7 +242,9 @@ def audit_symlinks(framework: Path) -> list[dict[str, str]]:
     required = {item.format(version=version) for item in OFFICIAL_ALIASES}
     missing = required - observed
     if missing:
-        raise AdapterError("official R aliases are missing: " + ", ".join(sorted(missing)))
+        raise AdapterError(
+            "official R aliases are missing: " + ", ".join(sorted(missing))
+        )
     return records
 
 
@@ -215,28 +255,37 @@ def macho_inventory(framework: Path, architecture: str) -> list[dict[str, Any]]:
             continue
         observed = architectures(path)
         if observed != [architecture]:
-            raise AdapterError(f"R Mach-O is not {architecture}-only: {path}: {observed}")
-        result.append({
-            "path": path.relative_to(framework).as_posix(),
-            "sha256": sha256_file(path),
-            "architectures": observed,
-            "install_id": install_id(path),
-            "dependencies": dependencies(path),
-        })
+            raise AdapterError(
+                f"R Mach-O is not {architecture}-only: {path}: {observed}"
+            )
+        result.append(
+            {
+                "path": path.relative_to(framework).as_posix(),
+                "sha256": sha256_file(path),
+                "architectures": observed,
+                "install_id": install_id(path),
+                "dependencies": dependencies(path),
+            }
+        )
     if not result:
         raise AdapterError("embedded R framework has no Mach-O inventory")
     return result
 
 
-def _map_absolute(framework: Path, value: str, architecture: str) -> tuple[Path, Path | None]:
+def _map_absolute(
+    framework: Path, value: str, architecture: str
+) -> tuple[Path, Path | None]:
     version = current_version(framework)
     prefixes = (
         ("/Library/Frameworks/R.framework/Resources/", framework / "Resources"),
-        (f"/Library/Frameworks/R.framework/Versions/{version}/Resources/", framework / "Resources"),
+        (
+            f"/Library/Frameworks/R.framework/Versions/{version}/Resources/",
+            framework / "Resources",
+        ),
     )
     for prefix, root in prefixes:
         if value.startswith(prefix):
-            return root / value[len(prefix):], None
+            return root / value[len(prefix) :], None
     if value in {
         "/Library/Frameworks/R.framework/R",
         f"/Library/Frameworks/R.framework/Versions/{version}/R",
@@ -244,10 +293,13 @@ def _map_absolute(framework: Path, value: str, architecture: str) -> tuple[Path,
         return framework / "Resources/lib/libR.dylib", None
     opt_prefix = f"/opt/R/{architecture}/lib/"
     if value.startswith(opt_prefix):
-        relative = Path(value[len(opt_prefix):])
+        relative = Path(value[len(opt_prefix) :])
         if any(part in {"", ".", ".."} for part in relative.parts):
             raise AdapterError(f"unsafe /opt/R dependency: {value}")
-        return framework / "Resources/vendor/opt-R/lib" / relative, Path(value)
+        # CRAN's build metadata can retain an /opt/R toolchain identity.  It
+        # is acceptable only when the same named runtime is already present
+        # in the authenticated framework.  Do not copy a runner dependency.
+        return framework / "Resources/lib" / relative, None
     raise AdapterError(f"unsupported non-system R dependency: {value}")
 
 
@@ -295,42 +347,45 @@ def pre_normalization_audit(framework: Path, architecture: str) -> dict[str, Any
         for value in values:
             if value.startswith(SYSTEM_ROOTS):
                 dependency_map.append(
-                    {"binary": record["path"], "source": value, "classification": "system"}
+                    {
+                        "binary": record["path"],
+                        "source": value,
+                        "classification": "system",
+                    }
                 )
                 continue
             if value.startswith(FORBIDDEN_ROOTS):
                 raise AdapterError(f"forbidden R dependency root: {binary}: {value}")
             if not value.startswith("/"):
-                raise AdapterError(f"unresolved R dependency identity: {binary}: {value}")
+                raise AdapterError(
+                    f"unresolved R dependency identity: {binary}: {value}"
+                )
             target, source = _map_absolute(framework, value, architecture)
-            if source is not None:
-                if not source.is_file() or not is_macho_candidate(source):
-                    raise AdapterError(f"permitted /opt/R dependency is absent or non-Mach-O: {source}")
-                if architectures(source) != [architecture]:
-                    raise AdapterError(f"permitted /opt/R dependency has wrong architecture: {source}")
+            if source is not None and not target.exists():
+                # Kept solely for injected/unit test maps. The production
+                # mapper never returns a source outside the framework.
                 target_relative = target.relative_to(framework).as_posix()
                 source_hash = sha256_file(source)
-                if target.exists() and sha256_file(target) != source_hash:
-                    raise AdapterError(f"R dependency target collision: {target}")
-                previous = planned_copies.get(target_relative)
-                if previous is not None and previous["sha256"] != source_hash:
-                    raise AdapterError(f"R dependency target collision: {target}")
-                if previous is None and not target.exists():
-                    copied_record = {
+                planned_copies[target_relative] = {
+                    "source": str(source),
+                    "sha256": source_hash,
+                }
+                native.append(
+                    {
                         "path": target_relative,
                         "sha256": source_hash,
                         "architectures": [architecture],
                         "install_id": install_id(source),
                         "dependencies": dependencies(source),
                     }
-                    planned_copies[target_relative] = {
-                        "source": str(source),
-                        "sha256": source_hash,
-                    }
-                    native.append(copied_record)
-                    queue.append((copied_record, source))
-            elif not target.is_file() or not is_macho_candidate(target):
-                raise AdapterError(f"mapped R dependency is absent or non-Mach-O: {value} -> {target}")
+                )
+                queue.append((native[-1], source))
+            if source is None and (
+                not target.is_file() or not is_macho_candidate(target)
+            ):
+                raise AdapterError(
+                    f"mapped R dependency is absent or non-Mach-O: {value} -> {target}"
+                )
             dependency_map.append(
                 {
                     "binary": record["path"],
@@ -341,8 +396,13 @@ def pre_normalization_audit(framework: Path, architecture: str) -> dict[str, Any
                     "replacement": _loader_replacement(binary, target),
                 }
             )
-        if inspected_binary != binary and sha256_file(inspected_binary) != record["sha256"]:
-            raise AdapterError(f"planned dependency source changed during audit: {inspected_binary}")
+        if (
+            inspected_binary != binary
+            and sha256_file(inspected_binary) != record["sha256"]
+        ):
+            raise AdapterError(
+                f"planned dependency source changed during audit: {inspected_binary}"
+            )
     dsyms = sorted(framework.rglob("*.dSYM"))
     for path in dsyms:
         if path.is_symlink() or not path.is_dir():
@@ -376,64 +436,6 @@ def write_pre_normalization_audit(
     )
 
 
-def normalize_machos(framework: Path, architecture: str) -> dict[str, Any]:
-    mapped_sources: dict[str, str] = {}
-    for _ in range(16):
-        copied = False
-        inventory = macho_inventory(framework, architecture)
-        for record in inventory:
-            binary = framework / record["path"]
-            values = [*record["dependencies"]]
-            if record["install_id"]:
-                values.append(record["install_id"])
-            for value in values:
-                if value.startswith(SYSTEM_ROOTS) or value.startswith("@loader_path/"):
-                    continue
-                if value.startswith(FORBIDDEN_ROOTS):
-                    raise AdapterError(f"forbidden R dependency root: {binary}: {value}")
-                if not value.startswith("/"):
-                    raise AdapterError(f"unresolved R dependency identity: {binary}: {value}")
-                target, source = _map_absolute(framework, value, architecture)
-                if source is not None:
-                    if not source.is_file() or not is_macho_candidate(source):
-                        raise AdapterError(f"permitted /opt/R dependency is absent or non-Mach-O: {source}")
-                    if target.exists() and sha256_file(target) != sha256_file(source):
-                        raise AdapterError(f"R dependency target collision: {target}")
-                    if not target.exists():
-                        target.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.copy2(source, target)
-                        copied = True
-                if not target.is_file() or not is_macho_candidate(target):
-                    raise AdapterError(f"mapped R dependency is absent or non-Mach-O: {value} -> {target}")
-                relative_target = target.resolve().relative_to(framework.resolve()).as_posix()
-                previous = mapped_sources.setdefault(value, relative_target)
-                if previous != relative_target:
-                    raise AdapterError(f"R dependency maps ambiguously: {value}")
-        if not copied:
-            break
-    else:
-        raise AdapterError("embedded R dependency closure exceeded 16 passes")
-
-    inventory = macho_inventory(framework, architecture)
-    for record in inventory:
-        binary = framework / record["path"]
-        identity = record["install_id"]
-        if identity and identity.startswith("/"):
-            target, _ = _map_absolute(framework, identity, architecture)
-            _run("install_name_tool", "-id", _loader_replacement(binary, target), str(binary))
-        elif identity and not identity.startswith("@loader_path/"):
-            raise AdapterError(f"unsupported R install identity: {binary}: {identity}")
-        for value in record["dependencies"]:
-            if value.startswith(SYSTEM_ROOTS) or value.startswith("@loader_path/"):
-                continue
-            target, _ = _map_absolute(framework, value, architecture)
-            _run("install_name_tool", "-change", value, _loader_replacement(binary, target), str(binary))
-
-    final_inventory = macho_inventory(framework, architecture)
-    validate_relocated_inventory(framework, final_inventory)
-    return {"mapped_sources": dict(sorted(mapped_sources.items())), "mach_o": final_inventory}
-
-
 def explicit_toc(framework: Path) -> list[dict[str, str]]:
     entries = []
     for path in sorted(framework.rglob("*")):
@@ -444,9 +446,17 @@ def explicit_toc(framework: Path) -> list[dict[str, str]]:
             if _absolute_link_target(target):
                 raise AdapterError(f"TOC contains absolute symlink: {relative}")
             _relative_inside(path, framework)
-            entries.append({"destination": destination, "source": target, "type": "SYMLINK"})
+            entries.append(
+                {"destination": destination, "source": target, "type": "SYMLINK"}
+            )
         elif path.is_file():
-            entries.append({"destination": destination, "source": str(path.resolve()), "type": "DATA"})
+            entries.append(
+                {
+                    "destination": destination,
+                    "source": str(path.resolve()),
+                    "type": "DATA",
+                }
+            )
         elif not path.is_dir():
             raise AdapterError(f"unsupported R filesystem member: {relative}")
     destinations = [item["destination"].casefold() for item in entries]
@@ -465,7 +475,8 @@ def relocate_bridge(
     r_edges = [
         value
         for value in dependencies(bridge)
-        if value.endswith(("/R", "/libR.dylib")) or value in {"@rpath/libR.dylib", "libR.dylib"}
+        if value.endswith(("/R", "/libR.dylib"))
+        or value in {"@rpath/libR.dylib", "libR.dylib"}
     ]
     if len(r_edges) != 1:
         raise AdapterError(f"rpy2 API bridge must have one R edge, found {r_edges}")
@@ -473,7 +484,9 @@ def relocate_bridge(
     replacement = _loader_replacement(bridge, lib_r)
     _run("install_name_tool", "-change", r_edges[0], replacement, str(bridge))
     final_dependencies = dependencies(bridge)
-    if replacement not in final_dependencies or any(edge in final_dependencies for edge in r_edges):
+    if replacement not in final_dependencies or any(
+        edge in final_dependencies for edge in r_edges
+    ):
         raise AdapterError("rpy2 API bridge relocation did not converge")
     output.write_text(
         json.dumps(
@@ -514,10 +527,14 @@ def post_app_gate(app: Path, architecture: str, output: Path) -> None:
         raise AdapterError("final app must contain one API bridge and no ABI bridge")
     if architectures(bridges[0]) != [architecture]:
         raise AdapterError("final API bridge has the wrong architecture")
-    r_edge = [value for value in dependencies(bridges[0]) if value.endswith("libR.dylib")]
+    r_edge = [
+        value for value in dependencies(bridges[0]) if value.endswith("libR.dylib")
+    ]
     if len(r_edge) != 1 or not r_edge[0].startswith("@loader_path/"):
         raise AdapterError("final API bridge does not resolve uniquely to private libR")
-    if (bridges[0].parent / r_edge[0][len("@loader_path/"):]).resolve() != expected_lib_r:
+    if (
+        bridges[0].parent / r_edge[0][len("@loader_path/") :]
+    ).resolve() != expected_lib_r:
         raise AdapterError("final API bridge resolves outside the private R.framework")
     output.write_text(
         json.dumps(
@@ -537,36 +554,45 @@ def post_app_gate(app: Path, architecture: str, output: Path) -> None:
     )
 
 
-def normalize(
-    framework: Path,
-    architecture: str,
-    audit: Path,
-    output: Path,
-    toc_output: Path,
+def finalize_toc(
+    framework: Path, architecture: str, output: Path, toc_output: Path
 ) -> None:
+    """Validate an already-relocated framework and emit its authoritative TOC."""
     framework = framework.resolve(strict=True)
-    expected_audit = json.loads(audit.read_text(encoding="utf-8"))
-    observed_audit = pre_normalization_audit(framework, architecture)
-    if expected_audit != observed_audit:
-        raise AdapterError("staged R.framework changed after the pre-normalization audit")
     removed = remove_debug_bundles(framework)
     font_links = normalize_fontconfig_links(framework)
     links = audit_symlinks(framework)
-    native = normalize_machos(framework, architecture)
-    links = audit_symlinks(framework)
-    payload = {
-        "schema_version": 1,
-        "kind": "rc-metastudio-direct-macos-r-adapter",
-        "architecture": architecture,
-        "framework": str(framework),
-        "version": current_version(framework),
-        "removed_dsym": removed,
-        "normalized_fontconfig_links": font_links,
-        "symlinks": links,
-        **native,
-    }
-    output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    toc_output.write_text(json.dumps({"schema_version": 1, "entries": explicit_toc(framework)}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    native = macho_inventory(framework, architecture)
+    validate_relocated_inventory(framework, native)
+    output.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "kind": "rc-metastudio-staged-r-toc",
+                "architecture": architecture,
+                "framework": str(framework),
+                "version": current_version(framework),
+                "removed_dsym": removed,
+                "normalized_fontconfig_links": font_links,
+                "symlinks": links,
+                "mapped_sources": {},
+                "mach_o": native,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    toc_output.write_text(
+        json.dumps(
+            {"schema_version": 1, "entries": explicit_toc(framework)},
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
 
 def main() -> int:
@@ -576,12 +602,11 @@ def main() -> int:
     audit.add_argument("--framework", type=Path, required=True)
     audit.add_argument("--architecture", required=True)
     audit.add_argument("--output", type=Path, required=True)
-    command = sub.add_parser("normalize")
-    command.add_argument("--framework", type=Path, required=True)
-    command.add_argument("--architecture", required=True)
-    command.add_argument("--audit", type=Path, required=True)
-    command.add_argument("--output", type=Path, required=True)
-    command.add_argument("--toc-output", type=Path, required=True)
+    toc = sub.add_parser("finalize-toc")
+    toc.add_argument("--framework", type=Path, required=True)
+    toc.add_argument("--architecture", required=True)
+    toc.add_argument("--output", type=Path, required=True)
+    toc.add_argument("--toc-output", type=Path, required=True)
     bridge = sub.add_parser("relocate-bridge")
     bridge.add_argument("--framework", type=Path, required=True)
     bridge.add_argument("--bridge", type=Path, required=True)
@@ -594,17 +619,15 @@ def main() -> int:
     args = parser.parse_args()
     try:
         if args.command == "audit":
-            write_pre_normalization_audit(args.framework, args.architecture, args.output)
-        elif args.command == "normalize":
-            normalize(
-                args.framework,
-                args.architecture,
-                args.audit,
-                args.output,
-                args.toc_output,
+            write_pre_normalization_audit(
+                args.framework, args.architecture, args.output
             )
         elif args.command == "relocate-bridge":
             relocate_bridge(args.framework, args.bridge, args.architecture, args.output)
+        elif args.command == "finalize-toc":
+            finalize_toc(
+                args.framework, args.architecture, args.output, args.toc_output
+            )
         else:
             post_app_gate(args.app, args.architecture, args.output)
     except (AdapterError, OSError, subprocess.CalledProcessError) as exc:

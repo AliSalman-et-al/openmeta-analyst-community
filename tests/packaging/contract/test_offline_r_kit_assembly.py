@@ -31,24 +31,15 @@ def test_release_assemblers_accept_only_prebuilt_authenticated_kits():
         )
 
 
-def test_ci_produces_then_downloads_exact_kit_before_offline_assembly():
+def test_macos_ci_runs_one_direct_target_native_build():
     workflow = Path(".github/workflows/package-target.yml").read_text(encoding="utf-8")
-    assert "uses: ./.github/workflows/r-integration-kit-producer.yml" in workflow
-    assert "needs: produce-r-integration-kit" in workflow
-    assert "actions/download-artifact@" in workflow
-    assert "needs.produce-r-integration-kit.outputs.kit_sha256" in workflow
-    assert "scripts\\assemble-windows-package.ps1" in workflow
-    assert "scripts/assemble-macos-package.sh" in workflow
-    assert "Cache qualified R integration kit" not in workflow
-    assert workflow.index("Download exact promoted R integration kit") < workflow.index(
-        "Install uv"
-    )
-    assert workflow.index("verify-content") < workflow.index("sync --locked --offline")
-    assert "python/uv-cache" in workflow
-    assert "uv sync --locked\n" not in workflow
-    assert workflow.index("Install Python") < workflow.index("Build Windows package")
+    assert "produce-r-integration-kit" not in workflow
+    assert "download-artifact" not in workflow
+    assert "macos-15-intel" in workflow
+    assert "scripts/package-macos.sh --architecture x64" in workflow
+    assert "uv sync --locked" not in workflow
     assert workflow.index("Install official Qt SDK on macOS") < workflow.index(
-        "Build macOS package"
+        "Build, inspect, smoke, archive, and requalify macOS Intel package"
     )
 
 
@@ -61,12 +52,11 @@ def test_windows_public_command_stages_authenticated_r_without_a_promoted_kit():
     assert "ExpectedRIntegrationKitSha256" not in wrapper
 
 
-def test_macos_public_command_remains_kit_based_until_its_native_slice_lands():
+def test_macos_public_command_is_self_contained_direct_native_build():
     wrapper = Path("scripts/package-macos.sh").read_text(encoding="utf-8")
-    assert "verify-content" in wrapper
-    assert "--expected-kit-sha256" in wrapper
-    assert "--offline" in wrapper
-    assert "uv-cache" in wrapper
+    assert "r-integration-kit" not in wrapper
+    assert "uv sync --locked" in wrapper
+    assert "Xcode Command Line Tools" in wrapper
 
 
 def test_producer_populates_a_clean_dedicated_uv_cache_from_the_exact_lock():

@@ -22,6 +22,7 @@ import urllib.request
 
 import py7zr
 from PyQt6 import QtCore, QtGui, QtWidgets
+from rc_metastudio.qt6_macos_feasibility import validate_macos_rcc as _validate_macos_rcc
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -76,6 +77,14 @@ QT_RCC_PACKAGE_SHA256 = "7f97edc3937fec7383eb865e010ed5128155bf9c80a563abca45086
 QT_RCC_SHA256 = "912f4565e9486243200517be9e7e8dddc76ea63cd426278e944ba36ad8ff14e7"
 QT_RCC_CORE_SHA256 = "fae4778a42e93adc82b831c879c886a05147e9cc26760808d21116be5547259b"
 WINDOWS_X64_PE_MACHINE = 0x8664
+
+
+def validate_macos_rcc(rcc: Path, *, expected_version: str = QT_RCC_VERSION) -> list[str]:
+    """Compatibility re-export using this module's historically patched seams."""
+    return _validate_macos_rcc(
+        rcc, expected_version=expected_version,
+        command_runner=subprocess.run, host_machine=platform.machine,
+    )
 
 
 def validate_form_manifest(
@@ -209,27 +218,6 @@ def validate_rcc(
     core = rcc.with_name("Qt6Core.dll")
     if not core.is_file() or _sha256(core) != QT_RCC_CORE_SHA256:
         raise RuntimeError("rcc is not paired with the pinned official Qt6Core.dll")
-
-
-def validate_macos_rcc(rcc: Path, *, expected_version: str = QT_RCC_VERSION) -> None:
-    """Validate the official macOS SDK rcc selected by the native CI job."""
-
-    completed = subprocess.run(
-        [str(rcc), "--version"], check=True, capture_output=True, text=True
-    )
-    reported = completed.stdout.strip() or completed.stderr.strip()
-    if reported != f"rcc {expected_version}":
-        raise RuntimeError(
-            f"rcc version mismatch: expected 'rcc {expected_version}', got {reported!r}"
-        )
-    architectures = subprocess.run(
-        ["lipo", "-archs", str(rcc)], check=True, capture_output=True, text=True
-    ).stdout.split()
-    host = platform.machine().lower()
-    if host not in architectures:
-        raise RuntimeError(
-            f"rcc architecture mismatch: host {host!r}, slices {architectures!r}"
-        )
 
 
 def download_pinned_archive(

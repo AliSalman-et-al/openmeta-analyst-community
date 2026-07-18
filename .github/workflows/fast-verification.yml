@@ -214,6 +214,32 @@ jobs:
           uv sync --locked
           uv run python scripts/verify_rcmetar_r_default.py --rscript "$(command -v Rscript)" --require-r --require-installed-packages --install-missing --r-library-cache-root artifacts/r-default-library-cache
 
+      - name: Rebuild and prove macOS rpy2 API bridge against installed R
+        if: ${{ matrix.platform == 'macos' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          export R_HOME="$(R RHOME)"
+          export RPY2_CFFI_MODE=API
+          echo "R_HOME=$R_HOME" >> "$GITHUB_ENV"
+          echo "RPY2_CFFI_MODE=API" >> "$GITHUB_ENV"
+          uv sync --locked --reinstall-package rpy2-rinterface \
+            --no-binary-package rpy2-rinterface
+          bridge="$(uv run python -c 'from pathlib import Path; import _rinterface_cffi_api as module; print(Path(module.__file__).resolve())')"
+          test "$(uv run python -c 'from importlib import metadata; print(metadata.version("rpy2-rinterface"))')" = "3.6.6"
+          test "$(lipo -archs "$bridge")" = "$(uname -m)"
+          test "$(otool -L "$bridge" | awk 'NR > 1 && ($1 ~ /libR[.]dylib$/ || $1 ~ /\/R$/) { count++ } END { print count + 0 }')" = "1"
+          uv run python - <<'PY'
+          from rpy2 import robjects
+          from rpy2.rinterface_lib import openrlib
+
+          if openrlib.cffi_mode.name != "API":
+              raise SystemExit(f"rpy2 loaded {openrlib.cffi_mode.name}, expected API")
+          result = float(robjects.r("sum(c(1.25, 2.5, 3.75))")[0])
+          if result != 7.5:
+              raise SystemExit(f"embedded R calculation returned {result}, expected 7.5")
+          PY
+
       - name: Cache official Qt rcc package on Windows
         if: ${{ matrix.platform == 'windows' }}
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
@@ -255,7 +281,7 @@ jobs:
         if: ${{ matrix.platform == 'macos' }}
         shell: bash
         run: |
-          bash ./scripts/verify-smoke.sh --sync --require-r-evidence
+          bash ./scripts/verify-smoke.sh --require-r-evidence
           bash ./scripts/verify-fast.sh --strict-taxonomy --require-r-evidence
 
       - name: Prune uv cache
@@ -274,10 +300,7 @@ jobs:
     if: ${{ needs.change-classifier.outputs.run-macos-x64-package == 'true' }}
     uses: ./.github/workflows/package-target.yml
     with:
-      runner: macos-15-intel
-      target_os: macos
       artifact_name: RCMetaStudio-macos-x64
-      archive_platform: macos-x64
 
   fast-verification-gate:
     name: Qt6 Integration Verification Gate

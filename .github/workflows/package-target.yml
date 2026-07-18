@@ -1,23 +1,10 @@
-name: Package Supported Target
+name: Package macOS Intel x64
 
 on:
   workflow_call:
     inputs:
-      runner:
-        required: true
-        type: string
-      target_os:
-        required: true
-        type: string
       artifact_name:
         required: true
-        type: string
-      archive_platform:
-        required: true
-        type: string
-      macos_architecture:
-        required: false
-        default: x64
         type: string
 
 permissions:
@@ -25,93 +12,56 @@ permissions:
 
 env:
   RCMS_CRAN_REPO: https://packagemanager.posit.co/cran/2026-07-16
-  RCMS_CRAN_REPO_KEY: public-ppm-2026-07-16
 
 jobs:
-  produce-r-integration-kit:
-    uses: ./.github/workflows/r-integration-kit-producer.yml
-    with:
-      runner: ${{ inputs.runner }}
-      target: ${{ inputs.archive_platform }}
-
   package:
     name: ${{ inputs.artifact_name }}
-    runs-on: ${{ inputs.runner }}
-    needs: produce-r-integration-kit
-    timeout-minutes: 60
+    runs-on: macos-15-intel
+    timeout-minutes: 90
     steps:
-      - name: Check out repository
+      - name: Check out exact source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
-
-      - name: Download exact promoted R integration kit
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4
-        with:
-          name: ${{ needs.produce-r-integration-kit.outputs.artifact_name }}
-          path: artifacts/r-integration-kits/${{ inputs.archive_platform }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           enable-cache: true
 
-      - name: Install Python
+      - name: Install locked Python
         run: uv python install 3.11.9
 
-      - name: Authenticate promoted kit before environment assembly
-        run: uv run --no-project --offline --python 3.11.9 python scripts/r_integration_kit.py verify-content --kit "artifacts/r-integration-kits/${{ inputs.archive_platform }}" --target "${{ inputs.archive_platform }}" --uv-lock uv.lock --expected-kit-sha256 "${{ needs.produce-r-integration-kit.outputs.kit_sha256 }}"
-
-      - name: Install locked offline assembly environment
-        run: uv --cache-dir "artifacts/r-integration-kits/${{ inputs.archive_platform }}/python/uv-cache" sync --locked --offline
-
-      - name: Resolve shared package metadata
+      - name: Resolve package metadata
         id: package-metadata
-        run: uv run python scripts/resolve_package_ci_metadata.py
+        shell: bash
+        run: uv run --no-project --python 3.11.9 python scripts/resolve_package_ci_metadata.py --version-only
 
       - name: Cache official Qt SDK on macOS
-        if: ${{ inputs.target_os == 'macos' }}
         id: macos_qt_sdk_cache
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: build/qt-sdk
-          key: qt-sdk-6.11.1-${{ inputs.archive_platform }}
+          key: qt-sdk-6.11.1-macos-x64
 
       - name: Install official Qt SDK on macOS
-        if: ${{ inputs.target_os == 'macos' && steps.macos_qt_sdk_cache.outputs.cache-hit != 'true' }}
+        if: ${{ steps.macos_qt_sdk_cache.outputs.cache-hit != 'true' }}
         shell: bash
-        run: uv run aqt install-qt mac desktop 6.11.1 clang_64 --outputdir "$PWD/build/qt-sdk"
+        run: uv tool run --from aqtinstall==3.3.0 aqt install-qt mac desktop 6.11.1 clang_64 --outputdir "$PWD/build/qt-sdk"
 
       - name: Resolve official Qt rcc on macOS
-        if: ${{ inputs.target_os == 'macos' }}
+        shell: bash
+        run: PYTHONPATH="$PWD/src" uv run --no-project --python 3.11.9 python scripts/qt6_macos_feasibility.py resolve-rcc --sdk-root "$PWD/build/qt-sdk/6.11.1/macos" --github-env "$GITHUB_ENV" --diagnostic "build/qt-sdk/macos-x64-rcc.json"
+
+      - name: Build, inspect, smoke, archive, and requalify macOS Intel package
         shell: bash
         run: |
           set -euo pipefail
-          uv run python scripts/qt6_macos_feasibility.py resolve-rcc \
-            --sdk-root "$PWD/build/qt-sdk/6.11.1/macos" \
-            --github-env "$GITHUB_ENV" \
-            --diagnostic "build/qt-sdk/${{ inputs.archive_platform }}-rcc.json"
-
-      - name: Build Windows package
-        if: ${{ inputs.target_os == 'windows' }}
-        shell: powershell
-        run: .\scripts\assemble-windows-package.ps1 -ArtifactName "${{ inputs.artifact_name }}" -ArchiveRootName "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ inputs.archive_platform }}" -RIntegrationKit "$PWD\artifacts\r-integration-kits\${{ inputs.archive_platform }}" -ExpectedRIntegrationKitSha256 "${{ needs.produce-r-integration-kit.outputs.kit_sha256 }}"
-
-      - name: Build macOS package
-        if: ${{ inputs.target_os == 'macos' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -e /opt/X11 ]; then
-            echo "The clean macOS qualification runner unexpectedly contains /opt/X11." >&2
-            exit 1
-          fi
-          bash scripts/assemble-macos-package.sh \
-            --architecture "${{ inputs.macos_architecture }}" \
+          test "$(uname -m)" = x86_64
+          test ! -e /opt/X11
+          bash scripts/package-macos.sh --architecture x64 \
             --artifact-name "${{ inputs.artifact_name }}" \
-            --archive-root-name "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ inputs.archive_platform }}" \
-            --r-integration-kit "$PWD/artifacts/r-integration-kits/${{ inputs.archive_platform }}" \
-            --expected-r-integration-kit-sha256 "${{ needs.produce-r-integration-kit.outputs.kit_sha256 }}"
+            --archive-root-name "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-macos-x64"
 
       - name: Upload package artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -122,66 +72,31 @@ jobs:
           retention-days: 30
           compression-level: 0
 
-      - name: Upload Windows qualification evidence
-        if: ${{ inputs.target_os == 'windows' }}
+      - name: Upload qualification evidence
+        if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ inputs.artifact_name }}-evidence
           path: |
             artifacts/${{ inputs.artifact_name }}-evidence.json
             artifacts/${{ inputs.artifact_name }}-archive-inspection.json
-          if-no-files-found: error
+            build/macos-package/x64/work/qualification/**
+            build/macos-package/x64/work/qualification/packaged-smoke*.log
+          if-no-files-found: warn
           retention-days: 30
           compression-level: 0
 
-      - name: Upload macOS qualification evidence
-        if: ${{ inputs.target_os == 'macos' }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: ${{ inputs.artifact_name }}-evidence
-          path: |
-            artifacts/${{ inputs.artifact_name }}-evidence.json
-            artifacts/${{ inputs.artifact_name }}-archive-inspection.json
-          if-no-files-found: error
-          retention-days: 30
-          compression-level: 0
-
-      - name: Upload Windows packaging diagnostics
-        if: ${{ failure() && inputs.target_os == 'windows' }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: ${{ inputs.artifact_name }}-diagnostics
-          path: |
-            build/windows-package/work/RCMetaStudio/warn-RCMetaStudio.txt
-            build/windows-package/work/RCMetaStudio/xref-RCMetaStudio.html
-            build/windows-package/dist/RCMetaStudio/automation-wizard-layout-smoke.log
-            build/windows-package/dist/RCMetaStudio/qualification/deployment-manifest.json
-            build/windows-package/dist/RCMetaStudio/qualification/runtime-probe.json
-            build/windows-package/dist/RCMetaStudio/qualification/packaged-smoke.json
-            build/windows-package/dist/RCMetaStudio/qualification/packaged-smoke*.log
-            artifacts/*-archive-inspection.json
-            artifacts/*-evidence.json
-          if-no-files-found: ignore
-          retention-days: 14
-          compression-level: 0
-
-      - name: Upload macOS packaging diagnostics
-        if: ${{ failure() && inputs.target_os == 'macos' }}
+      - name: Upload failure diagnostics
+        if: ${{ failure() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ inputs.artifact_name }}-diagnostics
           path: |
             build/macos-package/x64/work/RCMetaStudio/warn-RCMetaStudio.txt
             build/macos-package/x64/work/RCMetaStudio/xref-RCMetaStudio.html
-            build/macos-package/x64/shared-release-verification.log
-            build/macos-package/x64/work/qualification/*
-            build/qt-sdk/*-rcc.json
+            build/macos-package/x64/work/qualification/**
             artifacts/*-archive-inspection.json
             artifacts/*-evidence.json
           if-no-files-found: ignore
           retention-days: 14
           compression-level: 0
-
-      - name: Prune uv cache
-        if: ${{ always() }}
-        run: uv cache prune --ci

@@ -23,6 +23,30 @@ def text(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
+def official_macos_r_config_fixture() -> str:
+    return '''#!/bin/sh
+## config -- Simple shell script to get the values of basic R configure
+includes="-I${R_INCLUDE_DIR}"
+MAIN_LDFLAGS="-Wl,-headerpad_max_install_names"
+LDFLAGS="-L/opt/R/x86_64/lib"
+LIBR="-F/Library/Frameworks/R.framework/.. -framework R"
+LIBS="-L/opt/R/x86_64/lib -lbz2 -lz -licucore -ldl -lm -liconv"
+case "$1" in
+    --cppflags)
+      if false; then
+        echo "${includes}"
+      else
+        echo "${includes}"
+      fi
+      ;;
+    --ldflags)
+      echo "${MAIN_LDFLAGS} ${LDFLAGS} ${LIBR} ${LIBS}"
+      ;;
+    CC) echo clang ;;
+esac
+'''
+
+
 def load_inspector():
     path = ROOT / "scripts/inspect_macos_deployment.py"
     spec = importlib.util.spec_from_file_location("inspect_macos_deployment", path)
@@ -168,7 +192,7 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     assert "generated_form_modules" in spec
     assert 'os.environ.get("RCMS_PYINSTALLER_R_TOC")' in spec
     assert 'os.environ.get("RCMS_PYINSTALLER_R_MAP")' in spec
-    assert 'a.datas.extend(' in spec
+    assert "a.datas.extend(" in spec
     assert 'entry["type"]' in spec
     assert '(direct_r_framework, "R.framework")' not in spec
     assert '"direct-r-spike.marker"' in spec
@@ -181,305 +205,18 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     spike = text("scripts/package-macos-x64-direct-r-spike.sh")
     spike_workflow_text = text(".github/workflows/macos-x64-direct-r-spike.yml")
     spike_workflow = yaml.safe_load(spike_workflow_text)
-    assert list(spike_workflow["jobs"]) == ["feasibility"]
+    assert list(spike_workflow["jobs"]) == ["r-substrate", "feasibility"]
+    assert spike_workflow["jobs"]["feasibility"]["needs"] == "r-substrate"
+    assert "--stop-after-r-substrate" in spike_workflow_text
     assert "verify_macos_r_pyinstaller_toc.py" in spike_workflow_text
-    assert spike_workflow_text.index("verify_macos_r_pyinstaller_toc.py") < spike_workflow_text.index(
-        "package-macos-x64-direct-r-spike.sh"
-    )
+    assert spike_workflow_text.index(
+        "verify_macos_r_pyinstaller_toc.py"
+    ) < spike_workflow_text.index("package-macos-x64-direct-r-spike.sh")
     assert "produce-r-integration-kit" not in spike_workflow_text
     assert "r-integration-kit-producer.yml" not in spike_workflow_text
-    manual_workflow = text(".github/workflows/package-verification.yml")
-    assert "build_macos_direct_r_spike" in manual_workflow
-    assert "uses: ./.github/workflows/macos-x64-direct-r-spike.yml" in manual_workflow
-    for required in (
-        "612bb00cb4c627721d6d80b0f5224227c0fcdefb4a5b6c917511480361c16571",
-        'installed_framework="/Library/Frameworks/R.framework"',
-        'current="$(readlink "$framework/Versions/Current")"',
-        'ditto "$installed_framework" "$stage"',
-        'require_x64 "$home/bin/Rscript"',
-        'require_x64 "$home/bin/exec/R"',
-        'require_x64 "$home/lib/libR.dylib"',
-        '[ "$(head -n 1 "$home/bin/R")" = "#!/bin/sh" ]',
-        'framework_symlinks "$installed_framework"',
-        'framework_symlinks "$stage"',
-        'staged-r-symlinks.diff',
-        '"$home/bin/R" RHOME',
-        '"$home/bin/Rscript" -e',
-        "R.version$arch",
-        'otool -L "$home/bin/Rscript"',
-        'otool -L "$home/bin/exec/R"',
-        'otool -D "$home/lib/libR.dylib"',
-        'otool -L "$home/lib/libR.dylib"',
-        "installed-r-identity.txt",
-        "staged-r-identity.txt",
-        "staged-r-identity.diff",
-        "staging changed the official R.framework identities or load commands",
-        "s#/Library/Frameworks/R.framework#<FRAMEWORK>#g",
-        '"Resources/lib/libR.dylib"',
-        'readlink "$home/R"',
-        '"bin/R"',
-        "--official-framework-layout",
-        "profile_macos_embedded_r_runtime.py",
-        "scripts/install-rcmetar-source.R",
-        "RPY2_CFFI_MODE=API",
-        "RCMS_PYINSTALLER_R_TOC",
-        "RCMS_PYINSTALLER_R_MAP",
-        "packaging/pyinstaller/rc-metastudio-macos.spec",
-        'inspect_macos_deployment.py" inspect',
-        "--automation-package-runtime-probe",
-        "--automation-native-smoke",
-        "finalize-smoke",
-        "native-graph",
-        "--direct-build-manifest",
-        "extracted-direct-r-gate.json",
-        "extracted-runtime-probe.json",
-    ):
-        assert required in spike
-    assert "r_integration_kit.py" not in spike
-    assert "relocate_macos_r_kit.py" not in spike
-    assert "normalize_macos_macho.py" not in spike
-    assert 'readlink "$resources/lib/libR.dylib"' not in spike
-    assert 'require_x64 "$resources/bin/R"' not in spike
-    assert 'ln -s "4.6" "$stage/Versions/Current"' not in spike
-    assert "macos_embedded_r_adapter.py\" audit" in spike
-    assert "macos_embedded_r_adapter.py\" normalize" in spike
-    assert '--audit "$adapter_audit"' in spike
-    assert "macos_embedded_r_adapter.py\" relocate-bridge" in spike
-    assert "macos_embedded_r_adapter.py\" post-app" in spike
-    assert "uv run --no-sync aqt" in spike
-    assert "codesign --force --options runtime --sign - \"$app\"" not in spike
-    assert "packaged-workflow:process-exit:0" in spike
-    assert 'source "$repo/scripts/macos_host_r_isolation.sh"' in spike
-    assert spike.count('rcms_isolate_host_r "$installed_framework"') == 2
-    assert spike.count("rcms_restore_host_r") == 2
-    assert "R.framework.rcms-host" not in spike
-    assert "codesign --verify --strict --deep" in spike
-    assert "extracted-codesign-verification.json" in spike
-    assert spike.index("extracted-codesign-verification.json") < spike.rindex(
-        'macos_embedded_r_adapter.py" post-app'
-    )
-    assert "--automation-package-surface-smoke" in spike
-    assert "open -W -n \"$app\"" in spike
-    assert "--require-direct-teardown" in spike
-    assert "macOS R.framework PyInstaller preflight evidence is invalid" in spike
-    assert spike.index("preflight evidence is invalid") < spike.index('rm -rf "$work"')
-    isolation = text("scripts/macos_host_r_isolation.sh")
-    isolation_begin = isolation[isolation.index("rcms_isolate_host_r()") :]
-    assert isolation_begin.index("trap rcms_restore_host_r EXIT") < isolation_begin.index(
-        'rcms_host_r_move "$source" "$candidate"'
-    )
-    assert isolation_begin.index('rcms_host_r_move "$source" "$candidate"') < isolation_begin.index(
-        'RCMS_HOST_R_STATE="isolated"'
-    ) < isolation_begin.index('Host R isolation did not converge')
-    assert "No unique verified-absent host R backup path" in isolation
-    assert "Host R restoration did not converge" in isolation
-    assert "Restored host R identity changed" in isolation
-    assert all(
-        marker in text("src/rc_metastudio/launch.py")
-        for marker in (
-            "teardown:close:start",
-            "teardown:close:return",
-            "teardown:deferred-delete:complete",
-            "teardown:top-level-windows:none",
-            "teardown:app-quit:start",
-            "teardown:app-quit:return",
-            "packaged-workflow:return",
-        )
-    )
-
-    adapter = load_embedded_r_adapter()
-    framework_fixture = tmp_path / "fixture" / "R.framework"
-    version_fixture = framework_fixture / "Versions/4.6-x86_64"
-    resources_fixture = version_fixture / "Resources"
-    (resources_fixture / "lib").mkdir(parents=True)
-    (resources_fixture / "bin").mkdir()
-    (resources_fixture / "lib/libR.dylib").write_bytes(b"libR")
-    (resources_fixture / "bin/R").write_bytes(b"#!/bin/sh\n")
-    (version_fixture / "R").symlink_to(Path("Resources/lib/libR.dylib"))
-    (resources_fixture / "R").symlink_to(Path("bin/R"))
-    (framework_fixture / "Versions/Current").symlink_to(
-        "4.6-x86_64", target_is_directory=True
-    )
-    (framework_fixture / "Resources").symlink_to(
-        Path("Versions/Current/Resources"), target_is_directory=True
-    )
-    (framework_fixture / "R").symlink_to(Path("Versions/Current/R"))
-    links = adapter.audit_symlinks(framework_fixture)
-    assert {record["path"] for record in links} >= {
-        "Versions/Current",
-        "Resources",
-        "R",
-        "Versions/4.6-x86_64/R",
-        "Versions/4.6-x86_64/Resources/R",
-    }
-    toc = adapter.explicit_toc(framework_fixture)
-    assert [record["destination"] for record in toc] == sorted(
-        record["destination"] for record in toc
-    )
-    assert sum(record["type"] == "SYMLINK" for record in toc) == 5
-    font_available = resources_fixture / "fontconfig/fonts/conf.avail"
-    font_active = resources_fixture / "fontconfig/fonts/conf.d"
-    font_available.mkdir(parents=True)
-    font_active.mkdir()
-    for index in range(17):
-        target = font_available / f"{index:02d}-fixture.conf"
-        target.write_text("fixture\n", encoding="utf-8")
-        (font_active / target.name).symlink_to(
-            f"/Library/Frameworks/R.framework/Resources/fontconfig/fonts/conf.avail/{target.name}"
-        )
-    font_plan = adapter.plan_fontconfig_links(framework_fixture)
-    assert len(font_plan) == 17
-    assert all(
-        os.readlink(framework_fixture / record["path"]) == record["from"]
-        for record in font_plan
-    )
-    audited_links = adapter.audit_pre_normalization_symlinks(
-        framework_fixture, font_plan
-    )
-    assert sum("planned" in record for record in audited_links) == 17
-    adapter.normalize_fontconfig_links(framework_fixture)
-    assert all(
-        not Path(os.readlink(framework_fixture / record["path"])).is_absolute()
-        for record in font_plan
-    )
-    adapter.audit_symlinks(framework_fixture)
-    bad_link = resources_fixture / "absolute-link"
-    bad_link.symlink_to("/Library/Frameworks/R.framework/Resources/bin/R")
-    with pytest.raises(adapter.AdapterError, match="absolute R symlink"):
-        adapter.audit_symlinks(framework_fixture)
-    bad_link.unlink()
-    assert adapter._map_absolute(
-        framework_fixture, "/opt/R/x86_64/lib/libgfortran.5.dylib", "x86_64"
-    )[0] == framework_fixture / "Resources/vendor/opt-R/lib/libgfortran.5.dylib"
-    with pytest.raises(adapter.AdapterError, match="unsupported non-system"):
-        adapter._map_absolute(
-            framework_fixture, "/opt/homebrew/lib/libgfortran.dylib", "x86_64"
-        )
-
-    inspector = load_inspector()
-    app = tmp_path / "RCMetaStudio.app"
-    marker = app / inspector.DIRECT_R_MARKER_RELATIVE
-    marker.parent.mkdir(parents=True)
-    marker.write_bytes((ROOT / "packaging/pyinstaller/direct-r-spike.marker").read_bytes())
-    runtime_probe = {
-        "r": {
-            "direct_spike": True,
-            "kit_sha256": None,
-            "shared_library_sha256": "a" * 64,
-        },
-        "rpy2": {"api_bridge_sha256": "b" * 64},
-    }
-    identity = inspector.validate_r_delivery_identity(
-        app,
-        runtime_probe,
-        target="macos-x64",
-        architecture="x86_64",
-        source_commit="c" * 40,
-    )
-    direct = identity["direct_r_build"]
-    assert "r_integration_kit" not in identity
-    assert direct["source_commit"] == "c" * 40
-    assert direct["marker"]["sha256"] == inspector.DIRECT_R_MARKER_SHA256
-    assert direct["runtime_probe_sha256"] == inspector._canonical_json_sha256(
-        runtime_probe
-    )
-    input_record = {"sha256": "d" * 64, "size": 42}
-    direct_manifest = {
-        "schema_version": 1,
-        "kind": "rc-metastudio-direct-macos-target-build",
-        "target": "macos-x64",
-        "source_commit": "c" * 40,
-        "official_r": {
-            "url": inspector.DIRECT_R_OFFICIAL_URL,
-            "sha256": inspector.DIRECT_R_OFFICIAL_SHA256,
-        },
-        "ppm_snapshot": inspector.DIRECT_R_PPM_SNAPSHOT,
-        "rpy2_api_bridge_source_sha256": "b" * 64,
-        "inputs": {
-            name: dict(input_record)
-            for name in inspector.DIRECT_BUILD_INPUT_MEMBERS
-        },
-        "ppm_archives": [
-            {"path": "digest/package.tgz", "sha256": "e" * 64, "size": 84}
-        ],
-        "hsroc_source_exception": {
-            "name": "HSROC",
-            "version": "2.1.9",
-            "install_type": "source",
-            "url": inspector.DIRECT_R_HSROC_URL,
-            "sha256": inspector.DIRECT_R_HSROC_SHA256,
-            "archive": {
-                "sha256": inspector.DIRECT_R_HSROC_SHA256,
-                "size": 2023525,
-            },
-        },
-        "rcmetar_source": {
-            "name": "RCMetaR",
-            "version": "0.1.2",
-            "source_commit": "c" * 40,
-            "archive_sha256": "f" * 64,
-            "archive": {"sha256": "f" * 64, "size": 4096},
-        },
-    }
-    direct_manifest["inputs"]["hsroc_source_archive"] = dict(
-        direct_manifest["hsroc_source_exception"]["archive"]
-    )
-    direct_manifest["inputs"]["rcmetar_source_archive"] = dict(
-        direct_manifest["rcmetar_source"]["archive"]
-    )
-    assert (
-        inspector.validate_direct_build_manifest(
-            direct_manifest, target="macos-x64"
-        )
-        is direct_manifest
-    )
-    with pytest.raises(
-        inspector.MacOSDeploymentInspectionError, match="identity or target"
-    ):
-        inspector.validate_direct_build_manifest(
-            direct_manifest, target="macos-arm64"
-        )
-    assert direct["official_r"]["url"] in spike
-    assert direct["official_r"]["sha256"] in spike
-    assert direct["ppm_snapshot"] in spike
-
-    marker.unlink()
-    with pytest.raises(
-        inspector.MacOSDeploymentInspectionError, match="marker.*probe disagree"
-    ):
-        inspector.validate_r_delivery_identity(
-            app,
-            runtime_probe,
-            target="macos-x64",
-            architecture="x86_64",
-            source_commit="c" * 40,
-        )
-
-    marker.write_bytes((ROOT / "packaging/pyinstaller/direct-r-spike.marker").read_bytes())
-    runtime_probe["r"]["direct_spike"] = False
-    with pytest.raises(
-        inspector.MacOSDeploymentInspectionError, match="marker.*probe disagree"
-    ):
-        inspector.validate_r_delivery_identity(
-            app,
-            runtime_probe,
-            target="macos-x64",
-            architecture="x86_64",
-            source_commit="c" * 40,
-        )
-
-    runtime_probe["r"]["direct_spike"] = True
-    (app / "Contents/Resources/r-integration-kit").mkdir()
-    with pytest.raises(
-        inspector.MacOSDeploymentInspectionError, match="mixes direct R spike"
-    ):
-        inspector.validate_r_delivery_identity(
-            app,
-            runtime_probe,
-            target="macos-x64",
-            architecture="x86_64",
-            source_commit="c" * 40,
-        )
+    assert "build-macos-package.sh" in spike
+    assert "sudo installer" not in spike
+    assert 'installed_framework="/Library/Frameworks/R.framework"' not in spike
 
 
 def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
@@ -503,13 +240,14 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
     assert "RCMS_PACKAGE_SMOKE_EVIDENCE" in build
     assert "RCMS_AUTOMATION_HANG_TRACE" in build
     assert "run_bounded_process.py" in build
-    assert "from rc_metastudio.qt6_macos_feasibility import is_macho_candidate" in build
-    assert "MACH_O_MAGICS" not in build
+    relocator = text("scripts/relocate_macos_r_runtime.sh")
+    assert "magics =" in relocator
     assert 'open -W -n "$app_bundle" --args' in build
     assert "--automation-startup-completion-marker" in build
     assert '"$repo_root/scripts/sign_macos_app.py" "$app_bundle"' in build
     assert "--identity -" in build
-    assert 'copy_tree "$r_runtime_root" "$r_version_root/Resources"' in build
+    assert 'r_framework="$private_r_framework"' in build
+    assert 'export RCMS_PYINSTALLER_R_TOC="$adapter_toc_path"' in build
     assert 'copy_tree "$r_runtime_root" "$app_root/R"' not in build
     assert "from rc_metastudio.r_runtime import macos_r_framework_version" in build
     assert "v$minor" not in build
@@ -517,14 +255,9 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
         'expected_r_home = app_root / "Contents/Frameworks/R.framework/Resources"'
         in text("scripts/inspect_macos_deployment.py")
     )
-    assert 'mv "$r_version_root/Resources/lib/libR.dylib" "$r_version_root/R"' in build
-    assert 'chmod +x "$r_version_root/R"' in build
-    assert 'ln -s "../../R" "$r_version_root/Resources/lib/libR.dylib"' in build
-    assert '"$python_exe" - "$r_version_root" > "$macho_manifest"' in build
-    assert 'ln -s "$r_framework_version" "$r_framework/Versions/Current"' in build
-    assert 'ln -s "Versions/Current/Resources" "$r_framework/Resources"' in build
-    assert 'ln -s "Versions/Current/R" "$r_framework/R"' in build
-    assert '"CFBundlePackageType": "FMWK"' in build
+    assert 'copy_tree "$source_r_framework" "$private_r_framework"' in build
+    assert '"$python_exe" - "$resources" > "$manifest"' in relocator
+    assert "finalize-toc" in build
     assert (
         'python3 - "$zip_path" "$archive_root_name" "$skip_smoke" '
         '"$r_framework_version"' in build
@@ -533,21 +266,15 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
     assert "R.framework/Resources/bin/Rscript" not in build
     assert 'f"{framework}/Versions/Current": framework_version' in build
     assert 'f"{framework}/Resources": "Versions/Current/Resources"' in build
-    assert "r_source_relative()" in build
-    assert build.count('r_source_relative "$') == 4
-    assert "/Library/Frameworks/R.framework/Resources/*)" in build
-    assert "/Library/Frameworks/R.framework/Versions/*/Resources/*)" in build
-    assert "/Library/Frameworks/R.framework/R|" in build
-    assert "Unsupported source R framework dependency" in build
-    assert "Unsupported source R framework install ID" in build
-    assert "grep -F '/Library/Frameworks/R.framework/'" in build
-    assert 'scripts/normalize_macos_macho.py"' in build
-    assert '--manifest "$macho_manifest" --architecture "$expected_machine"' in build
+    assert "r_source_relative()" not in build
+    assert "/Library/Frameworks/R.framework/Resources/*)" in relocator
+    assert "/Library/Frameworks/R.framework/Versions/*/Resources/*)" in relocator
+    assert "--normalizer" in relocator and '"$python_exe" "$normalizer"' in relocator
     assert build.count('--target "macos-$architecture"') >= 3
     assert "find \"$app_bundle\" -type f -name '_rinterface_cffi_api*.so'" in build
-    assert "forbidden rpy2 ABI-mode fallback bridge" in build
-    assert "scripts/relocate_rpy2_api_bridge.py" in build
-    assert "--api-bridge-transformation" in build
+    assert "PyInstaller collected the forbidden ABI bridge" in build
+    assert "Proving and relocating the rpy2 API bridge against staged R" in build
+    assert 'install_name_tool -change "$dependency"' in build
     assert '"cffi_mode": os.environ.get("RPY2_CFFI_MODE")' in text(
         "src/rc_metastudio/launch.py"
     )
@@ -576,26 +303,849 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
     assert "${{ inputs.artifact_name }}-evidence" in workflow_text
     assert "*-archive-inspection.json" in workflow_text
     assert "packaged-smoke*.log" in workflow_text
-    assert "--expected-r-integration-kit-sha256" in text("scripts/package-macos.sh")
+    public_command = text("scripts/package-macos.sh")
+    assert "--architecture x64 is required" in public_command
+    assert "r-integration-kit" not in public_command
+    assert "Xcode Command Line Tools" in public_command
+    assert 'ditto -x -k "$zip_path" "$extracted_root"' in build
+    assert '"$extracted_app/Contents/MacOS/RCMetaStudio"' in build
+    assert '"$extracted_manifest"' in build
+    assert build.index('ditto -x -k "$zip_path" "$extracted_root"') < build.index(
+        'inspect_macos_deployment.py" evidence'
+    )
+    assert (
+        'extracted_smoke_log="$qualification_root/extracted-packaged-smoke.log"'
+        in build
+    )
     sdk_cache = steps_by_name["Cache official Qt SDK on macOS"]
-    assert sdk_cache["if"] == "${{ inputs.target_os == 'macos' }}"
     assert sdk_cache["id"] == "macos_qt_sdk_cache"
     assert sdk_cache["with"] == {
         "path": "build/qt-sdk",
-        "key": "qt-sdk-6.11.1-${{ inputs.archive_platform }}",
+        "key": "qt-sdk-6.11.1-macos-x64",
     }
     sdk_install = steps_by_name["Install official Qt SDK on macOS"]
-    assert sdk_install["if"] == (
-        "${{ inputs.target_os == 'macos' && "
-        "steps.macos_qt_sdk_cache.outputs.cache-hit != 'true' }}"
+    assert (
+        sdk_install["if"]
+        == "${{ steps.macos_qt_sdk_cache.outputs.cache-hit != 'true' }}"
     )
-    assert "uv run aqt install-qt mac desktop 6.11.1 clang_64" in sdk_install["run"]
+    assert (
+        "uv tool run --from aqtinstall==3.3.0 aqt install-qt mac desktop 6.11.1 clang_64"
+        in sdk_install["run"]
+    )
     rcc_resolve = steps_by_name["Resolve official Qt rcc on macOS"]
-    assert rcc_resolve["if"] == "${{ inputs.target_os == 'macos' }}"
     assert "qt6_macos_feasibility.py resolve-rcc" in rcc_resolve["run"]
     assert '--sdk-root "$PWD/build/qt-sdk/6.11.1/macos"' in rcc_resolve["run"]
     assert '--github-env "$GITHUB_ENV"' in rcc_resolve["run"]
-    assert steps.index(rcc_resolve) < steps.index(steps_by_name["Build macOS package"])
+    assert steps.index(rcc_resolve) < steps.index(
+        steps_by_name[
+            "Build, inspect, smoke, archive, and requalify macOS Intel package"
+        ]
+    )
+
+
+def test_direct_provenance_uses_named_cli_and_rejects_missing_named_inputs(tmp_path):
+    build = text("scripts/build-macos-package.sh")
+    assert 'scripts/build_macos_direct_provenance.py"' in build
+    assert "zip(labels, paths" not in build
+    helper = ROOT / "scripts" / "build_macos_direct_provenance.py"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(helper),
+            "--qualification-root",
+            str(tmp_path),
+            "--ppm-root",
+            str(tmp_path / "ppm"),
+            "--source-commit",
+            "c" * 40,
+            "--bridge",
+            str(tmp_path / "missing.so"),
+            "--output",
+            str(tmp_path / "out.json"),
+        ],
+        text=True,
+        capture_output=True,
+    )
+    assert completed.returncode != 0
+    assert "PPM archive inventory is empty" in completed.stderr
+
+
+def test_no_project_qt_resolver_executes_with_stdlib_only_src_layout(tmp_path):
+    sdk = tmp_path / "sdk"
+    rcc = sdk / "libexec" / "rcc"
+    rcc.parent.mkdir(parents=True)
+    rcc.write_bytes(b"fake official rcc")
+    github_env = tmp_path / "github-env"
+    diagnostic = tmp_path / "diagnostic.json"
+    host = "x86_64"
+    pristine = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
+    unavailable = subprocess.run(
+        [sys.executable, "-S", "-c", "import PyQt6, py7zr"],
+        cwd=tmp_path,
+        env=pristine,
+        text=True,
+        capture_output=True,
+    )
+    assert unavailable.returncode != 0
+    harness = """from pathlib import Path
+import subprocess, sys
+from rc_metastudio.qt6_macos_feasibility import resolve_macos_rcc
+rcc, env, diag = map(Path, sys.argv[1:4])
+host = sys.argv[4]
+def runner(command, **kwargs):
+    output = host + "\\n" if command[0] == "/usr/bin/lipo" else "rcc 6.11.1\\n"
+    return subprocess.CompletedProcess(command, 0, output, "")
+resolve_macos_rcc(rcc.parent.parent, env, diag, command_runner=runner, host_machine=lambda: host)
+"""
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-S",
+            "-c",
+            harness,
+            str(rcc),
+            str(github_env),
+            str(diagnostic),
+            host,
+        ],
+        cwd=tmp_path,
+        env=pristine,
+        text=True,
+        capture_output=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+    record = json.loads(diagnostic.read_text(encoding="utf-8"))
+    assert record["version"] == "6.11.1"
+    assert record["architectures"] == [host]
+    assert record["path"] == str(rcc.resolve())
+    assert github_env.read_text(encoding="utf-8") == f"RCMS_QT6_RCC={rcc.resolve()}\n"
+    bad_harness = harness.replace('"rcc 6.11.1\\n"', '"rcc 0.0.0\\n"')
+    wrong = subprocess.run(
+        [
+            sys.executable,
+            "-S",
+            "-c",
+            bad_harness,
+            str(rcc),
+            str(github_env),
+            str(diagnostic),
+            host,
+        ],
+        cwd=tmp_path,
+        env=pristine,
+        text=True,
+        capture_output=True,
+    )
+    assert wrong.returncode != 0
+    assert "rcc version mismatch" in wrong.stderr
+    workflow = text(".github/workflows/package-target.yml")
+    assert 'PYTHONPATH="$PWD/src" uv run --no-project --python 3.11.9' in workflow
+
+
+def test_private_official_r_expansion_creates_only_its_parent_before_pkgutil():
+    build = text("scripts/build-macos-package.sh")
+    parent = 'mkdir -p "$r_stage_parent"'
+    absent_target = '[ ! -e "$r_pkg_expanded" ]'
+    expand = 'pkgutil --expand-full "$r_pkg" "$r_pkg_expanded"'
+    assert build.index(parent) < build.index(absent_target) < build.index(expand)
+    assert (
+        'private_r_framework="$repo_root/build/macos-package/x64/staged/R.framework"'
+        in build
+    )
+    block = build[
+        build.index("r_pkg_expanded=") : build.index("source_r_runtime_input=")
+    ]
+    assert 'mkdir -p "$r_pkg_expanded"' not in block
+    assert 'ditto "$r_pkg_framework" "$r_stage_framework"' not in block
+    assert "sudo" not in block
+
+
+def test_private_r_launcher_configuration_is_exact_and_precedes_rpy2_build(tmp_path):
+    spec = importlib.util.spec_from_file_location(
+        "r_launchers", ROOT / "scripts" / "configure_macos_r_launchers.py"
+    )
+    launchers = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(launchers)
+    resources = tmp_path / "Resources"
+    binary = resources / "bin/R"
+    binary.parent.mkdir(parents=True)
+    binary.write_text("\n".join(launchers.OFFICIAL), encoding="utf-8")
+    binary.chmod(0o755)
+    source_rscript = resources / "bin/Rscript"
+    source_rscript.write_text(
+        "#!/bin/sh\n"
+        "set -eu\n"
+        '[ "${RHOME:-}" = "${R_HOME:?}" ]\n'
+        '[ "$#" -eq 2 ] && [ "$1" = "-e" ] && [ "$2" = "rcms_marker" ]\n'
+        "printf 'private-rscript-home:%s\\n' \"$RHOME\"\n"
+        "printf 'private-rscript-args:%s\\n' \"$*\"\n",
+        encoding="utf-8",
+    )
+    source_rscript.chmod(0o755)
+    config = resources / "bin/config"
+    config.write_text(official_macos_r_config_fixture(), encoding="utf-8")
+    config.chmod(0o755)
+    launchers.configure(resources)
+    launchers.configure(resources)
+    assert "Library/Frameworks/R.framework" not in binary.read_text(encoding="utf-8")
+    rscript = resources / "bin/Rscript"
+    if os.name != "nt":
+        assert stat.S_IMODE(rscript.stat().st_mode) == 0o755
+        assert stat.S_IMODE((resources / "bin/Rscript.real").stat().st_mode) == 0o755
+    wrapper = rscript.read_text(encoding="utf-8")
+    assert "RCMS_PRIVATE_RSCRIPT_V1" in wrapper
+    assert 'RHOME="$R_HOME"' in wrapper
+    assert "export RHOME" in wrapper
+    assert 'exec "$R_HOME/bin/Rscript.real" "$@"' in wrapper
+    assert '"$@"' in wrapper  # preserves both -e expressions and script-file arguments
+    source_snapshot = (resources / "bin/Rscript.real").read_bytes()
+    config_snapshot = config.read_bytes()
+    real_config_snapshot = (resources / "bin/config.real").read_bytes()
+    launchers.configure(resources)
+    assert (resources / "bin/Rscript.real").read_bytes() == source_snapshot
+    assert config.read_bytes() == config_snapshot
+    assert (resources / "bin/config.real").read_bytes() == real_config_snapshot
+    runtime_resources = tmp_path / "runtime-only/Resources"
+    runtime_binary = runtime_resources / "bin/R"
+    runtime_binary.parent.mkdir(parents=True)
+    runtime_binary.write_text("\n".join(launchers.OFFICIAL), encoding="utf-8")
+    runtime_binary.chmod(0o755)
+    runtime_rscript = runtime_resources / "bin/Rscript"
+    runtime_rscript.write_text('#!/bin/sh\nexec official "$@"\n', encoding="utf-8")
+    runtime_rscript.chmod(0o755)
+    runtime_config = runtime_resources / "bin/config"
+    runtime_config.write_text("arm64 build configuration is not adapted\n", encoding="utf-8")
+    runtime_config_snapshot = runtime_config.read_bytes()
+    launchers.configure(runtime_resources, configure_build=False)
+    assert runtime_config.read_bytes() == runtime_config_snapshot
+    assert not (runtime_resources / "bin/config.real").exists()
+    assert "Library/Frameworks/R.framework" not in runtime_binary.read_text(
+        encoding="utf-8"
+    )
+    bash = shutil.which("bash") or r"C:\Program Files\Git\bin\bash.exe"
+    if Path(bash).is_file():
+        env = {**os.environ, "R_HOME": str(resources.resolve())}
+        executed = subprocess.run(
+            [str(bash), str(rscript), "-e", "rcms_marker"],
+            env=env,
+            text=True,
+            capture_output=True,
+            check=True,
+        ).stdout.splitlines()
+        assert executed[0].startswith("private-rscript-home:")
+        assert executed[0].replace("\\", "/").endswith("/Resources")
+        assert executed[1] == "private-rscript-args:-e rcms_marker"
+        ldflags = subprocess.run(
+            [str(bash), str(config), "--ldflags"],
+            env=env,
+            text=True,
+            capture_output=True,
+            check=True,
+        ).stdout.strip()
+        cppflags = subprocess.run(
+            [str(bash), str(config), "--cppflags"],
+            env=env,
+            text=True,
+            capture_output=True,
+            check=True,
+        ).stdout.strip()
+        assert ldflags == (
+            f"-Wl,-headerpad_max_install_names -L{resources.resolve()}/lib "
+            "-lR -lbz2 -lz -licucore -ldl -lm -liconv"
+        )
+        assert cppflags == f"-I{resources.resolve()}/include"
+        assert "/opt/R/" not in ldflags
+        assert "/Library/Frameworks/R.framework/" not in ldflags
+        delegated = subprocess.run(
+            [str(bash), str(config), "CC"],
+            env=env,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        assert delegated.stdout.strip() == "clang"
+        real_config = resources / "bin/config.real"
+        real_config.write_text(
+            real_config.read_text(encoding="utf-8").replace(
+                "-liconv", "-lunexpected"
+            ),
+            encoding="utf-8",
+        )
+        rejected = subprocess.run(
+            [str(bash), str(config), "--ldflags"],
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        assert rejected.returncode != 0
+        assert "Unexpected upstream R CMD config --ldflags output" in rejected.stderr
+        real_config.write_bytes(real_config_snapshot)
+    real_binary = resources / "bin/R.real"
+    binary.rename(real_binary)
+    binary.symlink_to(real_binary.name)
+    with pytest.raises(RuntimeError, match="symlinked"):
+        launchers.configure(resources)
+    binary.unlink()
+    real_binary.rename(binary)
+    binary.write_text("unexpected", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="exact expected framework markers"):
+        launchers.configure(resources)
+
+
+def test_private_r_config_wrapper_fails_closed_on_upstream_drift(tmp_path):
+    spec = importlib.util.spec_from_file_location(
+        "r_launchers", ROOT / "scripts" / "configure_macos_r_launchers.py"
+    )
+    launchers = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(launchers)
+    resources = tmp_path / "Resources"
+    binary = resources / "bin/R"
+    binary.parent.mkdir(parents=True)
+    binary.write_text("\n".join(launchers.OFFICIAL), encoding="utf-8")
+    binary.chmod(0o755)
+    rscript = resources / "bin/Rscript"
+    rscript.write_text("#!/bin/sh\n", encoding="utf-8")
+    rscript.chmod(0o755)
+    config = resources / "bin/config"
+    config.write_text("#!/bin/sh\nupstream drift\n", encoding="utf-8")
+    config.chmod(0o755)
+
+    with pytest.raises(RuntimeError, match="exact expected markers"):
+        launchers.configure(resources)
+
+
+def test_private_r_launcher_rejects_unsafe_existing_real_rscript(tmp_path):
+    spec = importlib.util.spec_from_file_location(
+        "r_launchers", ROOT / "scripts" / "configure_macos_r_launchers.py"
+    )
+    launchers = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(launchers)
+    kinds = ["directory"] if os.name == "nt" else ["directory", "nonexec"]
+    for kind in kinds:
+        resources = tmp_path / kind / "Resources"
+        binary = resources / "bin/R"
+        binary.parent.mkdir(parents=True)
+        binary.write_text("\n".join(launchers.OFFICIAL), encoding="utf-8")
+        binary.chmod(0o755)
+        real = resources / "bin/Rscript.real"
+        if kind == "directory":
+            real.mkdir()
+        else:
+            real.write_text("#!/bin/sh\n", encoding="utf-8")
+            real.chmod(0o644)
+        (resources / "bin/Rscript").write_text("#!/bin/sh\n", encoding="utf-8")
+        config = resources / "bin/config"
+        config.write_text(official_macos_r_config_fixture(), encoding="utf-8")
+        config.chmod(0o755)
+        with pytest.raises(RuntimeError, match="regular executable"):
+            launchers.configure(resources)
+    build = text("scripts/build-macos-package.sh")
+    configure = build.index("configure_macos_r_launchers.py")
+    early_relocation = build.index(
+        'relocate_macos_r_runtime.sh" --resources "$r_runtime_root"'
+    )
+    assert (
+        configure
+        < early_relocation
+        < build.index("Building the target-native rpy2 API bridge")
+    )
+    assert build.count("configure_macos_r_launchers.py") == 1
+    assert "configure_relocatable_r_launchers()" not in build
+    assert (
+        "run_staged_r_config --ldflags" in build
+        and "run_staged_r_config --cppflags" in build
+    )
+    assert "R CMD config $config_flag" in build
+    assert build.index("run_staged_r_config --ldflags") < build.index(
+        "Building the target-native rpy2 API bridge"
+    )
+    assert build.index(
+        'relocate_macos_r_runtime.sh" --resources "$r_home"'
+    ) > build.index("profile_macos_embedded_r_runtime.py")
+    assert 'Sys.getenv("RHOME"), Sys.getenv("R_HOME")' in build
+    assert 'cat("staged-r-ok\\\\n")' in build
+
+
+def test_macos_r_relocator_is_reusable_private_and_idempotent_by_contract():
+    relocator = text("scripts/relocate_macos_r_runtime.sh")
+    assert "readarray" not in relocator
+    assert "mapfile" not in relocator
+    assert 'sys.stdout.buffer.write(os.fsencode(path) + b"\\0")' in relocator
+    assert "read -r -d '' resources" in relocator
+    assert "--resources" in relocator and "--architecture" in relocator
+    assert '"$python_exe" - "$resources" > "$manifest"' in relocator
+    assert (
+        'install_name_tool -change "$dependency" "$replacement" "$binary"' in relocator
+    )
+    assert '"@loader_path/$(relative_loader_target' in relocator
+    assert "/Library/Frameworks/R.framework/Versions/*/Resources/*" in relocator
+    assert "/Library/Frameworks/R.framework/R" in relocator
+    assert "private R retains an external framework reference" in relocator
+    assert "private R retains unresolved dependency" in relocator
+    assert "private R install ID is not its exact basename" in relocator
+
+
+def test_macos_r_relocator_enforces_private_root_before_mutation_and_is_idempotent(
+    tmp_path,
+):
+    if os.name == "nt":
+        pytest.skip("the production helper executes under a POSIX macOS shell")
+    bash = shutil.which("bash") or r"C:\Program Files\Git\bin\bash.exe"
+    if not Path(bash).is_file():
+        pytest.skip("bash is required to execute the relocator")
+    allowed = tmp_path / "build"
+    resources = allowed / "R.framework/Versions/4.6/Resources"
+    (resources / "bin").mkdir(parents=True)
+    source = tmp_path / "source/R.framework/Versions/4.6/Resources"
+    (source / "bin").mkdir(parents=True)
+    source_file = source / "bin/R"
+    source_file.write_bytes(b"source")
+    normalizer = tmp_path / "normalizer.py"
+    normalizer.write_text(
+        "from pathlib import Path\nPath(__file__).with_suffix('.ran').write_text('ran')\n",
+        encoding="utf-8",
+    )
+
+    def shell_path(path: Path | str) -> str:
+        value = str(path).replace("\\", "/")
+        return (
+            f"/{value[0].lower()}{value[2:]}"
+            if len(value) > 2 and value[1] == ":"
+            else value
+        )
+
+    command = [
+        str(bash),
+        shell_path(ROOT / "scripts/relocate_macos_r_runtime.sh"),
+        "--resources",
+        shell_path(resources),
+        "--architecture",
+        "x86_64",
+        "--python",
+        shell_path(sys.executable),
+        "--allowed-root",
+        shell_path(allowed),
+        "--normalizer",
+        shell_path(normalizer),
+    ]
+    for _ in range(2):
+        completed = subprocess.run(command, cwd=ROOT, text=True, capture_output=True)
+        assert completed.returncode == 0, completed.stderr
+    outside = command.copy()
+    outside[outside.index("--resources") + 1] = shell_path(source)
+    rejected = subprocess.run(outside, cwd=ROOT, text=True, capture_output=True)
+    assert rejected.returncode != 0
+    assert "escapes allowed root" in rejected.stderr
+    assert source_file.read_bytes() == b"source"
+
+
+def test_macos_r_relocator_never_copies_external_opt_r_members():
+    relocator = text("scripts/relocate_macos_r_runtime.sh")
+    assert 'cp -p "$dependency" "$target"' not in relocator
+    assert "closure-state" not in relocator
+    assert "already-authenticated framework member" in relocator
+
+
+def test_macos_r_relocator_converges_loader_relative_ids_and_rejects_missing_opt_member(
+    tmp_path,
+):
+    bash = shutil.which("bash") or r"C:\Program Files\Git\bin\bash.exe"
+    if not Path(bash).is_file():
+        pytest.skip("bash is unavailable")
+
+    def shell_path(path: Path | str) -> str:
+        value = str(path).replace("\\", "/")
+        return (
+            f"/{value[0].lower()}{value[2:]}"
+            if os.name == "nt" and len(value) > 2 and value[1] == ":"
+            else value
+        )
+
+    tools = tmp_path / "tools"
+    tools.mkdir()
+    otool = tools / "otool"
+    otool.write_text(
+        """#!/usr/bin/env bash
+set -eu
+case "$1" in
+  -D) printf '%s:\n' "$2"; [ ! -f "$2.id" ] || cat "$2.id" ;;
+  -L) printf '%s:\n' "$2"; [ ! -f "$2.deps" ] || cat "$2.deps" ;;
+  *) exit 2 ;;
+esac
+""",
+        encoding="utf-8",
+    )
+    install_name_tool = tools / "install_name_tool"
+    install_name_tool.write_text(
+        """#!/usr/bin/env bash
+set -eu
+case "$1" in
+  -id) printf '%s\n' "$2" > "$3.id" ;;
+  -change) printf '%s\n' "$3" > "$4.deps" ;;
+  *) exit 2 ;;
+esac
+""",
+        encoding="utf-8",
+    )
+    otool.chmod(0o755)
+    install_name_tool.chmod(0o755)
+    normalizer = tmp_path / "normalizer.py"
+    normalizer.write_text("", encoding="utf-8")
+
+    allowed = tmp_path / "private"
+    resources = allowed / "R.framework/Versions/4.6/Resources"
+    library = resources / "lib"
+    library.mkdir(parents=True)
+    (resources / "bin").mkdir()
+    dylib = library / "libfoo.dylib"
+    lib_r = library / "libR.dylib"
+    dylib.write_bytes(b"\xcf\xfa\xed\xfe")
+    lib_r.write_bytes(b"\xcf\xfa\xed\xfe")
+    (library / "libfoo.dylib.id").write_text(
+        "/Library/Frameworks/R.framework/Resources/lib/libfoo.dylib\n",
+        encoding="utf-8",
+    )
+    (library / "libfoo.dylib.deps").write_text(
+        "/Library/Frameworks/R.framework/Resources/lib/libR.dylib\n",
+        encoding="utf-8",
+    )
+    command = [
+        str(bash),
+        shell_path(ROOT / "scripts/relocate_macos_r_runtime.sh"),
+        "--resources",
+        shell_path(resources),
+        "--architecture",
+        "x86_64",
+        "--python",
+        shell_path(sys.executable),
+        "--allowed-root",
+        shell_path(allowed),
+        "--normalizer",
+        shell_path(normalizer),
+    ]
+    environment = os.environ | {
+        "PATH": f"{shell_path(tools)}:/usr/bin:/bin",
+    }
+    completed = subprocess.run(
+        command, cwd=ROOT, env=environment, text=True, capture_output=True
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert (library / "libfoo.dylib.id").read_text(encoding="utf-8").strip() == (
+        "@loader_path/libfoo.dylib"
+    )
+    assert (library / "libfoo.dylib.deps").read_text(encoding="utf-8").strip() == (
+        "@loader_path/libR.dylib"
+    )
+
+    (library / "libfoo.dylib.id").write_text("libfoo.dylib\n", encoding="utf-8")
+    self_id = subprocess.run(
+        command, cwd=ROOT, env=environment, text=True, capture_output=True
+    )
+    assert self_id.returncode == 0, self_id.stderr
+    assert (library / "libfoo.dylib.id").read_text(encoding="utf-8").strip() == (
+        "@loader_path/libfoo.dylib"
+    )
+
+    (library / "libfoo.dylib.id").write_text("KernSmooth.so\n", encoding="utf-8")
+    mismatched_id = subprocess.run(
+        command, cwd=ROOT, env=environment, text=True, capture_output=True
+    )
+    assert mismatched_id.returncode != 0
+    assert "install ID is not its exact basename" in mismatched_id.stderr
+    (library / "libfoo.dylib.id").write_text(
+        "@loader_path/libfoo.dylib\n", encoding="utf-8"
+    )
+
+    (library / "libfoo.dylib.deps").write_text(
+        "/opt/R/x86_64/lib/libmissing.dylib\n", encoding="utf-8"
+    )
+    rejected = subprocess.run(
+        command, cwd=ROOT, env=environment, text=True, capture_output=True
+    )
+    assert rejected.returncode != 0
+    assert "dependency target is absent" in rejected.stderr
+    assert not (library / "libmissing.dylib").exists()
+
+
+def test_official_r_component_resolver_requires_exact_private_payload(tmp_path):
+    spec = importlib.util.spec_from_file_location(
+        "r_component", ROOT / "scripts" / "resolve_macos_r_framework_component.py"
+    )
+    resolver = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(resolver)
+    component = tmp_path / "org.R-project.x86_64.R.fw.pkg"
+    (component / "Payload" / "R.framework").mkdir(parents=True)
+    (component / "PackageInfo").write_text(
+        '<pkg-info identifier="org.R-project.x86_64.R.fw.pkg" install-location="/Library/Frameworks"/>',
+        encoding="utf-8",
+    )
+    assert (
+        resolver.resolve_framework(tmp_path)
+        == (component / "Payload/R.framework").resolve()
+    )
+    (component / "PackageInfo").write_text(
+        '<pkg-info identifier="org.R-project.x86_64.R.GUI.pkg" install-location="/Library/Frameworks"/>',
+        encoding="utf-8",
+    )
+    with pytest.raises(RuntimeError, match="exactly one"):
+        resolver.resolve_framework(tmp_path)
+    (component / "PackageInfo").write_text(
+        '<pkg-info identifier="org.R-project.x86_64.R.fw.pkg" install-location="/Library/Frameworks"/>',
+        encoding="utf-8",
+    )
+    duplicate = tmp_path / "duplicate"
+    (duplicate / "Payload" / "R.framework").mkdir(parents=True)
+    (duplicate / "PackageInfo").write_text(
+        '<pkg-info identifier="org.R-project.x86_64.R.fw.pkg" install-location="/Library/Frameworks"/>',
+        encoding="utf-8",
+    )
+    with pytest.raises(RuntimeError, match="exactly one"):
+        resolver.resolve_framework(tmp_path)
+    build = text("scripts/build-macos-package.sh")
+    assert "resolve_macos_r_framework_component.py" in build
+    assert "*/Library/Frameworks/R.framework" not in build
+
+
+@pytest.mark.parametrize(
+    ("xml", "message"),
+    [
+        (
+            '<pkg-info identifier="org.R-project.x86_64.R.fw.pkg" install-location="/wrong"/>',
+            "exactly one",
+        ),
+        ("<not-pkg-info/>", "root must be pkg-info"),
+        ("<pkg-info>", "unreadable"),
+    ],
+)
+def test_official_r_component_resolver_rejects_invalid_metadata(tmp_path, xml, message):
+    spec = importlib.util.spec_from_file_location(
+        "r_component_invalid",
+        ROOT / "scripts" / "resolve_macos_r_framework_component.py",
+    )
+    resolver = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(resolver)
+    component = tmp_path / "component"
+    (component / "Payload/R.framework").mkdir(parents=True)
+    (component / "PackageInfo").write_text(xml, encoding="utf-8")
+    with pytest.raises(RuntimeError, match=message):
+        resolver.resolve_framework(tmp_path)
+
+
+def test_official_r_component_resolver_preserves_framework_symlinks_and_rejects_boundary_symlinks(
+    tmp_path,
+):
+    spec = importlib.util.spec_from_file_location(
+        "r_component_links", ROOT / "scripts" / "resolve_macos_r_framework_component.py"
+    )
+    resolver = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(resolver)
+    component = tmp_path / "org.R-project.x86_64.R.fw.pkg"
+    framework = component / "Payload/R.framework"
+    version = framework / "Versions/4.6-x86_64"
+    (version / "Resources").mkdir(parents=True)
+    (component / "PackageInfo").write_text(
+        '<pkg-info identifier="org.R-project.x86_64.R.fw.pkg" install-location="/Library/Frameworks"/>',
+        encoding="utf-8",
+    )
+    try:
+        (framework / "Versions/Current").symlink_to(
+            "4.6-x86_64", target_is_directory=True
+        )
+        (framework / "Resources").symlink_to(
+            "Versions/Current/Resources", target_is_directory=True
+        )
+    except OSError as exc:
+        pytest.skip(f"symlinks unavailable: {exc}")
+    assert resolver.resolve_framework(tmp_path) == framework.resolve()
+    root_link = tmp_path.parent / (tmp_path.name + "-root-link")
+    root_link.symlink_to(tmp_path, target_is_directory=True)
+    with pytest.raises(RuntimeError, match="root must not be a symlink"):
+        resolver.resolve_framework(root_link)
+    linked_component = tmp_path / "linked.pkg"
+    linked_component.symlink_to(component, target_is_directory=True)
+    with pytest.raises(RuntimeError, match="symlinked component"):
+        resolver.resolve_framework(tmp_path)
+    linked_component.unlink()
+    payload = component / "Payload"
+    payload_target = component / "payload-target"
+    payload.rename(payload_target)
+    payload.symlink_to(payload_target.name, target_is_directory=True)
+    with pytest.raises(RuntimeError, match="lacks a safe"):
+        resolver.resolve_framework(tmp_path)
+
+
+def test_official_r_component_resolver_rejects_framework_root_symlink_and_xml_bounds(
+    tmp_path,
+):
+    spec = importlib.util.spec_from_file_location(
+        "r_component_specific_bounds",
+        ROOT / "scripts" / "resolve_macos_r_framework_component.py",
+    )
+    resolver = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(resolver)
+    component = tmp_path / "component"
+    payload = component / "Payload"
+    payload.mkdir(parents=True)
+    (component / "PackageInfo").write_text(
+        '<pkg-info identifier="org.R-project.x86_64.R.fw.pkg" install-location="/Library/Frameworks"/>',
+        encoding="utf-8",
+    )
+    target = component / "actual-framework"
+    target.mkdir()
+    try:
+        (payload / "R.framework").symlink_to(target.name, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"symlinks unavailable: {exc}")
+    with pytest.raises(RuntimeError, match="lacks a safe"):
+        resolver.resolve_framework(tmp_path)
+    (payload / "R.framework").unlink()
+    (payload / "R.framework").mkdir()
+    deep = (
+        "<pkg-info>"
+        + "<x>" * resolver.MAX_XML_DEPTH
+        + "</x>" * resolver.MAX_XML_DEPTH
+        + "</pkg-info>"
+    )
+    (component / "PackageInfo").write_text(deep, encoding="utf-8")
+    with pytest.raises(RuntimeError, match="depth bound"):
+        resolver.resolve_framework(tmp_path)
+    for attribute in ("identifier", "install-location"):
+        values = {
+            "identifier": "org.R-project.x86_64.R.fw.pkg",
+            "install-location": "/Library/Frameworks",
+        }
+        values[attribute] = "x" * (resolver.MAX_FIELD_LENGTH + 1)
+        (component / "PackageInfo").write_text(
+            '<pkg-info identifier="{identifier}" install-location="{install-location}"/>'.format(
+                **values
+            ),
+            encoding="utf-8",
+        )
+        with pytest.raises(RuntimeError, match="length bound"):
+            resolver.resolve_framework(tmp_path)
+
+
+def test_official_r_component_resolver_caps_diagnostic_characters_before_count(
+    tmp_path,
+):
+    spec = importlib.util.spec_from_file_location(
+        "r_component_diag_chars",
+        ROOT / "scripts" / "resolve_macos_r_framework_component.py",
+    )
+    resolver = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(resolver)
+    # Six entries are below the count cap, but their legal field lengths exceed
+    # the total diagnostic character budget unless the resolver truncates them.
+    for index in range(6):
+        component = tmp_path / f"component-{index}"
+        component.mkdir()
+        (component / "PackageInfo").write_text(
+            '<pkg-info identifier="{0}" install-location="/{0}"/>'.format("x" * 200),
+            encoding="utf-8",
+        )
+    with pytest.raises(RuntimeError) as error:
+        resolver.resolve_framework(tmp_path)
+    assert "additional component(s) omitted" in str(error.value)
+    assert len(str(error.value)) <= 256 + resolver.MAX_DIAGNOSTIC_CHARS
+
+
+def test_official_r_component_resolver_bounds_files_and_rejects_symlinks(tmp_path):
+    spec = importlib.util.spec_from_file_location(
+        "r_component_bounds",
+        ROOT / "scripts" / "resolve_macos_r_framework_component.py",
+    )
+    resolver = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(resolver)
+    oversized = tmp_path / "oversized"
+    oversized.mkdir()
+    (oversized / "PackageInfo").write_bytes(
+        b"x" * (resolver.MAX_PACKAGE_INFO_BYTES + 1)
+    )
+    with pytest.raises(RuntimeError, match="byte bound"):
+        resolver.resolve_framework(tmp_path)
+    shutil.rmtree(oversized)
+    for number in range(resolver.MAX_PACKAGE_INFO_FILES + 1):
+        item = tmp_path / f"many-{number}"
+        item.mkdir()
+        (item / "PackageInfo").write_text(
+            '<pkg-info identifier="x" install-location="/x"/>', encoding="utf-8"
+        )
+    with pytest.raises(RuntimeError, match="file bound"):
+        resolver.resolve_framework(tmp_path)
+    for item in tmp_path.glob("many-*"):
+        shutil.rmtree(item)
+    for number in range(resolver.MAX_DIAGNOSTICS + 1):
+        item = tmp_path / f"diagnostic-{number}"
+        item.mkdir()
+        (item / "PackageInfo").write_text(
+            '<pkg-info identifier="x" install-location="/x"/>', encoding="utf-8"
+        )
+    with pytest.raises(RuntimeError, match=r"additional component\(s\) omitted"):
+        resolver.resolve_framework(tmp_path)
+    for item in tmp_path.glob("diagnostic-*"):
+        shutil.rmtree(item)
+    target = tmp_path / "target"
+    target.write_text("x", encoding="utf-8")
+    info = tmp_path / "PackageInfo"
+    info.symlink_to(target)
+    with pytest.raises(RuntimeError, match="symlinked PackageInfo"):
+        resolver.resolve_framework(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("slices", "message"),
+    [
+        ([], "invalid architecture"),
+        (["x86_64", "x86_64"], "invalid architecture"),
+        (["x86_64", "garbage"], "invalid architecture"),
+        (["arm64"], "architecture mismatch"),
+    ],
+)
+def test_macos_rcc_validator_rejects_invalid_or_wrong_host_slices(
+    tmp_path, monkeypatch, slices, message
+):
+    from rc_metastudio import qt6_macos_feasibility as feasibility
+
+    rcc = tmp_path / "rcc"
+    rcc.write_bytes(b"fixture")
+
+    def runner(command, **kwargs):
+        stdout = (
+            "rcc 6.11.1\n" if command[0] != "/usr/bin/lipo" else " ".join(slices) + "\n"
+        )
+        return subprocess.CompletedProcess(command, 0, stdout, "")
+
+    with pytest.raises(RuntimeError, match=message):
+        feasibility.validate_macos_rcc(
+            rcc, command_runner=runner, host_machine=lambda: "x86_64"
+        )
+
+
+def test_macos_rcc_validator_canonicalizes_valid_single_and_universal_slices(
+    tmp_path, monkeypatch
+):
+    from rc_metastudio import qt6_macos_feasibility as feasibility
+
+    rcc = tmp_path / "rcc"
+    rcc.write_bytes(b"fixture")
+
+    def runner(command, **kwargs):
+        stdout = "rcc 6.11.1\n" if command[0] != "/usr/bin/lipo" else "x86_64 arm64\n"
+        return subprocess.CompletedProcess(command, 0, stdout, "")
+
+    assert feasibility.validate_macos_rcc(
+        rcc, command_runner=runner, host_machine=lambda: "x86_64"
+    ) == ["arm64", "x86_64"]
 
 
 def test_signing_derivation_resolves_framework_api_bridge_from_final_path(tmp_path):
@@ -649,84 +1199,30 @@ def test_signing_derivation_resolves_framework_api_bridge_from_final_path(tmp_pa
 
 
 def test_r_relocation_maps_versioned_and_canonical_framework_load_commands():
-    bash = shutil.which("bash")
-    if bash is None:
-        pytest.skip("bash is required to execute the production relocation mapper")
-    build = text("scripts/build-macos-package.sh")
-    start = build.index("r_source_relative() {")
-    end = build.index("\n}\n\nrelocate_bundled_r_runtime()", start) + 3
-    function = build[start:end]
-    runtime_root = "/Library/Frameworks/R.framework/Versions/4.6/Resources"
-    paths = [
-        f"{runtime_root}/lib/libR.dylib",
-        "/Library/Frameworks/R.framework/Versions/4.6/Resources/lib/libR.dylib",
-        "/Library/Frameworks/R.framework/Resources/lib/libR.dylib",
-        "/Library/Frameworks/R.framework/R",
-        "/Library/Frameworks/R.framework/Versions/4.6/R",
-        "/opt/R/x86_64/lib/libgfortran.5.dylib",
-        "/opt/R/x86_64/lib/libtcl8.6.dylib",
-        "/opt/X11/lib/libX11.6.dylib",
-        "/opt/R/x86_64/include/unsupported.h",
-        "/opt/X11/include/unsupported.h",
-        "/Library/Frameworks/R.framework/PrivateHeaders/unsupported.h",
-        "/usr/lib/libSystem.B.dylib",
-    ]
-    command = (
-        function
-        + r"""
-r_runtime_root="$1"
-shift
-for path in "$@"; do
-  if relative="$(r_source_relative "$path")"; then
-    printf '0:%s\n' "$relative"
-  else
-    printf '%s:\n' "$?"
-  fi
-done
-"""
-    )
-    completed = subprocess.run(
-        [bash, "-c", command, "relocation-test", runtime_root, *paths],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    assert completed.stdout.splitlines() == [
-        "0:lib/libR.dylib",
-        "0:lib/libR.dylib",
-        "0:lib/libR.dylib",
-        "0:lib/libR.dylib",
-        "0:lib/libR.dylib",
-        "0:lib/libgfortran.5.dylib",
-        "2:",
-        "1:",
-        "2:",
-        "1:",
-        "2:",
-        "1:",
-    ]
+    relocator = text("scripts/relocate_macos_r_runtime.sh")
+    assert "r_relative_path()" in relocator
+    assert "/Library/Frameworks/R.framework/Versions/*/Resources/*" in relocator
+    assert "/Library/Frameworks/R.framework/R|" in relocator
 
 
 def test_macos_packager_profiles_optional_x11_r_surfaces_before_relocation():
     build = text("scripts/build-macos-package.sh")
 
-    assert "bundle_external_r_runtime_dylibs()" in build
-    assert 'case "$dependency" in' in build
-    assert "/opt/R/*/lib/*.dylib)" in build
+    relocator = text("scripts/relocate_macos_r_runtime.sh")
+    assert "bundle_external_r_runtime_dylibs()" not in build
+    assert 'case "$dependency" in' in relocator
+    assert "/opt/R/*/lib/*.dylib)" in relocator
     assert "/opt/X11/lib/*.dylib" not in build
     assert "profile_macos_embedded_r_runtime.py" in build
     assert "Applying the explicit non-X11 embedded R product profile" in build
     assert build.index("profile_macos_embedded_r_runtime.py") < build.rindex(
-        "relocate_bundled_r_runtime"
+        'relocate_macos_r_runtime.sh" --resources "$r_home"'
     )
-    assert "libtcl*.dylib|libtk*.dylib" in build
-    assert 'target="$r_home/$source_relative"' in build
-    assert 'cp -p "$dependency" "$target"' in build
-    assert 'write_bundled_r_macho_manifest "$macho_manifest"' in build
-    assert "External R runtime dependency closure exceeded 16 passes" in build
-    assert "normalize_macos_macho.py" in build
-    assert "grep -F '/opt/R/'" in build
-    assert "grep -F '/opt/X11/'" in build
+    assert "libtcl*.dylib|libtk*.dylib" in relocator
+    assert 'target="$resources/$relative"' in relocator
+    assert 'cp -p "$dependency" "$target"' not in relocator
+    assert "External R runtime dependency closure exceeded 16 passes" not in relocator
+    assert "normalize_manifest" in relocator
 
 
 def test_r_macho_normalizer_thins_universal_and_rejects_unusable_slices(

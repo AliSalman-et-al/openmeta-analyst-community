@@ -120,16 +120,12 @@ ZIP. Its uv, R dependency, and package inputs are cached, so avoid manual reruns
 when neither code nor cache state changed; local contracts are the quick feedback
 loop, not a substitute for the required hosted artifact proof.
 
-On macOS, use the package script with the matching producer artifact and its
-manifest `kit_sha256`:
+On macOS Intel, the public command is a single native build. It stages the
+authenticated official R framework and compiles the API-only rpy2 bridge in
+that same job; it never consumes an R Integration Kit:
 
 ```bash
-bash ./scripts/package-macos.sh --architecture x64 \
-  --r-integration-kit artifacts/r-integration-kits/macos-x64 \
-  --expected-r-integration-kit-sha256 <manifest-kit-sha256>
-bash ./scripts/package-macos.sh --architecture arm64 \
-  --r-integration-kit artifacts/r-integration-kits/macos-arm64 \
-  --expected-r-integration-kit-sha256 <manifest-kit-sha256>
+bash ./scripts/package-macos.sh --architecture x64
 ```
 
 Packaging-relevant pull requests now require the native macOS Intel x64

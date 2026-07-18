@@ -8,8 +8,44 @@ permissions:
   contents: read
 
 jobs:
+  r-substrate:
+    name: Private R.framework substrate gate
+    runs-on: macos-15-intel
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            uv.lock
+            docs/verification/RCMetaR-r-dependencies.json
+
+      - name: Install locked Python
+        run: uv python install 3.11.9
+
+      - name: Acquire, adapt, and prove private R without host R inputs
+        shell: bash
+        run: bash scripts/package-macos.sh --architecture x64 --stop-after-r-substrate
+
+      - name: Upload substrate diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: RCMetaStudio-macos-x64-r-substrate-${{ github.sha }}
+          path: build/macos-package/x64/work/qualification/**
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 0
+
   feasibility:
     name: Direct staged R.framework feasibility
+    needs: r-substrate
     runs-on: macos-15-intel
     timeout-minutes: 90
     steps:

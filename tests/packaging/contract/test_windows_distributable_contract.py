@@ -1,9 +1,11 @@
 import hashlib
 import json
 import importlib.util
+import os
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -20,6 +22,23 @@ def _load_source_provenance():
     assert spec.loader is not None
     spec.loader.exec_module(module)
     return module
+
+
+def test_package_metadata_version_only_needs_no_ambient_rscript(tmp_path):
+    output = tmp_path / "github-output.txt"
+    env = {**os.environ, "GITHUB_OUTPUT": str(output), "PATH": ""}
+    script = ROOT / "scripts" / "resolve_package_ci_metadata.py"
+    version_only = subprocess.run(
+        [sys.executable, str(script), "--version-only"], env=env,
+        text=True, capture_output=True,
+    )
+    assert version_only.returncode == 0, version_only.stderr
+    assert output.read_text(encoding="utf-8") == "version=0.1.2\n"
+    default = subprocess.run(
+        [sys.executable, str(script)], env=env, text=True, capture_output=True
+    )
+    assert default.returncode != 0
+    assert "Rscript is not available on PATH." in default.stderr
 
 
 def read_repo_text(*parts):
@@ -323,7 +342,8 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
     assert "docs/verification/*" in workflow["text"]
     assert ".\\scripts\\verify-smoke.ps1 -Sync" in workflow["text"]
     assert ".\\scripts\\verify-fast.ps1 -StrictTaxonomy" in workflow["text"]
-    assert "bash ./scripts/verify-smoke.sh --sync" in workflow["text"]
+    assert "bash ./scripts/verify-smoke.sh --require-r-evidence" in workflow["text"]
+    assert "bash ./scripts/verify-smoke.sh --sync" not in workflow["text"]
     assert "bash ./scripts/verify-fast.sh --strict-taxonomy" in workflow["text"]
     for target in ("windows-x64", "macos-x64", "macos-arm64"):
         assert target in workflow["text"]
@@ -371,13 +391,11 @@ def test_package_workflow_builds_path_aware_artifacts():
     assert {
         "windows-package",
         "macos-package-intel",
-        "macos-package-arm64",
     } <= workflow["jobs"]
     assert (
         target["env"]["RCMS_CRAN_REPO"]
         == "https://packagemanager.posit.co/cran/2026-07-16"
     )
-    assert target["env"]["RCMS_CRAN_REPO_KEY"] == "public-ppm-2026-07-16"
     assert workflow["events"] == {"workflow_dispatch"}
     assert workflow["legacy_uses"] == []
     pinned_uses = workflow["uses"] + target["uses"]
@@ -387,7 +405,7 @@ def test_package_workflow_builds_path_aware_artifacts():
     )
     assert workflow["paths"] == set()
     assert re.search(
-        r"- name: Check out repository\s+"
+        r"- name: Check out exact source\s+"
         r"uses: actions/checkout@[0-9a-f]{40} # v6\s+"
         r"with:\s+fetch-depth: 0",
         target["text"],
@@ -396,24 +414,15 @@ def test_package_workflow_builds_path_aware_artifacts():
     assert "artifacts/${{ inputs.artifact_name }}.zip" in target["text"]
     assert "artifacts/${{ inputs.artifact_name }}-evidence.json" in target["text"]
     assert any("RCMetaStudio-macos-x64" in run for run in workflow["text"].splitlines())
-    assert any(
-        "RCMetaStudio-macos-arm64" in run for run in workflow["text"].splitlines()
-    )
-    assert (
-        "build/windows-package/dist/RCMetaStudio/automation-wizard-layout-smoke.log"
-        in target["text"]
-    )
     r_cache_keys = [
         key for key in target["cache_keys"] if key.startswith("bundled-r-library-v4-")
     ]
     qt_cache_keys = [key for key in target["cache_keys"] if key.startswith("qt-sdk-")]
     assert r_cache_keys == []
-    assert "produce-r-integration-kit" in target["text"]
-    assert "Download exact promoted R integration kit" in target["text"]
-    assert "needs.produce-r-integration-kit.outputs.kit_sha256" in target["text"]
+    assert "produce-r-integration-kit" not in target["text"]
     assert all("RCMS_CRAN_REPO_KEY" in key for key in r_cache_keys)
     assert workflow["restore_keys"] == []
-    assert qt_cache_keys == ["qt-sdk-6.11.1-${{ inputs.archive_platform }}"]
+    assert qt_cache_keys == ["qt-sdk-6.11.1-macos-x64"]
     producer = Path(".github/workflows/r-integration-kit-producer.yml").read_text(
         encoding="utf-8"
     )
@@ -422,17 +431,12 @@ def test_package_workflow_builds_path_aware_artifacts():
     assert all(
         "steps.package-metadata.outputs.r-version" in key for key in r_cache_keys
     )
-    assert "-RIntegrationKit" in target["text"]
-    assert "ExpectedRIntegrationKitSha256" in target["text"]
-    assert "assemble-macos-package.sh" in target["text"]
-    assert "Resolve shared package metadata" in target["text"]
+    assert "r-integration-kit" not in target["text"]
+    assert "Resolve package metadata" in target["text"]
     assert "scripts/resolve_package_ci_metadata.py" in target["text"]
+    assert "resolve_package_ci_metadata.py --version-only" in target["text"]
     assert (
-        '-ArchiveRootName "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ inputs.archive_platform }}"'
-        in target["text"]
-    )
-    assert (
-        '--archive-root-name "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ inputs.archive_platform }}"'
+        '--archive-root-name "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-macos-x64"'
         in target["text"]
     )
     assert "if: ${{ inputs.build_windows }}" in workflow["text"]
@@ -441,8 +445,8 @@ def test_package_workflow_builds_path_aware_artifacts():
     assert "release_tag:" not in workflow["text"]
     assert "gh release" not in workflow["text"]
     assert "contents: write" not in workflow["text"]
-    assert "timeout-minutes: 60" in target["text"]
-    assert "macos_architecture: arm64" in workflow["text"]
+    assert "timeout-minutes: 90" in target["text"]
+    assert "macos_architecture: arm64" not in workflow["text"]
 
 
 def test_lane_named_local_scripts_replace_old_workflow_wrappers():
@@ -535,7 +539,6 @@ def test_macos_distributable_contract_is_declared():
         "--architecture",
         "--archive-root-name",
         "--bundle-identifier",
-        "--r-package-cache-root",
     } <= script["case_options"]
     assert {
         "require_free_space_gb",
@@ -543,12 +546,6 @@ def test_macos_distributable_contract_is_declared():
         "resolve_existing_dir",
         "project_version",
         "copy_tree",
-        "sha256_file",
-        "sha256_stdin_12",
-        "test_r_dependency_packages",
-        "copy_r_library_packages",
-        "configure_relocatable_r_launchers",
-        "relocate_bundled_r_runtime",
     } <= script["functions"]
     macos_spec = read_repo_text("packaging", "pyinstaller", "rc-metastudio-macos.spec")
     assert "BUNDLE(" in macos_spec
@@ -613,14 +610,10 @@ def test_local_macos_package_script_uses_shared_build_script():
         "--archive-root-name",
         "--artifact-name",
         "--bundle-identifier",
-        "--r-integration-kit",
-        "--expected-r-integration-kit-sha256",
     } <= script["case_options"]
     assert relative_order(
         script["text"],
-        "r_integration_kit.py verify-content",
-        "sync --locked --offline",
-        'build_args+=(--r-integration-kit "$r_integration_kit"',
+        "uv sync --locked",
         'build_args+=(--archive-root-name "$archive_root_name")',
         'bash "$repo_root/scripts/build-macos-package.sh"',
     )
@@ -677,12 +670,8 @@ def test_shared_r_dependency_installer_is_used_by_packagers():
     assert "RCMS_CRAN_REPO must match the manifest snapshot" in macos["text"]
     assert "r-library-cache" not in windows["text"]
     assert "Invoke-StrictRDependencyPolicy -RscriptExe $rscriptExe -Library $rLibrary" in windows["text"]
-    assert relative_order(
-        macos["text"],
-        'if [ -d "$cache_library" ]',
-        'run_strict_r_dependency_policy "$cache_library"',
-        'copy_r_library_packages "$cache_library" "$r_lib"',
-    )
+    assert 'run_strict_r_dependency_policy "$r_lib"' in macos["text"]
+    assert "r-library-cache" not in macos["text"]
 
 
 def test_macos_packager_resolves_relative_python_before_changing_directory():
@@ -702,49 +691,20 @@ def test_macos_packager_copies_resolved_r_runtime_contents():
 
     assert relative_order(
         script,
-        'r_runtime_root="$(resolve_existing_dir "$r_runtime_root" "Source R runtime")"',
-        'copy_tree "$r_runtime_root" "$r_version_root/Resources"',
+        'source_r_runtime_input="$r_runtime_root"',
+        'copy_tree "$source_r_framework" "$private_r_framework"',
+        'r_framework="$private_r_framework"',
         'if [ ! -x "$rscript" ] || [ ! -x "$r_binary" ]; then',
     )
 
 
 def test_macos_packager_relocates_every_bundled_r_macho_before_use():
     script = sh_contract("scripts", "build-macos-package.sh")["text"]
-
-    assert 'local macho_manifest="$work_root/bundled-r-mach-o-files.list"' in script
-    assert "bundle_external_r_runtime_dylibs" in script
-    assert "/opt/R/*/lib/*.dylib)" in script
-    assert "/opt/X11/lib/*.dylib" not in script
-
-    assert 'cp -p "$dependency" "$target"' in script
-    assert (
-        "from rc_metastudio.qt6_macos_feasibility import is_macho_candidate" in script
-    )
-    assert "MACH_O_MAGICS" not in script
-    assert "if is_macho_candidate(path):" in script
-    assert 'sys.stdout.buffer.write(os.fsencode(path) + b"\\0")' in script
-    assert 'done < "$macho_manifest"' in script
-    assert 'find "$r_home" -type f -print0' not in script
-    assert "file \"$binary\" | grep -q 'Mach-O'" not in script
-    assert 'otool -D "$binary"' in script
-    assert 'install_name_tool -id "@rpath/$source_relative" "$binary"' in script
-    assert 'otool -L "$binary"' in script
-    assert (
-        'install_name_tool -change "$dependency" "@loader_path/$relative_target"'
-        in script
-    )
-    assert "Bundled R runtime retains an absolute source-framework dependency" in script
-    assert "Bundled R launchers retain an absolute source-framework path" in script
-    assert 'exec "$R_HOME/bin/exec/R" --no-echo --no-restore "$@"' in script
-    assert relative_order(
-        script,
-        'copy_tree "$r_runtime_root" "$r_version_root/Resources"',
-        "install_local_r_packages",
-        'if ! test_bundled_r_packages "$r_lib"',
-        'step "Configuring relocatable bundled R launchers"',
-        'step "Relocating completed bundled R runtime dependencies"',
-        'cat > "$resources_root/LaunchRCMetaStudio.command"',
-    )
+    relocator = read_repo_text("scripts", "relocate_macos_r_runtime.sh")
+    assert "relocate_bundled_r_runtime" not in script
+    assert 'cp -p "$dependency" "$target"' not in relocator
+    assert "External R runtime dependency closure exceeded 16 passes" not in relocator
+    assert '"$python_exe" "$normalizer"' in relocator
 
 
 def test_windows_runtime_probe_does_not_apply_macos_r_product_policy():
@@ -1016,6 +976,7 @@ def test_frozen_windows_runtime_bootstraps_without_a_kit(monkeypatch, tmp_path):
     assert configured["derivation"] is None
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="requires Windows ctypes APIs")
 def test_windows_dll_policy_fails_closed(monkeypatch):
     from rc_metastudio import r_runtime
 
@@ -1196,6 +1157,7 @@ def _windows_runtime_probe(app):
     }
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="requires Windows PE tooling")
 def test_windows_runtime_probe_survives_relocation_but_rejects_tampering(tmp_path):
     inspector = _load_windows_deployment_inspector()
     original = _windows_deployment_fixture(tmp_path / "original")
@@ -1266,6 +1228,7 @@ def test_windows_deployment_inspector_recognizes_supported_os_imports():
     )
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="requires Windows PE tooling")
 def test_windows_deployment_inspector_accepts_one_coherent_x64_qt6_stack(
     tmp_path, monkeypatch
 ):
@@ -1405,6 +1368,7 @@ def test_windows_deployment_inspector_accepts_one_coherent_x64_qt6_stack(
     assert json.loads(output.read_text(encoding="utf-8"))["stack"] == versions
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="requires Windows PE tooling")
 def test_windows_deployment_inspector_records_dirty_source_provenance(tmp_path):
     inspector = _load_windows_deployment_inspector()
     app = _windows_deployment_fixture(tmp_path)
@@ -1524,6 +1488,7 @@ def test_final_windows_pe_closure_rejects_unique_but_unreachable_dependency():
         inspector._resolve_pe_closure([dependency, owner])
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="requires Windows PE tooling")
 def test_windows_deployment_inspector_rejects_legacy_duplicate_and_wrong_architecture(
     tmp_path,
 ):

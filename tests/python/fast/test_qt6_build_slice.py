@@ -163,7 +163,7 @@ def test_macos_official_rcc_requires_pinned_version_and_host_slice(
     def completed(command, **_kwargs):
         stdout = (
             responses["architectures"]
-            if command[0] == "lipo"
+            if str(command[0]).endswith("lipo")
             else responses["version"]
         )
         return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
@@ -550,6 +550,25 @@ def test_qt6_generation_and_type_checks_have_a_maintained_entry_point():
     assert "macos-x64" in hosted
     assert "macos-arm64" in hosted
     assert "timeout-minutes: 45" in hosted
+    assert (
+        "Rebuild and prove macOS rpy2 API bridge against installed R" in hosted
+    )
+    rebuild = hosted.index(
+        "Rebuild and prove macOS rpy2 API bridge against installed R"
+    )
+    macos_verify = hosted.index("Run source smoke and Fast Verification on macOS")
+    assert rebuild < macos_verify
+    assert 'export R_HOME="$(R RHOME)"' in hosted
+    assert 'echo "R_HOME=$R_HOME" >> "$GITHUB_ENV"' in hosted
+    assert 'echo "RPY2_CFFI_MODE=API" >> "$GITHUB_ENV"' in hosted
+    assert "uv sync --locked --reinstall-package rpy2-rinterface" in hosted
+    assert "--no-binary-package rpy2-rinterface" in hosted
+    assert 'metadata.version("rpy2-rinterface")' in hosted
+    assert 'lipo -archs "$bridge"' in hosted
+    assert "otool -L" in hosted and "count + 0" in hosted
+    assert 'openrlib.cffi_mode.name != "API"' in hosted
+    macos_run = hosted[macos_verify : hosted.index("Prune uv cache", macos_verify)]
+    assert "verify-smoke.sh --sync" not in macos_run
 
     for verification_script in (
         "scripts/verify-smoke.ps1",

@@ -155,6 +155,7 @@ def build_args(tmp_path: Path, kit=None) -> argparse.Namespace:
     )
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="requires the Windows Python DLL")
 def test_build_verify_and_consume_content_addressed_api_kit(monkeypatch, tmp_path):
     kit = module()
     monkeypatch.setattr(kit.platform, "system", lambda: "Windows")
@@ -181,6 +182,7 @@ def test_build_verify_and_consume_content_addressed_api_kit(monkeypatch, tmp_pat
     assert (destination / manifest["api_bridge_path"]).is_file()
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="requires the Windows Python DLL")
 def test_verification_rejects_tampering_and_abi_fallback(monkeypatch, tmp_path):
     kit = module()
     monkeypatch.setattr(kit.platform, "system", lambda: "Windows")

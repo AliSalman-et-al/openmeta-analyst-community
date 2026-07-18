@@ -83,8 +83,20 @@ a = Analysis(
     optimize=0,
 )
 if direct_r_toc:
+    r_framework_sources = [
+        Path(entry["source"]).resolve()
+        for entry in direct_r_toc
+        if entry["type"] == "DATA"
+    ]
+    if not r_framework_sources:
+        raise ValueError("explicit R TOC has no data members")
+    r_framework_root = Path(os.path.commonpath(r_framework_sources)).parent
+    while r_framework_root.name != "R.framework":
+        if r_framework_root.parent == r_framework_root:
+            raise ValueError("explicit R TOC is not rooted in R.framework")
+        r_framework_root = r_framework_root.parent
     a.binaries = adapter_module.filter_pyinstaller_r_binaries(
-        list(a.binaries), direct_r_map
+        list(a.binaries), r_framework_root
     )
     a.datas.extend(
         (entry["destination"], entry["source"], entry["type"])

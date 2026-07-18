@@ -68,7 +68,13 @@ def is_macho(path: Path) -> bool:
         return False
     try:
         with path.open("rb") as stream:
-            return stream.read(4) in MACH_O_MAGICS
+            magic = stream.read(4)
+        # Java ClassFile and fat Mach-O share CAFEBABE.  R's documented Java
+        # support payload contains .class files, which must remain ordinary
+        # resources and must never be passed to otool/lipo.
+        if path.suffix.casefold() == ".class" and magic == b"\xca\xfe\xba\xbe":
+            return False
+        return magic in MACH_O_MAGICS
     except OSError:
         return False
 
@@ -132,21 +138,35 @@ def manifest_roots(manifest_path: Path) -> tuple[list[str], set[str], str]:
     manifest = json.loads(raw)
     roots = {"RCMetaR"}
     roots.update(manifest["binary_package_policy"]["required_normal_packages"])
-    roots.update(item["name"] for item in manifest["binary_package_policy"]["source_exceptions"])
+    roots.update(
+        item["name"] for item in manifest["binary_package_policy"]["source_exceptions"]
+    )
     roots.update(item["name"] for item in manifest["direct_RCMetaR_dependencies"])
     roots.update(item["name"] for item in manifest["app_r_bundle_dependencies"])
-    builtin = {
-        item["name"] for item in manifest["direct_RCMetaR_dependencies"]
-        if item.get("source") in {"base-runtime", "recommended"}
-    } | {
-        item["name"] for item in manifest["app_r_bundle_dependencies"]
-        if item.get("source") in {"base-runtime", "recommended"}
-    } | {"R"}
+    builtin = (
+        {
+            item["name"]
+            for item in manifest["direct_RCMetaR_dependencies"]
+            if item.get("source") in {"base-runtime", "recommended"}
+        }
+        | {
+            item["name"]
+            for item in manifest["app_r_bundle_dependencies"]
+            if item.get("source") in {"base-runtime", "recommended"}
+        }
+        | {"R"}
+    )
     return sorted(roots, key=str.casefold), builtin, hashlib.sha256(raw).hexdigest()
 
 
-def hard_dependency_closure(library: Path, roots: list[str], builtin: set[str]) -> list[str]:
-    packages = {item.name: item for item in library.iterdir() if (item / "DESCRIPTION").is_file()}
+def hard_dependency_closure(
+    library: Path, roots: list[str], builtin: set[str]
+) -> list[str]:
+    packages = {
+        item.name: item
+        for item in library.iterdir()
+        if (item / "DESCRIPTION").is_file()
+    }
     missing = [name for name in roots if name not in packages and name not in builtin]
     if missing:
         raise ProfileError("required package roots are absent: " + ", ".join(missing))
@@ -171,10 +191,9 @@ def hard_dependency_closure(library: Path, roots: list[str], builtin: set[str]) 
     return sorted(closure, key=str.casefold)
 
 
-def profile(
+def quarantine(
     resources: Path,
     evidence: Path,
-    manifest_path: Path,
     r_version: str,
     architecture: str,
     source_resources: Path | None = None,
@@ -182,13 +201,12 @@ def profile(
     official_framework_layout: bool = False,
 ) -> None:
     resources = resources.resolve(strict=True)
-    library = resources / "library"
-    roots, builtin, manifest_sha256 = manifest_roots(manifest_path)
-    closure = hard_dependency_closure(library, roots, builtin)
     source_resources = (source_resources or resources).resolve(strict=True)
     source_macho = source_resources / "lib" / "libR.dylib"
     if not source_macho.is_file() or not is_macho(source_macho):
-        raise ProfileError("canonical source lib/libR.dylib is missing or is not Mach-O")
+        raise ProfileError(
+            "canonical source lib/libR.dylib is missing or is not Mach-O"
+        )
     source_macho_record = macho_record(source_macho, source_resources)
     if source_macho_record["architectures"] != [architecture]:
         raise ProfileError(
@@ -251,7 +269,9 @@ def profile(
             "relative_path": source_launcher.relative_to(source_resources).as_posix(),
             "kind": "script",
             "sha256": hashlib.sha256(launcher_bytes).hexdigest(),
-            "symlink_target": source_launcher.readlink().as_posix() if source_launcher.is_symlink() else None,
+            "symlink_target": source_launcher.readlink().as_posix()
+            if source_launcher.is_symlink()
+            else None,
         }
     exclusions: list[dict[str, object]] = []
     expected_paths = {relative for relative, _ in EXCLUSIONS}
@@ -265,33 +285,61 @@ def profile(
         loads = cast(list[str], record["load_commands"])
         if any(str(value).startswith("/opt/X11/") for value in loads):
             x11_machos.add(str(record["relative_path"]))
-        if any(re.search(r"/opt/R/[^/]+/lib/lib(?:tcl|tk)[^.]*", value) for value in loads):
+        if any(
+            re.search(r"/opt/R/[^/]+/lib/lib(?:tcl|tk)[^.]*", value) for value in loads
+        ):
             tcltk_machos.add(str(record["relative_path"]))
         opt_r = [value for value in loads if value.startswith("/opt/R/")]
         if opt_r:
             allowed_opt_r[str(record["relative_path"])] = opt_r
-    # Only these optional modules may refer to the separately installed X11/Tcl stack.
-    expected_machos = {"library/tcltk/libs/tcltk.so", "modules/R_X11.so", "modules/R_de.so", "library/grDevices/libs/cairo.so"}
-    if x11_machos != expected_machos or tcltk_machos != {"library/tcltk/libs/tcltk.so"}:
+    # External X11/Tcl edges are permitted only inside declared product
+    # exclusions. Upstream may add or remove incidental edges within those
+    # surfaces without changing this product invariant.
+    excluded_machos = {
+        "library/tcltk/libs/tcltk.so",
+        "modules/R_X11.so",
+        "modules/R_de.so",
+        "library/grDevices/libs/cairo.so",
+    }
+    if not x11_machos.issubset(excluded_machos) or not tcltk_machos.issubset(
+        excluded_machos
+    ):
         raise ProfileError(
-            "unexpected optional-R external dependency layout: "
-            f"expected X11 {sorted(expected_machos)} and Tcl/Tk tcltk.so; found "
+            "external X11/Tcl dependency escaped the declared product exclusions: "
             f"X11 {sorted(x11_machos)}, Tcl/Tk {sorted(tcltk_machos)}"
         )
     for relative, feature in EXCLUSIONS:
         target = resources / relative
         if not target.exists():
             raise ProfileError(f"expected optional R surface is missing: {relative}")
-        item: dict[str, object] = {"feature": feature, "relative_path": relative, "sha256": sha256(target)}
-        machos = [macho_record(path, resources) for path in ([target] if target.is_file() else target.rglob("*")) if is_macho(path)]
+        item: dict[str, object] = {
+            "feature": feature,
+            "relative_path": relative,
+            "sha256": sha256(target),
+        }
+        machos = [
+            macho_record(path, resources)
+            for path in ([target] if target.is_file() else target.rglob("*"))
+            if is_macho(path)
+        ]
         item["mach_o"] = machos
-        if relative == "library/tcltk" and [entry["relative_path"] for entry in machos] != ["library/tcltk/libs/tcltk.so"]:
+        if relative == "library/tcltk" and [
+            entry["relative_path"] for entry in machos
+        ] != ["library/tcltk/libs/tcltk.so"]:
             raise ProfileError("tcltk exclusion has an unexpected Mach-O layout")
         if relative != "library/tcltk" and len(machos) != 1:
-            raise ProfileError(f"optional R surface is not exactly one Mach-O: {relative}")
+            raise ProfileError(
+                f"optional R surface is not exactly one Mach-O: {relative}"
+            )
         if any(macho["architectures"] != [architecture] for macho in machos):
-            raise ProfileError(f"optional R surface is not {architecture}-only: {relative}")
-        commands = [command for macho in machos for command in cast(list[str], macho["load_commands"])]
+            raise ProfileError(
+                f"optional R surface is not {architecture}-only: {relative}"
+            )
+        commands = [
+            command
+            for macho in machos
+            for command in cast(list[str], macho["load_commands"])
+        ]
         if relative == "library/tcltk":
             required_families = (
                 r"/opt/R/[^/]+/lib/libtcl[^/]*\.dylib",
@@ -301,11 +349,22 @@ def profile(
                 r"/opt/X11/lib/libXext[^/]*\.dylib",
             )
         elif relative in {"modules/R_X11.so", "modules/R_de.so"}:
-            required_families = tuple(rf"/opt/X11/lib/lib{name}[^/]*\.dylib" for name in ("SM", "ICE", "X11", "Xext", "Xrender", "Xt", "Xmu"))
+            required_families = tuple(
+                rf"/opt/X11/lib/lib{name}[^/]*\.dylib"
+                for name in ("SM", "ICE", "X11", "Xext", "Xrender", "Xt", "Xmu")
+            )
         else:
-            required_families = tuple(rf"/opt/X11/lib/lib{name}[^/]*\.dylib" for name in ("Xrender", "SM", "ICE", "X11", "Xext"))
-        if any(not any(re.search(family, command) for command in commands) for family in required_families):
-            raise ProfileError(f"optional R surface has changed dependency families: {relative}")
+            required_families = tuple(
+                rf"/opt/X11/lib/lib{name}[^/]*\.dylib"
+                for name in ("Xrender", "SM", "ICE", "X11", "Xext")
+            )
+        if any(
+            not any(re.search(family, command) for command in commands)
+            for family in required_families
+        ):
+            raise ProfileError(
+                f"optional R surface has changed dependency families: {relative}"
+            )
         exclusions.append(item)
     for relative, _ in EXCLUSIONS:
         target = resources / relative
@@ -320,39 +379,135 @@ def profile(
             if any(str(value).startswith("/opt/X11/") for value in loads):
                 remaining_x11.append(candidate.relative_to(resources).as_posix())
     if remaining_x11:
-        raise ProfileError("profile left external X11 dependencies: " + ", ".join(sorted(remaining_x11)))
+        raise ProfileError(
+            "profile left external X11 dependencies: "
+            + ", ".join(sorted(remaining_x11))
+        )
     evidence.parent.mkdir(parents=True, exist_ok=True)
-    evidence.write_text(json.dumps({
-        "schema_version": 1,
-        "policy": "official-cran-r-with-optional-x11-tcl-surfaces-removed",
-        "hard_dependency_fields": list(DEPENDENCY_FIELDS),
-        "dependency_manifest": {"path": manifest_path.name, "sha256": manifest_sha256},
-        "hard_dependency_roots": roots,
-        "base_or_recommended_roots": sorted(builtin, key=str.casefold),
-        "hard_dependency_closure": closure,
-        "source_framework": {
-            "version": r_version,
-            "expected_architecture": architecture,
-            "source_resources": str(source_resources),
-            "source_tree_identity_sha256": sha256_tree_identity(source_resources),
-            "pre_profile_tree_identity_sha256": sha256_tree_identity(resources),
-            "canonical_macho": source_macho_record,
-            "executable_macho": source_executable_record,
-            "rscript_macho": source_rscript_record,
-            "launcher": source_launcher_record,
-        },
-        "allowed_non_tcl_opt_r_dependencies": {
-            path: [value for value in values if not re.search(r"/lib(?:tcl|tk)[^.]*", value)]
-            for path, values in allowed_opt_r.items()
-            if any(not re.search(r"/lib(?:tcl|tk)[^.]*", value) for value in values)
-        },
-        "excluded_surfaces": exclusions,
-        "post_profile_exclusions": sorted(expected_paths),
-    }, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    evidence.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "policy": "official-cran-r-with-optional-x11-tcl-surfaces-removed",
+                "phase": "quarantine",
+                "source_framework": {
+                    "version": r_version,
+                    "expected_architecture": architecture,
+                    "source_resources": str(source_resources),
+                    "source_tree_identity_sha256": sha256_tree_identity(
+                        source_resources
+                    ),
+                    "pre_profile_tree_identity_sha256": sha256_tree_identity(resources),
+                    "canonical_macho": source_macho_record,
+                    "executable_macho": source_executable_record,
+                    "rscript_macho": source_rscript_record,
+                    "launcher": source_launcher_record,
+                },
+                "allowed_non_tcl_opt_r_dependencies": {
+                    path: [
+                        value
+                        for value in values
+                        if not re.search(r"/lib(?:tcl|tk)[^.]*", value)
+                    ]
+                    for path, values in allowed_opt_r.items()
+                    if any(
+                        not re.search(r"/lib(?:tcl|tk)[^.]*", value) for value in values
+                    )
+                },
+                "excluded_surfaces": exclusions,
+                "post_profile_exclusions": sorted(expected_paths),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def finalize(
+    resources: Path, evidence: Path, manifest_path: Path, quarantine_evidence: Path
+) -> None:
+    resources = resources.resolve(strict=True)
+    try:
+        quarantine_data = json.loads(quarantine_evidence.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ProfileError(f"quarantine evidence is invalid: {exc}")
+    if quarantine_data.get("phase") != "quarantine" or not quarantine_data.get(
+        "excluded_surfaces"
+    ):
+        raise ProfileError("quarantine evidence is incomplete")
+    for relative, _ in EXCLUSIONS:
+        if (resources / relative).exists():
+            raise ProfileError(f"optional R surface was reintroduced: {relative}")
+    roots, builtin, manifest_sha256 = manifest_roots(manifest_path)
+    closure = hard_dependency_closure(resources / "library", roots, builtin)
+    evidence.parent.mkdir(parents=True, exist_ok=True)
+    evidence.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "phase": "finalize",
+                "quarantine_evidence": {
+                    "path": quarantine_evidence.name,
+                    "sha256": sha256(quarantine_evidence),
+                },
+                "dependency_manifest": {
+                    "path": manifest_path.name,
+                    "sha256": manifest_sha256,
+                },
+                "hard_dependency_fields": list(DEPENDENCY_FIELDS),
+                "hard_dependency_roots": roots,
+                "base_or_recommended_roots": sorted(builtin, key=str.casefold),
+                "hard_dependency_closure": closure,
+                "source_framework": quarantine_data["source_framework"],
+                "excluded_surfaces": quarantine_data["excluded_surfaces"],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def profile(
+    resources: Path,
+    evidence: Path,
+    manifest_path: Path,
+    r_version: str,
+    architecture: str,
+    source_resources: Path | None = None,
+    *,
+    official_framework_layout: bool = False,
+) -> None:
+    """Backward-compatible one-shot profile for existing fixtures."""
+    quarantine_path = evidence.with_suffix(evidence.suffix + ".quarantine")
+    quarantine(
+        resources,
+        quarantine_path,
+        r_version,
+        architecture,
+        source_resources,
+        official_framework_layout=official_framework_layout,
+    )
+    finalize(resources, evidence, manifest_path, quarantine_path)
+    final = json.loads(evidence.read_text(encoding="utf-8"))
+    early = json.loads(quarantine_path.read_text(encoding="utf-8"))
+    final.update(
+        {
+            key: early[key]
+            for key in ("post_profile_exclusions", "allowed_non_tcl_opt_r_dependencies")
+        }
+    )
+    evidence.write_text(
+        json.dumps(final, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("phase", choices=("quarantine", "finalize"))
     parser.add_argument("--resources", type=Path, required=True)
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--dependency-manifest", type=Path, required=True)
@@ -360,17 +515,27 @@ def main() -> int:
     parser.add_argument("--architecture", required=True)
     parser.add_argument("--source-resources", type=Path)
     parser.add_argument("--official-framework-layout", action="store_true")
+    parser.add_argument("--quarantine-evidence", type=Path)
     args = parser.parse_args()
     try:
-        profile(
-            args.resources,
-            args.evidence,
-            args.dependency_manifest,
-            args.r_version,
-            args.architecture,
-            args.source_resources,
-            official_framework_layout=args.official_framework_layout,
-        )
+        if args.phase == "quarantine":
+            quarantine(
+                args.resources,
+                args.evidence,
+                args.r_version,
+                args.architecture,
+                args.source_resources,
+                official_framework_layout=args.official_framework_layout,
+            )
+        else:
+            if args.quarantine_evidence is None:
+                raise ProfileError("--quarantine-evidence is required for finalize")
+            finalize(
+                args.resources,
+                args.evidence,
+                args.dependency_manifest,
+                args.quarantine_evidence,
+            )
     except (OSError, ProfileError) as exc:
         print(f"Embedded R product profile failed: {exc}", file=sys.stderr)
         return 1

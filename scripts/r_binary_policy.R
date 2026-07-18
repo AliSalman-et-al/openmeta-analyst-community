@@ -165,7 +165,13 @@ target_package_loadable <- function(package, lib) {
   startsWith(namespace_path, paste0(target, "/"))
 }
 
-normalize_rcms_downloaded_archives <- function(downloaded, expected_count) {
+rcms_binary_archive_extension <- function(platform) {
+  if (identical(platform$system, "Windows")) return("zip")
+  if (identical(platform$system, "Darwin")) return("tgz")
+  stop("Unsupported retained R binary archive system: ", platform$system)
+}
+
+normalize_rcms_downloaded_archives <- function(downloaded, expected_count, platform) {
   if (NROW(downloaded) != expected_count) {
     stop("PPM did not provide one retained binary archive per missing package")
   }
@@ -187,6 +193,13 @@ normalize_rcms_downloaded_archives <- function(downloaded, expected_count) {
   missing_archives <- archives[!file.exists(archives)]
   if (length(missing_archives)) {
     stop("PPM retained binary archive is missing: ", paste(missing_archives, collapse = ", "))
+  }
+  expected_extension <- rcms_binary_archive_extension(platform)
+  if (any(tolower(tools::file_ext(archives)) != expected_extension)) {
+    stop(
+      "PPM ", platform$system, " binary acquisition returned a non-.",
+      expected_extension, " archive"
+    )
   }
   unname(archives)
 }
@@ -222,7 +235,19 @@ install_rcms_binary_packages <- function(
       downloaded <- download_binary(
         missing, destdir = archive_dir, repos = policy$repository, type = "binary"
       )
-      retained_archives <- normalize_rcms_downloaded_archives(downloaded, length(missing))
+      retained_archives <- normalize_rcms_downloaded_archives(
+        downloaded, length(missing), platform
+      )
+      archive_hashes <- vapply(
+        retained_archives, function(path) policy_sha256(policy, path), character(1)
+      )
+      if (any(!grepl("^[0-9a-f]{64}$", archive_hashes))) {
+        stop("PPM binary archive pre-install SHA256 validation failed")
+      }
+      emit_rcms_binary_evidence(
+        "binary-archives-preinstall",
+        paste0(basename(retained_archives), "=sha256:", archive_hashes)
+      )
       install_binary(
         retained_archives, lib = lib, repos = NULL,
         dependencies = FALSE, type = "binary"
@@ -296,8 +321,11 @@ install_rcms_source_exception <- function(
   installed <- utils::installed.packages(lib.loc = lib)
   current <- if (exception$name %in% rownames(installed)) installed[exception$name, "Version"] else NA_character_
   if (!identical(current, exception$version)) {
-    archive <- tempfile(pattern = "HSROC_", fileext = ".tar.gz")
-    on.exit(unlink(archive), add = TRUE)
+    archive <- Sys.getenv("RCMS_HSROC_ARCHIVE", "")
+    if (!nzchar(archive)) archive <- tempfile(pattern = "HSROC_", fileext = ".tar.gz")
+    if (file.exists(archive)) unlink(archive)
+    dir.create(dirname(archive), recursive = TRUE, showWarnings = FALSE)
+    if (!nzchar(Sys.getenv("RCMS_HSROC_ARCHIVE", ""))) on.exit(unlink(archive), add = TRUE)
     download(exception$url, archive, mode = "wb", quiet = FALSE)
     observed <- sha256(archive)
     if (!identical(observed, exception$sha256)) {

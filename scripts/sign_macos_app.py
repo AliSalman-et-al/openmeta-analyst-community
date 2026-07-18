@@ -271,8 +271,12 @@ def _write_inventory(path: Path, plan: SigningPlan, identity: str) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("app", type=Path)
-    parser.add_argument("--identity", required=True)
+    parser.add_argument("--identity")
     parser.add_argument("--inventory-output", type=Path)
+    parser.add_argument(
+        "--inventory-only", action="store_true",
+        help="verify the final bundle and write its native inventory without signing",
+    )
     parser.add_argument(
         "--timestamp",
         action=argparse.BooleanOptionalAction,
@@ -280,11 +284,19 @@ def main() -> int:
         help="request a trusted timestamp (defaults on except for ad-hoc signing)",
     )
     args = parser.parse_args()
-    plan = sign_and_verify(
-        args.app, identity=args.identity, timestamp=args.timestamp
-    )
+    if args.inventory_only:
+        if args.identity is not None or args.timestamp is not None:
+            parser.error("--inventory-only cannot be combined with signing options")
+        _verify(args.app, deep=True)
+        plan = build_signing_plan(args.app)
+        identity = "-"
+    else:
+        if args.identity is None:
+            parser.error("--identity is required unless --inventory-only is used")
+        plan = sign_and_verify(args.app, identity=args.identity, timestamp=args.timestamp)
+        identity = args.identity
     if args.inventory_output is not None:
-        _write_inventory(args.inventory_output, plan, args.identity)
+        _write_inventory(args.inventory_output, plan, identity)
     print(
         "Signed and verified "
         f"{len(plan.native_files)} Mach-O files and "

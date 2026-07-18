@@ -8,9 +8,8 @@ recreate_venv=0
 skip_clean=0
 skip_smoke=0
 capture_adaptive_layout_evidence=0
+stop_after_r_substrate=0
 bundle_identifier="org.researchconsultancy.rc-metastudio"
-r_integration_kit=""
-expected_r_integration_kit_sha256=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -24,14 +23,6 @@ while [ "$#" -gt 0 ]; do
       ;;
     --archive-root-name)
       archive_root_name="$2"
-      shift 2
-      ;;
-    --r-integration-kit)
-      r_integration_kit="$2"
-      shift 2
-      ;;
-    --expected-r-integration-kit-sha256)
-      expected_r_integration_kit_sha256="$2"
       shift 2
       ;;
     --bundle-identifier)
@@ -52,6 +43,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --capture-adaptive-layout-evidence)
       capture_adaptive_layout_evidence=1
+      shift
+      ;;
+    --stop-after-r-substrate)
+      stop_after_r_substrate=1
       shift
       ;;
     *)
@@ -75,28 +70,39 @@ if [ "$(uname -s)" != "Darwin" ]; then
   exit 1
 fi
 
+if ! command -v uv >/dev/null 2>&1; then
+  echo "macOS packaging requires uv. Install it from https://docs.astral.sh/uv/." >&2
+  exit 1
+fi
+if ! xcode-select -p >/dev/null 2>&1 || ! command -v clang >/dev/null 2>&1; then
+  echo "macOS packaging requires the Xcode Command Line Tools. Run: xcode-select --install" >&2
+  exit 1
+fi
+macos_major="$(sw_vers -productVersion | awk -F. '{print $1}')"
+if [ "$macos_major" -lt 13 ]; then
+  echo "macOS Intel packaging requires macOS 13 or later; found $(sw_vers -productVersion)." >&2
+  exit 1
+fi
+
 case "${architecture:-}" in
   x64)
     default_artifact="RCMetaStudio-macos-x64"
     ;;
-  arm64)
-    default_artifact="RCMetaStudio-macos-arm64"
-    ;;
   "")
-    echo "--architecture is required and must be x64 or arm64." >&2
+    echo "--architecture x64 is required." >&2
     exit 2
     ;;
   *)
-    echo "--architecture must be x64 or arm64." >&2
+    echo "Issue #342 packages macOS Intel only; use --architecture x64." >&2
     exit 2
     ;;
 esac
 
-artifact_name="${artifact_name:-$default_artifact}"
-if [ -z "$r_integration_kit" ] || [ -z "$expected_r_integration_kit_sha256" ]; then
-  echo "Package assembly requires --r-integration-kit and --expected-r-integration-kit-sha256 from the native producer." >&2
+if [ "$(uname -m)" != "x86_64" ]; then
+  echo "macOS Intel packaging requires a native x86_64 host; found $(uname -m)." >&2
   exit 2
 fi
+artifact_name="${artifact_name:-$default_artifact}"
 
 cd "$repo_root"
 
@@ -105,21 +111,16 @@ if [ "$recreate_venv" -eq 1 ] && [ -d "$venv_root" ]; then
   rm -rf "$venv_root"
 fi
 
-step "Authenticating the promoted kit before offline environment assembly"
-uv run --no-project --offline --python 3.11.9 python scripts/r_integration_kit.py verify-content \
-  --kit "$r_integration_kit" --target "macos-$architecture" --uv-lock uv.lock \
-  --expected-kit-sha256 "$expected_r_integration_kit_sha256"
-step "Syncing locked verification environment from the authenticated kit cache"
-uv --cache-dir "$r_integration_kit/python/uv-cache" sync --locked --offline
+step "Syncing the locked Python environment"
+uv python install 3.11.9
+uv sync --locked
 
 build_args=(
   --architecture "$architecture"
   --artifact-name "$artifact_name"
   --bundle-identifier "$bundle_identifier"
   --python-exe "$python_exe"
-  --skip-dependency-install
 )
-build_args+=(--r-integration-kit "$r_integration_kit" --expected-r-integration-kit-sha256 "$expected_r_integration_kit_sha256")
 if [ -n "$archive_root_name" ]; then
   build_args+=(--archive-root-name "$archive_root_name")
 fi
@@ -131,6 +132,9 @@ if [ "$skip_smoke" -eq 1 ]; then
 fi
 if [ "$capture_adaptive_layout_evidence" -eq 1 ]; then
   build_args+=(--capture-adaptive-layout-evidence)
+fi
+if [ "$stop_after_r_substrate" -eq 1 ]; then
+  build_args+=(--stop-after-r-substrate)
 fi
 
 step "Building ad-hoc macOS package artifact"

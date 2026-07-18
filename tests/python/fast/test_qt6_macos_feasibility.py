@@ -105,6 +105,8 @@ def _valid_evidence(target: str = "macos-arm64") -> dict:
             "resource_registered": True,
             "svg_rendered": True,
             "r_result": 7.5,
+            "r_home": "Contents/Frameworks/R.framework/Resources",
+            "rpy2_mode": "API",
             "clean_exit": True,
             "qt_dependency_collector": "PyInstaller",
             "cocoa_plugin": "Qt/plugins/platforms/libqcocoa.dylib",
@@ -140,9 +142,15 @@ def _valid_evidence(target: str = "macos-arm64") -> dict:
             },
         },
         "diagnostics": {
+            "r_profile_quarantine": {
+                "path": "r-profile-quarantine.json",
+                "sha256": "7" * 64,
+            },
             "source_smoke": {"path": "source-smoke.json", "sha256": "a" * 64},
             "pyinstaller_build": {"path": "pyinstaller-build.log", "sha256": "b" * 64},
             "packaged_smoke": {"path": "packaged-smoke.json", "sha256": "c" * 64},
+            "packaged_phases": {"path": "packaged-phases.jsonl", "sha256": "9" * 64},
+            "packaged_r_graph": {"path": "packaged-r-graph.json", "sha256": "8" * 64},
         },
         "native_components": {
             name: {
@@ -228,6 +236,27 @@ def _materialize_retained_evidence(evidence: dict, root: Path) -> None:
             "architectures": executable["architectures"],
         },
         {
+            "path": "Contents/Frameworks/R.framework/Resources/lib/libR.dylib",
+            "kind": "file",
+            "size": 4,
+            "sha256": hashlib.sha256(b"libR").hexdigest(),
+            "architectures": executable["architectures"],
+        },
+        {
+            "path": "Contents/Frameworks/R.framework/Resources/etc/Renviron",
+            "kind": "file",
+            "size": 8,
+            "sha256": hashlib.sha256(b"Renviron").hexdigest(),
+            "architectures": [],
+        },
+        {
+            "path": "Contents/Frameworks/R.framework/Resources/include/R.h",
+            "kind": "file",
+            "size": 3,
+            "sha256": hashlib.sha256(b"R.h").hexdigest(),
+            "architectures": [],
+        },
+        {
             "path": "Contents/Frameworks/PyQt6/Qt6/lib/QtCore.framework/QtCore",
             "kind": "symlink",
             "size": 17,
@@ -293,23 +322,11 @@ def _materialize_retained_evidence(evidence: dict, root: Path) -> None:
         "arguments": [
             "--noconfirm",
             "--clean",
-            "--windowed",
-            "--onedir",
-            "--name",
-            "Qt6MacFeasibility",
-            "--target-architecture",
-            "arm64",
             "--distpath",
             str((root / "dist").resolve()),
             "--workpath",
             str((root / "work").resolve()),
-            "--specpath",
-            str((root / "spec").resolve()),
-            "--add-data",
-            f"{(root / 'icons.rcc').resolve()}:resources",
-            "--copy-metadata",
-            "rpy2",
-            str((root / "entry.py").resolve()),
+            str((root / "packaging/pyinstaller/qt6-macos-feasibility.spec").resolve()),
         ],
         "manual_qt_inputs": [],
     }
@@ -530,6 +547,67 @@ def test_native_macos_workflow_uses_two_strict_native_jobs_and_retains_evidence(
     assert "aqtinstall==3.3.0" in metadata["dependency-groups"]["dev"]
 
 
+def test_native_macos_workflow_rebuilds_and_proves_locked_rpy2_api_bridge():
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/qt6-macos-feasibility.yml").read_text(
+            encoding="utf-8"
+        )
+    )
+    steps = workflow["jobs"]["native-macos-feasibility"]["steps"]
+    step_names = [step["name"] for step in steps]
+    rebuild = next(
+        step for step in steps if step["name"] == "Rebuild and prove native rpy2 API bridge"
+    )
+    script = rebuild["run"]
+
+    assert step_names.index("Install native R") < step_names.index(
+        "Sync locked application stack"
+    ) < step_names.index("Rebuild and prove native rpy2 API bridge")
+    assert step_names.index("Rebuild and prove native rpy2 API bridge") < step_names.index(
+        "Run source, R, and packaged native proof"
+    )
+    assert 'export R_HOME="$(R RHOME)"' in script
+    assert "export RPY2_CFFI_MODE=API" in script
+    assert "uv sync --locked --reinstall-package rpy2-rinterface" in script
+    assert "--no-binary-package rpy2-rinterface" in script
+    assert 'metadata.version("rpy2-rinterface")' in script
+    assert '= "3.6.6"' in script
+    assert 'lipo -archs "$bridge"' in script
+    assert "otool -L" in script and "count + 0" in script
+    assert 'openrlib.cffi_mode.name != "API"' in script
+    assert 'robjects.r("sum(c(1.25, 2.5, 3.75))")' in script
+
+    trigger_paths = set(workflow[True]["pull_request"]["paths"])
+    assert {
+        "packaging/pyinstaller/qt6-macos-feasibility.spec",
+        "scripts/configure_macos_r_launchers.py",
+        "scripts/macos_embedded_r_adapter.py",
+        "scripts/normalize_macos_macho.py",
+        "scripts/profile_macos_embedded_r_runtime.py",
+        "scripts/relocate_macos_r_runtime.sh",
+        "docs/verification/RCMetaR-r-dependencies.json",
+        "docs/verification/native-macos-qt6-feasibility.md",
+    } <= trigger_paths
+    specification = (
+        ROOT / "packaging/pyinstaller/qt6-macos-feasibility.spec"
+    ).read_text(encoding="utf-8")
+    assert "filter_pyinstaller_r_binaries" in specification
+    assert "RCMS_FEASIBILITY_R_TOC" in specification
+    assert '"_rinterface_cffi_api"' in specification
+    assert '"_rinterface_cffi_abi"' in specification
+    assert "collect_all(" not in specification
+    assert "qt.conf" not in specification
+    feasibility = (ROOT / "src/rc_metastudio/qt6_macos_feasibility.py").read_text(
+        encoding="utf-8"
+    )
+    profile = feasibility.index("profile_macos_embedded_r_runtime.py")
+    launchers = feasibility.index("configure_macos_r_launchers.py")
+    relocation = feasibility.index("relocate_macos_r_runtime.sh")
+    assert profile < launchers < relocation
+    assert '"--runtime-only"' in feasibility
+    assert '"--official-framework-layout"' in feasibility
+
+
 def test_locked_rpy2_runtime_discovers_concrete_native_extensions():
     extensions = discover_rpy2_native_extensions()
 
@@ -704,11 +782,11 @@ def test_pyinstaller_plan_accepts_native_macos_paths_when_validated_on_any_host(
     plan_path = tmp_path / record["retained_path"]
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
     arguments = plan["arguments"]
-    arguments[9] = "/Users/runner/work/app/dist"
-    arguments[11] = "/Users/runner/work/app/work"
-    arguments[13] = "/Users/runner/work/app/spec"
-    arguments[15] = "/Users/runner/work/app/icons.rcc:resources"
-    arguments[18] = "/Users/runner/work/app/entry.py"
+    arguments[3] = "/Users/runner/work/app/dist"
+    arguments[5] = "/Users/runner/work/app/work"
+    arguments[6] = (
+        "/Users/runner/work/app/packaging/pyinstaller/qt6-macos-feasibility.spec"
+    )
     plan_path.write_text(json.dumps(plan, sort_keys=True), encoding="utf-8")
     record["size"] = plan_path.stat().st_size
     record["sha256"] = hashlib.sha256(plan_path.read_bytes()).hexdigest()
@@ -716,27 +794,26 @@ def test_pyinstaller_plan_accepts_native_macos_paths_when_validated_on_any_host(
     validate_evidence(evidence, "macos-arm64", evidence_dir=tmp_path)
 
 
-def test_pyinstaller_plan_rejects_unsafe_add_data_sources(tmp_path, monkeypatch):
+def test_pyinstaller_plan_rejects_noncanonical_feasibility_specification(
+    tmp_path, monkeypatch
+):
     monkeypatch.setattr(
         "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
     )
-    unsafe_arguments = [
-        "relative/icons.rcc:resources",
-        r"relative\icons.rcc:resources",
-        r"C:relative\icons.rcc:resources",
-        r"C:\work\icons.rcc:other",
-        "/workspace/icons.rcc:extra:resources",
-        r"C:\work\icons.rcc:extra:resources",
-        "/workspace/not-icons.txt:resources",
+    unsafe_specifications = [
+        "relative/qt6-macos-feasibility.spec",
+        r"C:relative\qt6-macos-feasibility.spec",
+        "/workspace/alternate.spec",
+        r"C:\work\alternate.spec",
     ]
-    for index, add_data in enumerate(unsafe_arguments):
+    for index, specification in enumerate(unsafe_specifications):
         evidence = _valid_evidence()
         root = tmp_path / str(index)
         _materialize_retained_evidence(evidence, root)
         record = evidence["package"]["build_plan"]
         plan_path = root / record["retained_path"]
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
-        plan["arguments"][15] = add_data
+        plan["arguments"][6] = specification
         plan_path.write_text(json.dumps(plan, sort_keys=True), encoding="utf-8")
         record["size"] = plan_path.stat().st_size
         record["sha256"] = hashlib.sha256(plan_path.read_bytes()).hexdigest()

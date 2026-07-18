@@ -11,9 +11,17 @@ on:
       - scripts/build_qt6.py
       - scripts/qt6_macos_feasibility.py
       - scripts/native_remaining_surfaces_smoke.py
+      - scripts/configure_macos_r_launchers.py
+      - scripts/macos_embedded_r_adapter.py
+      - scripts/normalize_macos_macho.py
+      - scripts/profile_macos_embedded_r_runtime.py
+      - scripts/relocate_macos_r_runtime.sh
       - scripts/validate_qt6_surface_inventory.py
+      - packaging/pyinstaller/qt6-macos-feasibility.spec
       - docs/verification/native-qt6-surface-inventory.json
       - docs/verification/native-qt6-remaining-surfaces.md
+      - docs/verification/RCMetaR-r-dependencies.json
+      - docs/verification/native-macos-qt6-feasibility.md
       - src/rc_metastudio/**
       - src/rc_metastudio/forms/about_legal.ui
       - src/rc_metastudio/images/**
@@ -84,6 +92,30 @@ jobs:
         run: |
           set -euo pipefail
           uv sync --locked 2>&1 | tee -a "artifacts/qt6-feasibility/${{ matrix.target }}/setup.log"
+
+      - name: Rebuild and prove native rpy2 API bridge
+        run: |
+          set -euo pipefail
+          evidence_dir="artifacts/qt6-feasibility/${{ matrix.target }}"
+          export R_HOME="$(R RHOME)"
+          export RPY2_CFFI_MODE=API
+          uv sync --locked --reinstall-package rpy2-rinterface \
+            --no-binary-package rpy2-rinterface \
+            2>&1 | tee -a "$evidence_dir/setup.log"
+          bridge="$(uv run python -c 'from pathlib import Path; import _rinterface_cffi_api as module; print(Path(module.__file__).resolve())')"
+          test "$(uv run python -c 'from importlib import metadata; print(metadata.version("rpy2-rinterface"))')" = "3.6.6"
+          test "$(lipo -archs "$bridge")" = "${{ matrix.machine }}"
+          test "$(otool -L "$bridge" | awk 'NR > 1 && ($1 ~ /libR[.]dylib$/ || $1 ~ /\/R$/) { count++ } END { print count + 0 }')" = "1"
+          uv run python - <<'PY'
+          from rpy2 import robjects
+          from rpy2.rinterface_lib import openrlib
+
+          if openrlib.cffi_mode.name != "API":
+              raise SystemExit(f"rpy2 loaded {openrlib.cffi_mode.name}, expected API")
+          result = float(robjects.r("sum(c(1.25, 2.5, 3.75))")[0])
+          if result != 7.5:
+              raise SystemExit(f"embedded R calculation returned {result}, expected 7.5")
+          PY
 
       - name: Install matching official Qt SDK tools
         run: |
