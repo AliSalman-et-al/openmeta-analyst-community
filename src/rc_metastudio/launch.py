@@ -43,6 +43,8 @@ APPLICATION_ICON_PATH = ":/misc/meta.png"
 AUTOMATION_SMOKE_LOG_ENV = "RCMS_AUTOMATION_SMOKE_LOG"
 ADAPTIVE_LAYOUT_EVIDENCE_LOG_ENV = "RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG"
 PACKAGED_SUMMARY_SHA256 = "78294820c83cd94c19dfdca8c24b6a96cdc8b6f1319a5cd1bedffacde73851e2"
+NATIVE_FILE_DIALOG_OBSERVE_DELAY_MS = 250
+NATIVE_FILE_DIALOG_TIMEOUT_MS = 10_000
 
 
 def screen_bounded_splash_pixmap(source, available_logical_size):
@@ -722,6 +724,75 @@ def _persist_package_surface_failure(
     )
 
 
+def _native_file_dialog_observation(app, parent):
+    """Exercise a Cocoa sheet without entering NSOpenPanel's blocking runModal."""
+    file_dialog = QtWidgets.QFileDialog(parent, "Packaged native file dialog")
+    file_dialog.setFileMode(QtWidgets.QFileDialog.FileMode.ExistingFile)
+    file_dialog.setOption(QtWidgets.QFileDialog.Option.DontUseNativeDialog, False)
+    file_dialog.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
+    observation = {
+        "dont_use_native_dialog": file_dialog.testOption(
+            QtWidgets.QFileDialog.Option.DontUseNativeDialog
+        ),
+        "window_modality": None,
+        "visible_before_cancel": False,
+        "cancel_requested": False,
+        "finished_signal": False,
+        "rejected_signal": False,
+        "result": None,
+        "rejected_value": int(QtWidgets.QDialog.DialogCode.Rejected),
+        "timed_out": False,
+        "timeout_ms": NATIVE_FILE_DIALOG_TIMEOUT_MS,
+    }
+    event_loop = QtCore.QEventLoop()
+    observe_timer = QtCore.QTimer()
+    observe_timer.setSingleShot(True)
+    watchdog = QtCore.QTimer()
+    watchdog.setSingleShot(True)
+
+    def finish(result):
+        observation["finished_signal"] = True
+        observation["result"] = int(result)
+        if event_loop.isRunning():
+            event_loop.quit()
+
+    def mark_rejected():
+        observation["rejected_signal"] = True
+
+    def observe_and_cancel():
+        observation["visible_before_cancel"] = file_dialog.isVisible()
+        observation["cancel_requested"] = True
+        file_dialog.reject()
+
+    def time_out():
+        observation["timed_out"] = True
+        observation["error_type"] = "TimeoutError"
+        observation["error_message"] = bounded_error_message(
+            TimeoutError("native file dialog did not reject before its 10 second bound")
+        )
+        file_dialog.reject()
+        if event_loop.isRunning():
+            event_loop.quit()
+
+    file_dialog.finished.connect(finish)
+    file_dialog.rejected.connect(mark_rejected)
+    observe_timer.timeout.connect(observe_and_cancel)
+    watchdog.timeout.connect(time_out)
+    watchdog.start(NATIVE_FILE_DIALOG_TIMEOUT_MS)
+    file_dialog.open()
+    app.processEvents()
+    observation["window_modality"] = file_dialog.windowModality().name
+    observe_timer.start(NATIVE_FILE_DIALOG_OBSERVE_DELAY_MS)
+    if not observation["finished_signal"]:
+        event_loop.exec()
+    observe_timer.stop()
+    watchdog.stop()
+    file_dialog.close()
+    app.processEvents()
+    file_dialog.deleteLater()
+    return observation
+
+
 def start_package_surface_smoke(evidence_path, expected_scale):
     """Exercise native package-only Qt surfaces at a requested scale factor."""
     app_error_handler.install_global_exception_handler()
@@ -867,30 +938,41 @@ def start_package_surface_smoke(evidence_path, expected_scale):
         )
         raise SystemExit("Package surface smoke could not exercise accessibility metadata.")
 
-    file_dialog = QtWidgets.QFileDialog(native_window, "Packaged native file dialog")
-    file_dialog.setFileMode(QtWidgets.QFileDialog.FileMode.ExistingFile)
-    file_dialog.setOption(QtWidgets.QFileDialog.Option.DontUseNativeDialog, False)
-    file_dialog_observation = {"visible_before_cancel": False}
-
-    def observe_and_cancel_file_dialog():
-        file_dialog_observation["visible_before_cancel"] = file_dialog.isVisible()
-        file_dialog.reject()
-
-    QtCore.QTimer.singleShot(100, observe_and_cancel_file_dialog)
-    file_dialog_result = file_dialog.exec()
-    native_file_dialog = {
-        "dont_use_native_dialog": file_dialog.testOption(
-            QtWidgets.QFileDialog.Option.DontUseNativeDialog
-        ),
-        "visible_before_cancel": file_dialog_observation["visible_before_cancel"],
-        "result": int(file_dialog_result),
-        "rejected_value": int(QtWidgets.QDialog.DialogCode.Rejected),
-    }
+    try:
+        native_file_dialog = _native_file_dialog_observation(app, native_window)
+    except Exception as error:
+        native_file_dialog = {
+            "dont_use_native_dialog": False,
+            "window_modality": None,
+            "visible_before_cancel": False,
+            "cancel_requested": False,
+            "finished_signal": False,
+            "rejected_signal": False,
+            "result": None,
+            "rejected_value": int(QtWidgets.QDialog.DialogCode.Rejected),
+            "timed_out": False,
+            "timeout_ms": NATIVE_FILE_DIALOG_TIMEOUT_MS,
+            "error_type": type(error).__name__,
+            "error_message": bounded_error_message(error),
+        }
     if (
         native_file_dialog["dont_use_native_dialog"] is not False
+        or native_file_dialog["window_modality"] != "WindowModal"
         or native_file_dialog["visible_before_cancel"] is not True
+        or native_file_dialog["cancel_requested"] is not True
+        or native_file_dialog["finished_signal"] is not True
+        or native_file_dialog["rejected_signal"] is not True
         or native_file_dialog["result"] != native_file_dialog["rejected_value"]
+        or native_file_dialog["timed_out"] is not False
+        or native_file_dialog["timeout_ms"] != NATIVE_FILE_DIALOG_TIMEOUT_MS
     ):
+        _persist_package_surface_failure(
+            evidence_path,
+            expected_scale,
+            platform_name,
+            "native-file-dialog",
+            native_file_dialog,
+        )
         raise SystemExit("Package surface smoke could not exercise the native file dialog.")
 
     dialog = QtWidgets.QMessageBox(

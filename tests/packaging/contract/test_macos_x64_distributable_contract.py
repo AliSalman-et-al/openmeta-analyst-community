@@ -379,6 +379,14 @@ def test_macos_surface_smoke_exercises_native_acceptance_surfaces():
     assert '"native_file_dialog": native_file_dialog' in launch
     assert '"accessibility": accessibility' in launch
     assert "DontUseNativeDialog" in launch
+    assert "NATIVE_FILE_DIALOG_TIMEOUT_MS = 10_000" in launch
+    assert "setWindowModality(QtCore.Qt.WindowModality.WindowModal)" in launch
+    assert "file_dialog.open()" in launch
+    assert 'file_dialog.windowModality().name' in launch
+    assert '"window_modality": "window-modal"' not in launch
+    assert "event_loop.exec()" in launch
+    assert "file_dialog.exec()" not in launch
+    assert '"native-file-dialog"' in launch
     assert "isNativeMenuBar" in launch
     assert "accessible_control.setFocus()" in launch
     assert "accessible_control.setFocus(QtCore.Qt.FocusReason" not in launch
@@ -1247,7 +1255,18 @@ def test_macos_surface_evidence_rejects_observation_mutations():
     base = {
         "platform_plugin": "cocoa", "clipboard": True, "critical_dialog": True,
         "binary_resources": True, "native_menu": {"is_native": True, "menu_count": 1, "action_count": 1},
-        "native_file_dialog": {"dont_use_native_dialog": False, "visible_before_cancel": True, "result": 0, "rejected_value": 0},
+        "native_file_dialog": {
+            "dont_use_native_dialog": False,
+            "window_modality": "WindowModal",
+            "visible_before_cancel": True,
+            "cancel_requested": True,
+            "finished_signal": True,
+            "rejected_signal": True,
+            "result": 0,
+            "rejected_value": 0,
+            "timed_out": False,
+            "timeout_ms": 10_000,
+        },
         "accessibility": {
             "focus_before": "packagedAccessibilityControl",
             "focus_after_tab": "packagedKeyboardTraversalTarget",
@@ -1280,7 +1299,24 @@ def test_macos_surface_evidence_rejects_observation_mutations():
     inspector.validate_macos_surface_records(records)
     mutations = [
         ("native_menu", {"is_native": False, "menu_count": 1, "action_count": 1}),
-        ("native_file_dialog", {"dont_use_native_dialog": False, "visible_before_cancel": False, "result": 0, "rejected_value": 0}),
+        ("native_file_dialog", {
+            "dont_use_native_dialog": False,
+            "window_modality": "WindowModal",
+            "visible_before_cancel": True,
+            "cancel_requested": True,
+            "finished_signal": False,
+            "rejected_signal": False,
+            "result": None,
+            "rejected_value": 0,
+            "timed_out": True,
+            "timeout_ms": 10_000,
+            "error_type": "TimeoutError",
+            "error_message": "native file dialog exceeded its internal bound",
+        }),
+        ("native_file_dialog", {
+            **base["native_file_dialog"],
+            "window_modality": "ApplicationModal",
+        }),
         ("accessibility", {
             "focus_before": "packagedAccessibilityControl",
             "focus_after_tab": "packagedKeyboardTraversalTarget",

@@ -969,8 +969,14 @@ def validate_macos_surface_records(scales: object) -> None:
             and int(menu.get("menu_count", 0)) >= 1
             and int(menu.get("action_count", 0)) >= 1
             and file_dialog.get("dont_use_native_dialog") is False
+            and file_dialog.get("window_modality") == "WindowModal"
             and file_dialog.get("visible_before_cancel") is True
+            and file_dialog.get("cancel_requested") is True
+            and file_dialog.get("finished_signal") is True
+            and file_dialog.get("rejected_signal") is True
             and file_dialog.get("result") == file_dialog.get("rejected_value") == 0
+            and file_dialog.get("timed_out") is False
+            and file_dialog.get("timeout_ms") == 10_000
             and accessibility.get("focus_before") == "packagedAccessibilityControl"
             and accessibility.get("focus_after_tab") == "packagedKeyboardTraversalTarget"
             and accessibility.get("accessible_name") == "Packaged accessibility control"
