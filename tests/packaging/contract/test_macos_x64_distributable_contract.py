@@ -300,9 +300,9 @@ done
         "0:lib/libR.dylib",
         "0:lib/libgfortran.5.dylib",
         "2:",
+        "1:",
         "2:",
-        "2:",
-        "2:",
+        "1:",
         "2:",
         "1:",
     ]
