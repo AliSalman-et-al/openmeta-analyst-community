@@ -179,9 +179,13 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
         "612bb00cb4c627721d6d80b0f5224227c0fcdefb4a5b6c917511480361c16571",
         "/Library/Frameworks/R.framework/Versions/4.6-x86_64",
         'resolved_source="$(cd "$source_version_root" && pwd -P)"',
-        'require_x64 "$stage/Versions/4.6/R"',
+        '[ ! -L "$resources/lib/libR.dylib" ]',
+        'require_x64 "$resources/lib/libR.dylib"',
+        'readlink "$stage/Versions/4.6/R"',
+        '"Resources/lib/libR.dylib"',
+        'readlink "$resources/R"',
+        '"bin/R"',
         'require_x64 "$resources/bin/exec/R"',
-        'readlink "$resources/lib/libR.dylib"',
         'otool -L "$resources/bin/R"',
         "profile_macos_embedded_r_runtime.py",
         "scripts/install-rcmetar-source.R",
@@ -197,6 +201,7 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     assert "r_integration_kit.py" not in spike
     assert "relocate_macos_r_kit.py" not in spike
     assert "normalize_macos_macho.py" not in spike
+    assert 'readlink "$resources/lib/libR.dylib"' not in spike
 
     inspector = load_inspector()
     app = tmp_path / "RCMetaStudio.app"
@@ -1181,6 +1186,74 @@ def test_archive_inspection_enforces_canonical_r_framework_symlinks_and_members(
             )
         return records
 
+    kit_records = make_records()
+    direct_records = [
+        record
+        for record in kit_records
+        if record["path"]
+        not in {f"{version_root}/R", f"{resources}/lib/libR.dylib", f"{framework}/R"}
+    ]
+    direct_records.extend(
+        [
+            {
+                "path": f"{resources}/lib/libR.dylib",
+                "kind": "file",
+                "size": 4,
+                "mode": 0o755,
+                "sha256": hashlib.sha256(b"libR").hexdigest(),
+                "architectures": ["x86_64"],
+            },
+            {
+                "path": f"{resources}/bin/R",
+                "kind": "file",
+                "size": 6,
+                "mode": 0o755,
+                "sha256": hashlib.sha256(b"script").hexdigest(),
+            },
+            {
+                "path": f"{version_root}/R",
+                "kind": "symlink",
+                "size": len("Resources/lib/libR.dylib"),
+                "mode": 0o777,
+                "link_target": "Resources/lib/libR.dylib",
+                "resolved_path": f"{resources}/lib/libR.dylib",
+            },
+            {
+                "path": f"{resources}/R",
+                "kind": "symlink",
+                "size": len("bin/R"),
+                "mode": 0o777,
+                "link_target": "bin/R",
+                "resolved_path": f"{resources}/bin/R",
+            },
+            {
+                "path": f"{framework}/R",
+                "kind": "symlink",
+                "size": len("Versions/Current/R"),
+                "mode": 0o777,
+                "link_target": "Versions/Current/R",
+                "resolved_path": f"{resources}/lib/libR.dylib",
+            },
+        ]
+    )
+    inspector.validate_r_framework_inventory(
+        direct_records, delivery_kind="direct-spike", architecture="x86_64"
+    )
+    with pytest.raises(
+        inspector.MacOSDeploymentInspectionError,
+        match="missing its concrete versioned member",
+    ):
+        inspector.validate_r_framework_inventory(
+            direct_records, delivery_kind="integration-kit", architecture="x86_64"
+        )
+    with pytest.raises(
+        inspector.MacOSDeploymentInspectionError,
+        match="missing its concrete versioned member",
+    ):
+        inspector.validate_r_framework_inventory(
+            kit_records, delivery_kind="direct-spike", architecture="x86_64"
+        )
+
     def write_fixture(name: str, records: list[dict]):
         archive = tmp_path / f"{name}.zip"
         manifest = tmp_path / f"{name}-deployment.json"
@@ -1201,6 +1274,7 @@ def test_archive_inspection_enforces_canonical_r_framework_symlinks_and_members(
             json.dumps(
                 {
                     "target": "macos-x64",
+                    "r_integration_kit": {"kit_sha256": "a" * 64},
                     "signing_inventory": {
                         "path": "qualification/ad-hoc-signing-inventory.json",
                         "sha256": hashlib.sha256(signing.read_bytes()).hexdigest(),

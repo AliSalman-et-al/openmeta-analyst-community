@@ -753,8 +753,12 @@ def validate_signing_inventory(
     return typed_inventory
 
 
-def validate_r_framework_inventory(records: object) -> None:
+def validate_r_framework_inventory(
+    records: object, *, delivery_kind: str, architecture: str
+) -> None:
     """Require the canonical, concrete R framework payload and alias topology."""
+    if delivery_kind not in {"integration-kit", "direct-spike"}:
+        raise MacOSDeploymentInspectionError("R framework delivery kind is invalid")
     if not isinstance(records, list) or not all(
         isinstance(item, dict) for item in records
     ):
@@ -776,22 +780,27 @@ def validate_r_framework_inventory(records: object) -> None:
         f"{resources}/bin/Rscript",
         f"{resources}/library/RCMetaR/DESCRIPTION",
         f"{resources}/Info.plist",
-        f"{version_root}/R",
     }
+    native_path = (
+        f"{resources}/lib/libR.dylib"
+        if delivery_kind == "direct-spike"
+        else f"{version_root}/R"
+    )
+    required_files.add(native_path)
     for path in required_files:
         if by_path.get(path, {}).get("kind") != "file":
             raise MacOSDeploymentInspectionError(
                 f"R framework is missing its concrete versioned member: {path}"
             )
-    r_executable = by_path[f"{version_root}/R"]
+    r_executable = by_path[native_path]
     if (
-        "architectures" not in r_executable
+        r_executable.get("architectures") != [architecture]
         or not int(r_executable.get("mode", 0)) & 0o111
     ):
         raise MacOSDeploymentInspectionError(
             "R framework native executable target is not in the Mach-O inventory"
         )
-    expected_links = {
+    expected_links: dict[str, tuple[str, str]] = {
         f"{framework}/Versions/Current": (
             framework_version,
             version_root,
@@ -800,15 +809,33 @@ def validate_r_framework_inventory(records: object) -> None:
             "Versions/Current/Resources",
             resources,
         ),
-        f"{resources}/lib/libR.dylib": (
-            "../../R",
-            f"{version_root}/R",
-        ),
-        f"{framework}/R": (
+    }
+    if delivery_kind == "direct-spike":
+        expected_links.update(
+            {
+                f"{framework}/R": (
+                    "Versions/Current/R",
+                    f"{resources}/lib/libR.dylib",
+                ),
+                f"{version_root}/R": (
+                    "Resources/lib/libR.dylib",
+                    f"{resources}/lib/libR.dylib",
+                ),
+                f"{resources}/R": (
+                    "bin/R",
+                    f"{resources}/bin/R",
+                ),
+            }
+        )
+    else:
+        expected_links[f"{framework}/R"] = (
             "Versions/Current/R",
             f"{version_root}/R",
-        ),
-    }
+        )
+        expected_links[f"{resources}/lib/libR.dylib"] = (
+            "../../R",
+            f"{version_root}/R",
+        )
     for path, (target, resolved) in expected_links.items():
         record = by_path.get(path, {})
         if (
@@ -899,6 +926,18 @@ def inspect_deployment(
             f"Info.plist is not the qualified macOS {minimum_macos} bundle contract"
         )
     _validate_runtime_probe(runtime_probe, app_root, architecture=architecture)
+    r_delivery_identity = validate_r_delivery_identity(
+        app_root,
+        runtime_probe,
+        target=target,
+        architecture=architecture,
+        source_commit=source_commit,
+    )
+    r_delivery_kind = (
+        "direct-spike"
+        if "direct_r_build" in r_delivery_identity
+        else "integration-kit"
+    )
 
     records: list[dict] = []
     folded: dict[str, str] = {}
@@ -972,7 +1011,9 @@ def inspect_deployment(
                 )
 
     lowered_paths = [record["path"].lower() for record in records]
-    validate_r_framework_inventory(records)
+    validate_r_framework_inventory(
+        records, delivery_kind=r_delivery_kind, architecture=architecture
+    )
     validate_rpy2_api_payload(records)
     if any(
         any(
@@ -1059,14 +1100,6 @@ def inspect_deployment(
         native_paths={record["path"] for record in native_records},
         app_root=app_root,
     )
-    r_delivery_identity = validate_r_delivery_identity(
-        app_root,
-        runtime_probe,
-        target=target,
-        architecture=architecture,
-        source_commit=source_commit,
-    )
-
     records.sort(key=lambda item: item["path"])
     return {
         "schema_version": 1,
@@ -1289,7 +1322,19 @@ def inspect_archive(
                     "deployment manifest does not authenticate the signing inventory"
                 )
             if deployment.get("target") in TARGET_CONTRACTS:
-                validate_r_framework_inventory(records)
+                has_kit_identity = isinstance(deployment.get("r_integration_kit"), dict)
+                has_direct_identity = isinstance(deployment.get("direct_r_build"), dict)
+                if has_kit_identity == has_direct_identity:
+                    raise MacOSDeploymentInspectionError(
+                        "deployment manifest must name exactly one R delivery identity"
+                    )
+                validate_r_framework_inventory(
+                    records,
+                    delivery_kind=(
+                        "direct-spike" if has_direct_identity else "integration-kit"
+                    ),
+                    architecture=TARGET_CONTRACTS[target]["architecture"],
+                )
             for relative in signing["nested_bundles"]:
                 bundle_prefix = (
                     prefix + "RCMetaStudio.app/" + relative.rstrip("/") + "/"

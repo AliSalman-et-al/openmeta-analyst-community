@@ -46,9 +46,14 @@ ditto "$source_version_root" "$stage/Versions/4.6"
 ln -s "4.6" "$stage/Versions/Current"
 ln -s "Versions/Current/Resources" "$stage/Resources"
 ln -s "Versions/Current/R" "$stage/R"
-[ "$(readlink "$resources/lib/libR.dylib")" = "../../R" ] \
-  || fail "target-native libR alias is not canonical"
-require_x64 "$stage/Versions/4.6/R"
+[ -f "$resources/lib/libR.dylib" ] && [ ! -L "$resources/lib/libR.dylib" ] \
+  || fail "target-native libR must be the official framework Mach-O"
+require_x64 "$resources/lib/libR.dylib"
+[ -L "$stage/Versions/4.6/R" ] \
+  && [ "$(readlink "$stage/Versions/4.6/R")" = "Resources/lib/libR.dylib" ] \
+  || fail "target-native version R symlink is not canonical"
+[ -L "$resources/R" ] && [ "$(readlink "$resources/R")" = "bin/R" ] \
+  || fail "target-native Resources/R symlink is not canonical"
 require_x64 "$resources/bin/exec/R"
 if otool -L "$resources/bin/R" >/dev/null 2>&1; then
   fail "target-native Resources/bin/R must be the official script launcher"
