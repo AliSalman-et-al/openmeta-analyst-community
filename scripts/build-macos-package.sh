@@ -382,13 +382,16 @@ r_source_relative() {
     /Library/Frameworks/R.framework/R|/Library/Frameworks/R.framework/Versions/*/R)
       printf '%s\n' "lib/libR.dylib"
       ;;
-    /opt/R/*/lib/*.dylib)
+    /opt/R/*/lib/*.dylib|/opt/X11/lib/*.dylib)
       printf 'lib/%s\n' "${source_path##*/}"
       ;;
     /Library/Frameworks/R.framework/*)
       return 2
       ;;
     /opt/R/*)
+      return 2
+      ;;
+    /opt/X11/*)
       return 2
       ;;
     *)
@@ -423,7 +426,7 @@ for directory, _, filenames in os.walk(root):
 PY
 }
 
-bundle_external_r_toolchain_dylibs() {
+bundle_external_r_runtime_dylibs() {
   local macho_manifest="$1"
   local binary dependency source_relative target pass copied mapping_status
   for pass in $(seq 1 16); do
@@ -431,30 +434,30 @@ bundle_external_r_toolchain_dylibs() {
     while IFS= read -r -d '' binary; do
       while IFS= read -r dependency; do
         case "$dependency" in
-          /opt/R/*/lib/*.dylib)
+          /opt/R/*/lib/*.dylib|/opt/X11/lib/*.dylib)
             if ! source_relative="$(r_source_relative "$dependency")"; then
-              echo "Cannot map external R toolchain dependency: $dependency" >&2
+              echo "Cannot map external R runtime dependency: $dependency" >&2
               exit 1
             fi
             target="$r_home/$source_relative"
             if [ -e "$target" ]; then
               if ! cmp -s "$dependency" "$target"; then
-                echo "External R toolchain dependency collides in bundle: $dependency" >&2
+                echo "External R runtime dependency collides in bundle: $dependency" >&2
                 exit 1
               fi
               continue
             fi
             if [ ! -f "$dependency" ]; then
-              echo "External R toolchain dependency is missing: $dependency" >&2
+              echo "External R runtime dependency is missing: $dependency" >&2
               exit 1
             fi
             mkdir -p "$(dirname "$target")"
             cp -p "$dependency" "$target"
             copied=1
             ;;
-          /opt/R/*)
+          /opt/R/*|/opt/X11/*)
             mapping_status=2
-            echo "Unsupported external R toolchain dependency: $dependency" >&2
+            echo "Unsupported external R runtime dependency: $dependency" >&2
             exit "$mapping_status"
             ;;
         esac
@@ -465,7 +468,7 @@ bundle_external_r_toolchain_dylibs() {
     fi
     write_bundled_r_macho_manifest "$macho_manifest"
   done
-  echo "External R toolchain dependency closure exceeded 16 passes." >&2
+  echo "External R runtime dependency closure exceeded 16 passes." >&2
   exit 1
 }
 
@@ -475,7 +478,7 @@ relocate_bundled_r_runtime() {
   local macho_manifest="$work_root/bundled-r-mach-o-files.list"
 
   write_bundled_r_macho_manifest "$macho_manifest"
-  bundle_external_r_toolchain_dylibs "$macho_manifest"
+  bundle_external_r_runtime_dylibs "$macho_manifest"
 
   "$python_exe" "$repo_root/scripts/normalize_macos_macho.py" \
     --manifest "$macho_manifest" --architecture x86_64
@@ -533,7 +536,8 @@ PY
   done < "$macho_manifest")"
   if printf '%s\n' "$dependency_report" | grep -F "$r_runtime_root/" \
     || printf '%s\n' "$dependency_report" | grep -F '/Library/Frameworks/R.framework/' \
-    || printf '%s\n' "$dependency_report" | grep -F '/opt/R/'; then
+    || printf '%s\n' "$dependency_report" | grep -F '/opt/R/' \
+    || printf '%s\n' "$dependency_report" | grep -F '/opt/X11/'; then
     echo "Bundled R runtime retains an absolute source-framework dependency." >&2
     exit 1
   fi

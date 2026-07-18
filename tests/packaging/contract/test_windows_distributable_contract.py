@@ -668,8 +668,8 @@ def test_macos_packager_relocates_every_bundled_r_macho_before_use():
     script = sh_contract("scripts", "build-macos-package.sh")["text"]
 
     assert 'local macho_manifest="$work_root/bundled-r-mach-o-files.list"' in script
-    assert "bundle_external_r_toolchain_dylibs" in script
-    assert "/opt/R/*/lib/*.dylib)" in script
+    assert "bundle_external_r_runtime_dylibs" in script
+    assert "/opt/R/*/lib/*.dylib|/opt/X11/lib/*.dylib)" in script
     assert 'cp -p "$dependency" "$target"' in script
     assert "from rc_metastudio.qt6_macos_feasibility import is_macho_candidate" in script
     assert "MACH_O_MAGICS" not in script

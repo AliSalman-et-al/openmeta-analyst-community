@@ -268,7 +268,9 @@ def test_r_relocation_maps_versioned_and_canonical_framework_load_commands():
         "/Library/Frameworks/R.framework/R",
         "/Library/Frameworks/R.framework/Versions/4.6/R",
         "/opt/R/x86_64/lib/libtcl8.6.dylib",
+        "/opt/X11/lib/libX11.6.dylib",
         "/opt/R/x86_64/include/unsupported.h",
+        "/opt/X11/include/unsupported.h",
         "/Library/Frameworks/R.framework/PrivateHeaders/unsupported.h",
         "/usr/lib/libSystem.B.dylib",
     ]
@@ -296,24 +298,27 @@ done
         "0:lib/libR.dylib",
         "0:lib/libR.dylib",
         "0:lib/libtcl8.6.dylib",
+        "0:lib/libX11.6.dylib",
+        "2:",
         "2:",
         "2:",
         "1:",
     ]
 
 
-def test_macos_packager_bundles_external_r_toolchain_dylib_closure():
+def test_macos_packager_bundles_external_r_runtime_dylib_closure():
     build = text("scripts/build-macos-package.sh")
 
-    assert "bundle_external_r_toolchain_dylibs()" in build
+    assert "bundle_external_r_runtime_dylibs()" in build
     assert 'case "$dependency" in' in build
-    assert "/opt/R/*/lib/*.dylib)" in build
+    assert "/opt/R/*/lib/*.dylib|/opt/X11/lib/*.dylib)" in build
     assert 'target="$r_home/$source_relative"' in build
     assert 'cp -p "$dependency" "$target"' in build
     assert 'write_bundled_r_macho_manifest "$macho_manifest"' in build
-    assert "External R toolchain dependency closure exceeded 16 passes" in build
+    assert "External R runtime dependency closure exceeded 16 passes" in build
     assert "normalize_macos_macho.py" in build
     assert "grep -F '/opt/R/'" in build
+    assert "grep -F '/opt/X11/'" in build
 
 
 def test_r_macho_normalizer_thins_universal_and_rejects_unusable_slices(
