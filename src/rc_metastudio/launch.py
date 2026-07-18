@@ -32,7 +32,10 @@ import app_error_handler
 import settings
 import adaptive_window
 import qt6_resources
-from rc_metastudio.cocoa_accessibility import find_accessibility_element
+from rc_metastudio.cocoa_accessibility import (
+    bounded_error_message,
+    find_accessibility_element,
+)
 from rc_metastudio.result_text_identity import normalize_heterogeneity_header
 
 SPLASH_DISPLAY_TIME = 0  # Keep startup smoke tests fast; packaged builds may override.
@@ -559,7 +562,8 @@ def _native_accessibility_observation(widget):
     if sys.platform != "darwin":
         return {
             "role": "qt-focusable-control",
-            "label": widget.accessibleName(),
+            "title": widget.accessibleName(),
+            "description": widget.accessibleDescription(),
             "is_element": widget.focusPolicy()
             != QtCore.Qt.FocusPolicy.NoFocus,
         }
@@ -569,6 +573,8 @@ def _native_accessibility_observation(widget):
     objc = ctypes.CDLL("/usr/lib/libobjc.A.dylib")
     objc.sel_registerName.argtypes = [ctypes.c_char_p]
     objc.sel_registerName.restype = ctypes.c_void_p
+    objc.objc_getClass.argtypes = [ctypes.c_char_p]
+    objc.objc_getClass.restype = ctypes.c_void_p
     message = objc.objc_msgSend
 
     def selector(name):
@@ -578,6 +584,30 @@ def _native_accessibility_observation(widget):
         message.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
         message.restype = ctypes.c_void_p
         return message(ctypes.c_void_p(receiver), selector(name))
+
+    def object_message_with_object(receiver, name, value):
+        message.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+        message.restype = ctypes.c_void_p
+        return message(
+            ctypes.c_void_p(receiver),
+            selector(name),
+            ctypes.c_void_p(value),
+        )
+
+    def ns_string(value):
+        string_class = objc.objc_getClass(b"NSString")
+        if not string_class:
+            raise RuntimeError("Cocoa NSString class is unavailable")
+        message.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_char_p]
+        message.restype = ctypes.c_void_p
+        result = message(
+            ctypes.c_void_p(string_class),
+            selector("stringWithUTF8String:"),
+            value.encode("utf-8"),
+        )
+        if not result:
+            raise RuntimeError("Cocoa NSString construction failed")
+        return int(result)
 
     def responds(receiver, name):
         message.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
@@ -606,10 +636,7 @@ def _native_accessibility_observation(widget):
         message.restype = ctypes.c_bool
         return bool(message(ctypes.c_void_p(receiver), selector(name)))
 
-    def array_children(receiver):
-        if not responds(receiver, "accessibilityChildren"):
-            return []
-        array = object_message(receiver, "accessibilityChildren")
+    def array_values(array):
         if not array:
             return []
         message.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
@@ -626,27 +653,70 @@ def _native_accessibility_observation(widget):
                 values.append(int(value))
         return values
 
+    def modern_children(receiver):
+        if not responds(receiver, "accessibilityChildren"):
+            return []
+        return array_values(object_message(receiver, "accessibilityChildren"))
+
+    def qnsview_children(receiver):
+        legacy_selector = "accessibilityAttributeValue:"
+        if not responds(receiver, legacy_selector):
+            return [], False
+        # Qt 6's QNSView activates the Qt accessibility tree only through its
+        # legacy AXChildren attribute handler. Calling accessibilityChildren on
+        # the backing view bypasses that activation path.
+        children_attribute = ns_string("AXChildren")
+        children = object_message_with_object(
+            receiver,
+            legacy_selector,
+            children_attribute,
+        )
+        return array_values(children), True
+
     def observe(receiver):
         return {
             "role": text_message(receiver, "accessibilityRole"),
-            "label": text_message(receiver, "accessibilityLabel")
-            or text_message(receiver, "accessibilityTitle"),
+            "title": text_message(receiver, "accessibilityTitle"),
+            "description": text_message(receiver, "accessibilityLabel"),
             "is_element": bool_message(receiver, "isAccessibilityElement"),
         }
 
     native_view = int(widget.winId())
-    window = object_message(native_view, "window")
-    roots = [native_view]
-    if window:
-        roots.append(int(window))
-        content_view = object_message(int(window), "contentView")
-        if content_view:
-            roots.append(int(content_view))
-    return find_accessibility_element(
+    roots, bridge_supported = qnsview_children(native_view)
+    observation = find_accessibility_element(
         roots,
-        expected_label=widget.accessibleName(),
+        expected_role="AXButton",
+        expected_title=widget.accessibleName(),
+        expected_description=widget.accessibleDescription(),
         observe=observe,
-        children=array_children,
+        children=modern_children,
+    )
+    return {
+        **observation,
+        "bridge": "accessibilityAttributeValue:AXChildren",
+        "bridge_supported": bridge_supported,
+        "root_count": len(roots),
+    }
+
+
+def _persist_package_surface_failure(
+    evidence_path, expected_scale, platform_name, stage, diagnostics
+):
+    """Persist bounded probe state before failing without creating pass evidence."""
+    path = Path(evidence_path)
+    evidence = json.loads(path.read_text(encoding="utf-8"))
+    failure = {
+        "requested": expected_scale,
+        "platform_plugin": platform_name,
+        "stage": stage,
+        "diagnostics": diagnostics,
+    }
+    evidence.setdefault("failures", []).append(failure)
+    path.write_text(
+        json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    _write_automation_smoke_log(
+        "packaged-surface:failed:" + json.dumps(failure, sort_keys=True)
     )
 
 
@@ -733,15 +803,32 @@ def start_package_surface_smoke(evidence_path, expected_scale):
         )
     app.processEvents()
     focus_after = app.focusWidget()
+    try:
+        native_accessibility = (
+            _native_accessibility_observation(accessible_control)
+            if sys.platform == "darwin" else {}
+        )
+    except Exception as error:
+        native_accessibility = {
+            "role": "",
+            "title": "",
+            "description": "",
+            "is_element": False,
+            "source": "accessibility-tree",
+            "bridge": "accessibilityAttributeValue:AXChildren",
+            "bridge_supported": False,
+            "root_count": 0,
+            "visited_nodes": 0,
+            "observed_states": {},
+            "error_type": type(error).__name__,
+            "error_message": bounded_error_message(error),
+        }
     accessibility = {
         "focus_before": focus_before.objectName() if focus_before else None,
         "focus_after_tab": focus_after.objectName() if focus_after else None,
         "accessible_name": accessible_control.accessibleName(),
         "accessible_description": accessible_control.accessibleDescription(),
-        "native": (
-            _native_accessibility_observation(accessible_control)
-            if sys.platform == "darwin" else {}
-        ),
+        "native": native_accessibility,
     }
     if (
         accessibility["accessible_name"] != "Packaged accessibility control"
@@ -753,14 +840,27 @@ def start_package_surface_smoke(evidence_path, expected_scale):
                 accessibility["focus_before"] != "packagedAccessibilityControl"
                 or accessibility["focus_after_tab"]
                 != "packagedKeyboardTraversalTarget"
-                or not accessibility["native"].get("role")
-                or accessibility["native"].get("label")
+                or accessibility["native"].get("role") != "AXButton"
+                or accessibility["native"].get("title")
                 != "Packaged accessibility control"
+                or accessibility["native"].get("description")
+                != "Verifies packaged Qt accessibility metadata."
                 or accessibility["native"].get("is_element") is not True
                 or accessibility["native"].get("source") != "accessibility-tree"
+                or accessibility["native"].get("bridge")
+                != "accessibilityAttributeValue:AXChildren"
+                or accessibility["native"].get("bridge_supported") is not True
+                or int(accessibility["native"].get("root_count", 0)) < 1
             )
         )
     ):
+        _persist_package_surface_failure(
+            evidence_path,
+            expected_scale,
+            platform_name,
+            "accessibility",
+            accessibility,
+        )
         raise SystemExit("Package surface smoke could not exercise accessibility metadata.")
 
     file_dialog = QtWidgets.QFileDialog(native_window, "Packaged native file dialog")

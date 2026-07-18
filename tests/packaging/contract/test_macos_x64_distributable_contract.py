@@ -383,6 +383,17 @@ def test_macos_surface_smoke_exercises_native_acceptance_surfaces():
     assert "accessible_control.setFocus()" in launch
     assert "accessible_control.setFocus(QtCore.Qt.FocusReason" not in launch
     assert 'if sys.platform == "darwin" else {}' in launch
+    assert 'legacy_selector = "accessibilityAttributeValue:"' in launch
+    assert 'children_attribute = ns_string("AXChildren")' in launch
+    assert "roots, bridge_supported = qnsview_children(native_view)" in launch
+    assert '"title": text_message(receiver, "accessibilityTitle")' in launch
+    assert '"description": text_message(receiver, "accessibilityLabel")' in launch
+    assert 'expected_role="AXButton"' in launch
+    assert 'get("role") != "AXButton"' in launch
+    assert 'roots = [native_view]' not in launch
+    assert "_persist_package_surface_failure(" in launch
+    assert '"packaged-surface:failed:"' in launch
+    assert '"error_message": bounded_error_message(error)' in launch
 
 
 def test_frozen_runtime_discovers_r_in_macos_framework(monkeypatch, tmp_path):
@@ -855,6 +866,17 @@ def test_smoke_finalizer_requires_the_post_close_marker(tmp_path):
     with pytest.raises(inspector.MacOSDeploymentInspectionError, match="post-close"):
         inspector.finalize_smoke_evidence(evidence, log)
 
+    evidence.write_text(
+        json.dumps({"passed": True, "failures": [{"stage": "accessibility"}]}),
+        encoding="utf-8",
+    )
+    log.write_text("packaged-workflow:post-close\n", encoding="utf-8")
+    with pytest.raises(
+        inspector.MacOSDeploymentInspectionError,
+        match="failed native observations",
+    ):
+        inspector.finalize_smoke_evidence(evidence, log)
+
 
 def test_smoke_finalizer_authenticates_launchservices_completion(tmp_path):
     inspector = load_inspector()
@@ -1231,9 +1253,13 @@ def test_macos_surface_evidence_rejects_observation_mutations():
             "accessible_description": "Verifies packaged Qt accessibility metadata.",
             "native": {
                 "role": "AXButton",
-                "label": "Packaged accessibility control",
+                "title": "Packaged accessibility control",
+                "description": "Verifies packaged Qt accessibility metadata.",
                 "is_element": True,
                 "source": "accessibility-tree",
+                "bridge": "accessibilityAttributeValue:AXChildren",
+                "bridge_supported": True,
+                "root_count": 1,
             },
         },
         "available_styles": ["macOS"], "active_style": "macos", "tls_backends": ["cert-only"],
@@ -1266,31 +1292,74 @@ def test_macos_surface_evidence_rejects_observation_mutations():
         with pytest.raises(inspector.MacOSDeploymentInspectionError, match="surface evidence"):
             inspector.validate_macos_surface_records(mutated)
 
+    native_mutations = {
+        "role": "AXCheckBox",
+        "title": "Changed accessible name",
+        "description": "Changed accessible description",
+        "bridge": "accessibilityChildren",
+        "bridge_supported": False,
+        "root_count": 0,
+    }
+    for key, value in native_mutations.items():
+        mutated = [dict(item) for item in records]
+        accessibility = dict(mutated[0]["accessibility"])
+        native = dict(accessibility["native"])
+        native[key] = value
+        accessibility["native"] = native
+        mutated[0]["accessibility"] = accessibility
+        with pytest.raises(
+            inspector.MacOSDeploymentInspectionError,
+            match="surface evidence",
+        ):
+            inspector.validate_macos_surface_records(mutated)
+
 
 def test_cocoa_accessibility_finds_exact_exposed_descendant_fail_closed():
-    from rc_metastudio.cocoa_accessibility import find_accessibility_element
+    from rc_metastudio.cocoa_accessibility import (
+        bounded_error_message,
+        find_accessibility_element,
+    )
 
     tree = {1: [2], 2: [3], 3: [1]}
     observations = {
-        1: {"role": "", "label": "", "is_element": False},
-        2: {"role": "AXButton", "label": "Other", "is_element": True},
+        1: {
+            "role": "",
+            "title": "",
+            "description": "",
+            "is_element": False,
+        },
+        2: {
+            "role": "AXCheckBox",
+            "title": "Packaged accessibility control",
+            "description": "Verifies packaged Qt accessibility metadata.",
+            "is_element": True,
+        },
         3: {
             "role": "AXButton",
-            "label": "Packaged accessibility control",
+            "title": "Packaged accessibility control",
+            "description": "Verifies packaged Qt accessibility metadata.",
             "is_element": True,
         },
     }
     observed = find_accessibility_element(
         [1],
-        expected_label="Packaged accessibility control",
+        expected_role="AXButton",
+        expected_title="Packaged accessibility control",
+        expected_description="Verifies packaged Qt accessibility metadata.",
         observe=observations.__getitem__,
         children=lambda node: tree[node],
     )
-    assert observed == {**observations[3], "source": "accessibility-tree"}
+    assert observed["title"] == "Packaged accessibility control"
+    assert observed["description"] == "Verifies packaged Qt accessibility metadata."
+    assert observed["is_element"] is True
+    assert observed["source"] == "accessibility-tree"
+    assert observed["visited_nodes"] == 3
 
     missing = find_accessibility_element(
         [1],
-        expected_label="Changed label",
+        expected_role="AXButton",
+        expected_title="Changed title",
+        expected_description="Changed description",
         observe=observations.__getitem__,
         children=lambda node: tree[node],
     )
@@ -1299,11 +1368,20 @@ def test_cocoa_accessibility_finds_exact_exposed_descendant_fail_closed():
     with pytest.raises(RuntimeError, match="exceeded its node bound"):
         find_accessibility_element(
             [1],
-            expected_label="Changed label",
+            expected_role="AXButton",
+            expected_title="Changed title",
+            expected_description="Changed description",
             observe=observations.__getitem__,
             children=lambda node: tree[node],
             max_nodes=2,
         )
+
+    diagnostic = bounded_error_message(
+        RuntimeError("AXChildren bridge unavailable\n" + "x" * 500)
+    )
+    assert diagnostic.startswith("AXChildren bridge unavailable ")
+    assert "\n" not in diagnostic
+    assert len(diagnostic) == 240
 
 
 def test_package_classifier_and_gate_cover_all_direct_macos_inputs():

@@ -770,6 +770,10 @@ def finalize_smoke_evidence(
     path: Path, log_path: Path, launchservices_marker: Path | None = None
 ) -> dict:
     evidence = json.loads(path.read_text(encoding="utf-8"))
+    if evidence.get("failures"):
+        raise MacOSDeploymentInspectionError(
+            "packaged automation contains failed native observations"
+        )
     if "packaged-workflow:post-close" not in log_path.read_text(encoding="utf-8"):
         raise MacOSDeploymentInspectionError("packaged automation did not emit its post-close marker")
     if launchservices_marker is not None:
@@ -973,9 +977,15 @@ def validate_macos_surface_records(scales: object) -> None:
             and accessibility.get("accessible_description")
                 == "Verifies packaged Qt accessibility metadata."
             and native_accessibility.get("is_element") is True
-            and bool(native_accessibility.get("role"))
-            and native_accessibility.get("label") == "Packaged accessibility control"
+            and native_accessibility.get("role") == "AXButton"
+            and native_accessibility.get("title") == "Packaged accessibility control"
+            and native_accessibility.get("description")
+                == "Verifies packaged Qt accessibility metadata."
             and native_accessibility.get("source") == "accessibility-tree"
+            and native_accessibility.get("bridge")
+                == "accessibilityAttributeValue:AXChildren"
+            and native_accessibility.get("bridge_supported") is True
+            and int(native_accessibility.get("root_count", 0)) >= 1
             and item.get("available_styles") and item.get("active_style")
             and item.get("tls_backends")
             and {"jpeg", "svg"} <= set(item.get("image_formats", []))
@@ -1041,6 +1051,7 @@ def write_qualification_evidence(
         and deployment.get("signing_inventory", {}).get("sha256")
             == sha256_file(signing_inventory)
         and smoke.get("passed") is True
+        and not smoke.get("failures")
         and all(workflows.get(key) is True for key in (
             "automation_entry_point", "representative_edit", "real_r_analysis",
             "result_text", "save_reopen", "analysis_after_reopen",
