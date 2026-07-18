@@ -4,7 +4,7 @@ set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 work="$repo/build/macos-direct-r-spike"
 stage="$work/staged/R.framework"
-resources="$stage/Versions/4.6/Resources"
+resources="$stage/Resources"
 dist="$work/dist"
 pyinstaller_work="$work/pyinstaller"
 evidence="$work/evidence"
@@ -12,7 +12,7 @@ artifact="$repo/artifacts/RCMetaStudio-macos-x64-direct-r-spike.zip"
 pkg="$work/R-4.6.1-x86_64.pkg"
 official_url="https://cloud.r-project.org/bin/macosx/big-sur-x86_64/base/R-4.6.1-x86_64.pkg"
 official_sha256="612bb00cb4c627721d6d80b0f5224227c0fcdefb4a5b6c917511480361c16571"
-source_version_root="/Library/Frameworks/R.framework/Versions/4.6-x86_64"
+installed_framework="/Library/Frameworks/R.framework"
 
 step() { printf '[direct-r-spike] %s\n' "$1"; }
 fail() { echo "Direct macOS R spike failed: $1" >&2; exit 1; }
@@ -20,6 +20,66 @@ require_x64() {
   local observed
   observed="$(lipo -archs "$1" 2>/dev/null || true)"
   [ "$observed" = "x86_64" ] || fail "$1 must be x86_64-only, found: ${observed:-non-Mach-O}"
+}
+framework_symlinks() {
+  local framework="$1"
+  find "$framework" -type l -print0 \
+    | while IFS= read -r -d '' link; do
+        printf '%s -> %s\n' "${link#"$framework"/}" "$(readlink "$link")"
+      done \
+    | LC_ALL=C sort
+}
+validate_official_framework() {
+  local framework="$1" report="$2" snapshot="$3" current version_root home raw
+  current="$(readlink "$framework/Versions/Current")"
+  case "$current" in
+    ""|/*|*/*|.|..) fail "Versions/Current has an unsafe target: $current" ;;
+  esac
+  version_root="$framework/Versions/$current"
+  home="$framework/Resources"
+  [ "$(readlink "$framework/Resources")" = "Versions/Current/Resources" ] \
+    || fail "official top-level Resources link is not canonical"
+  [ "$(readlink "$framework/R")" = "Versions/Current/R" ] \
+    || fail "official top-level R link is not canonical"
+  [ "$(readlink "$version_root/R")" = "Resources/lib/libR.dylib" ] \
+    || fail "official version R link is not canonical"
+  [ "$(readlink "$home/R")" = "bin/R" ] \
+    || fail "official Resources/R link is not canonical"
+  [ -f "$home/bin/R" ] && [ -x "$home/bin/R" ] \
+    || fail "official bin/R shell front-end is absent or not executable"
+  [ "$(head -n 1 "$home/bin/R")" = "#!/bin/sh" ] \
+    || fail "official bin/R shell front-end lacks its canonical shebang"
+  require_x64 "$home/bin/Rscript"
+  require_x64 "$home/bin/exec/R"
+  require_x64 "$home/lib/libR.dylib"
+  raw="${snapshot}.raw"
+  {
+    echo '== R identities =='
+    "$home/bin/R" RHOME
+    "$home/bin/Rscript" -e \
+      'cat(R.home(), "\n", R.version$arch, "\n", R.version.string, "\n", sep="")'
+    echo '== Mach-O load commands =='
+    otool -L "$home/bin/Rscript"
+    otool -L "$home/bin/exec/R"
+    otool -D "$home/lib/libR.dylib"
+    otool -L "$home/lib/libR.dylib"
+  } > "$raw" 2>&1
+  sed \
+    -e "s#${framework}#<FRAMEWORK>#g" \
+    -e 's#/Library/Frameworks/R.framework#<FRAMEWORK>#g' \
+    "$raw" > "$snapshot"
+  {
+    printf 'framework=%s\nVersions/Current=%s\n' "$framework" "$current"
+    file "$home/bin/R" "$home/bin/Rscript" "$home/bin/exec/R" \
+      "$home/lib/libR.dylib"
+    printf 'bin/R shebang='; head -n 1 "$home/bin/R"
+    printf 'bin/Rscript architectures='; lipo -archs "$home/bin/Rscript"
+    printf 'bin/exec/R architectures='; lipo -archs "$home/bin/exec/R"
+    printf 'libR architectures='; lipo -archs "$home/lib/libR.dylib"
+    cat "$raw"
+    framework_symlinks "$framework"
+  } > "$report"
+  rm -f "$raw"
 }
 
 [ "$(uname -s)" = Darwin ] || fail "requires macOS"
@@ -37,25 +97,26 @@ grep -q 'VZLD955F6P' <<<"$signature_report" || fail "official R package signer m
 printf '%s\n' "$signature_report" > "$evidence/official-r-signature.txt"
 sudo installer -pkg "$pkg" -target /
 
-step "Staging the canonical target-native R.framework root"
-[ -d "$source_version_root/Resources" ] || fail "official target-native framework root is absent"
-resolved_source="$(cd "$source_version_root" && pwd -P)"
-[ "$resolved_source" = "$source_version_root" ] || fail "target-native framework root must be canonical"
-mkdir -p "$stage/Versions"
-ditto "$source_version_root" "$stage/Versions/4.6"
-ln -s "4.6" "$stage/Versions/Current"
-ln -s "Versions/Current/Resources" "$stage/Resources"
-ln -s "Versions/Current/R" "$stage/R"
-[ -f "$resources/lib/libR.dylib" ] && [ ! -L "$resources/lib/libR.dylib" ] \
-  || fail "target-native libR must be the official framework Mach-O"
-require_x64 "$resources/lib/libR.dylib"
-[ -L "$stage/Versions/4.6/R" ] \
-  && [ "$(readlink "$stage/Versions/4.6/R")" = "Resources/lib/libR.dylib" ] \
-  || fail "target-native version R symlink is not canonical"
-[ -L "$resources/R" ] && [ "$(readlink "$resources/R")" = "bin/R" ] \
-  || fail "target-native Resources/R symlink is not canonical"
-require_x64 "$resources/bin/exec/R"
-require_x64 "$resources/bin/R"
+step "Inspecting and staging the complete official R.framework"
+[ -d "$installed_framework/Versions" ] \
+  || fail "official target-native framework root is absent"
+validate_official_framework \
+  "$installed_framework" "$evidence/installed-r-framework.txt" \
+  "$evidence/installed-r-identity.txt"
+framework_symlinks "$installed_framework" > "$evidence/installed-r-symlinks.txt"
+ditto "$installed_framework" "$stage"
+validate_official_framework \
+  "$stage" "$evidence/staged-r-framework.txt" \
+  "$evidence/staged-r-identity.txt"
+framework_symlinks "$stage" > "$evidence/staged-r-symlinks.txt"
+if ! diff -u "$evidence/installed-r-symlinks.txt" \
+  "$evidence/staged-r-symlinks.txt" > "$evidence/staged-r-symlinks.diff"; then
+  fail "staging changed the official R.framework symlink topology"
+fi
+if ! diff -u "$evidence/installed-r-identity.txt" \
+  "$evidence/staged-r-identity.txt" > "$evidence/staged-r-identity.diff"; then
+  fail "staging changed the official R.framework identities or load commands"
+fi
 
 export R_HOME="$resources"
 export R_LIBS="$resources/library"

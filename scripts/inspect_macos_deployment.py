@@ -767,13 +767,26 @@ def validate_r_framework_inventory(
         )
     typed_records = cast(list[dict[str, Any]], records)
     by_path = {record.get("path"): record for record in typed_records}
-    try:
-        framework_version = macos_r_framework_version(EXPECTED_VERSIONS["r"])
-    except ValueError as exc:
-        raise MacOSDeploymentInspectionError(
-            "locked R version cannot name its framework"
-        ) from exc
     framework = "Contents/Frameworks/R.framework"
+    if delivery_kind == "direct-spike":
+        current_record = by_path.get(f"{framework}/Versions/Current", {})
+        framework_version = current_record.get("link_target")
+        if (
+            not isinstance(framework_version, str)
+            or framework_version in {"", ".", ".."}
+            or "/" in framework_version
+            or "\\" in framework_version
+        ):
+            raise MacOSDeploymentInspectionError(
+                "official R framework Versions/Current target is invalid"
+            )
+    else:
+        try:
+            framework_version = macos_r_framework_version(EXPECTED_VERSIONS["r"])
+        except ValueError as exc:
+            raise MacOSDeploymentInspectionError(
+                "locked R version cannot name its framework"
+            ) from exc
     version_root = f"{framework}/Versions/{framework_version}"
     resources = f"{version_root}/Resources"
     required_files = {
@@ -782,10 +795,25 @@ def validate_r_framework_inventory(
         f"{resources}/Info.plist",
     }
     native_paths = (
-        [f"{resources}/lib/libR.dylib", f"{resources}/bin/R"]
+        [
+            f"{resources}/bin/Rscript",
+            f"{resources}/bin/exec/R",
+            f"{resources}/lib/libR.dylib",
+        ]
         if delivery_kind == "direct-spike"
         else [f"{version_root}/R"]
     )
+    if delivery_kind == "direct-spike":
+        launcher = by_path.get(f"{resources}/bin/R", {})
+        if (
+            launcher.get("kind") != "file"
+            or "architectures" in launcher
+            or not int(launcher.get("mode", 0)) & 0o111
+            or launcher.get("shebang") != "#!/bin/sh"
+        ):
+            raise MacOSDeploymentInspectionError(
+                "official R framework bin/R is not its executable shell front-end"
+            )
     required_files.update(native_paths)
     for path in required_files:
         if by_path.get(path, {}).get("kind") != "file":
@@ -990,6 +1018,17 @@ def inspect_deployment(
                     "mode": stat.S_IMODE(path.stat().st_mode),
                     "sha256": sha256_file(path),
                 }
+                direct_r_launcher = (
+                    app_root / "Contents/Frameworks/R.framework/Resources/bin/R"
+                )
+                if (
+                    r_delivery_kind == "direct-spike"
+                    and path.resolve() == direct_r_launcher.resolve()
+                ):
+                    with path.open("rb") as stream:
+                        record["shebang"] = (
+                            stream.readline(128).decode("ascii", errors="replace").rstrip()
+                        )
                 if _is_macho(path):
                     record["architectures"] = require_macho_architecture(
                         path, architecture

@@ -159,6 +159,7 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     assert "generated_form_modules" in spec
     assert 'os.environ.get("RCMS_PYINSTALLER_R_FRAMEWORK")' in spec
     assert '(direct_r_framework, "R.framework")' in spec
+    assert spec.count('(direct_r_framework, "R.framework")') == 1
     assert '"direct-r-spike.marker"' in spec
     assert '"_rinterface_cffi_api"' in spec
     assert (
@@ -177,16 +178,31 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     assert "uses: ./.github/workflows/macos-x64-direct-r-spike.yml" in manual_workflow
     for required in (
         "612bb00cb4c627721d6d80b0f5224227c0fcdefb4a5b6c917511480361c16571",
-        "/Library/Frameworks/R.framework/Versions/4.6-x86_64",
-        'resolved_source="$(cd "$source_version_root" && pwd -P)"',
-        '[ ! -L "$resources/lib/libR.dylib" ]',
-        'require_x64 "$resources/lib/libR.dylib"',
-        'readlink "$stage/Versions/4.6/R"',
+        'installed_framework="/Library/Frameworks/R.framework"',
+        'current="$(readlink "$framework/Versions/Current")"',
+        'ditto "$installed_framework" "$stage"',
+        'require_x64 "$home/bin/Rscript"',
+        'require_x64 "$home/bin/exec/R"',
+        'require_x64 "$home/lib/libR.dylib"',
+        '[ "$(head -n 1 "$home/bin/R")" = "#!/bin/sh" ]',
+        'framework_symlinks "$installed_framework"',
+        'framework_symlinks "$stage"',
+        'staged-r-symlinks.diff',
+        '"$home/bin/R" RHOME',
+        '"$home/bin/Rscript" -e',
+        "R.version$arch",
+        'otool -L "$home/bin/Rscript"',
+        'otool -L "$home/bin/exec/R"',
+        'otool -D "$home/lib/libR.dylib"',
+        'otool -L "$home/lib/libR.dylib"',
+        "installed-r-identity.txt",
+        "staged-r-identity.txt",
+        "staged-r-identity.diff",
+        "staging changed the official R.framework identities or load commands",
+        "s#/Library/Frameworks/R.framework#<FRAMEWORK>#g",
         '"Resources/lib/libR.dylib"',
-        'readlink "$resources/R"',
+        'readlink "$home/R"',
         '"bin/R"',
-        'require_x64 "$resources/bin/exec/R"',
-        'require_x64 "$resources/bin/R"',
         "--official-framework-layout",
         "profile_macos_embedded_r_runtime.py",
         "scripts/install-rcmetar-source.R",
@@ -203,6 +219,8 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     assert "relocate_macos_r_kit.py" not in spike
     assert "normalize_macos_macho.py" not in spike
     assert 'readlink "$resources/lib/libR.dylib"' not in spike
+    assert 'require_x64 "$resources/bin/R"' not in spike
+    assert 'ln -s "4.6" "$stage/Versions/Current"' not in spike
 
     inspector = load_inspector()
     app = tmp_path / "RCMetaStudio.app"
@@ -1188,56 +1206,58 @@ def test_archive_inspection_enforces_canonical_r_framework_symlinks_and_members(
         return records
 
     kit_records = make_records()
-    direct_records = [
-        record
-        for record in kit_records
-        if record["path"]
-        not in {f"{version_root}/R", f"{resources}/lib/libR.dylib", f"{framework}/R"}
-    ]
-    direct_records.extend(
-        [
+    direct_version_root = f"{framework}/Versions/4.6-x86_64"
+    direct_resources = f"{direct_version_root}/Resources"
+    direct_records = []
+    for path, payload, native in (
+        (f"{direct_resources}/bin/R", b"#!/bin/sh\n", False),
+        (f"{direct_resources}/bin/Rscript", b"rscript", True),
+        (f"{direct_resources}/bin/exec/R", b"r-exec", True),
+        (f"{direct_resources}/lib/libR.dylib", b"libR", True),
+        (f"{direct_resources}/library/RCMetaR/DESCRIPTION", b"package", False),
+        (f"{direct_resources}/Info.plist", b"plist", False),
+    ):
+        record = {
+            "path": path,
+            "kind": "file",
+            "size": len(payload),
+            "mode": 0o755 if "/bin/" in path or native else 0o644,
+            "sha256": hashlib.sha256(payload).hexdigest(),
+        }
+        if native:
+            record["architectures"] = ["x86_64"]
+        if path.endswith("/bin/R"):
+            record["shebang"] = "#!/bin/sh"
+        direct_records.append(record)
+    for path, target, resolved in (
+        (f"{framework}/Versions/Current", "4.6-x86_64", direct_version_root),
+        (
+            f"{framework}/Resources",
+            "Versions/Current/Resources",
+            direct_resources,
+        ),
+        (
+            f"{framework}/R",
+            "Versions/Current/R",
+            f"{direct_resources}/lib/libR.dylib",
+        ),
+        (
+            f"{direct_version_root}/R",
+            "Resources/lib/libR.dylib",
+            f"{direct_resources}/lib/libR.dylib",
+        ),
+        (f"{direct_resources}/R", "bin/R", f"{direct_resources}/bin/R"),
+    ):
+        direct_records.append(
             {
-                "path": f"{resources}/lib/libR.dylib",
-                "kind": "file",
-                "size": 4,
-                "mode": 0o755,
-                "sha256": hashlib.sha256(b"libR").hexdigest(),
-                "architectures": ["x86_64"],
-            },
-            {
-                "path": f"{resources}/bin/R",
-                "kind": "file",
-                "size": 6,
-                "mode": 0o755,
-                "sha256": hashlib.sha256(b"script").hexdigest(),
-                "architectures": ["x86_64"],
-            },
-            {
-                "path": f"{version_root}/R",
+                "path": path,
                 "kind": "symlink",
-                "size": len("Resources/lib/libR.dylib"),
+                "size": len(target),
                 "mode": 0o777,
-                "link_target": "Resources/lib/libR.dylib",
-                "resolved_path": f"{resources}/lib/libR.dylib",
-            },
-            {
-                "path": f"{resources}/R",
-                "kind": "symlink",
-                "size": len("bin/R"),
-                "mode": 0o777,
-                "link_target": "bin/R",
-                "resolved_path": f"{resources}/bin/R",
-            },
-            {
-                "path": f"{framework}/R",
-                "kind": "symlink",
-                "size": len("Versions/Current/R"),
-                "mode": 0o777,
-                "link_target": "Versions/Current/R",
-                "resolved_path": f"{resources}/lib/libR.dylib",
-            },
-        ]
-    )
+                "link_target": target,
+                "resolved_path": resolved,
+            }
+        )
     inspector.validate_r_framework_inventory(
         direct_records, delivery_kind="direct-spike", architecture="x86_64"
     )
@@ -1250,7 +1270,7 @@ def test_archive_inspection_enforces_canonical_r_framework_symlinks_and_members(
         )
     with pytest.raises(
         inspector.MacOSDeploymentInspectionError,
-        match="missing its concrete versioned member",
+        match="shell front-end",
     ):
         inspector.validate_r_framework_inventory(
             kit_records, delivery_kind="direct-spike", architecture="x86_64"

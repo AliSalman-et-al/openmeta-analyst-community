@@ -190,6 +190,15 @@ def profile(
             f"source bin/exec/R executable must be {architecture}-only, found "
             f"{source_executable_record['architectures']}"
         )
+    source_rscript = source_resources / "bin" / "Rscript"
+    if not source_rscript.is_file() or not is_macho(source_rscript):
+        raise ProfileError("source bin/Rscript executable is missing or is not Mach-O")
+    source_rscript_record = macho_record(source_rscript, source_resources)
+    if source_rscript_record["architectures"] != [architecture]:
+        raise ProfileError(
+            f"source bin/Rscript executable must be {architecture}-only, found "
+            f"{source_rscript_record['architectures']}"
+        )
     source_launcher = source_resources / "bin" / "R"
     if official_framework_layout:
         resources_launcher = source_resources / "R"
@@ -200,24 +209,25 @@ def profile(
             raise ProfileError(
                 "official source Resources/R must be the canonical bin/R symlink"
             )
-        if not source_launcher.is_file() or not is_macho(source_launcher):
-            raise ProfileError("official source bin/R launcher is missing or is not Mach-O")
-        source_launcher_record = macho_record(source_launcher, source_resources)
-        if source_launcher_record["architectures"] != [architecture]:
+        if not source_launcher.is_file() or is_macho(source_launcher):
             raise ProfileError(
-                f"official source bin/R launcher must be {architecture}-only, found "
-                f"{source_launcher_record['architectures']}"
+                "official source bin/R must be the expected non-Mach-O launcher"
             )
-        source_launcher_record.update(
-            {
-                "kind": "mach-o",
-                "resources_alias": {
-                    "relative_path": "R",
-                    "link_target": "bin/R",
-                    "resolved_path": "bin/R",
-                },
-            }
-        )
+        launcher_bytes = source_launcher.read_bytes()
+        if not launcher_bytes.startswith(b"#!/bin/sh\n"):
+            raise ProfileError(
+                "official source bin/R launcher is missing its shell shebang"
+            )
+        source_launcher_record = {
+            "relative_path": source_launcher.relative_to(source_resources).as_posix(),
+            "kind": "script",
+            "sha256": hashlib.sha256(launcher_bytes).hexdigest(),
+            "resources_alias": {
+                "relative_path": "R",
+                "link_target": "bin/R",
+                "resolved_path": "bin/R",
+            },
+        }
     else:
         if not source_launcher.is_file() or is_macho(source_launcher):
             raise ProfileError("source bin/R must be the expected non-Mach-O launcher")
@@ -315,6 +325,7 @@ def profile(
             "pre_profile_tree_identity_sha256": sha256_tree_identity(resources),
             "canonical_macho": source_macho_record,
             "executable_macho": source_executable_record,
+            "rscript_macho": source_rscript_record,
             "launcher": source_launcher_record,
         },
         "allowed_non_tcl_opt_r_dependencies": {

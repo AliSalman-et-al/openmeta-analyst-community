@@ -26,6 +26,8 @@ def fixture_runtime(tmp_path: Path) -> Path:
     executable = root / "bin/exec/R"
     executable.parent.mkdir(parents=True, exist_ok=True)
     executable.write_bytes(b"Mach-O R executable")
+    rscript = root / "bin/Rscript"
+    rscript.write_bytes(b"Mach-O Rscript executable")
     library = root / "lib/libR.dylib"
     library.parent.mkdir(parents=True, exist_ok=True)
     library.write_bytes(b"Mach-O libR")
@@ -39,6 +41,7 @@ def fixture_runtime(tmp_path: Path) -> Path:
 def configure_machos(monkeypatch, profile, root: Path, *, fifth: bool = False, non_tcl_opt_r: bool = False):
     records = {
         "bin/exec/R": [],
+        "bin/Rscript": [],
         "lib/libR.dylib": [],
         "library/tcltk/libs/tcltk.so": ["/opt/R/x86_64/lib/libtcl8.6.dylib", "/opt/R/x86_64/lib/libtk8.6.dylib", "/opt/X11/lib/libX11.6.dylib", "/opt/X11/lib/libXss.1.dylib", "/opt/X11/lib/libXext.6.dylib"],
         "modules/R_X11.so": [f"/opt/X11/lib/lib{name}.6.dylib" for name in ("SM", "ICE", "X11", "Xext", "Xrender", "Xt", "Xmu")],
@@ -66,7 +69,7 @@ def configure_machos(monkeypatch, profile, root: Path, *, fifth: bool = False, n
 
 
 def configure_official_launcher(
-    monkeypatch, profile, root: Path, *, macho: bool = True, architecture: str = "x86_64"
+    monkeypatch, profile, root: Path, *, macho: bool = False
 ):
     (root / "R").symlink_to("bin/R")
     launcher = root / "bin/R"
@@ -84,7 +87,7 @@ def configure_official_launcher(
             {
                 "relative_path": "bin/R",
                 "sha256": "c" * 64,
-                "architectures": [architecture],
+                "architectures": ["x86_64"],
                 "install_id": None,
                 "load_commands": [],
             }
@@ -189,6 +192,8 @@ def test_profile_classifies_launcher_separately_from_canonical_lib_r(monkeypatch
     assert source["canonical_macho"]["architectures"] == ["x86_64"]
     assert source["executable_macho"]["relative_path"] == "bin/exec/R"
     assert source["executable_macho"]["architectures"] == ["x86_64"]
+    assert source["rscript_macho"]["relative_path"] == "bin/Rscript"
+    assert source["rscript_macho"]["architectures"] == ["x86_64"]
     assert source["launcher"]["relative_path"] == "bin/R"
     assert source["launcher"]["kind"] == "script"
 
@@ -207,8 +212,7 @@ def test_profile_classifies_launcher_separately_from_canonical_lib_r(monkeypatch
     official_launcher = json.loads(official_evidence.read_text())["source_framework"][
         "launcher"
     ]
-    assert official_launcher["kind"] == "mach-o"
-    assert official_launcher["architectures"] == ["x86_64"]
+    assert official_launcher["kind"] == "script"
     assert official_launcher["resources_alias"] == {
         "relative_path": "R",
         "link_target": "bin/R",
@@ -236,9 +240,9 @@ def test_profile_rejects_reversed_launcher_and_executable_classification(monkeyp
 
     official_root = fixture_runtime(tmp_path / "official-non-macho")
     configure_machos(monkeypatch, profile, official_root)
-    configure_official_launcher(monkeypatch, profile, official_root, macho=False)
+    configure_official_launcher(monkeypatch, profile, official_root, macho=True)
     with pytest.raises(
-        profile.ProfileError, match="official source bin/R launcher.*not Mach-O"
+        profile.ProfileError, match="official source bin/R must be the expected non-Mach-O"
     ):
         profile.profile(
             official_root,
@@ -281,11 +285,18 @@ def test_profile_rejects_wrong_architecture_r_executable(monkeypatch, tmp_path):
 
     official_root = fixture_runtime(tmp_path / "official-wrong-arch")
     configure_machos(monkeypatch, profile, official_root)
-    configure_official_launcher(
-        monkeypatch, profile, official_root, architecture="arm64"
-    )
+    configure_official_launcher(monkeypatch, profile, official_root)
+    original = profile.macho_record
+    monkeypatch.setattr(profile, "macho_record", lambda path, parent: {
+        **original(path, parent),
+        "architectures": (
+            ["arm64"]
+            if path == official_root / "bin/Rscript"
+            else original(path, parent)["architectures"]
+        ),
+    })
     with pytest.raises(
-        profile.ProfileError, match="official source bin/R launcher must be x86_64-only"
+        profile.ProfileError, match="bin/Rscript executable must be x86_64-only"
     ):
         profile.profile(
             official_root,
