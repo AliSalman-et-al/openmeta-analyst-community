@@ -2,12 +2,24 @@ import hashlib
 import json
 import importlib.util
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
 
 
 ROOT = Path(__file__).resolve().parents[3]
+
+
+def _load_source_provenance():
+    spec = importlib.util.spec_from_file_location(
+        "source_provenance", ROOT / "scripts" / "source_provenance.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
 
 
 def read_repo_text(*parts):
@@ -127,11 +139,8 @@ def test_windows_distributable_contract_is_declared():
     spec = read_repo_text("packaging", "pyinstaller", "rc-metastudio.spec")
 
     assert {
-        "ArtifactName",
-        "ArchiveRootName",
         "PythonExe",
         "RRuntimeRoot",
-        "RPackageCacheRoot",
     } <= script["params"]
     assert {"SkipDependencyInstall", "SkipClean", "SkipSmoke"} <= script["params"]
     assert {
@@ -141,9 +150,7 @@ def test_windows_distributable_contract_is_declared():
         "Invoke-PackagedAppSmokeTest",
         "Invoke-PackagedWizardLayoutSmokeTest",
         "Get-ProjectVersion",
-        "Get-RPackageCacheKey",
         "Test-BundledRPackages",
-        "Copy-RLibraryPackages",
         "Assert-RCMetaRSummaryFormatting",
         "Install-LocalRPackagesFromSource",
         "Install-BundledRPackages",
@@ -164,8 +171,6 @@ def test_windows_distributable_contract_is_declared():
         "R\\library\\RCMetaR\\DESCRIPTION",
         "LaunchRCMetaStudio.bat",
         "scripts\\install-r-deps.R",
-        "docs\\verification\\RCMetaR-r-dependencies.json",
-        "r\\RCMetaR\\DESCRIPTION",
     } <= script["paths"]
     assert "doc\\openMA_help.html" not in script["paths"]
     assert "Bundled help" not in script["text"]
@@ -175,11 +180,8 @@ def test_windows_distributable_contract_is_declared():
     assert "sole authoritative" in script["text"]
     assert "src\\rc_metastudio\\launch.py" not in script["text"]
     assert "tomllib.loads" in script["text"]
-    assert (
-        'if ($ArchiveRootName) { $ArchiveRootName } else { "RCMetaStudio-$projectVersion-windows-x64" }'
-        in script["text"]
-    )
-    assert "ArchiveRootName must be a single portable directory name" in script["text"]
+    assert '$artifactName = "RCMetaStudio-$projectVersion-windows-x64"' in script["text"]
+    assert "$archiveRootName = $artifactName" in script["text"]
     assert '$archiveStagingRoot = Join-Path $workRoot "zip-staging"' in script["text"]
     assert (
         "Copy-DirectoryTree -Source $SourceDirectory -Destination $ArchiveRootDirectory"
@@ -194,22 +196,25 @@ def test_windows_distributable_contract_is_declared():
     assert "$ArchiveRootName\\_internal\\PyQt6\\" in script["text"]
 
 
-def test_windows_r_cache_reinstalls_local_packages_after_cache_restore():
+def test_windows_build_never_reuses_an_installed_r_library_tree():
     script = ps_contract("scripts", "build-windows-package.ps1")["text"]
 
-    assert relative_order(
-        script,
-        "Invoke-StrictRDependencyPolicy -RscriptExe $rscriptExe -Library $cacheLibrary",
-        "Copy-RLibraryPackages -Source $cacheLibrary -Destination $rLibrary",
-        "Install-LocalRPackagesFromSource -Root $Root",
-    )
-    assert relative_order(
-        script,
-        "Installing bundled R package dependencies",
-        "Test-RDependencyPackages -RscriptExe $rscriptExe -Library $rLibrary",
-        "Caching bundled R dependency library at $cacheLibrary",
-        "Installing local RCMetaR package",
-    )
+    assert "r-library-cache" not in script
+    assert "Copy-RLibraryPackages" not in script
+    assert "Installing locked bundled R package dependencies from immutable downloads" in script
+
+
+def test_windows_archive_is_version_derived_and_requalified_after_extraction():
+    script = ps_contract("scripts", "build-windows-package.ps1")["text"]
+    workflow = workflow_contract(".github", "workflows", "package-windows.yml")
+
+    assert '$artifactName = "RCMetaStudio-$projectVersion-windows-x64"' in script
+    assert "$archiveRootName = $artifactName" in script
+    assert "Expand-AndQualifyExactArchive" in script
+    assert "ExtractToDirectory($Archive, $qualificationRoot)" in script
+    assert "Running exact-archive packaged smoke through the normal user entry point" in script
+    assert "Invoke-PackagedAppSmokeTest -Root $extractedApp" in script
+    assert "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-windows-x64.zip" in workflow["text"]
 
 
 def test_packaged_smoke_launches_with_positional_project_argument():
@@ -471,18 +476,35 @@ def test_lane_named_local_scripts_replace_old_workflow_wrappers():
     assert "Current Version" in fast["text"]
     assert "ProgramFiles" not in smoke["text"]
     assert "ProgramFiles" not in fast["text"]
-    assert {
-        "ArchiveRootName",
-        "RIntegrationKit",
-        "ExpectedRIntegrationKitSha256",
-    } <= package["params"]
+    assert {"RecreateVenv", "SkipSmoke"} <= package["params"]
+    assert "ArtifactName" not in package["params"]
+    assert "ArchiveRootName" not in package["params"]
     assert "Resolve-RRuntimeRoot" not in package["functions"]
     assert "Resolve-RscriptFromRuntime" not in package["functions"]
     assert "--rscript" not in package["text"]
-    assert "RIntegrationKit = $RIntegrationKit" in package["text"]
-    assert (
-        "ExpectedRIntegrationKitSha256 = $ExpectedRIntegrationKitSha256"
-        in package["text"]
+    assert "Stage-AuthenticatedOfficialR" in package["functions"]
+    assert "RIntegrationKit" not in package["text"]
+    assert "ExpectedRIntegrationKitSha256" not in package["text"]
+    assert "R-4.6.1-win.exe" in package["text"]
+    assert "Get-AuthenticodeSignature" in package["text"]
+    assert "artifacts\\download-cache\\windows-x64" in package["text"]
+    assert "/CURRENTUSER" in package["text"]
+    assert "/VERYSILENT" in package["text"]
+    assert "/SUPPRESSMSGBOXES" in package["text"]
+    assert "/SP-" in package["text"]
+    assert "/NORESTART" in package["text"]
+    assert "('/DIR=\"{0}\"' -f $rStage)" in package["text"]
+    assert "('/LOG=\"{0}\"' -f $installerLog)" in package["text"]
+    assert "Save-CurrentUserRInstallerState" in package["functions"]
+    assert "Restore-CurrentUserRInstallerState" in package["functions"]
+    assert relative_order(
+        package["text"],
+        '"/CURRENTUSER"',
+        '"/VERYSILENT"',
+        '"/SP-"',
+        "$registrySnapshots = Save-CurrentUserRInstallerState -BackupRoot",
+        "Start-Process -FilePath $rInstaller -ArgumentList $installerArgs",
+        "Restore-CurrentUserRInstallerState -Snapshots $registrySnapshots",
     )
     assert "r-default-library-cache" in smoke["text"]
     assert "r-default-library-cache" in fast["text"]
@@ -643,13 +665,9 @@ def test_shared_r_dependency_installer_is_used_by_packagers():
     assert "HSROC 2.1.9 must be the sole pinned source exception" in policy_loader
     assert "https://packagemanager.posit.co/cran/2026-07-16" in policy_loader
     assert {
-        "Get-RPackageCacheKey",
-        "Get-Sha256FileHash",
         "Invoke-StrictRDependencyPolicy",
         "Test-RDependencyPackages",
     } <= windows["functions"]
-    assert "docs\\verification\\RCMetaR-r-dependencies.json" in windows["paths"]
-    assert "Get-Sha256FileHash -Path $installDeps" in windows["text"]
     assert "RCMetaR/DESCRIPTION" in macos["text"]
     assert "RCMS_CRAN_REPO" in windows["text"]
     assert "RCMS_CRAN_REPO" in macos["text"]
@@ -657,12 +675,8 @@ def test_shared_r_dependency_installer_is_used_by_packagers():
     assert "RCMS_POLICY_PYTHON" in macos["text"]
     assert "RCMS_CRAN_REPO must match the manifest snapshot" in windows["text"]
     assert "RCMS_CRAN_REPO must match the manifest snapshot" in macos["text"]
-    assert relative_order(
-        windows["text"],
-        "if (Test-Path $cacheLibrary)",
-        "Invoke-StrictRDependencyPolicy -RscriptExe $rscriptExe -Library $cacheLibrary",
-        "Copy-RLibraryPackages -Source $cacheLibrary -Destination $rLibrary",
-    )
+    assert "r-library-cache" not in windows["text"]
+    assert "Invoke-StrictRDependencyPolicy -RscriptExe $rscriptExe -Library $rLibrary" in windows["text"]
     assert relative_order(
         macos["text"],
         'if [ -d "$cache_library" ]',
@@ -740,6 +754,8 @@ def test_windows_runtime_probe_does_not_apply_macos_r_product_policy():
     )[0]
     assert 'if sys.platform == "darwin":' in probe
     assert '"macos_product_profile": macos_r_policy' in probe
+    assert 'importlib.import_module("_rinterface_cffi_api")' in probe
+    assert "import _rinterface_cffi_api" not in probe
 
 
 def test_windows_packager_restores_smoke_environment():
@@ -946,6 +962,60 @@ def test_frozen_windows_bootstrap_indexes_all_private_native_directories(tmp_pat
     assert observed == {path.resolve() for path in expected}
 
 
+def test_frozen_direct_runtime_probe_validates_private_r_without_a_kit(monkeypatch, tmp_path):
+    from rc_metastudio import launch
+
+    app = tmp_path / "RCMetaStudio"
+    executable = app / "RCMetaStudio.exe"
+    executable.parent.mkdir(parents=True)
+    executable.write_bytes(b"exe")
+    api_bridge = app / "_internal" / "_rinterface_cffi_api.pyd"
+    api_bridge.parent.mkdir()
+    api_bridge.write_bytes(b"api")
+    r_home = app / "R"
+    r_dll = r_home / "bin" / "x64" / "R.dll"
+    r_dll.parent.mkdir(parents=True)
+    r_dll.write_bytes(b"R")
+
+    monkeypatch.setattr(launch.sys, "executable", str(executable))
+    shared_library, direct_spike = launch._verified_frozen_runtime_shared_library(
+        {"R_HOME": str(r_home), "derivation": {}, "direct_spike": False},
+        api_bridge.resolve(),
+    )
+
+    assert shared_library == r_dll.resolve()
+    assert direct_spike is False
+
+
+def test_frozen_windows_runtime_bootstraps_without_a_kit(monkeypatch, tmp_path):
+    from rc_metastudio import r_runtime
+
+    app = tmp_path / "RCMetaStudio"
+    r_home = app / "R"
+    (r_home / "bin").mkdir(parents=True)
+    (r_home / "library" / "RCMetaR").mkdir(parents=True)
+    monkeypatch.setattr(r_runtime.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(r_runtime.sys, "platform", "win32")
+    monkeypatch.setattr(r_runtime, "_RUNTIME_IDENTITY", None)
+    monkeypatch.setattr(r_runtime, "_BOOTSTRAP_THREAD_ID", None)
+    monkeypatch.setattr(
+        r_runtime,
+        "_frozen_kit_identity",
+        lambda _root: pytest.fail("Windows native packages must not read a kit"),
+    )
+    monkeypatch.setattr(r_runtime, "_configure_private_runtime_directories", lambda _root: None)
+    monkeypatch.setattr(r_runtime, "_set_windows_dll_policy", lambda: None)
+    monkeypatch.setattr(r_runtime, "_prepend_path", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(r_runtime, "_add_dll_directories", lambda *_args: None)
+    monkeypatch.setattr(r_runtime.os, "environ", dict(r_runtime.os.environ))
+
+    configured = r_runtime.configure_bundled_r_environment(str(app))
+
+    assert Path(configured["R_HOME"]).resolve() == r_home.resolve()
+    assert configured["kit_sha256"] is None
+    assert configured["derivation"] is None
+
+
 def test_windows_dll_policy_fails_closed(monkeypatch):
     from rc_metastudio import r_runtime
 
@@ -1126,6 +1196,76 @@ def _windows_runtime_probe(app):
     }
 
 
+def test_windows_runtime_probe_survives_relocation_but_rejects_tampering(tmp_path):
+    inspector = _load_windows_deployment_inspector()
+    original = _windows_deployment_fixture(tmp_path / "original")
+    probe = _windows_runtime_probe(original)
+    probe["r"].pop("kit_sha256")
+    relocated = tmp_path / "extracted" / "RCMetaStudio-0.1.2-windows-x64"
+    shutil.copytree(original, relocated)
+    versions = dict(inspector.EXPECTED_VERSIONS)
+    provenance = {"schema_version": 1, "head_sha": "a" * 40, "working_tree": "clean", "worktree_sha256": "b" * 64}
+    inspector.inspect_deployment(
+        relocated, versions=versions, source_commit="a" * 40,
+        source_provenance=provenance,
+        runtime_probe=probe, locked_qt_root=relocated / "_internal" / "PyQt6" / "Qt6"
+    )
+    r_dll = relocated / "R" / "bin" / "x64" / "R.dll"
+    r_dll.write_bytes(r_dll.read_bytes() + b"tampered")
+    with pytest.raises(inspector.DeploymentInspectionError, match="frozen R runtime"):
+        inspector.inspect_deployment(
+            relocated, versions=versions, source_commit="a" * 40,
+            source_provenance=provenance,
+            runtime_probe=probe, locked_qt_root=relocated / "_internal" / "PyQt6" / "Qt6"
+        )
+
+
+def test_windows_deployment_inspector_resolves_wheel_private_libs_directory():
+    inspector = _load_windows_deployment_inspector()
+    records = [
+        {
+            "path": "_internal/numpy/_core/_multiarray_umath.pyd",
+            "sha256": "extension",
+            "_imports": [
+                {"name": "libscipy_openblas64_example.dll", "kind": "normal"}
+            ],
+        },
+        {
+            "path": "_internal/numpy.libs/libscipy_openblas64_example.dll",
+            "sha256": "openblas",
+            "_imports": [],
+        },
+    ]
+
+    inspector._resolve_pe_closure(records)
+
+    assert records[0]["imports"] == [
+        {
+            "name": "libscipy_openblas64_example.dll",
+            "kind": "normal",
+            "resolution": "app-local",
+            "resolved_path": "_internal/numpy.libs/libscipy_openblas64_example.dll",
+            "resolved_sha256": "openblas",
+        }
+    ]
+
+
+def test_windows_deployment_inspector_recognizes_supported_os_imports():
+    inspector = _load_windows_deployment_inspector()
+
+    assert all(
+        inspector._is_windows_system_import(name)
+        for name in (
+            "AUTHZ.dll",
+            "DWrite.dll",
+            "icuuc.dll",
+            "pdh.dll",
+            "UIAutomationCore.DLL",
+            "WTSAPI32.dll",
+        )
+    )
+
+
 def test_windows_deployment_inspector_accepts_one_coherent_x64_qt6_stack(
     tmp_path, monkeypatch
 ):
@@ -1145,11 +1285,15 @@ def test_windows_deployment_inspector_accepts_one_coherent_x64_qt6_stack(
         "pyinstaller": "6.21.0",
     }
 
+    direct_runtime_probe = _windows_runtime_probe(app)
+    direct_runtime_probe["r"].pop("kit_sha256")
+    provenance = {"schema_version": 1, "head_sha": "a" * 40, "working_tree": "clean", "worktree_sha256": "b" * 64}
     manifest = inspector.inspect_deployment(
         app,
         versions=versions,
         source_commit="a" * 40,
-        runtime_probe=_windows_runtime_probe(app),
+        source_provenance=provenance,
+        runtime_probe=direct_runtime_probe,
         locked_qt_root=qt_root,
     )
 
@@ -1161,6 +1305,8 @@ def test_windows_deployment_inspector_accepts_one_coherent_x64_qt6_stack(
         "provenance": "build-time-only",
         "definition": "packaging/pyinstaller/rc-metastudio.spec",
     }
+    assert "r_integration_kit" not in manifest
+    assert manifest["embedded_r"]["cffi_mode"] == "API"
     assert manifest["stack"] == versions
     assert manifest["plugins"]["platforms"] == ["qwindows.dll"]
     assert set(manifest["qt_plugins"]) == {
@@ -1205,6 +1351,8 @@ def test_windows_deployment_inspector_accepts_one_coherent_x64_qt6_stack(
     runtime_probe_path.write_text(
         json.dumps(_windows_runtime_probe(app)), encoding="utf-8"
     )
+    source_provenance_path = tmp_path / "source-provenance.json"
+    source_provenance_path.write_text(json.dumps(provenance), encoding="utf-8")
     output = tmp_path / "deployment-manifest.json"
     captured = {}
 
@@ -1226,6 +1374,8 @@ def test_windows_deployment_inspector_accepts_one_coherent_x64_qt6_stack(
             str(output),
             "--source-commit",
             "a" * 40,
+            "--source-provenance",
+            str(source_provenance_path),
             "--runtime-probe",
             str(runtime_probe_path),
             "--locked-qt-root",
@@ -1253,6 +1403,81 @@ def test_windows_deployment_inspector_accepts_one_coherent_x64_qt6_stack(
     assert captured["versions"] == versions
     assert captured["runtime_probe"] == _windows_runtime_probe(app)
     assert json.loads(output.read_text(encoding="utf-8"))["stack"] == versions
+
+
+def test_windows_deployment_inspector_records_dirty_source_provenance(tmp_path):
+    inspector = _load_windows_deployment_inspector()
+    app = _windows_deployment_fixture(tmp_path)
+    provenance = {
+        "schema_version": 1,
+        "head_sha": "a" * 40,
+        "working_tree": "dirty",
+        "worktree_sha256": "b" * 64,
+    }
+    manifest = inspector.inspect_deployment(
+        app,
+        versions=dict(inspector.EXPECTED_VERSIONS),
+        source_commit="a" * 40,
+        source_provenance=provenance,
+        runtime_probe=_windows_runtime_probe(app),
+        locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
+    )
+    assert manifest["source_provenance"] == provenance
+    with pytest.raises(inspector.DeploymentInspectionError, match="source provenance"):
+        inspector.inspect_deployment(
+            app,
+            versions=dict(inspector.EXPECTED_VERSIONS),
+            source_commit="a" * 40,
+            source_provenance=None,
+            runtime_probe=_windows_runtime_probe(app),
+            locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
+        )
+    with pytest.raises(inspector.DeploymentInspectionError, match="source provenance"):
+        inspector.inspect_deployment(
+            app,
+            versions=dict(inspector.EXPECTED_VERSIONS),
+            source_commit="a" * 40,
+            source_provenance={"schema_version": 1, "head_sha": "a" * 40, "working_tree": "dirty"},
+            runtime_probe=_windows_runtime_probe(app),
+            locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
+        )
+
+
+def test_source_provenance_frames_binary_untracked_paths_and_contents(tmp_path):
+    provenance = _load_source_provenance()
+    repo = tmp_path / "repository with spaces"
+    repo.mkdir()
+    for arguments in (
+        ("init",),
+        ("config", "user.email", "package@example.test"),
+        ("config", "user.name", "Package Test"),
+    ):
+        subprocess.run(["git", *arguments], cwd=repo, check=True, capture_output=True)
+    (repo / "tracked.txt").write_text("base", encoding="utf-8")
+    subprocess.run(["git", "add", "tracked.txt"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-m", "base"], cwd=repo, check=True, capture_output=True)
+    untracked = repo / "untracked file.bin"
+    untracked.write_bytes(b"\x00binary\xff")
+    first = provenance.collect_source_provenance(repo)
+    assert first["working_tree"] == "dirty"
+    untracked.write_bytes(b"\x00changed\xff")
+    second = provenance.collect_source_provenance(repo)
+    assert second["worktree_sha256"] != first["worktree_sha256"]
+    untracked.unlink()
+    (repo / "tracked.txt").write_text("changed", encoding="utf-8")
+    assert provenance.collect_source_provenance(repo)["worktree_sha256"] != first["worktree_sha256"]
+
+
+def test_windows_public_download_retry_is_powershell_51_compatible_and_atomic():
+    wrapper = Path("scripts/package-windows.ps1").read_text(encoding="utf-8")
+    assert "-MaximumRetryCount" not in wrapper
+    assert "-RetryIntervalSec" not in wrapper
+    assert "function Invoke-DownloadWithRetry" in wrapper
+    assert "for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++)" in wrapper
+    assert "Move-Item -LiteralPath $partialInstaller -Destination $rInstaller" in wrapper
+    retry_test = Path("scripts/test-package-download-retry.ps1").read_text(encoding="utf-8")
+    assert "Package download retry self-test passed." in retry_test
+    assert "terminal injected failure" in retry_test
 
 
 def test_final_windows_pe_closure_requires_app_local_msvc_and_tracks_delay_imports():
@@ -1689,6 +1914,12 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
             {
                 "target": "windows-x64",
                 "stack": inspector.EXPECTED_VERSIONS,
+                "source_provenance": {
+                    "schema_version": 1,
+                    "head_sha": "a" * 40,
+                    "working_tree": "clean",
+                    "worktree_sha256": "d" * 64,
+                },
                 "runtime_probe_canonical_sha256": hashlib.sha256(
                     runtime_canonical.encode()
                 ).hexdigest(),
@@ -1801,6 +2032,12 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
     )
     archive_inspection = tmp_path / "archive-inspection.json"
     archive_inspection.write_text(json.dumps(archive_report), encoding="utf-8")
+    extracted_deployment = tmp_path / "deployment-reinspection.json"
+    extracted_deployment.write_bytes(deployment.read_bytes())
+    extracted_smoke = tmp_path / "extracted-packaged-smoke.json"
+    extracted_smoke.write_bytes(smoke.read_bytes())
+    extracted_smoke_log = tmp_path / "extracted-packaged-smoke.log"
+    extracted_smoke_log.write_bytes(smoke_log.read_bytes())
 
     evidence = inspector.write_qualification_evidence(
         archive=archive,
@@ -1809,6 +2046,9 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
         smoke_log=smoke_log,
         runtime_probe=runtime_probe,
         archive_inspection=archive_inspection,
+        extracted_deployment_manifest=extracted_deployment,
+        extracted_smoke_evidence=extracted_smoke,
+        extracted_smoke_log=extracted_smoke_log,
         output=tmp_path / "evidence.json",
     )
 
@@ -1816,6 +2056,24 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
     assert evidence["artifact"]["sha256"] == inspector.sha256_file(archive)
     assert evidence["runner"]["runner_arch"]
     assert evidence["logs"][0]["sha256"] == inspector.sha256_file(smoke_log)
+    assert evidence["exact_extracted_qualification"]["archive_sha256"] == inspector.sha256_file(archive)
+    assert evidence["source_provenance"]["working_tree"] == "clean"
+
+    extracted_smoke.write_text("{}", encoding="utf-8")
+    with pytest.raises(inspector.DeploymentInspectionError, match="exact-extracted"):
+        inspector.write_qualification_evidence(
+            archive=archive,
+            deployment_manifest=deployment,
+            smoke_evidence=smoke,
+            smoke_log=smoke_log,
+            runtime_probe=runtime_probe,
+            archive_inspection=archive_inspection,
+            extracted_deployment_manifest=extracted_deployment,
+            extracted_smoke_evidence=extracted_smoke,
+            extracted_smoke_log=extracted_smoke_log,
+            output=tmp_path / "missing-extracted.json",
+        )
+    extracted_smoke.write_bytes(smoke.read_bytes())
 
     mutated = json.loads(smoke.read_text(encoding="utf-8"))
     mutated["scales"][0]["device_pixel_ratio"] = 1.0
@@ -1836,6 +2094,9 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
             smoke_log=smoke_log,
             runtime_probe=runtime_probe,
             archive_inspection=archive_inspection,
+            extracted_deployment_manifest=extracted_deployment,
+            extracted_smoke_evidence=extracted_smoke,
+            extracted_smoke_log=extracted_smoke_log,
             output=tmp_path / "mutated.json",
         )
 

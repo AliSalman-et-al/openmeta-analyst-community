@@ -172,7 +172,9 @@ def configure_bundled_r_environment(app_root=None):
             )
         if _RUNTIME_IDENTITY is not None:
             return dict(_RUNTIME_IDENTITY)
-        if not direct_spike:
+        # Windows packages assemble their R closure in this native job; macOS
+        # continues to consume a signed, separately derived integration kit.
+        if not direct_spike and sys.platform != "win32":
             manifest, derivation = _frozen_kit_identity(root)
         _configure_private_runtime_directories(root)
         _set_windows_dll_policy()

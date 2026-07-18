@@ -3,7 +3,9 @@
 Issue #341 qualifies the unsigned Windows x64 package produced by
 `scripts/package-windows.ps1`. Packaging-relevant pull requests run this same
 qualification as a required job in `.github/workflows/fast-verification.yml`;
-the manual workflow remains available for explicit rebuilds. The package is built from the locked Python 3.11,
+the manual workflow remains available for explicit rebuilds. The package command
+stages authenticated official R locally; it does not consume a promoted R
+Integration Kit. The package is built from the locked Python 3.11,
 PyQt6, Qt 6, SIP, R, rpy2, and PyInstaller inputs. PyInstaller 6.21 is the only
 Qt dependency collector; the build does not run `windeployqt` or copy an
 independently deployed Qt tree over PyInstaller's output.
@@ -66,18 +68,24 @@ fails if `taskkill` fails or the process remains alive after cleanup.
 
 ## Retained evidence
 
-After assembly, the ZIP itself is inspected without extraction. Qualification
+After assembly, the ZIP itself is inspected without extraction, then its exact
+bytes are extracted into a clean qualification directory. The extracted app is
+reinspected and reruns the complete normal-entry packaged smoke, including the
+125%, 150%, and 175% surface checks. Qualification
 rejects traversal, absolute/non-normalized names, backslashes, duplicate or
 case-colliding members, a wrong archive root, missing embedded evidence, or any
 embedded deployment/probe/smoke/log byte that differs from the inspected source.
 
-`artifacts/RCMetaStudio-windows-x64-evidence.json` authenticates the ZIP,
-final archive-inspection report, frozen runtime probe, deployment manifest,
-packaged smoke evidence, and log by SHA-256 and records the
-GitHub runner name, image, OS version, and architecture. The manual package
-workflow uploads it beside the uncompressed ZIP. On failure it additionally
-retains the PyInstaller warning/cross-reference reports and any deployment,
-smoke, or layout logs written before the failure.
+`artifacts/RCMetaStudio-{version}-windows-x64-evidence.json` authenticates the
+versioned ZIP, final archive-inspection report, frozen runtime probe, deployment
+manifest, and pre-archive smoke evidence/log by SHA-256. It also binds the same
+archive SHA-256 to distinct extracted deployment-reinspection and normal-entry
+smoke evidence/log results, and records source HEAD plus clean/dirty provenance.
+The manual package workflow uploads it beside the uncompressed versioned ZIP.
+It also retains the exact extracted deployment reinspection plus extracted
+smoke JSON/log so every evidence hash remains independently verifiable. On
+failure it additionally retains PyInstaller reports and the
+`archive-qualification` data along with any deployment, smoke, or layout logs.
 
 ## Accepted hosted qualification
 

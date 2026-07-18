@@ -52,14 +52,21 @@ def test_ci_produces_then_downloads_exact_kit_before_offline_assembly():
     )
 
 
-def test_public_package_wrappers_are_network_closed_during_environment_sync():
-    for path in (Path("scripts/package-macos.sh"), Path("scripts/package-windows.ps1")):
-        wrapper = path.read_text(encoding="utf-8")
-        assert "verify-content" in wrapper
-        assert "--expected-kit-sha256" in wrapper
-        assert "--offline" in wrapper
-        assert "uv-cache" in wrapper
-        assert "uv sync --locked" not in wrapper
+def test_windows_public_command_stages_authenticated_r_without_a_promoted_kit():
+    wrapper = Path("scripts/package-windows.ps1").read_text(encoding="utf-8")
+    assert "Stage-AuthenticatedOfficialR" in wrapper
+    assert "Get-AuthenticodeSignature" in wrapper
+    assert "artifacts\\download-cache\\windows-x64" in wrapper
+    assert "RIntegrationKit" not in wrapper
+    assert "ExpectedRIntegrationKitSha256" not in wrapper
+
+
+def test_macos_public_command_remains_kit_based_until_its_native_slice_lands():
+    wrapper = Path("scripts/package-macos.sh").read_text(encoding="utf-8")
+    assert "verify-content" in wrapper
+    assert "--expected-kit-sha256" in wrapper
+    assert "--offline" in wrapper
+    assert "uv-cache" in wrapper
 
 
 def test_producer_populates_a_clean_dedicated_uv_cache_from_the_exact_lock():

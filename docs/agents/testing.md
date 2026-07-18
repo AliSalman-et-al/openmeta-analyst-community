@@ -76,15 +76,15 @@ Run Full R Stack Evidence before R Stack changes:
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-r-stack-full.ps1
 ```
 
-Smoke/Fast Default R Evidence uses `artifacts\r-default-library-cache`; Full R Stack Evidence and packaging use `artifacts\r-library-cache`. Keeping those caches separate prevents fast verification from restoring the larger bundled-R packaging cache. Native binary dependencies are pinned to the dated Public PPM snapshot `https://packagemanager.posit.co/cran/2026-07-16`; `RCMS_CRAN_REPO` may repeat that exact value, but mismatched overrides are rejected. The package wrappers resolve one source R runtime and pass that same runtime into R Stack Evidence and artifact assembly, so the dependency cache can be reused before only the local `RCMetaR` package is reinstalled into the bundle.
+Smoke/Fast Default R Evidence uses `artifacts\r-default-library-cache`, and Full R Stack Evidence retains its separate `artifacts\r-library-cache`. Windows package construction does not reuse either installed library tree: it caches only immutable downloads, installs the pinned native package closure into its private staged R runtime, and then installs local `RCMetaR`. Native binary dependencies are pinned to the dated Public PPM snapshot `https://packagemanager.posit.co/cran/2026-07-16`; `RCMS_CRAN_REPO` may repeat that exact value, but mismatched overrides are rejected.
 
-Build the Windows package only from an authenticated native producer kit:
+Build and qualify the Windows package through one native command. It downloads
+and authenticates the pinned official R installer into the immutable download
+cache, stages it privately, and needs an x64 C compiler for the API-mode rpy2
+bridge:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\package-windows.ps1 `
-  -ArtifactName RCMetaStudio-windows-x64 `
-  -RIntegrationKit artifacts\r-integration-kits\windows-x64 `
-  -ExpectedRIntegrationKitSha256 <manifest-kit-sha256>
+powershell -ExecutionPolicy Bypass -File .\scripts\package-windows.ps1
 ```
 
 Pull requests that change a direct Windows assembly or qualification input must
@@ -99,8 +99,10 @@ Keep that classifier synchronized whenever the package script or release
 verifier gains another direct input.
 
 The job retains the distributable ZIP plus the deployment manifest, frozen
-runtime probe, packaged smoke evidence/log, archive-inspection report, and final
-qualification evidence. The runtime probe is collected with `QT_SCALE_FACTOR`
+runtime probe, packaged smoke evidence/log, archive-inspection report, exact-ZIP
+extracted reinspection and smoke evidence/log, and final qualification evidence.
+The final evidence binds those extracted gates, their pass status, and the ZIP
+SHA-256; it also records the source HEAD plus clean/dirty provenance. The runtime probe is collected with `QT_SCALE_FACTOR`
 absent; later 125%, 150%, and 175% subprocesses prove their requested scale
 against that unscaled baseline. UPX is disabled for the frozen executable and
 collected payload so Qt DLL and plugin bytes remain identical to the locked

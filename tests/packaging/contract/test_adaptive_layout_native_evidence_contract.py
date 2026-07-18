@@ -55,12 +55,14 @@ def test_packagers_retain_opt_in_controlled_adaptive_layout_evidence():
 def test_hosted_package_workflow_does_not_require_native_layout_evidence():
     workflow = _text(".github", "workflows", "package-verification.yml")
     target = _text(".github", "workflows", "package-target.yml")
+    windows = _text(".github", "workflows", "package-windows.yml")
 
-    assert "artifact_name: RCMetaStudio-windows-x64" in workflow
+    assert "uses: ./.github/workflows/package-windows.yml" in workflow
     assert "artifact_name: RCMetaStudio-macos-x64" in workflow
     assert "Upload adaptive-layout evidence" not in target
     assert "evidence_path" not in target
     assert "adaptive-layout-evidence" not in workflow
+    assert "adaptive-layout-evidence" not in windows
     assert target.count("if-no-files-found: error") >= 1
 
 

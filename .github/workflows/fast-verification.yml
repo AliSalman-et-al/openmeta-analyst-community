@@ -266,12 +266,7 @@ jobs:
     name: Required Windows x64 Package Qualification
     needs: change-classifier
     if: ${{ needs.change-classifier.outputs.run-windows-package == 'true' }}
-    uses: ./.github/workflows/package-target.yml
-    with:
-      runner: windows-latest
-      target_os: windows
-      artifact_name: RCMetaStudio-windows-x64
-      archive_platform: windows-x64
+    uses: ./.github/workflows/package-windows.yml
 
   macos-x64-package-qualification:
     name: Required macOS Intel x64 Package Qualification

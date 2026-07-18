@@ -1269,9 +1269,42 @@ def start_package_surface_smoke(evidence_path, expected_scale):
     return 0
 
 
+def _verified_frozen_runtime_shared_library(configured, api_bridge_path):
+    """Return the private R library after validating the frozen runtime closure."""
+    derivation = configured.get("derivation") or {}
+    direct_spike = configured.get("direct_spike") is True
+    executable_root = Path(sys.executable).resolve().parent
+    if direct_spike:
+        frameworks = executable_root.parent / "Frameworks"
+        if not api_bridge_path.is_relative_to(frameworks.resolve()):
+            raise RuntimeError("Direct-spike rpy2 API bridge is outside the app framework tree.")
+        shared_r_path = (Path(configured["R_HOME"]) / "lib" / "libR.dylib").resolve()
+        if not shared_r_path.is_relative_to(frameworks.resolve()):
+            raise RuntimeError("Direct-spike libR is outside the app framework tree.")
+    elif derivation:
+        final_identity = derivation.get("final", {})
+        api_record = final_identity.get("api_bridge", {})
+        expected_api_bridge = (executable_root / str(api_record.get("path", ""))).resolve()
+        if (
+            api_bridge_path != expected_api_bridge
+            or hashlib.sha256(api_bridge_path.read_bytes()).hexdigest() != api_record.get("sha256")
+        ):
+            raise RuntimeError("Loaded rpy2 API bridge differs from the authenticated kit derivation.")
+        r_shared_record = final_identity.get("r_shared_library", {})
+        shared_r_path = (executable_root / str(r_shared_record.get("path", ""))).resolve()
+    else:
+        if not api_bridge_path.is_relative_to(executable_root):
+            raise RuntimeError("Loaded rpy2 API bridge is outside the frozen application bundle.")
+        shared_r_path = (Path(configured["R_HOME"]) / "bin" / "x64" / "R.dll").resolve()
+        if not shared_r_path.is_relative_to(executable_root) or not shared_r_path.is_file():
+            raise RuntimeError("Frozen application is missing its private R shared library.")
+    return shared_r_path, direct_spike
+
+
 @serialized_r_call
 def start_package_runtime_probe(output_path):
     """Report the runtime actually loaded by the assembled frozen executable."""
+    import importlib
     import importlib.metadata
 
     from PyQt6 import sip
@@ -1283,7 +1316,7 @@ def start_package_runtime_probe(output_path):
     for member in project_schema_members:
         project_format._schema(1, member)
     configured = r_runtime.configure_bundled_r_environment()
-    import _rinterface_cffi_api
+    api_bridge = importlib.import_module("_rinterface_cffi_api")
     from rpy2 import robjects
     from rpy2.rinterface_lib import openrlib
 
@@ -1298,27 +1331,10 @@ def start_package_runtime_probe(output_path):
     r_home = str(r_home_values[0])
     r_version = str(r_version_values[0])
     r_library_paths = [str(value) for value in r_library_values]
-    api_bridge_path = Path(_rinterface_cffi_api.__file__).resolve()
-    derivation = configured.get("derivation") or {}
-    direct_spike = configured.get("direct_spike") is True
-    if direct_spike:
-        frameworks = Path(sys.executable).resolve().parent.parent / "Frameworks"
-        if not api_bridge_path.is_relative_to(frameworks.resolve()):
-            raise RuntimeError("Direct-spike rpy2 API bridge is outside the app framework tree.")
-        shared_r_path = (Path(configured["R_HOME"]) / "lib" / "libR.dylib").resolve()
-        if not shared_r_path.is_relative_to(frameworks.resolve()):
-            raise RuntimeError("Direct-spike libR is outside the app framework tree.")
-    else:
-        final_identity = derivation.get("final", {})
-        api_record = final_identity.get("api_bridge", {})
-        expected_api_bridge = (Path(sys.executable).resolve().parent / str(api_record.get("path", ""))).resolve()
-        if (
-            api_bridge_path != expected_api_bridge
-            or hashlib.sha256(api_bridge_path.read_bytes()).hexdigest() != api_record.get("sha256")
-        ):
-            raise RuntimeError("Loaded rpy2 API bridge differs from the authenticated kit derivation.")
-        r_shared_record = final_identity.get("r_shared_library", {})
-        shared_r_path = (Path(sys.executable).resolve().parent / str(r_shared_record.get("path", ""))).resolve()
+    api_bridge_path = Path(str(api_bridge.__file__)).resolve()
+    shared_r_path, direct_spike = _verified_frozen_runtime_shared_library(
+        configured, api_bridge_path
+    )
     macos_r_policy = None
     if sys.platform == "darwin":
         tcltk_available = bool(cast(Any, robjects.r("requireNamespace('tcltk', quietly=TRUE)"))[0])
@@ -1386,11 +1402,12 @@ def start_package_runtime_probe(output_path):
             "macos_product_profile": macos_r_policy,
             "shared_library_path": str(shared_r_path),
             "shared_library_sha256": hashlib.sha256(shared_r_path.read_bytes()).hexdigest(),
-            "kit_sha256": configured.get("kit_sha256"),
             "direct_spike": direct_spike,
             "lc_numeric": os.environ.get("LC_NUMERIC"),
         },
     }
+    if configured.get("kit_sha256") is not None:
+        probe["r"]["kit_sha256"] = configured["kit_sha256"]
     Path(output_path).write_text(
         json.dumps(probe, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )

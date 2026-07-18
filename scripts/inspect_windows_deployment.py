@@ -55,25 +55,41 @@ REQUIRED_PROJECT_SCHEMAS = {
 }
 WINDOWS_SYSTEM_DLLS = {
     "advapi32.dll",
+    "authz.dll",
     "bcrypt.dll",
+    "bcryptprimitives.dll",
     "cfgmgr32.dll",
     "comctl32.dll",
     "comdlg32.dll",
     "crypt32.dll",
     "cryptbase.dll",
+    "credui.dll",
+    "d2d1.dll",
+    "d3d11.dll",
+    "d3d12.dll",
     "dnsapi.dll",
+    "d3d9.dll",
+    "dbghelp.dll",
+    "dwrite.dll",
     "dwmapi.dll",
+    "dxgi.dll",
     "gdi32.dll",
+    "gdiplus.dll",
+    "imagehlp.dll",
     "imm32.dll",
+    "icuuc.dll",
     "iphlpapi.dll",
     "kernel32.dll",
     "msvcrt.dll",
     "ncrypt.dll",
     "netapi32.dll",
     "normaliz.dll",
+    "mpr.dll",
+    "msimg32.dll",
     "ntdll.dll",
     "ole32.dll",
     "oleaut32.dll",
+    "pdh.dll",
     "powrprof.dll",
     "propsys.dll",
     "psapi.dll",
@@ -83,12 +99,16 @@ WINDOWS_SYSTEM_DLLS = {
     "shell32.dll",
     "shlwapi.dll",
     "ucrtbase.dll",
+    "uiautomationcore.dll",
+    "usp10.dll",
+    "uxtheme.dll",
     "user32.dll",
     "userenv.dll",
     "version.dll",
     "winhttp.dll",
     "wininet.dll",
     "winmm.dll",
+    "wtsapi32.dll",
     "wldap32.dll",
     "ws2_32.dll",
 }
@@ -106,35 +126,14 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _valid_r_kit_derivation(manifest, derivation, target):
-    manifest_files = {
-        record.get("path"): record
-        for record in manifest.get("files", [])
-        if record.get("kind") == "file"
-    }
-    for name in ("api_bridge", "r_shared_library"):
-        source = derivation.get("source", {}).get(name, {})
-        pre_sign = derivation.get("pre_sign", {}).get(name, {})
-        final = derivation.get("final", {}).get(name, {})
-        transformation = derivation.get("transformations", {}).get(name)
-        pre_sign_is_derived = pre_sign.get("sha256") == source.get("sha256") or (
-            name == "api_bridge"
-            and isinstance(transformation, dict)
-            and transformation.get("kind") == "mach-o-load-command-relocation"
-            and transformation.get("source", {}).get("sha256") == source.get("sha256")
-            and transformation.get("output", {}).get("sha256") == pre_sign.get("sha256")
-            and bool(transformation.get("changes"))
-        )
-        if not (
-            manifest_files.get(source.get("path"), {}).get("sha256")
-            == source.get("sha256")
-            and pre_sign_is_derived
-            and final.get("path") == pre_sign.get("path")
-            and pre_sign.get("signing_identity")
-            and final.get("signing_identity")
-        ):
-            return False
-    return derivation.get("schema_version") == 1 and derivation.get("target") == target
+def _valid_source_provenance(value: object, source_commit: str) -> bool:
+    return (
+        isinstance(value, dict)
+        and value.get("schema_version") == 1
+        and value.get("head_sha") == source_commit
+        and value.get("working_tree") in {"clean", "dirty"}
+        and _valid_sha256(value.get("worktree_sha256"))
+    )
 
 
 def pe_machine(path: Path) -> int:
@@ -205,6 +204,14 @@ def _resolve_pe_closure(records: list[dict]) -> None:
         path = PurePosixPath(record["path"])
         if path.parts[:1] == ("R",):
             declared_private_dirs.add(path.parent)
+        # Wheels such as NumPy use an adjacent ``*.libs`` directory and add it
+        # before importing their extension modules.  Treat only that standard
+        # PyInstaller-private layout as a declared loader directory.
+        if (
+            path.parts[:1] == ("_internal",)
+            and path.parent.name.casefold().endswith(".libs")
+        ):
+            declared_private_dirs.add(path.parent)
     for record in records:
         resolutions = []
         owner = PurePosixPath(record["path"])
@@ -267,6 +274,7 @@ def inspect_deployment(
     *,
     versions: dict[str, str],
     source_commit: str,
+    source_provenance: dict | None = None,
     runtime_probe: dict,
     locked_qt_root: Path,
 ) -> dict:
@@ -515,36 +523,14 @@ def inspect_deployment(
             "deployment must contain exactly one rpy2 API bridge and no ABI fallback"
         )
     _validate_runtime_probe(runtime_probe, app_root=app_root, qt_root=qt_root)
-    kit_manifest_path = app_root / "r-integration-kit" / "manifest.json"
-    derivation_path = app_root / "r-integration-kit" / "derivation.json"
-    try:
-        kit_manifest = json.loads(kit_manifest_path.read_text(encoding="utf-8"))
-        derivation = json.loads(derivation_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise DeploymentInspectionError(
-            "Windows deployment lacks its R integration-kit manifest"
-        ) from exc
-    if not (
-        kit_manifest.get("kind") == "rc-metastudio-r-integration-kit"
-        and kit_manifest.get("target") == "windows-x64"
-        and kit_manifest.get("architecture") == "x86_64"
-        and kit_manifest.get("cffi_mode") == "API"
-        and len(str(kit_manifest.get("kit_sha256", ""))) == 64
-        and derivation.get("kit_sha256") == kit_manifest.get("kit_sha256")
-        and derivation.get("target") == "windows-x64"
-        and _valid_r_kit_derivation(kit_manifest, derivation, "windows-x64")
-        and derivation.get("final", {}).get("api_bridge", {}).get("sha256")
-        == runtime_probe.get("rpy2", {}).get("api_bridge_sha256")
-        and derivation.get("final", {}).get("r_shared_library", {}).get("sha256")
-        == runtime_probe.get("r", {}).get("shared_library_sha256")
-    ):
-        raise DeploymentInspectionError("Windows R integration-kit identity is invalid")
-
+    if not _valid_source_provenance(source_provenance, source_commit):
+        raise DeploymentInspectionError("source provenance is invalid")
     return {
         "schema_version": 1,
         "target": "windows-x64",
         "minimum_os": "Windows 10 version 1809",
         "source_commit": source_commit,
+        "source_provenance": source_provenance,
         "collector": {
             "name": "PyInstaller",
             "version": versions["pyinstaller"],
@@ -555,11 +541,11 @@ def inspect_deployment(
         "signing_required": False,
         "security_settings_weakened": False,
         "stack": versions,
-        "r_integration_kit": {
-            "path": "r-integration-kit/manifest.json",
-            "sha256": sha256_file(kit_manifest_path),
-            "kit_sha256": kit_manifest["kit_sha256"],
-            "derivation_sha256": sha256_file(derivation_path),
+        "embedded_r": {
+            "home": _relative(app_root / "R", app_root),
+            "shared_library_sha256": runtime_probe["r"]["shared_library_sha256"],
+            "api_bridge_sha256": runtime_probe["rpy2"]["api_bridge_sha256"],
+            "cffi_mode": runtime_probe["rpy2"]["cffi_mode"],
         },
         "qt_runtime_root": _relative(qt_root, app_root),
         "plugins": plugin_manifest,
@@ -584,6 +570,17 @@ def _normalized_path(value: str) -> Path:
     return Path(value.replace("/", os.sep)).resolve()
 
 
+def _probe_relative_path(value: object, probe_app_root: Path) -> PurePosixPath | None:
+    if not isinstance(value, str) or not value:
+        return None
+    path = _normalized_path(value)
+    return (
+        PurePosixPath(path.relative_to(probe_app_root).as_posix())
+        if path.is_relative_to(probe_app_root)
+        else None
+    )
+
+
 def _validate_runtime_probe(
     runtime_probe: dict, *, app_root: Path, qt_root: Path
 ) -> None:
@@ -603,26 +600,27 @@ def _validate_runtime_probe(
             "runtime probe did not execute from a frozen application"
         )
     python = runtime_probe.get("python", {})
+    probe_app_root = _normalized_path(python.get("executable", "")).parent
+    probe_path = lambda value: _probe_relative_path(value, probe_app_root)
     if (
         python.get("version") != EXPECTED_VERSIONS["python"]
         or str(python.get("architecture", "")).lower() not in {"amd64", "x86_64"}
-        or _normalized_path(python.get("executable", ""))
-        != app_root / "RCMetaStudio.exe"
-        or _normalized_path(python.get("bundle_root", "")) != app_root / "_internal"
+        or probe_path(python.get("executable")) != PurePosixPath("RCMetaStudio.exe")
+        or probe_path(python.get("bundle_root")) != PurePosixPath("_internal")
     ):
         raise DeploymentInspectionError(
             "frozen Python runtime probe does not match the assembled artifact"
         )
     qt = runtime_probe.get("qt", {})
-    plugins_root = qt_root / "plugins"
-    library_paths = {_normalized_path(value) for value in qt.get("library_paths", [])}
+    plugins_root = PurePosixPath("_internal/PyQt6/Qt6/plugins")
+    library_paths = {probe_path(value) for value in qt.get("library_paths", [])}
     if (
         qt.get("pyqt_version") != EXPECTED_VERSIONS["pyqt6"]
         or qt.get("compiled_qt_version") != "6.11.0"
         or qt.get("runtime_qt_version") != EXPECTED_VERSIONS["qt"]
         or qt.get("sip_runtime_version") != EXPECTED_VERSIONS["sip_runtime"]
         or qt.get("platform_plugin") != "windows"
-        or _normalized_path(qt.get("plugins_path", "")) != plugins_root
+        or probe_path(qt.get("plugins_path")) != plugins_root
         or plugins_root not in library_paths
         or qt.get("scale_factor_environment") is not None
         or float(qt.get("baseline_device_pixel_ratio", 0)) <= 0
@@ -653,7 +651,10 @@ def _validate_runtime_probe(
             "api_bridge_loaded": True,
         }
         and _valid_sha256(rpy2.get("api_bridge_sha256"))
-        and _normalized_path(rpy2.get("api_bridge_path", "")).is_relative_to(app_root)
+        and (api_bridge := probe_path(rpy2.get("api_bridge_path"))) is not None
+        and api_bridge.parts[:1] == ("_internal",)
+        and (app_root / api_bridge).is_file()
+        and sha256_file(app_root / api_bridge) == rpy2.get("api_bridge_sha256")
     ):
         raise DeploymentInspectionError(
             "frozen rpy2 runtime probe differs from the lock"
@@ -666,21 +667,20 @@ def _validate_runtime_probe(
             "frozen runtime did not validate the required project schemas"
         )
     r = runtime_probe.get("r", {})
-    expected_r_home = app_root / "R"
-    expected_r_library = expected_r_home / "library"
-    r_libraries = {_normalized_path(value) for value in r.get("library_paths", [])}
+    expected_r_home = PurePosixPath("R")
+    expected_r_library = PurePosixPath("R/library")
+    r_libraries = {probe_path(value) for value in r.get("library_paths", [])}
     if (
         r.get("version") != EXPECTED_VERSIONS["r"]
-        or _normalized_path(r.get("home", "")) != expected_r_home
-        or _normalized_path(r.get("configured_home", "")) != expected_r_home
-        or _normalized_path(r.get("configured_library", "")) != expected_r_library
+        or probe_path(r.get("home")) != expected_r_home
+        or probe_path(r.get("configured_home")) != expected_r_home
+        or probe_path(r.get("configured_library")) != expected_r_library
         or expected_r_library not in r_libraries
         or r.get("lc_numeric") != "C"
         or not _valid_sha256(r.get("shared_library_sha256"))
-        or not _normalized_path(r.get("shared_library_path", "")).is_relative_to(
-            app_root
-        )
-        or not _valid_sha256(r.get("kit_sha256"))
+        or probe_path(r.get("shared_library_path")) != PurePosixPath("R/bin/x64/R.dll")
+        or not (app_root / "R/bin/x64/R.dll").is_file()
+        or sha256_file(app_root / "R/bin/x64/R.dll") != r.get("shared_library_sha256")
     ):
         raise DeploymentInspectionError(
             "frozen R runtime probe does not use the bundled R runtime/library"
@@ -722,11 +722,17 @@ def write_qualification_evidence(
     smoke_log: Path,
     runtime_probe: Path,
     archive_inspection: Path,
+    extracted_deployment_manifest: Path,
+    extracted_smoke_evidence: Path,
+    extracted_smoke_log: Path,
     output: Path,
 ) -> dict:
     deployment = json.loads(deployment_manifest.read_text(encoding="utf-8"))
     smoke = json.loads(smoke_evidence.read_text(encoding="utf-8"))
     archive_report = json.loads(archive_inspection.read_text(encoding="utf-8"))
+    extracted_deployment = json.loads(
+        extracted_deployment_manifest.read_text(encoding="utf-8")
+    )
     expected_embedded_hashes = {
         "qualification/deployment-manifest.json": sha256_file(deployment_manifest),
         "qualification/runtime-probe.json": sha256_file(runtime_probe),
@@ -740,6 +746,17 @@ def write_qualification_evidence(
     ):
         raise DeploymentInspectionError(
             "final ZIP inspection is not bound to qualification inputs"
+        )
+    if (
+        extracted_deployment.get("target") != "windows-x64"
+        or extracted_deployment.get("stack") != EXPECTED_VERSIONS
+        or extracted_deployment.get("source_provenance")
+        != deployment.get("source_provenance")
+        or extracted_deployment.get("runtime_probe_canonical_sha256")
+        != deployment.get("runtime_probe_canonical_sha256")
+    ):
+        raise DeploymentInspectionError(
+            "exact-extracted deployment reinspection is not bound to the package"
         )
     required_workflows = {
         "automation_entry_point",
@@ -836,6 +853,17 @@ def write_qualification_evidence(
         or any(marker not in log_text for marker in required_log_markers)
     ):
         raise DeploymentInspectionError("packaged smoke evidence is incomplete")
+    extracted_smoke = json.loads(extracted_smoke_evidence.read_text(encoding="utf-8"))
+    extracted_log_text = extracted_smoke_log.read_text(encoding="utf-8")
+    if (
+        extracted_smoke.get("passed") is not True
+        or extracted_smoke.get("execution", {}).get("positional_user_entry_exit_code")
+        != 0
+        or extracted_smoke.get("execution", {}).get("clean_exit") is not True
+        or "startup-project:normal-entry-point-passed" not in extracted_log_text
+        or "packaged-workflow:post-close" not in extracted_log_text
+    ):
+        raise DeploymentInspectionError("exact-extracted packaged smoke evidence is incomplete")
     evidence = {
         "schema_version": 1,
         "target": "windows-x64",
@@ -843,6 +871,7 @@ def write_qualification_evidence(
             deployment.get("target") == "windows-x64"
             and deployment.get("stack") == EXPECTED_VERSIONS
             and smoke.get("passed") is True
+            and extracted_smoke.get("passed") is True
         ),
         "artifact": {
             "name": archive.name,
@@ -872,6 +901,24 @@ def write_qualification_evidence(
             "path": archive_inspection.name,
             "sha256": sha256_file(archive_inspection),
         },
+        "exact_extracted_qualification": {
+            "archive_sha256": sha256_file(archive),
+            "deployment_reinspection": {
+                "path": extracted_deployment_manifest.name,
+                "sha256": sha256_file(extracted_deployment_manifest),
+                "passed": True,
+            },
+            "smoke_evidence": {
+                "path": extracted_smoke_evidence.name,
+                "sha256": sha256_file(extracted_smoke_evidence),
+                "passed": True,
+            },
+            "smoke_log": {
+                "path": extracted_smoke_log.name,
+                "sha256": sha256_file(extracted_smoke_log),
+            },
+        },
+        "source_provenance": deployment["source_provenance"],
         "runner": {
             "github_actions": os.environ.get("GITHUB_ACTIONS") == "true",
             "runner_name": os.environ.get("RUNNER_NAME", "local"),
@@ -1064,6 +1111,7 @@ def _main() -> int:
     inspect_parser.add_argument("--app-root", type=Path, required=True)
     inspect_parser.add_argument("--output", type=Path, required=True)
     inspect_parser.add_argument("--source-commit", required=True)
+    inspect_parser.add_argument("--source-provenance", type=Path, required=True)
     inspect_parser.add_argument("--runtime-probe", type=Path, required=True)
     inspect_parser.add_argument("--locked-qt-root", type=Path, required=True)
     for name in (
@@ -1090,6 +1138,9 @@ def _main() -> int:
     evidence_parser.add_argument("--smoke-log", type=Path, required=True)
     evidence_parser.add_argument("--runtime-probe", type=Path, required=True)
     evidence_parser.add_argument("--archive-inspection", type=Path, required=True)
+    evidence_parser.add_argument("--extracted-deployment-manifest", type=Path, required=True)
+    evidence_parser.add_argument("--extracted-smoke-evidence", type=Path, required=True)
+    evidence_parser.add_argument("--extracted-smoke-log", type=Path, required=True)
     evidence_parser.add_argument("--output", type=Path, required=True)
     finalize_parser = subparsers.add_parser("finalize-smoke")
     finalize_parser.add_argument("--smoke-evidence", type=Path, required=True)
@@ -1122,6 +1173,9 @@ def _main() -> int:
                 args.app_root,
                 versions=versions,
                 source_commit=args.source_commit,
+                source_provenance=json.loads(
+                    args.source_provenance.read_text(encoding="utf-8-sig")
+                ),
                 runtime_probe=json.loads(
                     args.runtime_probe.read_text(encoding="utf-8")
                 ),
@@ -1139,6 +1193,9 @@ def _main() -> int:
                 smoke_log=args.smoke_log,
                 runtime_probe=args.runtime_probe,
                 archive_inspection=args.archive_inspection,
+                extracted_deployment_manifest=args.extracted_deployment_manifest,
+                extracted_smoke_evidence=args.extracted_smoke_evidence,
+                extracted_smoke_log=args.extracted_smoke_log,
                 output=args.output,
             )
         elif args.command == "finalize-smoke":
