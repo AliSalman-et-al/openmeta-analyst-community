@@ -976,7 +976,8 @@ def validate_macos_surface_records(scales: object) -> None:
             and accessibility.get("accessible_name") == "Packaged accessibility control"
             and accessibility.get("accessible_description")
                 == "Verifies packaged Qt accessibility metadata."
-            and native_accessibility.get("is_element") is True
+            and native_accessibility.get("is_ignored") is False
+            and native_accessibility.get("exposed") is True
             and native_accessibility.get("role") == "AXButton"
             and native_accessibility.get("title") == "Packaged accessibility control"
             and native_accessibility.get("description")

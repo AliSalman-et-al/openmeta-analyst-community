@@ -388,6 +388,8 @@ def test_macos_surface_smoke_exercises_native_acceptance_surfaces():
     assert "roots, bridge_supported = qnsview_children(native_view)" in launch
     assert '"title": text_message(receiver, "accessibilityTitle")' in launch
     assert '"description": text_message(receiver, "accessibilityLabel")' in launch
+    assert 'receiver, "accessibilityIsIgnored"' in launch
+    assert "isAccessibilityElement" not in launch
     assert 'expected_role="AXButton"' in launch
     assert 'get("role") != "AXButton"' in launch
     assert 'roots = [native_view]' not in launch
@@ -1255,7 +1257,8 @@ def test_macos_surface_evidence_rejects_observation_mutations():
                 "role": "AXButton",
                 "title": "Packaged accessibility control",
                 "description": "Verifies packaged Qt accessibility metadata.",
-                "is_element": True,
+                "is_ignored": False,
+                "exposed": True,
                 "source": "accessibility-tree",
                 "bridge": "accessibilityAttributeValue:AXChildren",
                 "bridge_supported": True,
@@ -1283,7 +1286,13 @@ def test_macos_surface_evidence_rejects_observation_mutations():
             "focus_after_tab": "packagedKeyboardTraversalTarget",
             "accessible_name": "Packaged accessibility control",
             "accessible_description": "Verifies packaged Qt accessibility metadata.",
-            "native": {"role": "", "label": "", "is_element": False},
+            "native": {
+                "role": "",
+                "title": "",
+                "description": "",
+                "is_ignored": None,
+                "exposed": False,
+            },
         }),
     ]
     for key, value in mutations:
@@ -1292,15 +1301,18 @@ def test_macos_surface_evidence_rejects_observation_mutations():
         with pytest.raises(inspector.MacOSDeploymentInspectionError, match="surface evidence"):
             inspector.validate_macos_surface_records(mutated)
 
-    native_mutations = {
-        "role": "AXCheckBox",
-        "title": "Changed accessible name",
-        "description": "Changed accessible description",
-        "bridge": "accessibilityChildren",
-        "bridge_supported": False,
-        "root_count": 0,
-    }
-    for key, value in native_mutations.items():
+    native_mutations = [
+        ("role", "AXCheckBox"),
+        ("title", "Changed accessible name"),
+        ("description", "Changed accessible description"),
+        ("is_ignored", True),
+        ("is_ignored", None),
+        ("exposed", False),
+        ("bridge", "accessibilityChildren"),
+        ("bridge_supported", False),
+        ("root_count", 0),
+    ]
+    for key, value in native_mutations:
         mutated = [dict(item) for item in records]
         accessibility = dict(mutated[0]["accessibility"])
         native = dict(accessibility["native"])
@@ -1326,19 +1338,19 @@ def test_cocoa_accessibility_finds_exact_exposed_descendant_fail_closed():
             "role": "",
             "title": "",
             "description": "",
-            "is_element": False,
+            "is_ignored": None,
         },
         2: {
             "role": "AXCheckBox",
             "title": "Packaged accessibility control",
             "description": "Verifies packaged Qt accessibility metadata.",
-            "is_element": True,
+            "is_ignored": False,
         },
         3: {
             "role": "AXButton",
             "title": "Packaged accessibility control",
             "description": "Verifies packaged Qt accessibility metadata.",
-            "is_element": True,
+            "is_ignored": False,
         },
     }
     observed = find_accessibility_element(
@@ -1351,7 +1363,8 @@ def test_cocoa_accessibility_finds_exact_exposed_descendant_fail_closed():
     )
     assert observed["title"] == "Packaged accessibility control"
     assert observed["description"] == "Verifies packaged Qt accessibility metadata."
-    assert observed["is_element"] is True
+    assert observed["is_ignored"] is False
+    assert observed["exposed"] is True
     assert observed["source"] == "accessibility-tree"
     assert observed["visited_nodes"] == 3
 
@@ -1363,8 +1376,25 @@ def test_cocoa_accessibility_finds_exact_exposed_descendant_fail_closed():
         observe=observations.__getitem__,
         children=lambda node: tree[node],
     )
-    assert missing["is_element"] is False
+    assert missing["is_ignored"] is None
+    assert missing["exposed"] is False
     assert missing["visited_nodes"] == 3
+
+    for ignored_state in (True, None):
+        matching_but_unexposed = {
+            **observations[3],
+            "is_ignored": ignored_state,
+        }
+        rejected = find_accessibility_element(
+            [3],
+            expected_role="AXButton",
+            expected_title="Packaged accessibility control",
+            expected_description="Verifies packaged Qt accessibility metadata.",
+            observe=lambda _node: matching_but_unexposed,
+            children=lambda _node: [],
+        )
+        assert rejected["exposed"] is False
+        assert rejected["visited_nodes"] == 1
     with pytest.raises(RuntimeError, match="exceeded its node bound"):
         find_accessibility_element(
             [1],

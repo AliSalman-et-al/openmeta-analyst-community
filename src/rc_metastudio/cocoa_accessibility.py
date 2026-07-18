@@ -22,7 +22,7 @@ def find_accessibility_element(
         "with_role": 0,
         "with_title": 0,
         "with_description": 0,
-        "accessibility_elements": 0,
+        "unignored_elements": 0,
     }
     while queue:
         current = queue.popleft()
@@ -37,17 +37,18 @@ def find_accessibility_element(
         observed_states["with_description"] += bool(
             observation.get("description")
         )
-        observed_states["accessibility_elements"] += (
-            observation.get("is_element") is True
+        observed_states["unignored_elements"] += (
+            observation.get("is_ignored") is False
         )
         if (
             observation.get("role") == expected_role
             and observation.get("title") == expected_title
             and observation.get("description") == expected_description
-            and observation.get("is_element") is True
+            and observation.get("is_ignored") is False
         ):
             return {
                 **observation,
+                "exposed": True,
                 "source": "accessibility-tree",
                 "visited_nodes": len(seen),
                 "observed_states": observed_states,
@@ -57,7 +58,8 @@ def find_accessibility_element(
         "role": "",
         "title": "",
         "description": "",
-        "is_element": False,
+        "is_ignored": None,
+        "exposed": False,
         "source": "accessibility-tree",
         "visited_nodes": len(seen),
         "observed_states": observed_states,

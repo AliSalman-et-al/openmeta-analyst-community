@@ -564,8 +564,8 @@ def _native_accessibility_observation(widget):
             "role": "qt-focusable-control",
             "title": widget.accessibleName(),
             "description": widget.accessibleDescription(),
-            "is_element": widget.focusPolicy()
-            != QtCore.Qt.FocusPolicy.NoFocus,
+            "is_ignored": widget.focusPolicy() == QtCore.Qt.FocusPolicy.NoFocus,
+            "exposed": widget.focusPolicy() != QtCore.Qt.FocusPolicy.NoFocus,
         }
 
     import ctypes
@@ -629,9 +629,9 @@ def _native_accessibility_observation(widget):
         raw = object_message(value, "UTF8String")
         return ctypes.cast(raw, ctypes.c_char_p).value.decode("utf-8") if raw else ""
 
-    def bool_message(receiver, name):
+    def optional_bool_message(receiver, name):
         if not responds(receiver, name):
-            return False
+            return None
         message.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
         message.restype = ctypes.c_bool
         return bool(message(ctypes.c_void_p(receiver), selector(name)))
@@ -678,7 +678,9 @@ def _native_accessibility_observation(widget):
             "role": text_message(receiver, "accessibilityRole"),
             "title": text_message(receiver, "accessibilityTitle"),
             "description": text_message(receiver, "accessibilityLabel"),
-            "is_element": bool_message(receiver, "isAccessibilityElement"),
+            "is_ignored": optional_bool_message(
+                receiver, "accessibilityIsIgnored"
+            ),
         }
 
     native_view = int(widget.winId())
@@ -813,7 +815,8 @@ def start_package_surface_smoke(evidence_path, expected_scale):
             "role": "",
             "title": "",
             "description": "",
-            "is_element": False,
+            "is_ignored": None,
+            "exposed": False,
             "source": "accessibility-tree",
             "bridge": "accessibilityAttributeValue:AXChildren",
             "bridge_supported": False,
@@ -845,7 +848,8 @@ def start_package_surface_smoke(evidence_path, expected_scale):
                 != "Packaged accessibility control"
                 or accessibility["native"].get("description")
                 != "Verifies packaged Qt accessibility metadata."
-                or accessibility["native"].get("is_element") is not True
+                or accessibility["native"].get("is_ignored") is not False
+                or accessibility["native"].get("exposed") is not True
                 or accessibility["native"].get("source") != "accessibility-tree"
                 or accessibility["native"].get("bridge")
                 != "accessibilityAttributeValue:AXChildren"
