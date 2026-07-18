@@ -1229,7 +1229,12 @@ def test_macos_surface_evidence_rejects_observation_mutations():
             "focus_after_tab": "packagedKeyboardTraversalTarget",
             "accessible_name": "Packaged accessibility control",
             "accessible_description": "Verifies packaged Qt accessibility metadata.",
-            "native": {"role": "AXButton", "is_element": True},
+            "native": {
+                "role": "AXButton",
+                "label": "Packaged accessibility control",
+                "is_element": True,
+                "source": "accessibility-tree",
+            },
         },
         "available_styles": ["macOS"], "active_style": "macos", "tls_backends": ["cert-only"],
         "image_formats": ["jpeg", "svg"], "baseline_device_pixel_ratio": 1.0,
@@ -1252,7 +1257,7 @@ def test_macos_surface_evidence_rejects_observation_mutations():
             "focus_after_tab": "packagedKeyboardTraversalTarget",
             "accessible_name": "Packaged accessibility control",
             "accessible_description": "Verifies packaged Qt accessibility metadata.",
-            "native": {"role": "", "is_element": False},
+            "native": {"role": "", "label": "", "is_element": False},
         }),
     ]
     for key, value in mutations:
@@ -1260,6 +1265,45 @@ def test_macos_surface_evidence_rejects_observation_mutations():
         mutated[0][key] = value
         with pytest.raises(inspector.MacOSDeploymentInspectionError, match="surface evidence"):
             inspector.validate_macos_surface_records(mutated)
+
+
+def test_cocoa_accessibility_finds_exact_exposed_descendant_fail_closed():
+    from rc_metastudio.cocoa_accessibility import find_accessibility_element
+
+    tree = {1: [2], 2: [3], 3: [1]}
+    observations = {
+        1: {"role": "", "label": "", "is_element": False},
+        2: {"role": "AXButton", "label": "Other", "is_element": True},
+        3: {
+            "role": "AXButton",
+            "label": "Packaged accessibility control",
+            "is_element": True,
+        },
+    }
+    observed = find_accessibility_element(
+        [1],
+        expected_label="Packaged accessibility control",
+        observe=observations.__getitem__,
+        children=lambda node: tree[node],
+    )
+    assert observed == {**observations[3], "source": "accessibility-tree"}
+
+    missing = find_accessibility_element(
+        [1],
+        expected_label="Changed label",
+        observe=observations.__getitem__,
+        children=lambda node: tree[node],
+    )
+    assert missing["is_element"] is False
+    assert missing["visited_nodes"] == 3
+    with pytest.raises(RuntimeError, match="exceeded its node bound"):
+        find_accessibility_element(
+            [1],
+            expected_label="Changed label",
+            observe=observations.__getitem__,
+            children=lambda node: tree[node],
+            max_nodes=2,
+        )
 
 
 def test_package_classifier_and_gate_cover_all_direct_macos_inputs():

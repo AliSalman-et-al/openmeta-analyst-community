@@ -32,6 +32,7 @@ import app_error_handler
 import settings
 import adaptive_window
 import qt6_resources
+from rc_metastudio.cocoa_accessibility import find_accessibility_element
 from rc_metastudio.result_text_identity import normalize_heterogeneity_header
 
 SPLASH_DISPLAY_TIME = 0  # Keep startup smoke tests fast; packaged builds may override.
@@ -578,22 +579,75 @@ def _native_accessibility_observation(widget):
         message.restype = ctypes.c_void_p
         return message(ctypes.c_void_p(receiver), selector(name))
 
+    def responds(receiver, name):
+        message.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+        message.restype = ctypes.c_bool
+        return bool(
+            message(
+                ctypes.c_void_p(receiver),
+                selector("respondsToSelector:"),
+                selector(name),
+            )
+        )
+
     def text_message(receiver, name):
+        if not responds(receiver, name):
+            return ""
         value = object_message(receiver, name)
         if not value:
             return ""
         raw = object_message(value, "UTF8String")
         return ctypes.cast(raw, ctypes.c_char_p).value.decode("utf-8") if raw else ""
 
+    def bool_message(receiver, name):
+        if not responds(receiver, name):
+            return False
+        message.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        message.restype = ctypes.c_bool
+        return bool(message(ctypes.c_void_p(receiver), selector(name)))
+
+    def array_children(receiver):
+        if not responds(receiver, "accessibilityChildren"):
+            return []
+        array = object_message(receiver, "accessibilityChildren")
+        if not array:
+            return []
+        message.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        message.restype = ctypes.c_ulong
+        count = min(256, int(message(ctypes.c_void_p(array), selector("count"))))
+        values = []
+        for index in range(count):
+            message.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_ulong]
+            message.restype = ctypes.c_void_p
+            value = message(
+                ctypes.c_void_p(array), selector("objectAtIndex:"), index
+            )
+            if value:
+                values.append(int(value))
+        return values
+
+    def observe(receiver):
+        return {
+            "role": text_message(receiver, "accessibilityRole"),
+            "label": text_message(receiver, "accessibilityLabel")
+            or text_message(receiver, "accessibilityTitle"),
+            "is_element": bool_message(receiver, "isAccessibilityElement"),
+        }
+
     native_view = int(widget.winId())
-    role = text_message(native_view, "accessibilityRole")
-    label = text_message(native_view, "accessibilityLabel")
-    message.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
-    message.restype = ctypes.c_bool
-    is_element = bool(
-        message(ctypes.c_void_p(native_view), selector("isAccessibilityElement"))
+    window = object_message(native_view, "window")
+    roots = [native_view]
+    if window:
+        roots.append(int(window))
+        content_view = object_message(int(window), "contentView")
+        if content_view:
+            roots.append(int(content_view))
+    return find_accessibility_element(
+        roots,
+        expected_label=widget.accessibleName(),
+        observe=observe,
+        children=array_children,
     )
-    return {"role": role, "label": label, "is_element": is_element}
 
 
 def start_package_surface_smoke(evidence_path, expected_scale):
@@ -700,7 +754,10 @@ def start_package_surface_smoke(evidence_path, expected_scale):
                 or accessibility["focus_after_tab"]
                 != "packagedKeyboardTraversalTarget"
                 or not accessibility["native"].get("role")
+                or accessibility["native"].get("label")
+                != "Packaged accessibility control"
                 or accessibility["native"].get("is_element") is not True
+                or accessibility["native"].get("source") != "accessibility-tree"
             )
         )
     ):

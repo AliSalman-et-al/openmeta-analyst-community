@@ -389,7 +389,7 @@ def test_workflow_layout_survives_process_level_scale_factors():
     root = Path(__file__).resolve().parents[3]
     script = r"""
 import json
-from PyQt6 import QtWidgets
+from PyQt6 import QtCore, QtWidgets
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 prepare_generated_ui_imports()
 import app_error_handler
@@ -398,22 +398,30 @@ import main_wizard
 
 app = app_error_handler.get_or_create_application([])
 wizard = main_wizard.MainWizard(path="new_dataset")
-wizard.restart()
-wizard.show()
-app.processEvents()
-page = wizard.currentPage()
-overflow = page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
-buttons = [wizard.button(role) for role in (
-    main_wizard.QWizard.WizardButton.NextButton,
-    main_wizard.QWizard.WizardButton.CancelButton,
-)]
-print("WORKFLOW_LAYOUT=" + json.dumps({
-    "archetype": adaptive_window.adaptive_window_state(wizard).policy.archetype.value,
-    "overflow": overflow is not None,
-    "buttons": all(button.isVisible() for button in buttons),
-    "bounded": wizard.frameGeometry().width() <= app.primaryScreen().availableGeometry().width()
-        and wizard.frameGeometry().height() <= app.primaryScreen().availableGeometry().height(),
-}))
+try:
+    wizard.restart()
+    wizard.show()
+    app.processEvents()
+    page = wizard.currentPage()
+    overflow = page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
+    buttons = [wizard.button(role) for role in (
+        main_wizard.QWizard.WizardButton.NextButton,
+        main_wizard.QWizard.WizardButton.CancelButton,
+    )]
+    print("WORKFLOW_LAYOUT=" + json.dumps({
+        "archetype": adaptive_window.adaptive_window_state(wizard).policy.archetype.value,
+        "overflow": overflow is not None,
+        "buttons": all(button.isVisible() for button in buttons),
+        "bounded": wizard.frameGeometry().width() <= app.primaryScreen().availableGeometry().width()
+            and wizard.frameGeometry().height() <= app.primaryScreen().availableGeometry().height(),
+    }), flush=True)
+finally:
+    wizard.close()
+    wizard.deleteLater()
+    QtWidgets.QApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
+    app.processEvents()
+    app.quit()
+    app.processEvents()
 """
     for scale_factor in ("1", "1.5", "2"):
         environment = os.environ.copy()

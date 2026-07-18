@@ -974,6 +974,8 @@ def validate_macos_surface_records(scales: object) -> None:
                 == "Verifies packaged Qt accessibility metadata."
             and native_accessibility.get("is_element") is True
             and bool(native_accessibility.get("role"))
+            and native_accessibility.get("label") == "Packaged accessibility control"
+            and native_accessibility.get("source") == "accessibility-tree"
             and item.get("available_styles") and item.get("active_style")
             and item.get("tls_backends")
             and {"jpeg", "svg"} <= set(item.get("image_formats", []))
