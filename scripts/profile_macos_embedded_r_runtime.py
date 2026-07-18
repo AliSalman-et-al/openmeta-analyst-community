@@ -164,14 +164,26 @@ def profile(resources: Path, evidence: Path, manifest_path: Path, r_version: str
     roots, builtin, manifest_sha256 = manifest_roots(manifest_path)
     closure = hard_dependency_closure(library, roots, builtin)
     source_resources = (source_resources or resources).resolve(strict=True)
-    source_executable = source_resources / "bin" / "exec" / "R"
-    if not source_executable.is_file() or not is_macho(source_executable):
-        raise ProfileError("source R executable is missing or is not Mach-O")
-    source_executable_record = macho_record(source_executable, source_resources)
-    if source_executable_record["architectures"] != [architecture]:
+    source_macho = source_resources / "lib" / "libR.dylib"
+    if not source_macho.is_file() or not is_macho(source_macho):
+        raise ProfileError("canonical source lib/libR.dylib is missing or is not Mach-O")
+    source_macho_record = macho_record(source_macho, source_resources)
+    if source_macho_record["architectures"] != [architecture]:
         raise ProfileError(
-            f"source R executable must be {architecture}-only, found {source_executable_record['architectures']}"
+            f"canonical source libR must be {architecture}-only, found {source_macho_record['architectures']}"
         )
+    source_launcher = source_resources / "bin" / "exec" / "R"
+    if not source_launcher.is_file() or is_macho(source_launcher):
+        raise ProfileError("source bin/exec/R must be the expected non-Mach-O launcher")
+    launcher_bytes = source_launcher.read_bytes()
+    if not launcher_bytes.startswith(b"#!"):
+        raise ProfileError("source bin/exec/R launcher is missing its script shebang")
+    source_launcher_record = {
+        "relative_path": source_launcher.relative_to(source_resources).as_posix(),
+        "kind": "script",
+        "sha256": hashlib.sha256(launcher_bytes).hexdigest(),
+        "symlink_target": source_launcher.readlink().as_posix() if source_launcher.is_symlink() else None,
+    }
     exclusions: list[dict[str, object]] = []
     expected_paths = {relative for relative, _ in EXCLUSIONS}
     x11_machos: set[str] = set()
@@ -255,7 +267,8 @@ def profile(resources: Path, evidence: Path, manifest_path: Path, r_version: str
             "source_resources": str(source_resources),
             "source_tree_identity_sha256": sha256_tree_identity(source_resources),
             "pre_profile_tree_identity_sha256": sha256_tree_identity(resources),
-            "source_executable": source_executable_record,
+            "canonical_macho": source_macho_record,
+            "launcher": source_launcher_record,
         },
         "allowed_non_tcl_opt_r_dependencies": {
             path: [value for value in values if not re.search(r"/lib(?:tcl|tk)[^.]*", value)]

@@ -1058,7 +1058,11 @@ def write_qualification_evidence(
         and "tcltk" not in {str(name).casefold() for name in profile.get("hard_dependency_closure", [])}
         and profile.get("source_framework", {}).get("version") == EXPECTED_VERSIONS["r"]
         and profile.get("source_framework", {}).get("expected_architecture") == "x86_64"
-        and profile.get("source_framework", {}).get("source_executable", {}).get("architectures") == ["x86_64"]
+        and profile.get("source_framework", {}).get("canonical_macho", {}).get("relative_path") == "lib/libR.dylib"
+        and profile.get("source_framework", {}).get("canonical_macho", {}).get("architectures") == ["x86_64"]
+        and profile.get("source_framework", {}).get("launcher", {}).get("relative_path") == "bin/exec/R"
+        and profile.get("source_framework", {}).get("launcher", {}).get("kind") == "script"
+        and _valid_sha256(profile.get("source_framework", {}).get("launcher", {}).get("sha256"))
         and _valid_sha256(profile.get("source_framework", {}).get("source_tree_identity_sha256"))
         and _valid_sha256(profile.get("source_framework", {}).get("pre_profile_tree_identity_sha256"))
         and profile.get("post_profile_exclusions") == expected_profile_paths
