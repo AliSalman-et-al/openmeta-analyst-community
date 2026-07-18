@@ -66,7 +66,9 @@ def test_producer_populates_a_clean_dedicated_uv_cache_from_the_exact_lock():
     workflow = Path(".github/workflows/r-integration-kit-producer.yml").read_text(
         encoding="utf-8"
     )
-    assert "UV_CACHE_DIR: ${{ runner.temp }}/rcms-r-kit-uv-cache" in workflow
+    top_level_env = workflow.split("jobs:", 1)[0]
+    assert "UV_CACHE_DIR: ${{ github.workspace }}/build/r-kit-uv-cache" in top_level_env
+    assert "${{ runner." not in top_level_env
     assert "with: {enable-cache: false}" in workflow
     clean = workflow.index("Initialize dedicated immutable-kit uv cache")
     locked_sync = workflow.index("uv sync --locked")

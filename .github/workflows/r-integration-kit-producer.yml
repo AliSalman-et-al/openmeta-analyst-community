@@ -16,7 +16,7 @@ permissions:
 
 env:
   RCMS_CRAN_REPO: https://packagemanager.posit.co/cran/2026-07-16
-  UV_CACHE_DIR: ${{ runner.temp }}/rcms-r-kit-uv-cache
+  UV_CACHE_DIR: ${{ github.workspace }}/build/r-kit-uv-cache
 
 jobs:
   produce:
