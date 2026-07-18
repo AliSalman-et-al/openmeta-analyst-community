@@ -164,6 +164,9 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
         assert value in build
     assert "--automation-package-runtime-probe" in build
     assert "--automation-package-surface-smoke" in build
+    assert 'local timeout_seconds="${RCMS_PACKAGED_PROCESS_TIMEOUT_SECONDS:-900}"' in build
+    assert "RCMS_PACKAGED_PROCESS_TIMEOUT_SECONDS=60" in build
+    assert '--timeout-seconds "$timeout_seconds"' in build
     assert "RCMS_PACKAGE_SMOKE_EVIDENCE" in build
     assert "RCMS_AUTOMATION_HANG_TRACE" in build
     assert "run_bounded_process.py" in build
@@ -373,6 +376,9 @@ def test_macos_inventory_allows_only_the_rpy2_abi_native_bridge():
 
 def test_macos_surface_smoke_exercises_native_acceptance_surfaces():
     launch = text("src/rc_metastudio/launch.py")
+    native_dialog_bridge = launch.split(
+        "def _native_file_dialog_observation", 1
+    )[1].split("def start_package_surface_smoke", 1)[0]
 
     assert 'platform_name != "cocoa"' in launch
     assert '"native_menu": native_menu' in launch
@@ -386,7 +392,14 @@ def test_macos_surface_smoke_exercises_native_acceptance_surfaces():
     assert '"window_modality": "window-modal"' not in launch
     assert "event_loop.exec()" in launch
     assert "file_dialog.exec()" not in launch
+    assert "app.processEvents()" not in native_dialog_bridge
+    assert "file_dialog.close()" not in native_dialog_bridge
     assert '"native-file-dialog"' in launch
+    assert '"surface_progress"' in launch
+    assert 'checkpoint("native-file-dialog:open:start")' in launch
+    assert 'checkpoint("native-file-dialog:open:return")' in launch
+    assert 'checkpoint("native-file-dialog:timeout")' in launch
+    assert 'evidence.pop("surface_progress", None)' in launch
     assert "isNativeMenuBar" in launch
     assert "accessible_control.setFocus()" in launch
     assert "accessible_control.setFocus(QtCore.Qt.FocusReason" not in launch
@@ -881,6 +894,22 @@ def test_smoke_finalizer_requires_the_post_close_marker(tmp_path):
         encoding="utf-8",
     )
     log.write_text("packaged-workflow:post-close\n", encoding="utf-8")
+    with pytest.raises(
+        inspector.MacOSDeploymentInspectionError,
+        match="failed native observations",
+    ):
+        inspector.finalize_smoke_evidence(evidence, log)
+
+    evidence.write_text(
+        json.dumps({
+            "passed": True,
+            "surface_progress": {
+                "requested": "1.25",
+                "stage": "native-file-dialog:open:start",
+            },
+        }),
+        encoding="utf-8",
+    )
     with pytest.raises(
         inspector.MacOSDeploymentInspectionError,
         match="failed native observations",

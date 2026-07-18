@@ -251,7 +251,9 @@ def load_R_libraries(app, splash=None, phase_callback=None):
 
 
 def start():
+    _write_automation_smoke_log("automation-dispatch:entered")
     qt6_resources.ensure_application_resources()
+    _write_automation_smoke_log("automation-dispatch:resources-ready")
     app_error_handler.install_global_exception_handler()
     pid_path = os.environ.get("RCMS_AUTOMATION_PID_FILE")
     startup_argv = _resolve_startup_argv()
@@ -295,6 +297,7 @@ def start():
             raise SystemExit(
                 "--automation-package-surface-smoke requires an evidence path and scale."
             )
+        _write_automation_smoke_log("packaged-surface:dispatch")
         return _run_automation_smoke(
             lambda: start_package_surface_smoke(startup_argv[2], startup_argv[3])
         )
@@ -724,12 +727,29 @@ def _persist_package_surface_failure(
     )
 
 
-def _native_file_dialog_observation(app, parent):
+def _record_package_surface_progress(evidence_path, expected_scale, stage):
+    """Atomically retain the last bounded surface stage for outer-timeout RCA."""
+    path = Path(evidence_path)
+    evidence = json.loads(path.read_text(encoding="utf-8"))
+    evidence["surface_progress"] = {
+        "requested": expected_scale,
+        "stage": stage,
+    }
+    temporary = path.with_name(path.name + ".surface-progress.tmp")
+    temporary.write_text(
+        json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    os.replace(temporary, path)
+    _write_automation_smoke_log("packaged-surface:" + stage)
+
+
+def _native_file_dialog_observation(app, parent, checkpoint):
     """Exercise a Cocoa sheet without entering NSOpenPanel's blocking runModal."""
     file_dialog = QtWidgets.QFileDialog(parent, "Packaged native file dialog")
     file_dialog.setFileMode(QtWidgets.QFileDialog.FileMode.ExistingFile)
     file_dialog.setOption(QtWidgets.QFileDialog.Option.DontUseNativeDialog, False)
     file_dialog.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
+    checkpoint("native-file-dialog:configured")
     observation = {
         "dont_use_native_dialog": file_dialog.testOption(
             QtWidgets.QFileDialog.Option.DontUseNativeDialog
@@ -753,16 +773,20 @@ def _native_file_dialog_observation(app, parent):
     def finish(result):
         observation["finished_signal"] = True
         observation["result"] = int(result)
+        checkpoint("native-file-dialog:finished-signal")
         if event_loop.isRunning():
             event_loop.quit()
 
     def mark_rejected():
         observation["rejected_signal"] = True
+        checkpoint("native-file-dialog:rejected-signal")
 
     def observe_and_cancel():
         observation["visible_before_cancel"] = file_dialog.isVisible()
         observation["cancel_requested"] = True
+        checkpoint("native-file-dialog:reject:start")
         file_dialog.reject()
+        checkpoint("native-file-dialog:reject:return")
 
     def time_out():
         observation["timed_out"] = True
@@ -770,6 +794,7 @@ def _native_file_dialog_observation(app, parent):
         observation["error_message"] = bounded_error_message(
             TimeoutError("native file dialog did not reject before its 10 second bound")
         )
+        checkpoint("native-file-dialog:timeout")
         file_dialog.reject()
         if event_loop.isRunning():
             event_loop.quit()
@@ -779,27 +804,38 @@ def _native_file_dialog_observation(app, parent):
     observe_timer.timeout.connect(observe_and_cancel)
     watchdog.timeout.connect(time_out)
     watchdog.start(NATIVE_FILE_DIALOG_TIMEOUT_MS)
+    checkpoint("native-file-dialog:open:start")
     file_dialog.open()
-    app.processEvents()
+    checkpoint("native-file-dialog:open:return")
     observation["window_modality"] = file_dialog.windowModality().name
     observe_timer.start(NATIVE_FILE_DIALOG_OBSERVE_DELAY_MS)
     if not observation["finished_signal"]:
+        checkpoint("native-file-dialog:event-loop:start")
         event_loop.exec()
+        checkpoint("native-file-dialog:event-loop:return")
     observe_timer.stop()
     watchdog.stop()
-    file_dialog.close()
-    app.processEvents()
     file_dialog.deleteLater()
+    checkpoint("native-file-dialog:complete")
     return observation
 
 
 def start_package_surface_smoke(evidence_path, expected_scale):
     """Exercise native package-only Qt surfaces at a requested scale factor."""
+    def checkpoint(stage):
+        _record_package_surface_progress(evidence_path, expected_scale, stage)
+
+    checkpoint("entry")
     app_error_handler.install_global_exception_handler()
+    checkpoint("application:create:start")
     app = app_error_handler.get_or_create_application(sys.argv)
+    checkpoint("application:create:complete")
     _configure_application(app)
+    checkpoint("application:configured")
     qt6_resources.ensure_application_resources()
+    checkpoint("resources:ready")
     from PyQt6 import QtNetwork
+    checkpoint("network-module:ready")
     platform_name = app.platformName().lower()
     if sys.platform == "win32" and platform_name != "windows":
         raise SystemExit("Package surface smoke did not load qwindows.")
@@ -807,10 +843,12 @@ def start_package_surface_smoke(evidence_path, expected_scale):
         raise SystemExit("Package surface smoke did not load Cocoa.")
 
     clipboard = app.clipboard()
+    checkpoint("clipboard:ready")
     clipboard_text = "RC MetaStudio clipboard – München – 1,25"
     clipboard.setText(clipboard_text)
     if clipboard.text() != clipboard_text:
         raise SystemExit("Package surface smoke clipboard round-trip failed.")
+    checkpoint("clipboard:round-trip:complete")
 
     locale = QtCore.QLocale(QtCore.QLocale.Language.German)
     value, valid = locale.toDouble("1,25")
@@ -830,6 +868,7 @@ def start_package_surface_smoke(evidence_path, expected_scale):
     image_formats = sorted(value.data().decode("ascii").lower() for value in QtGui.QImageReader.supportedImageFormats())
     if not {"ico", "jpeg", "svg"} <= set(image_formats):
         raise SystemExit("Package surface smoke did not load required image/SVG plugins.")
+    checkpoint("runtime-surfaces:ready")
 
     native_window = QtWidgets.QMainWindow()
     native_window.setWindowTitle("RC MetaStudio package surfaces")
@@ -849,8 +888,11 @@ def start_package_surface_smoke(evidence_path, expected_scale):
     body_layout.addWidget(next_control)
     native_window.setCentralWidget(body)
     native_window.setTabOrder(accessible_control, next_control)
+    checkpoint("native-window:show:start")
     native_window.show()
+    checkpoint("native-window:events:start")
     app.processEvents()
+    checkpoint("native-window:visible")
     native_menu = {
         "is_native": bool(menu_bar.isNativeMenuBar()),
         "menu_count": len(menu_bar.actions()),
@@ -876,6 +918,7 @@ def start_package_surface_smoke(evidence_path, expected_scale):
         )
     app.processEvents()
     focus_after = app.focusWidget()
+    checkpoint("accessibility:observe:start")
     try:
         native_accessibility = (
             _native_accessibility_observation(accessible_control)
@@ -904,6 +947,7 @@ def start_package_surface_smoke(evidence_path, expected_scale):
         "accessible_description": accessible_control.accessibleDescription(),
         "native": native_accessibility,
     }
+    checkpoint("accessibility:observed")
     if (
         accessibility["accessible_name"] != "Packaged accessibility control"
         or accessibility["accessible_description"]
@@ -939,7 +983,9 @@ def start_package_surface_smoke(evidence_path, expected_scale):
         raise SystemExit("Package surface smoke could not exercise accessibility metadata.")
 
     try:
-        native_file_dialog = _native_file_dialog_observation(app, native_window)
+        native_file_dialog = _native_file_dialog_observation(
+            app, native_window, checkpoint
+        )
     except Exception as error:
         native_file_dialog = {
             "dont_use_native_dialog": False,
@@ -1009,6 +1055,7 @@ def start_package_surface_smoke(evidence_path, expected_scale):
 
     path = Path(evidence_path)
     evidence = json.loads(path.read_text(encoding="utf-8"))
+    evidence.pop("surface_progress", None)
     evidence.setdefault("scales", []).append(
         {
             "requested": expected_scale,

@@ -770,7 +770,7 @@ def finalize_smoke_evidence(
     path: Path, log_path: Path, launchservices_marker: Path | None = None
 ) -> dict:
     evidence = json.loads(path.read_text(encoding="utf-8"))
-    if evidence.get("failures"):
+    if evidence.get("failures") or evidence.get("surface_progress"):
         raise MacOSDeploymentInspectionError(
             "packaged automation contains failed native observations"
         )
@@ -1059,6 +1059,7 @@ def write_qualification_evidence(
             == sha256_file(signing_inventory)
         and smoke.get("passed") is True
         and not smoke.get("failures")
+        and not smoke.get("surface_progress")
         and all(workflows.get(key) is True for key in (
             "automation_entry_point", "representative_edit", "real_r_analysis",
             "result_text", "save_reopen", "analysis_after_reopen",

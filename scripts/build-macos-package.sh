@@ -686,13 +686,14 @@ run_adaptive_layout_evidence() {
 }
 
 run_packaged_process() {
+  local timeout_seconds="${RCMS_PACKAGED_PROCESS_TIMEOUT_SECONDS:-900}"
   env -u QT_QPA_PLATFORM \
     RCMS_REQUIRE_IN_PROCESS_RPY2=1 \
     RPY2_CFFI_MODE=ABI \
     RCMS_R_HOME="$r_home" \
     RCMS_R_LIBS="$r_lib" \
     "$python_exe" "$repo_root/scripts/run_bounded_process.py" \
-      --timeout-seconds 900 \
+      --timeout-seconds "$timeout_seconds" \
       --stdout "$smoke_stdout_path" \
       --stderr "$smoke_stderr_path" \
       -- "$@"
@@ -733,6 +734,7 @@ PY
     QT_SCALE_FACTOR="$scale" \
       RCMS_PACKAGE_BASELINE_DPR="$baseline_dpr" \
       RCMS_AUTOMATION_SMOKE_LOG="$smoke_log_path" \
+      RCMS_PACKAGED_PROCESS_TIMEOUT_SECONDS=60 \
       run_packaged_process "$app_root/RCMetaStudio" \
         --automation-package-surface-smoke "$smoke_evidence_path" "$scale"
   done
