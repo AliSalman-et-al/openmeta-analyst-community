@@ -400,6 +400,16 @@ def test_macos_surface_smoke_exercises_native_acceptance_surfaces():
     assert 'checkpoint("native-file-dialog:open:return")' in launch
     assert 'checkpoint("native-file-dialog:timeout")' in launch
     assert 'evidence.pop("surface_progress", None)' in launch
+    assert "CRITICAL_DIALOG_TIMEOUT_MS = 5_000" in launch
+    assert "QMessageBox.Option.DontUseNativeDialog" in launch
+    assert "ApplicationAttribute.AA_DontUseNativeDialogs" in launch
+    assert "WidgetAttribute.WA_DontShowOnScreen" in launch
+    assert 'observation["native_helper_active"] = (' in launch
+    assert 'checkpoint("critical-dialog:show:start")' in launch
+    assert 'checkpoint("critical-dialog:timeout")' in launch
+    assert "QCoreApplication.sendPostedEvents" in launch
+    assert "QEvent.Type.DeferredDelete" in launch
+    assert 'checkpoint("cleanup:application-quit")' in launch
     assert "isNativeMenuBar" in launch
     assert "accessible_control.setFocus()" in launch
     assert "accessible_control.setFocus(QtCore.Qt.FocusReason" not in launch
@@ -1282,7 +1292,23 @@ def test_bounded_process_kills_stubborn_grandchild(tmp_path):
 def test_macos_surface_evidence_rejects_observation_mutations():
     inspector = load_inspector()
     base = {
-        "platform_plugin": "cocoa", "clipboard": True, "critical_dialog": True,
+        "platform_plugin": "cocoa", "clipboard": True,
+        "critical_dialog": {
+            "dont_use_native_dialog": False,
+            "application_dont_use_native_dialogs": False,
+            "dont_show_on_screen_before_show": False,
+            "dont_show_on_screen_after_show": True,
+            "native_helper_active": True,
+            "window_modality": "WindowModal",
+            "visible_before_close": True,
+            "critical_icon": True,
+            "finished_signal": True,
+            "result": 1,
+            "accepted_value": 1,
+            "timed_out": False,
+            "timeout_ms": 5_000,
+        },
+        "cleanup": {"close_accepted": True, "window_visible": False},
         "binary_resources": True, "native_menu": {"is_native": True, "menu_count": 1, "action_count": 1},
         "native_file_dialog": {
             "dont_use_native_dialog": False,
@@ -1346,6 +1372,33 @@ def test_macos_surface_evidence_rejects_observation_mutations():
             **base["native_file_dialog"],
             "window_modality": "ApplicationModal",
         }),
+        ("critical_dialog", {
+            **base["critical_dialog"],
+            "finished_signal": False,
+            "result": None,
+            "timed_out": True,
+        }),
+        ("critical_dialog", {
+            **base["critical_dialog"],
+            "dont_use_native_dialog": True,
+            "native_helper_active": False,
+        }),
+        ("critical_dialog", {
+            **base["critical_dialog"],
+            "application_dont_use_native_dialogs": True,
+            "native_helper_active": False,
+        }),
+        ("critical_dialog", {
+            **base["critical_dialog"],
+            "dont_show_on_screen_before_show": True,
+            "native_helper_active": False,
+        }),
+        ("critical_dialog", {
+            **base["critical_dialog"],
+            "dont_show_on_screen_after_show": False,
+            "native_helper_active": False,
+        }),
+        ("cleanup", {"close_accepted": True, "window_visible": True}),
         ("accessibility", {
             "focus_before": "packagedAccessibilityControl",
             "focus_after_tab": "packagedKeyboardTraversalTarget",

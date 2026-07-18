@@ -958,13 +958,13 @@ def validate_macos_surface_records(scales: object) -> None:
     for item in typed_scales:
         menu = item.get("native_menu", {})
         file_dialog = item.get("native_file_dialog", {})
+        critical_dialog = item.get("critical_dialog", {})
+        cleanup = item.get("cleanup", {})
         accessibility = item.get("accessibility", {})
         native_accessibility = accessibility.get("native", {})
         if not (
             item.get("platform_plugin") == "cocoa"
-            and all(item.get(key) is True for key in (
-                "clipboard", "critical_dialog", "binary_resources"
-            ))
+            and all(item.get(key) is True for key in ("clipboard", "binary_resources"))
             and menu.get("is_native") is True
             and int(menu.get("menu_count", 0)) >= 1
             and int(menu.get("action_count", 0)) >= 1
@@ -977,6 +977,19 @@ def validate_macos_surface_records(scales: object) -> None:
             and file_dialog.get("result") == file_dialog.get("rejected_value") == 0
             and file_dialog.get("timed_out") is False
             and file_dialog.get("timeout_ms") == 10_000
+            and critical_dialog.get("dont_use_native_dialog") is False
+            and critical_dialog.get("application_dont_use_native_dialogs") is False
+            and critical_dialog.get("dont_show_on_screen_before_show") is False
+            and critical_dialog.get("dont_show_on_screen_after_show") is True
+            and critical_dialog.get("native_helper_active") is True
+            and critical_dialog.get("window_modality") == "WindowModal"
+            and critical_dialog.get("visible_before_close") is True
+            and critical_dialog.get("critical_icon") is True
+            and critical_dialog.get("finished_signal") is True
+            and critical_dialog.get("result")
+                == critical_dialog.get("accepted_value") == 1
+            and critical_dialog.get("timed_out") is False
+            and critical_dialog.get("timeout_ms") == 5_000
             and accessibility.get("focus_before") == "packagedAccessibilityControl"
             and accessibility.get("focus_after_tab") == "packagedKeyboardTraversalTarget"
             and accessibility.get("accessible_name") == "Packaged accessibility control"
@@ -993,6 +1006,8 @@ def validate_macos_surface_records(scales: object) -> None:
                 == "accessibilityAttributeValue:AXChildren"
             and native_accessibility.get("bridge_supported") is True
             and int(native_accessibility.get("root_count", 0)) >= 1
+            and cleanup.get("close_accepted") is True
+            and cleanup.get("window_visible") is False
             and item.get("available_styles") and item.get("active_style")
             and item.get("tls_backends")
             and {"jpeg", "svg"} <= set(item.get("image_formats", []))

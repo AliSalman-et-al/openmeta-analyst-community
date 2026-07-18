@@ -45,6 +45,8 @@ ADAPTIVE_LAYOUT_EVIDENCE_LOG_ENV = "RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG"
 PACKAGED_SUMMARY_SHA256 = "78294820c83cd94c19dfdca8c24b6a96cdc8b6f1319a5cd1bedffacde73851e2"
 NATIVE_FILE_DIALOG_OBSERVE_DELAY_MS = 250
 NATIVE_FILE_DIALOG_TIMEOUT_MS = 10_000
+CRITICAL_DIALOG_OBSERVE_DELAY_MS = 100
+CRITICAL_DIALOG_TIMEOUT_MS = 5_000
 
 
 def screen_bounded_splash_pixmap(source, available_logical_size):
@@ -820,6 +822,118 @@ def _native_file_dialog_observation(app, parent, checkpoint):
     return observation
 
 
+def _critical_dialog_observation(parent, checkpoint):
+    """Show and close the real critical dialog inside one bounded Qt loop."""
+    dialog = QtWidgets.QMessageBox(
+        QtWidgets.QMessageBox.Icon.Critical,
+        "Packaged critical dialog",
+        "Deployment smoke diagnostic",
+        QtWidgets.QMessageBox.StandardButton.Ok,
+        parent,
+    )
+    dialog.setOption(QtWidgets.QMessageBox.Option.DontUseNativeDialog, False)
+    dialog.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
+    observation = {
+        "dont_use_native_dialog": dialog.testOption(
+            QtWidgets.QMessageBox.Option.DontUseNativeDialog
+        ),
+        "application_dont_use_native_dialogs": QtCore.QCoreApplication.testAttribute(
+            QtCore.Qt.ApplicationAttribute.AA_DontUseNativeDialogs
+        ),
+        "dont_show_on_screen_before_show": dialog.testAttribute(
+            QtCore.Qt.WidgetAttribute.WA_DontShowOnScreen
+        ),
+        "dont_show_on_screen_after_show": None,
+        "native_helper_active": False,
+        "window_modality": None,
+        "visible_before_close": False,
+        "critical_icon": False,
+        "finished_signal": False,
+        "result": None,
+        "accepted_value": int(QtWidgets.QDialog.DialogCode.Accepted),
+        "timed_out": False,
+        "timeout_ms": CRITICAL_DIALOG_TIMEOUT_MS,
+    }
+    event_loop = QtCore.QEventLoop()
+    observe_timer = QtCore.QTimer()
+    observe_timer.setSingleShot(True)
+    watchdog = QtCore.QTimer()
+    watchdog.setSingleShot(True)
+
+    def finish(result):
+        observation["finished_signal"] = True
+        observation["result"] = int(result)
+        checkpoint("critical-dialog:finished-signal")
+        if event_loop.isRunning():
+            event_loop.quit()
+
+    def observe_and_accept():
+        observation["visible_before_close"] = dialog.isVisible()
+        observation["critical_icon"] = (
+            dialog.icon() == QtWidgets.QMessageBox.Icon.Critical
+        )
+        checkpoint("critical-dialog:accept:start")
+        dialog.accept()
+        checkpoint("critical-dialog:accept:return")
+
+    def time_out():
+        observation["timed_out"] = True
+        observation["error_type"] = "TimeoutError"
+        observation["error_message"] = bounded_error_message(
+            TimeoutError("critical dialog did not close before its 5 second bound")
+        )
+        checkpoint("critical-dialog:timeout")
+        dialog.reject()
+        if event_loop.isRunning():
+            event_loop.quit()
+
+    dialog.finished.connect(finish)
+    observe_timer.timeout.connect(observe_and_accept)
+    watchdog.timeout.connect(time_out)
+    watchdog.start(CRITICAL_DIALOG_TIMEOUT_MS)
+    checkpoint("critical-dialog:show:start")
+    dialog.show()
+    checkpoint("critical-dialog:show:return")
+    observation["dont_show_on_screen_after_show"] = dialog.testAttribute(
+        QtCore.Qt.WidgetAttribute.WA_DontShowOnScreen
+    )
+    observation["native_helper_active"] = (
+        observation["dont_use_native_dialog"] is False
+        and observation["application_dont_use_native_dialogs"] is False
+        and observation["dont_show_on_screen_before_show"] is False
+        and observation["dont_show_on_screen_after_show"] is True
+    )
+    observation["window_modality"] = dialog.windowModality().name
+    observe_timer.start(CRITICAL_DIALOG_OBSERVE_DELAY_MS)
+    if not observation["finished_signal"]:
+        checkpoint("critical-dialog:event-loop:start")
+        event_loop.exec()
+        checkpoint("critical-dialog:event-loop:return")
+    observe_timer.stop()
+    watchdog.stop()
+    dialog.deleteLater()
+    checkpoint("critical-dialog:complete")
+    return observation
+
+
+def _finish_package_surface_cleanup(app, native_window, checkpoint):
+    """Close the disposable native window and drain only deferred deletions."""
+    checkpoint("cleanup:native-window-close:start")
+    close_accepted = native_window.close()
+    checkpoint("cleanup:native-window-close:return")
+    checkpoint("cleanup:deferred-delete:start")
+    QtCore.QCoreApplication.sendPostedEvents(
+        None, QtCore.QEvent.Type.DeferredDelete
+    )
+    checkpoint("cleanup:deferred-delete:complete")
+    app.quit()
+    checkpoint("cleanup:application-quit")
+    return {
+        "close_accepted": bool(close_accepted),
+        "window_visible": native_window.isVisible(),
+    }
+
+
 def start_package_surface_smoke(evidence_path, expected_scale):
     """Exercise native package-only Qt surfaces at a requested scale factor."""
     def checkpoint(stage):
@@ -1021,20 +1135,50 @@ def start_package_surface_smoke(evidence_path, expected_scale):
         )
         raise SystemExit("Package surface smoke could not exercise the native file dialog.")
 
-    dialog = QtWidgets.QMessageBox(
-        QtWidgets.QMessageBox.Icon.Critical,
-        "Packaged critical dialog",
-        "Deployment smoke diagnostic",
-        QtWidgets.QMessageBox.StandardButton.Ok,
-    )
-    dialog.show()
-    app.processEvents()
-    if not dialog.isVisible() or dialog.icon() != QtWidgets.QMessageBox.Icon.Critical:
+    try:
+        critical_dialog = _critical_dialog_observation(native_window, checkpoint)
+    except Exception as error:
+        critical_dialog = {
+            "dont_use_native_dialog": False,
+            "application_dont_use_native_dialogs": False,
+            "dont_show_on_screen_before_show": None,
+            "dont_show_on_screen_after_show": None,
+            "native_helper_active": False,
+            "window_modality": None,
+            "visible_before_close": False,
+            "critical_icon": False,
+            "finished_signal": False,
+            "result": None,
+            "accepted_value": int(QtWidgets.QDialog.DialogCode.Accepted),
+            "timed_out": False,
+            "timeout_ms": CRITICAL_DIALOG_TIMEOUT_MS,
+            "error_type": type(error).__name__,
+            "error_message": bounded_error_message(error),
+        }
+    if (
+        critical_dialog["dont_use_native_dialog"] is not False
+        or critical_dialog["application_dont_use_native_dialogs"] is not False
+        or critical_dialog["dont_show_on_screen_before_show"] is not False
+        or critical_dialog["dont_show_on_screen_after_show"] is not True
+        or critical_dialog["native_helper_active"] is not True
+        or critical_dialog["window_modality"] != "WindowModal"
+        or critical_dialog["visible_before_close"] is not True
+        or critical_dialog["critical_icon"] is not True
+        or critical_dialog["finished_signal"] is not True
+        or critical_dialog["result"] != critical_dialog["accepted_value"]
+        or critical_dialog["timed_out"] is not False
+        or critical_dialog["timeout_ms"] != CRITICAL_DIALOG_TIMEOUT_MS
+    ):
+        _persist_package_surface_failure(
+            evidence_path,
+            expected_scale,
+            platform_name,
+            "critical-dialog",
+            critical_dialog,
+        )
         raise SystemExit("Package surface smoke could not show a critical dialog.")
-    dialog.close()
-    native_window.close()
-    app.processEvents()
 
+    checkpoint("display-metrics:observe:start")
     primary = app.primaryScreen()
     if primary is None or primary.devicePixelRatio() <= 0 or primary.logicalDotsPerInch() <= 0:
         raise SystemExit("Package surface smoke found invalid display metrics.")
@@ -1053,6 +1197,18 @@ def start_package_surface_smoke(evidence_path, expected_scale):
             % (observed_dpr, expected_dpr, tolerance)
         )
 
+    cleanup = _finish_package_surface_cleanup(app, native_window, checkpoint)
+    if cleanup["close_accepted"] is not True or cleanup["window_visible"] is not False:
+        _persist_package_surface_failure(
+            evidence_path,
+            expected_scale,
+            platform_name,
+            "cleanup",
+            cleanup,
+        )
+        raise SystemExit("Package surface smoke could not cleanly close its native window.")
+
+    checkpoint("evidence:write:start")
     path = Path(evidence_path)
     evidence = json.loads(path.read_text(encoding="utf-8"))
     evidence.pop("surface_progress", None)
@@ -1066,7 +1222,7 @@ def start_package_surface_smoke(evidence_path, expected_scale):
             "dpr_tolerance": tolerance,
             "logical_dpi": primary.logicalDotsPerInch(),
             "clipboard": True,
-            "critical_dialog": True,
+            "critical_dialog": critical_dialog,
             "binary_resources": True,
             "native_menu": native_menu,
             "native_file_dialog": native_file_dialog,
@@ -1077,6 +1233,7 @@ def start_package_surface_smoke(evidence_path, expected_scale):
             "image_formats": image_formats,
             "locale": "de_DE",
             "platform_plugin": platform_name,
+            "cleanup": cleanup,
         }
     )
     path.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
