@@ -78,10 +78,13 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-r-stack-full.ps1
 
 Smoke/Fast Default R Evidence uses `artifacts\r-default-library-cache`; Full R Stack Evidence and packaging use `artifacts\r-library-cache`. Keeping those caches separate prevents fast verification from restoring the larger bundled-R packaging cache. Native binary dependencies are pinned to the dated Public PPM snapshot `https://packagemanager.posit.co/cran/2026-07-16`; `RCMS_CRAN_REPO` may repeat that exact value, but mismatched overrides are rejected. The package wrappers resolve one source R runtime and pass that same runtime into R Stack Evidence and artifact assembly, so the dependency cache can be reused before only the local `RCMetaR` package is reinstalled into the bundle.
 
-Build the Windows package only when packaging evidence is needed:
+Build the Windows package only from an authenticated native producer kit:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\package-windows.ps1 -ArtifactName RCMetaStudio-windows-x64
+powershell -ExecutionPolicy Bypass -File .\scripts\package-windows.ps1 `
+  -ArtifactName RCMetaStudio-windows-x64 `
+  -RIntegrationKit artifacts\r-integration-kits\windows-x64 `
+  -ExpectedRIntegrationKitSha256 <manifest-kit-sha256>
 ```
 
 Pull requests that change a direct Windows assembly or qualification input must
@@ -115,11 +118,16 @@ ZIP. Its uv, R dependency, and package inputs are cached, so avoid manual reruns
 when neither code nor cache state changed; local contracts are the quick feedback
 loop, not a substitute for the required hosted artifact proof.
 
-On macOS, use the package script for the matching host architecture:
+On macOS, use the package script with the matching producer artifact and its
+manifest `kit_sha256`:
 
 ```bash
-bash ./scripts/package-macos.sh --architecture x64
-bash ./scripts/package-macos.sh --architecture arm64
+bash ./scripts/package-macos.sh --architecture x64 \
+  --r-integration-kit artifacts/r-integration-kits/macos-x64 \
+  --expected-r-integration-kit-sha256 <manifest-kit-sha256>
+bash ./scripts/package-macos.sh --architecture arm64 \
+  --r-integration-kit artifacts/r-integration-kits/macos-arm64 \
+  --expected-r-integration-kit-sha256 <manifest-kit-sha256>
 ```
 
 Packaging-relevant pull requests now require the native macOS Intel x64

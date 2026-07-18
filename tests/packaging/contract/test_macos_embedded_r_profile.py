@@ -20,9 +20,12 @@ def load_profile():
 
 def fixture_runtime(tmp_path: Path) -> Path:
     root = tmp_path / "Resources"
+    launcher = root / "bin/R"
+    launcher.parent.mkdir(parents=True, exist_ok=True)
+    launcher.write_bytes(b'#!/bin/sh\nexec "$(dirname "$0")/exec/R" "$@"\n')
     executable = root / "bin/exec/R"
     executable.parent.mkdir(parents=True, exist_ok=True)
-    executable.write_bytes(b'#!/bin/sh\nexec R "$@"\n')
+    executable.write_bytes(b"Mach-O R executable")
     library = root / "lib/libR.dylib"
     library.parent.mkdir(parents=True, exist_ok=True)
     library.write_bytes(b"Mach-O libR")
@@ -35,6 +38,7 @@ def fixture_runtime(tmp_path: Path) -> Path:
 
 def configure_machos(monkeypatch, profile, root: Path, *, fifth: bool = False, non_tcl_opt_r: bool = False):
     records = {
+        "bin/exec/R": [],
         "lib/libR.dylib": [],
         "library/tcltk/libs/tcltk.so": ["/opt/R/x86_64/lib/libtcl8.6.dylib", "/opt/R/x86_64/lib/libtk8.6.dylib", "/opt/X11/lib/libX11.6.dylib", "/opt/X11/lib/libXss.1.dylib", "/opt/X11/lib/libXext.6.dylib"],
         "modules/R_X11.so": [f"/opt/X11/lib/lib{name}.6.dylib" for name in ("SM", "ICE", "X11", "Xext", "Xrender", "Xt", "Xmu")],
@@ -154,7 +158,9 @@ def test_profile_classifies_launcher_separately_from_canonical_lib_r(monkeypatch
     source = json.loads(evidence.read_text())["source_framework"]
     assert source["canonical_macho"]["relative_path"] == "lib/libR.dylib"
     assert source["canonical_macho"]["architectures"] == ["x86_64"]
-    assert source["launcher"]["relative_path"] == "bin/exec/R"
+    assert source["executable_macho"]["relative_path"] == "bin/exec/R"
+    assert source["executable_macho"]["architectures"] == ["x86_64"]
+    assert source["launcher"]["relative_path"] == "bin/R"
     assert source["launcher"]["kind"] == "script"
 
 
@@ -164,4 +170,27 @@ def test_profile_rejects_official_layout_without_canonical_lib_r(monkeypatch, tm
     (root / "lib/libR.dylib").unlink()
     configure_machos(monkeypatch, profile, root)
     with pytest.raises(profile.ProfileError, match="canonical source lib/libR.dylib"):
+        profile.profile(root, tmp_path / "profile.json", tmp_path / "manifest.json", "4.6.1", "x86_64")
+
+
+def test_profile_rejects_reversed_launcher_and_executable_classification(monkeypatch, tmp_path):
+    profile = load_profile()
+    root = fixture_runtime(tmp_path)
+    configure_machos(monkeypatch, profile, root)
+    original = profile.is_macho
+    monkeypatch.setattr(profile, "is_macho", lambda path: True if path == root / "bin/R" else original(path))
+    with pytest.raises(profile.ProfileError, match="bin/R must be the expected non-Mach-O launcher"):
+        profile.profile(root, tmp_path / "profile.json", tmp_path / "manifest.json", "4.6.1", "x86_64")
+
+
+def test_profile_rejects_wrong_architecture_r_executable(monkeypatch, tmp_path):
+    profile = load_profile()
+    root = fixture_runtime(tmp_path)
+    configure_machos(monkeypatch, profile, root)
+    original = profile.macho_record
+    monkeypatch.setattr(profile, "macho_record", lambda path, parent: {
+        **original(path, parent),
+        "architectures": (["arm64"] if path == root / "bin/exec/R" else original(path, parent)["architectures"]),
+    })
+    with pytest.raises(profile.ProfileError, match="bin/exec/R executable must be x86_64-only"):
         profile.profile(root, tmp_path / "profile.json", tmp_path / "manifest.json", "4.6.1", "x86_64")

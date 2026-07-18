@@ -21,6 +21,18 @@ uv run python scripts/sign_macos_app.py "$app" \
   --timestamp \
   --inventory-output "$signing_inventory"
 
+app_root="$app/Contents/MacOS"
+derivation="$app/Contents/Resources/r-integration-kit/derivation.json"
+test -f "$derivation"
+api_bridge="$(uv run python scripts/r_kit_derivation.py resolve-final --app-root "$app_root" --derivation "$derivation" --name api_bridge)"
+r_shared_library="$(uv run python scripts/r_kit_derivation.py resolve-final --app-root "$app_root" --derivation "$derivation" --name r_shared_library)"
+test -f "$api_bridge" && test -e "$r_shared_library"
+uv run python scripts/r_kit_derivation.py finalize \
+  --app-root "$app_root" --api-bridge "$api_bridge" \
+  --r-shared-library "$r_shared_library" --derivation "$derivation"
+codesign --force --options runtime --timestamp --sign "$RCMS_APPLE_SIGNING_IDENTITY" "$app"
+codesign --verify --strict --deep "$app"
+
 submission="$workspace/notarization.zip"
 ditto -c -k --keepParent "$app" "$submission"
 xcrun notarytool submit "$submission" --key "$RCMS_APPLE_NOTARY_KEY_FILE" --key-id "$RCMS_APPLE_NOTARY_KEY_ID" --issuer "$RCMS_APPLE_NOTARY_ISSUER" --wait

@@ -34,6 +34,7 @@ import app_error_handler
 import settings
 import adaptive_window
 import qt6_resources
+from r_call_serialization import serialized_r_call
 from rc_metastudio.cocoa_accessibility import (
     bounded_error_message,
     find_accessibility_element,
@@ -1247,6 +1248,7 @@ def start_package_surface_smoke(evidence_path, expected_scale):
     return 0
 
 
+@serialized_r_call
 def start_package_runtime_probe(output_path):
     """Report the runtime actually loaded by the assembled frozen executable."""
     import importlib.metadata
@@ -1260,7 +1262,9 @@ def start_package_runtime_probe(output_path):
     for member in project_schema_members:
         project_format._schema(1, member)
     configured = r_runtime.configure_bundled_r_environment()
+    import _rinterface_cffi_api
     from rpy2 import robjects
+    from rpy2.rinterface_lib import openrlib
 
     app = app_error_handler.get_or_create_application(sys.argv)
     _configure_application(app)
@@ -1273,6 +1277,18 @@ def start_package_runtime_probe(output_path):
     r_home = str(r_home_values[0])
     r_version = str(r_version_values[0])
     r_library_paths = [str(value) for value in r_library_values]
+    api_bridge_path = Path(_rinterface_cffi_api.__file__).resolve()
+    derivation = configured.get("derivation") or {}
+    final_identity = derivation.get("final", {})
+    api_record = final_identity.get("api_bridge", {})
+    expected_api_bridge = (Path(sys.executable).resolve().parent / str(api_record.get("path", ""))).resolve()
+    if (
+        api_bridge_path != expected_api_bridge
+        or hashlib.sha256(api_bridge_path.read_bytes()).hexdigest() != api_record.get("sha256")
+    ):
+        raise RuntimeError("Loaded rpy2 API bridge differs from the authenticated kit derivation.")
+    r_shared_record = final_identity.get("r_shared_library", {})
+    shared_r_path = (Path(sys.executable).resolve().parent / str(r_shared_record.get("path", ""))).resolve()
     macos_r_policy = None
     if sys.platform == "darwin":
         tcltk_available = bool(cast(Any, robjects.r("requireNamespace('tcltk', quietly=TRUE)"))[0])
@@ -1319,7 +1335,13 @@ def start_package_runtime_probe(output_path):
         },
         "rpy2": {
             "distribution_version": importlib.metadata.version("rpy2"),
+            "rinterface_distribution_version": importlib.metadata.version("rpy2-rinterface"),
+            "robjects_distribution_version": importlib.metadata.version("rpy2-robjects"),
             "cffi_mode": os.environ.get("RPY2_CFFI_MODE"),
+            "loaded_cffi_mode": openrlib.cffi_mode.name,
+            "api_bridge_loaded": openrlib.cffi_mode.name == "API",
+            "api_bridge_path": str(api_bridge_path),
+            "api_bridge_sha256": hashlib.sha256(api_bridge_path.read_bytes()).hexdigest(),
         },
         "project_schemas": {
             "version": 1,
@@ -1332,6 +1354,10 @@ def start_package_runtime_probe(output_path):
             "configured_home": configured.get("R_HOME"),
             "configured_library": configured.get("R_LIBS"),
             "macos_product_profile": macos_r_policy,
+            "shared_library_path": str(shared_r_path),
+            "shared_library_sha256": hashlib.sha256(shared_r_path.read_bytes()).hexdigest(),
+            "kit_sha256": configured.get("kit_sha256"),
+            "lc_numeric": os.environ.get("LC_NUMERIC"),
         },
     }
     Path(output_path).write_text(

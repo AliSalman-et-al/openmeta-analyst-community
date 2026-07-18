@@ -75,11 +75,39 @@ jobs:
           trusted-signing-account-name: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
           certificate-profile-name: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
           files-folder: signed/tree
-          files-folder-filter: exe,dll
+          files-folder-filter: exe,dll,pyd
           files-folder-recurse: true
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
+      - name: Refresh signed Windows R integration derivation
+        if: matrix.target == 'windows-x64'
+        shell: pwsh
+        run: |
+          $derivations = @(Get-ChildItem signed/tree -Recurse -File -Filter derivation.json | Where-Object { $_.Directory.Name -eq 'r-integration-kit' })
+          if ($derivations.Count -ne 1) { throw "Expected one signed R integration-kit derivation, found $($derivations.Count)." }
+          $derivationPath = $derivations[0]
+          $appRoot = $derivationPath.Directory.Parent.FullName
+          $derivation = Get-Content -Raw -LiteralPath $derivationPath.FullName | ConvertFrom-Json
+          $apiBridge = Join-Path $appRoot $derivation.final.api_bridge.path
+          $rSharedLibrary = Join-Path $appRoot $derivation.final.r_shared_library.path
+          function Get-SignedMemberEvidence([string]$native) {
+            $signature = Get-AuthenticodeSignature -LiteralPath $native
+            if ($signature.Status -ne 'Valid' -or -not $signature.SignerCertificate -or -not $signature.TimeStamperCertificate) { throw "Azure Artifact Signing did not produce a valid timestamped signature: $native" }
+            return [ordered]@{
+              path = [IO.Path]::GetRelativePath($appRoot, $native).Replace('\','/')
+              sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $native).Hash.ToLowerInvariant()
+              status = $signature.Status.ToString()
+              signer_subject = $signature.SignerCertificate.Subject
+              signer_thumbprint = $signature.SignerCertificate.Thumbprint.ToLowerInvariant()
+              timestamp_subject = $signature.TimeStamperCertificate.Subject
+              timestamp_thumbprint = $signature.TimeStamperCertificate.Thumbprint.ToLowerInvariant()
+            }
+          }
+          $signingEvidence = Join-Path $env:RUNNER_TEMP 'windows-r-signing-evidence.json'
+          [ordered]@{ schema_version = 1; members = [ordered]@{ api_bridge = Get-SignedMemberEvidence $apiBridge; r_shared_library = Get-SignedMemberEvidence $rSharedLibrary } } | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 -LiteralPath $signingEvidence
+          uv run --no-project --offline --python 3.11.9 python scripts/r_kit_derivation.py finalize --app-root $appRoot --api-bridge $apiBridge --r-shared-library $rSharedLibrary --derivation $derivationPath.FullName --signing-evidence $signingEvidence --require-signed
+          if ($LASTEXITCODE -ne 0) { throw "Signed Windows R derivation refresh failed." }
       - name: Verify and archive Windows signed bytes
         if: matrix.target == 'windows-x64'
         shell: pwsh

@@ -37,6 +37,7 @@ a = Analysis(
     hiddenimports=[
         "rpy2.robjects",
         "rpy2.rinterface",
+        "_rinterface_cffi_api",
         "PyQt6.QtNetwork",
         "PyQt6.QtSvg",
         "PyQt6.QtSvgWidgets",
@@ -51,7 +52,7 @@ a = Analysis(
         "PySide2",
         "PySide6",
         "qtpy",
-        "_rinterface_cffi_api",
+        "_rinterface_cffi_abi",
     ],
     noarchive=False,
     optimize=0,
@@ -89,7 +90,7 @@ app = BUNDLE(
     ),
     version=os.environ.get("RCMS_PROJECT_VERSION", "0.1.2"),
     info_plist={
-        "LSMinimumSystemVersion": "13.0",
+        "LSMinimumSystemVersion": os.environ.get("RCMS_MINIMUM_MACOS_VERSION", "13.0"),
         "NSHighResolutionCapable": True,
         "NSPrincipalClass": "NSApplication",
     },

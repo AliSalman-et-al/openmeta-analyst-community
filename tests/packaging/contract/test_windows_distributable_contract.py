@@ -1,3 +1,4 @@
+import hashlib
 import json
 import importlib.util
 import re
@@ -272,8 +273,7 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
     assert "tests/*" in workflow["text"]
     assert (
         ".github/workflows/*|.python-version|pyproject.toml|uv.lock|config/*|"
-        "docs/verification/*|r/*|scripts/*|src/*|tests/*"
-        in workflow["text"]
+        "docs/verification/*|r/*|scripts/*|src/*|tests/*" in workflow["text"]
     )
     for critical_input in (
         "config/qt6-ty-ignore-allowlist.json",
@@ -282,10 +282,14 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
     ):
         top_level = critical_input.split("/", 1)[0]
         assert f"{top_level}/*" in workflow["text"]
-    assert workflow["text"].count(
-        "needs.change-classifier.outputs.run-windows == 'true'"
-    ) == 2
-    assert "needs.change-classifier.outputs.run-windows-package == 'true'" in workflow["text"]
+    assert (
+        workflow["text"].count("needs.change-classifier.outputs.run-windows == 'true'")
+        == 2
+    )
+    assert (
+        "needs.change-classifier.outputs.run-windows-package == 'true'"
+        in workflow["text"]
+    )
     for package_input in (
         "sample_projects/*",
         "scripts/build_qt6.py",
@@ -344,8 +348,14 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
     assert "qt6_macos_feasibility.py resolve-rcc" in workflow["text"]
     assert '--sdk-root "$PWD/build/qt-sdk/6.11.1/macos"' in workflow["text"]
     assert '--github-env "$GITHUB_ENV"' in workflow["text"]
-    assert workflow["env"]["RCMS_CRAN_REPO"] == "https://packagemanager.posit.co/cran/2026-07-16"
-    assert "r-default-evidence-v2-${{ matrix.target }}-r-4.6.1-public-ppm-2026-07-16" in workflow["text"]
+    assert (
+        workflow["env"]["RCMS_CRAN_REPO"]
+        == "https://packagemanager.posit.co/cran/2026-07-16"
+    )
+    assert (
+        "r-default-evidence-v2-${{ matrix.target }}-r-4.6.1-public-ppm-2026-07-16"
+        in workflow["text"]
+    )
     assert "use-public-rspm: true" in workflow["text"]
 
 
@@ -358,7 +368,10 @@ def test_package_workflow_builds_path_aware_artifacts():
         "macos-package-intel",
         "macos-package-arm64",
     } <= workflow["jobs"]
-    assert target["env"]["RCMS_CRAN_REPO"] == "https://packagemanager.posit.co/cran/2026-07-16"
+    assert (
+        target["env"]["RCMS_CRAN_REPO"]
+        == "https://packagemanager.posit.co/cran/2026-07-16"
+    )
     assert target["env"]["RCMS_CRAN_REPO_KEY"] == "public-ppm-2026-07-16"
     assert workflow["events"] == {"workflow_dispatch"}
     assert workflow["legacy_uses"] == []
@@ -386,31 +399,35 @@ def test_package_workflow_builds_path_aware_artifacts():
         in target["text"]
     )
     r_cache_keys = [
-        key for key in target["cache_keys"]
-        if key.startswith("bundled-r-library-v4-")
+        key for key in target["cache_keys"] if key.startswith("bundled-r-library-v4-")
     ]
-    qt_cache_keys = [
-        key for key in target["cache_keys"]
-        if key.startswith("qt-sdk-")
-    ]
-    assert len(r_cache_keys) == 1
+    qt_cache_keys = [key for key in target["cache_keys"] if key.startswith("qt-sdk-")]
+    assert r_cache_keys == []
+    assert "produce-r-integration-kit" in target["text"]
+    assert "Download exact promoted R integration kit" in target["text"]
+    assert "needs.produce-r-integration-kit.outputs.kit_sha256" in target["text"]
     assert all("RCMS_CRAN_REPO_KEY" in key for key in r_cache_keys)
     assert workflow["restore_keys"] == []
     assert qt_cache_keys == ["qt-sdk-6.11.1-${{ inputs.archive_platform }}"]
-    assert "use-public-rspm: true" in target["text"]
+    producer = Path(".github/workflows/r-integration-kit-producer.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "packagemanager.posit.co/cran/2026-07-16" in producer
+    assert "RCMS_PRODUCER_R_HOME" in producer
     assert all(
         "steps.package-metadata.outputs.r-version" in key for key in r_cache_keys
     )
-    assert "-RRuntimeRoot" in target["text"]
-    assert "--r-runtime-root" in target["text"]
+    assert "-RIntegrationKit" in target["text"]
+    assert "ExpectedRIntegrationKitSha256" in target["text"]
+    assert "assemble-macos-package.sh" in target["text"]
     assert "Resolve shared package metadata" in target["text"]
     assert "scripts/resolve_package_ci_metadata.py" in target["text"]
     assert (
-        "-ArchiveRootName \"RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ inputs.archive_platform }}\""
+        '-ArchiveRootName "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ inputs.archive_platform }}"'
         in target["text"]
     )
     assert (
-        "--archive-root-name \"RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ inputs.archive_platform }}\""
+        '--archive-root-name "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ inputs.archive_platform }}"'
         in target["text"]
     )
     assert "if: ${{ inputs.build_windows }}" in workflow["text"]
@@ -420,7 +437,7 @@ def test_package_workflow_builds_path_aware_artifacts():
     assert "gh release" not in workflow["text"]
     assert "contents: write" not in workflow["text"]
     assert "timeout-minutes: 60" in target["text"]
-    assert "timeout-minutes: 60" in workflow["text"]
+    assert "macos_architecture: arm64" in workflow["text"]
 
 
 def test_lane_named_local_scripts_replace_old_workflow_wrappers():
@@ -454,12 +471,19 @@ def test_lane_named_local_scripts_replace_old_workflow_wrappers():
     assert "Current Version" in fast["text"]
     assert "ProgramFiles" not in smoke["text"]
     assert "ProgramFiles" not in fast["text"]
-    assert {"ArchiveRootName", "RPackageCacheRoot", "RRuntimeRoot"} <= package["params"]
-    assert {"Resolve-RRuntimeRoot", "Resolve-RscriptFromRuntime"} <= package[
-        "functions"
-    ]
-    assert "--rscript" in package["text"]
-    assert "RRuntimeRoot = $resolvedRRuntimeRoot" in package["text"]
+    assert {
+        "ArchiveRootName",
+        "RIntegrationKit",
+        "ExpectedRIntegrationKitSha256",
+    } <= package["params"]
+    assert "Resolve-RRuntimeRoot" not in package["functions"]
+    assert "Resolve-RscriptFromRuntime" not in package["functions"]
+    assert "--rscript" not in package["text"]
+    assert "RIntegrationKit = $RIntegrationKit" in package["text"]
+    assert (
+        "ExpectedRIntegrationKitSha256 = $ExpectedRIntegrationKitSha256"
+        in package["text"]
+    )
     assert "r-default-library-cache" in smoke["text"]
     assert "r-default-library-cache" in fast["text"]
     assert '"r-library-cache"' not in smoke["text"]
@@ -504,11 +528,11 @@ def test_macos_distributable_contract_is_declared():
         "configure_relocatable_r_launchers",
         "relocate_bundled_r_runtime",
     } <= script["functions"]
-    macos_spec = read_repo_text(
-        "packaging", "pyinstaller", "rc-metastudio-macos.spec"
-    )
+    macos_spec = read_repo_text("packaging", "pyinstaller", "rc-metastudio-macos.spec")
     assert "BUNDLE(" in macos_spec
-    assert 'target_arch=os.environ.get("RCMS_TARGET_ARCHITECTURE", "x86_64")' in macos_spec
+    assert (
+        'target_arch=os.environ.get("RCMS_TARGET_ARCHITECTURE", "x86_64")' in macos_spec
+    )
     assert "RCMS_BUNDLE_IDENTIFIER" in macos_spec
     assert {
         "RCMS_REQUIRE_IN_PROCESS_RPY2",
@@ -526,19 +550,23 @@ def test_macos_distributable_contract_is_declared():
     assert 'app_source / "__main__.py"' in macos_spec
     assert "src/rc_metastudio/launch.py" not in script["text"]
     assert 'bundle_identifier="org.researchconsultancy.rc-metastudio"' in script["text"]
-    assert "inspect_macos_deployment.py\" validate-root" in script["text"]
+    assert 'inspect_macos_deployment.py" validate-root' in script["text"]
     assert "archive root must be one portable directory name" in read_repo_text(
         "scripts", "inspect_macos_deployment.py"
     )
     assert "tomllib.loads" in script["text"]
-    assert 'archive_root_name="${archive_root_name:-RCMetaStudio-$resolved_project_version-macos-$architecture}"' in script["text"]
+    assert (
+        'archive_root_name="${archive_root_name:-RCMetaStudio-$resolved_project_version-macos-$architecture}"'
+        in script["text"]
+    )
     assert 'archive_staging_root="$work_root/zip-staging"' in script["text"]
     assert (
         'copy_tree "$app_bundle" "$archive_root_dir/RCMetaStudio.app"' in script["text"]
     )
-    assert 'ditto -c -k --norsrc --keepParent "$archive_root_dir" "$tmp_zip_path"' in script[
-        "text"
-    ]
+    assert (
+        'ditto -c -k --norsrc --keepParent "$archive_root_dir" "$tmp_zip_path"'
+        in script["text"]
+    )
     assert (
         'name for name in names if name and not name.startswith(f"{archive_root_name}/")'
         in script["text"]
@@ -563,14 +591,14 @@ def test_local_macos_package_script_uses_shared_build_script():
         "--archive-root-name",
         "--artifact-name",
         "--bundle-identifier",
-        "--r-package-cache-root",
-        "--r-runtime-root",
+        "--r-integration-kit",
+        "--expected-r-integration-kit-sha256",
     } <= script["case_options"]
     assert relative_order(
         script["text"],
-        "uv sync --locked",
-        '"$python_exe" scripts/verify_package_release.py',
-        '--r-runtime-root "$r_runtime_root"',
+        "r_integration_kit.py verify-content",
+        "sync --locked --offline",
+        'build_args+=(--r-integration-kit "$r_integration_kit"',
         'build_args+=(--archive-root-name "$archive_root_name")',
         'bash "$repo_root/scripts/build-macos-package.sh"',
     )
@@ -587,7 +615,9 @@ def test_shared_package_verifier_names_only_existing_qt6_test_paths():
 
     assert module.PACKAGE_TEST_PATHS
     assert all((ROOT / test_path).exists() for test_path in module.PACKAGE_TEST_PATHS)
-    assert all("pyqt5" not in test_path.lower() for test_path in module.PACKAGE_TEST_PATHS)
+    assert all(
+        "pyqt5" not in test_path.lower() for test_path in module.PACKAGE_TEST_PATHS
+    )
     source = path.read_text(encoding="utf-8")
     assert '"scripts/build_qt6.py"' in source
     assert 'os.environ["RCMS_QT6_BUILD_ROOT"]' in source
@@ -605,10 +635,10 @@ def test_shared_r_dependency_installer_is_used_by_packagers():
     assert "install_rcms_source_exception" in installer
     assert 'type = "binary"' in policy_runtime
     assert 'type = "source"' in policy_runtime
-    assert "type = \"both\"" not in policy_runtime
+    assert 'type = "both"' not in policy_runtime
     assert "available.packages" in policy_runtime
     assert "Required native R binaries unavailable" in policy_runtime
-    assert "install.packages.compile.from.source = \"never\"" in policy_runtime
+    assert 'install.packages.compile.from.source = "never"' in policy_runtime
     assert "HSROC source archive SHA256 mismatch" in policy_runtime
     assert "HSROC 2.1.9 must be the sole pinned source exception" in policy_loader
     assert "https://packagemanager.posit.co/cran/2026-07-16" in policy_loader
@@ -648,7 +678,7 @@ def test_macos_packager_resolves_relative_python_before_changing_directory():
         script,
         'python_exe="$(repo_path "$python_exe")"',
         'cd "$repo_root"\n  qt6_package_build_root=',
-        'pyinstaller_args=(',
+        "pyinstaller_args=(",
         '"$python_exe" -m PyInstaller',
     )
 
@@ -673,17 +703,22 @@ def test_macos_packager_relocates_every_bundled_r_macho_before_use():
     assert "/opt/X11/lib/*.dylib" not in script
 
     assert 'cp -p "$dependency" "$target"' in script
-    assert "from rc_metastudio.qt6_macos_feasibility import is_macho_candidate" in script
+    assert (
+        "from rc_metastudio.qt6_macos_feasibility import is_macho_candidate" in script
+    )
     assert "MACH_O_MAGICS" not in script
     assert "if is_macho_candidate(path):" in script
     assert 'sys.stdout.buffer.write(os.fsencode(path) + b"\\0")' in script
     assert 'done < "$macho_manifest"' in script
     assert 'find "$r_home" -type f -print0' not in script
     assert "file \"$binary\" | grep -q 'Mach-O'" not in script
-    assert "otool -D \"$binary\"" in script
+    assert 'otool -D "$binary"' in script
     assert 'install_name_tool -id "@rpath/$source_relative" "$binary"' in script
-    assert "otool -L \"$binary\"" in script
-    assert 'install_name_tool -change "$dependency" "@loader_path/$relative_target"' in script
+    assert 'otool -L "$binary"' in script
+    assert (
+        'install_name_tool -change "$dependency" "@loader_path/$relative_target"'
+        in script
+    )
     assert "Bundled R runtime retains an absolute source-framework dependency" in script
     assert "Bundled R launchers retain an absolute source-framework path" in script
     assert 'exec "$R_HOME/bin/exec/R" --no-echo --no-restore "$@"' in script
@@ -739,12 +774,12 @@ def test_windows_packager_qualifies_qt6_deployment_and_packaged_surfaces():
     assert "qualification\\packaged-smoke.json" in script
     assert "RCMS_PACKAGE_SMOKE_EVIDENCE" in script
     assert "--automation-package-surface-smoke" in script
-    runtime_probe_function = script.split(
-        "function Invoke-PackagedRuntimeProbe", 1
-    )[1].split("function Invoke-StrictRDependencyPolicy", 1)[0]
+    runtime_probe_function = script.split("function Invoke-PackagedRuntimeProbe", 1)[
+        1
+    ].split("function Invoke-StrictRDependencyPolicy", 1)[0]
     assert relative_order(
         runtime_probe_function,
-        'QT_SCALE_FACTOR = $env:QT_SCALE_FACTOR',
+        "QT_SCALE_FACTOR = $env:QT_SCALE_FACTOR",
         'Remove-Item "Env:\\QT_SCALE_FACTOR" -ErrorAction SilentlyContinue',
         '"--automation-package-runtime-probe", $quotedProbePath',
         "foreach ($name in $previousEnv.Keys)",
@@ -755,7 +790,9 @@ def test_windows_packager_qualifies_qt6_deployment_and_packaged_surfaces():
     assert "exited without a readable exit code" in script
     assert "test-bounded-package-process.ps1" in script
     assert "function Stop-BoundedPackageProcessTree" in script
-    assert "taskkill exceeded its $TimeoutMilliseconds-millisecond cleanup bound" in script
+    assert (
+        "taskkill exceeded its $TimeoutMilliseconds-millisecond cleanup bound" in script
+    )
     assert "-Wait -PassThru" not in script
     process_test = read_repo_text("scripts", "test-bounded-package-process.ps1")
     assert "Invoke-BoundedPackageProcess" in process_test
@@ -813,7 +850,11 @@ def test_windows_packager_qualifies_qt6_deployment_and_packaged_surfaces():
     assert 'project_schema_root.glob("*.schema.json")' in spec
     assert 'str(Path("rc_metastudio") / "project_schemas" / "v1")' in spec
     assert '*(f"forms.{name}" for name in generated_form_modules)' in spec
-    assert 'excludes=["PyQt5", "PySide2", "PySide6", "qtpy"]' in spec
+    assert (
+        'excludes=["PyQt5", "PySide2", "PySide6", "qtpy", "_rinterface_cffi_abi"]'
+        in spec
+    )
+    assert '"_rinterface_cffi_api"' in spec
     assert spec.count("upx=False") == 2
     assert "upx=True" not in spec
     assert "upx_exclude" not in spec
@@ -822,6 +863,37 @@ def test_windows_packager_qualifies_qt6_deployment_and_packaged_surfaces():
         "function Copy-DirectoryTree",
         'Copy-DirectoryTree -Source $Root -Destination (Join-Path $DestinationRoot "R")',
     )
+
+
+def test_future_windows_signing_refreshes_r_derivation_after_nested_signing():
+    script = read_repo_text("scripts", "sign-windows-package.ps1")
+    assert "'.exe', '.dll', '.pyd'" in script
+    assert (
+        script.index("signtool sign")
+        < script.index("r_kit_derivation.py")
+        < script.index("signtool verify")
+    )
+    assert "Get-SignedMemberEvidence" in script
+    assert "--signing-evidence $signingEvidence --require-signed" in script
+
+
+def test_release_candidate_azure_signing_refreshes_real_r_derivation_before_archive():
+    workflow = read_repo_text(".github", "workflows", "release-candidate.yml")
+    azure = workflow.index("Sign Windows candidate with Azure Artifact Signing")
+    refresh = workflow.index("Refresh signed Windows R integration derivation")
+    archive = workflow.index("Verify and archive Windows signed bytes")
+    assert azure < refresh < archive
+    assert "files-folder-filter: exe,dll,pyd" in workflow
+    refresh_body = workflow[refresh:archive]
+    assert "Get-AuthenticodeSignature" in refresh_body
+    assert "r_kit_derivation.py finalize" in refresh_body
+    assert "--api-bridge $apiBridge" in refresh_body
+    assert "--r-shared-library $rSharedLibrary" in refresh_body
+    assert "signer_subject" in refresh_body
+    assert "timestamp_subject" in refresh_body
+    assert "--signing-evidence $signingEvidence --require-signed" in refresh_body
+    verifier = read_repo_text("scripts", "verify-archive-windows.ps1")
+    assert "'.exe', '.dll', '.pyd'" in verifier
 
 
 def _load_windows_deployment_inspector():
@@ -838,19 +910,142 @@ def _load_windows_deployment_inspector():
 def _write_pe(path, machine=0x8664):
     import struct
 
-    payload = bytearray(256)
+    payload = bytearray(512)
     payload[0:2] = b"MZ"
     payload[0x3C:0x40] = struct.pack("<I", 0x80)
     payload[0x80:0x84] = b"PE\0\0"
-    payload[0x84:0x86] = struct.pack("<H", machine)
+    payload[0x84:0x98] = struct.pack("<HHIIIHH", machine, 0, 0, 0, 0, 0xF0, 0x2022)
+    optional = 0x98
+    payload[optional : optional + 2] = struct.pack("<H", 0x20B)
+    payload[optional + 24 : optional + 32] = struct.pack("<Q", 0x140000000)
+    payload[optional + 32 : optional + 40] = struct.pack("<II", 0x1000, 0x200)
+    payload[optional + 56 : optional + 64] = struct.pack("<II", 0x1000, 0x200)
+    payload[optional + 68 : optional + 70] = struct.pack("<H", 3)
+    payload[optional + 108 : optional + 112] = struct.pack("<I", 16)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(payload)
+
+
+def test_frozen_windows_bootstrap_indexes_all_private_native_directories(tmp_path):
+    from rc_metastudio import r_runtime
+
+    r_home = tmp_path / "R"
+    expected = {
+        r_home / "bin" / "x64",
+        r_home / "library" / "xml2" / "libs" / "x64",
+    }
+    for directory in expected:
+        directory.mkdir(parents=True)
+        (directory / "private.dll").write_bytes(b"dll")
+    (r_home / "library" / "docs").mkdir(parents=True)
+    (r_home / "library" / "docs" / "readme.txt").write_text("not native")
+
+    observed = {
+        Path(path) for path in r_runtime._private_windows_dll_directories(r_home)
+    }
+    assert observed == {path.resolve() for path in expected}
+
+
+def test_windows_dll_policy_fails_closed(monkeypatch):
+    from rc_metastudio import r_runtime
+
+    class Kernel32:
+        @staticmethod
+        def SetDefaultDllDirectories(_policy):
+            return 0
+
+    monkeypatch.setattr(r_runtime.sys, "platform", "win32")
+    monkeypatch.setattr(
+        r_runtime.ctypes, "WinDLL", lambda *_args, **_kwargs: Kernel32()
+    )
+    monkeypatch.setattr(r_runtime.ctypes, "get_last_error", lambda: 5)
+    with pytest.raises(OSError, match="SetDefaultDllDirectories failed"):
+        r_runtime._set_windows_dll_policy()
 
 
 def _windows_deployment_fixture(tmp_path):
     app = tmp_path / "RCMetaStudio"
     qt = app / "_internal" / "PyQt6" / "Qt6"
     _write_pe(app / "RCMetaStudio.exe")
+    api_bridge = app / "_internal" / "_rinterface_cffi_api.cp311-win_amd64.pyd"
+    _write_pe(api_bridge)
+    r_dll = app / "R" / "bin" / "x64" / "R.dll"
+    _write_pe(r_dll)
+    rcmetar = app / "R" / "library" / "RCMetaR" / "DESCRIPTION"
+    rcmetar.parent.mkdir(parents=True)
+    rcmetar.write_text("Package: RCMetaR\nVersion: 0.1.1\n", encoding="utf-8")
+    kit_root = app / "r-integration-kit"
+    kit_root.mkdir(parents=True)
+    api_sha256 = hashlib.sha256(api_bridge.read_bytes()).hexdigest()
+    r_sha256 = hashlib.sha256(r_dll.read_bytes()).hexdigest()
+    (kit_root / "manifest.json").write_text(
+        json.dumps(
+            {
+                "kind": "rc-metastudio-r-integration-kit",
+                "target": "windows-x64",
+                "architecture": "x86_64",
+                "cffi_mode": "API",
+                "kit_sha256": "a" * 64,
+                "files": [
+                    {
+                        "path": "bridge/_rinterface_cffi_api.cp311-win_amd64.pyd",
+                        "kind": "file",
+                        "sha256": api_sha256,
+                    },
+                    {
+                        "path": "runtime/bin/x64/R.dll",
+                        "kind": "file",
+                        "sha256": r_sha256,
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (kit_root / "derivation.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "target": "windows-x64",
+                "kit_sha256": "a" * 64,
+                "source": {
+                    "api_bridge": {
+                        "path": "bridge/_rinterface_cffi_api.cp311-win_amd64.pyd",
+                        "sha256": api_sha256,
+                    },
+                    "r_shared_library": {
+                        "path": "runtime/bin/x64/R.dll",
+                        "sha256": r_sha256,
+                    },
+                },
+                "pre_sign": {
+                    "api_bridge": {
+                        "path": api_bridge.relative_to(app).as_posix(),
+                        "sha256": api_sha256,
+                        "signing_identity": "unsigned",
+                    },
+                    "r_shared_library": {
+                        "path": r_dll.relative_to(app).as_posix(),
+                        "sha256": r_sha256,
+                        "signing_identity": "unsigned",
+                    },
+                },
+                "final": {
+                    "api_bridge": {
+                        "path": api_bridge.relative_to(app).as_posix(),
+                        "sha256": api_sha256,
+                        "signing_identity": "unsigned",
+                    },
+                    "r_shared_library": {
+                        "path": r_dll.relative_to(app).as_posix(),
+                        "sha256": r_sha256,
+                        "signing_identity": "unsigned",
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
     for name in (
         "Qt6Core.dll",
         "Qt6Gui.dll",
@@ -880,6 +1075,8 @@ def _windows_deployment_fixture(tmp_path):
 
 def _windows_runtime_probe(app):
     qt = app / "_internal" / "PyQt6" / "Qt6"
+    api_bridge = app / "_internal" / "_rinterface_cffi_api.cp311-win_amd64.pyd"
+    r_dll = app / "R" / "bin" / "x64" / "R.dll"
     return {
         "schema_version": 1,
         "frozen": True,
@@ -901,7 +1098,16 @@ def _windows_runtime_probe(app):
             "baseline_device_pixel_ratio": 1.0,
             "baseline_logical_dpi": 96.0,
         },
-        "rpy2": {"distribution_version": "3.6.7"},
+        "rpy2": {
+            "distribution_version": "3.6.7",
+            "cffi_mode": "API",
+            "rinterface_distribution_version": "3.6.6",
+            "robjects_distribution_version": "3.6.5",
+            "loaded_cffi_mode": "API",
+            "api_bridge_loaded": True,
+            "api_bridge_path": str(api_bridge),
+            "api_bridge_sha256": hashlib.sha256(api_bridge.read_bytes()).hexdigest(),
+        },
         "project_schemas": {
             "version": 1,
             "validated_members": ["manifest.json", "project.json", "state.json"],
@@ -912,6 +1118,10 @@ def _windows_runtime_probe(app):
             "library_paths": [str(app / "R" / "library")],
             "configured_home": str(app / "R"),
             "configured_library": str(app / "R" / "library"),
+            "shared_library_path": str(r_dll),
+            "shared_library_sha256": hashlib.sha256(r_dll.read_bytes()).hexdigest(),
+            "kit_sha256": "a" * 64,
+            "lc_numeric": "C",
         },
     }
 
@@ -964,12 +1174,12 @@ def test_windows_deployment_inspector_accepts_one_coherent_x64_qt6_stack(
         "tls/qschannelbackend.dll",
     }
     assert all(item["machine"] == "x86_64" for item in manifest["native_files"])
+    assert all("imports" in item for item in manifest["native_files"])
     assert set(manifest["project_schema_resources"]) == {
         "manifest.schema.json",
         "project.schema.json",
         "state.schema.json",
     }
-
     missing_schema = (
         app
         / "_internal"
@@ -1010,19 +1220,32 @@ def test_windows_deployment_inspector_accepts_one_coherent_x64_qt6_stack(
         [
             "inspect_windows_deployment.py",
             "inspect",
-            "--app-root", str(app),
-            "--output", str(output),
-            "--source-commit", "a" * 40,
-            "--runtime-probe", str(runtime_probe_path),
-            "--locked-qt-root", str(app / "_internal" / "PyQt6" / "Qt6"),
-            "--python-version", versions["python"],
-            "--pyqt6-version", versions["pyqt6"],
-            "--qt-version", versions["qt"],
-            "--sip-version", versions["sip"],
-            "--sip-runtime-version", versions["sip_runtime"],
-            "--r-version", versions["r"],
-            "--rpy2-version", versions["rpy2"],
-            "--pyinstaller-version", versions["pyinstaller"],
+            "--app-root",
+            str(app),
+            "--output",
+            str(output),
+            "--source-commit",
+            "a" * 40,
+            "--runtime-probe",
+            str(runtime_probe_path),
+            "--locked-qt-root",
+            str(app / "_internal" / "PyQt6" / "Qt6"),
+            "--python-version",
+            versions["python"],
+            "--pyqt6-version",
+            versions["pyqt6"],
+            "--qt-version",
+            versions["qt"],
+            "--sip-version",
+            versions["sip"],
+            "--sip-runtime-version",
+            versions["sip_runtime"],
+            "--r-version",
+            versions["r"],
+            "--rpy2-version",
+            versions["rpy2"],
+            "--pyinstaller-version",
+            versions["pyinstaller"],
         ],
     )
 
@@ -1032,7 +1255,53 @@ def test_windows_deployment_inspector_accepts_one_coherent_x64_qt6_stack(
     assert json.loads(output.read_text(encoding="utf-8"))["stack"] == versions
 
 
-def test_windows_deployment_inspector_rejects_legacy_duplicate_and_wrong_architecture(tmp_path):
+def test_final_windows_pe_closure_requires_app_local_msvc_and_tracks_delay_imports():
+    inspector = _load_windows_deployment_inspector()
+    runtime = {
+        "path": "_internal/vcruntime140.dll",
+        "sha256": "d" * 64,
+        "_imports": [],
+    }
+    bridge = {
+        "path": "_internal/api.pyd",
+        "sha256": "a" * 64,
+        "_imports": [
+            {"name": "VCRUNTIME140.dll", "kind": "delay"},
+            {"name": "KERNEL32.dll", "kind": "normal"},
+        ],
+    }
+    inspector._resolve_pe_closure([runtime, bridge])
+    assert bridge["imports"] == [
+        {
+            "name": "VCRUNTIME140.dll",
+            "kind": "delay",
+            "resolution": "app-local",
+            "resolved_path": "_internal/vcruntime140.dll",
+            "resolved_sha256": "d" * 64,
+        },
+        {"name": "KERNEL32.dll", "kind": "normal", "resolution": "system"},
+    ]
+
+
+def test_final_windows_pe_closure_rejects_unique_but_unreachable_dependency():
+    inspector = _load_windows_deployment_inspector()
+    dependency = {
+        "path": "unregistered/private.dll",
+        "sha256": "d" * 64,
+        "_imports": [],
+    }
+    owner = {
+        "path": "_internal/api.pyd",
+        "sha256": "a" * 64,
+        "_imports": [{"name": "private.dll", "kind": "normal"}],
+    }
+    with pytest.raises(inspector.DeploymentInspectionError, match="unreachable"):
+        inspector._resolve_pe_closure([dependency, owner])
+
+
+def test_windows_deployment_inspector_rejects_legacy_duplicate_and_wrong_architecture(
+    tmp_path,
+):
     import shutil
 
     inspector = _load_windows_deployment_inspector()
@@ -1051,7 +1320,9 @@ def test_windows_deployment_inspector_rejects_legacy_duplicate_and_wrong_archite
     _write_pe(app / "_internal" / "PyQt5" / "Qt5Core.dll")
     with pytest.raises(inspector.DeploymentInspectionError, match="mixed or legacy"):
         inspector.inspect_deployment(
-            app, versions=versions, source_commit="a" * 40,
+            app,
+            versions=versions,
+            source_commit="a" * 40,
             runtime_probe=_windows_runtime_probe(app),
             locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
         )
@@ -1060,7 +1331,9 @@ def test_windows_deployment_inspector_rejects_legacy_duplicate_and_wrong_archite
     _write_pe(app / "other" / "Qt6Core.dll")
     with pytest.raises(inspector.DeploymentInspectionError, match="duplicate Qt6"):
         inspector.inspect_deployment(
-            app, versions=versions, source_commit="a" * 40,
+            app,
+            versions=versions,
+            source_commit="a" * 40,
             runtime_probe=_windows_runtime_probe(app),
             locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
         )
@@ -1069,7 +1342,9 @@ def test_windows_deployment_inspector_rejects_legacy_duplicate_and_wrong_archite
     _write_pe(app / "bad.dll", machine=0x014C)
     with pytest.raises(inspector.DeploymentInspectionError, match="non-x64"):
         inspector.inspect_deployment(
-            app, versions=versions, source_commit="a" * 40,
+            app,
+            versions=versions,
+            source_commit="a" * 40,
             runtime_probe=_windows_runtime_probe(app),
             locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
         )
@@ -1077,9 +1352,13 @@ def test_windows_deployment_inspector_rejects_legacy_duplicate_and_wrong_archite
     for binding in ("PySide2", "PySide6", "qtpy"):
         app = _windows_deployment_fixture(tmp_path / f"mixed-{binding}")
         _write_pe(app / "_internal" / binding / "binding.pyd")
-        with pytest.raises(inspector.DeploymentInspectionError, match="mixed or legacy"):
+        with pytest.raises(
+            inspector.DeploymentInspectionError, match="mixed or legacy"
+        ):
             inspector.inspect_deployment(
-                app, versions=versions, source_commit="a" * 40,
+                app,
+                versions=versions,
+                source_commit="a" * 40,
                 runtime_probe=_windows_runtime_probe(app),
                 locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
             )
@@ -1094,9 +1373,13 @@ def test_windows_deployment_inspector_rejects_legacy_duplicate_and_wrong_archite
     for family, name in required_plugin.items():
         app = _windows_deployment_fixture(tmp_path / f"missing-{family}")
         (app / "_internal" / "PyQt6" / "Qt6" / "plugins" / family / name).unlink()
-        with pytest.raises(inspector.DeploymentInspectionError, match="missing required Qt"):
+        with pytest.raises(
+            inspector.DeploymentInspectionError, match="missing required Qt"
+        ):
             inspector.inspect_deployment(
-                app, versions=versions, source_commit="a" * 40,
+                app,
+                versions=versions,
+                source_commit="a" * 40,
                 runtime_probe=_windows_runtime_probe(app),
                 locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
             )
@@ -1105,28 +1388,40 @@ def test_windows_deployment_inspector_rejects_legacy_duplicate_and_wrong_archite
     _write_pe(app / "_internal" / "plugins" / "qwindows.dll")
     with pytest.raises(inspector.DeploymentInspectionError, match="plugin root"):
         inspector.inspect_deployment(
-            app, versions=versions, source_commit="a" * 40,
+            app,
+            versions=versions,
+            source_commit="a" * 40,
             runtime_probe=_windows_runtime_probe(app),
             locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
         )
 
     for generated in ("forms/ui_dialog.py", "icons_rc.pyc"):
-        app = _windows_deployment_fixture(tmp_path / ("generated-" + generated.replace("/", "-")))
+        app = _windows_deployment_fixture(
+            tmp_path / ("generated-" + generated.replace("/", "-"))
+        )
         path = app / generated
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("generated", encoding="utf-8")
-        with pytest.raises(inspector.DeploymentInspectionError, match="generated sources"):
+        with pytest.raises(
+            inspector.DeploymentInspectionError, match="generated sources"
+        ):
             inspector.inspect_deployment(
-                app, versions=versions, source_commit="a" * 40,
+                app,
+                versions=versions,
+                source_commit="a" * 40,
                 runtime_probe=_windows_runtime_probe(app),
                 locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
             )
 
     app = _windows_deployment_fixture(tmp_path / "stack-mismatch")
     mismatched = dict(versions, qt="6.11.0")
-    with pytest.raises(inspector.DeploymentInspectionError, match="differs from the locked"):
+    with pytest.raises(
+        inspector.DeploymentInspectionError, match="differs from the locked"
+    ):
         inspector.inspect_deployment(
-            app, versions=mismatched, source_commit="a" * 40,
+            app,
+            versions=mismatched,
+            source_commit="a" * 40,
             runtime_probe=_windows_runtime_probe(app),
             locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
         )
@@ -1136,9 +1431,13 @@ def test_windows_deployment_inspector_rejects_legacy_duplicate_and_wrong_archite
     destination = app / "_internal" / "other" / source.name
     destination.parent.mkdir(parents=True, exist_ok=True)
     source.replace(destination)
-    with pytest.raises(inspector.DeploymentInspectionError, match="outside the authoritative"):
+    with pytest.raises(
+        inspector.DeploymentInspectionError, match="outside the authoritative"
+    ):
         inspector.inspect_deployment(
-            app, versions=versions, source_commit="a" * 40,
+            app,
+            versions=versions,
+            source_commit="a" * 40,
             runtime_probe=_windows_runtime_probe(app),
             locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
         )
@@ -1148,7 +1447,9 @@ def test_windows_deployment_inspector_rejects_legacy_duplicate_and_wrong_archite
     probe["qt"]["runtime_qt_version"] = "6.11.0"
     with pytest.raises(inspector.DeploymentInspectionError, match="frozen Qt runtime"):
         inspector.inspect_deployment(
-            app, versions=versions, source_commit="a" * 40,
+            app,
+            versions=versions,
+            source_commit="a" * 40,
             runtime_probe=probe,
             locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
         )
@@ -1175,8 +1476,11 @@ def test_windows_deployment_inspector_rejects_legacy_duplicate_and_wrong_archite
         stream.write(b"different")
     with pytest.raises(inspector.DeploymentInspectionError, match="identity differs"):
         inspector.inspect_deployment(
-            app, versions=versions, source_commit="a" * 40,
-            runtime_probe=_windows_runtime_probe(app), locked_qt_root=locked_qt,
+            app,
+            versions=versions,
+            source_commit="a" * 40,
+            runtime_probe=_windows_runtime_probe(app),
+            locked_qt_root=locked_qt,
         )
 
     app = _windows_deployment_fixture(tmp_path / "locked-plugin-mismatch")
@@ -1184,66 +1488,121 @@ def test_windows_deployment_inspector_rejects_legacy_duplicate_and_wrong_archite
     shutil.copytree(app / "_internal" / "PyQt6" / "Qt6", locked_qt)
     with (locked_qt / "plugins" / "platforms" / "qwindows.dll").open("ab") as stream:
         stream.write(b"different")
-    with pytest.raises(inspector.DeploymentInspectionError, match="plugin identity differs"):
+    with pytest.raises(
+        inspector.DeploymentInspectionError, match="plugin identity differs"
+    ):
         inspector.inspect_deployment(
-            app, versions=versions, source_commit="a" * 40,
-            runtime_probe=_windows_runtime_probe(app), locked_qt_root=locked_qt,
+            app,
+            versions=versions,
+            source_commit="a" * 40,
+            runtime_probe=_windows_runtime_probe(app),
+            locked_qt_root=locked_qt,
         )
 
     app = _windows_deployment_fixture(tmp_path / "extra-qt-library")
     locked_qt = tmp_path / "extra-qt-library-locked"
     shutil.copytree(app / "_internal" / "PyQt6" / "Qt6", locked_qt)
     _write_pe(app / "_internal" / "PyQt6" / "Qt6" / "bin" / "Qt6Concurrent.dll")
-    with pytest.raises(inspector.DeploymentInspectionError, match="library identity differs"):
+    with pytest.raises(
+        inspector.DeploymentInspectionError, match="library identity differs"
+    ):
         inspector.inspect_deployment(
-            app, versions=versions, source_commit="a" * 40,
-            runtime_probe=_windows_runtime_probe(app), locked_qt_root=locked_qt,
+            app,
+            versions=versions,
+            source_commit="a" * 40,
+            runtime_probe=_windows_runtime_probe(app),
+            locked_qt_root=locked_qt,
         )
 
     app = _windows_deployment_fixture(tmp_path / "extra-plugin")
     locked_qt = tmp_path / "extra-plugin-locked"
     shutil.copytree(app / "_internal" / "PyQt6" / "Qt6", locked_qt)
-    _write_pe(app / "_internal" / "PyQt6" / "Qt6" / "plugins" / "networkinformation" / "qnetworklistmanager.dll")
-    with pytest.raises(inspector.DeploymentInspectionError, match="plugin identity differs"):
+    _write_pe(
+        app
+        / "_internal"
+        / "PyQt6"
+        / "Qt6"
+        / "plugins"
+        / "networkinformation"
+        / "qnetworklistmanager.dll"
+    )
+    with pytest.raises(
+        inspector.DeploymentInspectionError, match="plugin identity differs"
+    ):
         inspector.inspect_deployment(
-            app, versions=versions, source_commit="a" * 40,
-            runtime_probe=_windows_runtime_probe(app), locked_qt_root=locked_qt,
+            app,
+            versions=versions,
+            source_commit="a" * 40,
+            runtime_probe=_windows_runtime_probe(app),
+            locked_qt_root=locked_qt,
         )
 
     app = _windows_deployment_fixture(tmp_path / "mismatched-non-required-plugin")
     locked_qt = tmp_path / "mismatched-non-required-plugin-locked"
     shutil.copytree(app / "_internal" / "PyQt6" / "Qt6", locked_qt)
-    locked_extra = locked_qt / "plugins" / "networkinformation" / "qnetworklistmanager.dll"
+    locked_extra = (
+        locked_qt / "plugins" / "networkinformation" / "qnetworklistmanager.dll"
+    )
     _write_pe(locked_extra)
-    packaged_extra = app / "_internal" / "PyQt6" / "Qt6" / "plugins" / "networkinformation" / "qnetworklistmanager.dll"
+    packaged_extra = (
+        app
+        / "_internal"
+        / "PyQt6"
+        / "Qt6"
+        / "plugins"
+        / "networkinformation"
+        / "qnetworklistmanager.dll"
+    )
     _write_pe(packaged_extra)
     with packaged_extra.open("ab") as stream:
         stream.write(b"different")
-    with pytest.raises(inspector.DeploymentInspectionError, match="plugin identity differs"):
+    with pytest.raises(
+        inspector.DeploymentInspectionError, match="plugin identity differs"
+    ):
         inspector.inspect_deployment(
-            app, versions=versions, source_commit="a" * 40,
-            runtime_probe=_windows_runtime_probe(app), locked_qt_root=locked_qt,
+            app,
+            versions=versions,
+            source_commit="a" * 40,
+            runtime_probe=_windows_runtime_probe(app),
+            locked_qt_root=locked_qt,
         )
 
     app = _windows_deployment_fixture(tmp_path / "duplicate-non-required-plugin")
     locked_qt = tmp_path / "duplicate-non-required-plugin-locked"
     shutil.copytree(app / "_internal" / "PyQt6" / "Qt6", locked_qt)
-    locked_extra = locked_qt / "plugins" / "networkinformation" / "qnetworklistmanager.dll"
-    packaged_extra = app / "_internal" / "PyQt6" / "Qt6" / "plugins" / "networkinformation" / "qnetworklistmanager.dll"
+    locked_extra = (
+        locked_qt / "plugins" / "networkinformation" / "qnetworklistmanager.dll"
+    )
+    packaged_extra = (
+        app
+        / "_internal"
+        / "PyQt6"
+        / "Qt6"
+        / "plugins"
+        / "networkinformation"
+        / "qnetworklistmanager.dll"
+    )
     _write_pe(locked_extra)
     _write_pe(packaged_extra)
     _write_pe(app / "_internal" / "plugins" / "qnetworklistmanager.dll")
     with pytest.raises(inspector.DeploymentInspectionError, match="plugin root"):
         inspector.inspect_deployment(
-            app, versions=versions, source_commit="a" * 40,
-            runtime_probe=_windows_runtime_probe(app), locked_qt_root=locked_qt,
+            app,
+            versions=versions,
+            source_commit="a" * 40,
+            runtime_probe=_windows_runtime_probe(app),
+            locked_qt_root=locked_qt,
         )
 
     app = _windows_deployment_fixture(tmp_path / "misplaced-unknown-plugin")
     _write_pe(app / "_internal" / "plugins" / "qcustomplugin.dll")
-    with pytest.raises(inspector.DeploymentInspectionError, match="outside the authoritative plugin"):
+    with pytest.raises(
+        inspector.DeploymentInspectionError, match="outside the authoritative plugin"
+    ):
         inspector.inspect_deployment(
-            app, versions=versions, source_commit="a" * 40,
+            app,
+            versions=versions,
+            source_commit="a" * 40,
             runtime_probe=_windows_runtime_probe(app),
             locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
         )
@@ -1254,8 +1613,11 @@ def test_windows_deployment_inspector_rejects_legacy_duplicate_and_wrong_archite
     _write_pe(app / "_internal" / "plugins" / "imageformats" / "qpdf.dll")
     with pytest.raises(inspector.DeploymentInspectionError, match="plugin root"):
         inspector.inspect_deployment(
-            app, versions=versions, source_commit="a" * 40,
-            runtime_probe=_windows_runtime_probe(app), locked_qt_root=qt_root,
+            app,
+            versions=versions,
+            source_commit="a" * 40,
+            runtime_probe=_windows_runtime_probe(app),
+            locked_qt_root=qt_root,
         )
 
     app = _windows_deployment_fixture(tmp_path / "scaled-runtime-probe")
@@ -1263,7 +1625,9 @@ def test_windows_deployment_inspector_rejects_legacy_duplicate_and_wrong_archite
     probe["qt"]["scale_factor_environment"] = "1.25"
     with pytest.raises(inspector.DeploymentInspectionError, match="frozen Qt runtime"):
         inspector.inspect_deployment(
-            app, versions=versions, source_commit="a" * 40,
+            app,
+            versions=versions,
+            source_commit="a" * 40,
             runtime_probe=probe,
             locked_qt_root=app / "_internal" / "PyQt6" / "Qt6",
         )
@@ -1282,10 +1646,12 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
         "native": {},
     }
     assert inspector._valid_windows_accessibility(windows_accessibility)
-    assert not inspector._valid_windows_accessibility({
-        **windows_accessibility,
-        "accessible_description": "",
-    })
+    assert not inspector._valid_windows_accessibility(
+        {
+            **windows_accessibility,
+            "accessible_description": "",
+        }
+    )
     windows_critical_dialog = {
         "dont_use_native_dialog": False,
         "application_dont_use_native_dialogs": False,
@@ -1302,23 +1668,30 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
         "timeout_ms": 5_000,
     }
     assert inspector._valid_windows_critical_dialog(windows_critical_dialog)
-    assert not inspector._valid_windows_critical_dialog({
-        **windows_critical_dialog,
-        "finished_signal": False,
-    })
+    assert not inspector._valid_windows_critical_dialog(
+        {
+            **windows_critical_dialog,
+            "finished_signal": False,
+        }
+    )
     archive = tmp_path / "RCMetaStudio-windows-x64.zip"
     runtime_probe = tmp_path / "runtime-probe.json"
     runtime_value = {"frozen": True}
     runtime_probe.write_text(json.dumps(runtime_value), encoding="utf-8")
-    runtime_canonical = json.dumps(runtime_value, sort_keys=True, separators=(",", ":")) + "\n"
+    runtime_canonical = (
+        json.dumps(runtime_value, sort_keys=True, separators=(",", ":")) + "\n"
+    )
     import hashlib
+
     deployment = tmp_path / "deployment-manifest.json"
     deployment.write_text(
         json.dumps(
             {
                 "target": "windows-x64",
                 "stack": inspector.EXPECTED_VERSIONS,
-                "runtime_probe_canonical_sha256": hashlib.sha256(runtime_canonical.encode()).hexdigest(),
+                "runtime_probe_canonical_sha256": hashlib.sha256(
+                    runtime_canonical.encode()
+                ).hexdigest(),
             }
         ),
         encoding="utf-8",
@@ -1361,13 +1734,17 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
                     "svg_sha256": {"Forest Plot": "a" * 64},
                     "locale_variants": [
                         {
-                            "locale": "en_US", "input": "7.0", "canonical_value": 7.0,
+                            "locale": "en_US",
+                            "input": "7.0",
+                            "canonical_value": 7.0,
                             "raw_summary_sha256": "b" * 64,
                             "normalized_summary_sha256": inspector.EXPECTED_SUMMARY_SHA256,
                             "svg_sha256": {"Forest Plot": "a" * 64},
                         },
                         {
-                            "locale": "de_DE", "input": "7,0", "canonical_value": 7.0,
+                            "locale": "de_DE",
+                            "input": "7,0",
+                            "canonical_value": 7.0,
                             "raw_summary_sha256": "b" * 64,
                             "normalized_summary_sha256": inspector.EXPECTED_SUMMARY_SHA256,
                             "svg_sha256": {"Forest Plot": "a" * 64},
@@ -1453,9 +1830,13 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
     archive_inspection.write_text(json.dumps(archive_report), encoding="utf-8")
     with pytest.raises(inspector.DeploymentInspectionError, match="incomplete"):
         inspector.write_qualification_evidence(
-            archive=archive, deployment_manifest=deployment, smoke_evidence=smoke,
-            smoke_log=smoke_log, runtime_probe=runtime_probe,
-            archive_inspection=archive_inspection, output=tmp_path / "mutated.json",
+            archive=archive,
+            deployment_manifest=deployment,
+            smoke_evidence=smoke,
+            smoke_log=smoke_log,
+            runtime_probe=runtime_probe,
+            archive_inspection=archive_inspection,
+            output=tmp_path / "mutated.json",
         )
 
     for member_names in (

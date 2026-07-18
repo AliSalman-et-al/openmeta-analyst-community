@@ -279,7 +279,7 @@ def isolated_r_env(
         env["PATH"] = os.pathsep.join(
             [*(str(path) for path in r_path_entries), env.get("PATH", "")]
         )
-    env.setdefault("RPY2_CFFI_MODE", "ABI")
+    env.setdefault("RPY2_CFFI_MODE", "API")
     env.setdefault("_R_CHECK_FORCE_SUGGESTS_", "false")
     return env
 

@@ -27,7 +27,7 @@ from study_effect_shapes import (
     normalize_diagnostic_effects,
     normalize_effect_result,
 )
-from r_call_serialization import serialized_r_call
+from r_call_serialization import require_r_transaction, serialized_r_call
 from meta_globals import *
 
 r_runtime.configure_bundled_r_environment()
@@ -91,7 +91,7 @@ def _r_is_null(r_object):
 
 @serialized_r_call
 def execute_r_string(r_str):
-
+    require_r_transaction()
     try:
         print(("Executing: %s\n" % r_str))
         return ro.r(r_str)
@@ -104,6 +104,7 @@ def execute_r_string(r_str):
 
 @serialized_r_call
 def execute_r_function(function_name, *args, **kwargs):
+    require_r_transaction()
     return ro.r[function_name](*args, **kwargs)
 
 
@@ -154,6 +155,7 @@ def RfunctionCaller(function):
     return _RfunctionCaller
 
 
+@RfunctionCaller
 def get_R_libpaths():
     """Returns the libpaths that R looks at, sanity check to make sure it sees the right paths"""
 
@@ -430,6 +432,7 @@ def _r_null_if_none(value):
     return rpy2.rinterface.NULL if value is None else value
 
 
+@RfunctionCaller
 def get_params(method_name):
     param_list = execute_r_function("rcmetar.method.parameters", str(method_name))
     param_d = {}
@@ -679,6 +682,7 @@ def ma_dataset_to_simple_binary_robj(
     return r_obj
 
 
+@RfunctionCaller
 def ma_dataset_to_simple_network(
     table_model,
     var_name="tmp_obj",
@@ -1253,6 +1257,7 @@ def generate_forest_plot(file_path, params_name="plot.data"):
     )
 
 
+@serialized_r_call
 def parse_out_results(result):
     # parse out text field(s). note that "plot names" is 'reserved', i.e., it's
     # a special field which is assumed to contain the plot variable names
@@ -1380,6 +1385,7 @@ def _is_summary_display(r_object):
     return bool(execute_r_function("inherits", r_object, "summary.display")[0])
 
 
+@serialized_r_call
 def _capture_formatted_summary(r_object):
     capture_summary = ro.r(
         "function(x) paste(capture.output(print(x)), collapse='\\n')"

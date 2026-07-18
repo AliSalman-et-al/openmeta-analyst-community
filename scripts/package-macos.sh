@@ -4,14 +4,13 @@ set -euo pipefail
 architecture=""
 artifact_name=""
 archive_root_name=""
-r_package_cache_root=""
-r_runtime_root="${RCMS_R_HOME:-${R_HOME:-}}"
 recreate_venv=0
-skip_tests=0
 skip_clean=0
 skip_smoke=0
 capture_adaptive_layout_evidence=0
 bundle_identifier="org.researchconsultancy.rc-metastudio"
+r_integration_kit=""
+expected_r_integration_kit_sha256=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -27,12 +26,12 @@ while [ "$#" -gt 0 ]; do
       archive_root_name="$2"
       shift 2
       ;;
-    --r-package-cache-root)
-      r_package_cache_root="$2"
+    --r-integration-kit)
+      r_integration_kit="$2"
       shift 2
       ;;
-    --r-runtime-root)
-      r_runtime_root="$2"
+    --expected-r-integration-kit-sha256)
+      expected_r_integration_kit_sha256="$2"
       shift 2
       ;;
     --bundle-identifier)
@@ -41,10 +40,6 @@ while [ "$#" -gt 0 ]; do
       ;;
     --recreate-venv)
       recreate_venv=1
-      shift
-      ;;
-    --skip-tests)
-      skip_tests=1
       shift
       ;;
     --skip-clean)
@@ -70,7 +65,6 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
 venv_root="$repo_root/.venv"
 python_exe="$venv_root/bin/python"
-r_package_cache_root="${r_package_cache_root:-$repo_root/artifacts/r-library-cache}"
 
 step() {
   printf '[%s] %s\n' "$(date '+%H:%M:%S')" "$1"
@@ -99,15 +93,10 @@ case "${architecture:-}" in
 esac
 
 artifact_name="${artifact_name:-$default_artifact}"
-
-if [ -z "$r_runtime_root" ]; then
-  r_runtime_root="$(R RHOME)"
+if [ -z "$r_integration_kit" ] || [ -z "$expected_r_integration_kit_sha256" ]; then
+  echo "Package assembly requires --r-integration-kit and --expected-r-integration-kit-sha256 from the native producer." >&2
+  exit 2
 fi
-if [ -z "$r_runtime_root" ] || [ ! -d "$r_runtime_root" ]; then
-  echo "No source R runtime was found. Pass --r-runtime-root or set RCMS_R_HOME/R_HOME." >&2
-  exit 1
-fi
-r_runtime_root="$(cd "$r_runtime_root" && pwd -P)"
 
 cd "$repo_root"
 
@@ -116,28 +105,21 @@ if [ "$recreate_venv" -eq 1 ] && [ -d "$venv_root" ]; then
   rm -rf "$venv_root"
 fi
 
-step "Syncing locked verification environment with uv"
-uv sync --locked
-
-if [ "$skip_tests" -eq 0 ]; then
-  step "Running shared release-package verification"
-  shared_verification_log="$repo_root/build/macos-package/$architecture/shared-release-verification.log"
-  mkdir -p "$(dirname "$shared_verification_log")"
-  "$python_exe" scripts/verify_package_release.py \
-    --rscript "$r_runtime_root/bin/Rscript" \
-    --r-library-cache-root "$r_package_cache_root" \
-    2>&1 | tee "$shared_verification_log"
-fi
+step "Authenticating the promoted kit before offline environment assembly"
+uv run --no-project --offline --python 3.11.9 python scripts/r_integration_kit.py verify-content \
+  --kit "$r_integration_kit" --target "macos-$architecture" --uv-lock uv.lock \
+  --expected-kit-sha256 "$expected_r_integration_kit_sha256"
+step "Syncing locked verification environment from the authenticated kit cache"
+uv --cache-dir "$r_integration_kit/python/uv-cache" sync --locked --offline
 
 build_args=(
   --architecture "$architecture"
   --artifact-name "$artifact_name"
   --bundle-identifier "$bundle_identifier"
   --python-exe "$python_exe"
-  --r-runtime-root "$r_runtime_root"
-  --r-package-cache-root "$r_package_cache_root"
   --skip-dependency-install
 )
+build_args+=(--r-integration-kit "$r_integration_kit" --expected-r-integration-kit-sha256 "$expected_r_integration_kit_sha256")
 if [ -n "$archive_root_name" ]; then
   build_args+=(--archive-root-name "$archive_root_name")
 fi

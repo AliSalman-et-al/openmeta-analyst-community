@@ -1,0 +1,115 @@
+name: Produce Target-Native R Integration Kit
+
+on:
+  workflow_call:
+    inputs:
+      runner: {required: true, type: string}
+      target: {required: true, type: string}
+    outputs:
+      kit_sha256:
+        value: ${{ jobs.produce.outputs.kit_sha256 }}
+      artifact_name:
+        value: ${{ jobs.produce.outputs.artifact_name }}
+
+permissions:
+  contents: read
+
+env:
+  RCMS_CRAN_REPO: https://packagemanager.posit.co/cran/2026-07-16
+  UV_CACHE_DIR: ${{ runner.temp }}/rcms-r-kit-uv-cache
+
+jobs:
+  produce:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 60
+    outputs:
+      kit_sha256: ${{ steps.identity.outputs.kit_sha256 }}
+      artifact_name: ${{ steps.identity.outputs.artifact_name }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with: {enable-cache: false}
+      - run: uv python install 3.11.9
+      - name: Initialize dedicated immutable-kit uv cache
+        shell: pwsh
+        run: |
+          uv cache clean
+          $observed = [IO.Path]::GetFullPath((uv cache dir).Trim()).TrimEnd([IO.Path]::DirectorySeparatorChar)
+          $expected = [IO.Path]::GetFullPath($env:UV_CACHE_DIR).TrimEnd([IO.Path]::DirectorySeparatorChar)
+          if ($observed -ne $expected) { throw "uv cache is not isolated at $expected (found $observed)." }
+      - name: Download, authenticate, and install official R
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $url = 'https://cloud.r-project.org/bin/windows/base/R-4.6.1-win.exe'
+          $path = Join-Path $PWD 'build/official-R-4.6.1-win.exe'
+          Invoke-WebRequest -Uri $url -OutFile $path
+          $signature = Get-AuthenticodeSignature -FilePath $path
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'R Core Team') { throw 'Official R Authenticode verification failed.' }
+          $install = Join-Path $PWD 'build/official-R-4.6.1'
+          $process = Start-Process -FilePath $path -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$install") -Wait -PassThru
+          if ($process.ExitCode -ne 0 -or -not (Test-Path (Join-Path $install 'bin/Rscript.exe'))) { throw 'Authenticated official R installer failed.' }
+          "RCMS_OFFICIAL_R_ARTIFACT=$path" | Out-File $env:GITHUB_ENV -Append
+          "RCMS_OFFICIAL_R_URL=$url" | Out-File $env:GITHUB_ENV -Append
+          "RCMS_OFFICIAL_R_SIGNATURE=$($signature.SignerCertificate.Subject)" | Out-File $env:GITHUB_ENV -Append
+          "RCMS_PRODUCER_R_HOME=$install" | Out-File $env:GITHUB_ENV -Append
+          "R_HOME=$install" | Out-File $env:GITHUB_ENV -Append
+      - name: Download, authenticate, and install official R pkg
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          case '${{ inputs.target }}' in
+            macos-x64) url='https://cloud.r-project.org/bin/macosx/big-sur-x86_64/base/R-4.6.1-x86_64.pkg' ;;
+            macos-arm64) url='https://cloud.r-project.org/bin/macosx/sonoma-arm64/base/R-4.6.1-arm64.pkg' ;;
+            *) exit 2 ;;
+          esac
+          path="$PWD/build/$(basename "$url")"; curl --fail --location --proto '=https' --tlsv1.2 "$url" --output "$path"
+          signature_report="$(pkgutil --check-signature "$path" 2>&1)"
+          grep -q 'VZLD955F6P' <<<"$signature_report"
+          signature="$(awk -F': ' '/1\. / {print $2; exit}' <<<"$signature_report")"
+          sudo installer -pkg "$path" -target /
+          r_home='/Library/Frameworks/R.framework/Resources'
+          test -x "$r_home/bin/Rscript"
+          printf 'RCMS_OFFICIAL_R_ARTIFACT=%s\nRCMS_OFFICIAL_R_URL=%s\nRCMS_OFFICIAL_R_SIGNATURE=%s\nRCMS_PRODUCER_R_HOME=%s\nR_HOME=%s\n' "$path" "$url" "$signature" "$r_home" "$r_home" >> "$GITHUB_ENV"
+      - name: Install locked producer tools against authenticated R
+        run: uv sync --locked
+        env:
+          RPY2_CFFI_MODE: API
+      - name: Download exact rpy2 split sdists from PyPI metadata
+        shell: bash
+        run: |
+          uv run python - <<'PY'
+          import hashlib,json,os,pathlib,urllib.request
+          specs=(('RPY2','rpy2','3.6.7'),('RPY2_RINTERFACE','rpy2-rinterface','3.6.6'),('RPY2_ROBJECTS','rpy2-robjects','3.6.5'))
+          with open(os.environ['GITHUB_ENV'],'a',encoding='utf-8') as f:
+              for env_name,distribution,version in specs:
+                  data=json.load(urllib.request.urlopen(f'https://pypi.org/pypi/{distribution}/{version}/json'))
+                  item=next(x for x in data['urls'] if x['packagetype']=='sdist')
+                  path=pathlib.Path('build')/item['filename']; path.parent.mkdir(exist_ok=True)
+                  payload=urllib.request.urlopen(item['url']).read(); path.write_bytes(payload)
+                  if hashlib.sha256(payload).hexdigest()!=item['digests']['sha256']: raise SystemExit(f'{distribution} sdist hash mismatch')
+                  f.write(f'RCMS_{env_name}_SDIST={path.resolve()}\nRCMS_{env_name}_SDIST_URL={item["url"]}\n')
+          PY
+      - name: Produce Windows x64 kit
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: .\scripts\produce-r-integration-kit.ps1 -RRuntimeRoot $env:RCMS_PRODUCER_R_HOME -PythonExe "$PWD\.venv\Scripts\python.exe" -OfficialRArtifact $env:RCMS_OFFICIAL_R_ARTIFACT -OfficialRUrl $env:RCMS_OFFICIAL_R_URL -OfficialRSignatureIdentity $env:RCMS_OFFICIAL_R_SIGNATURE -Rpy2Sdist $env:RCMS_RPY2_SDIST -Rpy2SdistUrl $env:RCMS_RPY2_SDIST_URL -Rpy2RinterfaceSdist $env:RCMS_RPY2_RINTERFACE_SDIST -Rpy2RinterfaceSdistUrl $env:RCMS_RPY2_RINTERFACE_SDIST_URL -Rpy2RobjectsSdist $env:RCMS_RPY2_ROBJECTS_SDIST -Rpy2RobjectsSdistUrl $env:RCMS_RPY2_ROBJECTS_SDIST_URL -Output "$PWD\artifacts\r-integration-kits\${{ inputs.target }}"
+      - name: Produce macOS kit
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash scripts/produce-r-integration-kit-macos.sh '${{ inputs.target }}' "$RCMS_PRODUCER_R_HOME" "$PWD/.venv/bin/python" "$RCMS_OFFICIAL_R_ARTIFACT" "$RCMS_OFFICIAL_R_URL" "$RCMS_OFFICIAL_R_SIGNATURE" "$RCMS_RPY2_SDIST" "$RCMS_RPY2_SDIST_URL" "$RCMS_RPY2_RINTERFACE_SDIST" "$RCMS_RPY2_RINTERFACE_SDIST_URL" "$RCMS_RPY2_ROBJECTS_SDIST" "$RCMS_RPY2_ROBJECTS_SDIST_URL" "$PWD/artifacts/r-integration-kits/${{ inputs.target }}"
+      - name: Record immutable kit identity
+        id: identity
+        shell: bash
+        run: |
+          digest="$(uv run python -c 'import json; print(json.load(open("artifacts/r-integration-kits/${{ inputs.target }}/manifest.json"))["kit_sha256"])')"
+          echo "kit_sha256=$digest" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=r-integration-kit-${{ inputs.target }}-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: r-integration-kit-${{ inputs.target }}-${{ github.sha }}
+          path: artifacts/r-integration-kits/${{ inputs.target }}
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0

@@ -110,7 +110,7 @@ jobs:
       - name: Run source, R, and packaged native proof
         env:
           RCMS_RUNNER_IMAGE: ${{ matrix.runner }}
-          RPY2_CFFI_MODE: ABI
+          RPY2_CFFI_MODE: API
         run: |
           set -euo pipefail
           mkdir -p "artifacts/qt6-feasibility/${{ matrix.target }}"

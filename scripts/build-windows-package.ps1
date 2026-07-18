@@ -4,6 +4,10 @@ param(
     [string]$PythonExe = "python",
     [string]$RRuntimeRoot,
     [string]$RPackageCacheRoot,
+    [string]$RIntegrationKit,
+    [string]$ExpectedRIntegrationKitSha256,
+    [switch]$BuildDevRKit,
+    [string]$DevRKitProvenance,
     [switch]$SkipDependencyInstall,
     [switch]$SkipClean,
     [switch]$SkipSmoke,
@@ -17,6 +21,14 @@ $pinnedCranRepo = "https://packagemanager.posit.co/cran/2026-07-16"
 $artifactDir = Join-Path $repoRoot "artifacts"
 $distRoot = Join-Path $repoRoot "build\windows-package\dist"
 $workRoot = Join-Path $repoRoot "build\windows-package\work"
+$rIntegrationKitRoot = Join-Path $artifactDir "r-integration-kits\windows-x64"
+if ($RIntegrationKit) { $rIntegrationKitRoot = (Resolve-Path -LiteralPath $RIntegrationKit).ProviderPath }
+if (-not $RIntegrationKit -and -not $BuildDevRKit) {
+    throw "Final assembly requires -RIntegrationKit and -ExpectedRIntegrationKitSha256. Use -BuildDevRKit only for an explicit local producer build."
+}
+if ($BuildDevRKit -and -not $DevRKitProvenance) {
+    throw "-BuildDevRKit requires -DevRKitProvenance with verified artifact evidence."
+}
 $appDir = Join-Path $distRoot "RCMetaStudio"
 $archiveStagingRoot = Join-Path $workRoot "zip-staging"
 $zipPath = Join-Path $artifactDir "$ArtifactName.zip"
@@ -302,7 +314,7 @@ function Invoke-PackagedAppSmokeTest {
     }
     try {
         $env:RCMS_REQUIRE_IN_PROCESS_RPY2 = "1"
-        $env:RPY2_CFFI_MODE = "ABI"
+        $env:RPY2_CFFI_MODE = "API"
         $env:RCMS_PACKAGE_SMOKE_EVIDENCE = $smokeEvidencePath
         $env:RCMS_AUTOMATION_SMOKE_LOG = $smokeLogPath
         $env:RCMS_AUTOMATION_HANG_TRACE = $hangTracePath
@@ -360,7 +372,7 @@ function Invoke-PackagedAdaptiveLayoutEvidence {
     try {
         Remove-Item Env:\QT_QPA_PLATFORM -ErrorAction SilentlyContinue
         $env:RCMS_REQUIRE_IN_PROCESS_RPY2 = "1"
-        $env:RPY2_CFFI_MODE = "ABI"
+        $env:RPY2_CFFI_MODE = "API"
         foreach ($scale in @(
             @{ Value = "1.0"; Directory = "scale-100" },
             @{ Value = "1.5"; Directory = "scale-150" }
@@ -546,7 +558,7 @@ function Invoke-PackagedRuntimeProbe {
     }
     try {
         Remove-Item "Env:\QT_SCALE_FACTOR" -ErrorAction SilentlyContinue
-        $env:RPY2_CFFI_MODE = "ABI"
+        $env:RPY2_CFFI_MODE = "API"
         $env:RCMS_REQUIRE_IN_PROCESS_RPY2 = "1"
         $env:RCMS_AUTOMATION_SMOKE_LOG = $smokeLogPath
         $quotedProbePath = '"{0}"' -f $probePath
@@ -758,7 +770,42 @@ if (Test-Path $tmpZipPath) { Remove-Item -LiteralPath $tmpZipPath -Force }
 if (Test-Path $qualificationEvidencePath) { Remove-Item -LiteralPath $qualificationEvidencePath -Force }
 if (Test-Path $archiveInspectionPath) { Remove-Item -LiteralPath $archiveInspectionPath -Force }
 New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
-$resolvedRRuntimeRoot = Resolve-RRuntimeRoot
+$releaseAssembly = [bool]$RIntegrationKit
+$resolvedRRuntimeRoot = if ($releaseAssembly) { Join-Path $rIntegrationKitRoot "runtime" } else { Resolve-RRuntimeRoot }
+$cachedKitValid = $false
+if (Test-Path $rIntegrationKitRoot) {
+    $kitJson = & $PythonExe (Join-Path $repoRoot "scripts\r_integration_kit.py") verify --kit $rIntegrationKitRoot --target windows-x64
+    $cachedKitValid = $LASTEXITCODE -eq 0
+    if ($releaseAssembly) {
+        if (-not $cachedKitValid) { throw "Authenticated Windows R integration kit is invalid." }
+        $kitManifest = $kitJson | ConvertFrom-Json
+        if (-not $ExpectedRIntegrationKitSha256 -or $kitManifest.kit_sha256 -ne $ExpectedRIntegrationKitSha256) {
+            throw "Authenticated R integration-kit digest mismatch."
+        }
+        $resolvedRRuntimeRoot = Join-Path $rIntegrationKitRoot "runtime"
+    }
+}
+if ($releaseAssembly -and -not $cachedKitValid) { throw "Authenticated Windows R integration kit is absent or invalid." }
+if ($cachedKitValid) {
+    Write-Step "Installing the cached target-native rpy2 API bridge"
+    $pythonPlatformLibrary = (& $PythonExe -c "import sysconfig; print(sysconfig.get_paths()['platlib'])").Trim()
+    Copy-Item -Path (Join-Path $rIntegrationKitRoot "bridge\_rinterface_cffi_api*.pyd") -Destination $pythonPlatformLibrary -Force
+}
+elseif (-not $releaseAssembly) {
+    Write-Step "Building the target-native rpy2 API bridge against official R"
+    $previousRHomeForBridge = $env:R_HOME
+    $previousCffiModeForBridge = $env:RPY2_CFFI_MODE
+    try {
+        $env:R_HOME = $resolvedRRuntimeRoot
+        $env:RPY2_CFFI_MODE = "API"
+        & uv pip install --python $PythonExe --reinstall --no-binary rpy2-rinterface "rpy2-rinterface==3.6.6"
+        if ($LASTEXITCODE -ne 0) { throw "Target-native rpy2 API bridge build failed." }
+    }
+    finally {
+        if ($null -eq $previousRHomeForBridge) { Remove-Item Env:\R_HOME -ErrorAction SilentlyContinue } else { $env:R_HOME = $previousRHomeForBridge }
+        if ($null -eq $previousCffiModeForBridge) { Remove-Item Env:\RPY2_CFFI_MODE -ErrorAction SilentlyContinue } else { $env:RPY2_CFFI_MODE = $previousCffiModeForBridge }
+    }
+}
 $pyQtRoot = (& $PythonExe -c "from pathlib import Path; import PyQt6; print(Path(PyQt6.__file__).resolve().parent)").Trim()
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $pyQtRoot)) { throw "Could not resolve the locked PyQt6 runtime root." }
 Push-Location $repoRoot
@@ -767,7 +814,7 @@ $previousQt6BuildRoot = $env:RCMS_QT6_BUILD_ROOT
 try {
     # packaging/pyinstaller/rc-metastudio.spec is the sole authoritative
     # PyInstaller collection definition. This wrapper only supplies build roots.
-    $env:RPY2_CFFI_MODE = "ABI"
+    $env:RPY2_CFFI_MODE = "API"
     $env:RCMS_PYQT_ROOT = $pyQtRoot
     $qt6PackageBuildRoot = Join-Path $workRoot "qt6-input"
     & $PythonExe scripts\build_qt6.py generate --build-root $qt6PackageBuildRoot
@@ -794,16 +841,74 @@ finally {
     Pop-Location
 }
 
+if ($releaseAssembly) {
+    Copy-Item -LiteralPath (Join-Path $rIntegrationKitRoot "native\python311.dll") `
+        -Destination (Join-Path $appDir "python311.dll") -Force
+}
+
 Copy-DirectoryTree -Source (Join-Path $repoRoot "sample_projects") -Destination (Join-Path $appDir "sample_projects")
 Write-Step "Bundling R runtime and packages"
-Copy-RRuntime -Root $resolvedRRuntimeRoot -DestinationRoot $appDir
-Remove-BundledRInstallerResidue -Root $appDir
-Install-BundledRPackages -Root $appDir
+if ($releaseAssembly) {
+    Copy-DirectoryTree -Source (Join-Path $rIntegrationKitRoot "runtime") -Destination (Join-Path $appDir "R")
+}
+else {
+    Copy-RRuntime -Root $resolvedRRuntimeRoot -DestinationRoot $appDir
+    Remove-BundledRInstallerResidue -Root $appDir
+    Install-BundledRPackages -Root $appDir
+}
+
+Write-Step "Building and consuming the local target-native R integration kit"
+$rpy2ApiBridge = Get-ChildItem -LiteralPath $appDir -Recurse -File -Filter "_rinterface_cffi_api*.pyd" | Select-Object -First 1
+if ($null -eq $rpy2ApiBridge) { throw "The required rpy2 API bridge was not collected for the integration kit." }
+$rpy2AbiBridge = Get-ChildItem -LiteralPath $appDir -Recurse -File -Filter "_rinterface_cffi_abi*" | Select-Object -First 1
+if ($null -ne $rpy2AbiBridge) { throw "The forbidden rpy2 ABI fallback was collected." }
+$rDll = Join-Path $appDir "R\bin\x64\R.dll"
+if (-not (Test-Path $rDll)) { throw "The private Windows R runtime is missing R.dll." }
+$rSourceIdentity = (Get-FileHash -Algorithm SHA256 -LiteralPath $rDll).Hash.ToLowerInvariant()
+$rPackageLockSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $repoRoot "docs\verification\RCMetaR-r-dependencies.json")).Hash.ToLowerInvariant()
+$sourceCommit = (& git rev-parse HEAD).Trim()
+$uvLock = Join-Path $repoRoot "uv.lock"
+$uvLockSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $uvLock).Hash.ToLowerInvariant()
+$uvCacheDir = (& uv cache dir).Trim()
+$kitIsValid = $false
+if (Test-Path $rIntegrationKitRoot) {
+    & $PythonExe (Join-Path $repoRoot "scripts\r_integration_kit.py") verify --kit $rIntegrationKitRoot --target windows-x64
+    $kitIsValid = $LASTEXITCODE -eq 0
+}
+if (-not $kitIsValid -and -not $releaseAssembly) {
+    if (Test-Path $rIntegrationKitRoot) { Remove-Item -LiteralPath $rIntegrationKitRoot -Recurse -Force }
+    & $PythonExe (Join-Path $repoRoot "scripts\r_integration_kit.py") build `
+        --target windows-x64 --runtime (Join-Path $appDir "R") `
+        --library (Join-Path $appDir "R\library") --api-bridge $rpy2ApiBridge.FullName `
+        --output $rIntegrationKitRoot --provenance-manifest $DevRKitProvenance `
+        --package-lock-sha256 $rPackageLockSha256 --source-commit $sourceCommit `
+        --uv-cache $uvCacheDir --uv-lock $uvLock --uv-lock-sha256 $uvLockSha256 `
+        --source-payload (Join-Path (Split-Path -Parent $DevRKitProvenance) "source-payload")
+    if ($LASTEXITCODE -ne 0) { throw "Windows R integration-kit build failed." }
+}
+& $PythonExe (Join-Path $repoRoot "scripts\r_integration_kit.py") verify --kit $rIntegrationKitRoot --target windows-x64
+if ($LASTEXITCODE -ne 0) { throw "Windows R integration-kit verification failed." }
+Copy-DirectoryTree -Source (Join-Path $rIntegrationKitRoot "runtime") -Destination (Join-Path $appDir "R")
+Copy-Item -LiteralPath (Join-Path $rIntegrationKitRoot ("bridge\" + $rpy2ApiBridge.Name)) -Destination $rpy2ApiBridge.FullName -Force
+$kitMetadataRoot = Join-Path $appDir "r-integration-kit"
+New-Item -ItemType Directory -Force -Path $kitMetadataRoot | Out-Null
+Copy-Item -LiteralPath (Join-Path $rIntegrationKitRoot "manifest.json") -Destination (Join-Path $kitMetadataRoot "manifest.json")
+Copy-Item -LiteralPath (Join-Path $rIntegrationKitRoot "sources.json") -Destination (Join-Path $kitMetadataRoot "sources.json")
+Copy-Item -LiteralPath (Join-Path $rIntegrationKitRoot "native-dependencies.json") -Destination (Join-Path $kitMetadataRoot "native-dependencies.json")
+& $PythonExe (Join-Path $repoRoot "scripts\r_kit_derivation.py") record-pre-sign `
+    --kit $rIntegrationKitRoot --target windows-x64 --app-root $appDir `
+    --api-bridge $rpy2ApiBridge.FullName --r-shared-library $rDll `
+    --output (Join-Path $kitMetadataRoot "derivation.json")
+if ($LASTEXITCODE -ne 0) { throw "Windows R kit derivation recording failed." }
+& $PythonExe (Join-Path $repoRoot "scripts\r_kit_derivation.py") finalize `
+    --app-root $appDir --api-bridge $rpy2ApiBridge.FullName --r-shared-library $rDll `
+    --derivation (Join-Path $kitMetadataRoot "derivation.json")
+if ($LASTEXITCODE -ne 0) { throw "Windows R kit derivation finalization failed." }
 
 @'
 @echo off
 set APP_DIR=%~dp0
-set RPY2_CFFI_MODE=ABI
+set RPY2_CFFI_MODE=API
 start "" "%APP_DIR%RCMetaStudio.exe" "%APP_DIR%sample_projects\amino.rcms"
 '@ | Set-Content -Path (Join-Path $appDir "LaunchRCMetaStudio.bat") -Encoding ASCII
 
@@ -811,7 +916,8 @@ Assert-AppLayout -Root $appDir
 $runtimeProbePath = Invoke-PackagedRuntimeProbe -Root $appDir
 $deploymentManifestPath = Join-Path $appDir "qualification\deployment-manifest.json"
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $deploymentManifestPath) | Out-Null
-$sourceCommit = (& git rev-parse HEAD).Trim()
+$rIntegrationKitManifestPath = Join-Path $appDir "qualification\r-integration-kit-manifest.json"
+Copy-Item -LiteralPath (Join-Path $rIntegrationKitRoot "manifest.json") -Destination $rIntegrationKitManifestPath
 $pythonVersion = (& $PythonExe -c "import platform; print(platform.python_version())").Trim()
 $pyQtVersion = (& $PythonExe -c "import importlib.metadata as m; print(m.version('PyQt6'))").Trim()
 $qtVersion = (& $PythonExe -c "import importlib.metadata as m; print(m.version('PyQt6-Qt6'))").Trim()

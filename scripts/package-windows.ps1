@@ -1,12 +1,11 @@
 param(
     [string]$ArtifactName = "RCMetaStudio-windows-x64",
     [string]$ArchiveRootName,
-    [string]$RRuntimeRoot,
-    [string]$RPackageCacheRoot,
+    [string]$RIntegrationKit,
+    [string]$ExpectedRIntegrationKitSha256,
     [switch]$RecreateVenv,
     [switch]$SkipClean,
     [switch]$SkipSmoke,
-    [switch]$SkipVerification,
     [switch]$CaptureAdaptiveLayoutEvidence
 )
 
@@ -15,61 +14,37 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $venvRoot = Join-Path $repoRoot ".venv"
 $pythonExe = Join-Path $venvRoot "Scripts\python.exe"
-if (-not $RPackageCacheRoot) {
-    $RPackageCacheRoot = Join-Path (Join-Path $repoRoot "artifacts") "r-library-cache"
-}
 
 function Write-Step {
     param([string]$Message)
     Write-Host ("[{0}] {1}" -f (Get-Date -Format "HH:mm:ss"), $Message)
 }
 
-function Resolve-RRuntimeRoot {
-    if ($RRuntimeRoot) { return (Resolve-Path -LiteralPath $RRuntimeRoot).ProviderPath }
-    if ($env:RCMS_R_HOME) { return (Resolve-Path -LiteralPath $env:RCMS_R_HOME).ProviderPath }
-    if ($env:R_HOME) { return (Resolve-Path -LiteralPath $env:R_HOME).ProviderPath }
-    $programFilesR = Join-Path $env:ProgramFiles "R"
-    if (Test-Path $programFilesR) {
-        $latestR = Get-ChildItem -Path $programFilesR -Directory | Sort-Object Name -Descending | Select-Object -First 1
-        if ($latestR) { return (Resolve-Path -LiteralPath $latestR.FullName).ProviderPath }
-    }
-    throw "No source R runtime was found. Pass -RRuntimeRoot or set RCMS_R_HOME/R_HOME."
-}
-
-function Resolve-RscriptFromRuntime {
-    param([string]$Root)
-    $rscript = Join-Path $Root "bin\Rscript.exe"
-    if (-not (Test-Path $rscript)) { throw "Rscript was not found in selected R runtime at '$rscript'." }
-    return (Resolve-Path -LiteralPath $rscript).ProviderPath
-}
-
 Push-Location $repoRoot
 try {
+    if (-not $RIntegrationKit -or -not $ExpectedRIntegrationKitSha256) {
+        throw "Package assembly requires -RIntegrationKit and -ExpectedRIntegrationKitSha256 from the native producer."
+    }
     if ($RecreateVenv -and (Test-Path $venvRoot)) {
         Write-Step "Removing existing uv environment at .venv"
         Remove-Item -LiteralPath $venvRoot -Recurse -Force
     }
 
-    Write-Step "Syncing locked verification environment with uv"
-    uv sync --locked
+    Write-Step "Authenticating the promoted kit before offline environment assembly"
+    uv run --no-project --offline --python 3.11.9 python scripts/r_integration_kit.py verify-content --kit $RIntegrationKit --target windows-x64 --uv-lock uv.lock --expected-kit-sha256 $ExpectedRIntegrationKitSha256
+    if ($LASTEXITCODE -ne 0) { throw "promoted R integration kit authentication failed." }
+
+    Write-Step "Syncing locked verification environment from the authenticated kit cache"
+    uv --cache-dir (Join-Path $RIntegrationKit "python\uv-cache") sync --locked --offline
     if ($LASTEXITCODE -ne 0) { throw "uv failed to sync the locked verification environment." }
-
-    $resolvedRRuntimeRoot = Resolve-RRuntimeRoot
-    $resolvedRscript = Resolve-RscriptFromRuntime -Root $resolvedRRuntimeRoot
-
-    if (-not $SkipVerification) {
-        Write-Step "Running shared release-package verification"
-        & $pythonExe scripts\verify_package_release.py --rscript $resolvedRscript --r-library-cache-root $RPackageCacheRoot
-        if ($LASTEXITCODE -ne 0) { throw "Shared release-package verification failed." }
-    }
 
     Write-Step "Building Windows package artifact with PyInstaller"
     $buildArgs = @{
         ArtifactName = $ArtifactName
         ArchiveRootName = $ArchiveRootName
         PythonExe = $pythonExe
-        RRuntimeRoot = $resolvedRRuntimeRoot
-        RPackageCacheRoot = $RPackageCacheRoot
+        RIntegrationKit = $RIntegrationKit
+        ExpectedRIntegrationKitSha256 = $ExpectedRIntegrationKitSha256
         SkipDependencyInstall = $true
     }
     if ($SkipClean) { $buildArgs.SkipClean = $true }

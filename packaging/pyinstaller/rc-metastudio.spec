@@ -57,6 +57,7 @@ a = Analysis(
     hiddenimports=[
         "rpy2.robjects",
         "rpy2.rinterface",
+        "_rinterface_cffi_api",
         "PyQt6.QtNetwork",
         "PyQt6.QtSvg",
         "PyQt6.QtSvgWidgets",
@@ -66,7 +67,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=["PyQt5", "PySide2", "PySide6", "qtpy"],
+    excludes=["PyQt5", "PySide2", "PySide6", "qtpy", "_rinterface_cffi_abi"],
     noarchive=False,
     optimize=0,
 )

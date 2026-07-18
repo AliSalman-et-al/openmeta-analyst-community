@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed inspection and evidence for the macOS Intel package."""
+"""Fail-closed inspection and evidence for target-native macOS packages."""
 
 from __future__ import annotations
 
@@ -35,16 +35,37 @@ EXPECTED_VERSIONS = {
     "rpy2": "3.6.7",
     "pyinstaller": "6.21.0",
 }
-EXPECTED_SUMMARY_SHA256 = "78294820c83cd94c19dfdca8c24b6a96cdc8b6f1319a5cd1bedffacde73851e2"
+EXPECTED_SUMMARY_SHA256 = (
+    "78294820c83cd94c19dfdca8c24b6a96cdc8b6f1319a5cd1bedffacde73851e2"
+)
 MAX_FILES = 25_000
 MAX_BYTES = 3_000_000_000
 MAX_ARCHIVE_MEMBERS = 30_000
 MAX_ARCHIVE_UNCOMPRESSED_BYTES = 3_000_000_000
 PORTABLE_FORBIDDEN = set('<>:"/\\|?*')
+TARGET_CONTRACTS = {
+    "macos-x64": {"architecture": "x86_64", "minimum_macos": "13.0"},
+    "macos-arm64": {"architecture": "arm64", "minimum_macos": "14.0"},
+}
 
 
 class MacOSDeploymentInspectionError(RuntimeError):
     """Raised when an assembled macOS package is not self-consistent."""
+
+
+def _macos_version(value: str) -> tuple[int, int, int]:
+    try:
+        parts = tuple(int(part) for part in value.split("."))
+    except ValueError as exc:
+        raise MacOSDeploymentInspectionError(
+            f"invalid macOS deployment version: {value}"
+        ) from exc
+    if not 1 <= len(parts) <= 3 or any(part < 0 for part in parts):
+        raise MacOSDeploymentInspectionError(
+            f"invalid macOS deployment version: {value}"
+        )
+    padded = (*parts, *(0 for _ in range(3 - len(parts))))
+    return padded[0], padded[1], padded[2]
 
 
 def sha256_file(path: Path) -> str:
@@ -55,6 +76,37 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _valid_r_kit_derivation(manifest, derivation, target):
+    manifest_files = {
+        record.get("path"): record
+        for record in manifest.get("files", [])
+        if record.get("kind") == "file"
+    }
+    for name in ("api_bridge", "r_shared_library"):
+        source = derivation.get("source", {}).get(name, {})
+        pre_sign = derivation.get("pre_sign", {}).get(name, {})
+        final = derivation.get("final", {}).get(name, {})
+        transformation = derivation.get("transformations", {}).get(name)
+        pre_sign_is_derived = pre_sign.get("sha256") == source.get("sha256") or (
+            name == "api_bridge"
+            and isinstance(transformation, dict)
+            and transformation.get("kind") == "mach-o-load-command-relocation"
+            and transformation.get("source", {}).get("sha256") == source.get("sha256")
+            and transformation.get("output", {}).get("sha256") == pre_sign.get("sha256")
+            and bool(transformation.get("changes"))
+        )
+        if not (
+            manifest_files.get(source.get("path"), {}).get("sha256")
+            == source.get("sha256")
+            and pre_sign_is_derived
+            and final.get("path") == pre_sign.get("path")
+            and pre_sign.get("signing_identity")
+            and final.get("signing_identity")
+        ):
+            return False
+    return derivation.get("schema_version") == 1 and derivation.get("target") == target
+
+
 def validate_archive_root_name(value: str) -> str:
     if (
         not value
@@ -63,7 +115,14 @@ def validate_archive_root_name(value: str) -> str:
         or unicodedata.normalize("NFC", value) != value
         or any(char in PORTABLE_FORBIDDEN or ord(char) < 32 for char in value)
         or value.split(".", 1)[0].casefold()
-        in {"con", "prn", "aux", "nul", *(f"com{i}" for i in range(1, 10)), *(f"lpt{i}" for i in range(1, 10))}
+        in {
+            "con",
+            "prn",
+            "aux",
+            "nul",
+            *(f"com{i}" for i in range(1, 10)),
+            *(f"lpt{i}" for i in range(1, 10)),
+        }
     ):
         raise MacOSDeploymentInspectionError(
             f"archive root must be one portable directory name: {value!r}"
@@ -78,13 +137,18 @@ def macho_architectures(path: Path) -> list[str]:
         raise MacOSDeploymentInspectionError(str(exc)) from exc
 
 
-def require_x64_macho(path: Path) -> list[str]:
+def require_macho_architecture(path: Path, architecture: str) -> list[str]:
     architectures = macho_architectures(path)
-    if architectures != ["x86_64"]:
+    if architectures != [architecture]:
         raise MacOSDeploymentInspectionError(
-            f"Mach-O payload must be x86_64-only: {path} ({architectures})"
+            f"Mach-O payload must be {architecture}-only: {path} ({architectures})"
         )
     return architectures
+
+
+def require_x64_macho(path: Path) -> list[str]:
+    """Retain the named Intel helper for existing callers and focused tests."""
+    return require_macho_architecture(path, "x86_64")
 
 
 def _is_macho(path: Path) -> bool:
@@ -130,20 +194,40 @@ def _dependencies(path: Path) -> list[str]:
         raise MacOSDeploymentInspectionError(
             f"otool could not inspect {path}: {completed.stderr.strip()}"
         )
-    dependencies = [line.strip().split(" (", 1)[0] for line in completed.stdout.splitlines()[1:]]
+    dependencies = [
+        line.strip().split(" (", 1)[0] for line in completed.stdout.splitlines()[1:]
+    ]
     for dependency in dependencies:
-        if dependency.startswith("/") and not dependency.startswith(("/usr/lib/", "/System/Library/")):
+        if dependency.startswith("/") and not dependency.startswith(
+            ("/usr/lib/", "/System/Library/")
+        ):
             raise MacOSDeploymentInspectionError(
                 f"Mach-O payload retains a non-system absolute dependency: {path}: {dependency}"
             )
     return dependencies
 
 
+def _minimum_macos_from_load_commands(output: str) -> str | None:
+    command = None
+    for raw_line in output.splitlines():
+        line = raw_line.strip()
+        if line.startswith("cmd "):
+            command = line.split(None, 1)[1]
+        elif command == "LC_BUILD_VERSION" and line.startswith("minos "):
+            return line.split(None, 1)[1]
+        elif command == "LC_VERSION_MIN_MACOSX" and line.startswith("version "):
+            return line.split(None, 1)[1]
+    return None
+
+
 def _macho_load_metadata(path: Path) -> dict:
     if sys.platform != "darwin":
         return {
-            "install_id": None, "rpaths": [], "uuid": None,
+            "install_id": None,
+            "rpaths": [],
+            "uuid": None,
             "text_section_sha256": None,
+            "minimum_macos": None,
         }
     completed = subprocess.run(
         ["otool", "-l", str(path)], capture_output=True, text=True, check=False
@@ -156,6 +240,7 @@ def _macho_load_metadata(path: Path) -> dict:
     install_id = None
     rpaths: list[str] = []
     uuid = None
+    minimum_macos = _minimum_macos_from_load_commands(completed.stdout)
     sections: list[dict[str, str]] = []
     section: dict[str, str] | None = None
     for raw_line in completed.stdout.splitlines():
@@ -168,7 +253,9 @@ def _macho_load_metadata(path: Path) -> dict:
                 sections.append(section)
             section = {}
             continue
-        if section is not None and line.startswith(("sectname ", "segname ", "size ", "offset ")):
+        if section is not None and line.startswith(
+            ("sectname ", "segname ", "size ", "offset ")
+        ):
             key, value = line.split(None, 1)
             section[key] = value
         if line.startswith("cmd "):
@@ -182,7 +269,8 @@ def _macho_load_metadata(path: Path) -> dict:
     if section is not None:
         sections.append(section)
     text_sections = [
-        item for item in sections
+        item
+        for item in sections
         if item.get("sectname") == "__text" and item.get("segname") == "__TEXT"
     ]
     if len(text_sections) != 1:
@@ -208,6 +296,7 @@ def _macho_load_metadata(path: Path) -> dict:
         "install_id": install_id,
         "rpaths": sorted(set(rpaths)),
         "uuid": uuid,
+        "minimum_macos": minimum_macos,
         "text_section_sha256": hashlib.sha256(payload).hexdigest(),
     }
 
@@ -218,19 +307,22 @@ def _resolve_token_base(
     if value == "@loader_path":
         return loader
     if value.startswith("@loader_path/"):
-        return loader / value[len("@loader_path/"):]
+        return loader / value[len("@loader_path/") :]
     if value == "@executable_path":
         return executable_dir
     if value.startswith("@executable_path/"):
-        return executable_dir / value[len("@executable_path/"):]
+        return executable_dir / value[len("@executable_path/") :]
     if value.startswith("/"):
         return Path(value)
     return None
 
 
 def validate_dependency_graph(
-    native_records: list[dict], *, app_root: Path,
+    native_records: list[dict],
+    *,
+    app_root: Path,
     executable_relative: str = "Contents/MacOS/RCMetaStudio",
+    architecture: str = "x86_64",
 ) -> None:
     root = app_root.resolve()
     executable_dir = (root / executable_relative).parent
@@ -253,8 +345,7 @@ def validate_dependency_graph(
             identities[identity] = record["path"]
 
     executable_records = [
-        record for record in native_records
-        if record.get("path") == executable_relative
+        record for record in native_records if record.get("path") == executable_relative
     ]
     if len(executable_records) != 1:
         raise MacOSDeploymentInspectionError(
@@ -276,7 +367,7 @@ def validate_dependency_graph(
             if direct is not None:
                 candidates.add(direct.resolve())
             elif dependency.startswith("@rpath/"):
-                suffix = dependency[len("@rpath/"):]
+                suffix = dependency[len("@rpath/") :]
                 rpath_declarations = [
                     *((rpath, loader) for rpath in record.get("rpaths", [])),
                     *((rpath, executable_dir) for rpath in executable_rpaths),
@@ -300,14 +391,17 @@ def validate_dependency_graph(
                     f"{dependency} ({sorted(str(path) for path in matches)})"
                 )
             target = by_resolved[next(iter(matches))]
-            if target.get("architectures") != ["x86_64"]:
+            if target.get("architectures") != [architecture]:
                 raise MacOSDeploymentInspectionError(
-                    f"Mach-O dependency target is not x86_64-only: {target['path']}"
+                    f"Mach-O dependency target is not {architecture}-only: {target['path']}"
                 )
 
 
 def validate_locked_qt_inventory(
-    deployed_qt_records: list[dict], *, locked_qt_root: Path
+    deployed_qt_records: list[dict],
+    *,
+    locked_qt_root: Path,
+    architecture: str = "x86_64",
 ) -> list[dict]:
     expected: list[dict] = []
     for deployed in deployed_qt_records:
@@ -317,7 +411,7 @@ def validate_locked_qt_inventory(
             raise MacOSDeploymentInspectionError(
                 f"deployed Qt native payload has no locked-wheel source: {relative}"
             )
-        source_architectures = require_x64_macho(source)
+        source_architectures = require_macho_architecture(source, architecture)
         source_metadata = _macho_load_metadata(source)
         if (
             source_architectures != deployed.get("architectures")
@@ -352,7 +446,9 @@ def _codesign_observation(app_root: Path) -> dict:
         return {"verified": False, "runtime": False, "entitlements": {}}
     verified = subprocess.run(
         ["codesign", "--verify", "--deep", "--strict", str(app_root)],
-        capture_output=True, text=True, check=False,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if verified.returncode != 0:
         raise MacOSDeploymentInspectionError(
@@ -360,7 +456,9 @@ def _codesign_observation(app_root: Path) -> dict:
         )
     details = subprocess.run(
         ["codesign", "-d", "--verbose=4", str(app_root)],
-        capture_output=True, text=True, check=False,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     detail_text = details.stdout + details.stderr
     if details.returncode != 0 or "runtime" not in detail_text.lower():
@@ -369,7 +467,8 @@ def _codesign_observation(app_root: Path) -> dict:
         )
     entitlements = subprocess.run(
         ["codesign", "-d", "--entitlements", ":-", str(app_root)],
-        capture_output=True, check=False,
+        capture_output=True,
+        check=False,
     )
     entitlement_payload = entitlements.stdout.strip()
     parsed_entitlements: dict = {}
@@ -381,7 +480,9 @@ def _codesign_observation(app_root: Path) -> dict:
                 "app bundle entitlements are not a valid property list"
             ) from exc
         if not isinstance(parsed, dict):
-            raise MacOSDeploymentInspectionError("app bundle entitlements must be a dictionary")
+            raise MacOSDeploymentInspectionError(
+                "app bundle entitlements must be a dictionary"
+            )
         parsed_entitlements = parsed
     if parsed_entitlements:
         raise MacOSDeploymentInspectionError(
@@ -394,21 +495,27 @@ def _normalize_runtime_path(value: object) -> Path:
     return Path(str(value)).resolve()
 
 
-def _validate_runtime_probe(probe: dict, app_root: Path) -> None:
+def _validate_runtime_probe(
+    probe: dict, app_root: Path, *, architecture: str = "x86_64"
+) -> None:
     executable = app_root / "Contents/MacOS/RCMetaStudio"
     frameworks = app_root / "Contents/Frameworks"
     python = probe.get("python", {})
     if (
         probe.get("frozen") is not True
         or python.get("version") != EXPECTED_VERSIONS["python"]
-        or str(python.get("architecture", "")).lower() != "x86_64"
+        or str(python.get("architecture", "")).lower() != architecture
         or _normalize_runtime_path(python.get("executable")) != executable
         or _normalize_runtime_path(python.get("bundle_root")) != frameworks
     ):
-        raise MacOSDeploymentInspectionError("frozen Python probe does not match the app bundle")
+        raise MacOSDeploymentInspectionError(
+            "frozen Python probe does not match the app bundle"
+        )
     qt = probe.get("qt", {})
     plugin_path = _normalize_runtime_path(qt.get("plugins_path"))
-    library_paths = {_normalize_runtime_path(item) for item in qt.get("library_paths", [])}
+    library_paths = {
+        _normalize_runtime_path(item) for item in qt.get("library_paths", [])
+    }
     if (
         qt.get("pyqt_version") != EXPECTED_VERSIONS["pyqt6"]
         or qt.get("compiled_qt_version") != "6.11.0"
@@ -421,11 +528,35 @@ def _validate_runtime_probe(probe: dict, app_root: Path) -> None:
         or float(qt.get("baseline_device_pixel_ratio", 0)) <= 0
         or float(qt.get("baseline_logical_dpi", 0)) <= 0
     ):
-        raise MacOSDeploymentInspectionError("frozen Qt probe does not match the Cocoa deployment")
-    if probe.get("rpy2") != {
-        "distribution_version": EXPECTED_VERSIONS["rpy2"],
-        "cffi_mode": "ABI",
-    }:
+        raise MacOSDeploymentInspectionError(
+            "frozen Qt probe does not match the Cocoa deployment"
+        )
+    rpy2 = probe.get("rpy2", {})
+    if not (
+        {
+            key: rpy2.get(key)
+            for key in (
+                "distribution_version",
+                "rinterface_distribution_version",
+                "robjects_distribution_version",
+                "cffi_mode",
+                "loaded_cffi_mode",
+                "api_bridge_loaded",
+            )
+        }
+        == {
+            "distribution_version": EXPECTED_VERSIONS["rpy2"],
+            "cffi_mode": "API",
+            "rinterface_distribution_version": "3.6.6",
+            "robjects_distribution_version": "3.6.5",
+            "loaded_cffi_mode": "API",
+            "api_bridge_loaded": True,
+        }
+        and _valid_sha256(rpy2.get("api_bridge_sha256"))
+        and _normalize_runtime_path(rpy2.get("api_bridge_path")).is_relative_to(
+            frameworks
+        )
+    ):
         raise MacOSDeploymentInspectionError("frozen rpy2 probe differs from the lock")
     if probe.get("project_schemas") != {
         "version": 1,
@@ -439,11 +570,21 @@ def _validate_runtime_probe(probe: dict, app_root: Path) -> None:
     if (
         r.get("version") != EXPECTED_VERSIONS["r"]
         or _normalize_runtime_path(r.get("home")) != expected_r_home.resolve()
-        or _normalize_runtime_path(r.get("configured_home")) != expected_r_home.resolve()
-        or _normalize_runtime_path(r.get("configured_library")) != expected_r_library.resolve()
+        or _normalize_runtime_path(r.get("configured_home"))
+        != expected_r_home.resolve()
+        or _normalize_runtime_path(r.get("configured_library"))
+        != expected_r_library.resolve()
         or expected_r_library.resolve() not in r_libraries
+        or r.get("lc_numeric") != "C"
+        or not _valid_sha256(r.get("shared_library_sha256"))
+        or not _normalize_runtime_path(r.get("shared_library_path")).is_relative_to(
+            frameworks
+        )
+        or not _valid_sha256(r.get("kit_sha256"))
     ):
-        raise MacOSDeploymentInspectionError("frozen R probe does not use the bundled runtime")
+        raise MacOSDeploymentInspectionError(
+            "frozen R probe does not use the bundled runtime"
+        )
     policy = r.get("macos_product_profile")
     png = policy.get("default_png", {}) if isinstance(policy, dict) else {}
     if not (
@@ -452,10 +593,13 @@ def _validate_runtime_probe(probe: dict, app_root: Path) -> None:
         and policy.get("tcltk_loaded") is False
         and policy.get("aqua") is True
         and policy.get("bitmap_type") == "quartz"
-        and isinstance(png.get("size"), int) and png["size"] > 0
+        and isinstance(png.get("size"), int)
+        and png["size"] > 0
         and _valid_sha256(png.get("sha256"))
     ):
-        raise MacOSDeploymentInspectionError("frozen R probe lacks the macOS Quartz product-profile evidence")
+        raise MacOSDeploymentInspectionError(
+            "frozen R probe lacks the macOS Quartz product-profile evidence"
+        )
 
 
 def validate_signing_inventory(
@@ -465,8 +609,12 @@ def validate_signing_inventory(
         raise MacOSDeploymentInspectionError("signing inventory must be an object")
     typed_inventory = cast(dict[str, Any], inventory)
     expected_keys = {
-        "schema_version", "app", "identity", "native_files",
-        "nested_bundles", "verification",
+        "schema_version",
+        "app",
+        "identity",
+        "native_files",
+        "nested_bundles",
+        "verification",
     }
     native_files = typed_inventory.get("native_files")
     nested_bundles = typed_inventory.get("nested_bundles")
@@ -491,16 +639,24 @@ def validate_signing_inventory(
     for relative in nested_bundles:
         path = Path(relative)
         if path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
-            raise MacOSDeploymentInspectionError("signing inventory has an unsafe bundle path")
+            raise MacOSDeploymentInspectionError(
+                "signing inventory has an unsafe bundle path"
+            )
         if app_root is not None and not (app_root / path).is_dir():
-            raise MacOSDeploymentInspectionError("signing inventory names a missing bundle")
+            raise MacOSDeploymentInspectionError(
+                "signing inventory names a missing bundle"
+            )
     return typed_inventory
 
 
 def validate_r_framework_inventory(records: object) -> None:
     """Require the canonical, concrete R framework payload and alias topology."""
-    if not isinstance(records, list) or not all(isinstance(item, dict) for item in records):
-        raise MacOSDeploymentInspectionError("R framework inventory is not a record list")
+    if not isinstance(records, list) or not all(
+        isinstance(item, dict) for item in records
+    ):
+        raise MacOSDeploymentInspectionError(
+            "R framework inventory is not a record list"
+        )
     typed_records = cast(list[dict[str, Any]], records)
     by_path = {record.get("path"): record for record in typed_records}
     try:
@@ -562,27 +718,40 @@ def validate_r_framework_inventory(records: object) -> None:
             )
 
 
-def validate_rpy2_abi_payload(records: object) -> None:
-    """Require ABI support code and reject the API-mode native extension."""
-    if not isinstance(records, list) or not all(isinstance(item, dict) for item in records):
+def validate_rpy2_api_payload(records: object) -> None:
+    """Require the API bridge and reject all ABI-mode fallback payloads."""
+    if not isinstance(records, list) or not all(
+        isinstance(item, dict) for item in records
+    ):
         raise MacOSDeploymentInspectionError("rpy2 inventory is not a record list")
     typed_records = cast(list[dict[str, Any]], records)
     if any(
-        "_rinterface_cffi_api" in str(record.get("path", "")).lower()
+        "_rinterface_cffi_abi" in str(record.get("path", "")).lower()
         for record in typed_records
     ):
         raise MacOSDeploymentInspectionError(
-            "deployment contains the forbidden rpy2 API-mode native bridge"
+            "deployment contains the forbidden rpy2 ABI-mode fallback bridge"
         )
-    abi_native = [
+    api_native = [
         record
         for record in typed_records
         if "architectures" in record
-        and "/rpy2/rinterface_lib/_bufferprotocol" in str(record.get("path", "")).lower()
+        and "_rinterface_cffi_api" in str(record.get("path", "")).lower()
     ]
-    if len(abi_native) != 1:
+    if len(api_native) != 1:
         raise MacOSDeploymentInspectionError(
-            "deployment must contain exactly one rpy2 ABI bridge support extension"
+            "deployment must contain exactly one rpy2 API-mode bridge"
+        )
+    api_support = [
+        record
+        for record in typed_records
+        if "architectures" in record
+        and "/rpy2/rinterface_lib/_bufferprotocol"
+        in str(record.get("path", "")).lower()
+    ]
+    if len(api_support) != 1:
+        raise MacOSDeploymentInspectionError(
+            "deployment must contain exactly one rpy2 API bridge support extension"
         )
 
 
@@ -594,26 +763,38 @@ def inspect_deployment(
     runtime_probe: dict,
     locked_qt_root: Path,
     signing_inventory_path: Path,
+    target: str = "macos-x64",
 ) -> dict:
     app_root = app_root.resolve()
+    contract = TARGET_CONTRACTS[target]
+    architecture = contract["architecture"]
+    minimum_macos = contract["minimum_macos"]
     if versions != EXPECTED_VERSIONS:
         raise MacOSDeploymentInspectionError(f"locked stack mismatch: {versions}")
-    if len(source_commit) != 40 or any(char not in "0123456789abcdef" for char in source_commit):
-        raise MacOSDeploymentInspectionError("source commit must be a full lowercase Git SHA")
+    if len(source_commit) != 40 or any(
+        char not in "0123456789abcdef" for char in source_commit
+    ):
+        raise MacOSDeploymentInspectionError(
+            "source commit must be a full lowercase Git SHA"
+        )
     info_path = app_root / "Contents/Info.plist"
     executable = app_root / "Contents/MacOS/RCMetaStudio"
     if not info_path.is_file() or not executable.is_file():
-        raise MacOSDeploymentInspectionError("app bundle is missing Info.plist or CFBundleExecutable")
+        raise MacOSDeploymentInspectionError(
+            "app bundle is missing Info.plist or CFBundleExecutable"
+        )
     with info_path.open("rb") as stream:
         info = plistlib.load(stream)
     if (
         info.get("CFBundleExecutable") != "RCMetaStudio"
         or info.get("CFBundleIdentifier") != "org.researchconsultancy.rc-metastudio"
-        or info.get("LSMinimumSystemVersion") != "13.0"
+        or info.get("LSMinimumSystemVersion") != minimum_macos
         or info.get("NSHighResolutionCapable") is not True
     ):
-        raise MacOSDeploymentInspectionError("Info.plist is not the qualified macOS 13 bundle contract")
-    _validate_runtime_probe(runtime_probe, app_root)
+        raise MacOSDeploymentInspectionError(
+            f"Info.plist is not the qualified macOS {minimum_macos} bundle contract"
+        )
+    _validate_runtime_probe(runtime_probe, app_root, architecture=architecture)
 
     records: list[dict] = []
     folded: dict[str, str] = {}
@@ -666,20 +847,39 @@ def inspect_deployment(
                     "sha256": sha256_file(path),
                 }
                 if _is_macho(path):
-                    record["architectures"] = require_x64_macho(path)
+                    record["architectures"] = require_macho_architecture(
+                        path, architecture
+                    )
                     record["dependencies"] = _dependencies(path)
                     record.update(_macho_load_metadata(path))
+                    minimum = record.get("minimum_macos")
+                    if minimum is None or _macos_version(str(minimum)) > _macos_version(
+                        minimum_macos
+                    ):
+                        raise MacOSDeploymentInspectionError(
+                            f"Mach-O deployment target exceeds {minimum_macos}: {relative}={minimum}"
+                        )
                     native_records.append(record)
             records.append(record)
             total_bytes += record["size"]
             if len(records) > MAX_FILES or total_bytes > MAX_BYTES:
-                raise MacOSDeploymentInspectionError("deployment exceeds its bounded inventory")
+                raise MacOSDeploymentInspectionError(
+                    "deployment exceeds its bounded inventory"
+                )
 
     lowered_paths = [record["path"].lower() for record in records]
     validate_r_framework_inventory(records)
-    validate_rpy2_abi_payload(records)
-    if any(any(token in path for token in ("pyqt5", "pyside2", "pyside6", "shiboken6", "qt5")) for path in lowered_paths):
-        raise MacOSDeploymentInspectionError("deployment contains a legacy or alternate Qt binding")
+    validate_rpy2_api_payload(records)
+    if any(
+        any(
+            token in path
+            for token in ("pyqt5", "pyside2", "pyside6", "shiboken6", "qt5")
+        )
+        for path in lowered_paths
+    ):
+        raise MacOSDeploymentInspectionError(
+            "deployment contains a legacy or alternate Qt binding"
+        )
     required_plugins = {
         "cocoa": "/plugins/platforms/libqcocoa.dylib",
         "jpeg": "/plugins/imageformats/libqjpeg.dylib",
@@ -688,22 +888,31 @@ def inspect_deployment(
     }
     plugin_paths: dict[str, str] = {}
     for label, suffix in required_plugins.items():
-        matches = [record["path"] for record in native_records if record["path"].lower().endswith(suffix)]
+        matches = [
+            record["path"]
+            for record in native_records
+            if record["path"].lower().endswith(suffix)
+        ]
         if len(matches) != 1:
-            raise MacOSDeploymentInspectionError(f"required {label} Qt plugin count is {len(matches)}, expected one")
+            raise MacOSDeploymentInspectionError(
+                f"required {label} Qt plugin count is {len(matches)}, expected one"
+            )
         plugin_paths[label] = matches[0]
     tls_plugins = [
-        record["path"] for record in native_records
-        if "/plugins/tls/" in record["path"].lower() and record["path"].lower().endswith(".dylib")
+        record["path"]
+        for record in native_records
+        if "/plugins/tls/" in record["path"].lower()
+        and record["path"].lower().endswith(".dylib")
     ]
     if not tls_plugins:
         raise MacOSDeploymentInspectionError("deployment contains no Qt TLS plugin")
     qt_roots = {
-        path.split("/plugins/", 1)[0]
-        for path in [*plugin_paths.values(), *tls_plugins]
+        path.split("/plugins/", 1)[0] for path in [*plugin_paths.values(), *tls_plugins]
     }
     if len(qt_roots) != 1 or not next(iter(qt_roots)).endswith("/PyQt6/Qt6"):
-        raise MacOSDeploymentInspectionError("deployment does not have one authoritative PyQt6 Qt root")
+        raise MacOSDeploymentInspectionError(
+            "deployment does not have one authoritative PyQt6 Qt root"
+        )
     qt_root = next(iter(qt_roots))
     for record in native_records:
         path = record["path"]
@@ -718,17 +927,25 @@ def inspect_deployment(
             raise MacOSDeploymentInspectionError(
                 f"deployment contains a second or displaced Qt payload: {path}"
             )
-    if not native_records or require_x64_macho(executable) != ["x86_64"]:
-        raise MacOSDeploymentInspectionError("deployment has no qualified native executable")
-    validate_dependency_graph(native_records, app_root=app_root)
+    if not native_records or require_macho_architecture(executable, architecture) != [
+        architecture
+    ]:
+        raise MacOSDeploymentInspectionError(
+            "deployment has no qualified native executable"
+        )
+    validate_dependency_graph(
+        native_records, app_root=app_root, architecture=architecture
+    )
     deployed_qt_records = []
     for record in native_records:
         if record["path"].startswith(qt_root + "/"):
             deployed_qt_records.append(
-                {**record, "qt_relative_path": record["path"][len(qt_root) + 1:]}
+                {**record, "qt_relative_path": record["path"][len(qt_root) + 1 :]}
             )
     locked_qt_inventory = validate_locked_qt_inventory(
-        deployed_qt_records, locked_qt_root=locked_qt_root.resolve()
+        deployed_qt_records,
+        locked_qt_root=locked_qt_root.resolve(),
+        architecture=architecture,
     )
 
     codesign = _codesign_observation(app_root)
@@ -738,16 +955,52 @@ def inspect_deployment(
         native_paths={record["path"] for record in native_records},
         app_root=app_root,
     )
+    kit_manifest_path = (
+        app_root / "Contents" / "Resources" / "r-integration-kit" / "manifest.json"
+    )
+    derivation_path = (
+        app_root / "Contents" / "Resources" / "r-integration-kit" / "derivation.json"
+    )
+    try:
+        kit_manifest = json.loads(kit_manifest_path.read_text(encoding="utf-8"))
+        derivation = json.loads(derivation_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise MacOSDeploymentInspectionError(
+            "macOS deployment lacks its R integration-kit manifest"
+        ) from exc
+    if not (
+        kit_manifest.get("kind") == "rc-metastudio-r-integration-kit"
+        and kit_manifest.get("target") == target
+        and kit_manifest.get("architecture") == architecture
+        and kit_manifest.get("cffi_mode") == "API"
+        and len(str(kit_manifest.get("kit_sha256", ""))) == 64
+        and derivation.get("kit_sha256") == kit_manifest.get("kit_sha256")
+        and derivation.get("target") == target
+        and _valid_r_kit_derivation(kit_manifest, derivation, target)
+        and derivation.get("final", {}).get("api_bridge", {}).get("sha256")
+        == runtime_probe.get("rpy2", {}).get("api_bridge_sha256")
+        and derivation.get("final", {}).get("r_shared_library", {}).get("sha256")
+        == runtime_probe.get("r", {}).get("shared_library_sha256")
+    ):
+        raise MacOSDeploymentInspectionError(
+            "macOS R integration-kit identity is invalid"
+        )
 
     records.sort(key=lambda item: item["path"])
     return {
         "schema_version": 1,
-        "target": "macos-x64",
+        "target": target,
         "source_commit": source_commit,
-        "minimum_macos": "13.0",
+        "minimum_macos": minimum_macos,
         "stack": versions,
+        "r_integration_kit": {
+            "path": "Contents/Resources/r-integration-kit/manifest.json",
+            "sha256": sha256_file(kit_manifest_path),
+            "kit_sha256": kit_manifest["kit_sha256"],
+            "derivation_sha256": sha256_file(derivation_path),
+        },
         "qt_dependency_collector": "PyInstaller",
-        "architecture": "x86_64",
+        "architecture": architecture,
         "app_bundle": {
             "bundle_identifier": info["CFBundleIdentifier"],
             "executable": "Contents/MacOS/RCMetaStudio",
@@ -787,7 +1040,9 @@ def finalize_smoke_evidence(
             "packaged automation contains failed native observations"
         )
     if "packaged-workflow:post-close" not in log_path.read_text(encoding="utf-8"):
-        raise MacOSDeploymentInspectionError("packaged automation did not emit its post-close marker")
+        raise MacOSDeploymentInspectionError(
+            "packaged automation did not emit its post-close marker"
+        )
     if launchservices_marker is not None:
         marker = json.loads(launchservices_marker.read_text(encoding="utf-8"))
         if (
@@ -808,11 +1063,19 @@ def finalize_smoke_evidence(
         "launchservices_completion_marker": launchservices_marker is not None,
         "clean_exit": True,
     }
-    path.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     return evidence
 
 
-def inspect_archive(archive: Path, *, archive_root_name: str, embedded_files: dict[str, Path]) -> dict:
+def inspect_archive(
+    archive: Path,
+    *,
+    archive_root_name: str,
+    embedded_files: dict[str, Path],
+    target: str = "macos-x64",
+) -> dict:
     validate_archive_root_name(archive_root_name)
     prefix = archive_root_name + "/"
     with zipfile.ZipFile(archive) as bundle:
@@ -821,25 +1084,34 @@ def inspect_archive(archive: Path, *, archive_root_name: str, embedded_files: di
             raise MacOSDeploymentInspectionError("ZIP exceeds the member-count bound")
         total_uncompressed = sum(item.file_size for item in infos)
         if total_uncompressed > MAX_ARCHIVE_UNCOMPRESSED_BYTES:
-            raise MacOSDeploymentInspectionError("ZIP exceeds the uncompressed-byte bound")
+            raise MacOSDeploymentInspectionError(
+                "ZIP exceeds the uncompressed-byte bound"
+            )
         names = [item.filename for item in infos if not item.is_dir()]
         folded: dict[str, str] = {}
         for info in infos:
             name = info.filename
             if info.flag_bits & 0x1:
-                raise MacOSDeploymentInspectionError(f"ZIP contains an encrypted member: {name}")
+                raise MacOSDeploymentInspectionError(
+                    f"ZIP contains an encrypted member: {name}"
+                )
             if (
-                "\\" in name or name.startswith("/")
+                "\\" in name
+                or name.startswith("/")
                 or unicodedata.normalize("NFC", name) != name
                 or not name.startswith(prefix)
             ):
-                raise MacOSDeploymentInspectionError(f"ZIP contains a non-normalized member: {name}")
-            relative = name[len(prefix):].rstrip("/")
+                raise MacOSDeploymentInspectionError(
+                    f"ZIP contains a non-normalized member: {name}"
+                )
+            relative = name[len(prefix) :].rstrip("/")
             if name != prefix and (
                 not relative
                 or any(part in {"", ".", ".."} for part in relative.split("/"))
             ):
-                raise MacOSDeploymentInspectionError(f"ZIP contains traversal or empty components: {name}")
+                raise MacOSDeploymentInspectionError(
+                    f"ZIP contains traversal or empty components: {name}"
+                )
             key = name.casefold()
             if key in folded:
                 raise MacOSDeploymentInspectionError(
@@ -849,37 +1121,47 @@ def inspect_archive(archive: Path, *, archive_root_name: str, embedded_files: di
             unix_mode = info.external_attr >> 16
             if info.is_dir():
                 if unix_mode and not stat.S_ISDIR(unix_mode):
-                    raise MacOSDeploymentInspectionError(f"ZIP directory has a non-directory mode: {name}")
+                    raise MacOSDeploymentInspectionError(
+                        f"ZIP directory has a non-directory mode: {name}"
+                    )
             elif not (stat.S_ISREG(unix_mode) or stat.S_ISLNK(unix_mode)):
-                raise MacOSDeploymentInspectionError(f"ZIP member has an unsafe file mode: {name}")
+                raise MacOSDeploymentInspectionError(
+                    f"ZIP member has an unsafe file mode: {name}"
+                )
         embedded_hashes = {}
         for relative, source in embedded_files.items():
             member = prefix + relative
             if member not in names or bundle.read(member) != source.read_bytes():
-                raise MacOSDeploymentInspectionError(f"ZIP qualification input is missing or changed: {member}")
+                raise MacOSDeploymentInspectionError(
+                    f"ZIP qualification input is missing or changed: {member}"
+                )
             embedded_hashes[relative] = hashlib.sha256(bundle.read(member)).hexdigest()
         manifest_path = embedded_files.get("qualification/deployment-manifest.json")
-        signing_path = embedded_files.get(
-            "qualification/ad-hoc-signing-inventory.json"
-        )
+        signing_path = embedded_files.get("qualification/ad-hoc-signing-inventory.json")
         if manifest_path is None or signing_path is None:
             raise MacOSDeploymentInspectionError(
                 "ZIP inspection requires deployment and signing inventories"
             )
         if manifest_path is not None:
             deployment = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if deployment.get("target") != target:
+                raise MacOSDeploymentInspectionError(
+                    "deployment manifest target differs from the archive target"
+                )
             records = deployment.get("inventory", {}).get("files", [])
             if not isinstance(records, list) or not records:
-                raise MacOSDeploymentInspectionError("deployment manifest has no archive inventory")
-            if deployment.get("target") == "macos-x64":
-                validate_r_framework_inventory(records)
+                raise MacOSDeploymentInspectionError(
+                    "deployment manifest has no archive inventory"
+                )
             app_prefix = prefix + "RCMetaStudio.app/"
             app_members = {
-                name[len(app_prefix):] for name in names if name.startswith(app_prefix)
+                name[len(app_prefix) :] for name in names if name.startswith(app_prefix)
             }
             expected_members = {record.get("path") for record in records}
             if app_members != expected_members:
-                raise MacOSDeploymentInspectionError("ZIP app members differ from the inspected inventory")
+                raise MacOSDeploymentInspectionError(
+                    "ZIP app members differ from the inspected inventory"
+                )
             info_by_name = {item.filename: item for item in bundle.infolist()}
             for record in records:
                 member = app_prefix + record["path"]
@@ -892,7 +1174,9 @@ def inspect_archive(archive: Path, *, archive_root_name: str, embedded_files: di
                         or stat.S_IMODE(mode) != record.get("mode")
                         or payload.decode("utf-8") != record.get("link_target")
                     ):
-                        raise MacOSDeploymentInspectionError(f"ZIP symlink differs from inventory: {member}")
+                        raise MacOSDeploymentInspectionError(
+                            f"ZIP symlink differs from inventory: {member}"
+                        )
                 else:
                     digest = hashlib.sha256()
                     size = 0
@@ -912,33 +1196,35 @@ def inspect_archive(archive: Path, *, archive_root_name: str, embedded_files: di
             signing = validate_signing_inventory(
                 json.loads(signing_path.read_text(encoding="utf-8")),
                 native_paths={
-                    record["path"] for record in records
-                    if "architectures" in record
+                    record["path"] for record in records if "architectures" in record
                 },
             )
             signing_record = deployment.get("signing_inventory", {})
             signing_sha256 = sha256_file(signing_path)
             if (
                 signing_record.get("path")
-                    != "qualification/ad-hoc-signing-inventory.json"
+                != "qualification/ad-hoc-signing-inventory.json"
                 or signing_record.get("sha256") != signing_sha256
                 or signing_record.get("identity") != signing["identity"]
                 or signing_record.get("native_files") != signing["native_files"]
-                or signing_record.get("nested_bundles")
-                    != signing["nested_bundles"]
+                or signing_record.get("nested_bundles") != signing["nested_bundles"]
             ):
                 raise MacOSDeploymentInspectionError(
                     "deployment manifest does not authenticate the signing inventory"
                 )
+            if deployment.get("target") in TARGET_CONTRACTS:
+                validate_r_framework_inventory(records)
             for relative in signing["nested_bundles"]:
-                bundle_prefix = prefix + "RCMetaStudio.app/" + relative.rstrip("/") + "/"
+                bundle_prefix = (
+                    prefix + "RCMetaStudio.app/" + relative.rstrip("/") + "/"
+                )
                 if not any(name.startswith(bundle_prefix) for name in names):
                     raise MacOSDeploymentInspectionError(
                         "ZIP signing inventory names a missing nested bundle"
                     )
     return {
         "schema_version": 1,
-        "target": "macos-x64",
+        "target": target,
         "archive_root": archive_root_name,
         "archive_sha256": sha256_file(archive),
         "member_count": len(infos),
@@ -947,25 +1233,33 @@ def inspect_archive(archive: Path, *, archive_root_name: str, embedded_files: di
 
 
 def _valid_sha256_map(value: object) -> bool:
-    return isinstance(value, dict) and bool(value) and all(
-        isinstance(item, str) and len(item) == 64 and all(char in "0123456789abcdef" for char in item)
-        for item in value.values()
+    return (
+        isinstance(value, dict)
+        and bool(value)
+        and all(
+            isinstance(item, str)
+            and len(item) == 64
+            and all(char in "0123456789abcdef" for char in item)
+            for item in value.values()
+        )
     )
 
 
 def _valid_sha256(value: object) -> bool:
-    return isinstance(value, str) and len(value) == 64 and all(
-        character in "0123456789abcdef" for character in value
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
     )
 
 
 def validate_macos_surface_records(scales: object) -> None:
-    if not isinstance(scales, list) or not all(isinstance(item, dict) for item in scales):
+    if not isinstance(scales, list) or not all(
+        isinstance(item, dict) for item in scales
+    ):
         raise MacOSDeploymentInspectionError("macOS surface scales are incomplete")
     typed_scales = cast(list[dict[str, Any]], scales)
-    if [item.get("requested") for item in typed_scales] != [
-        "1.25", "1.50", "1.75"
-    ]:
+    if [item.get("requested") for item in typed_scales] != ["1.25", "1.50", "1.75"]:
         raise MacOSDeploymentInspectionError("macOS surface scales are incomplete")
     for item in typed_scales:
         menu = item.get("native_menu", {})
@@ -999,39 +1293,49 @@ def validate_macos_surface_records(scales: object) -> None:
             and critical_dialog.get("critical_icon") is True
             and critical_dialog.get("finished_signal") is True
             and critical_dialog.get("result")
-                == critical_dialog.get("accepted_value") == 1
+            == critical_dialog.get("accepted_value")
+            == 1
             and critical_dialog.get("timed_out") is False
             and critical_dialog.get("timeout_ms") == 5_000
             and accessibility.get("focus_before") == "packagedAccessibilityControl"
-            and accessibility.get("focus_after_tab") == "packagedKeyboardTraversalTarget"
+            and accessibility.get("focus_after_tab")
+            == "packagedKeyboardTraversalTarget"
             and accessibility.get("accessible_name") == "Packaged accessibility control"
             and accessibility.get("accessible_description")
-                == "Verifies packaged Qt accessibility metadata."
+            == "Verifies packaged Qt accessibility metadata."
             and native_accessibility.get("is_ignored") is False
             and native_accessibility.get("exposed") is True
             and native_accessibility.get("role") == "AXButton"
             and native_accessibility.get("title") == "Packaged accessibility control"
             and native_accessibility.get("description")
-                == "Verifies packaged Qt accessibility metadata."
+            == "Verifies packaged Qt accessibility metadata."
             and native_accessibility.get("source") == "accessibility-tree"
             and native_accessibility.get("bridge")
-                == "accessibilityAttributeValue:AXChildren"
+            == "accessibilityAttributeValue:AXChildren"
             and native_accessibility.get("bridge_supported") is True
             and int(native_accessibility.get("root_count", 0)) >= 1
             and cleanup.get("close_accepted") is True
             and cleanup.get("window_visible") is False
-            and item.get("available_styles") and item.get("active_style")
+            and item.get("available_styles")
+            and item.get("active_style")
             and item.get("tls_backends")
             and {"jpeg", "svg"} <= set(item.get("image_formats", []))
-            and abs(float(item.get("qt_scale_factor", 0)) - float(item.get("requested", -1))) < 1e-9
+            and abs(
+                float(item.get("qt_scale_factor", 0)) - float(item.get("requested", -1))
+            )
+            < 1e-9
             and float(item.get("baseline_device_pixel_ratio", 0)) > 0
             and abs(
                 float(item.get("expected_device_pixel_ratio", 0))
                 - float(item.get("baseline_device_pixel_ratio", 0))
                 * float(item.get("requested", -1))
-            ) < 1e-9
-            and abs(float(item.get("device_pixel_ratio", 0)) - float(item.get("expected_device_pixel_ratio", -1)))
-                <= float(item.get("dpr_tolerance", -1))
+            )
+            < 1e-9
+            and abs(
+                float(item.get("device_pixel_ratio", 0))
+                - float(item.get("expected_device_pixel_ratio", -1))
+            )
+            <= float(item.get("dpr_tolerance", -1))
         ):
             raise MacOSDeploymentInspectionError(
                 f"macOS packaged surface evidence is incomplete at {item.get('requested')}"
@@ -1039,57 +1343,114 @@ def validate_macos_surface_records(scales: object) -> None:
 
 
 def write_qualification_evidence(
-    *, archive: Path, deployment_manifest: Path, smoke_evidence: Path,
-    smoke_log: Path, smoke_stdout: Path, smoke_stderr: Path, hang_trace: Path,
-    runtime_probe: Path, r_runtime_profile: Path, launchservices_marker: Path,
-    archive_inspection: Path, signing_inventory: Path, output: Path,
+    *,
+    archive: Path,
+    deployment_manifest: Path,
+    smoke_evidence: Path,
+    smoke_log: Path,
+    smoke_stdout: Path,
+    smoke_stderr: Path,
+    hang_trace: Path,
+    runtime_probe: Path,
+    r_runtime_profile: Path,
+    r_integration_kit_manifest: Path,
+    launchservices_marker: Path,
+    archive_inspection: Path,
+    signing_inventory: Path,
+    output: Path,
+    target: str = "macos-x64",
 ) -> dict:
+    contract = TARGET_CONTRACTS[target]
+    architecture = contract["architecture"]
     deployment = json.loads(deployment_manifest.read_text(encoding="utf-8"))
     profile = json.loads(r_runtime_profile.read_text(encoding="utf-8"))
     expected_profile_paths = [
-        "library/grDevices/libs/cairo.so", "library/tcltk", "modules/R_X11.so",
+        "library/grDevices/libs/cairo.so",
+        "library/tcltk",
+        "modules/R_X11.so",
         "modules/R_de.so",
     ]
     if not (
         profile.get("schema_version") == 1
-        and profile.get("policy") == "official-cran-r-with-optional-x11-tcl-surfaces-removed"
+        and profile.get("policy")
+        == "official-cran-r-with-optional-x11-tcl-surfaces-removed"
         and profile.get("hard_dependency_fields") == ["Depends", "Imports", "LinkingTo"]
         and _valid_sha256(profile.get("dependency_manifest", {}).get("sha256"))
-        and "tcltk" not in {str(name).casefold() for name in profile.get("hard_dependency_closure", [])}
+        and "tcltk"
+        not in {
+            str(name).casefold() for name in profile.get("hard_dependency_closure", [])
+        }
         and profile.get("source_framework", {}).get("version") == EXPECTED_VERSIONS["r"]
-        and profile.get("source_framework", {}).get("expected_architecture") == "x86_64"
-        and profile.get("source_framework", {}).get("canonical_macho", {}).get("relative_path") == "lib/libR.dylib"
-        and profile.get("source_framework", {}).get("canonical_macho", {}).get("architectures") == ["x86_64"]
-        and profile.get("source_framework", {}).get("launcher", {}).get("relative_path") == "bin/exec/R"
-        and profile.get("source_framework", {}).get("launcher", {}).get("kind") == "script"
-        and _valid_sha256(profile.get("source_framework", {}).get("launcher", {}).get("sha256"))
-        and _valid_sha256(profile.get("source_framework", {}).get("source_tree_identity_sha256"))
-        and _valid_sha256(profile.get("source_framework", {}).get("pre_profile_tree_identity_sha256"))
+        and profile.get("source_framework", {}).get("expected_architecture")
+        == architecture
+        and profile.get("source_framework", {})
+        .get("canonical_macho", {})
+        .get("relative_path")
+        == "lib/libR.dylib"
+        and profile.get("source_framework", {})
+        .get("canonical_macho", {})
+        .get("architectures")
+        == [architecture]
+        and profile.get("source_framework", {})
+        .get("executable_macho", {})
+        .get("relative_path")
+        == "bin/exec/R"
+        and profile.get("source_framework", {})
+        .get("executable_macho", {})
+        .get("architectures")
+        == [architecture]
+        and profile.get("source_framework", {}).get("launcher", {}).get("relative_path")
+        == "bin/R"
+        and profile.get("source_framework", {}).get("launcher", {}).get("kind")
+        == "script"
+        and _valid_sha256(
+            profile.get("source_framework", {}).get("launcher", {}).get("sha256")
+        )
+        and _valid_sha256(
+            profile.get("source_framework", {}).get("source_tree_identity_sha256")
+        )
+        and _valid_sha256(
+            profile.get("source_framework", {}).get("pre_profile_tree_identity_sha256")
+        )
         and profile.get("post_profile_exclusions") == expected_profile_paths
-        and [entry.get("relative_path") for entry in profile.get("excluded_surfaces", [])]
-            == ["library/tcltk", "modules/R_X11.so", "modules/R_de.so", "library/grDevices/libs/cairo.so"]
+        and [
+            entry.get("relative_path") for entry in profile.get("excluded_surfaces", [])
+        ]
+        == [
+            "library/tcltk",
+            "modules/R_X11.so",
+            "modules/R_de.so",
+            "library/grDevices/libs/cairo.so",
+        ]
     ):
-        raise MacOSDeploymentInspectionError("embedded R profile evidence is incomplete")
+        raise MacOSDeploymentInspectionError(
+            "embedded R profile evidence is incomplete"
+        )
     smoke = json.loads(smoke_evidence.read_text(encoding="utf-8"))
     archive_report = json.loads(archive_inspection.read_text(encoding="utf-8"))
     workflows = smoke.get("workflows", {})
     scales = smoke.get("scales", [])
     log_text = smoke_log.read_text(encoding="utf-8")
     required_markers = {
-        "packaged-runtime-probe:passed", "packaged-workflow:shell-created",
-        "packaged-workflow:paint:complete", "packaged-workflow:project-exercise:complete",
-        "packaged-workflow:evidence-written", "packaged-workflow:post-close",
+        "packaged-runtime-probe:passed",
+        "packaged-workflow:shell-created",
+        "packaged-workflow:paint:complete",
+        "packaged-workflow:project-exercise:complete",
+        "packaged-workflow:evidence-written",
+        "packaged-workflow:post-close",
         "startup-project:normal-entry-point-passed",
-        "packaged-surface:scale-1.25-passed", "packaged-surface:scale-1.50-passed",
+        "packaged-surface:scale-1.25-passed",
+        "packaged-surface:scale-1.50-passed",
         "packaged-surface:scale-1.75-passed",
     }
     expected_embedded = {
         "qualification/deployment-manifest.json": sha256_file(deployment_manifest),
-        "qualification/ad-hoc-signing-inventory.json": sha256_file(
-            signing_inventory
-        ),
+        "qualification/ad-hoc-signing-inventory.json": sha256_file(signing_inventory),
         "qualification/runtime-probe.json": sha256_file(runtime_probe),
         "qualification/embedded-r-runtime-profile.json": sha256_file(r_runtime_profile),
+        "qualification/r-integration-kit-manifest.json": sha256_file(
+            r_integration_kit_manifest
+        ),
         "qualification/packaged-smoke.json": sha256_file(smoke_evidence),
         "qualification/packaged-smoke.log": sha256_file(smoke_log),
         "qualification/launchservices-completion.json": sha256_file(
@@ -1102,23 +1463,31 @@ def write_qualification_evidence(
     validate_macos_surface_records(scales)
     locale_variants = workflows.get("locale_variants", [])
     if not (
-        deployment.get("target") == "macos-x64"
+        deployment.get("target") == target
         and deployment.get("stack") == EXPECTED_VERSIONS
-        and deployment.get("architecture") == "x86_64"
+        and deployment.get("architecture") == architecture
         and deployment.get("qt_dependency_collector") == "PyInstaller"
         and deployment.get("signing_inventory", {}).get("path")
-            == "qualification/ad-hoc-signing-inventory.json"
+        == "qualification/ad-hoc-signing-inventory.json"
         and deployment.get("signing_inventory", {}).get("sha256")
-            == sha256_file(signing_inventory)
+        == sha256_file(signing_inventory)
         and smoke.get("passed") is True
         and not smoke.get("failures")
         and not smoke.get("surface_progress")
-        and all(workflows.get(key) is True for key in (
-            "automation_entry_point", "representative_edit", "real_r_analysis",
-            "result_text", "save_reopen", "analysis_after_reopen",
-        ))
+        and all(
+            workflows.get(key) is True
+            for key in (
+                "automation_entry_point",
+                "representative_edit",
+                "real_r_analysis",
+                "result_text",
+                "save_reopen",
+                "analysis_after_reopen",
+            )
+        )
         and workflows.get("converted_sample") == "amino.rcms"
-        and workflows.get("expected_normalized_summary_sha256") == EXPECTED_SUMMARY_SHA256
+        and workflows.get("expected_normalized_summary_sha256")
+        == EXPECTED_SUMMARY_SHA256
         and workflows.get("normalized_summary_sha256") == EXPECTED_SUMMARY_SHA256
         and _valid_sha256(workflows.get("raw_summary_sha256"))
         and _valid_sha256_map(workflows.get("svg_sha256"))
@@ -1131,29 +1500,59 @@ def write_qualification_evidence(
         and smoke.get("execution", {}).get("clean_exit") is True
         and smoke.get("execution", {}).get("launchservices_completion_marker") is True
         and required_markers <= set(log_text.splitlines())
-        and archive_report.get("target") == "macos-x64"
+        and archive_report.get("target") == target
         and archive_report.get("archive_sha256") == sha256_file(archive)
         and archive_report.get("embedded_sha256") == expected_embedded
     ):
-        raise MacOSDeploymentInspectionError("macOS packaged qualification evidence is incomplete")
+        raise MacOSDeploymentInspectionError(
+            "macOS packaged qualification evidence is incomplete"
+        )
     evidence = {
         "schema_version": 1,
-        "target": "macos-x64",
+        "target": target,
         "passed": True,
-        "artifact": {"name": archive.name, "size": archive.stat().st_size, "sha256": sha256_file(archive)},
-        "deployment_manifest": {"path": deployment_manifest.name, "sha256": sha256_file(deployment_manifest)},
+        "artifact": {
+            "name": archive.name,
+            "size": archive.stat().st_size,
+            "sha256": sha256_file(archive),
+        },
+        "deployment_manifest": {
+            "path": deployment_manifest.name,
+            "sha256": sha256_file(deployment_manifest),
+        },
         "signing_inventory": {
             "path": "qualification/ad-hoc-signing-inventory.json",
             "sha256": sha256_file(signing_inventory),
         },
-        "runtime_probe": {"path": runtime_probe.name, "sha256": sha256_file(runtime_probe)},
-        "embedded_r_runtime_profile": {
-            "path": r_runtime_profile.name, "sha256": sha256_file(r_runtime_profile)
+        "runtime_probe": {
+            "path": runtime_probe.name,
+            "sha256": sha256_file(runtime_probe),
         },
-        "smoke_evidence": {"path": smoke_evidence.name, "sha256": sha256_file(smoke_evidence)},
-        "archive_inspection": {"path": archive_inspection.name, "sha256": sha256_file(archive_inspection)},
+        "embedded_r_runtime_profile": {
+            "path": r_runtime_profile.name,
+            "sha256": sha256_file(r_runtime_profile),
+        },
+        "r_integration_kit": {
+            "path": r_integration_kit_manifest.name,
+            "sha256": sha256_file(r_integration_kit_manifest),
+            "kit_sha256": json.loads(
+                r_integration_kit_manifest.read_text(encoding="utf-8")
+            )["kit_sha256"],
+        },
+        "smoke_evidence": {
+            "path": smoke_evidence.name,
+            "sha256": sha256_file(smoke_evidence),
+        },
+        "archive_inspection": {
+            "path": archive_inspection.name,
+            "sha256": sha256_file(archive_inspection),
+        },
         "logs": [
-            {"path": path.name, "size": path.stat().st_size, "sha256": sha256_file(path)}
+            {
+                "path": path.name,
+                "size": path.stat().st_size,
+                "sha256": sha256_file(path),
+            }
             for path in (smoke_log, smoke_stdout, smoke_stderr, hang_trace)
         ],
         "launchservices_completion": {
@@ -1170,7 +1569,9 @@ def write_qualification_evidence(
         },
     }
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    output.write_text(
+        json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     return evidence
 
 
@@ -1186,8 +1587,13 @@ def main() -> int:
     inspect.add_argument("--runtime-probe", type=Path, required=True)
     inspect.add_argument("--signing-inventory", type=Path, required=True)
     inspect.add_argument("--locked-qt-root", type=Path, required=True)
+    inspect.add_argument(
+        "--target", choices=sorted(TARGET_CONTRACTS), default="macos-x64"
+    )
     for name in EXPECTED_VERSIONS:
-        inspect.add_argument(f"--{name.replace('_', '-')}-version", dest=f"{name}_version", required=True)
+        inspect.add_argument(
+            f"--{name.replace('_', '-')}-version", dest=f"{name}_version", required=True
+        )
     finalize = commands.add_parser("finalize-smoke")
     finalize.add_argument("--smoke-evidence", type=Path, required=True)
     finalize.add_argument("--smoke-log", type=Path, required=True)
@@ -1195,18 +1601,43 @@ def main() -> int:
     archive = commands.add_parser("archive")
     archive.add_argument("--archive", type=Path, required=True)
     archive.add_argument("--archive-root-name", required=True)
+    archive.add_argument(
+        "--target", choices=sorted(TARGET_CONTRACTS), default="macos-x64"
+    )
     for name in (
-        "deployment_manifest", "runtime_probe", "smoke_evidence", "smoke_log",
-        "smoke_stdout", "smoke_stderr", "hang_trace", "launchservices_marker",
-        "signing_inventory", "r_runtime_profile",
+        "deployment_manifest",
+        "runtime_probe",
+        "smoke_evidence",
+        "smoke_log",
+        "smoke_stdout",
+        "smoke_stderr",
+        "hang_trace",
+        "launchservices_marker",
+        "signing_inventory",
+        "r_runtime_profile",
+        "r_integration_kit_manifest",
     ):
         archive.add_argument(f"--{name.replace('_', '-')}", type=Path, required=True)
     archive.add_argument("--output", type=Path, required=True)
     evidence = commands.add_parser("evidence")
+    evidence.add_argument(
+        "--target", choices=sorted(TARGET_CONTRACTS), default="macos-x64"
+    )
     for name in (
-        "archive", "deployment_manifest", "runtime_probe", "smoke_evidence",
-        "smoke_log", "smoke_stdout", "smoke_stderr", "hang_trace",
-        "launchservices_marker", "archive_inspection", "signing_inventory", "r_runtime_profile", "output",
+        "archive",
+        "deployment_manifest",
+        "runtime_probe",
+        "smoke_evidence",
+        "smoke_log",
+        "smoke_stdout",
+        "smoke_stderr",
+        "hang_trace",
+        "launchservices_marker",
+        "archive_inspection",
+        "signing_inventory",
+        "r_runtime_profile",
+        "r_integration_kit_manifest",
+        "output",
     ):
         evidence.add_argument(f"--{name.replace('_', '-')}", type=Path, required=True)
     args = parser.parse_args()
@@ -1214,27 +1645,39 @@ def main() -> int:
         if args.command == "validate-root":
             validate_archive_root_name(args.archive_root_name)
         elif args.command == "inspect":
-            versions = {name: getattr(args, f"{name}_version") for name in EXPECTED_VERSIONS}
+            versions = {
+                name: getattr(args, f"{name}_version") for name in EXPECTED_VERSIONS
+            }
             result = inspect_deployment(
-                args.app_root, versions=versions, source_commit=args.source_commit,
-                runtime_probe=json.loads(args.runtime_probe.read_text(encoding="utf-8")),
+                args.app_root,
+                versions=versions,
+                source_commit=args.source_commit,
+                runtime_probe=json.loads(
+                    args.runtime_probe.read_text(encoding="utf-8")
+                ),
                 locked_qt_root=args.locked_qt_root,
                 signing_inventory_path=args.signing_inventory,
+                target=args.target,
             )
             args.output.parent.mkdir(parents=True, exist_ok=True)
-            args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            args.output.write_text(
+                json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
         elif args.command == "finalize-smoke":
             finalize_smoke_evidence(
                 args.smoke_evidence, args.smoke_log, args.launchservices_marker
             )
         elif args.command == "archive":
             result = inspect_archive(
-                args.archive, archive_root_name=args.archive_root_name,
+                args.archive,
+                archive_root_name=args.archive_root_name,
+                target=args.target,
                 embedded_files={
                     "qualification/deployment-manifest.json": args.deployment_manifest,
                     "qualification/ad-hoc-signing-inventory.json": args.signing_inventory,
                     "qualification/runtime-probe.json": args.runtime_probe,
                     "qualification/embedded-r-runtime-profile.json": args.r_runtime_profile,
+                    "qualification/r-integration-kit-manifest.json": args.r_integration_kit_manifest,
                     "qualification/packaged-smoke.json": args.smoke_evidence,
                     "qualification/packaged-smoke.log": args.smoke_log,
                     "qualification/packaged-smoke.stdout.log": args.smoke_stdout,
@@ -1243,17 +1686,38 @@ def main() -> int:
                     "qualification/launchservices-completion.json": args.launchservices_marker,
                 },
             )
-            args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            args.output.write_text(
+                json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
         else:
-            write_qualification_evidence(**{
-                name: getattr(args, name) for name in (
-                    "archive", "deployment_manifest", "runtime_probe", "smoke_evidence",
-                    "smoke_log", "smoke_stdout", "smoke_stderr", "hang_trace",
-                    "launchservices_marker", "archive_inspection", "signing_inventory", "output",
-                    "r_runtime_profile",
-                )
-            })
-    except (MacOSDeploymentInspectionError, OSError, ValueError, json.JSONDecodeError) as exc:
+            write_qualification_evidence(
+                target=args.target,
+                **{
+                    name: getattr(args, name)
+                    for name in (
+                        "archive",
+                        "deployment_manifest",
+                        "runtime_probe",
+                        "smoke_evidence",
+                        "smoke_log",
+                        "smoke_stdout",
+                        "smoke_stderr",
+                        "hang_trace",
+                        "launchservices_marker",
+                        "archive_inspection",
+                        "signing_inventory",
+                        "output",
+                        "r_runtime_profile",
+                        "r_integration_kit_manifest",
+                    )
+                },
+            )
+    except (
+        MacOSDeploymentInspectionError,
+        OSError,
+        ValueError,
+        json.JSONDecodeError,
+    ) as exc:
         print(f"macOS deployment inspection failed: {exc}", file=sys.stderr)
         return 1
     return 0

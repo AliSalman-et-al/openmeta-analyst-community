@@ -15,6 +15,10 @@ on:
       archive_platform:
         required: true
         type: string
+      macos_architecture:
+        required: false
+        default: x64
+        type: string
 
 permissions:
   contents: read
@@ -24,15 +28,28 @@ env:
   RCMS_CRAN_REPO_KEY: public-ppm-2026-07-16
 
 jobs:
+  produce-r-integration-kit:
+    uses: ./.github/workflows/r-integration-kit-producer.yml
+    with:
+      runner: ${{ inputs.runner }}
+      target: ${{ inputs.archive_platform }}
+
   package:
     name: ${{ inputs.artifact_name }}
     runs-on: ${{ inputs.runner }}
+    needs: produce-r-integration-kit
     timeout-minutes: 60
     steps:
       - name: Check out repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
+
+      - name: Download exact promoted R integration kit
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4
+        with:
+          name: ${{ needs.produce-r-integration-kit.outputs.artifact_name }}
+          path: artifacts/r-integration-kits/${{ inputs.archive_platform }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
@@ -42,11 +59,11 @@ jobs:
       - name: Install Python
         run: uv python install 3.11.9
 
-      - name: Set up R for bundled runtime
-        uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
-        with:
-          r-version: 4.6.1
-          use-public-rspm: true
+      - name: Authenticate promoted kit before environment assembly
+        run: uv run --no-project --offline --python 3.11.9 python scripts/r_integration_kit.py verify-content --kit "artifacts/r-integration-kits/${{ inputs.archive_platform }}" --target "${{ inputs.archive_platform }}" --uv-lock uv.lock --expected-kit-sha256 "${{ needs.produce-r-integration-kit.outputs.kit_sha256 }}"
+
+      - name: Install locked offline assembly environment
+        run: uv --cache-dir "artifacts/r-integration-kits/${{ inputs.archive_platform }}/python/uv-cache" sync --locked --offline
 
       - name: Resolve shared package metadata
         id: package-metadata
@@ -75,16 +92,10 @@ jobs:
             --github-env "$GITHUB_ENV" \
             --diagnostic "build/qt-sdk/${{ inputs.archive_platform }}-rcc.json"
 
-      - name: Cache bundled R package library
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
-        with:
-          path: artifacts/r-library-cache
-          key: bundled-r-library-v4-${{ inputs.archive_platform }}-${{ steps.package-metadata.outputs.r-version }}-${{ env.RCMS_CRAN_REPO_KEY }}-${{ hashFiles('scripts/install-r-deps.R', 'scripts/r_binary_policy.R', 'scripts/r_dependency_policy.py', 'docs/verification/RCMetaR-r-dependencies.json', 'r/RCMetaR/DESCRIPTION') }}
-
       - name: Build Windows package
         if: ${{ inputs.target_os == 'windows' }}
         shell: powershell
-        run: .\scripts\package-windows.ps1 -ArtifactName "${{ inputs.artifact_name }}" -ArchiveRootName "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ inputs.archive_platform }}" -RRuntimeRoot "${{ steps.package-metadata.outputs.r-runtime-root }}"
+        run: .\scripts\assemble-windows-package.ps1 -ArtifactName "${{ inputs.artifact_name }}" -ArchiveRootName "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ inputs.archive_platform }}" -RIntegrationKit "$PWD\artifacts\r-integration-kits\${{ inputs.archive_platform }}" -ExpectedRIntegrationKitSha256 "${{ needs.produce-r-integration-kit.outputs.kit_sha256 }}"
 
       - name: Build macOS package
         if: ${{ inputs.target_os == 'macos' }}
@@ -95,7 +106,12 @@ jobs:
             echo "The clean macOS qualification runner unexpectedly contains /opt/X11." >&2
             exit 1
           fi
-          bash scripts/package-macos.sh --architecture x64 --artifact-name "${{ inputs.artifact_name }}" --archive-root-name "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ inputs.archive_platform }}" --r-runtime-root "${{ steps.package-metadata.outputs.r-runtime-root }}"
+          bash scripts/assemble-macos-package.sh \
+            --architecture "${{ inputs.macos_architecture }}" \
+            --artifact-name "${{ inputs.artifact_name }}" \
+            --archive-root-name "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ inputs.archive_platform }}" \
+            --r-integration-kit "$PWD/artifacts/r-integration-kits/${{ inputs.archive_platform }}" \
+            --expected-r-integration-kit-sha256 "${{ needs.produce-r-integration-kit.outputs.kit_sha256 }}"
 
       - name: Upload package artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

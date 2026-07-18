@@ -12,7 +12,7 @@ import sys
 import unicodedata
 import zipfile
 from collections import defaultdict
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import cast
 
 
@@ -43,13 +43,54 @@ EXPECTED_VERSIONS = {
     "rpy2": "3.6.7",
     "pyinstaller": "6.21.0",
 }
-EXPECTED_SUMMARY_SHA256 = "78294820c83cd94c19dfdca8c24b6a96cdc8b6f1319a5cd1bedffacde73851e2"
+EXPECTED_SUMMARY_SHA256 = (
+    "78294820c83cd94c19dfdca8c24b6a96cdc8b6f1319a5cd1bedffacde73851e2"
+)
 FORBIDDEN_GENERATED_SOURCE_SUFFIXES = {".py", ".pyc", ".pyo", ".ui", ".qrc"}
 FORBIDDEN_BINDINGS = ("pyqt5", "pyside2", "pyside6", "qtpy")
 REQUIRED_PROJECT_SCHEMAS = {
     "manifest.schema.json",
     "project.schema.json",
     "state.schema.json",
+}
+WINDOWS_SYSTEM_DLLS = {
+    "advapi32.dll",
+    "bcrypt.dll",
+    "cfgmgr32.dll",
+    "comctl32.dll",
+    "comdlg32.dll",
+    "crypt32.dll",
+    "cryptbase.dll",
+    "dnsapi.dll",
+    "dwmapi.dll",
+    "gdi32.dll",
+    "imm32.dll",
+    "iphlpapi.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "ncrypt.dll",
+    "netapi32.dll",
+    "normaliz.dll",
+    "ntdll.dll",
+    "ole32.dll",
+    "oleaut32.dll",
+    "powrprof.dll",
+    "propsys.dll",
+    "psapi.dll",
+    "rpcrt4.dll",
+    "secur32.dll",
+    "setupapi.dll",
+    "shell32.dll",
+    "shlwapi.dll",
+    "ucrtbase.dll",
+    "user32.dll",
+    "userenv.dll",
+    "version.dll",
+    "winhttp.dll",
+    "wininet.dll",
+    "winmm.dll",
+    "wldap32.dll",
+    "ws2_32.dll",
 }
 
 
@@ -65,6 +106,37 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _valid_r_kit_derivation(manifest, derivation, target):
+    manifest_files = {
+        record.get("path"): record
+        for record in manifest.get("files", [])
+        if record.get("kind") == "file"
+    }
+    for name in ("api_bridge", "r_shared_library"):
+        source = derivation.get("source", {}).get(name, {})
+        pre_sign = derivation.get("pre_sign", {}).get(name, {})
+        final = derivation.get("final", {}).get(name, {})
+        transformation = derivation.get("transformations", {}).get(name)
+        pre_sign_is_derived = pre_sign.get("sha256") == source.get("sha256") or (
+            name == "api_bridge"
+            and isinstance(transformation, dict)
+            and transformation.get("kind") == "mach-o-load-command-relocation"
+            and transformation.get("source", {}).get("sha256") == source.get("sha256")
+            and transformation.get("output", {}).get("sha256") == pre_sign.get("sha256")
+            and bool(transformation.get("changes"))
+        )
+        if not (
+            manifest_files.get(source.get("path"), {}).get("sha256")
+            == source.get("sha256")
+            and pre_sign_is_derived
+            and final.get("path") == pre_sign.get("path")
+            and pre_sign.get("signing_identity")
+            and final.get("signing_identity")
+        ):
+            return False
+    return derivation.get("schema_version") == 1 and derivation.get("target") == target
+
+
 def pe_machine(path: Path) -> int:
     with path.open("rb") as stream:
         if stream.read(2) != b"MZ":
@@ -72,15 +144,104 @@ def pe_machine(path: Path) -> int:
         stream.seek(0x3C)
         raw_offset = stream.read(4)
         if len(raw_offset) != 4:
-            raise DeploymentInspectionError(f"native file has a truncated DOS header: {path}")
+            raise DeploymentInspectionError(
+                f"native file has a truncated DOS header: {path}"
+            )
         pe_offset = struct.unpack("<I", raw_offset)[0]
         stream.seek(pe_offset)
         if stream.read(4) != b"PE\0\0":
             raise DeploymentInspectionError(f"native file has no PE signature: {path}")
         raw_machine = stream.read(2)
         if len(raw_machine) != 2:
-            raise DeploymentInspectionError(f"native file has a truncated PE header: {path}")
+            raise DeploymentInspectionError(
+                f"native file has a truncated PE header: {path}"
+            )
         return struct.unpack("<H", raw_machine)[0]
+
+
+def _is_windows_system_import(name: str) -> bool:
+    lowered = name.casefold()
+    return (
+        lowered in WINDOWS_SYSTEM_DLLS
+        or lowered.startswith("api-ms-win-")
+        or lowered.startswith("ext-ms-win-")
+    )
+
+
+def _pe_imports(path: Path) -> list[dict[str, str]]:
+    import pefile
+
+    try:
+        pe = pefile.PE(str(path), fast_load=True)
+        pe.parse_data_directories(
+            directories=[
+                pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_IMPORT"],
+                pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT"],
+            ]
+        )
+    except pefile.PEFormatError as exc:
+        raise DeploymentInspectionError(
+            f"native file is not a valid PE: {path}"
+        ) from exc
+    imports = [
+        {"name": entry.dll.decode("ascii", errors="strict"), "kind": "normal"}
+        for entry in getattr(pe, "DIRECTORY_ENTRY_IMPORT", [])
+    ]
+    imports.extend(
+        {"name": entry.dll.decode("ascii", errors="strict"), "kind": "delay"}
+        for entry in getattr(pe, "DIRECTORY_ENTRY_DELAY_IMPORT", [])
+    )
+    return imports
+
+
+def _resolve_pe_closure(records: list[dict]) -> None:
+    by_path = {PurePosixPath(record["path"]): record for record in records}
+    declared_private_dirs = {
+        PurePosixPath("."),
+        PurePosixPath("_internal"),
+        PurePosixPath("_internal/PyQt6/Qt6/bin"),
+    }
+    for record in records:
+        path = PurePosixPath(record["path"])
+        if path.parts[:1] == ("R",):
+            declared_private_dirs.add(path.parent)
+    for record in records:
+        resolutions = []
+        owner = PurePosixPath(record["path"])
+        for imported in record.pop("_imports"):
+            name = imported["name"]
+            if _is_windows_system_import(name):
+                resolutions.append({**imported, "resolution": "system"})
+                continue
+            search_dirs = [owner.parent, *sorted(declared_private_dirs, key=str)]
+            matches = []
+            for directory in search_dirs:
+                candidate = directory / name
+                record_match = next(
+                    (
+                        value
+                        for path, value in by_path.items()
+                        if path.as_posix().casefold() == candidate.as_posix().casefold()
+                    ),
+                    None,
+                )
+                if record_match is not None:
+                    matches = [record_match]
+                    break
+            if len(matches) != 1:
+                raise DeploymentInspectionError(
+                    f"Windows PE import is unreachable from declared loader directories: "
+                    f"{record['path']} -> {name}"
+                )
+            resolutions.append(
+                {
+                    **imported,
+                    "resolution": "app-local",
+                    "resolved_path": matches[0]["path"],
+                    "resolved_sha256": matches[0]["sha256"],
+                }
+            )
+        record["imports"] = resolutions
 
 
 def _relative(path: Path, root: Path) -> str:
@@ -123,7 +284,8 @@ def inspect_deployment(
     ]
     if forbidden_binding:
         raise DeploymentInspectionError(
-            "mixed or legacy Qt binding payload is forbidden: " + ", ".join(forbidden_binding)
+            "mixed or legacy Qt binding payload is forbidden: "
+            + ", ".join(forbidden_binding)
         )
 
     generated_sources = [
@@ -163,11 +325,15 @@ def inspect_deployment(
     locked_payload_hashes = {}
     for family, required_names in REQUIRED_PLUGINS.items():
         family_root = plugins_root / family
-        found = {
-            path.name.lower()
-            for path in family_root.iterdir()
-            if family_root.is_dir() and path.is_file()
-        } if family_root.is_dir() else set()
+        found = (
+            {
+                path.name.lower()
+                for path in family_root.iterdir()
+                if family_root.is_dir() and path.is_file()
+            }
+            if family_root.is_dir()
+            else set()
+        )
         missing = sorted(required_names - found)
         if missing:
             raise DeploymentInspectionError(
@@ -228,7 +394,9 @@ def inspect_deployment(
     for packaged_plugin in packaged_plugins:
         relative_plugin = _relative(packaged_plugin, plugins_root)
         locked_plugin = locked_plugins_by_relative.get(relative_plugin.casefold())
-        if locked_plugin is None or sha256_file(packaged_plugin) != sha256_file(locked_plugin):
+        if locked_plugin is None or sha256_file(packaged_plugin) != sha256_file(
+            locked_plugin
+        ):
             raise DeploymentInspectionError(
                 "Qt plugin identity differs from the locked wheel: " + relative_plugin
             )
@@ -236,7 +404,9 @@ def inspect_deployment(
             packaged_plugin
         )
 
-    native_files = [path for path in all_files if path.suffix.lower() in NATIVE_SUFFIXES]
+    native_files = [
+        path for path in all_files if path.suffix.lower() in NATIVE_SUFFIXES
+    ]
     wrong_architecture = []
     native_manifest = []
     qt_libraries: dict[str, list[str]] = defaultdict(list)
@@ -248,12 +418,18 @@ def inspect_deployment(
         if path.name.lower().startswith("qt6") and path.suffix.lower() == ".dll":
             qt_libraries[path.name.lower()].append(name)
         native_manifest.append(
-            {"path": name, "machine": "x86_64", "sha256": sha256_file(path)}
+            {
+                "path": name,
+                "machine": "x86_64",
+                "sha256": sha256_file(path),
+                "_imports": _pe_imports(path),
+            }
         )
     if wrong_architecture:
         raise DeploymentInspectionError(
             "non-x64 native files found: " + ", ".join(wrong_architecture)
         )
+    _resolve_pe_closure(native_manifest)
     duplicates = {
         name: paths for name, paths in qt_libraries.items() if len(paths) != 1
     }
@@ -279,38 +455,90 @@ def inspect_deployment(
             + ", ".join(misplaced_qt_libraries)
         )
     locked_qt_bin = locked_qt_root / "bin"
-    locked_libraries = {
-        path.name.casefold(): path
-        for path in locked_qt_bin.iterdir()
+    locked_libraries = (
+        {
+            path.name.casefold(): path
+            for path in locked_qt_bin.iterdir()
+            if locked_qt_bin.is_dir()
+            and path.is_file()
+            and path.name.lower().startswith("qt6")
+            and path.suffix.lower() == ".dll"
+        }
         if locked_qt_bin.is_dir()
-        and path.is_file()
-        and path.name.lower().startswith("qt6")
-        and path.suffix.lower() == ".dll"
-    } if locked_qt_bin.is_dir() else {}
+        else {}
+    )
     for library_name, packaged_paths in sorted(qt_libraries.items()):
         packaged_library = app_root / packaged_paths[0]
         locked_library = locked_libraries.get(library_name.casefold())
-        if locked_library is None or sha256_file(packaged_library) != sha256_file(locked_library):
+        if locked_library is None or sha256_file(packaged_library) != sha256_file(
+            locked_library
+        ):
             raise DeploymentInspectionError(
                 f"Qt library identity differs from the locked wheel: {library_name}"
             )
-        locked_payload_hashes[_relative(packaged_library, app_root)] = sha256_file(packaged_library)
+        locked_payload_hashes[_relative(packaged_library, app_root)] = sha256_file(
+            packaged_library
+        )
 
     required_stack = {
-        "python", "pyqt6", "qt", "sip", "sip_runtime", "r", "rpy2", "pyinstaller"
+        "python",
+        "pyqt6",
+        "qt",
+        "sip",
+        "sip_runtime",
+        "r",
+        "rpy2",
+        "pyinstaller",
     }
     if set(versions) != required_stack or any(not value for value in versions.values()):
         raise DeploymentInspectionError(
-            "version evidence must contain exactly: " + ", ".join(sorted(required_stack))
+            "version evidence must contain exactly: "
+            + ", ".join(sorted(required_stack))
         )
     if versions != EXPECTED_VERSIONS:
         raise DeploymentInspectionError(
             "deployment stack differs from the locked versions: "
             + json.dumps(versions, sort_keys=True)
         )
-    if len(source_commit) != 40 or any(character not in "0123456789abcdef" for character in source_commit.lower()):
+    if len(source_commit) != 40 or any(
+        character not in "0123456789abcdef" for character in source_commit.lower()
+    ):
         raise DeploymentInspectionError("source commit must be a full Git SHA")
+    rpy2_api = [
+        path for path in all_files if "_rinterface_cffi_api" in path.name.lower()
+    ]
+    rpy2_abi = [
+        path for path in all_files if "_rinterface_cffi_abi" in path.name.lower()
+    ]
+    if len(rpy2_api) != 1 or rpy2_api[0].suffix.lower() != ".pyd" or rpy2_abi:
+        raise DeploymentInspectionError(
+            "deployment must contain exactly one rpy2 API bridge and no ABI fallback"
+        )
     _validate_runtime_probe(runtime_probe, app_root=app_root, qt_root=qt_root)
+    kit_manifest_path = app_root / "r-integration-kit" / "manifest.json"
+    derivation_path = app_root / "r-integration-kit" / "derivation.json"
+    try:
+        kit_manifest = json.loads(kit_manifest_path.read_text(encoding="utf-8"))
+        derivation = json.loads(derivation_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise DeploymentInspectionError(
+            "Windows deployment lacks its R integration-kit manifest"
+        ) from exc
+    if not (
+        kit_manifest.get("kind") == "rc-metastudio-r-integration-kit"
+        and kit_manifest.get("target") == "windows-x64"
+        and kit_manifest.get("architecture") == "x86_64"
+        and kit_manifest.get("cffi_mode") == "API"
+        and len(str(kit_manifest.get("kit_sha256", ""))) == 64
+        and derivation.get("kit_sha256") == kit_manifest.get("kit_sha256")
+        and derivation.get("target") == "windows-x64"
+        and _valid_r_kit_derivation(kit_manifest, derivation, "windows-x64")
+        and derivation.get("final", {}).get("api_bridge", {}).get("sha256")
+        == runtime_probe.get("rpy2", {}).get("api_bridge_sha256")
+        and derivation.get("final", {}).get("r_shared_library", {}).get("sha256")
+        == runtime_probe.get("r", {}).get("shared_library_sha256")
+    ):
+        raise DeploymentInspectionError("Windows R integration-kit identity is invalid")
 
     return {
         "schema_version": 1,
@@ -327,17 +555,26 @@ def inspect_deployment(
         "signing_required": False,
         "security_settings_weakened": False,
         "stack": versions,
+        "r_integration_kit": {
+            "path": "r-integration-kit/manifest.json",
+            "sha256": sha256_file(kit_manifest_path),
+            "kit_sha256": kit_manifest["kit_sha256"],
+            "derivation_sha256": sha256_file(derivation_path),
+        },
         "qt_runtime_root": _relative(qt_root, app_root),
         "plugins": plugin_manifest,
         "qt_plugins": {
-            _relative(path, plugins_root): sha256_file(path) for path in packaged_plugins
+            _relative(path, plugins_root): sha256_file(path)
+            for path in packaged_plugins
         },
         "qt_libraries": dict(sorted(qt_libraries.items())),
         "project_schema_resources": dict(sorted(project_schemas.items())),
         "native_files": native_manifest,
         "locked_qt_payload_sha256": dict(sorted(locked_payload_hashes.items())),
         "runtime_probe_canonical_sha256": hashlib.sha256(
-            (json.dumps(runtime_probe, sort_keys=True, separators=(",", ":")) + "\n").encode()
+            (
+                json.dumps(runtime_probe, sort_keys=True, separators=(",", ":")) + "\n"
+            ).encode()
         ).hexdigest(),
         "file_count": len(all_files),
     }
@@ -347,7 +584,9 @@ def _normalized_path(value: str) -> Path:
     return Path(value.replace("/", os.sep)).resolve()
 
 
-def _validate_runtime_probe(runtime_probe: dict, *, app_root: Path, qt_root: Path) -> None:
+def _validate_runtime_probe(
+    runtime_probe: dict, *, app_root: Path, qt_root: Path
+) -> None:
     expected_keys = {
         "schema_version",
         "frozen",
@@ -360,15 +599,20 @@ def _validate_runtime_probe(runtime_probe: dict, *, app_root: Path, qt_root: Pat
     if set(runtime_probe) != expected_keys or runtime_probe.get("schema_version") != 1:
         raise DeploymentInspectionError("frozen runtime probe schema is invalid")
     if runtime_probe.get("frozen") is not True:
-        raise DeploymentInspectionError("runtime probe did not execute from a frozen application")
+        raise DeploymentInspectionError(
+            "runtime probe did not execute from a frozen application"
+        )
     python = runtime_probe.get("python", {})
     if (
         python.get("version") != EXPECTED_VERSIONS["python"]
         or str(python.get("architecture", "")).lower() not in {"amd64", "x86_64"}
-        or _normalized_path(python.get("executable", "")) != app_root / "RCMetaStudio.exe"
+        or _normalized_path(python.get("executable", ""))
+        != app_root / "RCMetaStudio.exe"
         or _normalized_path(python.get("bundle_root", "")) != app_root / "_internal"
     ):
-        raise DeploymentInspectionError("frozen Python runtime probe does not match the assembled artifact")
+        raise DeploymentInspectionError(
+            "frozen Python runtime probe does not match the assembled artifact"
+        )
     qt = runtime_probe.get("qt", {})
     plugins_root = qt_root / "plugins"
     library_paths = {_normalized_path(value) for value in qt.get("library_paths", [])}
@@ -384,9 +628,36 @@ def _validate_runtime_probe(runtime_probe: dict, *, app_root: Path, qt_root: Pat
         or float(qt.get("baseline_device_pixel_ratio", 0)) <= 0
         or float(qt.get("baseline_logical_dpi", 0)) <= 0
     ):
-        raise DeploymentInspectionError("frozen Qt runtime probe does not match the assembled artifact")
-    if runtime_probe.get("rpy2", {}).get("distribution_version") != EXPECTED_VERSIONS["rpy2"]:
-        raise DeploymentInspectionError("frozen rpy2 runtime probe differs from the lock")
+        raise DeploymentInspectionError(
+            "frozen Qt runtime probe does not match the assembled artifact"
+        )
+    rpy2 = runtime_probe.get("rpy2", {})
+    if not (
+        {
+            key: rpy2.get(key)
+            for key in (
+                "distribution_version",
+                "rinterface_distribution_version",
+                "robjects_distribution_version",
+                "cffi_mode",
+                "loaded_cffi_mode",
+                "api_bridge_loaded",
+            )
+        }
+        == {
+            "distribution_version": EXPECTED_VERSIONS["rpy2"],
+            "cffi_mode": "API",
+            "rinterface_distribution_version": "3.6.6",
+            "robjects_distribution_version": "3.6.5",
+            "loaded_cffi_mode": "API",
+            "api_bridge_loaded": True,
+        }
+        and _valid_sha256(rpy2.get("api_bridge_sha256"))
+        and _normalized_path(rpy2.get("api_bridge_path", "")).is_relative_to(app_root)
+    ):
+        raise DeploymentInspectionError(
+            "frozen rpy2 runtime probe differs from the lock"
+        )
     if runtime_probe.get("project_schemas") != {
         "version": 1,
         "validated_members": ["manifest.json", "project.json", "state.json"],
@@ -404,8 +675,16 @@ def _validate_runtime_probe(runtime_probe: dict, *, app_root: Path, qt_root: Pat
         or _normalized_path(r.get("configured_home", "")) != expected_r_home
         or _normalized_path(r.get("configured_library", "")) != expected_r_library
         or expected_r_library not in r_libraries
+        or r.get("lc_numeric") != "C"
+        or not _valid_sha256(r.get("shared_library_sha256"))
+        or not _normalized_path(r.get("shared_library_path", "")).is_relative_to(
+            app_root
+        )
+        or not _valid_sha256(r.get("kit_sha256"))
     ):
-        raise DeploymentInspectionError("frozen R runtime probe does not use the bundled R runtime/library")
+        raise DeploymentInspectionError(
+            "frozen R runtime probe does not use the bundled R runtime/library"
+        )
 
 
 def _valid_windows_accessibility(value: object) -> bool:
@@ -415,7 +694,7 @@ def _valid_windows_accessibility(value: object) -> bool:
     return (
         accessibility.get("accessible_name") == "Packaged accessibility control"
         and accessibility.get("accessible_description")
-            == "Verifies packaged Qt accessibility metadata."
+        == "Verifies packaged Qt accessibility metadata."
         and accessibility.get("native") == {}
     )
 
@@ -459,7 +738,9 @@ def write_qualification_evidence(
         or archive_report.get("archive_sha256") != sha256_file(archive)
         or archive_report.get("embedded_sha256") != expected_embedded_hashes
     ):
-        raise DeploymentInspectionError("final ZIP inspection is not bound to qualification inputs")
+        raise DeploymentInspectionError(
+            "final ZIP inspection is not bound to qualification inputs"
+        )
     required_workflows = {
         "automation_entry_point",
         "converted_sample",
@@ -497,17 +778,23 @@ def write_qualification_evidence(
         or any(
             workflows[name] is not True
             for name in {
-                "automation_entry_point", "representative_edit", "real_r_analysis",
-                "result_text", "save_reopen", "analysis_after_reopen"
+                "automation_entry_point",
+                "representative_edit",
+                "real_r_analysis",
+                "result_text",
+                "save_reopen",
+                "analysis_after_reopen",
             }
         )
         or workflows.get("converted_sample") != "amino.rcms"
-        or workflows.get("expected_normalized_summary_sha256") != EXPECTED_SUMMARY_SHA256
+        or workflows.get("expected_normalized_summary_sha256")
+        != EXPECTED_SUMMARY_SHA256
         or workflows.get("normalized_summary_sha256") != EXPECTED_SUMMARY_SHA256
         or not _valid_sha256(workflows.get("raw_summary_sha256"))
         or not _valid_sha256_map(workflows.get("svg_sha256"))
         or not _valid_locale_variants(workflows.get("locale_variants"), workflows)
-        or smoke.get("execution") != {
+        or smoke.get("execution")
+        != {
             "automation_exit_code": 0,
             "positional_user_entry_exit_code": 0,
             "scale_exit_codes": {"1.25": 0, "1.50": 0, "1.75": 0},
@@ -516,22 +803,33 @@ def write_qualification_evidence(
         }
         or [item.get("requested") for item in scales] != ["1.25", "1.50", "1.75"]
         or any(
-            not all(item.get(check) is True for check in ("clipboard", "binary_resources"))
+            not all(
+                item.get(check) is True for check in ("clipboard", "binary_resources")
+            )
             or not _valid_windows_critical_dialog(item.get("critical_dialog"))
             or item.get("locale") != "de_DE"
             or item.get("platform_plugin") != "windows"
             or not _valid_windows_accessibility(item.get("accessibility"))
-            or "schannel" not in [str(value).lower() for value in item.get("tls_backends", [])]
+            or "schannel"
+            not in [str(value).lower() for value in item.get("tls_backends", [])]
             or not item.get("active_style")
             or not item.get("available_styles")
             or not {"ico", "jpeg", "svg"} <= set(item.get("image_formats", []))
-            or abs(float(item.get("qt_scale_factor", 0)) - float(item.get("requested", -1))) > 1e-9
+            or abs(
+                float(item.get("qt_scale_factor", 0)) - float(item.get("requested", -1))
+            )
+            > 1e-9
             or float(item.get("baseline_device_pixel_ratio", 0)) <= 0
             or abs(
                 float(item.get("expected_device_pixel_ratio", 0))
-                - float(item.get("baseline_device_pixel_ratio", 0)) * float(item.get("requested", -1))
-            ) > 1e-9
-            or abs(float(item.get("device_pixel_ratio", 0)) - float(item.get("expected_device_pixel_ratio", -1)))
+                - float(item.get("baseline_device_pixel_ratio", 0))
+                * float(item.get("requested", -1))
+            )
+            > 1e-9
+            or abs(
+                float(item.get("device_pixel_ratio", 0))
+                - float(item.get("expected_device_pixel_ratio", -1))
+            )
             > float(item.get("dpr_tolerance", -1))
             for item in scales
         )
@@ -586,7 +884,9 @@ def write_qualification_evidence(
     if not evidence["passed"]:
         raise DeploymentInspectionError("qualification inputs did not pass")
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    output.write_text(
+        json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     return evidence
 
 
@@ -600,14 +900,23 @@ def _valid_locale_variants(variants: object, workflows: dict) -> bool:
     typed_variants = cast(list[dict[str, object]], variants)
     if [item.get("locale") for item in typed_variants] != ["en_US", "de_DE"]:
         return False
-    if "." not in str(typed_variants[0].get("input")) or "," not in str(typed_variants[1].get("input")):
+    if "." not in str(typed_variants[0].get("input")) or "," not in str(
+        typed_variants[1].get("input")
+    ):
         return False
     return (
-        typed_variants[0].get("canonical_value") == typed_variants[1].get("canonical_value")
-        and typed_variants[0].get("normalized_summary_sha256") == typed_variants[1].get("normalized_summary_sha256") == EXPECTED_SUMMARY_SHA256
-        and typed_variants[0].get("raw_summary_sha256") == typed_variants[1].get("raw_summary_sha256") == workflows.get("raw_summary_sha256")
+        typed_variants[0].get("canonical_value")
+        == typed_variants[1].get("canonical_value")
+        and typed_variants[0].get("normalized_summary_sha256")
+        == typed_variants[1].get("normalized_summary_sha256")
+        == EXPECTED_SUMMARY_SHA256
+        and typed_variants[0].get("raw_summary_sha256")
+        == typed_variants[1].get("raw_summary_sha256")
+        == workflows.get("raw_summary_sha256")
         and _valid_sha256(typed_variants[0].get("raw_summary_sha256"))
-        and typed_variants[0].get("svg_sha256") == typed_variants[1].get("svg_sha256") == workflows.get("svg_sha256")
+        and typed_variants[0].get("svg_sha256")
+        == typed_variants[1].get("svg_sha256")
+        == workflows.get("svg_sha256")
         and _valid_sha256_map(typed_variants[0].get("svg_sha256"))
     )
 
@@ -628,8 +937,10 @@ def _valid_sha256_map(value: object) -> bool:
 
 
 def _valid_sha256(value: object) -> bool:
-    return isinstance(value, str) and len(value) == 64 and all(
-        character in "0123456789abcdef" for character in value
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
     )
 
 
@@ -637,7 +948,9 @@ def finalize_smoke_evidence(path: Path, log_path: Path) -> dict:
     evidence = json.loads(path.read_text(encoding="utf-8"))
     log_text = log_path.read_text(encoding="utf-8")
     if "packaged-workflow:post-close" not in log_text:
-        raise DeploymentInspectionError("packaged automation did not emit its post-close marker")
+        raise DeploymentInspectionError(
+            "packaged automation did not emit its post-close marker"
+        )
     evidence["execution"] = {
         "automation_exit_code": 0,
         "positional_user_entry_exit_code": 0,
@@ -645,7 +958,9 @@ def finalize_smoke_evidence(path: Path, log_path: Path) -> dict:
         "post_close_marker": True,
         "clean_exit": True,
     }
-    path.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     return evidence
 
 
@@ -666,10 +981,16 @@ def inspect_archive(
                 or unicodedata.normalize("NFC", name) != name
                 or not name.startswith(prefix)
             ):
-                raise DeploymentInspectionError(f"ZIP contains a non-normalized member: {name}")
+                raise DeploymentInspectionError(
+                    f"ZIP contains a non-normalized member: {name}"
+                )
             relative = name[len(prefix) :]
-            if not relative or any(part in {"", ".", ".."} for part in relative.split("/")):
-                raise DeploymentInspectionError(f"ZIP contains traversal or empty components: {name}")
+            if not relative or any(
+                part in {"", ".", ".."} for part in relative.split("/")
+            ):
+                raise DeploymentInspectionError(
+                    f"ZIP contains traversal or empty components: {name}"
+                )
             key = name.casefold()
             if key in folded:
                 raise DeploymentInspectionError(
@@ -682,25 +1003,47 @@ def inspect_archive(
             normalized_relative = relative.replace("\\", "/")
             member = prefix + normalized_relative
             if member not in names:
-                raise DeploymentInspectionError(f"ZIP is missing embedded qualification input: {member}")
+                raise DeploymentInspectionError(
+                    f"ZIP is missing embedded qualification input: {member}"
+                )
             payload = bundle.read(member)
             if payload != source.read_bytes():
-                raise DeploymentInspectionError(f"ZIP qualification input differs from inspected source: {member}")
+                raise DeploymentInspectionError(
+                    f"ZIP qualification input differs from inspected source: {member}"
+                )
             embedded_hashes[normalized_relative] = hashlib.sha256(payload).hexdigest()
 
-        deployment = json.loads(bundle.read(prefix + "qualification/deployment-manifest.json"))
-        runtime_probe = json.loads(bundle.read(prefix + "qualification/runtime-probe.json"))
+        deployment = json.loads(
+            bundle.read(prefix + "qualification/deployment-manifest.json")
+        )
+        runtime_probe = json.loads(
+            bundle.read(prefix + "qualification/runtime-probe.json")
+        )
         smoke = json.loads(bundle.read(prefix + "qualification/packaged-smoke.json"))
-        log_text = bundle.read(prefix + "qualification/packaged-smoke.log").decode("utf-8")
-        if deployment.get("target") != "windows-x64" or deployment.get("stack") != EXPECTED_VERSIONS:
+        log_text = bundle.read(prefix + "qualification/packaged-smoke.log").decode(
+            "utf-8"
+        )
+        if (
+            deployment.get("target") != "windows-x64"
+            or deployment.get("stack") != EXPECTED_VERSIONS
+        ):
             raise DeploymentInspectionError("embedded deployment manifest is invalid")
         runtime_canonical_sha256 = hashlib.sha256(
-            (json.dumps(runtime_probe, sort_keys=True, separators=(",", ":")) + "\n").encode()
+            (
+                json.dumps(runtime_probe, sort_keys=True, separators=(",", ":")) + "\n"
+            ).encode()
         ).hexdigest()
         if deployment.get("runtime_probe_canonical_sha256") != runtime_canonical_sha256:
-            raise DeploymentInspectionError("embedded runtime probe is not authenticated by deployment manifest")
-        if runtime_probe.get("frozen") is not True or smoke.get("execution", {}).get("clean_exit") is not True:
-            raise DeploymentInspectionError("embedded runtime/smoke evidence is incomplete")
+            raise DeploymentInspectionError(
+                "embedded runtime probe is not authenticated by deployment manifest"
+            )
+        if (
+            runtime_probe.get("frozen") is not True
+            or smoke.get("execution", {}).get("clean_exit") is not True
+        ):
+            raise DeploymentInspectionError(
+                "embedded runtime/smoke evidence is incomplete"
+            )
         if "startup-project:normal-entry-point-passed" not in log_text:
             raise DeploymentInspectionError("embedded smoke log is incomplete")
 
@@ -724,7 +1067,14 @@ def _main() -> int:
     inspect_parser.add_argument("--runtime-probe", type=Path, required=True)
     inspect_parser.add_argument("--locked-qt-root", type=Path, required=True)
     for name in (
-        "python", "pyqt6", "qt", "sip", "sip_runtime", "r", "rpy2", "pyinstaller"
+        "python",
+        "pyqt6",
+        "qt",
+        "sip",
+        "sip_runtime",
+        "r",
+        "rpy2",
+        "pyinstaller",
     ):
         option_name = name.replace("_", "-")
         inspect_parser.add_argument(
@@ -758,14 +1108,23 @@ def _main() -> int:
             versions = {
                 name: getattr(args, f"{name}_version")
                 for name in (
-                    "python", "pyqt6", "qt", "sip", "sip_runtime", "r", "rpy2", "pyinstaller"
+                    "python",
+                    "pyqt6",
+                    "qt",
+                    "sip",
+                    "sip_runtime",
+                    "r",
+                    "rpy2",
+                    "pyinstaller",
                 )
             }
             manifest = inspect_deployment(
                 args.app_root,
                 versions=versions,
                 source_commit=args.source_commit,
-                runtime_probe=json.loads(args.runtime_probe.read_text(encoding="utf-8")),
+                runtime_probe=json.loads(
+                    args.runtime_probe.read_text(encoding="utf-8")
+                ),
                 locked_qt_root=args.locked_qt_root.resolve(),
             )
             args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -798,7 +1157,12 @@ def _main() -> int:
             args.output.write_text(
                 json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )
-    except (DeploymentInspectionError, OSError, ValueError, json.JSONDecodeError) as exc:
+    except (
+        DeploymentInspectionError,
+        OSError,
+        ValueError,
+        json.JSONDecodeError,
+    ) as exc:
         print(f"Windows deployment inspection failed: {exc}", file=sys.stderr)
         return 1
     return 0

@@ -189,7 +189,22 @@ install_rcms_binary_packages <- function(
   missing <- setdiff(required_binary, target)
   if (length(missing)) {
     message("Installing complete R dependency closure with type=binary only: ", paste(missing, collapse = ", "))
-    install_binary(missing, lib = lib, dependencies = FALSE, type = "binary")
+    archive_dir <- Sys.getenv("RCMS_R_PACKAGE_ARCHIVE_DIR", "")
+    if (nzchar(archive_dir)) {
+      dir.create(archive_dir, recursive = TRUE, showWarnings = FALSE)
+      downloaded <- utils::download.packages(
+        missing, destdir = archive_dir, repos = policy$repository, type = "binary"
+      )
+      if (nrow(downloaded) != length(missing)) {
+        stop("PPM did not provide one retained binary archive per missing package")
+      }
+      install_binary(
+        downloaded[, "destfile"], lib = lib, repos = NULL,
+        dependencies = FALSE, type = "binary"
+      )
+    } else {
+      install_binary(missing, lib = lib, dependencies = FALSE, type = "binary")
+    }
   }
   target_after <- installed_in_target()
   not_installed <- setdiff(required_binary, target_after)
@@ -278,6 +293,14 @@ install_rcms_source_exception <- function(
     stop("HSROC installed at version ", actual, ", expected ", exception$version)
   }
   if (!requireNamespace(exception$name, quietly = TRUE)) stop("HSROC cannot be loaded after installation")
+  retained_archive <- Sys.getenv("RCMS_HSROC_ARCHIVE", "")
+  if (nzchar(retained_archive) && !file.exists(retained_archive)) {
+    dir.create(dirname(retained_archive), recursive = TRUE, showWarnings = FALSE)
+    download(exception$url, retained_archive, mode = "wb", quiet = FALSE)
+    if (!identical(sha256(retained_archive), exception$sha256)) {
+      stop("Retained HSROC source archive SHA256 mismatch")
+    }
+  }
   emit_rcms_binary_evidence(
     "source-exception",
     c(
