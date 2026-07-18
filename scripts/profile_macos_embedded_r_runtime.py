@@ -26,6 +26,16 @@ EXCLUSIONS = (
     ("library/grDevices/libs/cairo.so", "X11-linked Cairo device"),
 )
 DEPENDENCY_FIELDS = ("Depends", "Imports", "LinkingTo")
+MACH_O_MAGICS = {
+    b"\xfe\xed\xfa\xce",  # MH_MAGIC
+    b"\xce\xfa\xed\xfe",  # MH_CIGAM
+    b"\xfe\xed\xfa\xcf",  # MH_MAGIC_64
+    b"\xcf\xfa\xed\xfe",  # MH_CIGAM_64
+    b"\xca\xfe\xba\xbe",  # FAT_MAGIC
+    b"\xbe\xba\xfe\xca",  # FAT_CIGAM
+    b"\xca\xfe\xba\xbf",  # FAT_MAGIC_64
+    b"\xbf\xba\xfe\xca",  # FAT_CIGAM_64
+}
 
 
 class ProfileError(RuntimeError):
@@ -54,10 +64,13 @@ def command_lines(*command: str) -> list[str]:
 
 
 def is_macho(path: Path) -> bool:
-    return path.is_file() and subprocess.run(
-        ["otool", "-L", str(path)], stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL, check=False,
-    ).returncode == 0
+    if not path.is_file():
+        return False
+    try:
+        with path.open("rb") as stream:
+            return stream.read(4) in MACH_O_MAGICS
+    except OSError:
+        return False
 
 
 def macho_record(path: Path, root: Path) -> dict[str, object]:

@@ -29,6 +29,12 @@ jobs:
       - name: Install locked Python
         run: uv python install 3.11.9
 
+      - name: Prove explicit R.framework collection
+        run: |
+          uv sync --locked
+          uv run --no-sync python scripts/verify_macos_r_pyinstaller_toc.py \
+            --output build/macos-r-pyinstaller-toc-preflight.json
+
       - name: Run direct target-native R and PyInstaller feasibility path
         shell: bash
         run: bash scripts/package-macos-x64-direct-r-spike.sh
@@ -48,6 +54,7 @@ jobs:
         with:
           name: RCMetaStudio-macos-x64-direct-r-spike-evidence-${{ github.sha }}
           path: |
+            build/macos-r-pyinstaller-toc-preflight.json
             build/macos-direct-r-spike/evidence/**
             build/macos-direct-r-spike/pyinstaller/RCMetaStudio/warn-RCMetaStudio.txt
             build/macos-direct-r-spike/pyinstaller/RCMetaStudio/xref-RCMetaStudio.html

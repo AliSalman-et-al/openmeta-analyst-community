@@ -32,6 +32,15 @@ def load_inspector():
     return module
 
 
+def load_embedded_r_adapter():
+    path = ROOT / "scripts/macos_embedded_r_adapter.py"
+    spec = importlib.util.spec_from_file_location("macos_embedded_r_adapter", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def load_bounded_runner():
     path = ROOT / "scripts/run_bounded_process.py"
     spec = importlib.util.spec_from_file_location("run_bounded_process", path)
@@ -157,9 +166,11 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     assert all(f'"{name}"' in spec for name in ("PyQt5", "PySide2", "PySide6", "qtpy"))
     assert "project_schema_data" in spec
     assert "generated_form_modules" in spec
-    assert 'os.environ.get("RCMS_PYINSTALLER_R_FRAMEWORK")' in spec
-    assert '(direct_r_framework, "R.framework")' in spec
-    assert spec.count('(direct_r_framework, "R.framework")') == 1
+    assert 'os.environ.get("RCMS_PYINSTALLER_R_TOC")' in spec
+    assert 'os.environ.get("RCMS_PYINSTALLER_R_MAP")' in spec
+    assert 'a.datas.extend(' in spec
+    assert 'entry["type"]' in spec
+    assert '(direct_r_framework, "R.framework")' not in spec
     assert '"direct-r-spike.marker"' in spec
     assert '"_rinterface_cffi_api"' in spec
     assert (
@@ -171,6 +182,10 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     spike_workflow_text = text(".github/workflows/macos-x64-direct-r-spike.yml")
     spike_workflow = yaml.safe_load(spike_workflow_text)
     assert list(spike_workflow["jobs"]) == ["feasibility"]
+    assert "verify_macos_r_pyinstaller_toc.py" in spike_workflow_text
+    assert spike_workflow_text.index("verify_macos_r_pyinstaller_toc.py") < spike_workflow_text.index(
+        "package-macos-x64-direct-r-spike.sh"
+    )
     assert "produce-r-integration-kit" not in spike_workflow_text
     assert "r-integration-kit-producer.yml" not in spike_workflow_text
     manual_workflow = text(".github/workflows/package-verification.yml")
@@ -207,12 +222,17 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
         "profile_macos_embedded_r_runtime.py",
         "scripts/install-rcmetar-source.R",
         "RPY2_CFFI_MODE=API",
-        "RCMS_PYINSTALLER_R_FRAMEWORK",
+        "RCMS_PYINSTALLER_R_TOC",
+        "RCMS_PYINSTALLER_R_MAP",
         "packaging/pyinstaller/rc-metastudio-macos.spec",
         'inspect_macos_deployment.py" inspect',
         "--automation-package-runtime-probe",
         "--automation-native-smoke",
         "finalize-smoke",
+        "native-graph",
+        "--direct-build-manifest",
+        "extracted-direct-r-gate.json",
+        "extracted-runtime-probe.json",
     ):
         assert required in spike
     assert "r_integration_kit.py" not in spike
@@ -221,6 +241,120 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     assert 'readlink "$resources/lib/libR.dylib"' not in spike
     assert 'require_x64 "$resources/bin/R"' not in spike
     assert 'ln -s "4.6" "$stage/Versions/Current"' not in spike
+    assert "macos_embedded_r_adapter.py\" audit" in spike
+    assert "macos_embedded_r_adapter.py\" normalize" in spike
+    assert '--audit "$adapter_audit"' in spike
+    assert "macos_embedded_r_adapter.py\" relocate-bridge" in spike
+    assert "macos_embedded_r_adapter.py\" post-app" in spike
+    assert "uv run --no-sync aqt" in spike
+    assert "codesign --force --options runtime --sign - \"$app\"" not in spike
+    assert "packaged-workflow:process-exit:0" in spike
+    assert 'source "$repo/scripts/macos_host_r_isolation.sh"' in spike
+    assert spike.count('rcms_isolate_host_r "$installed_framework"') == 2
+    assert spike.count("rcms_restore_host_r") == 2
+    assert "R.framework.rcms-host" not in spike
+    assert "codesign --verify --strict --deep" in spike
+    assert "extracted-codesign-verification.json" in spike
+    assert spike.index("extracted-codesign-verification.json") < spike.rindex(
+        'macos_embedded_r_adapter.py" post-app'
+    )
+    assert "--automation-package-surface-smoke" in spike
+    assert "open -W -n \"$app\"" in spike
+    assert "--require-direct-teardown" in spike
+    assert "macOS R.framework PyInstaller preflight evidence is invalid" in spike
+    assert spike.index("preflight evidence is invalid") < spike.index('rm -rf "$work"')
+    isolation = text("scripts/macos_host_r_isolation.sh")
+    isolation_begin = isolation[isolation.index("rcms_isolate_host_r()") :]
+    assert isolation_begin.index("trap rcms_restore_host_r EXIT") < isolation_begin.index(
+        'rcms_host_r_move "$source" "$candidate"'
+    )
+    assert isolation_begin.index('rcms_host_r_move "$source" "$candidate"') < isolation_begin.index(
+        'RCMS_HOST_R_STATE="isolated"'
+    ) < isolation_begin.index('Host R isolation did not converge')
+    assert "No unique verified-absent host R backup path" in isolation
+    assert "Host R restoration did not converge" in isolation
+    assert "Restored host R identity changed" in isolation
+    assert all(
+        marker in text("src/rc_metastudio/launch.py")
+        for marker in (
+            "teardown:close:start",
+            "teardown:close:return",
+            "teardown:deferred-delete:complete",
+            "teardown:top-level-windows:none",
+            "teardown:app-quit:start",
+            "teardown:app-quit:return",
+            "packaged-workflow:return",
+        )
+    )
+
+    adapter = load_embedded_r_adapter()
+    framework_fixture = tmp_path / "fixture" / "R.framework"
+    version_fixture = framework_fixture / "Versions/4.6-x86_64"
+    resources_fixture = version_fixture / "Resources"
+    (resources_fixture / "lib").mkdir(parents=True)
+    (resources_fixture / "bin").mkdir()
+    (resources_fixture / "lib/libR.dylib").write_bytes(b"libR")
+    (resources_fixture / "bin/R").write_bytes(b"#!/bin/sh\n")
+    (version_fixture / "R").symlink_to(Path("Resources/lib/libR.dylib"))
+    (resources_fixture / "R").symlink_to(Path("bin/R"))
+    (framework_fixture / "Versions/Current").symlink_to(
+        "4.6-x86_64", target_is_directory=True
+    )
+    (framework_fixture / "Resources").symlink_to(
+        Path("Versions/Current/Resources"), target_is_directory=True
+    )
+    (framework_fixture / "R").symlink_to(Path("Versions/Current/R"))
+    links = adapter.audit_symlinks(framework_fixture)
+    assert {record["path"] for record in links} >= {
+        "Versions/Current",
+        "Resources",
+        "R",
+        "Versions/4.6-x86_64/R",
+        "Versions/4.6-x86_64/Resources/R",
+    }
+    toc = adapter.explicit_toc(framework_fixture)
+    assert [record["destination"] for record in toc] == sorted(
+        record["destination"] for record in toc
+    )
+    assert sum(record["type"] == "SYMLINK" for record in toc) == 5
+    font_available = resources_fixture / "fontconfig/fonts/conf.avail"
+    font_active = resources_fixture / "fontconfig/fonts/conf.d"
+    font_available.mkdir(parents=True)
+    font_active.mkdir()
+    for index in range(17):
+        target = font_available / f"{index:02d}-fixture.conf"
+        target.write_text("fixture\n", encoding="utf-8")
+        (font_active / target.name).symlink_to(
+            f"/Library/Frameworks/R.framework/Resources/fontconfig/fonts/conf.avail/{target.name}"
+        )
+    font_plan = adapter.plan_fontconfig_links(framework_fixture)
+    assert len(font_plan) == 17
+    assert all(
+        os.readlink(framework_fixture / record["path"]) == record["from"]
+        for record in font_plan
+    )
+    audited_links = adapter.audit_pre_normalization_symlinks(
+        framework_fixture, font_plan
+    )
+    assert sum("planned" in record for record in audited_links) == 17
+    adapter.normalize_fontconfig_links(framework_fixture)
+    assert all(
+        not Path(os.readlink(framework_fixture / record["path"])).is_absolute()
+        for record in font_plan
+    )
+    adapter.audit_symlinks(framework_fixture)
+    bad_link = resources_fixture / "absolute-link"
+    bad_link.symlink_to("/Library/Frameworks/R.framework/Resources/bin/R")
+    with pytest.raises(adapter.AdapterError, match="absolute R symlink"):
+        adapter.audit_symlinks(framework_fixture)
+    bad_link.unlink()
+    assert adapter._map_absolute(
+        framework_fixture, "/opt/R/x86_64/lib/libgfortran.5.dylib", "x86_64"
+    )[0] == framework_fixture / "Resources/vendor/opt-R/lib/libgfortran.5.dylib"
+    with pytest.raises(adapter.AdapterError, match="unsupported non-system"):
+        adapter._map_absolute(
+            framework_fixture, "/opt/homebrew/lib/libgfortran.dylib", "x86_64"
+        )
 
     inspector = load_inspector()
     app = tmp_path / "RCMetaStudio.app"
@@ -249,6 +383,62 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     assert direct["runtime_probe_sha256"] == inspector._canonical_json_sha256(
         runtime_probe
     )
+    input_record = {"sha256": "d" * 64, "size": 42}
+    direct_manifest = {
+        "schema_version": 1,
+        "kind": "rc-metastudio-direct-macos-target-build",
+        "target": "macos-x64",
+        "source_commit": "c" * 40,
+        "official_r": {
+            "url": inspector.DIRECT_R_OFFICIAL_URL,
+            "sha256": inspector.DIRECT_R_OFFICIAL_SHA256,
+        },
+        "ppm_snapshot": inspector.DIRECT_R_PPM_SNAPSHOT,
+        "rpy2_api_bridge_source_sha256": "b" * 64,
+        "inputs": {
+            name: dict(input_record)
+            for name in inspector.DIRECT_BUILD_INPUT_MEMBERS
+        },
+        "ppm_archives": [
+            {"path": "digest/package.tgz", "sha256": "e" * 64, "size": 84}
+        ],
+        "hsroc_source_exception": {
+            "name": "HSROC",
+            "version": "2.1.9",
+            "install_type": "source",
+            "url": inspector.DIRECT_R_HSROC_URL,
+            "sha256": inspector.DIRECT_R_HSROC_SHA256,
+            "archive": {
+                "sha256": inspector.DIRECT_R_HSROC_SHA256,
+                "size": 2023525,
+            },
+        },
+        "rcmetar_source": {
+            "name": "RCMetaR",
+            "version": "0.1.2",
+            "source_commit": "c" * 40,
+            "archive_sha256": "f" * 64,
+            "archive": {"sha256": "f" * 64, "size": 4096},
+        },
+    }
+    direct_manifest["inputs"]["hsroc_source_archive"] = dict(
+        direct_manifest["hsroc_source_exception"]["archive"]
+    )
+    direct_manifest["inputs"]["rcmetar_source_archive"] = dict(
+        direct_manifest["rcmetar_source"]["archive"]
+    )
+    assert (
+        inspector.validate_direct_build_manifest(
+            direct_manifest, target="macos-x64"
+        )
+        is direct_manifest
+    )
+    with pytest.raises(
+        inspector.MacOSDeploymentInspectionError, match="identity or target"
+    ):
+        inspector.validate_direct_build_manifest(
+            direct_manifest, target="macos-arm64"
+        )
     assert direct["official_r"]["url"] in spike
     assert direct["official_r"]["sha256"] in spike
     assert direct["ppm_snapshot"] in spike
@@ -1940,6 +2130,7 @@ def test_macos_surface_evidence_rejects_observation_mutations():
     inspector = load_inspector()
     base = {
         "platform_plugin": "cocoa",
+        "locale": "de_DE",
         "clipboard": True,
         "critical_dialog": {
             "dont_use_native_dialog": False,
@@ -2007,6 +2198,7 @@ def test_macos_surface_evidence_rejects_observation_mutations():
     ]
     inspector.validate_macos_surface_records(records)
     mutations = [
+        ("locale", "C"),
         ("native_menu", {"is_native": False, "menu_count": 1, "action_count": 1}),
         (
             "native_file_dialog",
@@ -2226,6 +2418,9 @@ def test_package_classifier_and_gate_cover_all_direct_macos_inputs():
         "scripts/normalize_macos_macho.py",
         "scripts/install-rcmetar-source.R",
         "scripts/package-macos-x64-direct-r-spike.sh",
+        "scripts/macos_embedded_r_adapter.py",
+        "scripts/macos_host_r_isolation.sh",
+        "scripts/verify_macos_r_pyinstaller_toc.py",
         ".github/workflows/macos-x64-direct-r-spike.yml",
         ".github/workflows/package-verification.yml",
         ".github/workflows/release-candidate.yml",

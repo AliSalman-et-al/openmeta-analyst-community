@@ -469,6 +469,7 @@ def _configure_application(app):
 def start_automation_smoke(sample_path, require_native_window=False):
     _write_automation_smoke_log("packaged-workflow:start")
     hang_trace = _start_automation_hang_trace()
+    app = None
     meta = None
     try:
         app, meta = start_automation(
@@ -541,11 +542,31 @@ def start_automation_smoke(sample_path, require_native_window=False):
                 # smoke failure become an unattended save-confirmation dialog that
                 # masks the real error until the outer watchdog expires.
                 meta.current_data_unsaved = False
+                _write_automation_smoke_log("packaged-workflow:teardown:close:start")
                 meta.close()
+                _write_automation_smoke_log("packaged-workflow:teardown:close:return")
                 app.processEvents()
+                _dispose_qobjects(app, (meta,))
+                _write_automation_smoke_log(
+                    "packaged-workflow:teardown:deferred-delete:complete"
+                )
+                remaining = app.topLevelWidgets()
+                if remaining:
+                    raise RuntimeError(
+                        "automation teardown retained top-level Qt windows: %s"
+                        % ", ".join(type(widget).__name__ for widget in remaining)
+                    )
+                _write_automation_smoke_log(
+                    "packaged-workflow:teardown:top-level-windows:none"
+                )
+            if app is not None:
+                _write_automation_smoke_log("packaged-workflow:teardown:app-quit:start")
+                app.quit()
+                _write_automation_smoke_log("packaged-workflow:teardown:app-quit:return")
         finally:
             _stop_automation_hang_trace(hang_trace)
     _write_automation_smoke_log("packaged-workflow:post-close")
+    _write_automation_smoke_log("packaged-workflow:return")
     return 0
 
 

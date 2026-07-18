@@ -231,6 +231,31 @@ def test_profile_rejects_official_layout_without_canonical_lib_r(monkeypatch, tm
 
 def test_profile_rejects_reversed_launcher_and_executable_classification(monkeypatch, tmp_path):
     profile = load_profile()
+    classifier_root = tmp_path / "classifier"
+    classifier_root.mkdir()
+    candidate = classifier_root / "candidate"
+    monkeypatch.setattr(
+        profile.subprocess,
+        "run",
+        lambda *_args, **_kwargs: type("Completed", (), {"returncode": 0})(),
+    )
+    candidate.write_bytes(b"#!/bin/sh\n")
+    assert profile.is_macho(candidate) is False
+    for magic in (
+        b"\xfe\xed\xfa\xce",
+        b"\xce\xfa\xed\xfe",
+        b"\xfe\xed\xfa\xcf",
+        b"\xcf\xfa\xed\xfe",
+        b"\xca\xfe\xba\xbe",
+        b"\xbe\xba\xfe\xca",
+        b"\xca\xfe\xba\xbf",
+        b"\xbf\xba\xfe\xca",
+    ):
+        candidate.write_bytes(magic + b"payload")
+        assert profile.is_macho(candidate) is True
+    candidate.write_bytes(b"arbitrary data")
+    assert profile.is_macho(candidate) is False
+
     root = fixture_runtime(tmp_path)
     configure_machos(monkeypatch, profile, root)
     original = profile.is_macho

@@ -5910,6 +5910,15 @@ def test_native_packaged_smoke_requires_expected_plugin_and_visible_window(monke
         def processEvents(self):
             pass
 
+        def sendPostedEvents(self, *_args):
+            pass
+
+        def topLevelWidgets(self):
+            return []
+
+        def quit(self):
+            pass
+
     class Meta:
         tableView = Table()
 
@@ -5922,6 +5931,12 @@ def test_native_packaged_smoke_requires_expected_plugin_and_visible_window(monke
 
         def close(self):
             close_states.append(self.current_data_unsaved)
+
+        def hide(self):
+            pass
+
+        def deleteLater(self):
+            pass
 
     def start_automation(phase_callback=None):
         if phase_callback is not None:
@@ -5955,7 +5970,14 @@ def test_native_packaged_smoke_requires_expected_plugin_and_visible_window(monke
         "packaged-workflow:project-exercise:start",
         "packaged-workflow:project-exercise:complete",
         "packaged-workflow:save-reopen-complete",
+        "packaged-workflow:teardown:close:start",
+        "packaged-workflow:teardown:close:return",
+        "packaged-workflow:teardown:deferred-delete:complete",
+        "packaged-workflow:teardown:top-level-windows:none",
+        "packaged-workflow:teardown:app-quit:start",
+        "packaged-workflow:teardown:app-quit:return",
         "packaged-workflow:post-close",
+        "packaged-workflow:return",
     ]
 
     trace = object()
