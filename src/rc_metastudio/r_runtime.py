@@ -155,6 +155,12 @@ def configure_bundled_r_environment(app_root=None):
     frozen = bool(getattr(sys, "frozen", False))
     manifest = None
     derivation = None
+    direct_spike_marker = Path(root).parent / "Resources" / "direct-r-spike.marker"
+    direct_spike = (
+        frozen
+        and os.environ.get("RCMS_DIRECT_R_SPIKE") == "1"
+        and direct_spike_marker.is_file()
+    )
     if frozen:
         if threading.current_thread() is not threading.main_thread():
             raise RuntimeError(
@@ -166,7 +172,8 @@ def configure_bundled_r_environment(app_root=None):
             )
         if _RUNTIME_IDENTITY is not None:
             return dict(_RUNTIME_IDENTITY)
-        manifest, derivation = _frozen_kit_identity(root)
+        if not direct_spike:
+            manifest, derivation = _frozen_kit_identity(root)
         _configure_private_runtime_directories(root)
         _set_windows_dll_policy()
     runtime_candidates = [
@@ -224,6 +231,7 @@ def configure_bundled_r_environment(app_root=None):
         "cffi_mode": "API",
         "kit_sha256": manifest["kit_sha256"] if manifest is not None else None,
         "derivation": derivation,
+        "direct_spike": direct_spike,
     }
     if _RUNTIME_IDENTITY is not None and _RUNTIME_IDENTITY != identity:
         raise RuntimeError(

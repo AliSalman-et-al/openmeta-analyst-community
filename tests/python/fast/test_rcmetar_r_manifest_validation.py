@@ -84,6 +84,7 @@ def test_r_verifiers_preserve_symlinked_python_identity(monkeypatch, tmp_path):
 
         assert captured["command"][0] == expected_python
         assert captured["env"]["RCMS_POLICY_PYTHON"] == expected_python
+
 LEGACY_ALIAS_PATTERN = re.compile(
     r"^([A-Za-z][A-Za-z0-9._]*)\s*<-\s*([A-Za-z][A-Za-z0-9._]*)\s*$", re.MULTILINE
 )
@@ -350,6 +351,15 @@ def test_native_r_binary_policy_fails_closed_without_source_fallback(tmp_path):
         candidate = Path("C:/Program Files/R/R-4.6.1/bin/Rscript.exe")
         rscript = str(candidate) if candidate.is_file() else None
     assert rscript is not None, "Rscript 4.6.1 is required by the Fast verification environment"
+
+    checked_installer = subprocess.run(
+        [rscript, str(REPO_ROOT / "scripts" / "install-rcmetar-source.R")],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert checked_installer.returncode != 0
+    assert "requires exactly SOURCE and LIBRARY arguments" in checked_installer.stderr
 
     helper = (REPO_ROOT / "scripts" / "r_binary_policy.R").as_posix()
     root = REPO_ROOT.as_posix()

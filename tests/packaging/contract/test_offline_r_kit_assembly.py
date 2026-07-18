@@ -109,11 +109,16 @@ def test_producer_populates_a_clean_dedicated_uv_cache_from_the_exact_lock():
     macos_producer = Path("scripts/produce-r-integration-kit-macos.sh").read_text(
         encoding="utf-8"
     )
+    rcmetar_installer = Path("scripts/install-rcmetar-source.R").read_text(
+        encoding="utf-8"
+    )
     for producer in (windows_producer, macos_producer):
-        assert "commandArgs(trailingOnly=TRUE)" in producer
-        assert "length(args) != 2L" in producer
-        assert '"RCMetaR", "DESCRIPTION"' in producer
+        assert "scripts/install-rcmetar-source.R" in producer.replace("\\", "/")
+        assert " -e " not in producer
         assert " --args " not in producer
+    assert "commandArgs(trailingOnly = TRUE)" in rcmetar_installer
+    assert "length(args) != 2L" in rcmetar_installer
+    assert 'file.path(library, "RCMetaR", "DESCRIPTION")' in rcmetar_installer
     for contract in (
         'ErrorActionPreference = "Continue"',
         "$exitCode = $LASTEXITCODE",

@@ -1279,16 +1279,25 @@ def start_package_runtime_probe(output_path):
     r_library_paths = [str(value) for value in r_library_values]
     api_bridge_path = Path(_rinterface_cffi_api.__file__).resolve()
     derivation = configured.get("derivation") or {}
-    final_identity = derivation.get("final", {})
-    api_record = final_identity.get("api_bridge", {})
-    expected_api_bridge = (Path(sys.executable).resolve().parent / str(api_record.get("path", ""))).resolve()
-    if (
-        api_bridge_path != expected_api_bridge
-        or hashlib.sha256(api_bridge_path.read_bytes()).hexdigest() != api_record.get("sha256")
-    ):
-        raise RuntimeError("Loaded rpy2 API bridge differs from the authenticated kit derivation.")
-    r_shared_record = final_identity.get("r_shared_library", {})
-    shared_r_path = (Path(sys.executable).resolve().parent / str(r_shared_record.get("path", ""))).resolve()
+    direct_spike = configured.get("direct_spike") is True
+    if direct_spike:
+        frameworks = Path(sys.executable).resolve().parent.parent / "Frameworks"
+        if not api_bridge_path.is_relative_to(frameworks.resolve()):
+            raise RuntimeError("Direct-spike rpy2 API bridge is outside the app framework tree.")
+        shared_r_path = (Path(configured["R_HOME"]) / "lib" / "libR.dylib").resolve()
+        if not shared_r_path.is_relative_to(frameworks.resolve()):
+            raise RuntimeError("Direct-spike libR is outside the app framework tree.")
+    else:
+        final_identity = derivation.get("final", {})
+        api_record = final_identity.get("api_bridge", {})
+        expected_api_bridge = (Path(sys.executable).resolve().parent / str(api_record.get("path", ""))).resolve()
+        if (
+            api_bridge_path != expected_api_bridge
+            or hashlib.sha256(api_bridge_path.read_bytes()).hexdigest() != api_record.get("sha256")
+        ):
+            raise RuntimeError("Loaded rpy2 API bridge differs from the authenticated kit derivation.")
+        r_shared_record = final_identity.get("r_shared_library", {})
+        shared_r_path = (Path(sys.executable).resolve().parent / str(r_shared_record.get("path", ""))).resolve()
     macos_r_policy = None
     if sys.platform == "darwin":
         tcltk_available = bool(cast(Any, robjects.r("requireNamespace('tcltk', quietly=TRUE)"))[0])
@@ -1357,6 +1366,7 @@ def start_package_runtime_probe(output_path):
             "shared_library_path": str(shared_r_path),
             "shared_library_sha256": hashlib.sha256(shared_r_path.read_bytes()).hexdigest(),
             "kit_sha256": configured.get("kit_sha256"),
+            "direct_spike": direct_spike,
             "lc_numeric": os.environ.get("LC_NUMERIC"),
         },
     }

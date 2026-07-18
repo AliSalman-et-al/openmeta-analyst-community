@@ -47,6 +47,18 @@ TARGET_CONTRACTS = {
     "macos-x64": {"architecture": "x86_64", "minimum_macos": "13.0"},
     "macos-arm64": {"architecture": "arm64", "minimum_macos": "14.0"},
 }
+DIRECT_R_MARKER_RELATIVE = Path("Contents/Resources/direct-r-spike.marker")
+DIRECT_R_MARKER_SHA256 = (
+    "bff2ab12435dd85693745bfd390e12b97ad7fecf284a05b1b339425d40ca720f"
+)
+DIRECT_R_OFFICIAL_URL = (
+    "https://cloud.r-project.org/bin/macosx/big-sur-x86_64/base/"
+    "R-4.6.1-x86_64.pkg"
+)
+DIRECT_R_OFFICIAL_SHA256 = (
+    "612bb00cb4c627721d6d80b0f5224227c0fcdefb4a5b6c917511480361c16571"
+)
+DIRECT_R_PPM_SNAPSHOT = "https://packagemanager.posit.co/cran/2026-07-16"
 
 
 class MacOSDeploymentInspectionError(RuntimeError):
@@ -105,6 +117,92 @@ def _valid_r_kit_derivation(manifest, derivation, target):
         ):
             return False
     return derivation.get("schema_version") == 1 and derivation.get("target") == target
+
+
+def validate_r_delivery_identity(
+    app_root: Path,
+    runtime_probe: dict[str, Any],
+    *,
+    target: str,
+    architecture: str,
+    source_commit: str,
+) -> dict[str, Any]:
+    """Validate one, and only one, packaged R delivery identity."""
+    marker_path = app_root / DIRECT_R_MARKER_RELATIVE
+    marker_present = marker_path.is_file()
+    probe_direct = runtime_probe.get("r", {}).get("direct_spike") is True
+    kit_root = app_root / "Contents" / "Resources" / "r-integration-kit"
+    kit_manifest_path = kit_root / "manifest.json"
+    derivation_path = kit_root / "derivation.json"
+
+    if marker_present != probe_direct:
+        raise MacOSDeploymentInspectionError(
+            "direct R spike marker and frozen runtime probe disagree"
+        )
+
+    if probe_direct:
+        if target != "macos-x64" or architecture != "x86_64":
+            raise MacOSDeploymentInspectionError(
+                "direct R spike identity is only valid for macOS Intel x64"
+            )
+        if kit_root.exists():
+            raise MacOSDeploymentInspectionError(
+                "deployment mixes direct R spike and integration-kit identities"
+            )
+        marker_sha256 = sha256_file(marker_path)
+        if marker_sha256 != DIRECT_R_MARKER_SHA256:
+            raise MacOSDeploymentInspectionError(
+                "direct R spike marker differs from the non-release marker"
+            )
+        return {
+            "direct_r_build": {
+                "kind": "non-release-macos-x64-direct-r-spike",
+                "source_commit": source_commit,
+                "runtime_probe_sha256": _canonical_json_sha256(runtime_probe),
+                "marker": {
+                    "path": DIRECT_R_MARKER_RELATIVE.as_posix(),
+                    "sha256": marker_sha256,
+                },
+                "official_r": {
+                    "url": DIRECT_R_OFFICIAL_URL,
+                    "sha256": DIRECT_R_OFFICIAL_SHA256,
+                },
+                "ppm_snapshot": DIRECT_R_PPM_SNAPSHOT,
+            }
+        }
+
+    try:
+        kit_manifest = json.loads(kit_manifest_path.read_text(encoding="utf-8"))
+        derivation = json.loads(derivation_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise MacOSDeploymentInspectionError(
+            "macOS deployment lacks its R integration-kit manifest"
+        ) from exc
+    if not (
+        kit_manifest.get("kind") == "rc-metastudio-r-integration-kit"
+        and kit_manifest.get("target") == target
+        and kit_manifest.get("architecture") == architecture
+        and kit_manifest.get("cffi_mode") == "API"
+        and len(str(kit_manifest.get("kit_sha256", ""))) == 64
+        and derivation.get("kit_sha256") == kit_manifest.get("kit_sha256")
+        and derivation.get("target") == target
+        and _valid_r_kit_derivation(kit_manifest, derivation, target)
+        and derivation.get("final", {}).get("api_bridge", {}).get("sha256")
+        == runtime_probe.get("rpy2", {}).get("api_bridge_sha256")
+        and derivation.get("final", {}).get("r_shared_library", {}).get("sha256")
+        == runtime_probe.get("r", {}).get("shared_library_sha256")
+    ):
+        raise MacOSDeploymentInspectionError(
+            "macOS R integration-kit identity is invalid"
+        )
+    return {
+        "r_integration_kit": {
+            "path": "Contents/Resources/r-integration-kit/manifest.json",
+            "sha256": sha256_file(kit_manifest_path),
+            "kit_sha256": kit_manifest["kit_sha256"],
+            "derivation_sha256": sha256_file(derivation_path),
+        }
+    }
 
 
 def validate_archive_root_name(value: str) -> str:
@@ -567,6 +665,12 @@ def _validate_runtime_probe(
     expected_r_library = expected_r_home / "library"
     r = probe.get("r", {})
     r_libraries = {_normalize_runtime_path(item) for item in r.get("library_paths", [])}
+    direct_spike = r.get("direct_spike") is True
+    valid_runtime_identity = (
+        r.get("kit_sha256") is None
+        if direct_spike
+        else _valid_sha256(r.get("kit_sha256"))
+    )
     if (
         r.get("version") != EXPECTED_VERSIONS["r"]
         or _normalize_runtime_path(r.get("home")) != expected_r_home.resolve()
@@ -580,7 +684,7 @@ def _validate_runtime_probe(
         or not _normalize_runtime_path(r.get("shared_library_path")).is_relative_to(
             frameworks
         )
-        or not _valid_sha256(r.get("kit_sha256"))
+        or not valid_runtime_identity
     ):
         raise MacOSDeploymentInspectionError(
             "frozen R probe does not use the bundled runtime"
@@ -955,36 +1059,13 @@ def inspect_deployment(
         native_paths={record["path"] for record in native_records},
         app_root=app_root,
     )
-    kit_manifest_path = (
-        app_root / "Contents" / "Resources" / "r-integration-kit" / "manifest.json"
+    r_delivery_identity = validate_r_delivery_identity(
+        app_root,
+        runtime_probe,
+        target=target,
+        architecture=architecture,
+        source_commit=source_commit,
     )
-    derivation_path = (
-        app_root / "Contents" / "Resources" / "r-integration-kit" / "derivation.json"
-    )
-    try:
-        kit_manifest = json.loads(kit_manifest_path.read_text(encoding="utf-8"))
-        derivation = json.loads(derivation_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise MacOSDeploymentInspectionError(
-            "macOS deployment lacks its R integration-kit manifest"
-        ) from exc
-    if not (
-        kit_manifest.get("kind") == "rc-metastudio-r-integration-kit"
-        and kit_manifest.get("target") == target
-        and kit_manifest.get("architecture") == architecture
-        and kit_manifest.get("cffi_mode") == "API"
-        and len(str(kit_manifest.get("kit_sha256", ""))) == 64
-        and derivation.get("kit_sha256") == kit_manifest.get("kit_sha256")
-        and derivation.get("target") == target
-        and _valid_r_kit_derivation(kit_manifest, derivation, target)
-        and derivation.get("final", {}).get("api_bridge", {}).get("sha256")
-        == runtime_probe.get("rpy2", {}).get("api_bridge_sha256")
-        and derivation.get("final", {}).get("r_shared_library", {}).get("sha256")
-        == runtime_probe.get("r", {}).get("shared_library_sha256")
-    ):
-        raise MacOSDeploymentInspectionError(
-            "macOS R integration-kit identity is invalid"
-        )
 
     records.sort(key=lambda item: item["path"])
     return {
@@ -993,12 +1074,7 @@ def inspect_deployment(
         "source_commit": source_commit,
         "minimum_macos": minimum_macos,
         "stack": versions,
-        "r_integration_kit": {
-            "path": "Contents/Resources/r-integration-kit/manifest.json",
-            "sha256": sha256_file(kit_manifest_path),
-            "kit_sha256": kit_manifest["kit_sha256"],
-            "derivation_sha256": sha256_file(derivation_path),
-        },
+        **r_delivery_identity,
         "qt_dependency_collector": "PyInstaller",
         "architecture": architecture,
         "app_bundle": {

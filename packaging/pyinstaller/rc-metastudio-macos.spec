@@ -19,6 +19,14 @@ project_schema_data = [
     for path in sorted(project_schema_root.glob("*.schema.json"))
 ]
 generated_form_modules = sorted(path.stem for path in generated_forms.glob("ui_*.py"))
+direct_r_framework = os.environ.get("RCMS_PYINSTALLER_R_FRAMEWORK")
+direct_r_datas = []
+if direct_r_framework:
+    direct_r_framework = str(Path(direct_r_framework).resolve(strict=True))
+    direct_r_datas.append((direct_r_framework, "R.framework"))
+    direct_r_datas.append(
+        (str(repo_root / "packaging" / "pyinstaller" / "direct-r-spike.marker"), ".")
+    )
 
 a = Analysis(
     [str(app_source / "__main__.py")],
@@ -33,6 +41,7 @@ a = Analysis(
         *copy_metadata("rpy2"),
         (str(binary_resource), "resources"),
         *project_schema_data,
+        *direct_r_datas,
     ],
     hiddenimports=[
         "rpy2.robjects",

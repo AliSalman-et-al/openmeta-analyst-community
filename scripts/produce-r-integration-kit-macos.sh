@@ -22,7 +22,7 @@ export R_HOME="$staged_home" R_LIBS="$library" R_LIBS_USER="$library" MACOSX_DEP
 commit="$(git -C "$repo" rev-parse HEAD)"; rc_url="https://github.com/AliSalman-et-al/rc-metastudio/archive/$commit.tar.gz"; rc_archive="$work/rc-metastudio-$commit.tar.gz"
 curl --fail --location --proto '=https' --tlsv1.2 "$rc_url" --output "$rc_archive"
 mkdir "$work/rc-source"; tar -xzf "$rc_archive" -C "$work/rc-source"; rc_package="$(find "$work/rc-source" -path '*/r/RCMetaR/DESCRIPTION' -print -quit | xargs dirname)"
-"$rscript" -e 'args <- commandArgs(trailingOnly=TRUE); if (length(args) != 2L) stop("RCMetaR source install requires archive and library arguments"); install.packages(args[[1L]], lib=args[[2L]], repos=NULL, type="source", dependencies=FALSE); if (!file.exists(file.path(args[[2L]], "RCMetaR", "DESCRIPTION"))) stop("RCMetaR source install did not produce the target package")' "$rc_package" "$library" 2>&1 | tee "$logs/rcmetar.log"
+"$rscript" "$repo/scripts/install-rcmetar-source.R" "$rc_package" "$library" 2>&1 | tee "$logs/rcmetar.log"
 profile="$work/runtime-profile.json"
 "$python" "$repo/scripts/profile_macos_embedded_r_runtime.py" --resources "$staged_home" --evidence "$profile" --dependency-manifest "$repo/docs/verification/RCMetaR-r-dependencies.json" --r-version 4.6.1 --architecture "$arch" --source-resources "$r_home"
 "$python" "$repo/scripts/relocate_macos_r_kit.py" --framework "$stage" --source-resources "$r_home" --version 4.6

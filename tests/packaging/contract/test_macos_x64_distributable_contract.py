@@ -142,7 +142,7 @@ def macos_code_bundle(
     return executable
 
 
-def test_macos_x64_uses_one_authoritative_pyinstaller_spec():
+def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     build = text("scripts/build-macos-package.sh")
     spec = text("packaging/pyinstaller/rc-metastudio-macos.spec")
 
@@ -157,12 +157,115 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec():
     assert all(f'"{name}"' in spec for name in ("PyQt5", "PySide2", "PySide6", "qtpy"))
     assert "project_schema_data" in spec
     assert "generated_form_modules" in spec
+    assert 'os.environ.get("RCMS_PYINSTALLER_R_FRAMEWORK")' in spec
+    assert '(direct_r_framework, "R.framework")' in spec
+    assert '"direct-r-spike.marker"' in spec
     assert '"_rinterface_cffi_api"' in spec
     assert (
         '"LSMinimumSystemVersion": os.environ.get("RCMS_MINIMUM_MACOS_VERSION", "13.0")'
         in spec
     )
     assert 'minimum_macos_version="14.0"' in build
+    spike = text("scripts/package-macos-x64-direct-r-spike.sh")
+    spike_workflow_text = text(".github/workflows/macos-x64-direct-r-spike.yml")
+    spike_workflow = yaml.safe_load(spike_workflow_text)
+    assert list(spike_workflow["jobs"]) == ["feasibility"]
+    assert "produce-r-integration-kit" not in spike_workflow_text
+    assert "r-integration-kit-producer.yml" not in spike_workflow_text
+    manual_workflow = text(".github/workflows/package-verification.yml")
+    assert "build_macos_direct_r_spike" in manual_workflow
+    assert "uses: ./.github/workflows/macos-x64-direct-r-spike.yml" in manual_workflow
+    for required in (
+        "612bb00cb4c627721d6d80b0f5224227c0fcdefb4a5b6c917511480361c16571",
+        "/Library/Frameworks/R.framework/Versions/4.6-x86_64",
+        'resolved_source="$(cd "$source_version_root" && pwd -P)"',
+        'require_x64 "$stage/Versions/4.6/R"',
+        'require_x64 "$resources/bin/exec/R"',
+        'readlink "$resources/lib/libR.dylib"',
+        'otool -L "$resources/bin/R"',
+        "profile_macos_embedded_r_runtime.py",
+        "scripts/install-rcmetar-source.R",
+        "RPY2_CFFI_MODE=API",
+        "RCMS_PYINSTALLER_R_FRAMEWORK",
+        "packaging/pyinstaller/rc-metastudio-macos.spec",
+        'inspect_macos_deployment.py" inspect',
+        "--automation-package-runtime-probe",
+        "--automation-native-smoke",
+        "finalize-smoke",
+    ):
+        assert required in spike
+    assert "r_integration_kit.py" not in spike
+    assert "relocate_macos_r_kit.py" not in spike
+    assert "normalize_macos_macho.py" not in spike
+
+    inspector = load_inspector()
+    app = tmp_path / "RCMetaStudio.app"
+    marker = app / inspector.DIRECT_R_MARKER_RELATIVE
+    marker.parent.mkdir(parents=True)
+    marker.write_bytes((ROOT / "packaging/pyinstaller/direct-r-spike.marker").read_bytes())
+    runtime_probe = {
+        "r": {
+            "direct_spike": True,
+            "kit_sha256": None,
+            "shared_library_sha256": "a" * 64,
+        },
+        "rpy2": {"api_bridge_sha256": "b" * 64},
+    }
+    identity = inspector.validate_r_delivery_identity(
+        app,
+        runtime_probe,
+        target="macos-x64",
+        architecture="x86_64",
+        source_commit="c" * 40,
+    )
+    direct = identity["direct_r_build"]
+    assert "r_integration_kit" not in identity
+    assert direct["source_commit"] == "c" * 40
+    assert direct["marker"]["sha256"] == inspector.DIRECT_R_MARKER_SHA256
+    assert direct["runtime_probe_sha256"] == inspector._canonical_json_sha256(
+        runtime_probe
+    )
+    assert direct["official_r"]["url"] in spike
+    assert direct["official_r"]["sha256"] in spike
+    assert direct["ppm_snapshot"] in spike
+
+    marker.unlink()
+    with pytest.raises(
+        inspector.MacOSDeploymentInspectionError, match="marker.*probe disagree"
+    ):
+        inspector.validate_r_delivery_identity(
+            app,
+            runtime_probe,
+            target="macos-x64",
+            architecture="x86_64",
+            source_commit="c" * 40,
+        )
+
+    marker.write_bytes((ROOT / "packaging/pyinstaller/direct-r-spike.marker").read_bytes())
+    runtime_probe["r"]["direct_spike"] = False
+    with pytest.raises(
+        inspector.MacOSDeploymentInspectionError, match="marker.*probe disagree"
+    ):
+        inspector.validate_r_delivery_identity(
+            app,
+            runtime_probe,
+            target="macos-x64",
+            architecture="x86_64",
+            source_commit="c" * 40,
+        )
+
+    runtime_probe["r"]["direct_spike"] = True
+    (app / "Contents/Resources/r-integration-kit").mkdir()
+    with pytest.raises(
+        inspector.MacOSDeploymentInspectionError, match="mixes direct R spike"
+    ):
+        inspector.validate_r_delivery_identity(
+            app,
+            runtime_probe,
+            target="macos-x64",
+            architecture="x86_64",
+            source_commit="c" * 40,
+        )
 
 
 def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
@@ -685,8 +788,24 @@ def test_frozen_runtime_rejects_missing_kit_before_rpy2_import(monkeypatch, tmp_
     monkeypatch.setattr(r_runtime.sys, "platform", "darwin")
     monkeypatch.setattr(r_runtime, "_RUNTIME_IDENTITY", None)
     monkeypatch.setattr(r_runtime, "_BOOTSTRAP_THREAD_ID", None)
+    isolated = dict(os.environ, RCMS_DIRECT_R_SPIKE="1")
+    monkeypatch.setattr(r_runtime.os, "environ", isolated)
     with pytest.raises(RuntimeError, match="integration-kit identity"):
         r_runtime.configure_bundled_r_environment(str(app_root))
+
+    private = app_root.parent / "Frameworks" / "R.framework" / "Resources"
+    (private / "bin").mkdir(parents=True)
+    (private / "library" / "RCMetaR").mkdir(parents=True)
+    marker = app_root.parent / "Resources" / "direct-r-spike.marker"
+    marker.parent.mkdir(parents=True)
+    marker.write_text("non-release spike", encoding="utf-8")
+    monkeypatch.setattr(
+        r_runtime, "_configure_private_runtime_directories", lambda _root: None
+    )
+    configured = r_runtime.configure_bundled_r_environment(str(app_root))
+    assert configured["direct_spike"] is True
+    assert configured["kit_sha256"] is None
+    assert Path(configured["R_HOME"]).resolve() == private.resolve()
 
 
 def test_frozen_macos_sample_projects_use_bundle_resources(monkeypatch):
@@ -2009,6 +2128,10 @@ def test_package_classifier_and_gate_cover_all_direct_macos_inputs():
         "scripts/sign_macos_app.py",
         "scripts/sign-notarize-macos-package.sh",
         "scripts/normalize_macos_macho.py",
+        "scripts/install-rcmetar-source.R",
+        "scripts/package-macos-x64-direct-r-spike.sh",
+        ".github/workflows/macos-x64-direct-r-spike.yml",
+        ".github/workflows/package-verification.yml",
         ".github/workflows/release-candidate.yml",
         "packaging/pyinstaller/rc-metastudio-macos.spec",
     ]
