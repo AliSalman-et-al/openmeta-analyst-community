@@ -781,25 +781,26 @@ def validate_r_framework_inventory(
         f"{resources}/library/RCMetaR/DESCRIPTION",
         f"{resources}/Info.plist",
     }
-    native_path = (
-        f"{resources}/lib/libR.dylib"
+    native_paths = (
+        [f"{resources}/lib/libR.dylib", f"{resources}/bin/R"]
         if delivery_kind == "direct-spike"
-        else f"{version_root}/R"
+        else [f"{version_root}/R"]
     )
-    required_files.add(native_path)
+    required_files.update(native_paths)
     for path in required_files:
         if by_path.get(path, {}).get("kind") != "file":
             raise MacOSDeploymentInspectionError(
                 f"R framework is missing its concrete versioned member: {path}"
             )
-    r_executable = by_path[native_path]
-    if (
-        r_executable.get("architectures") != [architecture]
-        or not int(r_executable.get("mode", 0)) & 0o111
-    ):
-        raise MacOSDeploymentInspectionError(
-            "R framework native executable target is not in the Mach-O inventory"
-        )
+    for native_path in native_paths:
+        r_executable = by_path[native_path]
+        if (
+            r_executable.get("architectures") != [architecture]
+            or not int(r_executable.get("mode", 0)) & 0o111
+        ):
+            raise MacOSDeploymentInspectionError(
+                "R framework native executable target is not in the Mach-O inventory"
+            )
     expected_links: dict[str, tuple[str, str]] = {
         f"{framework}/Versions/Current": (
             framework_version,

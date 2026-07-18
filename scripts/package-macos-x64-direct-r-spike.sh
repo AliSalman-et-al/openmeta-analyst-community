@@ -55,10 +55,7 @@ require_x64 "$resources/lib/libR.dylib"
 [ -L "$resources/R" ] && [ "$(readlink "$resources/R")" = "bin/R" ] \
   || fail "target-native Resources/R symlink is not canonical"
 require_x64 "$resources/bin/exec/R"
-if otool -L "$resources/bin/R" >/dev/null 2>&1; then
-  fail "target-native Resources/bin/R must be the official script launcher"
-fi
-head -c 2 "$resources/bin/R" | grep -q '^#!' || fail "official R launcher lacks a shebang"
+require_x64 "$resources/bin/R"
 
 export R_HOME="$resources"
 export R_LIBS="$resources/library"
@@ -83,7 +80,7 @@ step "Installing PPM binaries, HSROC, and local RCMetaR into staged R"
   --resources "$resources" --source-resources "$resources" \
   --evidence "$evidence/embedded-r-runtime-profile.json" \
   --dependency-manifest "$repo/docs/verification/RCMetaR-r-dependencies.json" \
-  --r-version 4.6.1 --architecture x86_64
+  --r-version 4.6.1 --architecture x86_64 --official-framework-layout
 
 step "Rebuilding the locked rpy2 API bridge against staged R"
 rpy2_sdist="$work/rpy2-rinterface-3.6.6.tar.gz"

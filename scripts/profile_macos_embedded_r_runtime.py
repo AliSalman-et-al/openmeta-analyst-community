@@ -158,7 +158,16 @@ def hard_dependency_closure(library: Path, roots: list[str], builtin: set[str]) 
     return sorted(closure, key=str.casefold)
 
 
-def profile(resources: Path, evidence: Path, manifest_path: Path, r_version: str, architecture: str, source_resources: Path | None = None) -> None:
+def profile(
+    resources: Path,
+    evidence: Path,
+    manifest_path: Path,
+    r_version: str,
+    architecture: str,
+    source_resources: Path | None = None,
+    *,
+    official_framework_layout: bool = False,
+) -> None:
     resources = resources.resolve(strict=True)
     library = resources / "library"
     roots, builtin, manifest_sha256 = manifest_roots(manifest_path)
@@ -182,17 +191,45 @@ def profile(resources: Path, evidence: Path, manifest_path: Path, r_version: str
             f"{source_executable_record['architectures']}"
         )
     source_launcher = source_resources / "bin" / "R"
-    if not source_launcher.is_file() or is_macho(source_launcher):
-        raise ProfileError("source bin/R must be the expected non-Mach-O launcher")
-    launcher_bytes = source_launcher.read_bytes()
-    if not launcher_bytes.startswith(b"#!"):
-        raise ProfileError("source bin/R launcher is missing its script shebang")
-    source_launcher_record = {
-        "relative_path": source_launcher.relative_to(source_resources).as_posix(),
-        "kind": "script",
-        "sha256": hashlib.sha256(launcher_bytes).hexdigest(),
-        "symlink_target": source_launcher.readlink().as_posix() if source_launcher.is_symlink() else None,
-    }
+    if official_framework_layout:
+        resources_launcher = source_resources / "R"
+        if (
+            not resources_launcher.is_symlink()
+            or resources_launcher.readlink().as_posix() != "bin/R"
+        ):
+            raise ProfileError(
+                "official source Resources/R must be the canonical bin/R symlink"
+            )
+        if not source_launcher.is_file() or not is_macho(source_launcher):
+            raise ProfileError("official source bin/R launcher is missing or is not Mach-O")
+        source_launcher_record = macho_record(source_launcher, source_resources)
+        if source_launcher_record["architectures"] != [architecture]:
+            raise ProfileError(
+                f"official source bin/R launcher must be {architecture}-only, found "
+                f"{source_launcher_record['architectures']}"
+            )
+        source_launcher_record.update(
+            {
+                "kind": "mach-o",
+                "resources_alias": {
+                    "relative_path": "R",
+                    "link_target": "bin/R",
+                    "resolved_path": "bin/R",
+                },
+            }
+        )
+    else:
+        if not source_launcher.is_file() or is_macho(source_launcher):
+            raise ProfileError("source bin/R must be the expected non-Mach-O launcher")
+        launcher_bytes = source_launcher.read_bytes()
+        if not launcher_bytes.startswith(b"#!"):
+            raise ProfileError("source bin/R launcher is missing its script shebang")
+        source_launcher_record = {
+            "relative_path": source_launcher.relative_to(source_resources).as_posix(),
+            "kind": "script",
+            "sha256": hashlib.sha256(launcher_bytes).hexdigest(),
+            "symlink_target": source_launcher.readlink().as_posix() if source_launcher.is_symlink() else None,
+        }
     exclusions: list[dict[str, object]] = []
     expected_paths = {relative for relative, _ in EXCLUSIONS}
     x11_machos: set[str] = set()
@@ -298,9 +335,18 @@ def main() -> int:
     parser.add_argument("--r-version", required=True)
     parser.add_argument("--architecture", required=True)
     parser.add_argument("--source-resources", type=Path)
+    parser.add_argument("--official-framework-layout", action="store_true")
     args = parser.parse_args()
     try:
-        profile(args.resources, args.evidence, args.dependency_manifest, args.r_version, args.architecture, args.source_resources)
+        profile(
+            args.resources,
+            args.evidence,
+            args.dependency_manifest,
+            args.r_version,
+            args.architecture,
+            args.source_resources,
+            official_framework_layout=args.official_framework_layout,
+        )
     except (OSError, ProfileError) as exc:
         print(f"Embedded R product profile failed: {exc}", file=sys.stderr)
         return 1

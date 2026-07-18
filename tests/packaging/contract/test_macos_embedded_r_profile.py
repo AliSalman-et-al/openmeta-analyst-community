@@ -65,6 +65,35 @@ def configure_machos(monkeypatch, profile, root: Path, *, fifth: bool = False, n
     monkeypatch.setattr(profile, "manifest_roots", lambda _: (["RCMetaR"], set(), "b" * 64))
 
 
+def configure_official_launcher(
+    monkeypatch, profile, root: Path, *, macho: bool = True, architecture: str = "x86_64"
+):
+    (root / "R").symlink_to("bin/R")
+    launcher = root / "bin/R"
+    original_is_macho = profile.is_macho
+    original_macho_record = profile.macho_record
+    monkeypatch.setattr(
+        profile,
+        "is_macho",
+        lambda path: macho if path == launcher else original_is_macho(path),
+    )
+    monkeypatch.setattr(
+        profile,
+        "macho_record",
+        lambda path, parent: (
+            {
+                "relative_path": "bin/R",
+                "sha256": "c" * 64,
+                "architectures": [architecture],
+                "install_id": None,
+                "load_commands": [],
+            }
+            if path == launcher
+            else original_macho_record(path, parent)
+        ),
+    )
+
+
 def test_profile_removes_exact_surfaces_and_records_evidence(monkeypatch, tmp_path):
     profile = load_profile()
     root = fixture_runtime(tmp_path)
@@ -163,6 +192,29 @@ def test_profile_classifies_launcher_separately_from_canonical_lib_r(monkeypatch
     assert source["launcher"]["relative_path"] == "bin/R"
     assert source["launcher"]["kind"] == "script"
 
+    official_root = fixture_runtime(tmp_path / "official")
+    configure_machos(monkeypatch, profile, official_root)
+    configure_official_launcher(monkeypatch, profile, official_root)
+    official_evidence = tmp_path / "official-profile.json"
+    profile.profile(
+        official_root,
+        official_evidence,
+        tmp_path / "manifest.json",
+        "4.6.1",
+        "x86_64",
+        official_framework_layout=True,
+    )
+    official_launcher = json.loads(official_evidence.read_text())["source_framework"][
+        "launcher"
+    ]
+    assert official_launcher["kind"] == "mach-o"
+    assert official_launcher["architectures"] == ["x86_64"]
+    assert official_launcher["resources_alias"] == {
+        "relative_path": "R",
+        "link_target": "bin/R",
+        "resolved_path": "bin/R",
+    }
+
 
 def test_profile_rejects_official_layout_without_canonical_lib_r(monkeypatch, tmp_path):
     profile = load_profile()
@@ -182,6 +234,38 @@ def test_profile_rejects_reversed_launcher_and_executable_classification(monkeyp
     with pytest.raises(profile.ProfileError, match="bin/R must be the expected non-Mach-O launcher"):
         profile.profile(root, tmp_path / "profile.json", tmp_path / "manifest.json", "4.6.1", "x86_64")
 
+    official_root = fixture_runtime(tmp_path / "official-non-macho")
+    configure_machos(monkeypatch, profile, official_root)
+    configure_official_launcher(monkeypatch, profile, official_root, macho=False)
+    with pytest.raises(
+        profile.ProfileError, match="official source bin/R launcher.*not Mach-O"
+    ):
+        profile.profile(
+            official_root,
+            tmp_path / "official-profile.json",
+            tmp_path / "manifest.json",
+            "4.6.1",
+            "x86_64",
+            official_framework_layout=True,
+        )
+
+    wrong_alias_root = fixture_runtime(tmp_path / "official-wrong-alias")
+    configure_machos(monkeypatch, profile, wrong_alias_root)
+    configure_official_launcher(monkeypatch, profile, wrong_alias_root)
+    (wrong_alias_root / "R").unlink()
+    (wrong_alias_root / "R").symlink_to("bin/exec/R")
+    with pytest.raises(
+        profile.ProfileError, match="Resources/R must be the canonical bin/R symlink"
+    ):
+        profile.profile(
+            wrong_alias_root,
+            tmp_path / "wrong-alias-profile.json",
+            tmp_path / "manifest.json",
+            "4.6.1",
+            "x86_64",
+            official_framework_layout=True,
+        )
+
 
 def test_profile_rejects_wrong_architecture_r_executable(monkeypatch, tmp_path):
     profile = load_profile()
@@ -194,3 +278,20 @@ def test_profile_rejects_wrong_architecture_r_executable(monkeypatch, tmp_path):
     })
     with pytest.raises(profile.ProfileError, match="bin/exec/R executable must be x86_64-only"):
         profile.profile(root, tmp_path / "profile.json", tmp_path / "manifest.json", "4.6.1", "x86_64")
+
+    official_root = fixture_runtime(tmp_path / "official-wrong-arch")
+    configure_machos(monkeypatch, profile, official_root)
+    configure_official_launcher(
+        monkeypatch, profile, official_root, architecture="arm64"
+    )
+    with pytest.raises(
+        profile.ProfileError, match="official source bin/R launcher must be x86_64-only"
+    ):
+        profile.profile(
+            official_root,
+            tmp_path / "official-profile.json",
+            tmp_path / "manifest.json",
+            "4.6.1",
+            "x86_64",
+            official_framework_layout=True,
+        )

@@ -186,7 +186,8 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
         'readlink "$resources/R"',
         '"bin/R"',
         'require_x64 "$resources/bin/exec/R"',
-        'otool -L "$resources/bin/R"',
+        'require_x64 "$resources/bin/R"',
+        "--official-framework-layout",
         "profile_macos_embedded_r_runtime.py",
         "scripts/install-rcmetar-source.R",
         "RPY2_CFFI_MODE=API",
@@ -1209,6 +1210,7 @@ def test_archive_inspection_enforces_canonical_r_framework_symlinks_and_members(
                 "size": 6,
                 "mode": 0o755,
                 "sha256": hashlib.sha256(b"script").hexdigest(),
+                "architectures": ["x86_64"],
             },
             {
                 "path": f"{version_root}/R",
