@@ -5,7 +5,9 @@ import faulthandler
 import hashlib
 import json
 import platform
-import sys, time, traceback
+import sys
+import time
+import traceback
 import tempfile
 from pathlib import Path
 from typing import Any, cast
@@ -1271,6 +1273,29 @@ def start_package_runtime_probe(output_path):
     r_home = str(r_home_values[0])
     r_version = str(r_version_values[0])
     r_library_paths = [str(value) for value in r_library_values]
+    macos_r_policy = None
+    if sys.platform == "darwin":
+        tcltk_available = bool(cast(Any, robjects.r("requireNamespace('tcltk', quietly=TRUE)"))[0])
+        tcltk_loaded = bool(cast(Any, robjects.r("'tcltk' %in% loadedNamespaces()"))[0])
+        aqua = bool(cast(Any, robjects.r("capabilities('aqua')"))[0])
+        bitmap_type = str(cast(Any, robjects.r("getOption('bitmapType')"))[0])
+        png_path = str(cast(Any, robjects.r(
+            "output <- tempfile(fileext='.png'); grDevices::png(output); "
+            "graphics::plot(1, 1); grDevices::dev.off(); output"
+        ))[0])
+        png = Path(png_path)
+        if tcltk_available or tcltk_loaded or not aqua or bitmap_type != "quartz" or not png.is_file():
+            raise SystemExit("Packaged macOS R runtime violates the non-X11 Quartz policy.")
+        macos_r_policy = {
+            "tcltk_available": tcltk_available,
+            "tcltk_loaded": tcltk_loaded,
+            "aqua": aqua,
+            "bitmap_type": bitmap_type,
+            "default_png": {"size": png.stat().st_size, "sha256": hashlib.sha256(png.read_bytes()).hexdigest()},
+        }
+        if macos_r_policy["default_png"]["size"] <= 0:
+            raise SystemExit("Packaged macOS default Quartz png probe failed.")
+        png.unlink()
     probe = {
         "schema_version": 1,
         "frozen": bool(getattr(sys, "frozen", False)),
@@ -1306,6 +1331,7 @@ def start_package_runtime_probe(output_path):
             "library_paths": r_library_paths,
             "configured_home": configured.get("R_HOME"),
             "configured_library": configured.get("R_LIBS"),
+            "macos_product_profile": macos_r_policy,
         },
     }
     Path(output_path).write_text(

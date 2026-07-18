@@ -205,6 +205,7 @@ hang_trace_path="$qualification_root/packaged-smoke.hang-trace.log"
 launchservices_marker_path="$qualification_root/launchservices-completion.json"
 launchservices_pid_path="$qualification_root/launchservices.pid"
 signing_inventory_path="$qualification_root/ad-hoc-signing-inventory.json"
+r_runtime_profile_path="$qualification_root/embedded-r-runtime-profile.json"
 archive_inspection_path="$artifact_dir/$artifact_name-archive-inspection.json"
 qualification_evidence_path="$artifact_dir/$artifact_name-evidence.json"
 r_package_cache_root="${r_package_cache_root:-$artifact_dir/r-library-cache}"
@@ -382,16 +383,18 @@ r_source_relative() {
     /Library/Frameworks/R.framework/R|/Library/Frameworks/R.framework/Versions/*/R)
       printf '%s\n' "lib/libR.dylib"
       ;;
-    /opt/R/*/lib/*.dylib|/opt/X11/lib/*.dylib)
+    /opt/R/*/lib/*.dylib)
+      case "${source_path##*/}" in
+        libtcl*.dylib|libtk*.dylib)
+          return 2
+          ;;
+      esac
       printf 'lib/%s\n' "${source_path##*/}"
       ;;
     /Library/Frameworks/R.framework/*)
       return 2
       ;;
     /opt/R/*)
-      return 2
-      ;;
-    /opt/X11/*)
       return 2
       ;;
     *)
@@ -434,7 +437,13 @@ bundle_external_r_runtime_dylibs() {
     while IFS= read -r -d '' binary; do
       while IFS= read -r dependency; do
         case "$dependency" in
-          /opt/R/*/lib/*.dylib|/opt/X11/lib/*.dylib)
+          /opt/R/*/lib/*.dylib)
+            case "${dependency##*/}" in
+              libtcl*.dylib|libtk*.dylib)
+                echo "Embedded R profile forbids Tcl/Tk runtime dependency: $dependency" >&2
+                exit 1
+                ;;
+            esac
             if ! source_relative="$(r_source_relative "$dependency")"; then
               echo "Cannot map external R runtime dependency: $dependency" >&2
               exit 1
@@ -688,10 +697,28 @@ if ! test_bundled_r_packages "$r_lib"; then
   exit 1
 fi
 
+step "Applying the explicit non-X11 embedded R product profile"
+"$python_exe" "$repo_root/scripts/profile_macos_embedded_r_runtime.py" \
+  --resources "$r_home" --evidence "$r_runtime_profile_path" \
+  --dependency-manifest "$repo_root/docs/verification/RCMetaR-r-dependencies.json" \
+  --r-version "$r_version" --architecture "$expected_machine" \
+  --source-resources "$r_runtime_root"
+
 step "Configuring relocatable bundled R launchers"
 configure_relocatable_r_launchers
 step "Relocating completed bundled R runtime dependencies"
 relocate_bundled_r_runtime
+
+step "Verifying the embedded R Quartz runtime policy"
+R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$rscript" -e '
+  if (requireNamespace("tcltk", quietly=TRUE)) stop("tcltk must be excluded")
+  if ("tcltk" %in% loadedNamespaces()) stop("tcltk namespace must not load")
+  if (!isTRUE(capabilities("aqua"))) stop("macOS R must provide Aqua")
+  if (!identical(getOption("bitmapType"), "quartz")) stop("macOS bitmapType must be quartz")
+  output <- tempfile(fileext=".png"); grDevices::png(output); graphics::plot(1, 1); grDevices::dev.off()
+  if (!file.exists(output) || file.info(output)$size <= 0) stop("default Quartz png probe failed")
+  unlink(output)
+'
 
 cat > "$resources_root/LaunchRCMetaStudio.command" <<'SH'
 #!/usr/bin/env bash
@@ -889,6 +916,7 @@ required = [
     f"{archive_root_name}/RCMetaStudio.app/Contents/Resources/LaunchRCMetaStudio.command",
     f"{archive_root_name}/qualification/deployment-manifest.json",
     f"{archive_root_name}/qualification/runtime-probe.json",
+    f"{archive_root_name}/qualification/embedded-r-runtime-profile.json",
 ]
 expected_links = {
     f"{framework}/Versions/Current": framework_version,
@@ -939,6 +967,7 @@ if [ "$skip_smoke" -eq 0 ]; then
     --deployment-manifest "$deployment_manifest_path" \
     --signing-inventory "$signing_inventory_path" \
     --runtime-probe "$runtime_probe_path" \
+    --r-runtime-profile "$r_runtime_profile_path" \
     --smoke-evidence "$smoke_evidence_path" --smoke-log "$smoke_log_path" \
     --smoke-stdout "$smoke_stdout_path" --smoke-stderr "$smoke_stderr_path" \
     --hang-trace "$hang_trace_path" \
@@ -948,6 +977,7 @@ if [ "$skip_smoke" -eq 0 ]; then
     --archive "$zip_path" --deployment-manifest "$deployment_manifest_path" \
     --signing-inventory "$signing_inventory_path" \
     --runtime-probe "$runtime_probe_path" \
+    --r-runtime-profile "$r_runtime_profile_path" \
     --smoke-evidence "$smoke_evidence_path" --smoke-log "$smoke_log_path" \
     --smoke-stdout "$smoke_stdout_path" --smoke-stderr "$smoke_stderr_path" \
     --hang-trace "$hang_trace_path" \

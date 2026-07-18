@@ -444,6 +444,18 @@ def _validate_runtime_probe(probe: dict, app_root: Path) -> None:
         or expected_r_library.resolve() not in r_libraries
     ):
         raise MacOSDeploymentInspectionError("frozen R probe does not use the bundled runtime")
+    policy = r.get("macos_product_profile")
+    png = policy.get("default_png", {}) if isinstance(policy, dict) else {}
+    if not (
+        isinstance(policy, dict)
+        and policy.get("tcltk_available") is False
+        and policy.get("tcltk_loaded") is False
+        and policy.get("aqua") is True
+        and policy.get("bitmap_type") == "quartz"
+        and isinstance(png.get("size"), int) and png["size"] > 0
+        and _valid_sha256(png.get("sha256"))
+    ):
+        raise MacOSDeploymentInspectionError("frozen R probe lacks the macOS Quartz product-profile evidence")
 
 
 def validate_signing_inventory(
@@ -1029,10 +1041,31 @@ def validate_macos_surface_records(scales: object) -> None:
 def write_qualification_evidence(
     *, archive: Path, deployment_manifest: Path, smoke_evidence: Path,
     smoke_log: Path, smoke_stdout: Path, smoke_stderr: Path, hang_trace: Path,
-    runtime_probe: Path, launchservices_marker: Path,
+    runtime_probe: Path, r_runtime_profile: Path, launchservices_marker: Path,
     archive_inspection: Path, signing_inventory: Path, output: Path,
 ) -> dict:
     deployment = json.loads(deployment_manifest.read_text(encoding="utf-8"))
+    profile = json.loads(r_runtime_profile.read_text(encoding="utf-8"))
+    expected_profile_paths = [
+        "library/grDevices/libs/cairo.so", "library/tcltk", "modules/R_X11.so",
+        "modules/R_de.so",
+    ]
+    if not (
+        profile.get("schema_version") == 1
+        and profile.get("policy") == "official-cran-r-with-optional-x11-tcl-surfaces-removed"
+        and profile.get("hard_dependency_fields") == ["Depends", "Imports", "LinkingTo"]
+        and _valid_sha256(profile.get("dependency_manifest", {}).get("sha256"))
+        and "tcltk" not in {str(name).casefold() for name in profile.get("hard_dependency_closure", [])}
+        and profile.get("source_framework", {}).get("version") == EXPECTED_VERSIONS["r"]
+        and profile.get("source_framework", {}).get("expected_architecture") == "x86_64"
+        and profile.get("source_framework", {}).get("source_executable", {}).get("architectures") == ["x86_64"]
+        and _valid_sha256(profile.get("source_framework", {}).get("source_tree_identity_sha256"))
+        and _valid_sha256(profile.get("source_framework", {}).get("pre_profile_tree_identity_sha256"))
+        and profile.get("post_profile_exclusions") == expected_profile_paths
+        and [entry.get("relative_path") for entry in profile.get("excluded_surfaces", [])]
+            == ["library/tcltk", "modules/R_X11.so", "modules/R_de.so", "library/grDevices/libs/cairo.so"]
+    ):
+        raise MacOSDeploymentInspectionError("embedded R profile evidence is incomplete")
     smoke = json.loads(smoke_evidence.read_text(encoding="utf-8"))
     archive_report = json.loads(archive_inspection.read_text(encoding="utf-8"))
     workflows = smoke.get("workflows", {})
@@ -1052,6 +1085,7 @@ def write_qualification_evidence(
             signing_inventory
         ),
         "qualification/runtime-probe.json": sha256_file(runtime_probe),
+        "qualification/embedded-r-runtime-profile.json": sha256_file(r_runtime_profile),
         "qualification/packaged-smoke.json": sha256_file(smoke_evidence),
         "qualification/packaged-smoke.log": sha256_file(smoke_log),
         "qualification/launchservices-completion.json": sha256_file(
@@ -1109,6 +1143,9 @@ def write_qualification_evidence(
             "sha256": sha256_file(signing_inventory),
         },
         "runtime_probe": {"path": runtime_probe.name, "sha256": sha256_file(runtime_probe)},
+        "embedded_r_runtime_profile": {
+            "path": r_runtime_profile.name, "sha256": sha256_file(r_runtime_profile)
+        },
         "smoke_evidence": {"path": smoke_evidence.name, "sha256": sha256_file(smoke_evidence)},
         "archive_inspection": {"path": archive_inspection.name, "sha256": sha256_file(archive_inspection)},
         "logs": [
@@ -1157,7 +1194,7 @@ def main() -> int:
     for name in (
         "deployment_manifest", "runtime_probe", "smoke_evidence", "smoke_log",
         "smoke_stdout", "smoke_stderr", "hang_trace", "launchservices_marker",
-        "signing_inventory",
+        "signing_inventory", "r_runtime_profile",
     ):
         archive.add_argument(f"--{name.replace('_', '-')}", type=Path, required=True)
     archive.add_argument("--output", type=Path, required=True)
@@ -1165,7 +1202,7 @@ def main() -> int:
     for name in (
         "archive", "deployment_manifest", "runtime_probe", "smoke_evidence",
         "smoke_log", "smoke_stdout", "smoke_stderr", "hang_trace",
-        "launchservices_marker", "archive_inspection", "signing_inventory", "output",
+        "launchservices_marker", "archive_inspection", "signing_inventory", "r_runtime_profile", "output",
     ):
         evidence.add_argument(f"--{name.replace('_', '-')}", type=Path, required=True)
     args = parser.parse_args()
@@ -1193,6 +1230,7 @@ def main() -> int:
                     "qualification/deployment-manifest.json": args.deployment_manifest,
                     "qualification/ad-hoc-signing-inventory.json": args.signing_inventory,
                     "qualification/runtime-probe.json": args.runtime_probe,
+                    "qualification/embedded-r-runtime-profile.json": args.r_runtime_profile,
                     "qualification/packaged-smoke.json": args.smoke_evidence,
                     "qualification/packaged-smoke.log": args.smoke_log,
                     "qualification/packaged-smoke.stdout.log": args.smoke_stdout,
@@ -1208,6 +1246,7 @@ def main() -> int:
                     "archive", "deployment_manifest", "runtime_probe", "smoke_evidence",
                     "smoke_log", "smoke_stdout", "smoke_stderr", "hang_trace",
                     "launchservices_marker", "archive_inspection", "signing_inventory", "output",
+                    "r_runtime_profile",
                 )
             })
     except (MacOSDeploymentInspectionError, OSError, ValueError, json.JSONDecodeError) as exc:

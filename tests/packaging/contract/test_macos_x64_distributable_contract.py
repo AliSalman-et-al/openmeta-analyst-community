@@ -267,6 +267,7 @@ def test_r_relocation_maps_versioned_and_canonical_framework_load_commands():
         "/Library/Frameworks/R.framework/Resources/lib/libR.dylib",
         "/Library/Frameworks/R.framework/R",
         "/Library/Frameworks/R.framework/Versions/4.6/R",
+        "/opt/R/x86_64/lib/libgfortran.5.dylib",
         "/opt/R/x86_64/lib/libtcl8.6.dylib",
         "/opt/X11/lib/libX11.6.dylib",
         "/opt/R/x86_64/include/unsupported.h",
@@ -297,8 +298,9 @@ done
         "0:lib/libR.dylib",
         "0:lib/libR.dylib",
         "0:lib/libR.dylib",
-        "0:lib/libtcl8.6.dylib",
-        "0:lib/libX11.6.dylib",
+        "0:lib/libgfortran.5.dylib",
+        "2:",
+        "2:",
         "2:",
         "2:",
         "2:",
@@ -306,12 +308,19 @@ done
     ]
 
 
-def test_macos_packager_bundles_external_r_runtime_dylib_closure():
+def test_macos_packager_profiles_optional_x11_r_surfaces_before_relocation():
     build = text("scripts/build-macos-package.sh")
 
     assert "bundle_external_r_runtime_dylibs()" in build
     assert 'case "$dependency" in' in build
-    assert "/opt/R/*/lib/*.dylib|/opt/X11/lib/*.dylib)" in build
+    assert "/opt/R/*/lib/*.dylib)" in build
+    assert "/opt/X11/lib/*.dylib" not in build
+    assert "profile_macos_embedded_r_runtime.py" in build
+    assert "Applying the explicit non-X11 embedded R product profile" in build
+    assert build.index("profile_macos_embedded_r_runtime.py") < build.rindex(
+        "relocate_bundled_r_runtime"
+    )
+    assert "libtcl*.dylib|libtk*.dylib" in build
     assert 'target="$r_home/$source_relative"' in build
     assert 'cp -p "$dependency" "$target"' in build
     assert 'write_bundled_r_macho_manifest "$macho_manifest"' in build

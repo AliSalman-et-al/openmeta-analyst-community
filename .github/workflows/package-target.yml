@@ -89,7 +89,13 @@ jobs:
       - name: Build macOS package
         if: ${{ inputs.target_os == 'macos' }}
         shell: bash
-        run: bash scripts/package-macos.sh --architecture x64 --artifact-name "${{ inputs.artifact_name }}" --archive-root-name "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ inputs.archive_platform }}" --r-runtime-root "${{ steps.package-metadata.outputs.r-runtime-root }}"
+        run: |
+          set -euo pipefail
+          if [ -e /opt/X11 ]; then
+            echo "The clean macOS qualification runner unexpectedly contains /opt/X11." >&2
+            exit 1
+          fi
+          bash scripts/package-macos.sh --architecture x64 --artifact-name "${{ inputs.artifact_name }}" --archive-root-name "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ inputs.archive_platform }}" --r-runtime-root "${{ steps.package-metadata.outputs.r-runtime-root }}"
 
       - name: Upload package artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

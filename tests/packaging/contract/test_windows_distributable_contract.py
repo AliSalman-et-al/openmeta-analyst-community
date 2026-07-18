@@ -669,7 +669,9 @@ def test_macos_packager_relocates_every_bundled_r_macho_before_use():
 
     assert 'local macho_manifest="$work_root/bundled-r-mach-o-files.list"' in script
     assert "bundle_external_r_runtime_dylibs" in script
-    assert "/opt/R/*/lib/*.dylib|/opt/X11/lib/*.dylib)" in script
+    assert "/opt/R/*/lib/*.dylib)" in script
+    assert "/opt/X11/lib/*.dylib" not in script
+
     assert 'cp -p "$dependency" "$target"' in script
     assert "from rc_metastudio.qt6_macos_feasibility import is_macho_candidate" in script
     assert "MACH_O_MAGICS" not in script
@@ -694,6 +696,15 @@ def test_macos_packager_relocates_every_bundled_r_macho_before_use():
         'step "Relocating completed bundled R runtime dependencies"',
         'cat > "$resources_root/LaunchRCMetaStudio.command"',
     )
+
+
+def test_windows_runtime_probe_does_not_apply_macos_r_product_policy():
+    launch = read_repo_text("src", "rc_metastudio", "launch.py")
+    probe = launch.split("def start_package_runtime_probe", 1)[1].split(
+        "def _exercise_packaged_project_workflow", 1
+    )[0]
+    assert 'if sys.platform == "darwin":' in probe
+    assert '"macos_product_profile": macos_r_policy' in probe
 
 
 def test_windows_packager_restores_smoke_environment():
