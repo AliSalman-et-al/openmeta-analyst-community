@@ -16,6 +16,29 @@ param(
     [Parameter(Mandatory=$true)][string]$Output
 )
 $ErrorActionPreference = "Stop"
+function Invoke-NativeLogged {
+    param(
+        [Parameter(Mandatory=$true)][string]$FilePath,
+        [Parameter(Mandatory=$true)][object[]]$ArgumentList,
+        [Parameter(Mandatory=$true)][string]$LogPath,
+        [Parameter(Mandatory=$true)][string]$FailureMessage
+    )
+    $previousPreference = $ErrorActionPreference
+    $exitCode = $null
+    try {
+        # Windows PowerShell 5 promotes native stderr records to terminating errors
+        # under Stop. Preserve both streams, then make the process exit code decisive.
+        $ErrorActionPreference = "Continue"
+        & $FilePath @ArgumentList *>&1 | Tee-Object -FilePath $LogPath
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousPreference
+    }
+    if ($null -eq $exitCode -or $exitCode -ne 0) {
+        throw "$FailureMessage (exit code: $exitCode; log: $LogPath)"
+    }
+}
 $repo = Split-Path -Parent $PSScriptRoot
 $work = Join-Path $repo "build\r-kit-producer\windows-x64"
 $stage = Join-Path $work "R"
@@ -34,8 +57,7 @@ $env:R_LIBS_USER = $library
 $env:RCMS_CRAN_REPO = "https://packagemanager.posit.co/cran/2026-07-16"
 $env:RCMS_R_PACKAGE_ARCHIVE_DIR = $archives
 $env:RCMS_HSROC_ARCHIVE = Join-Path $work "HSROC_2.1.9.tar.gz"
-& $rscript (Join-Path $repo "scripts\install-r-deps.R") *>&1 | Tee-Object (Join-Path $logs "r-packages.log")
-if ($LASTEXITCODE -ne 0) { throw "R binary/source dependency production failed" }
+Invoke-NativeLogged -FilePath $rscript -ArgumentList @((Join-Path $repo "scripts\install-r-deps.R")) -LogPath (Join-Path $logs "r-packages.log") -FailureMessage "R binary/source dependency production failed"
 $commit = (& git -C $repo rev-parse HEAD).Trim()
 $rcmetarUrl = "https://github.com/AliSalman-et-al/rc-metastudio/archive/$commit.tar.gz"
 $rcmetarArchive = Join-Path $work "rc-metastudio-$commit.tar.gz"
@@ -45,11 +67,10 @@ New-Item -ItemType Directory -Force -Path $rcmetarSource | Out-Null
 tar -xf $rcmetarArchive -C $rcmetarSource
 $rcmetarPackage = Get-ChildItem -LiteralPath $rcmetarSource -Directory | ForEach-Object { Join-Path $_.FullName "r\RCMetaR" } | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $rcmetarPackage) { throw "Downloaded RCMetaR source archive lacks r/RCMetaR" }
-& $rscript -e "install.packages(commandArgs(TRUE)[1], lib=commandArgs(TRUE)[2], repos=NULL, type='source', dependencies=FALSE)" --args $rcmetarPackage $library *>&1 | Tee-Object (Join-Path $logs "rcmetar.log")
-if ($LASTEXITCODE -ne 0) { throw "RCMetaR source production failed" }
+$rcmetarInstall = 'args <- commandArgs(trailingOnly=TRUE); if (length(args) != 2L) stop("RCMetaR source install requires archive and library arguments"); install.packages(args[[1L]], lib=args[[2L]], repos=NULL, type="source", dependencies=FALSE); if (!file.exists(file.path(args[[2L]], "RCMetaR", "DESCRIPTION"))) stop("RCMetaR source install did not produce the target package")'
+Invoke-NativeLogged -FilePath $rscript -ArgumentList @("-e", $rcmetarInstall, $rcmetarPackage, $library) -LogPath (Join-Path $logs "rcmetar.log") -FailureMessage "RCMetaR source production failed"
 $env:RPY2_CFFI_MODE = "API"
-& uv pip install --python $PythonExe --reinstall $Rpy2RinterfaceSdist *>&1 | Tee-Object (Join-Path $logs "rpy2.log")
-if ($LASTEXITCODE -ne 0) { throw "rpy2 API bridge production failed" }
+Invoke-NativeLogged -FilePath "uv" -ArgumentList @("pip", "install", "--python", $PythonExe, "--reinstall", $Rpy2RinterfaceSdist) -LogPath (Join-Path $logs "rpy2.log") -FailureMessage "rpy2 API bridge production failed"
 $platlib = (& $PythonExe -c "import sysconfig; print(sysconfig.get_paths()['platlib'])").Trim()
 $bridge = Get-ChildItem -LiteralPath $platlib -Recurse -File -Filter "_rinterface_cffi_api*.pyd" | Select-Object -First 1
 if ($null -eq $bridge) { throw "rpy2 API bridge was not built" }
