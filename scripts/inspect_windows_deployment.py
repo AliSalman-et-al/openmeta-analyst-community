@@ -420,6 +420,21 @@ def _valid_windows_accessibility(value: object) -> bool:
     )
 
 
+def _valid_windows_critical_dialog(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    dialog = cast(dict[str, object], value)
+    return (
+        dialog.get("window_modality") == "WindowModal"
+        and dialog.get("visible_before_close") is True
+        and dialog.get("critical_icon") is True
+        and dialog.get("finished_signal") is True
+        and dialog.get("result") == dialog.get("accepted_value") == 1
+        and dialog.get("timed_out") is False
+        and dialog.get("timeout_ms") == 5_000
+    )
+
+
 def write_qualification_evidence(
     *,
     archive: Path,
@@ -501,7 +516,8 @@ def write_qualification_evidence(
         }
         or [item.get("requested") for item in scales] != ["1.25", "1.50", "1.75"]
         or any(
-            not all(item.get(check) is True for check in ("clipboard", "critical_dialog", "binary_resources"))
+            not all(item.get(check) is True for check in ("clipboard", "binary_resources"))
+            or not _valid_windows_critical_dialog(item.get("critical_dialog"))
             or item.get("locale") != "de_DE"
             or item.get("platform_plugin") != "windows"
             or not _valid_windows_accessibility(item.get("accessibility"))

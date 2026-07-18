@@ -74,6 +74,7 @@
     "PyQt5.QtWidgets.QWizard.Stretch": "WizardButton.Stretch"
   },
   "scoped_enums": {
+    "AA_DontUseNativeDialogs": "ApplicationAttribute.AA_DontUseNativeDialogs",
     "AlignBottom": "AlignmentFlag.AlignBottom",
     "AlignCenter": "AlignmentFlag.AlignCenter",
     "AlignHCenter": "AlignmentFlag.AlignHCenter",

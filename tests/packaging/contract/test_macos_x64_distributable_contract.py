@@ -200,7 +200,7 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
     assert 'f"{framework}/Versions/Current": framework_version' in build
     assert 'f"{framework}/Resources": "Versions/Current/Resources"' in build
     assert "r_source_relative()" in build
-    assert build.count('r_source_relative "$') == 2
+    assert build.count('r_source_relative "$') == 3
     assert "/Library/Frameworks/R.framework/Resources/*)" in build
     assert "/Library/Frameworks/R.framework/Versions/*/Resources/*)" in build
     assert "/Library/Frameworks/R.framework/R|" in build
@@ -267,6 +267,8 @@ def test_r_relocation_maps_versioned_and_canonical_framework_load_commands():
         "/Library/Frameworks/R.framework/Resources/lib/libR.dylib",
         "/Library/Frameworks/R.framework/R",
         "/Library/Frameworks/R.framework/Versions/4.6/R",
+        "/opt/R/x86_64/lib/libtcl8.6.dylib",
+        "/opt/R/x86_64/include/unsupported.h",
         "/Library/Frameworks/R.framework/PrivateHeaders/unsupported.h",
         "/usr/lib/libSystem.B.dylib",
     ]
@@ -293,9 +295,25 @@ done
         "0:lib/libR.dylib",
         "0:lib/libR.dylib",
         "0:lib/libR.dylib",
+        "0:lib/libtcl8.6.dylib",
+        "2:",
         "2:",
         "1:",
     ]
+
+
+def test_macos_packager_bundles_external_r_toolchain_dylib_closure():
+    build = text("scripts/build-macos-package.sh")
+
+    assert "bundle_external_r_toolchain_dylibs()" in build
+    assert 'case "$dependency" in' in build
+    assert "/opt/R/*/lib/*.dylib)" in build
+    assert 'target="$r_home/$source_relative"' in build
+    assert 'cp -p "$dependency" "$target"' in build
+    assert 'write_bundled_r_macho_manifest "$macho_manifest"' in build
+    assert "External R toolchain dependency closure exceeded 16 passes" in build
+    assert "normalize_macos_macho.py" in build
+    assert "grep -F '/opt/R/'" in build
 
 
 def test_r_macho_normalizer_thins_universal_and_rejects_unusable_slices(

@@ -668,6 +668,9 @@ def test_macos_packager_relocates_every_bundled_r_macho_before_use():
     script = sh_contract("scripts", "build-macos-package.sh")["text"]
 
     assert 'local macho_manifest="$work_root/bundled-r-mach-o-files.list"' in script
+    assert "bundle_external_r_toolchain_dylibs" in script
+    assert "/opt/R/*/lib/*.dylib)" in script
+    assert 'cp -p "$dependency" "$target"' in script
     assert "from rc_metastudio.qt6_macos_feasibility import is_macho_candidate" in script
     assert "MACH_O_MAGICS" not in script
     assert "if is_macho_candidate(path):" in script
@@ -1272,6 +1275,26 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
         **windows_accessibility,
         "accessible_description": "",
     })
+    windows_critical_dialog = {
+        "dont_use_native_dialog": False,
+        "application_dont_use_native_dialogs": False,
+        "dont_show_on_screen_before_show": False,
+        "dont_show_on_screen_after_show": False,
+        "native_helper_active": False,
+        "window_modality": "WindowModal",
+        "visible_before_close": True,
+        "critical_icon": True,
+        "finished_signal": True,
+        "result": 1,
+        "accepted_value": 1,
+        "timed_out": False,
+        "timeout_ms": 5_000,
+    }
+    assert inspector._valid_windows_critical_dialog(windows_critical_dialog)
+    assert not inspector._valid_windows_critical_dialog({
+        **windows_critical_dialog,
+        "finished_signal": False,
+    })
     archive = tmp_path / "RCMetaStudio-windows-x64.zip"
     runtime_probe = tmp_path / "runtime-probe.json"
     runtime_value = {"frozen": True}
@@ -1358,7 +1381,7 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
                         "expected_device_pixel_ratio": float(scale),
                         "dpr_tolerance": 0.05,
                         "clipboard": True,
-                        "critical_dialog": True,
+                        "critical_dialog": windows_critical_dialog,
                         "binary_resources": True,
                         "locale": "de_DE",
                         "platform_plugin": "windows",

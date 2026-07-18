@@ -1155,20 +1155,24 @@ def start_package_surface_smoke(evidence_path, expected_scale):
             "error_type": type(error).__name__,
             "error_message": bounded_error_message(error),
         }
-    if (
-        critical_dialog["dont_use_native_dialog"] is not False
-        or critical_dialog["application_dont_use_native_dialogs"] is not False
-        or critical_dialog["dont_show_on_screen_before_show"] is not False
-        or critical_dialog["dont_show_on_screen_after_show"] is not True
-        or critical_dialog["native_helper_active"] is not True
-        or critical_dialog["window_modality"] != "WindowModal"
+    critical_dialog_invalid = (
+        critical_dialog["window_modality"] != "WindowModal"
         or critical_dialog["visible_before_close"] is not True
         or critical_dialog["critical_icon"] is not True
         or critical_dialog["finished_signal"] is not True
         or critical_dialog["result"] != critical_dialog["accepted_value"]
         or critical_dialog["timed_out"] is not False
         or critical_dialog["timeout_ms"] != CRITICAL_DIALOG_TIMEOUT_MS
-    ):
+    )
+    if sys.platform == "darwin":
+        critical_dialog_invalid = critical_dialog_invalid or (
+            critical_dialog["dont_use_native_dialog"] is not False
+            or critical_dialog["application_dont_use_native_dialogs"] is not False
+            or critical_dialog["dont_show_on_screen_before_show"] is not False
+            or critical_dialog["dont_show_on_screen_after_show"] is not True
+            or critical_dialog["native_helper_active"] is not True
+        )
+    if critical_dialog_invalid:
         _persist_package_surface_failure(
             evidence_path,
             expected_scale,

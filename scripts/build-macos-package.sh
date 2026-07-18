@@ -382,7 +382,13 @@ r_source_relative() {
     /Library/Frameworks/R.framework/R|/Library/Frameworks/R.framework/Versions/*/R)
       printf '%s\n' "lib/libR.dylib"
       ;;
+    /opt/R/*/lib/*.dylib)
+      printf 'lib/%s\n' "${source_path##*/}"
+      ;;
     /Library/Frameworks/R.framework/*)
+      return 2
+      ;;
+    /opt/R/*)
       return 2
       ;;
     *)
@@ -391,11 +397,8 @@ r_source_relative() {
   esac
 }
 
-relocate_bundled_r_runtime() {
-  local binary dylib_id dependency source_relative target loader_dir relative_target
-  local mapping_status
-  local macho_manifest="$work_root/bundled-r-mach-o-files.list"
-
+write_bundled_r_macho_manifest() {
+  local macho_manifest="$1"
   # Spawning `file` for every file in a complete R installation is extremely
   # expensive on GitHub's macOS runners. Scan the tree once in one process,
   # structurally excluding valid JVM ClassFiles from the CAFEBABE fat-Mach-O
@@ -418,6 +421,61 @@ for directory, _, filenames in os.walk(root):
         if is_macho_candidate(path):
             sys.stdout.buffer.write(os.fsencode(path) + b"\0")
 PY
+}
+
+bundle_external_r_toolchain_dylibs() {
+  local macho_manifest="$1"
+  local binary dependency source_relative target pass copied mapping_status
+  for pass in $(seq 1 16); do
+    copied=0
+    while IFS= read -r -d '' binary; do
+      while IFS= read -r dependency; do
+        case "$dependency" in
+          /opt/R/*/lib/*.dylib)
+            if ! source_relative="$(r_source_relative "$dependency")"; then
+              echo "Cannot map external R toolchain dependency: $dependency" >&2
+              exit 1
+            fi
+            target="$r_home/$source_relative"
+            if [ -e "$target" ]; then
+              if ! cmp -s "$dependency" "$target"; then
+                echo "External R toolchain dependency collides in bundle: $dependency" >&2
+                exit 1
+              fi
+              continue
+            fi
+            if [ ! -f "$dependency" ]; then
+              echo "External R toolchain dependency is missing: $dependency" >&2
+              exit 1
+            fi
+            mkdir -p "$(dirname "$target")"
+            cp -p "$dependency" "$target"
+            copied=1
+            ;;
+          /opt/R/*)
+            mapping_status=2
+            echo "Unsupported external R toolchain dependency: $dependency" >&2
+            exit "$mapping_status"
+            ;;
+        esac
+      done < <(otool -L "$binary" | awk 'NR > 1 { print $1 }')
+    done < "$macho_manifest"
+    if [ "$copied" -eq 0 ]; then
+      return 0
+    fi
+    write_bundled_r_macho_manifest "$macho_manifest"
+  done
+  echo "External R toolchain dependency closure exceeded 16 passes." >&2
+  exit 1
+}
+
+relocate_bundled_r_runtime() {
+  local binary dylib_id dependency source_relative target loader_dir relative_target
+  local mapping_status
+  local macho_manifest="$work_root/bundled-r-mach-o-files.list"
+
+  write_bundled_r_macho_manifest "$macho_manifest"
+  bundle_external_r_toolchain_dylibs "$macho_manifest"
 
   "$python_exe" "$repo_root/scripts/normalize_macos_macho.py" \
     --manifest "$macho_manifest" --architecture x86_64
@@ -474,7 +532,8 @@ PY
     otool -L "$binary"
   done < "$macho_manifest")"
   if printf '%s\n' "$dependency_report" | grep -F "$r_runtime_root/" \
-    || printf '%s\n' "$dependency_report" | grep -F '/Library/Frameworks/R.framework/'; then
+    || printf '%s\n' "$dependency_report" | grep -F '/Library/Frameworks/R.framework/' \
+    || printf '%s\n' "$dependency_report" | grep -F '/opt/R/'; then
     echo "Bundled R runtime retains an absolute source-framework dependency." >&2
     exit 1
   fi
