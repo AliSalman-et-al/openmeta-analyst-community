@@ -165,11 +165,38 @@ target_package_loadable <- function(package, lib) {
   startsWith(namespace_path, paste0(target, "/"))
 }
 
+normalize_rcms_downloaded_archives <- function(downloaded, expected_count) {
+  if (NROW(downloaded) != expected_count) {
+    stop("PPM did not provide one retained binary archive per missing package")
+  }
+  if (is.null(dim(downloaded))) {
+    if (expected_count != 1L || length(downloaded) < 2L) {
+      stop("PPM binary archive result does not have a usable destination column")
+    }
+    archives <- downloaded[[2L]]
+  } else {
+    if (NCOL(downloaded) < 2L) {
+      stop("PPM binary archive result does not have a usable destination column")
+    }
+    archives <- downloaded[, 2L, drop = TRUE]
+  }
+  archives <- as.character(archives)
+  if (length(archives) != expected_count || any(!nzchar(archives))) {
+    stop("PPM binary archive result has an invalid destination count")
+  }
+  missing_archives <- archives[!file.exists(archives)]
+  if (length(missing_archives)) {
+    stop("PPM retained binary archive is missing: ", paste(missing_archives, collapse = ", "))
+  }
+  unname(archives)
+}
+
 install_rcms_binary_packages <- function(
   policy,
   lib,
   database = NULL,
   install_binary = utils::install.packages,
+  download_binary = utils::download.packages,
   installed_in_target = function() rownames(utils::installed.packages(lib.loc = lib)),
   package_loadable = function(package) target_package_loadable(package, lib)
 ) {
@@ -192,14 +219,12 @@ install_rcms_binary_packages <- function(
     archive_dir <- Sys.getenv("RCMS_R_PACKAGE_ARCHIVE_DIR", "")
     if (nzchar(archive_dir)) {
       dir.create(archive_dir, recursive = TRUE, showWarnings = FALSE)
-      downloaded <- utils::download.packages(
+      downloaded <- download_binary(
         missing, destdir = archive_dir, repos = policy$repository, type = "binary"
       )
-      if (nrow(downloaded) != length(missing)) {
-        stop("PPM did not provide one retained binary archive per missing package")
-      }
+      retained_archives <- normalize_rcms_downloaded_archives(downloaded, length(missing))
       install_binary(
-        downloaded[, "destfile"], lib = lib, repos = NULL,
+        retained_archives, lib = lib, repos = NULL,
         dependencies = FALSE, type = "binary"
       )
     } else {

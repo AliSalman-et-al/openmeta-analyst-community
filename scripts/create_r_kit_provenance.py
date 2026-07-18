@@ -95,6 +95,9 @@ def main() -> int:
     parser.add_argument("--official-r-artifact", type=Path, required=True)
     parser.add_argument("--official-r-url", required=True)
     parser.add_argument("--official-r-signature-identity", required=True)
+    parser.add_argument("--official-r-signer-thumbprint")
+    parser.add_argument("--official-r-signature-status")
+    parser.add_argument("--official-r-timestamped", action="store_true")
     parser.add_argument(
         "--official-r-artifact-type", choices=("installer", "pkg"), required=True
     )
@@ -127,6 +130,9 @@ def main() -> int:
             "url": args.official_r_url,
             "sha256": sha256(args.official_r_artifact.resolve(strict=True)),
             "signature_identity": args.official_r_signature_identity,
+            "signer_thumbprint": args.official_r_signer_thumbprint,
+            "signature_status": args.official_r_signature_status,
+            "timestamped": args.official_r_timestamped,
             "artifact_type": args.official_r_artifact_type,
         },
         "ppm_packages": [

@@ -4,6 +4,9 @@ param(
     [Parameter(Mandatory=$true)][string]$OfficialRArtifact,
     [Parameter(Mandatory=$true)][string]$OfficialRUrl,
     [Parameter(Mandatory=$true)][string]$OfficialRSignatureIdentity,
+    [Parameter(Mandatory=$true)][string]$OfficialRSignerThumbprint,
+    [Parameter(Mandatory=$true)][string]$OfficialRSignatureStatus,
+    [Parameter(Mandatory=$true)][switch]$OfficialRTimestamped,
     [Parameter(Mandatory=$true)][string]$Rpy2Sdist,
     [Parameter(Mandatory=$true)][string]$Rpy2SdistUrl,
     [Parameter(Mandatory=$true)][string]$Rpy2RinterfaceSdist,
@@ -19,6 +22,7 @@ $stage = Join-Path $work "R"
 $archives = Join-Path $work "ppm-archives"
 $logs = Join-Path $work "logs"
 $provenance = Join-Path $work "provenance.json"
+if (-not $OfficialRTimestamped) { throw "Official R installer provenance must include an Authenticode timestamp" }
 Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $stage,$archives,$logs | Out-Null
 Copy-Item -Path (Join-Path $RRuntimeRoot "*") -Destination $stage -Recurse -Force
@@ -50,7 +54,7 @@ $platlib = (& $PythonExe -c "import sysconfig; print(sysconfig.get_paths()['plat
 $bridge = Get-ChildItem -LiteralPath $platlib -Recurse -File -Filter "_rinterface_cffi_api*.pyd" | Select-Object -First 1
 if ($null -eq $bridge) { throw "rpy2 API bridge was not built" }
 & $PythonExe (Join-Path $repo "scripts\index_r_binary_archives.py") --archives $archives --contrib-url "https://packagemanager.posit.co/cran/2026-07-16/bin/windows/contrib/4.6" --package-type win.binary --library $library --output (Join-Path $work "ppm-index.json")
-& $PythonExe (Join-Path $repo "scripts\create_r_kit_provenance.py") --target windows-x64 --official-r-artifact $OfficialRArtifact --official-r-url $OfficialRUrl --official-r-signature-identity $OfficialRSignatureIdentity --official-r-artifact-type installer --ppm-index (Join-Path $work "ppm-index.json") --ppm-archive-root $archives --hsroc-archive $env:RCMS_HSROC_ARCHIVE --hsroc-url "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz" --hsroc-build-log (Join-Path $logs "r-packages.log") --rcmetar-archive $rcmetarArchive --rcmetar-url $rcmetarUrl --rcmetar-build-log (Join-Path $logs "rcmetar.log") --rpy2-sdist $Rpy2Sdist --rpy2-sdist-url $Rpy2SdistUrl --rpy2-rinterface-sdist $Rpy2RinterfaceSdist --rpy2-rinterface-sdist-url $Rpy2RinterfaceSdistUrl --rpy2-robjects-sdist $Rpy2RobjectsSdist --rpy2-robjects-sdist-url $Rpy2RobjectsSdistUrl --rpy2-build-log (Join-Path $logs "rpy2.log") --rpy2-api-bridge $bridge.FullName --toolchain "R 4.6.1; Python 3.11.9; uv; MSVC x64" --output $provenance
+& $PythonExe (Join-Path $repo "scripts\create_r_kit_provenance.py") --target windows-x64 --official-r-artifact $OfficialRArtifact --official-r-url $OfficialRUrl --official-r-signature-identity $OfficialRSignatureIdentity --official-r-signer-thumbprint $OfficialRSignerThumbprint --official-r-signature-status $OfficialRSignatureStatus --official-r-timestamped --official-r-artifact-type installer --ppm-index (Join-Path $work "ppm-index.json") --ppm-archive-root $archives --hsroc-archive $env:RCMS_HSROC_ARCHIVE --hsroc-url "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz" --hsroc-build-log (Join-Path $logs "r-packages.log") --rcmetar-archive $rcmetarArchive --rcmetar-url $rcmetarUrl --rcmetar-build-log (Join-Path $logs "rcmetar.log") --rpy2-sdist $Rpy2Sdist --rpy2-sdist-url $Rpy2SdistUrl --rpy2-rinterface-sdist $Rpy2RinterfaceSdist --rpy2-rinterface-sdist-url $Rpy2RinterfaceSdistUrl --rpy2-robjects-sdist $Rpy2RobjectsSdist --rpy2-robjects-sdist-url $Rpy2RobjectsSdistUrl --rpy2-build-log (Join-Path $logs "rpy2.log") --rpy2-api-bridge $bridge.FullName --toolchain "R 4.6.1; Python 3.11.9; uv; MSVC x64" --output $provenance
 $sourcePayload = Join-Path $work "source-payload"
 New-Item -ItemType Directory -Force -Path $sourcePayload | Out-Null
 Copy-Item -LiteralPath $env:RCMS_HSROC_ARCHIVE,$rcmetarArchive,$Rpy2Sdist,$Rpy2RinterfaceSdist,$Rpy2RobjectsSdist -Destination $sourcePayload

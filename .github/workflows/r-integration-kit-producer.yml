@@ -45,13 +45,22 @@ jobs:
           $path = Join-Path $PWD 'build/official-R-4.6.1-win.exe'
           Invoke-WebRequest -Uri $url -OutFile $path
           $signature = Get-AuthenticodeSignature -FilePath $path
-          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'R Core Team') { throw 'Official R Authenticode verification failed.' }
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToUpperInvariant()
+          $expectedHash = 'C5424C40CD70EF85765A55D2FF96BB602B5F30ED536938FF004F14DB5DB3C2DF'
+          $expectedSubject = 'CN=Martyn Plummer, O=Martyn Plummer, S=West Midlands, C=GB'
+          $expectedThumbprint = 'F356FC6CD245D722F4A82697473DA5995CB42975'
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -ne $expectedSubject -or $signature.SignerCertificate.Thumbprint -ne $expectedThumbprint -or -not $signature.TimeStamperCertificate -or $hash -ne $expectedHash) {
+            Write-Host "Official R authentication mismatch: status=$($signature.Status); subject=$($signature.SignerCertificate.Subject); thumbprint=$($signature.SignerCertificate.Thumbprint); sha256=$hash; timestamped=$([bool]$signature.TimeStamperCertificate)"
+            throw 'Official R Authenticode or SHA256 verification failed.'
+          }
           $install = Join-Path $PWD 'build/official-R-4.6.1'
           $process = Start-Process -FilePath $path -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$install") -Wait -PassThru
           if ($process.ExitCode -ne 0 -or -not (Test-Path (Join-Path $install 'bin/Rscript.exe'))) { throw 'Authenticated official R installer failed.' }
           "RCMS_OFFICIAL_R_ARTIFACT=$path" | Out-File $env:GITHUB_ENV -Append
           "RCMS_OFFICIAL_R_URL=$url" | Out-File $env:GITHUB_ENV -Append
           "RCMS_OFFICIAL_R_SIGNATURE=$($signature.SignerCertificate.Subject)" | Out-File $env:GITHUB_ENV -Append
+          "RCMS_OFFICIAL_R_SIGNER_THUMBPRINT=$($signature.SignerCertificate.Thumbprint)" | Out-File $env:GITHUB_ENV -Append
+          "RCMS_OFFICIAL_R_SIGNATURE_STATUS=$($signature.Status)" | Out-File $env:GITHUB_ENV -Append
           "RCMS_PRODUCER_R_HOME=$install" | Out-File $env:GITHUB_ENV -Append
           "R_HOME=$install" | Out-File $env:GITHUB_ENV -Append
       - name: Download, authenticate, and install official R pkg
@@ -94,7 +103,7 @@ jobs:
       - name: Produce Windows x64 kit
         if: runner.os == 'Windows'
         shell: powershell
-        run: .\scripts\produce-r-integration-kit.ps1 -RRuntimeRoot $env:RCMS_PRODUCER_R_HOME -PythonExe "$PWD\.venv\Scripts\python.exe" -OfficialRArtifact $env:RCMS_OFFICIAL_R_ARTIFACT -OfficialRUrl $env:RCMS_OFFICIAL_R_URL -OfficialRSignatureIdentity $env:RCMS_OFFICIAL_R_SIGNATURE -Rpy2Sdist $env:RCMS_RPY2_SDIST -Rpy2SdistUrl $env:RCMS_RPY2_SDIST_URL -Rpy2RinterfaceSdist $env:RCMS_RPY2_RINTERFACE_SDIST -Rpy2RinterfaceSdistUrl $env:RCMS_RPY2_RINTERFACE_SDIST_URL -Rpy2RobjectsSdist $env:RCMS_RPY2_ROBJECTS_SDIST -Rpy2RobjectsSdistUrl $env:RCMS_RPY2_ROBJECTS_SDIST_URL -Output "$PWD\artifacts\r-integration-kits\${{ inputs.target }}"
+        run: .\scripts\produce-r-integration-kit.ps1 -RRuntimeRoot $env:RCMS_PRODUCER_R_HOME -PythonExe "$PWD\.venv\Scripts\python.exe" -OfficialRArtifact $env:RCMS_OFFICIAL_R_ARTIFACT -OfficialRUrl $env:RCMS_OFFICIAL_R_URL -OfficialRSignatureIdentity $env:RCMS_OFFICIAL_R_SIGNATURE -OfficialRSignerThumbprint $env:RCMS_OFFICIAL_R_SIGNER_THUMBPRINT -OfficialRSignatureStatus $env:RCMS_OFFICIAL_R_SIGNATURE_STATUS -OfficialRTimestamped -Rpy2Sdist $env:RCMS_RPY2_SDIST -Rpy2SdistUrl $env:RCMS_RPY2_SDIST_URL -Rpy2RinterfaceSdist $env:RCMS_RPY2_RINTERFACE_SDIST -Rpy2RinterfaceSdistUrl $env:RCMS_RPY2_RINTERFACE_SDIST_URL -Rpy2RobjectsSdist $env:RCMS_RPY2_ROBJECTS_SDIST -Rpy2RobjectsSdistUrl $env:RCMS_RPY2_ROBJECTS_SDIST_URL -Output "$PWD\artifacts\r-integration-kits\${{ inputs.target }}"
       - name: Produce macOS kit
         if: runner.os == 'macOS'
         shell: bash

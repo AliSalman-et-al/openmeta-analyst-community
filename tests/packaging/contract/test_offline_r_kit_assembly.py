@@ -83,3 +83,26 @@ def test_producer_populates_a_clean_dedicated_uv_cache_from_the_exact_lock():
     assert '--uv-cache "$uv_cache"' in Path(
         "scripts/produce-r-integration-kit-macos.sh"
     ).read_text(encoding="utf-8")
+    for value in (
+        "C5424C40CD70EF85765A55D2FF96BB602B5F30ED536938FF004F14DB5DB3C2DF",
+        "CN=Martyn Plummer, O=Martyn Plummer, S=West Midlands, C=GB",
+        "F356FC6CD245D722F4A82697473DA5995CB42975",
+        "$signature.Status -ne 'Valid'",
+        "-not $signature.TimeStamperCertificate",
+        "status=$($signature.Status)",
+        "subject=$($signature.SignerCertificate.Subject)",
+        "sha256=$hash",
+    ):
+        assert value in workflow
+    windows_producer = Path("scripts/produce-r-integration-kit.ps1").read_text(
+        encoding="utf-8"
+    )
+    for parameter in (
+        "$OfficialRSignerThumbprint",
+        "$OfficialRSignatureStatus",
+        "$OfficialRTimestamped",
+        "--official-r-signer-thumbprint",
+        "--official-r-signature-status",
+        "--official-r-timestamped",
+    ):
+        assert parameter in windows_producer

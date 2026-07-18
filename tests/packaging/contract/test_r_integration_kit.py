@@ -57,8 +57,13 @@ def build_args(tmp_path: Path, kit=None) -> argparse.Namespace:
                 "target": "windows-x64",
                 "official_r": {
                     "url": "https://cloud.r-project.org/bin/windows/base/R-4.6.1-win.exe",
-                    "sha256": sha,
-                    "signature_identity": "R Core Team",
+                    "sha256": "c5424c40cd70ef85765a55d2ff96bb602b5f30ed536938ff004f14db5db3c2df",
+                    "signature_identity": (
+                        "CN=Martyn Plummer, O=Martyn Plummer, S=West Midlands, C=GB"
+                    ),
+                    "signer_thumbprint": "f356fc6cd245d722f4a82697473da5995cb42975",
+                    "signature_status": "Valid",
+                    "timestamped": True,
                     "artifact_type": "installer",
                 },
                 "ppm_packages": [
@@ -481,6 +486,13 @@ def test_provenance_rejects_wrong_locked_artifact_identities(tmp_path):
             {"url": "https://cran.r-project.org/bin/windows/contrib/4.6/metafor.zip"}
         ),
         lambda value: value["source_packages"][0].update({"sha256": "0" * 64}),
+        lambda value: value["official_r"].update({"sha256": "0" * 64}),
+        lambda value: value["official_r"].update(
+            {"signature_identity": "CN=R Core Team"}
+        ),
+        lambda value: value["official_r"].update({"signer_thumbprint": "0" * 40}),
+        lambda value: value["official_r"].update({"signature_status": "UnknownError"}),
+        lambda value: value["official_r"].update({"timestamped": False}),
     )
     for mutate in mutations:
         candidate = json.loads(json.dumps(original))

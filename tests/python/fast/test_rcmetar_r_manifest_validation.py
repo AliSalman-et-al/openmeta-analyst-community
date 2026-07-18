@@ -381,6 +381,23 @@ expect_error(
 )
 if (install_called) stop("missing binary preflight attempted an install")
 
+one_archive <- tempfile(fileext = ".zip")
+file.create(one_archive)
+one_row_no_dimnames <- matrix(c("root", one_archive), nrow = 1L)
+if (!identical(normalize_rcms_downloaded_archives(one_row_no_dimnames, 1L), one_archive)) {{
+  stop("one-row download result without dimnames was not normalized positionally")
+}}
+two_archives <- c(tempfile(fileext = ".zip"), tempfile(fileext = ".zip"))
+file.create(two_archives)
+multi_row <- matrix(c("root", two_archives[[1]], "transitive", two_archives[[2]]), nrow = 2L, byrow = TRUE)
+if (!identical(normalize_rcms_downloaded_archives(multi_row, 2L), two_archives)) {{
+  stop("multi-row download result was not normalized positionally")
+}}
+expect_error(
+  normalize_rcms_downloaded_archives(matrix(c("missing", tempfile()), nrow = 1L), 1L),
+  "PPM retained binary archive is missing"
+)
+
 binary_type <- NULL
 binary_dependencies <- NULL
 installed_packages <- "root"

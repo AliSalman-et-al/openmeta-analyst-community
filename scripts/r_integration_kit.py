@@ -33,6 +33,9 @@ OFFICIAL_R_URLS = {
     "macos-x64": "https://cloud.r-project.org/bin/macosx/big-sur-x86_64/base/R-4.6.1-x86_64.pkg",
     "macos-arm64": "https://cloud.r-project.org/bin/macosx/sonoma-arm64/base/R-4.6.1-arm64.pkg",
 }
+WINDOWS_R_SHA256 = "c5424c40cd70ef85765a55d2ff96bb602b5f30ed536938ff004f14db5db3c2df"
+WINDOWS_R_SIGNER_SUBJECT = "CN=Martyn Plummer, O=Martyn Plummer, S=West Midlands, C=GB"
+WINDOWS_R_SIGNER_THUMBPRINT = "f356fc6cd245d722f4a82697473da5995cb42975"
 PPM_CONTRIB_PATHS = {
     "windows-x64": "bin/windows/contrib/4.6",
     "macos-x64": "bin/macosx/big-sur-x86_64/contrib/4.6",
@@ -187,6 +190,26 @@ def _valid_license_files(value: object, *, declared_license: object) -> bool:
     )
 
 
+def _valid_official_r(record: dict[str, Any], target: str) -> bool:
+    if record.get("url") != OFFICIAL_R_URLS[target]:
+        return False
+    if target == "windows-x64":
+        return (
+            record.get("sha256") == WINDOWS_R_SHA256
+            and record.get("signature_identity") == WINDOWS_R_SIGNER_SUBJECT
+            and str(record.get("signer_thumbprint", "")).casefold()
+            == WINDOWS_R_SIGNER_THUMBPRINT
+            and record.get("signature_status") == "Valid"
+            and record.get("timestamped") is True
+            and record.get("artifact_type") == "installer"
+        )
+    return (
+        _valid_sha256(record.get("sha256"))
+        and "VZLD955F6P" in str(record.get("signature_identity"))
+        and record.get("artifact_type") == "pkg"
+    )
+
+
 def load_provenance(path: Path, target: str, bridge: Path) -> dict[str, Any]:
     provenance = json.loads(path.read_text(encoding="utf-8"))
     official_r = provenance.get("official_r", {})
@@ -197,15 +220,7 @@ def load_provenance(path: Path, target: str, bridge: Path) -> dict[str, Any]:
     if not (
         provenance.get("schema_version") == 1
         and provenance.get("target") == target
-        and official_r.get("url") == OFFICIAL_R_URLS[target]
-        and _valid_sha256(official_r.get("sha256"))
-        and (
-            "R Core Team" in str(official_r.get("signature_identity"))
-            if target == "windows-x64"
-            else "VZLD955F6P" in str(official_r.get("signature_identity"))
-        )
-        and official_r.get("artifact_type")
-        == ("installer" if target == "windows-x64" else "pkg")
+        and _valid_official_r(official_r, target)
         and isinstance(ppm, list)
         and ppm
         and isinstance(source_packages, list)
