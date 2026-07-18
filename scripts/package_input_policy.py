@@ -31,6 +31,7 @@ PACKAGE_INPUT_PATTERNS = (
     "scripts/build-macos-package.sh",
     "scripts/package-macos.sh",
     "scripts/inspect_macos_deployment.py",
+    "scripts/normalize_macos_macho.py",
     "scripts/sign_macos_app.py",
     "scripts/sign-notarize-macos-package.sh",
     "scripts/qt6_macos_feasibility.py",

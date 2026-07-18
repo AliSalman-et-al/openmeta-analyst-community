@@ -504,14 +504,18 @@ def validate_r_framework_inventory(records: object) -> None:
         f"{resources}/bin/Rscript",
         f"{resources}/library/RCMetaR/DESCRIPTION",
         f"{resources}/Info.plist",
-        f"{resources}/lib/libR.dylib",
+        f"{version_root}/R",
     }
     for path in required_files:
         if by_path.get(path, {}).get("kind") != "file":
             raise MacOSDeploymentInspectionError(
                 f"R framework is missing its concrete versioned member: {path}"
             )
-    if "architectures" not in by_path[f"{resources}/lib/libR.dylib"]:
+    r_executable = by_path[f"{version_root}/R"]
+    if (
+        "architectures" not in r_executable
+        or not int(r_executable.get("mode", 0)) & 0o111
+    ):
         raise MacOSDeploymentInspectionError(
             "R framework native executable target is not in the Mach-O inventory"
         )
@@ -524,13 +528,13 @@ def validate_r_framework_inventory(records: object) -> None:
             "Versions/Current/Resources",
             resources,
         ),
-        f"{version_root}/R": (
-            "Resources/lib/libR.dylib",
-            f"{resources}/lib/libR.dylib",
+        f"{resources}/lib/libR.dylib": (
+            "../../R",
+            f"{version_root}/R",
         ),
         f"{framework}/R": (
             "Versions/Current/R",
-            f"{resources}/lib/libR.dylib",
+            f"{version_root}/R",
         ),
     }
     for path, (target, resolved) in expected_links.items():

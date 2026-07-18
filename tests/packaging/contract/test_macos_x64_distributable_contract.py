@@ -60,6 +60,15 @@ def load_macos_signer():
     return module
 
 
+def load_macho_normalizer():
+    path = ROOT / "scripts/normalize_macos_macho.py"
+    spec = importlib.util.spec_from_file_location("normalize_macos_macho", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def zip_info(name: str, mode: int) -> zipfile.ZipInfo:
     info = zipfile.ZipInfo(name)
     info.create_system = 3
@@ -171,7 +180,10 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
     assert 'expected_r_home = app_root / "Contents/Frameworks/R.framework/Resources"' in text(
         "scripts/inspect_macos_deployment.py"
     )
-    assert 'ln -s "Resources/lib/libR.dylib" "$r_version_root/R"' in build
+    assert 'mv "$r_version_root/Resources/lib/libR.dylib" "$r_version_root/R"' in build
+    assert 'chmod +x "$r_version_root/R"' in build
+    assert 'ln -s "../../R" "$r_version_root/Resources/lib/libR.dylib"' in build
+    assert '"$python_exe" - "$r_version_root" > "$macho_manifest"' in build
     assert 'ln -s "$r_framework_version" "$r_framework/Versions/Current"' in build
     assert 'ln -s "Versions/Current/Resources" "$r_framework/Resources"' in build
     assert 'ln -s "Versions/Current/R" "$r_framework/R"' in build
@@ -192,6 +204,8 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
     assert "Unsupported source R framework dependency" in build
     assert "Unsupported source R framework install ID" in build
     assert "grep -F '/Library/Frameworks/R.framework/'" in build
+    assert 'scripts/normalize_macos_macho.py"' in build
+    assert '--manifest "$macho_manifest" --architecture x86_64' in build
     assert "find \"$app_bundle\" -name '_rinterface_cffi_api*'" in build
     assert "forbidden rpy2 API-mode native bridge" in build
     assert '"cffi_mode": os.environ.get("RPY2_CFFI_MODE")' in text(
@@ -279,6 +293,53 @@ done
         "2:",
         "1:",
     ]
+
+
+def test_r_macho_normalizer_thins_universal_and_rejects_unusable_slices(
+    monkeypatch, tmp_path
+):
+    normalizer = load_macho_normalizer()
+    universal = tmp_path / "universal.dylib"
+    thin = tmp_path / "thin.dylib"
+    arm_only = tmp_path / "arm-only.dylib"
+    failed = tmp_path / "failed-thin.dylib"
+    universal.write_text("x86_64 arm64:universal", encoding="utf-8")
+    thin.write_text("x86_64:thin", encoding="utf-8")
+    arm_only.write_text("arm64:arm", encoding="utf-8")
+    failed.write_text("x86_64 arm64:fail", encoding="utf-8")
+    universal.chmod(0o751)
+    original_mode = stat.S_IMODE(universal.stat().st_mode)
+
+    def fake_lipo(arguments):
+        if arguments[0] == "-archs":
+            path = Path(arguments[1])
+            architectures = path.read_text(encoding="utf-8").split(":", 1)[0]
+            return subprocess.CompletedProcess(arguments, 0, architectures + "\n", "")
+        assert arguments[:2] == ["-thin", "x86_64"]
+        source = Path(arguments[2])
+        output = Path(arguments[4])
+        if source == failed:
+            raise normalizer.MachONormalizationError("controlled thinning failure")
+        output.write_text("x86_64:thinned", encoding="utf-8")
+        return subprocess.CompletedProcess(arguments, 0, "", "")
+
+    monkeypatch.setattr(normalizer, "_run_lipo", fake_lipo)
+    manifest = tmp_path / "r-machos.list"
+    manifest.write_bytes(os.fsencode(universal) + b"\0" + os.fsencode(thin) + b"\0")
+
+    assert normalizer.normalize_manifest(manifest) == 2
+    assert universal.read_text(encoding="utf-8") == "x86_64:thinned"
+    assert stat.S_IMODE(universal.stat().st_mode) == original_mode
+    assert thin.read_text(encoding="utf-8") == "x86_64:thin"
+
+    with pytest.raises(normalizer.MachONormalizationError, match="no x86_64 slice"):
+        normalizer.normalize_macho(arm_only)
+    with pytest.raises(
+        normalizer.MachONormalizationError, match="controlled thinning failure"
+    ):
+        normalizer.normalize_macho(failed)
+    assert failed.read_text(encoding="utf-8") == "x86_64 arm64:fail"
+    assert not list(tmp_path.glob(".failed-thin.dylib.thin-*"))
 
 
 def test_macos_inventory_allows_only_the_rpy2_abi_native_bridge():
@@ -473,11 +534,6 @@ def test_explicit_codesign_plan_ignores_dotted_resources_and_covers_native_code(
     app_executable = macos_code_bundle(app, executable_name="RCMetaStudio")
     r_framework = app / "Contents" / "Frameworks" / "R.framework"
     r_executable = macos_code_bundle(r_framework, executable_name="R", framework=True)
-    r_library = (
-        r_framework / "Versions" / "A" / "Resources" / "lib" / "libR.dylib"
-    )
-    r_library.parent.mkdir(parents=True)
-    r_library.write_bytes(thin_macho(0x01000007, 3))
     qt_framework = app / "Contents" / "Frameworks" / "QtCore.framework"
     framework_executable = macos_code_bundle(
         qt_framework, executable_name="QtCore", framework=True
@@ -503,7 +559,6 @@ def test_explicit_codesign_plan_ignores_dotted_resources_and_covers_native_code(
     assert set(plan.native_files) == {
         app_executable,
         r_executable,
-        r_library,
         framework_executable,
     }
     assert set(plan.nested_bundles) == {qt_framework, r_framework}
@@ -647,19 +702,19 @@ def test_archive_inspection_enforces_canonical_r_framework_symlinks_and_members(
         f"{resources}/bin/Rscript": b"rscript",
         f"{resources}/library/RCMetaR/DESCRIPTION": b"package",
         f"{resources}/Info.plist": b"plist",
-        f"{resources}/lib/libR.dylib": b"libR",
+        f"{version_root}/R": b"libR",
     }
     link_targets = {
         f"{framework}/Versions/Current": "4.6",
         f"{framework}/Resources": "Versions/Current/Resources",
-        f"{version_root}/R": "Resources/lib/libR.dylib",
+        f"{resources}/lib/libR.dylib": "../../R",
         f"{framework}/R": "Versions/Current/R",
     }
     resolved_links = {
         f"{framework}/Versions/Current": version_root,
         f"{framework}/Resources": resources,
-        f"{version_root}/R": f"{resources}/lib/libR.dylib",
-        f"{framework}/R": f"{resources}/lib/libR.dylib",
+        f"{resources}/lib/libR.dylib": f"{version_root}/R",
+        f"{framework}/R": f"{version_root}/R",
     }
 
     def make_records(*, missing: str | None = None, wrong_link: str | None = None):
@@ -671,12 +726,16 @@ def test_archive_inspection_enforces_canonical_r_framework_symlinks_and_members(
                 "path": path,
                 "kind": "file",
                 "size": len(payload),
-                "mode": 0o755 if path.endswith(("RCMetaStudio", "Rscript")) else 0o644,
+                "mode": (
+                    0o755
+                    if path.endswith(("RCMetaStudio", "Rscript", "/R"))
+                    else 0o644
+                ),
                 "sha256": hashlib.sha256(payload).hexdigest(),
             }
             if path in {
                 "Contents/MacOS/RCMetaStudio",
-                f"{resources}/lib/libR.dylib",
+                f"{version_root}/R",
             }:
                 record["architectures"] = ["x86_64"]
             records.append(record)
@@ -1210,6 +1269,7 @@ def test_package_classifier_and_gate_cover_all_direct_macos_inputs():
         "docs/verification/test-taxonomy.json", "scripts/delivery.py",
         "scripts/inspect_macos_deployment.py", "scripts/qt6_macos_feasibility.py",
         "scripts/sign_macos_app.py", "scripts/sign-notarize-macos-package.sh",
+        "scripts/normalize_macos_macho.py",
         ".github/workflows/release-candidate.yml",
         "packaging/pyinstaller/rc-metastudio-macos.spec",
     ]

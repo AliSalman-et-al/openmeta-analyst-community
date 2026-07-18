@@ -325,7 +325,9 @@ if [ ! -f "$r_version_root/Resources/lib/libR.dylib" ]; then
   echo "Bundled R framework is missing Resources/lib/libR.dylib." >&2
   exit 1
 fi
-ln -s "Resources/lib/libR.dylib" "$r_version_root/R"
+mv "$r_version_root/Resources/lib/libR.dylib" "$r_version_root/R"
+chmod +x "$r_version_root/R"
+ln -s "../../R" "$r_version_root/Resources/lib/libR.dylib"
 ln -s "Versions/Current/R" "$r_framework/R"
 "$python_exe" - "$r_version_root/Resources/Info.plist" "$r_framework_version" <<'PY'
 from pathlib import Path
@@ -399,7 +401,7 @@ relocate_bundled_r_runtime() {
   # structurally excluding valid JVM ClassFiles from the CAFEBABE fat-Mach-O
   # magic collision, then reuse the NUL-delimited manifest for mutation and
   # verification. Malformed collisions remain candidates and fail in _archs/otool.
-  "$python_exe" - "$r_home" > "$macho_manifest" <<'PY'
+  "$python_exe" - "$r_version_root" > "$macho_manifest" <<'PY'
 import os
 from pathlib import Path
 import stat
@@ -416,6 +418,9 @@ for directory, _, filenames in os.walk(root):
         if is_macho_candidate(path):
             sys.stdout.buffer.write(os.fsencode(path) + b"\0")
 PY
+
+  "$python_exe" "$repo_root/scripts/normalize_macos_macho.py" \
+    --manifest "$macho_manifest" --architecture x86_64
 
   local macho_count=0
   while IFS= read -r -d '' binary; do
@@ -814,7 +819,7 @@ required = [
     f"{resources}/bin/Rscript",
     f"{resources}/library/RCMetaR/DESCRIPTION",
     f"{resources}/Info.plist",
-    f"{resources}/lib/libR.dylib",
+    f"{version_root}/R",
     f"{archive_root_name}/qualification/ad-hoc-signing-inventory.json",
     f"{archive_root_name}/RCMetaStudio.app/Contents/Resources/LaunchRCMetaStudio.command",
     f"{archive_root_name}/qualification/deployment-manifest.json",
@@ -823,7 +828,7 @@ required = [
 expected_links = {
     f"{framework}/Versions/Current": framework_version,
     f"{framework}/Resources": "Versions/Current/Resources",
-    f"{version_root}/R": "Resources/lib/libR.dylib",
+    f"{resources}/lib/libR.dylib": "../../R",
     f"{framework}/R": "Versions/Current/R",
 }
 required.extend(expected_links)

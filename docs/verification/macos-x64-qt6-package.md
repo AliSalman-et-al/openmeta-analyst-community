@@ -19,12 +19,17 @@ The finished app contains the bundled R 4.6 runtime and strict package library.
 Posit Public Package Manager supplies native Intel binaries for the complete
 dependency closure; the pinned HSROC 2.1.9 archive is the sole source-package
 exception. The R launchers and Mach-O install names are relocated before the
-app is used.
+app is used. Before relocation, the complete concrete R framework inventory is
+normalized atomically to thin x86_64: existing Intel-only files are retained,
+universal files are replaced by their Intel slice with modes preserved, and
+arm-only, unknown, failed, or non-thin results stop packaging.
 The complete R runtime is a nested `Contents/Frameworks/R.framework`. Its
 `Versions/<R-version>/Resources` directory is R_HOME, `Versions/Current` and
 the top-level `Resources` use canonical framework links, and the framework's
-`R` executable link resolves to the bundled `Resources/lib/libR.dylib` named by
-its `FMWK` Info.plist. Sample projects and the convenience launcher remain
+versioned `R` executable is the sole regular `libR` Mach-O named by its `FMWK`
+Info.plist. The conventional `Resources/lib/libR.dylib` path links back to that
+executable, while the top-level `R` remains a framework alias. Sample projects
+and the convenience launcher remain
 under the app's `Contents/Resources`; `Contents/MacOS` retains only the actual
 `RCMetaStudio` entry executable. Every R Mach-O remains in the explicit signing
 and deployment inventories, and the complete framework is signed as nested
