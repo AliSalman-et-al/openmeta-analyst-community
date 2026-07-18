@@ -73,6 +73,9 @@ def test_import_and_strict_ty_use_the_identical_closed_qt_module_set(
         assert command[-1] == relative
         assert "spec_from_file_location" in command[4]
         assert "exec_module(module)" in command[4]
+        assert "os.environ['RCMS_STUB_BACKEND'] = '1'" in command[4]
+        assert "install_meta_py_r_backend()" in command[4]
+        assert "initialized the real rpy2 backend" in command[4]
         assert kwargs["env"]["PYTHONWARNINGS"] == "error"
         assert kwargs["timeout"] == 30
         assert kwargs["check"] is False
@@ -138,6 +141,30 @@ def test_import_and_strict_ty_use_the_identical_closed_qt_module_set(
     (package / "qt6_resources.py").write_text(
         "def ensure_application_resources():\n    return None\n", encoding="utf-8"
     )
+    (package / "meta_py_r_backend.py").write_text(
+        "import os\n"
+        "import sys\n"
+        "import types\n"
+        "def install_meta_py_r_backend():\n"
+        "    if os.environ.get('RCMS_STUB_BACKEND') != '1':\n"
+        "        import rpy2\n"
+        "    backend = types.ModuleType('rc_metastudio.meta_py_r')\n"
+        "    backend._oma_stub_backend = True\n"
+        "    sys.modules['rc_metastudio.meta_py_r'] = backend\n"
+        "    sys.modules['meta_py_r'] = backend\n"
+        "    return backend\n",
+        encoding="utf-8",
+    )
+    (scripts / "rpy2.py").write_text(
+        "raise AssertionError('the real analysis backend was initialized')\n",
+        encoding="utf-8",
+    )
+    (scripts / "backend_surface.py").write_text(
+        "from PyQt6 import QtCore\n"
+        "import meta_py_r\n"
+        "assert meta_py_r._oma_stub_backend is True\n",
+        encoding="utf-8",
+    )
     (scripts / "warning_surface.py").write_text(
         "from PyQt6 import QtCore\n"
         "import warnings\n"
@@ -165,10 +192,13 @@ def test_import_and_strict_ty_use_the_identical_closed_qt_module_set(
     }
 
     assert set(real_results) == {
+        "scripts/backend_surface.py",
         "scripts/early_exit_surface.py",
         "scripts/guarded_surface.py",
         "scripts/warning_surface.py",
     }
+    assert real_results["scripts/backend_surface.py"]["returncode"] == 0
+    assert real_results["scripts/backend_surface.py"]["stderr"] == ""
     assert real_results["scripts/warning_surface.py"]["returncode"] != 0
     assert "fixture import warning" in real_results["scripts/warning_surface.py"][
         "stderr"

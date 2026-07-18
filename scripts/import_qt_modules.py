@@ -15,20 +15,21 @@ from rc_metastudio.qt6_cutover import (
 )
 
 
-def _success_marker(relative: str) -> str:
-    return "RCMS_QT_WARNINGS_AUDIT_IMPORTED=" + relative
-
-
-def import_modules(root: Path, build_root: Path) -> list[dict[str, object]]:
-    root = root.resolve()
-    build_root = build_root.resolve()
-    generated = build_root / "generated/rc_metastudio"
-    bootstrap = """
+ISOLATED_IMPORT_BOOTSTRAP = """
 import importlib, importlib.util, os, pathlib, sys
 root, generated, relative = sys.argv[1:4]
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
-os.environ.setdefault('RCMS_STUB_BACKEND', '1')
+os.environ['RCMS_STUB_BACKEND'] = '1'
+os.environ.pop('RCMS_REQUIRE_IN_PROCESS_RPY2', None)
 sys.path[:0] = [root + '/scripts', root + '/src/rc_metastudio', root + '/src']
+import meta_py_r_backend
+backend = meta_py_r_backend.install_meta_py_r_backend()
+if not getattr(backend, '_oma_stub_backend', False):
+    raise RuntimeError('Qt warnings audit did not install the stub analysis backend')
+if sys.modules.get('rc_metastudio.meta_py_r') is not backend:
+    raise RuntimeError('Qt warnings audit did not register the package stub backend')
+if sys.modules.get('meta_py_r') is not backend:
+    raise RuntimeError('Qt warnings audit did not register the legacy stub alias')
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 prepare_generated_ui_imports()
 import rc_metastudio.qt6_resources as resources
@@ -44,8 +45,20 @@ if relative.startswith('scripts/'):
     spec.loader.exec_module(module)
 else:
     importlib.import_module(path.stem)
+if any(name == 'rpy2' or name.startswith('rpy2.') for name in sys.modules):
+    raise RuntimeError('Qt warnings audit initialized the real rpy2 backend')
 print('RCMS_QT_WARNINGS_AUDIT_IMPORTED=' + relative, flush=True)
 """
+
+
+def _success_marker(relative: str) -> str:
+    return "RCMS_QT_WARNINGS_AUDIT_IMPORTED=" + relative
+
+
+def import_modules(root: Path, build_root: Path) -> list[dict[str, object]]:
+    root = root.resolve()
+    build_root = build_root.resolve()
+    generated = build_root / "generated/rc_metastudio"
     results: list[dict[str, object]] = []
     for path in discover_handwritten_qt_files(root):
         relative = path.relative_to(root).as_posix()
@@ -55,7 +68,7 @@ print('RCMS_QT_WARNINGS_AUDIT_IMPORTED=' + relative, flush=True)
                 "-W",
                 "error",
                 "-c",
-                bootstrap,
+                ISOLATED_IMPORT_BOOTSTRAP,
                 str(root),
                 str(generated),
                 relative,
