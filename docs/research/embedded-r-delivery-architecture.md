@@ -1,6 +1,6 @@
 # Embedded R delivery architecture for RC MetaStudio
 
-**Research date:** 2026-07-18  
+**Research date:** 2026-07-18
 **Scope:** PyQt6/PyInstaller desktop application, RCMetaR and its R package
 closure, Windows x64, macOS Intel x64, macOS Apple Silicon, and a future Linux
 target.
@@ -479,4 +479,3 @@ toolchain cost. Escalate to conda only if the product intentionally standardizes
 its entire Python, R and native dependency supply chain on conda-forge; using
 conda only to avoid understanding R.framework would replace one mixed supply
 chain with two.
-

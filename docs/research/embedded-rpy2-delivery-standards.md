@@ -1,7 +1,7 @@
 # Standards for shipping embedded R through rpy2
 
-**Status:** Research recommendation, 18 July 2026  
-**Scope:** RC MetaStudio, Python 3.11, PyQt6, PyInstaller, in-process rpy2, Windows x64, macOS Intel x64, and macOS Apple Silicon arm64  
+**Status:** Research recommendation, 18 July 2026
+**Scope:** RC MetaStudio, Python 3.11, PyQt6, PyInstaller, in-process rpy2, Windows x64, macOS Intel x64, and macOS Apple Silicon arm64
 **Decision constraint:** Keep rpy2 as the Python-to-R integration layer.
 
 ## Executive recommendation
