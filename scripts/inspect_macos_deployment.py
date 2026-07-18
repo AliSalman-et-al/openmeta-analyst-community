@@ -937,6 +937,12 @@ def _valid_sha256_map(value: object) -> bool:
     )
 
 
+def _valid_sha256(value: object) -> bool:
+    return isinstance(value, str) and len(value) == 64 and all(
+        character in "0123456789abcdef" for character in value
+    )
+
+
 def validate_macos_surface_records(scales: object) -> None:
     if not isinstance(scales, list) or not all(isinstance(item, dict) for item in scales):
         raise MacOSDeploymentInspectionError("macOS surface scales are incomplete")
@@ -1038,9 +1044,16 @@ def write_qualification_evidence(
             "result_text", "save_reopen", "analysis_after_reopen",
         ))
         and workflows.get("converted_sample") == "amino.rcms"
-        and workflows.get("summary_sha256") == EXPECTED_SUMMARY_SHA256
+        and workflows.get("expected_normalized_summary_sha256") == EXPECTED_SUMMARY_SHA256
+        and workflows.get("normalized_summary_sha256") == EXPECTED_SUMMARY_SHA256
+        and _valid_sha256(workflows.get("raw_summary_sha256"))
         and _valid_sha256_map(workflows.get("svg_sha256"))
         and [item.get("locale") for item in locale_variants] == ["en_US", "de_DE"]
+        and all(
+            item.get("normalized_summary_sha256") == EXPECTED_SUMMARY_SHA256
+            and item.get("raw_summary_sha256") == workflows.get("raw_summary_sha256")
+            for item in locale_variants
+        )
         and smoke.get("execution", {}).get("clean_exit") is True
         and smoke.get("execution", {}).get("launchservices_completion_marker") is True
         and required_markers <= set(log_text.splitlines())

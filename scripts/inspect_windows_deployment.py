@@ -451,8 +451,9 @@ def write_qualification_evidence(
         "representative_edit",
         "real_r_analysis",
         "result_text",
-        "expected_summary_sha256",
-        "summary_sha256",
+        "expected_normalized_summary_sha256",
+        "raw_summary_sha256",
+        "normalized_summary_sha256",
         "svg_sha256",
         "locale_variants",
         "save_reopen",
@@ -486,8 +487,9 @@ def write_qualification_evidence(
             }
         )
         or workflows.get("converted_sample") != "amino.rcms"
-        or workflows.get("expected_summary_sha256") != EXPECTED_SUMMARY_SHA256
-        or workflows.get("summary_sha256") != EXPECTED_SUMMARY_SHA256
+        or workflows.get("expected_normalized_summary_sha256") != EXPECTED_SUMMARY_SHA256
+        or workflows.get("normalized_summary_sha256") != EXPECTED_SUMMARY_SHA256
+        or not _valid_sha256(workflows.get("raw_summary_sha256"))
         or not _valid_sha256_map(workflows.get("svg_sha256"))
         or not _valid_locale_variants(workflows.get("locale_variants"), workflows)
         or smoke.get("execution") != {
@@ -586,7 +588,9 @@ def _valid_locale_variants(variants: object, workflows: dict) -> bool:
         return False
     return (
         typed_variants[0].get("canonical_value") == typed_variants[1].get("canonical_value")
-        and typed_variants[0].get("summary_sha256") == typed_variants[1].get("summary_sha256") == EXPECTED_SUMMARY_SHA256
+        and typed_variants[0].get("normalized_summary_sha256") == typed_variants[1].get("normalized_summary_sha256") == EXPECTED_SUMMARY_SHA256
+        and typed_variants[0].get("raw_summary_sha256") == typed_variants[1].get("raw_summary_sha256") == workflows.get("raw_summary_sha256")
+        and _valid_sha256(typed_variants[0].get("raw_summary_sha256"))
         and typed_variants[0].get("svg_sha256") == typed_variants[1].get("svg_sha256") == workflows.get("svg_sha256")
         and _valid_sha256_map(typed_variants[0].get("svg_sha256"))
     )
@@ -604,6 +608,12 @@ def _valid_sha256_map(value: object) -> bool:
             and all(character in "0123456789abcdef" for character in digest)
             for label, digest in value.items()
         )
+    )
+
+
+def _valid_sha256(value: object) -> bool:
+    return isinstance(value, str) and len(value) == 64 and all(
+        character in "0123456789abcdef" for character in value
     )
 
 

@@ -23,6 +23,7 @@ from analysis_regression_compare import (
     TEXT_ARTIFACT_DRIFT,
     UNEXPECTED_OUTPUT,
     UNSUPPORTED_WORKFLOW,
+    normalize_heterogeneity_header,
     compare_golden_baseline,
     main,
 )
@@ -145,6 +146,8 @@ def test_cross_platform_text_normalization_is_limited_to_tau_squared_header():
         " 0.378    33.360         0.015  46.0%"
     )
     actual["texts"]["Summary"] = expected["texts"]["Summary"].replace("t²", "τ²")
+    assert normalize_heterogeneity_header(actual["texts"]["Summary"]) == expected["texts"]["Summary"]
+    assert normalize_heterogeneity_header("Narrative τ² meaning") == "Narrative τ² meaning"
 
     text_row = next(
         row for row in compare_golden_baseline(baseline, current)["rows"]

@@ -32,6 +32,7 @@ import app_error_handler
 import settings
 import adaptive_window
 import qt6_resources
+from rc_metastudio.result_text_identity import normalize_heterogeneity_header
 
 SPLASH_DISPLAY_TIME = 0  # Keep startup smoke tests fast; packaged builds may override.
 APPLICATION_ICON_PATH = ":/misc/meta.png"
@@ -911,7 +912,8 @@ def _exercise_packaged_project_workflow(app, meta, sample_path):
                 "locale": locale_name,
                 "input": numeric_text,
                 "canonical_value": numeric_value,
-                "summary_sha256": identity["summary_sha256"],
+                "raw_summary_sha256": identity["raw_summary_sha256"],
+                "normalized_summary_sha256": identity["normalized_summary_sha256"],
                 "svg_sha256": identity["svg_sha256"],
                 "path": destination,
             }
@@ -921,7 +923,7 @@ def _exercise_packaged_project_workflow(app, meta, sample_path):
     comma_project = project_format.load_project(variants[1]["path"]).project
     if dot_project != comma_project:
         raise SystemExit("Dot/comma packaged inputs did not persist canonically.")
-    if variants[0]["summary_sha256"] != variants[1]["summary_sha256"]:
+    if variants[0]["raw_summary_sha256"] != variants[1]["raw_summary_sha256"]:
         raise SystemExit("Dot/comma packaged analyses produced different result text.")
     if variants[0]["svg_sha256"] != variants[1]["svg_sha256"]:
         raise SystemExit("Dot/comma packaged analyses produced different SVG content.")
@@ -936,7 +938,7 @@ def _exercise_packaged_project_workflow(app, meta, sample_path):
     reopened_identity = _packaged_result_identity(
         _assert_standard_binary_summary_is_formatted(meta)
     )
-    if reopened_identity["summary_sha256"] != variants[1]["summary_sha256"]:
+    if reopened_identity["raw_summary_sha256"] != variants[1]["raw_summary_sha256"]:
         raise SystemExit("Reopened packaged analysis changed result text.")
     if reopened_identity["svg_sha256"] != variants[1]["svg_sha256"]:
         raise SystemExit("Reopened packaged analysis changed SVG content.")
@@ -946,8 +948,9 @@ def _exercise_packaged_project_workflow(app, meta, sample_path):
         "representative_edit": True,
         "real_r_analysis": True,
         "result_text": True,
-        "expected_summary_sha256": PACKAGED_SUMMARY_SHA256,
-        "summary_sha256": reopened_identity["summary_sha256"],
+        "expected_normalized_summary_sha256": PACKAGED_SUMMARY_SHA256,
+        "raw_summary_sha256": reopened_identity["raw_summary_sha256"],
+        "normalized_summary_sha256": reopened_identity["normalized_summary_sha256"],
         "svg_sha256": reopened_identity["svg_sha256"],
         "locale_variants": [
             {key: value for key, value in variant.items() if key != "path"}
@@ -960,11 +963,15 @@ def _exercise_packaged_project_workflow(app, meta, sample_path):
 
 def _packaged_result_identity(result):
     summary = result.get("texts", {}).get("Summary", "").replace("\r\n", "\n")
-    summary_sha256 = hashlib.sha256(summary.encode("utf-8")).hexdigest()
-    if summary_sha256 != PACKAGED_SUMMARY_SHA256:
+    raw_summary_sha256 = hashlib.sha256(summary.encode("utf-8")).hexdigest()
+    normalized_summary = normalize_heterogeneity_header(summary)
+    normalized_summary_sha256 = hashlib.sha256(
+        normalized_summary.encode("utf-8")
+    ).hexdigest()
+    if normalized_summary_sha256 != PACKAGED_SUMMARY_SHA256:
         raise SystemExit(
             "Packaged summary identity mismatch: %s != %s"
-            % (summary_sha256, PACKAGED_SUMMARY_SHA256)
+            % (normalized_summary_sha256, PACKAGED_SUMMARY_SHA256)
         )
     display_images = result.get("display_images", {})
     svg_hashes = {}
@@ -978,7 +985,11 @@ def _packaged_result_identity(result):
         svg_hashes[label] = hashlib.sha256(payload).hexdigest()
     if not svg_hashes:
         raise SystemExit("Packaged smoke analysis produced no display SVG.")
-    return {"summary_sha256": summary_sha256, "svg_sha256": svg_hashes}
+    return {
+        "raw_summary_sha256": raw_summary_sha256,
+        "normalized_summary_sha256": normalized_summary_sha256,
+        "svg_sha256": svg_hashes,
+    }
 
 
 def start_shell_smoke(require_native_window=False):

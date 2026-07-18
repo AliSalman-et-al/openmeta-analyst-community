@@ -2,8 +2,9 @@ import argparse
 import json
 import math
 import os
-import re
 import sys
+
+from rc_metastudio.result_text_identity import normalize_heterogeneity_header
 
 
 PASS = "pass"
@@ -396,11 +397,7 @@ def _normalize_text(value, cross_platform=False):
     lines = str(value).replace("\r\n", "\n").replace("\r", "\n").split("\n")
     normalized = "\n".join(line.rstrip() for line in lines).strip()
     if cross_platform:
-        normalized = re.sub(
-            r"(?m)^(\s*)τ²(?=\s+Q(?:\(|\s))",
-            r"\1t²",
-            normalized,
-        )
+        normalized = normalize_heterogeneity_header(normalized)
     return normalized
 
 
