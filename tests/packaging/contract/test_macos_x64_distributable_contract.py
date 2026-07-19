@@ -683,7 +683,7 @@ def test_macos_r_relocator_is_reusable_private_and_idempotent_by_contract():
     assert "/Library/Frameworks/R.framework/R" in relocator
     assert "private R retains an external framework reference" in relocator
     assert "private R retains unresolved dependency" in relocator
-    assert "private R install ID is not its exact basename" in relocator
+    assert "private R install ID is not a safe leaf name" in relocator
 
 
 def test_macos_r_relocator_enforces_private_root_before_mutation_and_is_idempotent(
@@ -851,8 +851,10 @@ esac
     mismatched_id = subprocess.run(
         command, cwd=ROOT, env=environment, text=True, capture_output=True
     )
-    assert mismatched_id.returncode != 0
-    assert "install ID is not its exact basename" in mismatched_id.stderr
+    assert mismatched_id.returncode == 0, mismatched_id.stderr
+    assert (library / "libfoo.dylib.id").read_text(encoding="utf-8").strip() == (
+        "@loader_path/libfoo.dylib"
+    )
     (library / "libfoo.dylib.id").write_text(
         "@loader_path/libfoo.dylib\n", encoding="utf-8"
     )

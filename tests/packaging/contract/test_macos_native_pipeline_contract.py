@@ -90,6 +90,16 @@ def test_rpy2_bridge_is_relocated_before_it_is_imported():
     assert "import _rinterface_cffi_api as m" not in build
 
 
+def test_nested_r_extensions_rebase_broken_loader_relative_runtime_edges():
+    relocator = (ROOT / "scripts/relocate_macos_r_runtime.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'loader_target="$(dirname "$binary")/${dependency#@loader_path/}"' in relocator
+    assert 'target="$resources/lib/${dependency##*/}"' in relocator
+    assert 'install_name_tool -change "$dependency" "$replacement" "$binary"' in relocator
+
+
 def test_arm64_framework_component_is_selected_by_its_real_package_identifier(
     tmp_path: Path,
 ):
