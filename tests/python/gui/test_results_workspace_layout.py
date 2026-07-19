@@ -71,6 +71,74 @@ def test_qtsvg_renders_materialized_default_black_plot_stroke():
     ) >= 75
 
 
+@pytest.mark.parametrize("plot_format", ("svg", "png"))
+def test_results_plot_preview_is_opaque_white_on_dark_theme(
+    qapp, tmp_path, plot_format
+):
+    import results_window
+
+    _use_isolated_settings(tmp_path)
+    plot_path = tmp_path / ("transparent-plot." + plot_format)
+    if plot_format == "svg":
+        plot_path.write_text(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="40" '
+            'viewBox="0 0 100 40"><line x1="10" y1="20" x2="90" y2="20" '
+            'stroke="black"/></svg>',
+            encoding="utf-8",
+        )
+    else:
+        source = QtGui.QImage(100, 40, QtGui.QImage.Format.Format_ARGB32)
+        source.fill(QtCore.Qt.GlobalColor.transparent)
+        painter = QtGui.QPainter(source)
+        painter.setPen(QtGui.QColor(QtCore.Qt.GlobalColor.black))
+        painter.drawLine(10, 20, 90, 20)
+        painter.end()
+        assert source.save(str(plot_path), "PNG")
+
+    window = results_window.ResultsWindow(
+        {
+            "texts": {},
+            "images": {"Plot": str(plot_path)},
+            "plot_capabilities": {
+                "Plot": _plot_capability(
+                    plot_kind="other",
+                    editable=False,
+                    styleable=False,
+                    regenerator="none",
+                )
+            },
+        }
+    )
+    try:
+        plot_item = (
+            window._svg_plot_items[0]
+            if plot_format == "svg"
+            else window._raster_plot_items[0]
+        )
+        preview = QtGui.QImage(100, 40, QtGui.QImage.Format.Format_ARGB32)
+        preview.fill(QtGui.QColor("#2b2b2b"))
+        painter = QtGui.QPainter(preview)
+        if plot_format == "svg":
+            plot_item.renderer().render(painter, QtCore.QRectF(0, 0, 100, 40))
+        else:
+            painter.drawPixmap(QtCore.QRect(0, 0, 100, 40), plot_item.pixmap())
+        painter.end()
+
+        white = QtGui.QColor(QtCore.Qt.GlobalColor.white)
+        white_pixels = sum(
+            preview.pixelColor(x, y) == white
+            for y in range(preview.height())
+            for x in range(preview.width())
+        )
+        assert white_pixels >= 3500, white_pixels
+        assert all(
+            preview.pixelColor(x, y) == white
+            for x, y in ((0, 0), (99, 0), (0, 39), (99, 39))
+        )
+    finally:
+        _dispose(window, qapp)
+
+
 def test_results_workspace_defaults_maximized_and_restores_screen_safe_state(
     qapp, tmp_path
 ):

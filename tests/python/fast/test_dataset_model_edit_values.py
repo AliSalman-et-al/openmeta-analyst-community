@@ -407,6 +407,18 @@ def test_normal_study_cells_do_not_override_view_alternating_row_background():
     ) == QColor(Qt.GlobalColor.yellow)
 
 
+def test_highlighted_outcome_cells_use_dark_text_for_theme_independent_contrast():
+    model = _continuous_model_with_named_study()
+    outcome_index = model.index(0, model.OUTCOMES[0])
+
+    assert model.data(
+        outcome_index, Qt.ItemDataRole.BackgroundRole
+    ) == QColor(Qt.GlobalColor.yellow)
+    assert model.data(
+        outcome_index, Qt.ItemDataRole.ForegroundRole
+    ) == QColor(Qt.GlobalColor.black)
+
+
 def test_one_arm_inactive_raw_data_cells_keep_disabled_background():
     model = _continuous_model_with_named_study()
     model.current_effect = "TX Mean"
