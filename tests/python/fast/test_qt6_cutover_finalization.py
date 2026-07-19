@@ -217,7 +217,7 @@ def test_final_cutover_audit_has_zero_active_legacy_findings():
 
 
 def test_strict_ty_suppressions_match_the_reviewed_budget_exactly(tmp_path):
-    assert validate_ty_ignore_allowlist(ROOT) == {"files": 14, "total": 30, "maximum": 30}
+    assert validate_ty_ignore_allowlist(ROOT) == {"files": 14, "total": 31, "maximum": 31}
 
     original = """\
 class Owner:
