@@ -413,6 +413,8 @@ r_home="$r_framework/Resources"
 r_lib="$r_home/library"
 rscript="$r_home/bin/Rscript"
 r_binary="$r_home/bin/R"
+r_makevars="$work_root/private-r.Makevars"
+printf 'LDFLAGS = -L%s/lib\nLIBR = -L%s/lib -lR\n' "$r_home" "$r_home" > "$r_makevars"
 
 if [ ! -x "$rscript" ] || [ ! -x "$r_binary" ]; then
   echo "Bundled R runtime is missing R or Rscript under $r_home/bin." >&2
@@ -422,7 +424,7 @@ fi
 run_strict_r_dependency_policy() {
   local library="$1"
   mkdir -p "$library"
-  R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" \
+  R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" R_MAKEVARS_USER="$r_makevars" \
     RCMS_CRAN_REPO="$pinned_cran_repo" RCMS_POLICY_PYTHON="$python_exe" \
     RCMS_R_PACKAGE_ARCHIVE_DIR="$ppm_archive_root" RCMS_HSROC_ARCHIVE="$hsroc_archive_path" \
     "$rscript" "$repo_root/scripts/install-r-deps.R"
@@ -447,7 +449,8 @@ install_local_r_packages() {
   [ -n "$built_archive" ] || { echo "RCMetaR source archive was not built." >&2; exit 1; }
   cp "$built_archive" "$rcmetar_archive_path"
 
-  R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$r_binary" CMD INSTALL --library="$r_lib" "$rcmetar_archive_path"
+  R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" R_MAKEVARS_USER="$r_makevars" \
+    "$r_binary" CMD INSTALL --library="$r_lib" "$rcmetar_archive_path"
 }
 
 step "Installing bundled R package dependencies into this private staged runtime"

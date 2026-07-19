@@ -72,6 +72,14 @@ def test_first_green_gate_uses_the_bcg_packaged_workflow():
     assert "RCMS_REQUIRE_IN_PROCESS_RPY2=1" in build
 
 
+def test_source_r_packages_link_against_the_private_staged_runtime():
+    build = (ROOT / "scripts/build-macos-package.sh").read_text(encoding="utf-8")
+
+    assert 'r_makevars="$work_root/private-r.Makevars"' in build
+    assert "LDFLAGS = -L%s/lib\\nLIBR = -L%s/lib -lR\\n" in build
+    assert build.count('R_MAKEVARS_USER="$r_makevars"') == 2
+
+
 def test_arm64_framework_component_is_selected_by_its_real_package_identifier(
     tmp_path: Path,
 ):
