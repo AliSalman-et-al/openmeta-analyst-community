@@ -35,7 +35,10 @@ def install_meta_py_r_backend():
 
         return meta_py_r
     except Exception:
-        if getattr(sys, "frozen", False) or os.environ.get("RCMS_REQUIRE_IN_PROCESS_RPY2") == "1":
+        if (
+            getattr(sys, "frozen", False)
+            or os.environ.get("RCMS_REQUIRE_IN_PROCESS_RPY2") == "1"
+        ):
             raise
         return install_stub_meta_py_r()
 

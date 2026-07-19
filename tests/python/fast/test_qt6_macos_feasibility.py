@@ -26,7 +26,9 @@ def _thin_macho(
     subtype: int,
     magic: bytes = b"\xcf\xfa\xed\xfe",
 ) -> bytes:
-    byte_order = "little" if magic in {b"\xce\xfa\xed\xfe", b"\xcf\xfa\xed\xfe"} else "big"
+    byte_order = (
+        "little" if magic in {b"\xce\xfa\xed\xfe", b"\xcf\xfa\xed\xfe"} else "big"
+    )
     header_size = 32 if magic in {b"\xfe\xed\xfa\xcf", b"\xcf\xfa\xed\xfe"} else 28
     return (
         magic
@@ -42,7 +44,9 @@ def _fat_macho(
     *,
     reserved: int = 0,
 ) -> bytes:
-    byte_order = "little" if magic in {b"\xbe\xba\xfe\xca", b"\xbf\xba\xfe\xca"} else "big"
+    byte_order = (
+        "little" if magic in {b"\xbe\xba\xfe\xca", b"\xbf\xba\xfe\xca"} else "big"
+    )
     entry_size = 32 if magic in {b"\xca\xfe\xba\xbf", b"\xbf\xba\xfe\xca"} else 20
     table_end = 8 + entry_size * len(architectures)
     offset = (table_end + 15) // 16 * 16
@@ -416,9 +420,7 @@ def test_macho_architecture_parser_rejects_subtype_and_fat64_tampering(tmp_path)
         (_thin_macho(0x01000007, 8), "unsupported x86_64 CPU subtype"),
         (_thin_macho(0x01000007, 0x40000003), "unsupported x86_64 CPU subtype"),
         (
-            _fat_macho(
-                [(0x01000007, 3, _thin_macho(0x01000007, 0x80000003))]
-            ),
+            _fat_macho([(0x01000007, 3, _thin_macho(0x01000007, 0x80000003))]),
             "mismatched fat slice CPU identity",
         ),
         (
@@ -444,7 +446,10 @@ def test_macho_architecture_parser_rejects_subtype_and_fat64_tampering(tmp_path)
 @pytest.mark.parametrize(
     ("mutation", "message"),
     [
-        (lambda data: data["runner"].__setitem__("rosetta_translated", True), "Rosetta"),
+        (
+            lambda data: data["runner"].__setitem__("rosetta_translated", True),
+            "Rosetta",
+        ),
         (lambda data: data["runner"].pop("release"), "runner identity"),
         (lambda data: data["runner"].__setitem__("system", "Linux"), "Darwin"),
         (lambda data: data["runner"].__setitem__("release", "unknown"), "malformed"),
@@ -556,16 +561,20 @@ def test_native_macos_workflow_rebuilds_and_proves_locked_rpy2_api_bridge():
     steps = workflow["jobs"]["native-macos-feasibility"]["steps"]
     step_names = [step["name"] for step in steps]
     rebuild = next(
-        step for step in steps if step["name"] == "Rebuild and prove native rpy2 API bridge"
+        step
+        for step in steps
+        if step["name"] == "Rebuild and prove native rpy2 API bridge"
     )
     script = rebuild["run"]
 
-    assert step_names.index("Install native R") < step_names.index(
-        "Sync locked application stack"
-    ) < step_names.index("Rebuild and prove native rpy2 API bridge")
-    assert step_names.index("Rebuild and prove native rpy2 API bridge") < step_names.index(
-        "Run source, R, and packaged native proof"
+    assert (
+        step_names.index("Install native R")
+        < step_names.index("Sync locked application stack")
+        < step_names.index("Rebuild and prove native rpy2 API bridge")
     )
+    assert step_names.index(
+        "Rebuild and prove native rpy2 API bridge"
+    ) < step_names.index("Run source, R, and packaged native proof")
     assert 'export R_HOME="$(R RHOME)"' in script
     assert "export RPY2_CFFI_MODE=API" in script
     assert "uv sync --locked --reinstall-package rpy2-rinterface" in script
@@ -604,7 +613,10 @@ def test_locked_rpy2_runtime_discovers_concrete_native_extensions():
     assert extensions
     assert all(path.is_file() for path in extensions)
     assert all(path.suffix.lower() in {".dylib", ".pyd", ".so"} for path in extensions)
-    assert any("rinterface" in path.name.lower() or "rinterface_lib" in path.as_posix() for path in extensions)
+    assert any(
+        "rinterface" in path.name.lower() or "rinterface_lib" in path.as_posix()
+        for path in extensions
+    )
 
 
 def test_macos_sdk_rcc_discovery_uses_qt6_libexec_layout_and_fails_ambiguous(
@@ -714,7 +726,10 @@ def test_native_macos_evidence_rejects_invented_hashes_and_missing_artifacts(
     missing = _valid_evidence()
     missing_root = tmp_path / "missing"
     _materialize_retained_evidence(missing, missing_root)
-    (missing_root / missing["native_components"]["rcc"]["retained"][0]["retained_path"]).unlink()
+    (
+        missing_root
+        / missing["native_components"]["rcc"]["retained"][0]["retained_path"]
+    ).unlink()
     with pytest.raises(EvidenceError, match="native component rcc"):
         validate_evidence(missing, "macos-arm64", evidence_dir=missing_root)
 
@@ -1002,7 +1017,9 @@ def test_deployment_inventory_rejects_incoherent_qt_payloads_and_aliases(
         mutation(inventory["files"])
         inventory["file_count"] = len(inventory["files"])
         inventory["total_bytes"] = sum(item["size"] for item in inventory["files"])
-        inventory_path.write_text(json.dumps(inventory, sort_keys=True), encoding="utf-8")
+        inventory_path.write_text(
+            json.dumps(inventory, sort_keys=True), encoding="utf-8"
+        )
         record["size"] = inventory_path.stat().st_size
         record["sha256"] = hashlib.sha256(inventory_path.read_bytes()).hexdigest()
 
@@ -1096,7 +1113,9 @@ def test_deployment_inventory_requires_exact_qt_directory_aliases(
         mutation(inventory["files"])
         inventory["file_count"] = len(inventory["files"])
         inventory["total_bytes"] = sum(item["size"] for item in inventory["files"])
-        inventory_path.write_text(json.dumps(inventory, sort_keys=True), encoding="utf-8")
+        inventory_path.write_text(
+            json.dumps(inventory, sort_keys=True), encoding="utf-8"
+        )
         record["size"] = inventory_path.stat().st_size
         record["sha256"] = hashlib.sha256(inventory_path.read_bytes()).hexdigest()
 
@@ -1104,9 +1123,7 @@ def test_deployment_inventory_requires_exact_qt_directory_aliases(
             validate_evidence(evidence, "macos-arm64", evidence_dir=root)
 
 
-def test_deployment_inventory_rejects_displaced_runtime_symlinks(
-    tmp_path, monkeypatch
-):
+def test_deployment_inventory_rejects_displaced_runtime_symlinks(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
     )
@@ -1142,7 +1159,9 @@ def test_deployment_inventory_rejects_displaced_runtime_symlinks(
         )
         inventory["file_count"] = len(inventory["files"])
         inventory["total_bytes"] = sum(item["size"] for item in inventory["files"])
-        inventory_path.write_text(json.dumps(inventory, sort_keys=True), encoding="utf-8")
+        inventory_path.write_text(
+            json.dumps(inventory, sort_keys=True), encoding="utf-8"
+        )
         record["size"] = inventory_path.stat().st_size
         record["sha256"] = hashlib.sha256(inventory_path.read_bytes()).hexdigest()
 
@@ -1184,9 +1203,7 @@ def test_deployment_inventory_allows_unrelated_shiboken_prose_and_data(
     validate_evidence(evidence, "macos-arm64", evidence_dir=tmp_path)
 
 
-def test_deployment_inventory_rejects_noncanonical_record_paths(
-    tmp_path, monkeypatch
-):
+def test_deployment_inventory_rejects_noncanonical_record_paths(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
     )
@@ -1209,7 +1226,9 @@ def test_deployment_inventory_rejects_noncanonical_record_paths(
         inventory_path = root / record["retained_path"]
         inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
         inventory["files"][0]["path"] = forged_path
-        inventory_path.write_text(json.dumps(inventory, sort_keys=True), encoding="utf-8")
+        inventory_path.write_text(
+            json.dumps(inventory, sort_keys=True), encoding="utf-8"
+        )
         record["size"] = inventory_path.stat().st_size
         record["sha256"] = hashlib.sha256(inventory_path.read_bytes()).hexdigest()
 
@@ -1244,7 +1263,9 @@ def test_deployment_inventory_rejects_noncanonical_resolved_paths(
             if item["path"] == "Contents/Frameworks/PyQt6/Qt6/translations"
         )
         alias["resolved_path"] = forged_path
-        inventory_path.write_text(json.dumps(inventory, sort_keys=True), encoding="utf-8")
+        inventory_path.write_text(
+            json.dumps(inventory, sort_keys=True), encoding="utf-8"
+        )
         record["size"] = inventory_path.stat().st_size
         record["sha256"] = hashlib.sha256(inventory_path.read_bytes()).hexdigest()
 
@@ -1386,7 +1407,9 @@ def test_deployment_inventory_resolves_symlink_graph_and_rejects_forgery(
         mutation(inventory["files"])
         inventory["file_count"] = len(inventory["files"])
         inventory["total_bytes"] = sum(item["size"] for item in inventory["files"])
-        inventory_path.write_text(json.dumps(inventory, sort_keys=True), encoding="utf-8")
+        inventory_path.write_text(
+            json.dumps(inventory, sort_keys=True), encoding="utf-8"
+        )
         record["size"] = inventory_path.stat().st_size
         record["sha256"] = hashlib.sha256(inventory_path.read_bytes()).hexdigest()
 

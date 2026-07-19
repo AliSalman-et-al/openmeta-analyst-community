@@ -82,9 +82,10 @@ def test_supporting_models_return_none_and_reject_every_invalid_edit(model_index
     assert model.data(model.index(0, 0), Qt.ItemDataRole.DecorationRole) is None
     for bad_index in bad_indexes:
         assert model.setData(bad_index, "ignored") is False
-    assert model.setData(
-        model.index(0, 0), "ignored", Qt.ItemDataRole.DisplayRole
-    ) is False
+    assert (
+        model.setData(model.index(0, 0), "ignored", Qt.ItemDataRole.DisplayRole)
+        is False
+    )
     assert len(errors) == 5
 
     parent = model.index(0, 0)
@@ -97,9 +98,7 @@ def test_supporting_models_return_none_and_reject_every_invalid_edit(model_index
     for section in (-1, model.rowCount()):
         assert model.headerData(section, Qt.Orientation.Vertical) is None
     assert (
-        model.headerData(
-            0, Qt.Orientation.Horizontal, Qt.ItemDataRole.DecorationRole
-        )
+        model.headerData(0, Qt.Orientation.Horizontal, Qt.ItemDataRole.DecorationRole)
         is None
     )
 

@@ -22,7 +22,9 @@ def _load_script():
 
 
 def test_frozen_sample_semantic_snapshots_cover_every_committed_project():
-    sample_names = sorted(path.name for path in (ROOT / "sample_projects").glob("*.rcms"))
+    sample_names = sorted(
+        path.name for path in (ROOT / "sample_projects").glob("*.rcms")
+    )
 
     snapshots = {
         path.stem: json.loads(path.read_text(encoding="utf-8"))
@@ -51,7 +53,10 @@ def test_qt_port_inventory_classifies_required_surfaces_and_completion_rules():
     assert len(inventory["canonical_forms"]) == 29
     assert "src/rc_metastudio/images/icons.qrc" in inventory["resources"]
     assert "src/rc_metastudio/forms/icons_rc.py" in inventory["generated_modules"]
-    assert "packaging/pyinstaller/rc-metastudio.spec" in inventory["packaging_entry_points"]
+    assert (
+        "packaging/pyinstaller/rc-metastudio.spec"
+        in inventory["packaging_entry_points"]
+    )
     for entry_point in (
         "scripts/sign-windows-package.ps1",
         "scripts/sign-notarize-macos-package.sh",
@@ -229,7 +234,9 @@ def test_forward_validation_does_not_import_pyqt5_or_execute_pickle(monkeypatch)
     assert module.validate_checked_in_baseline(ROOT) == []
 
 
-def test_baseline_retains_actual_golden_outputs_and_rendered_interface_payloads(tmp_path):
+def test_baseline_retains_actual_golden_outputs_and_rendered_interface_payloads(
+    tmp_path,
+):
     manifest = json.loads((BASELINE_DIR / "manifest.json").read_text(encoding="utf-8"))
 
     module = _load_script()
@@ -248,9 +255,12 @@ def test_baseline_retains_actual_golden_outputs_and_rendered_interface_payloads(
 
     tampered_bundle = tmp_path / "local-debug-golden-baseline.zip"
     source_bundle = BASELINE_DIR / "observed-golden-baseline.zip"
-    with zipfile.ZipFile(source_bundle) as source, zipfile.ZipFile(
-        tampered_bundle, "w", compression=zipfile.ZIP_DEFLATED
-    ) as target:
+    with (
+        zipfile.ZipFile(source_bundle) as source,
+        zipfile.ZipFile(
+            tampered_bundle, "w", compression=zipfile.ZIP_DEFLATED
+        ) as target,
+    ):
         for info in source.infolist():
             payload = source.read(info.filename)
             if info.filename == "manifest.json":

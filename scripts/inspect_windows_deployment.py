@@ -207,9 +207,8 @@ def _resolve_pe_closure(records: list[dict]) -> None:
         # Wheels such as NumPy use an adjacent ``*.libs`` directory and add it
         # before importing their extension modules.  Treat only that standard
         # PyInstaller-private layout as a declared loader directory.
-        if (
-            path.parts[:1] == ("_internal",)
-            and path.parent.name.casefold().endswith(".libs")
+        if path.parts[:1] == ("_internal",) and path.parent.name.casefold().endswith(
+            ".libs"
         ):
             declared_private_dirs.add(path.parent)
     for record in records:
@@ -863,7 +862,9 @@ def write_qualification_evidence(
         or "startup-project:normal-entry-point-passed" not in extracted_log_text
         or "packaged-workflow:post-close" not in extracted_log_text
     ):
-        raise DeploymentInspectionError("exact-extracted packaged smoke evidence is incomplete")
+        raise DeploymentInspectionError(
+            "exact-extracted packaged smoke evidence is incomplete"
+        )
     evidence = {
         "schema_version": 1,
         "target": "windows-x64",
@@ -1138,7 +1139,9 @@ def _main() -> int:
     evidence_parser.add_argument("--smoke-log", type=Path, required=True)
     evidence_parser.add_argument("--runtime-probe", type=Path, required=True)
     evidence_parser.add_argument("--archive-inspection", type=Path, required=True)
-    evidence_parser.add_argument("--extracted-deployment-manifest", type=Path, required=True)
+    evidence_parser.add_argument(
+        "--extracted-deployment-manifest", type=Path, required=True
+    )
     evidence_parser.add_argument("--extracted-smoke-evidence", type=Path, required=True)
     evidence_parser.add_argument("--extracted-smoke-log", type=Path, required=True)
     evidence_parser.add_argument("--output", type=Path, required=True)

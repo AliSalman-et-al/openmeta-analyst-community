@@ -9,9 +9,7 @@ from PyQt6 import QtCore, QtGui, QtSvg, QtTest, QtWidgets
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 ROOT = Path(__file__).resolve().parents[3]
-os.environ.setdefault(
-    "RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification")
-)
+os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
 sys.path.insert(0, os.path.abspath("src/rc_metastudio"))
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
@@ -65,10 +63,13 @@ def test_qtsvg_renders_materialized_default_black_plot_stroke():
     renderer.render(painter)
     painter.end()
 
-    assert sum(
-        image.pixelColor(x, 20) != QtGui.QColor(QtCore.Qt.GlobalColor.white)
-        for x in range(100)
-    ) >= 75
+    assert (
+        sum(
+            image.pixelColor(x, 20) != QtGui.QColor(QtCore.Qt.GlobalColor.white)
+            for x in range(100)
+        )
+        >= 75
+    )
 
 
 def test_plot_graphics_items_paint_an_opaque_white_canvas(qapp, tmp_path):
@@ -358,9 +359,7 @@ def test_results_regeneration_burst_runs_one_scheduled_expensive_reflow(
 
     _use_isolated_settings(tmp_path)
     plot_path = tmp_path / "plot.png"
-    image = results_window.QImage(
-        600, 300, results_window.QImage.Format.Format_RGB32
-    )
+    image = results_window.QImage(600, 300, results_window.QImage.Format.Format_RGB32)
     image.fill(results_window.Qt.GlobalColor.white)
     assert image.save(str(plot_path), "PNG")
     window = results_window.ResultsWindow(
@@ -804,7 +803,8 @@ def test_plot_save_path_browser_is_accessible_and_keyboard_operable_for_all_edit
             QtTest.QTest.keyClick(dialog.save_btn, QtCore.Qt.Key.Key_Space)
             qapp.processEvents()
             assert dialog.image_path.text() == str(
-                tmp_path / f"{plot_type}-selected.{'svg' if plot_type == 'forest' else 'png'}"
+                tmp_path
+                / f"{plot_type}-selected.{'svg' if plot_type == 'forest' else 'png'}"
             )
             assert len(applied) == 0
         finally:

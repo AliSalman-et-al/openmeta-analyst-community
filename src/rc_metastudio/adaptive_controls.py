@@ -130,9 +130,13 @@ class ChoiceControlController(QObject):
         combo = self.combo
         # layout-audit: allow=content-overflow-control; reason=required choice content may consume available layout width
         combo.setMaximumWidth(QWIDGETSIZE_MAX)
-        combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        combo.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+        )
         combo.setMinimumContentsLength(max(1, int(self.visible_characters)))
-        combo.setSizePolicy(QSizePolicy.Policy.Expanding, combo.sizePolicy().verticalPolicy())
+        combo.setSizePolicy(
+            QSizePolicy.Policy.Expanding, combo.sizePolicy().verticalPolicy()
+        )
 
         view = combo.view()
         view.setAccessibleName(combo.accessibleName() or "Available choices")
@@ -184,9 +188,15 @@ class ChoiceControlController(QObject):
             default=0,
         )
         chrome = (
-            combo.style().pixelMetric(QStyle.PixelMetric.PM_ScrollBarExtent, None, combo)
-            + combo.style().pixelMetric(QStyle.PixelMetric.PM_LayoutLeftMargin, None, combo)
-            + combo.style().pixelMetric(QStyle.PixelMetric.PM_LayoutRightMargin, None, combo)
+            combo.style().pixelMetric(
+                QStyle.PixelMetric.PM_ScrollBarExtent, None, combo
+            )
+            + combo.style().pixelMetric(
+                QStyle.PixelMetric.PM_LayoutLeftMargin, None, combo
+            )
+            + combo.style().pixelMetric(
+                QStyle.PixelMetric.PM_LayoutRightMargin, None, combo
+            )
         )
         display_width = combo.width() if combo.isVisible() else combo.sizeHint().width()
         return max(display_width, text_width + chrome)
@@ -198,7 +208,9 @@ class ChoiceControlController(QObject):
         column = self.combo.modelColumn()
         for row in range(self.combo.count()):
             index = model.index(row, column, root)
-            model.setData(index, str(self.combo.itemText(row)), Qt.ItemDataRole.ToolTipRole)
+            model.setData(
+                index, str(self.combo.itemText(row)), Qt.ItemDataRole.ToolTipRole
+            )
 
     def _selected_text_changed(self, text):
         self.combo.setToolTip(str(text))
@@ -221,9 +233,7 @@ class ChoiceControlController(QObject):
         if self._screen is not None:
             for name in ("availableGeometryChanged", "logicalDotsPerInchChanged"):
                 try:
-                    getattr(self._screen, name).disconnect(
-                        self._screen_metrics_changed
-                    )
+                    getattr(self._screen, name).disconnect(self._screen_metrics_changed)
                 except (AttributeError, TypeError, RuntimeError):
                     pass
         self._screen = screen
@@ -333,16 +343,16 @@ class ChoiceControlController(QObject):
             )
             # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
             popup.move(
-                popup.pos()
-                + QPoint(corrected_left, corrected_top)
-                - realized.topLeft()
+                popup.pos() + QPoint(corrected_left, corrected_top) - realized.topLeft()
             )
         overflow = max(0, view.sizeHintForColumn(0) - view.viewport().width())
         view.horizontalScrollBar().setRange(0, overflow)
         view.horizontalScrollBar().setPageStep(max(1, view.viewport().width()))
 
 
-def configure_choice_control(combo, visible_characters=VALUE_SELECTOR_VISIBLE_CHARACTERS):
+def configure_choice_control(
+    combo, visible_characters=VALUE_SELECTOR_VISIBLE_CHARACTERS
+):
     """Apply and return one reusable screen-bounded choice-control controller."""
     if not isinstance(combo, AdaptiveComboBox):
         raise TypeError(
@@ -389,11 +399,15 @@ def configure_numeric_value_control(control):
     """Use the editor's value range as its Semantic Size Invariant."""
     # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
     control.setMaximumWidth(QWIDGETSIZE_MAX)
-    control.setSizePolicy(QSizePolicy.Policy.Minimum, control.sizePolicy().verticalPolicy())
+    control.setSizePolicy(
+        QSizePolicy.Policy.Minimum, control.sizePolicy().verticalPolicy()
+    )
 
 
 def configure_text_value_control(control):
     """Allow editable Required Content to consume the available row width."""
     # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
     control.setMaximumWidth(QWIDGETSIZE_MAX)
-    control.setSizePolicy(QSizePolicy.Policy.Expanding, control.sizePolicy().verticalPolicy())
+    control.setSizePolicy(
+        QSizePolicy.Policy.Expanding, control.sizePolicy().verticalPolicy()
+    )

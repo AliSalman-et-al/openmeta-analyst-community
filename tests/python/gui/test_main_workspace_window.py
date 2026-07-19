@@ -31,7 +31,10 @@ def test_main_is_a_managed_workspace_with_expanding_table_and_layouted_navigatio
         state = adaptive_window.adaptive_window_state(window)
         assert state.policy.archetype is adaptive_window.WindowArchetype.WORKSPACE
         assert state.role is adaptive_window.WindowRole.MAIN
-        assert window.layout().sizeConstraint() == QtWidgets.QLayout.SizeConstraint.SetNoConstraint
+        assert (
+            window.layout().sizeConstraint()
+            == QtWidgets.QLayout.SizeConstraint.SetNoConstraint
+        )
         assert (
             window.tableView.sizePolicy().horizontalPolicy()
             == QtWidgets.QSizePolicy.Policy.Expanding
@@ -240,7 +243,9 @@ def test_returning_normal_workspace_is_not_remaximized_on_first_show(qapp, tmp_p
     import settings
 
     QtCore.QSettings.setPath(
-        QtCore.QSettings.Format.IniFormat, QtCore.QSettings.Scope.UserScope, str(tmp_path)
+        QtCore.QSettings.Format.IniFormat,
+        QtCore.QSettings.Scope.UserScope,
+        str(tmp_path),
     )
     QtCore.QSettings.setDefaultFormat(QtCore.QSettings.Format.IniFormat)
     store = QtCore.QSettings()
@@ -272,7 +277,7 @@ def test_returning_normal_workspace_is_not_remaximized_on_first_show(qapp, tmp_p
     reason="Native fractional-scale evidence is collected on qwindows and cocoa.",
 )
 def test_workspace_table_uses_valid_logical_geometry_at_fractional_scale_factors():
-    script = r'''
+    script = r"""
 import json
 from rc_metastudio import launch
 app, window = launch.start_automation()
@@ -303,7 +308,7 @@ finally:
     window.current_data_unsaved = False
     window.close()
     app.processEvents()
-'''
+"""
     expected_platform = "windows" if sys.platform == "win32" else "cocoa"
     evidence_by_factor = {}
     for factor in ("1", "1.25", "1.5", "1.75"):

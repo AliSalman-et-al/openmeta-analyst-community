@@ -27,7 +27,9 @@ TARGETS = {
 
 def rendered_targets():
     values = json.loads(CONTRACT.read_text(encoding="utf-8"))["arm_labels"]
-    if len(values) != 2 or not all(isinstance(value, str) and value for value in values):
+    if len(values) != 2 or not all(
+        isinstance(value, str) and value for value in values
+    ):
         raise ValueError("arm_labels must contain two non-empty strings")
     substitutions = {"intervention": values[0], "control": values[1]}
     return {

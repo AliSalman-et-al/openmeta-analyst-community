@@ -115,7 +115,9 @@ def _validate_raw(family: str, values: list[object], location: str) -> None:
             f"{location}: raw-data arity for {family} must be {arity}"
         )
     if any(isinstance(value, str) and value != "" for value in values):
-        raise ProjectSemanticError(f"{location}: missing raw data must use an empty string")
+        raise ProjectSemanticError(
+            f"{location}: missing raw data must use an empty string"
+        )
     numbers = [None if value == "" else _finite(value, location) for value in values]
     present = [value for value in numbers if value is not None]
     if family in {"binary", "diagnostic"}:
@@ -147,13 +149,17 @@ def _validate_effect(effect: dict[str, object], location: str) -> None:
     for key, value in effect.items():
         number = _finite(value, f"{location}/{key}")
         if key in {"SE", "display_se"} and number < 0:
-            raise ProjectSemanticError(f"{location}/{key}: standard error cannot be negative")
+            raise ProjectSemanticError(
+                f"{location}/{key}: standard error cannot be negative"
+            )
     for prefix in ("", "display_"):
         lower = _finite(effect[f"{prefix}lower"], location)
         estimate = _finite(effect[f"{prefix}est"], location)
         upper = _finite(effect[f"{prefix}upper"], location)
         if not lower <= estimate <= upper:
-            raise ProjectSemanticError(f"{location}: interval does not contain estimate")
+            raise ProjectSemanticError(
+                f"{location}: interval does not contain estimate"
+            )
 
 
 def validate_project_semantics(
@@ -168,7 +174,9 @@ def validate_project_semantics(
     if isinstance(summary, dict):
         summary_value = cast(dict[str, object], summary)
         if summary_value["data_type"] != family:
-            raise ProjectSemanticError("project summary data type conflicts with family")
+            raise ProjectSemanticError(
+                "project summary data type conflicts with family"
+            )
         if summary_value["sub_type"] not in _FAMILY_SUBTYPES[family]:
             raise ProjectSemanticError("project summary subtype conflicts with family")
         effect = summary_value["effect"]
@@ -197,7 +205,9 @@ def validate_project_semantics(
             )
         follow_ups = cast(list[str], outcome["follow_ups"])
         if len(follow_ups) != len(set(follow_ups)):
-            raise ProjectSemanticError(f"outcome {name!r}: duplicate follow-up identifier")
+            raise ProjectSemanticError(
+                f"outcome {name!r}: duplicate follow-up identifier"
+            )
 
     covariates = [
         _object(value, f"covariate {index}")
@@ -227,9 +237,7 @@ def validate_project_semantics(
         study_id = study["id"]
         sample_size = study["sample_size"]
         if sample_size is not None:
-            numeric_sample_size = _finite(
-                sample_size, f"study {study_id} sample_size"
-            )
+            numeric_sample_size = _finite(sample_size, f"study {study_id} sample_size")
             if numeric_sample_size <= 0 or numeric_sample_size % 1 != 0:
                 raise ProjectSemanticError(
                     f"study {study_id} sample_size: expected a positive integer"
@@ -336,7 +344,9 @@ def validate_project_semantics(
                         raise ProjectSemanticError(
                             f"study {study_id} unit {unit_index}: undeclared group comparison"
                         )
-                    _validate_effect(_object(effect, "effect"), f"{metric}/{comparison}")
+                    _validate_effect(
+                        _object(effect, "effect"), f"{metric}/{comparison}"
+                    )
 
     active_outcome = cast(str | None, state["active_outcome"])
     active_follow_up = cast(str | None, state["active_follow_up"])
@@ -344,7 +354,9 @@ def validate_project_semantics(
     active_effect = cast(str | None, state["active_effect"])
     if active_outcome is None:
         if active_follow_up is not None or active_groups or active_effect is not None:
-            raise ProjectSemanticError("active outcome is required for other active state")
+            raise ProjectSemanticError(
+                "active outcome is required for other active state"
+            )
         return
     if active_outcome not in outcome_by_name:
         raise ProjectSemanticError("active outcome is not declared")
@@ -366,9 +378,18 @@ def reconstruct_analysis_dataset(
     return AnalysisDataset(
         analysis_family=cast(str, dataset["analysis_family"]),
         title=cast(str, dataset["title"]),
-        outcomes=tuple(cast(JsonObject, copy.deepcopy(v)) for v in cast(list[object], dataset["outcomes"])),
-        covariates=tuple(cast(JsonObject, copy.deepcopy(v)) for v in cast(list[object], dataset["covariates"])),
-        studies=tuple(cast(JsonObject, copy.deepcopy(v)) for v in cast(list[object], dataset["studies"])),
+        outcomes=tuple(
+            cast(JsonObject, copy.deepcopy(v))
+            for v in cast(list[object], dataset["outcomes"])
+        ),
+        covariates=tuple(
+            cast(JsonObject, copy.deepcopy(v))
+            for v in cast(list[object], dataset["covariates"])
+        ),
+        studies=tuple(
+            cast(JsonObject, copy.deepcopy(v))
+            for v in cast(list[object], dataset["studies"])
+        ),
         is_diagnostic=cast(bool, dataset["is_diagnostic"]),
         notes=cast(str, dataset["notes"]),
         summary=cast(JsonValue, copy.deepcopy(dataset["summary"])),

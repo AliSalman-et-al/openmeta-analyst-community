@@ -74,7 +74,11 @@ def import_modules(root: Path, build_root: Path) -> list[dict[str, object]]:
                 relative,
             ],
             cwd=root,
-            env={**os.environ, "PYTHONWARNINGS": "error", "RCMS_QT6_BUILD_ROOT": str(build_root)},
+            env={
+                **os.environ,
+                "PYTHONWARNINGS": "error",
+                "RCMS_QT6_BUILD_ROOT": str(build_root),
+            },
             capture_output=True,
             text=True,
             timeout=30,
@@ -82,7 +86,10 @@ def import_modules(root: Path, build_root: Path) -> list[dict[str, object]]:
         )
         returncode = completed.returncode
         stderr = completed.stderr.strip()
-        if returncode == 0 and _success_marker(relative) not in completed.stdout.splitlines():
+        if (
+            returncode == 0
+            and _success_marker(relative) not in completed.stdout.splitlines()
+        ):
             returncode = 1
             stderr = (
                 stderr + "\n" if stderr else ""
@@ -102,8 +109,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--build-root", type=Path)
     parser.add_argument("--report", type=Path)
-    parser.add_argument("--list", action="store_true", help="print all Qt-bearing type-check inputs")
-    parser.add_argument("--list-imports", action="store_true", help="print importable application modules")
+    parser.add_argument(
+        "--list", action="store_true", help="print all Qt-bearing type-check inputs"
+    )
+    parser.add_argument(
+        "--list-imports",
+        action="store_true",
+        help="print importable application modules",
+    )
     args = parser.parse_args(argv)
     if args.list:
         for path in discover_handwritten_qt_files(args.root):
@@ -117,7 +130,10 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--build-root and --report are required unless --list is used")
     results = import_modules(args.root, args.build_root)
     args.report.parent.mkdir(parents=True, exist_ok=True)
-    args.report.write_text(json.dumps({"schema_version": 1, "modules": results}, indent=2) + "\n", encoding="utf-8")
+    args.report.write_text(
+        json.dumps({"schema_version": 1, "modules": results}, indent=2) + "\n",
+        encoding="utf-8",
+    )
     failures = [result for result in results if result["returncode"] != 0]
     if failures:
         for failure in failures:

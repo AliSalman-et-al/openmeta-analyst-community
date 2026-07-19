@@ -45,7 +45,9 @@ SPLASH_DISPLAY_TIME = 0  # Keep startup smoke tests fast; packaged builds may ov
 APPLICATION_ICON_PATH = ":/misc/meta.png"
 AUTOMATION_SMOKE_LOG_ENV = "RCMS_AUTOMATION_SMOKE_LOG"
 ADAPTIVE_LAYOUT_EVIDENCE_LOG_ENV = "RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG"
-PACKAGED_SUMMARY_SHA256 = "78294820c83cd94c19dfdca8c24b6a96cdc8b6f1319a5cd1bedffacde73851e2"
+PACKAGED_SUMMARY_SHA256 = (
+    "78294820c83cd94c19dfdca8c24b6a96cdc8b6f1319a5cd1bedffacde73851e2"
+)
 NATIVE_FILE_DIALOG_OBSERVE_DELAY_MS = 250
 NATIVE_FILE_DIALOG_TIMEOUT_MS = 10_000
 CRITICAL_DIALOG_OBSERVE_DELAY_MS = 100
@@ -62,10 +64,7 @@ def screen_bounded_splash_pixmap(source, available_logical_size):
     device_pixel_ratio = max(1.0, pixmap.devicePixelRatioF())
     logical_width = pixmap.width() / device_pixel_ratio
     logical_height = pixmap.height() / device_pixel_ratio
-    if (
-        logical_width <= available.width()
-        and logical_height <= available.height()
-    ):
+    if logical_width <= available.width() and logical_height <= available.height():
         return pixmap
 
     scale = min(
@@ -277,10 +276,7 @@ def start():
         return start_automation_smoke(sample_path)
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-shell-smoke":
         return start_shell_smoke()
-    if (
-        len(startup_argv) > 1
-        and startup_argv[1] == "--automation-native-shell-smoke"
-    ):
+    if len(startup_argv) > 1 and startup_argv[1] == "--automation-native-shell-smoke":
         return start_shell_smoke(require_native_window=True)
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-shell-failure-smoke":
         if len(startup_argv) != 3:
@@ -297,7 +293,10 @@ def start():
         return _run_automation_smoke(
             lambda: start_automation_smoke(sample_path, require_native_window=True)
         )
-    if len(startup_argv) > 1 and startup_argv[1] == "--automation-package-surface-smoke":
+    if (
+        len(startup_argv) > 1
+        and startup_argv[1] == "--automation-package-surface-smoke"
+    ):
         if len(startup_argv) != 4:
             raise SystemExit(
                 "--automation-package-surface-smoke requires an evidence path and scale."
@@ -306,10 +305,17 @@ def start():
         return _run_automation_smoke(
             lambda: start_package_surface_smoke(startup_argv[2], startup_argv[3])
         )
-    if len(startup_argv) > 1 and startup_argv[1] == "--automation-package-runtime-probe":
+    if (
+        len(startup_argv) > 1
+        and startup_argv[1] == "--automation-package-runtime-probe"
+    ):
         if len(startup_argv) != 3:
-            raise SystemExit("--automation-package-runtime-probe requires an output path.")
-        return _run_automation_smoke(lambda: start_package_runtime_probe(startup_argv[2]))
+            raise SystemExit(
+                "--automation-package-runtime-probe requires an output path."
+            )
+        return _run_automation_smoke(
+            lambda: start_package_runtime_probe(startup_argv[2])
+        )
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-wizard-layout-smoke":
         return _run_automation_smoke(start_wizard_layout_smoke)
     if (
@@ -562,7 +568,9 @@ def start_automation_smoke(sample_path, require_native_window=False):
             if app is not None:
                 _write_automation_smoke_log("packaged-workflow:teardown:app-quit:start")
                 app.quit()
-                _write_automation_smoke_log("packaged-workflow:teardown:app-quit:return")
+                _write_automation_smoke_log(
+                    "packaged-workflow:teardown:app-quit:return"
+                )
         finally:
             _stop_automation_hang_trace(hang_trace)
     _write_automation_smoke_log("packaged-workflow:post-close")
@@ -677,9 +685,7 @@ def _native_accessibility_observation(widget):
         for index in range(count):
             message.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_ulong]
             message.restype = ctypes.c_void_p
-            value = message(
-                ctypes.c_void_p(array), selector("objectAtIndex:"), index
-            )
+            value = message(ctypes.c_void_p(array), selector("objectAtIndex:"), index)
             if value:
                 values.append(int(value))
         return values
@@ -709,9 +715,7 @@ def _native_accessibility_observation(widget):
             "role": text_message(receiver, "accessibilityRole"),
             "title": text_message(receiver, "accessibilityTitle"),
             "description": text_message(receiver, "accessibilityLabel"),
-            "is_ignored": optional_bool_message(
-                receiver, "accessibilityIsIgnored"
-            ),
+            "is_ignored": optional_bool_message(receiver, "accessibilityIsIgnored"),
         }
 
     native_view = int(widget.winId())
@@ -946,9 +950,7 @@ def _finish_package_surface_cleanup(app, native_window, checkpoint):
     close_accepted = native_window.close()
     checkpoint("cleanup:native-window-close:return")
     checkpoint("cleanup:deferred-delete:start")
-    QtCore.QCoreApplication.sendPostedEvents(
-        None, QtCore.QEvent.Type.DeferredDelete
-    )
+    QtCore.QCoreApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
     checkpoint("cleanup:deferred-delete:complete")
     app.quit()
     checkpoint("cleanup:application-quit")
@@ -960,6 +962,7 @@ def _finish_package_surface_cleanup(app, native_window, checkpoint):
 
 def start_package_surface_smoke(evidence_path, expected_scale):
     """Exercise native package-only Qt surfaces at a requested scale factor."""
+
     def checkpoint(stage):
         _record_package_surface_progress(evidence_path, expected_scale, stage)
 
@@ -973,6 +976,7 @@ def start_package_surface_smoke(evidence_path, expected_scale):
     qt6_resources.ensure_application_resources()
     checkpoint("resources:ready")
     from PyQt6 import QtNetwork
+
     checkpoint("network-module:ready")
     platform_name = app.platformName().lower()
     if sys.platform == "win32" and platform_name != "windows":
@@ -993,19 +997,29 @@ def start_package_surface_smoke(evidence_path, expected_scale):
     if not valid or value != 1.25:
         raise SystemExit("Package surface smoke locale parsing failed.")
 
-    if QIcon(":/icons/actions/copy.svg").isNull() or QPixmap(":/misc/meta.png").isNull():
+    if (
+        QIcon(":/icons/actions/copy.svg").isNull()
+        or QPixmap(":/misc/meta.png").isNull()
+    ):
         raise SystemExit("Package surface smoke could not load binary resources.")
     tls_backends = list(QtNetwork.QSslSocket.availableBackends())
-    if sys.platform == "win32" and "schannel" not in [backend.lower() for backend in tls_backends]:
+    if sys.platform == "win32" and "schannel" not in [
+        backend.lower() for backend in tls_backends
+    ]:
         raise SystemExit("Package surface smoke did not load the Schannel TLS backend.")
     if sys.platform == "darwin" and not tls_backends:
         raise SystemExit("Package surface smoke did not load a TLS backend.")
     available_styles = list(QtWidgets.QStyleFactory.keys())
     if not available_styles or app.style() is None:
         raise SystemExit("Package surface smoke found no Qt style plugin/style.")
-    image_formats = sorted(value.data().decode("ascii").lower() for value in QtGui.QImageReader.supportedImageFormats())
+    image_formats = sorted(
+        value.data().decode("ascii").lower()
+        for value in QtGui.QImageReader.supportedImageFormats()
+    )
     if not {"ico", "jpeg", "svg"} <= set(image_formats):
-        raise SystemExit("Package surface smoke did not load required image/SVG plugins.")
+        raise SystemExit(
+            "Package surface smoke did not load required image/SVG plugins."
+        )
     checkpoint("runtime-surfaces:ready")
 
     native_window = QtWidgets.QMainWindow()
@@ -1013,10 +1027,14 @@ def start_package_surface_smoke(evidence_path, expected_scale):
     menu_bar = cast(QtWidgets.QMenuBar, native_window.menuBar())
     menu = cast(QtWidgets.QMenu, menu_bar.addMenu("Package smoke"))
     menu.addAction("Verified action")
-    accessible_control = QtWidgets.QPushButton("Accessible package control", native_window)
+    accessible_control = QtWidgets.QPushButton(
+        "Accessible package control", native_window
+    )
     accessible_control.setObjectName("packagedAccessibilityControl")
     accessible_control.setAccessibleName("Packaged accessibility control")
-    accessible_control.setAccessibleDescription("Verifies packaged Qt accessibility metadata.")
+    accessible_control.setAccessibleDescription(
+        "Verifies packaged Qt accessibility metadata."
+    )
     accessible_control.setAttribute(QtCore.Qt.WidgetAttribute.WA_NativeWindow, True)
     next_control = QtWidgets.QLineEdit(native_window)
     next_control.setObjectName("packagedKeyboardTraversalTarget")
@@ -1041,7 +1059,9 @@ def start_package_surface_smoke(evidence_path, expected_scale):
         or native_menu["action_count"] < 1
         or (sys.platform == "darwin" and native_menu["is_native"] is not True)
     ):
-        raise SystemExit("Package surface smoke could not exercise the native menu bar.")
+        raise SystemExit(
+            "Package surface smoke could not exercise the native menu bar."
+        )
     accessible_control.setFocus()
     app.processEvents()
     focus_before = app.focusWidget()
@@ -1060,7 +1080,8 @@ def start_package_surface_smoke(evidence_path, expected_scale):
     try:
         native_accessibility = (
             _native_accessibility_observation(accessible_control)
-            if sys.platform == "darwin" else {}
+            if sys.platform == "darwin"
+            else {}
         )
     except Exception as error:
         native_accessibility = {
@@ -1094,8 +1115,7 @@ def start_package_surface_smoke(evidence_path, expected_scale):
             sys.platform == "darwin"
             and (
                 accessibility["focus_before"] != "packagedAccessibilityControl"
-                or accessibility["focus_after_tab"]
-                != "packagedKeyboardTraversalTarget"
+                or accessibility["focus_after_tab"] != "packagedKeyboardTraversalTarget"
                 or accessibility["native"].get("role") != "AXButton"
                 or accessibility["native"].get("title")
                 != "Packaged accessibility control"
@@ -1118,7 +1138,9 @@ def start_package_surface_smoke(evidence_path, expected_scale):
             "accessibility",
             accessibility,
         )
-        raise SystemExit("Package surface smoke could not exercise accessibility metadata.")
+        raise SystemExit(
+            "Package surface smoke could not exercise accessibility metadata."
+        )
 
     try:
         native_file_dialog = _native_file_dialog_observation(
@@ -1157,7 +1179,9 @@ def start_package_surface_smoke(evidence_path, expected_scale):
             "native-file-dialog",
             native_file_dialog,
         )
-        raise SystemExit("Package surface smoke could not exercise the native file dialog.")
+        raise SystemExit(
+            "Package surface smoke could not exercise the native file dialog."
+        )
 
     try:
         critical_dialog = _critical_dialog_observation(native_window, checkpoint)
@@ -1208,7 +1232,11 @@ def start_package_surface_smoke(evidence_path, expected_scale):
 
     checkpoint("display-metrics:observe:start")
     primary = app.primaryScreen()
-    if primary is None or primary.devicePixelRatio() <= 0 or primary.logicalDotsPerInch() <= 0:
+    if (
+        primary is None
+        or primary.devicePixelRatio() <= 0
+        or primary.logicalDotsPerInch() <= 0
+    ):
         raise SystemExit("Package surface smoke found invalid display metrics.")
 
     requested_scale = float(expected_scale)
@@ -1218,7 +1246,9 @@ def start_package_surface_smoke(evidence_path, expected_scale):
     expected_dpr = baseline_dpr * requested_scale
     tolerance = 0.05
     if abs(environment_scale - requested_scale) > 1e-9:
-        raise SystemExit("Package surface smoke scale environment differs from request.")
+        raise SystemExit(
+            "Package surface smoke scale environment differs from request."
+        )
     if baseline_dpr <= 0 or abs(observed_dpr - expected_dpr) > tolerance:
         raise SystemExit(
             "Package surface smoke observed DPR %.4f, expected %.4f ± %.4f."
@@ -1234,7 +1264,9 @@ def start_package_surface_smoke(evidence_path, expected_scale):
             "cleanup",
             cleanup,
         )
-        raise SystemExit("Package surface smoke could not cleanly close its native window.")
+        raise SystemExit(
+            "Package surface smoke could not cleanly close its native window."
+        )
 
     checkpoint("evidence:write:start")
     path = Path(evidence_path)
@@ -1264,7 +1296,9 @@ def start_package_surface_smoke(evidence_path, expected_scale):
             "cleanup": cleanup,
         }
     )
-    path.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     _write_automation_smoke_log("packaged-surface:scale-%s-passed" % expected_scale)
     return 0
 
@@ -1277,27 +1311,41 @@ def _verified_frozen_runtime_shared_library(configured, api_bridge_path):
     if direct_spike:
         frameworks = executable_root.parent / "Frameworks"
         if not api_bridge_path.is_relative_to(frameworks.resolve()):
-            raise RuntimeError("Direct-spike rpy2 API bridge is outside the app framework tree.")
+            raise RuntimeError(
+                "Direct-spike rpy2 API bridge is outside the app framework tree."
+            )
         shared_r_path = (Path(configured["R_HOME"]) / "lib" / "libR.dylib").resolve()
         if not shared_r_path.is_relative_to(frameworks.resolve()):
             raise RuntimeError("Direct-spike libR is outside the app framework tree.")
     elif derivation:
         final_identity = derivation.get("final", {})
         api_record = final_identity.get("api_bridge", {})
-        expected_api_bridge = (executable_root / str(api_record.get("path", ""))).resolve()
-        if (
-            api_bridge_path != expected_api_bridge
-            or hashlib.sha256(api_bridge_path.read_bytes()).hexdigest() != api_record.get("sha256")
-        ):
-            raise RuntimeError("Loaded rpy2 API bridge differs from the authenticated kit derivation.")
+        expected_api_bridge = (
+            executable_root / str(api_record.get("path", ""))
+        ).resolve()
+        if api_bridge_path != expected_api_bridge or hashlib.sha256(
+            api_bridge_path.read_bytes()
+        ).hexdigest() != api_record.get("sha256"):
+            raise RuntimeError(
+                "Loaded rpy2 API bridge differs from the authenticated kit derivation."
+            )
         r_shared_record = final_identity.get("r_shared_library", {})
-        shared_r_path = (executable_root / str(r_shared_record.get("path", ""))).resolve()
+        shared_r_path = (
+            executable_root / str(r_shared_record.get("path", ""))
+        ).resolve()
     else:
         if not api_bridge_path.is_relative_to(executable_root):
-            raise RuntimeError("Loaded rpy2 API bridge is outside the frozen application bundle.")
+            raise RuntimeError(
+                "Loaded rpy2 API bridge is outside the frozen application bundle."
+            )
         shared_r_path = (Path(configured["R_HOME"]) / "bin" / "x64" / "R.dll").resolve()
-        if not shared_r_path.is_relative_to(executable_root) or not shared_r_path.is_file():
-            raise RuntimeError("Frozen application is missing its private R shared library.")
+        if (
+            not shared_r_path.is_relative_to(executable_root)
+            or not shared_r_path.is_file()
+        ):
+            raise RuntimeError(
+                "Frozen application is missing its private R shared library."
+            )
     return shared_r_path, direct_spike
 
 
@@ -1325,9 +1373,13 @@ def start_package_runtime_probe(output_path):
     primary = app.primaryScreen()
     if primary is None:
         raise SystemExit("Frozen runtime probe found no primary screen.")
-    r_home_values = cast(Any, robjects.r("normalizePath(R.home(), winslash='/', mustWork=TRUE)"))
+    r_home_values = cast(
+        Any, robjects.r("normalizePath(R.home(), winslash='/', mustWork=TRUE)")
+    )
     r_version_values = cast(Any, robjects.r("as.character(getRversion())"))
-    r_library_values = cast(Any, robjects.r("normalizePath(.libPaths(), winslash='/', mustWork=TRUE)"))
+    r_library_values = cast(
+        Any, robjects.r("normalizePath(.libPaths(), winslash='/', mustWork=TRUE)")
+    )
     r_home = str(r_home_values[0])
     r_version = str(r_version_values[0])
     r_library_paths = [str(value) for value in r_library_values]
@@ -1337,23 +1389,41 @@ def start_package_runtime_probe(output_path):
     )
     macos_r_policy = None
     if sys.platform == "darwin":
-        tcltk_available = bool(cast(Any, robjects.r("requireNamespace('tcltk', quietly=TRUE)"))[0])
+        tcltk_available = bool(
+            cast(Any, robjects.r("requireNamespace('tcltk', quietly=TRUE)"))[0]
+        )
         tcltk_loaded = bool(cast(Any, robjects.r("'tcltk' %in% loadedNamespaces()"))[0])
         aqua = bool(cast(Any, robjects.r("capabilities('aqua')"))[0])
         bitmap_type = str(cast(Any, robjects.r("getOption('bitmapType')"))[0])
-        png_path = str(cast(Any, robjects.r(
-            "output <- tempfile(fileext='.png'); grDevices::png(output); "
-            "graphics::plot(1, 1); grDevices::dev.off(); output"
-        ))[0])
+        png_path = str(
+            cast(
+                Any,
+                robjects.r(
+                    "output <- tempfile(fileext='.png'); grDevices::png(output); "
+                    "graphics::plot(1, 1); grDevices::dev.off(); output"
+                ),
+            )[0]
+        )
         png = Path(png_path)
-        if tcltk_available or tcltk_loaded or not aqua or bitmap_type != "quartz" or not png.is_file():
-            raise SystemExit("Packaged macOS R runtime violates the non-X11 Quartz policy.")
+        if (
+            tcltk_available
+            or tcltk_loaded
+            or not aqua
+            or bitmap_type != "quartz"
+            or not png.is_file()
+        ):
+            raise SystemExit(
+                "Packaged macOS R runtime violates the non-X11 Quartz policy."
+            )
         macos_r_policy = {
             "tcltk_available": tcltk_available,
             "tcltk_loaded": tcltk_loaded,
             "aqua": aqua,
             "bitmap_type": bitmap_type,
-            "default_png": {"size": png.stat().st_size, "sha256": hashlib.sha256(png.read_bytes()).hexdigest()},
+            "default_png": {
+                "size": png.stat().st_size,
+                "sha256": hashlib.sha256(png.read_bytes()).hexdigest(),
+            },
         }
         if macos_r_policy["default_png"]["size"] <= 0:
             raise SystemExit("Packaged macOS default Quartz png probe failed.")
@@ -1373,7 +1443,9 @@ def start_package_runtime_probe(output_path):
             "runtime_qt_version": QtCore.qVersion(),
             "sip_runtime_version": sip.SIP_VERSION_STR,
             "platform_plugin": app.platformName().lower(),
-            "plugins_path": QtCore.QLibraryInfo.path(QtCore.QLibraryInfo.LibraryPath.PluginsPath),
+            "plugins_path": QtCore.QLibraryInfo.path(
+                QtCore.QLibraryInfo.LibraryPath.PluginsPath
+            ),
             "library_paths": list(app.libraryPaths()),
             "scale_factor_environment": os.environ.get("QT_SCALE_FACTOR"),
             "baseline_device_pixel_ratio": float(primary.devicePixelRatio()),
@@ -1381,13 +1453,19 @@ def start_package_runtime_probe(output_path):
         },
         "rpy2": {
             "distribution_version": importlib.metadata.version("rpy2"),
-            "rinterface_distribution_version": importlib.metadata.version("rpy2-rinterface"),
-            "robjects_distribution_version": importlib.metadata.version("rpy2-robjects"),
+            "rinterface_distribution_version": importlib.metadata.version(
+                "rpy2-rinterface"
+            ),
+            "robjects_distribution_version": importlib.metadata.version(
+                "rpy2-robjects"
+            ),
             "cffi_mode": os.environ.get("RPY2_CFFI_MODE"),
             "loaded_cffi_mode": openrlib.cffi_mode.name,
             "api_bridge_loaded": openrlib.cffi_mode.name == "API",
             "api_bridge_path": str(api_bridge_path),
-            "api_bridge_sha256": hashlib.sha256(api_bridge_path.read_bytes()).hexdigest(),
+            "api_bridge_sha256": hashlib.sha256(
+                api_bridge_path.read_bytes()
+            ).hexdigest(),
         },
         "project_schemas": {
             "version": 1,
@@ -1401,7 +1479,9 @@ def start_package_runtime_probe(output_path):
             "configured_library": configured.get("R_LIBS"),
             "macos_product_profile": macos_r_policy,
             "shared_library_path": str(shared_r_path),
-            "shared_library_sha256": hashlib.sha256(shared_r_path.read_bytes()).hexdigest(),
+            "shared_library_sha256": hashlib.sha256(
+                shared_r_path.read_bytes()
+            ).hexdigest(),
             "direct_spike": direct_spike,
             "lc_numeric": os.environ.get("LC_NUMERIC"),
         },
@@ -1441,23 +1521,33 @@ def _exercise_packaged_project_workflow(app, meta, sample_path):
         locale = QtCore.QLocale(locale_name)
         parsed_value, parsed = locale.toDouble(numeric_text)
         if not parsed or parsed_value != numeric_value:
-            raise SystemExit("Packaged smoke could not parse the %s locale boundary." % locale_name)
+            raise SystemExit(
+                "Packaged smoke could not parse the %s locale boundary." % locale_name
+            )
         if locale_name == "de_DE":
             if not meta.open(os.path.abspath(sample_path), raise_on_error=True):
-                raise SystemExit("Packaged smoke could not reset the locale comparison project.")
+                raise SystemExit(
+                    "Packaged smoke could not reset the locale comparison project."
+                )
             model = meta.tableView.model()
             study_index = model.index(0, model.NAME)
             raw_index = model.index(0, model.RAW_DATA[0])
             if not model.setData(study_index, edited_name):
-                raise SystemExit("Packaged smoke could not repeat the representative edit.")
+                raise SystemExit(
+                    "Packaged smoke could not repeat the representative edit."
+                )
         if not model.setData(raw_index, numeric_text):
             raise SystemExit("Packaged smoke rejected %s numeric input." % locale_name)
         result = _assert_standard_binary_summary_is_formatted(meta)
         identity = _packaged_result_identity(result)
-        _write_automation_smoke_log("packaged-workflow:analysis-%s-complete" % locale_name)
+        _write_automation_smoke_log(
+            "packaged-workflow:analysis-%s-complete" % locale_name
+        )
         meta.out_path = str(destination)
         if meta.save() is not True or not destination.is_file():
-            raise SystemExit("Packaged smoke could not save the %s project." % locale_name)
+            raise SystemExit(
+                "Packaged smoke could not save the %s project." % locale_name
+            )
         variants.append(
             {
                 "locale": locale_name,
@@ -1532,7 +1622,9 @@ def _packaged_result_identity(result):
             continue
         payload = path.read_bytes() if path.is_file() else b""
         if b"<svg" not in payload[:4096].lower():
-            raise SystemExit("Packaged smoke analysis produced an invalid SVG: %s" % path)
+            raise SystemExit(
+                "Packaged smoke analysis produced an invalid SVG: %s" % path
+            )
         svg_hashes[label] = hashlib.sha256(payload).hexdigest()
     if not svg_hashes:
         raise SystemExit("Packaged smoke analysis produced no display SVG.")
@@ -1679,9 +1771,7 @@ def start_wizard_layout_smoke():
 
     try:
         for scenario_name, wizard, actions in scenarios:
-            stable_geometry = _show_wizard_for_layout_smoke(
-                app, wizard, scenario_name
-            )
+            stable_geometry = _show_wizard_for_layout_smoke(app, wizard, scenario_name)
             for action, expected_page_id, value in actions:
                 _advance_wizard_layout_smoke_page(
                     app, wizard, action, expected_page_id, value
@@ -1753,14 +1843,12 @@ def _assert_wizard_layout_smoke_page(
         is not adaptive_window.WindowArchetype.WORKFLOW
     ):
         raise SystemExit(
-            "Wizard layout smoke expected Workflow Window policy: %s"
-            % scenario_name
+            "Wizard layout smoke expected Workflow Window policy: %s" % scenario_name
         )
     overflow = page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
     if overflow is None or not overflow.widgetResizable():
         raise SystemExit(
-            "Wizard layout smoke expected a page Overflow Boundary: %s"
-            % scenario_name
+            "Wizard layout smoke expected a page Overflow Boundary: %s" % scenario_name
         )
     for button_role in (
         QtWidgets.QWizard.WizardButton.BackButton,
@@ -1777,8 +1865,7 @@ def _assert_wizard_layout_smoke_page(
         and _window_frame_tuple(wizard) != expected_geometry
     ):
         raise SystemExit(
-            "Visible Workflow Window geometry changed between pages: %s"
-            % scenario_name
+            "Visible Workflow Window geometry changed between pages: %s" % scenario_name
         )
     if page.sizeHint().width() <= 0 or page.sizeHint().height() <= 0:
         raise SystemExit(

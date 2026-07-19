@@ -67,17 +67,20 @@ class MigrationResult:
     refusals: tuple[Diagnostic, ...]
 
     def to_json(self) -> str:
-        return json.dumps(
-            {
-                "schema_version": 1,
-                "file": self.file,
-                "changed": bool(self.transformations),
-                "transformations": [asdict(item) for item in self.transformations],
-                "refusals": [asdict(item) for item in self.refusals],
-            },
-            indent=2,
-            sort_keys=True,
-        ) + "\n"
+        return (
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "file": self.file,
+                    "changed": bool(self.transformations),
+                    "transformations": [asdict(item) for item in self.transformations],
+                    "refusals": [asdict(item) for item in self.refusals],
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n"
+        )
 
 
 class MigrationRefused(RuntimeError):
@@ -137,7 +140,9 @@ def _require_string_map(value: Any, field: str) -> dict[str, str]:
     if not isinstance(value, dict) or not all(
         isinstance(key, str) and isinstance(item, str) for key, item in value.items()
     ):
-        raise ValueError(f"mapping manifest {field!r} must be a string-to-string object")
+        raise ValueError(
+            f"mapping manifest {field!r} must be a string-to-string object"
+        )
     return dict(value)
 
 
@@ -152,7 +157,9 @@ def _is_compatibility_path(name: str) -> bool:
 
 
 def _is_qt_symbol(name: str) -> bool:
-    return name.startswith(tuple(f"{binding}." for binding in _BINDINGS)) and not _is_compatibility_path(name)
+    return name.startswith(
+        tuple(f"{binding}." for binding in _BINDINGS)
+    ) and not _is_compatibility_path(name)
 
 
 def load_mapping_manifest(path: Path = DEFAULT_MANIFEST) -> MappingManifest:
@@ -173,7 +180,9 @@ def load_mapping_manifest(path: Path = DEFAULT_MANIFEST) -> MappingManifest:
         raise ValueError("mapping manifest has missing or unknown top-level fields")
     binding = payload["binding"]
     if binding != {"from": "PyQt5", "to": "PyQt6"}:
-        raise ValueError("mapping manifest must describe the PyQt5-to-PyQt6 hard cutover")
+        raise ValueError(
+            "mapping manifest must describe the PyQt5-to-PyQt6 hard cutover"
+        )
     if payload["schema_version"] != 1:
         raise ValueError("unsupported mapping manifest schema version")
     return MappingManifest(
@@ -182,12 +191,16 @@ def load_mapping_manifest(path: Path = DEFAULT_MANIFEST) -> MappingManifest:
         binding_to=binding["to"],
         moved_classes=_require_string_map(payload["moved_classes"], "moved_classes"),
         removed_apis=_require_string_map(payload["removed_apis"], "removed_apis"),
-        method_rewrites=_require_string_map(payload["method_rewrites"], "method_rewrites"),
+        method_rewrites=_require_string_map(
+            payload["method_rewrites"], "method_rewrites"
+        ),
         scoped_enums=_require_string_map(payload["scoped_enums"], "scoped_enums"),
         class_scoped_enums=_require_string_map(
             payload["class_scoped_enums"], "class_scoped_enums"
         ),
-        ambiguous_enums=_require_string_map(payload["ambiguous_enums"], "ambiguous_enums"),
+        ambiguous_enums=_require_string_map(
+            payload["ambiguous_enums"], "ambiguous_enums"
+        ),
     )
 
 
@@ -237,7 +250,9 @@ class _ImportBindings(cst.CSTVisitor):
             if imported in _BINDINGS or any(
                 imported.startswith(f"{binding}.") for binding in _BINDINGS
             ):
-                bound = imported if alias.asname is not None else imported.split(".", 1)[0]
+                bound = (
+                    imported if alias.asname is not None else imported.split(".", 1)[0]
+                )
                 self.module_aliases[_local_import_name(alias)] = bound
 
 
@@ -282,7 +297,9 @@ class _RefusalVisitor(cst.CSTVisitor):
     def _add(self, node: cst.CSTNode, symbol: str, action: str) -> None:
         position = self.get_metadata(metadata.PositionProvider, node).start
         self.refusals.append(
-            Diagnostic(self.filename, position.line, position.column + 1, symbol, action)
+            Diagnostic(
+                self.filename, position.line, position.column + 1, symbol, action
+            )
         )
 
     def visit_ImportFrom(self, node: cst.ImportFrom) -> None:
@@ -305,9 +322,7 @@ class _RefusalVisitor(cst.CSTVisitor):
             return
         destinations = {
             (
-                self.manifest.moved_classes.get(
-                    f"{module}.{_dotted_name(alias.name)}"
-                )
+                self.manifest.moved_classes.get(f"{module}.{_dotted_name(alias.name)}")
                 or f"{_replace_root(module, self.manifest)}.{_dotted_name(alias.name)}"
             ).rpartition(".")[0]
             for alias in node.names
@@ -318,9 +333,8 @@ class _RefusalVisitor(cst.CSTVisitor):
             or module.startswith(f"{self.manifest.binding_from}.")
         ):
             rendered = cst.Module([]).code_for_node(node)
-            canonical = (
-                f"from {module} import "
-                + ", ".join(_alias_text(alias) for alias in node.names)
+            canonical = f"from {module} import " + ", ".join(
+                _alias_text(alias) for alias in node.names
             )
             if rendered != canonical:
                 self._add(
@@ -418,7 +432,11 @@ def _replace_root(module: str, manifest: MappingManifest) -> str:
     if module == manifest.binding_from:
         return manifest.binding_to
     prefix = f"{manifest.binding_from}."
-    return f"{manifest.binding_to}.{module[len(prefix):]}" if module.startswith(prefix) else module
+    return (
+        f"{manifest.binding_to}.{module[len(prefix) :]}"
+        if module.startswith(prefix)
+        else module
+    )
 
 
 def _normalize_qt5(symbol: str, manifest: MappingManifest) -> str:
@@ -426,7 +444,7 @@ def _normalize_qt5(symbol: str, manifest: MappingManifest) -> str:
         return manifest.binding_from
     prefix = f"{manifest.binding_to}."
     if symbol.startswith(prefix):
-        return f"{manifest.binding_from}.{symbol[len(prefix):]}"
+        return f"{manifest.binding_from}.{symbol[len(prefix) :]}"
     return symbol
 
 
@@ -438,9 +456,7 @@ def _removed_action(symbol: str, manifest: MappingManifest) -> str | None:
     return manifest.removed_apis.get(_normalize_qt5(symbol, manifest))
 
 
-def _class_enum_replacement(
-    symbol: str, manifest: MappingManifest
-) -> str | None:
+def _class_enum_replacement(symbol: str, manifest: MappingManifest) -> str | None:
     return manifest.class_scoped_enums.get(_normalize_qt5(symbol, manifest))
 
 
@@ -453,9 +469,7 @@ def _alias_text(alias: cst.ImportAlias) -> str:
     return imported
 
 
-def _qt_receiver_symbol(
-    node: cst.BaseExpression, bindings: _ImportBindings
-) -> str:
+def _qt_receiver_symbol(node: cst.BaseExpression, bindings: _ImportBindings) -> str:
     if isinstance(node, cst.Call):
         return _qualified_expression(node.func, bindings)
     return _qualified_expression(node, bindings)
@@ -472,7 +486,9 @@ def _build_instance_bindings(
 ) -> _InstanceBindings:
     tree = ast.parse(source)
     assignments: dict[str, list[str]] = {}
-    aliases = bindings.module_aliases if isinstance(bindings, _ImportBindings) else bindings
+    aliases = (
+        bindings.module_aliases if isinstance(bindings, _ImportBindings) else bindings
+    )
 
     def record(name: str, value: ast.AST | None) -> None:
         kind = "ambiguous"
@@ -516,14 +532,19 @@ def _dynamic_import_sites(source: str) -> tuple[_DynamicImportSite, ...]:
         if isinstance(node, ast.Import):
             for imported in node.names:
                 local = imported.asname or imported.name.split(".", 1)[0]
-                aliases[local] = imported.name if imported.asname else imported.name.split(".", 1)[0]
+                aliases[local] = (
+                    imported.name if imported.asname else imported.name.split(".", 1)[0]
+                )
         elif isinstance(node, ast.ImportFrom) and node.module:
             for imported in node.names:
-                aliases[imported.asname or imported.name] = f"{node.module}.{imported.name}"
+                aliases[imported.asname or imported.name] = (
+                    f"{node.module}.{imported.name}"
+                )
     intrinsic_names = {
         local
         for local, target in aliases.items()
-        if target in {
+        if target
+        in {
             "importlib",
             "builtins",
             "importlib.import_module",
@@ -682,7 +703,9 @@ class _Qt6Transformer(cst.CSTTransformer):
     ) -> cst.Import:
         changed = False
         names: list[cst.ImportAlias] = []
-        for original_alias, updated_alias in zip(original_node.names, updated_node.names):
+        for original_alias, updated_alias in zip(
+            original_node.names, updated_node.names
+        ):
             module = _dotted_name(original_alias.name)
             replacement = _replace_root(module, self.manifest)
             if replacement != module:
@@ -736,9 +759,7 @@ class _Qt6Transformer(cst.CSTTransformer):
             records.append((alias, kind, source, replacement))
 
         for alias, kind, source, replacement in records:
-            self._record(
-                alias, kind=kind, symbol=source, replacement=replacement
-            )
+            self._record(alias, kind=kind, symbol=source, replacement=replacement)
 
         if len(groups) == 1:
             destination, aliases = next(iter(groups.items()))
@@ -889,7 +910,11 @@ def migrate_source(
             filename,
             source,
             (),
-            (Diagnostic(filename, exc.raw_line, exc.raw_column, "invalid Python", str(exc)),),
+            (
+                Diagnostic(
+                    filename, exc.raw_line, exc.raw_column, "invalid Python", str(exc)
+                ),
+            ),
         )
         raise MigrationRefused(result) from exc
 
@@ -995,10 +1020,15 @@ def _scan_python(
             for alias in node.names:
                 local = alias.asname or alias.name
                 module_aliases[local] = f"{node.module}.{alias.name}"
-                if node.module in {"PyQt5.QtCore", "PyQt6.QtCore"} and alias.name == "Qt":
+                if (
+                    node.module in {"PyQt5.QtCore", "PyQt6.QtCore"}
+                    and alias.name == "Qt"
+                ):
                     qt_aliases.add(local)
                 qualified = f"{node.module}.{alias.name}"
-                if not _is_compatibility_path(node.module) and _is_compatibility_path(qualified):
+                if not _is_compatibility_path(node.module) and _is_compatibility_path(
+                    qualified
+                ):
                     add(
                         node,
                         "binding-facade",
@@ -1017,7 +1047,12 @@ def _scan_python(
                         f"import the class from {moved_target}",
                     )
                 if node.module in {"PyQt5.uic", "PyQt6.uic"} and alias.name == "loadUi":
-                    add(node, "runtime-form-loading", qualified, "generate canonical forms at build time")
+                    add(
+                        node,
+                        "runtime-form-loading",
+                        qualified,
+                        "generate canonical forms at build time",
+                    )
 
     instances = _build_instance_bindings(text, module_aliases)
     scopes = {target.split(".", 1)[0] for target in manifest.scoped_enums.values()}
@@ -1033,7 +1068,12 @@ def _scan_python(
                 "PyQt6.QtCore.Qt",
             }
             if is_qt and node.attr not in scopes:
-                add(node, "short-enum", f"{owner}.{node.attr}", "use an explicit Qt6 enum scope")
+                add(
+                    node,
+                    "short-enum",
+                    f"{owner}.{node.attr}",
+                    "use an explicit Qt6 enum scope",
+                )
             qualified = f"{resolved}.{node.attr}" if resolved else node.attr
             if _class_enum_replacement(qualified, manifest) is not None:
                 add(
@@ -1053,13 +1093,10 @@ def _scan_python(
                     qualified,
                     f"reference the class from {moved_target}",
                 )
-            if (
-                node.attr in manifest.method_rewrites
-                and (
-                    _is_qt_symbol(resolved)
-                    or owner in instances.qt
-                    or owner not in instances.non_qt
-                )
+            if node.attr in manifest.method_rewrites and (
+                _is_qt_symbol(resolved)
+                or owner in instances.qt
+                or owner not in instances.non_qt
             ):
                 if owner in instances.non_qt:
                     continue
@@ -1075,10 +1112,20 @@ def _scan_python(
                     action,
                 )
             if node.attr == "loadUi" and resolved in {"PyQt5.uic", "PyQt6.uic"}:
-                add(node, "runtime-form-loading", f"{owner}.loadUi", "generate canonical forms at build time")
+                add(
+                    node,
+                    "runtime-form-loading",
+                    f"{owner}.loadUi",
+                    "generate canonical forms at build time",
+                )
         elif isinstance(node, ast.Name) and node.id in _RESOURCE_NAMES:
             if isinstance(getattr(node, "ctx", None), ast.Store):
-                add(node, "generated-python-resource", node.id, "compile and register a binary .rcc resource")
+                add(
+                    node,
+                    "generated-python-resource",
+                    node.id,
+                    "compile and register a binary .rcc resource",
+                )
 
     for token in tokenize.generate_tokens(io.StringIO(text).readline):
         if token.type != tokenize.COMMENT:
@@ -1119,7 +1166,9 @@ def scan_paths(
 
     manifest = manifest or load_mapping_manifest()
     findings: list[StrictFinding] = []
-    for path in sorted((Path(item) for item in paths), key=lambda item: item.as_posix()):
+    for path in sorted(
+        (Path(item) for item in paths), key=lambda item: item.as_posix()
+    ):
         relative = path.resolve().relative_to(root.resolve()).as_posix()
         text = path.read_text(encoding="utf-8", errors="strict")
         if path.suffix == ".py":
@@ -1137,7 +1186,9 @@ def scan_paths(
                             "remove the active PyQt5 dependency declaration",
                         )
                     )
-                if re.search(r"\b(?:qtpy|PySide2|PySide6|Qt5Compat)\b", line, re.IGNORECASE):
+                if re.search(
+                    r"\b(?:qtpy|PySide2|PySide6|Qt5Compat)\b", line, re.IGNORECASE
+                ):
                     findings.append(
                         StrictFinding(
                             relative,
@@ -1170,7 +1221,9 @@ def _detect_encoding(payload: bytes) -> str:
     try:
         encoding, _lines = tokenize.detect_encoding(io.BytesIO(payload).readline)
     except SyntaxError as exc:
-        raise MigrationTransactionError(f"cannot detect Python source encoding: {exc}") from exc
+        raise MigrationTransactionError(
+            f"cannot detect Python source encoding: {exc}"
+        ) from exc
     return encoding
 
 
@@ -1181,24 +1234,34 @@ def prepare_file_migration(
 
     path = path.resolve(strict=False) if not path.is_symlink() else path.absolute()
     if path.is_symlink():
-        raise MigrationTransactionError(f"refusing symbolic link migration target: {path}")
+        raise MigrationTransactionError(
+            f"refusing symbolic link migration target: {path}"
+        )
     if not path.is_file():
-        raise MigrationTransactionError(f"migration target is not a regular file: {path}")
+        raise MigrationTransactionError(
+            f"migration target is not a regular file: {path}"
+        )
     before = _identity(path)
     source_bytes = path.read_bytes()
     after = _identity(path)
     if before != after or len(source_bytes) != after[2]:
-        raise MigrationTransactionError(f"migration target changed while planning: {path}")
+        raise MigrationTransactionError(
+            f"migration target changed while planning: {path}"
+        )
     encoding = _detect_encoding(source_bytes)
     try:
         source = source_bytes.decode(encoding)
     except UnicodeError as exc:
-        raise MigrationTransactionError(f"cannot decode {path} as {encoding}: {exc}") from exc
+        raise MigrationTransactionError(
+            f"cannot decode {path} as {encoding}: {exc}"
+        ) from exc
     result = migrate_source(source, filename=path.as_posix(), manifest=manifest)
     try:
         target_bytes = result.code.encode(encoding)
     except UnicodeError as exc:
-        raise MigrationTransactionError(f"cannot encode migrated {path} as {encoding}: {exc}") from exc
+        raise MigrationTransactionError(
+            f"cannot encode migrated {path} as {encoding}: {exc}"
+        ) from exc
     return FileMigration(
         path=path,
         source_bytes=source_bytes,
@@ -1215,7 +1278,10 @@ def _verify_plan_source(plan: FileMigration) -> None:
         raise MigrationTransactionError(
             f"migration target changed after planning: {plan.path}"
         )
-    if _identity(plan.path) != plan.source_identity or plan.path.read_bytes() != plan.source_bytes:
+    if (
+        _identity(plan.path) != plan.source_identity
+        or plan.path.read_bytes() != plan.source_bytes
+    ):
         raise MigrationTransactionError(
             f"migration target changed after planning: {plan.path}"
         )
@@ -1264,11 +1330,13 @@ def write_atomic_text(path: Path, content: str) -> None:
         if original is not None:
             backup = _temporary_payload(path, "backup", original, mode)
         if path.is_symlink() or path.exists() != existed:
-            raise MigrationTransactionError(f"report target changed before replace: {path}")
-        if existed and (
-            _identity(path) != identity or path.read_bytes() != original
-        ):
-            raise MigrationTransactionError(f"report target changed before replace: {path}")
+            raise MigrationTransactionError(
+                f"report target changed before replace: {path}"
+            )
+        if existed and (_identity(path) != identity or path.read_bytes() != original):
+            raise MigrationTransactionError(
+                f"report target changed before replace: {path}"
+            )
         os.replace(temporary, path)
         replaced = True
         _sync_directory(path.parent)
@@ -1325,7 +1393,9 @@ def apply_migration_transaction(plans: Sequence[FileMigration]) -> None:
     changed = [plan for plan in plans if plan.source_bytes != plan.target_bytes]
     paths = [plan.path for plan in changed]
     if len(paths) != len(set(paths)):
-        raise MigrationTransactionError("migration transaction contains duplicate paths")
+        raise MigrationTransactionError(
+            "migration transaction contains duplicate paths"
+        )
     staged: dict[Path, Path] = {}
     backups: dict[Path, Path] = {}
     replaced: list[FileMigration] = []
@@ -1370,15 +1440,18 @@ def apply_migration_transaction(plans: Sequence[FileMigration]) -> None:
 
 
 def report_findings(findings: Sequence[StrictFinding]) -> str:
-    return json.dumps(
-        {
-            "schema_version": 1,
-            "passed": not findings,
-            "findings": [asdict(item) for item in findings],
-        },
-        indent=2,
-        sort_keys=True,
-    ) + "\n"
+    return (
+        json.dumps(
+            {
+                "schema_version": 1,
+                "passed": not findings,
+                "findings": [asdict(item) for item in findings],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n"
+    )
 
 
 def findings_snapshot(findings: Sequence[StrictFinding]) -> dict[str, object]:

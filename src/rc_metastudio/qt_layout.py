@@ -89,7 +89,9 @@ def configure_primary_action_buttons(buttons):
     """Give text-and-icon workflow actions an optically useful icon size."""
     for button in buttons:
         # layout-audit: allow=semantic-icon-control; reason=primary workflow actions use a surface-specific optical icon size
-        button.setIconSize(QSize(PRIMARY_ACTION_ICON_EXTENT, PRIMARY_ACTION_ICON_EXTENT))
+        button.setIconSize(
+            QSize(PRIMARY_ACTION_ICON_EXTENT, PRIMARY_ACTION_ICON_EXTENT)
+        )
         # layout-audit: allow=semantic-icon-control; reason=primary workflow actions need a dependable desktop click target
         button.setMinimumHeight(PRIMARY_ACTION_CONTROL_HEIGHT)
 

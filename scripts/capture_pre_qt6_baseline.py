@@ -136,9 +136,7 @@ def _source_text(root: Path, relative: str, commit: str | None) -> str:
     return _git_blob(root, commit, relative).decode("utf-8", errors="replace")
 
 
-def _source_tracked(
-    root: Path, commit: str | None, *patterns: str
-) -> list[str]:
+def _source_tracked(root: Path, commit: str | None, *patterns: str) -> list[str]:
     return (
         _tracked(root, *patterns)
         if commit is None
@@ -155,9 +153,9 @@ def _file_sha256(path: Path) -> str:
 
 
 def _json_bytes(value: Any) -> bytes:
-    return (json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode(
-        "utf-8"
-    )
+    return (
+        json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    ).encode("utf-8")
 
 
 def _occurrence(
@@ -183,7 +181,9 @@ class _QtSurfaceVisitor(ast.NodeVisitor):
         owner = _call_name(node.value)
         if owner == "Qt" or owner.endswith(".Qt"):
             if node.attr not in QT_ENUM_NAMESPACES:
-                self.short_enums.append(_occurrence(self.path, node, f"{owner}.{node.attr}"))
+                self.short_enums.append(
+                    _occurrence(self.path, node, f"{owner}.{node.attr}")
+                )
         self.generic_visit(node)
 
     def visit_Name(self, node: ast.Name) -> None:
@@ -222,9 +222,7 @@ def _literal_string(node: ast.AST) -> str:
     return "<dynamic>"
 
 
-def detect_removed_or_displaced_apis(
-    path: str, text: str
-) -> list[dict[str, Any]]:
+def detect_removed_or_displaced_apis(path: str, text: str) -> list[dict[str, Any]]:
     """Detect only Qt6-invalid API ownership, resolving common import aliases."""
     tree = ast.parse(text, filename=path)
     module_aliases: dict[str, str] = {}
@@ -400,9 +398,7 @@ def build_qt_port_inventory(
         "counts": {
             "handwritten_qt_modules": len(handwritten_qt),
             "canonical_forms": len(
-                _source_tracked(
-                    root, source_commit, "src/rc_metastudio/forms/*.ui"
-                )
+                _source_tracked(root, source_commit, "src/rc_metastudio/forms/*.ui")
             ),
             "generated_modules": len(generated),
             "resources": len(_source_tracked(root, source_commit, "*.qrc")),
@@ -449,7 +445,7 @@ def _text_occurrences(
 
 
 def detect_legacy_dependency_declarations(
-    sources: dict[str, str]
+    sources: dict[str, str],
 ) -> dict[str, list[dict[str, Any]]]:
     """Detect forbidden GUI binding declarations independently of Python imports."""
     pyqt5_pattern = re.compile(r"\bPyQt5(?:-Qt5|-sip)?\b", re.IGNORECASE)
@@ -506,7 +502,9 @@ def run_zero_legacy_detectors(
     pickle_storage = _text_occurrences(
         root,
         [path for path in python_files if path.startswith(("src/", "tests/"))],
-        re.compile(r"(?:project_pickle|load_project_pickle|\.rcms\.state|pickle\.dump|pickle\.load)"),
+        re.compile(
+            r"(?:project_pickle|load_project_pickle|\.rcms\.state|pickle\.dump|pickle\.load)"
+        ),
         "python-text:pickle-project-storage",
     )
     packaging_files = [
@@ -627,7 +625,11 @@ def _dataset_snapshot(dataset: Any) -> dict[str, Any]:
     for name in outcome_names:
         outcome = dataset.get_outcome_obj(name)
         followups = sorted(
-            [value for value in dataset.outcome_names_to_follow_ups[name].values() if value is not None],
+            [
+                value
+                for value in dataset.outcome_names_to_follow_ups[name].values()
+                if value is not None
+            ],
             key=str,
         )
         outcomes.append(
@@ -676,7 +678,9 @@ def _dataset_snapshot(dataset: Any) -> dict[str, Any]:
         )
     families = {outcome["data_type"] for outcome in outcomes}
     family_names = {0: "binary", 1: "continuous", 2: "diagnostic"}
-    analysis_family = family_names[next(iter(families))] if len(families) == 1 else "mixed"
+    analysis_family = (
+        family_names[next(iter(families))] if len(families) == 1 else "mixed"
+    )
     return {
         "title": dataset.title,
         "summary": dataset.summary,
@@ -700,11 +704,17 @@ def capture_sample_snapshots(root: Path) -> dict[str, dict[str, Any]]:
     source_dir = root / "src" / "rc_metastudio"
     sys.path.insert(0, str(source_dir))
     try:
-        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        with (
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
             import project_pickle
         snapshots = {}
         for path in sorted((root / "sample_projects").glob("*.rcms")):
-            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            with (
+                contextlib.redirect_stdout(io.StringIO()),
+                contextlib.redirect_stderr(io.StringIO()),
+            ):
                 dataset = project_pickle.load_project_pickle(path)
             snapshots[path.name] = {
                 "schema_version": 1,
@@ -719,7 +729,9 @@ def capture_sample_snapshots(root: Path) -> dict[str, dict[str, Any]]:
             sys.path.pop(0)
 
 
-def inspect_observed_golden_bundle(bundle_path: Path) -> tuple[list[str], dict[str, Any]]:
+def inspect_observed_golden_bundle(
+    bundle_path: Path,
+) -> tuple[list[str], dict[str, Any]]:
     """Validate a real comprehensive capture and return a compact observed summary."""
     errors: list[str] = []
     outputs: list[dict[str, Any]] = []
@@ -733,7 +745,9 @@ def inspect_observed_golden_bundle(bundle_path: Path) -> tuple[list[str], dict[s
                 capture_metadata.get("baseline_environment")
                 != AUTHORITATIVE_BASELINE_ENVIRONMENT
             ):
-                errors.append("observed Golden Analysis manifest has the wrong baseline environment")
+                errors.append(
+                    "observed Golden Analysis manifest has the wrong baseline environment"
+                )
             if manifest.get("passed") is not True:
                 errors.append("observed Golden Analysis capture did not pass")
             if manifest.get("capture_failures") != []:
@@ -758,7 +772,9 @@ def inspect_observed_golden_bundle(bundle_path: Path) -> tuple[list[str], dict[s
                 if environment.get("matches_expected") is not True:
                     errors.append(f"{capture_id}: baseline environment does not match")
                 if environment.get("expected") != AUTHORITATIVE_BASELINE_ENVIRONMENT:
-                    errors.append(f"{capture_id}: expected baseline environment is wrong")
+                    errors.append(
+                        f"{capture_id}: expected baseline environment is wrong"
+                    )
                 for key, expected in AUTHORITATIVE_BASELINE_ENVIRONMENT.items():
                     observed = environment.get(key)
                     matches = (
@@ -823,7 +839,12 @@ def inspect_observed_golden_bundle(bundle_path: Path) -> tuple[list[str], dict[s
                         "artifacts": observed_artifacts,
                     }
                 )
-    except (FileNotFoundError, KeyError, json.JSONDecodeError, zipfile.BadZipFile) as exc:
+    except (
+        FileNotFoundError,
+        KeyError,
+        json.JSONDecodeError,
+        zipfile.BadZipFile,
+    ) as exc:
         errors.append(f"invalid observed Golden Analysis bundle: {exc}")
     return errors, {
         "schema_version": 1,
@@ -845,8 +866,9 @@ def capture_rendered_interface_evidence(
     sys.path.insert(0, str(source_dir))
     evidence_dir.mkdir(parents=True, exist_ok=True)
     try:
-        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(
-            io.StringIO()
+        with (
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()),
         ):
             from PyQt5 import QtCore, QtWidgets
             import main_wizard
@@ -919,9 +941,9 @@ def baseline_input_drift(root: Path) -> list[str]:
     )
     return sorted(
         {
-        path.replace("\\", "/")
-        for path in (changed + "\n" + untracked).splitlines()
-        if path and path.replace("\\", "/") not in BASELINE_CAPTURE_EXCLUSIONS
+            path.replace("\\", "/")
+            for path in (changed + "\n" + untracked).splitlines()
+            if path and path.replace("\\", "/") not in BASELINE_CAPTURE_EXCLUSIONS
         }
     )
 
@@ -948,11 +970,18 @@ def build_baseline_manifest(
 ) -> dict[str, Any]:
     pyproject = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
     dependencies = pyproject["project"]["dependencies"]
-    versions = {item.split("==", 1)[0]: item.split("==", 1)[1] for item in dependencies if "==" in item}
+    versions = {
+        item.split("==", 1)[0]: item.split("==", 1)[1]
+        for item in dependencies
+        if "==" in item
+    }
     workflow_text = "\n".join(
-        path.read_text(encoding="utf-8") for path in (root / ".github/workflows").glob("*.yml")
+        path.read_text(encoding="utf-8")
+        for path in (root / ".github/workflows").glob("*.yml")
     )
-    python_patch = sorted(set(re.findall(r"uv python install (3\.11\.\d+)", workflow_text)))[0]
+    python_patch = sorted(
+        set(re.findall(r"uv python install (3\.11\.\d+)", workflow_text))
+    )[0]
     r_patch = sorted(set(re.findall(r"r-version:\s*(4\.6\.\d+)", workflow_text)))[0]
     baseline_dir = baseline_dir or root / BASELINE_RELATIVE_DIR
     snapshots = [
@@ -963,9 +992,7 @@ def build_baseline_manifest(
         for path in sorted((baseline_dir / "sample-projects").glob("*.json"))
     ]
     rendered = json.loads(
-        (baseline_dir / "rendered-interface-evidence.json").read_text(
-            encoding="utf-8"
-        )
+        (baseline_dir / "rendered-interface-evidence.json").read_text(encoding="utf-8")
     )["surfaces"]
     return {
         "schema_version": 1,
@@ -996,36 +1023,50 @@ def build_baseline_manifest(
             "sha256": _sha256(_git_blob(root, BASELINE_COMMIT, "uv.lock")),
         },
         "retained_evidence": [
-            _evidence_record(root, "src/rc_metastudio/golden_analysis.py", "Golden Analysis Test expected outputs and capture logic"),
-            _evidence_record(root, "docs/verification/comprehensive-golden-baseline-manifest.json", "Golden Output Bundle manifest"),
-            _evidence_record(root, "docs/verification/golden-coverage-manifest.json", "Golden Analysis Test coverage"),
-            _evidence_record(root, "docs/verification/gui-verification-evidence.md", "representative interface evidence"),
-            _evidence_record(root, "docs/verification/adaptive-layout-native-evidence.md", "native interface rendering evidence"),
+            _evidence_record(
+                root,
+                "src/rc_metastudio/golden_analysis.py",
+                "Golden Analysis Test expected outputs and capture logic",
+            ),
+            _evidence_record(
+                root,
+                "docs/verification/comprehensive-golden-baseline-manifest.json",
+                "Golden Output Bundle manifest",
+            ),
+            _evidence_record(
+                root,
+                "docs/verification/golden-coverage-manifest.json",
+                "Golden Analysis Test coverage",
+            ),
+            _evidence_record(
+                root,
+                "docs/verification/gui-verification-evidence.md",
+                "representative interface evidence",
+            ),
+            _evidence_record(
+                root,
+                "docs/verification/adaptive-layout-native-evidence.md",
+                "native interface rendering evidence",
+            ),
         ],
         "sample_semantic_snapshots": snapshots,
         "observed_golden_analysis_bundle": {
             "path": (baseline_dir / "observed-golden-baseline.zip")
             .relative_to(root)
             .as_posix(),
-            "sha256": _file_sha256(
-                baseline_dir / "observed-golden-baseline.zip"
-            ),
+            "sha256": _file_sha256(baseline_dir / "observed-golden-baseline.zip"),
         },
         "observed_golden_analysis_summary": {
             "path": (baseline_dir / "observed-golden-summary.json")
             .relative_to(root)
             .as_posix(),
-            "sha256": _file_sha256(
-                baseline_dir / "observed-golden-summary.json"
-            ),
+            "sha256": _file_sha256(baseline_dir / "observed-golden-summary.json"),
         },
         "rendered_interface_manifest": {
             "path": (baseline_dir / "rendered-interface-evidence.json")
             .relative_to(root)
             .as_posix(),
-            "sha256": _file_sha256(
-                baseline_dir / "rendered-interface-evidence.json"
-            ),
+            "sha256": _file_sha256(baseline_dir / "rendered-interface-evidence.json"),
         },
         "rendered_interface_evidence": rendered,
         "qt_port_inventory": {
@@ -1048,7 +1089,9 @@ def write_baseline(
     snapshots = capture_sample_snapshots(root)
     for name, snapshot in snapshots.items():
         (snapshots_dir / f"{name}.json").write_bytes(_json_bytes(snapshot))
-    (target / "qt-port-inventory.json").write_bytes(_json_bytes(build_qt_port_inventory(root)))
+    (target / "qt-port-inventory.json").write_bytes(
+        _json_bytes(build_qt_port_inventory(root))
+    )
     destination_bundle = target / "observed-golden-baseline.zip"
     source_bundle = observed_golden_bundle or (
         destination_bundle if destination_bundle.exists() else None
@@ -1062,12 +1105,8 @@ def write_baseline(
         raise RuntimeError("; ".join(errors))
     if source_bundle.resolve() != destination_bundle.resolve():
         destination_bundle.write_bytes(source_bundle.read_bytes())
-    (target / "observed-golden-summary.json").write_bytes(
-        _json_bytes(observed_summary)
-    )
-    rendered = capture_rendered_interface_evidence(
-        root, target / "rendered-interface"
-    )
+    (target / "observed-golden-summary.json").write_bytes(_json_bytes(observed_summary))
+    rendered = capture_rendered_interface_evidence(root, target / "rendered-interface")
     (target / "rendered-interface-evidence.json").write_bytes(
         _json_bytes(
             {
@@ -1101,7 +1140,9 @@ def validate_checked_in_baseline(root: Path, require_tag: bool = False) -> list[
         try:
             tagged_commit = _run(root, "git", "rev-list", "-n", "1", manifest["tag"])
             if tagged_commit != commit:
-                errors.append(f"tag {manifest['tag']} resolves to {tagged_commit}, expected {commit}")
+                errors.append(
+                    f"tag {manifest['tag']} resolves to {tagged_commit}, expected {commit}"
+                )
         except subprocess.CalledProcessError:
             errors.append(f"missing baseline tag {manifest['tag']}")
     for record in [manifest["dependency_lock"], *manifest["retained_evidence"]]:
@@ -1129,10 +1170,7 @@ def validate_checked_in_baseline(root: Path, require_tag: bool = False) -> list[
     elif json.loads(summary_path.read_text(encoding="utf-8")) != observed_summary:
         errors.append("observed Golden Analysis Test summary does not match bundle")
     rendered_manifest = manifest["rendered_interface_manifest"]
-    if (
-        _file_sha256(root / rendered_manifest["path"])
-        != rendered_manifest["sha256"]
-    ):
+    if _file_sha256(root / rendered_manifest["path"]) != rendered_manifest["sha256"]:
         errors.append("rendered interface evidence manifest hash mismatch")
     for record in manifest["rendered_interface_evidence"]:
         if _file_sha256(root / record["path"]) != record["sha256"]:
@@ -1157,8 +1195,12 @@ def main() -> int:
         type=Path,
         help="complete comprehensive bundle captured from the tagged baseline",
     )
-    parser.add_argument("--check", action="store_true", help="validate checked-in evidence")
-    parser.add_argument("--require-tag", action="store_true", help="also require the annotated tag")
+    parser.add_argument(
+        "--check", action="store_true", help="validate checked-in evidence"
+    )
+    parser.add_argument(
+        "--require-tag", action="store_true", help="also require the annotated tag"
+    )
     parser.add_argument(
         "--legacy-report",
         nargs="?",
@@ -1175,13 +1217,15 @@ def main() -> int:
     root = Path(__file__).resolve().parents[1]
     if args.write:
         try:
-            write_baseline(
-                root, observed_golden_bundle=args.observed_golden_bundle
-            )
+            write_baseline(root, observed_golden_bundle=args.observed_golden_bundle)
         except (BaselineDriftError, RuntimeError) as exc:
             print(str(exc), file=sys.stderr)
             return 1
-    errors = validate_checked_in_baseline(root, require_tag=args.require_tag) if args.check else []
+    errors = (
+        validate_checked_in_baseline(root, require_tag=args.require_tag)
+        if args.check
+        else []
+    )
     if args.legacy_report is not None or args.require_zero:
         report = run_zero_legacy_detectors(root)
         payload = _json_bytes(report).decode("utf-8")

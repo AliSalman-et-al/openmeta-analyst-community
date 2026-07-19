@@ -91,9 +91,7 @@ PLOT_EXPORT_GUIDANCE = {
     "tiff": "Publication-grade 600 dpi raster export with lossless compression.",
     "png": "Publication-grade 600 dpi raster export for compatible submission systems.",
 }
-PLOT_EDITOR_SAVE_FILTER = (
-    "Plot images (*.pdf *.png *.tif *.tiff *.svg);;All files (*)"
-)
+PLOT_EDITOR_SAVE_FILTER = "Plot images (*.pdf *.png *.tif *.tiff *.svg);;All files (*)"
 
 FOREST_STYLE_LABELS = {
     "default": "Default (metafor)",
@@ -227,7 +225,7 @@ def _svg_bytes_with_white_background(path):
     opener = gzip.open if str(path).lower().endswith(".svgz") else open
     with opener(path, "rb") as svg_file:
         svg = svg_file.read()
-    root = re.search(br"<svg\b[^>]*>", svg, flags=re.IGNORECASE)
+    root = re.search(rb"<svg\b[^>]*>", svg, flags=re.IGNORECASE)
     if root is None:
         return svg
     white_canvas = b'<rect width="100%" height="100%" fill="#ffffff"/>'
@@ -509,8 +507,12 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self.nav_tree.setItemsExpandable(True)
         # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
         self.nav_tree.setMinimumWidth(0)
-        self.nav_tree.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
-        self.graphics_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.nav_tree.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding
+        )
+        self.graphics_view.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         self.results_nav_splitter.setChildrenCollapsible(False)
         self.results_nav_splitter.setStretchFactor(0, 1)
         self.results_nav_splitter.setStretchFactor(1, 1)
@@ -738,8 +740,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         line_count = max(1, str(text).count("\n") + 1)
         font_metrics = QFontMetricsF(txt_item.font())
         line_height = (
-            line_count * font_metrics.lineSpacing()
-            + 2 * document.documentMargin()
+            line_count * font_metrics.lineSpacing() + 2 * document.documentMargin()
         )
         return max(bounding_height, document_height, line_height)
 
@@ -765,7 +766,8 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             "2) Right click again and choose copy."
         )
         txt_item.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard
+            Qt.TextInteractionFlag.TextSelectableByMouse
+            | Qt.TextInteractionFlag.TextSelectableByKeyboard
         )
         self.scene.addItem(txt_item)
         self._layout_items.append(txt_item)
@@ -1200,9 +1202,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                 isinstance(plot_item, _svg_item_class())
                 and refreshed_artifact.has_vector_display()
             ):
-                renderer = _opaque_svg_renderer(
-                    refreshed_artifact.display_path(), self
-                )
+                renderer = _opaque_svg_renderer(refreshed_artifact.display_path(), self)
                 if renderer.isValid():
                     plot_item.setSharedRenderer(renderer)
                     self._schedule_viewport_refit()

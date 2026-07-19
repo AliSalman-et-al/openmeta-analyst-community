@@ -47,9 +47,9 @@ GENERATED_UI_MODULE_NAMES = [
 
 def _read(relative_path):
     source_path = Path(relative_path)
-    if source_path.parent == Path("src/rc_metastudio/forms") and source_path.name.startswith(
-        "ui_"
-    ):
+    if source_path.parent == Path(
+        "src/rc_metastudio/forms"
+    ) and source_path.name.startswith("ui_"):
         source_path = Path("build/qt6/generated/rc_metastudio/forms") / source_path.name
     elif source_path in {
         Path("src/rc_metastudio/ui_meta.py"),
@@ -75,7 +75,9 @@ def test_issue_94_current_outcome_and_follow_up_labels_can_expand():
 
     for label in (ui.cur_outcome_lbl, ui.cur_time_lbl):
         assert label.maximumWidth() > 80
-        assert label.sizePolicy().horizontalPolicy() != QtWidgets.QSizePolicy.Policy.Fixed
+        assert (
+            label.sizePolicy().horizontalPolicy() != QtWidgets.QSizePolicy.Policy.Fixed
+        )
 
     window.deleteLater()
     app.processEvents()
@@ -115,7 +117,8 @@ def test_generated_dialogs_do_not_depend_on_fixed_position_content():
         direct_children = [
             child
             for child in root.findChildren(
-                QtWidgets.QWidget, options=QtCore.Qt.FindChildOption.FindDirectChildrenOnly
+                QtWidgets.QWidget,
+                options=QtCore.Qt.FindChildOption.FindDirectChildrenOnly,
             )
             if not child.isHidden() and not child.isWindow()
         ]

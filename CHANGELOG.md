@@ -11,11 +11,14 @@ RC MetaStudio starts a fresh maintained-product changelog. Historical release hi
 - Added the first native Qt 6 / PyQt6 release of RC MetaStudio for Windows x64.
 - Added a self-contained Windows package with Python 3.11, Qt 6.11, R 4.6.1, RCMetaR 0.2.0, and an API-mode rpy2 bridge.
 - Added the versioned ZIP-and-JSON `.rcms` project format with schema validation, atomic saves, and converted sample projects.
+- Added selectable inference methods to supported standard meta-analyses.
 
 ### Changed
 
 - Replaced the Qt 5 and PyQt5 application runtime with the locked native Qt 6 stack.
 - Updated generated forms, resources, layouts, accessibility behavior, and packaged automation for Qt 6.
+- Updated the splash screen, application/window icons, packaged executable icon, and README to use the new RC MetaStudio branding.
+- Improved meta-regression result displays and statistical output formatting.
 - Made the Windows x64 package the sole 0.2.0 downloadable artifact; native Intel and Apple Silicon macOS packages are deferred to 0.2.1.
 
 ### Removed
@@ -27,8 +30,9 @@ RC MetaStudio starts a fresh maintained-product changelog. Historical release hi
 - Fixed Windows packaging so R is staged without elevation and the complete Qt/R application is built and qualified through one local-and-CI command.
 - Fixed dark-mode contrast for highlighted effect-size cells and Results-window plot previews.
 - Fixed Results-window SVG and raster plots inheriting the dark themed scene background instead of painting an opaque white canvas.
-- Fixed dataset-type wizard icons so they follow the active light or dark palette, and made the Diagnostic choice match the other button geometry.
+- Fixed dataset-type wizard icons so they use crisp light or dark SVG masters without flattening the Diagnostic icon's detail, and made the Diagnostic choice match the other button geometry.
 - Fixed standard meta-analysis Method and Parameters dialogs incorrectly using diagnostic likelihood-ratio wording.
+- Fixed encoded Unicode code-point markers appearing in result text.
 
 ## 0.1.2 - 2026-07-15 (Prerelease)
 

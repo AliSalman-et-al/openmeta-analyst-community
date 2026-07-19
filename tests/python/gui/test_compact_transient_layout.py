@@ -309,7 +309,9 @@ def test_compact_transactional_keyboard_and_accessibility_matrix(qapp, monkeypat
         rejected = []
         dialog = factory()
         before_cancel = {
-            "editors": [editor.text() for editor in dialog.findChildren(QtWidgets.QLineEdit)],
+            "editors": [
+                editor.text() for editor in dialog.findChildren(QtWidgets.QLineEdit)
+            ],
             "models": [
                 (view.model().rowCount(), view.model().columnCount())
                 for view in dialog.findChildren(QtWidgets.QAbstractItemView)
@@ -325,7 +327,9 @@ def test_compact_transactional_keyboard_and_accessibility_matrix(qapp, monkeypat
         assert dialog.result() == QtWidgets.QDialog.DialogCode.Rejected, name
         assert not dialog.isVisible(), name
         assert before_cancel == {
-            "editors": [editor.text() for editor in dialog.findChildren(QtWidgets.QLineEdit)],
+            "editors": [
+                editor.text() for editor in dialog.findChildren(QtWidgets.QLineEdit)
+            ],
             "models": [
                 (view.model().rowCount(), view.model().columnCount())
                 for view in dialog.findChildren(QtWidgets.QAbstractItemView)

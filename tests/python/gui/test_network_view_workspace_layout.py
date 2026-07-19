@@ -11,9 +11,7 @@ from PyQt6 import QtCore, QtGui, QtTest, QtWidgets, sip
 ROOT = Path(__file__).resolve().parents[3]
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("RCMS_STUB_BACKEND", "1")
-os.environ.setdefault(
-    "RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification")
-)
+os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
 sys.path.insert(0, os.path.abspath("src/rc_metastudio"))
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
@@ -89,7 +87,9 @@ def _dispose(qapp, *widgets):
 
 
 @pytest.mark.parametrize("screen_size", [(800, 600), (1024, 640), (1600, 1000)])
-def test_network_view_first_use_tracks_owning_screen(qapp, tmp_path, monkeypatch, screen_size):
+def test_network_view_first_use_tracks_owning_screen(
+    qapp, tmp_path, monkeypatch, screen_size
+):
     import adaptive_window
 
     _clear_settings()
@@ -239,9 +239,7 @@ def test_network_selectors_are_usable_with_large_font_on_constrained_screen(
         _dispose(qapp, dialog)
 
 
-def test_network_view_restores_independent_placement(
-    qapp, tmp_path, monkeypatch
-):
+def test_network_view_restores_independent_placement(qapp, tmp_path, monkeypatch):
     _clear_settings()
     available = QtCore.QRect(qapp.primaryScreen().availableGeometry())
     first = _network_dialog(qapp, tmp_path, monkeypatch)
@@ -295,9 +293,7 @@ def test_network_workspace_policy_uses_injected_owning_screen(qapp, owner_kind):
         ),
     )
     try:
-        assert ownership_calls == [
-            (window, adaptive_window.WindowArchetype.WORKSPACE)
-        ]
+        assert ownership_calls == [(window, adaptive_window.WindowArchetype.WORKSPACE)]
         assert window.frameGeometry().width() == pytest.approx(800, abs=8)
         assert window.frameGeometry().height() == pytest.approx(560, abs=8)
         if owner_kind == "active_workspace":

@@ -117,9 +117,7 @@ def dataset_to_project(dataset: ma_dataset.Dataset) -> dict[str, Any]:
                 "name": str(study.name),
                 "year": study.year,
                 "include": bool(study.include),
-                "manually_excluded": bool(
-                    getattr(study, "manually_excluded", False)
-                ),
+                "manually_excluded": bool(getattr(study, "manually_excluded", False)),
                 "notes": str(study.notes),
                 "sample_size": study.N,
                 "covariates": _portable_value(study.covariate_dict),
@@ -208,7 +206,9 @@ def project_to_dataset(project: dict[str, Any]) -> ma_dataset.Dataset:
         for unit_data in item["analysis_units"]:
             outcome = outcomes[unit_data["outcome"]]
             group_names = [group["name"] for group in unit_data["groups"]]
-            raw_data = [copy.deepcopy(group["raw_data"]) for group in unit_data["groups"]]
+            raw_data = [
+                copy.deepcopy(group["raw_data"]) for group in unit_data["groups"]
+            ]
             unit = ma_dataset.MetaAnalyticUnit(
                 outcome, raw_data=raw_data, group_names=group_names
             )
@@ -220,9 +220,7 @@ def project_to_dataset(project: dict[str, Any]) -> ma_dataset.Dataset:
                         raise ProjectAdapterError(
                             f"unknown effect comparison {comparison!r} for {metric}"
                         )
-                    unit.effects_dict[metric][comparison].update(
-                        copy.deepcopy(values)
-                    )
+                    unit.effects_dict[metric][comparison].update(copy.deepcopy(values))
             study.outcomes_to_follow_ups.setdefault(unit_data["outcome"], {})[
                 unit_data["follow_up"]
             ] = unit
@@ -230,7 +228,9 @@ def project_to_dataset(project: dict[str, Any]) -> ma_dataset.Dataset:
     return dataset
 
 
-def state_to_model_state(dataset: ma_dataset.Dataset, state: dict[str, Any]) -> dict[str, Any]:
+def state_to_model_state(
+    dataset: ma_dataset.Dataset, state: dict[str, Any]
+) -> dict[str, Any]:
     """Translate portable durable state to the table model's typed state keys."""
 
     outcome = state["active_outcome"]

@@ -1,5 +1,7 @@
 # RC MetaStudio
 
+<img src="src/rc_metastudio/images/RC_MetaStudio_Logo_4K_Preview.png" alt="RC MetaStudio logo" width="720">
+
 RC MetaStudio is a desktop application for performing and reviewing meta-analyses through a graphical interface.
 
 ## What You Can Do

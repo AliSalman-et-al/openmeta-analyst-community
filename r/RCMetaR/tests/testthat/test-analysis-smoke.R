@@ -387,6 +387,12 @@ test_that("core method discovery and metadata avoid direct implementation export
   params <- rcmetar.method.parameters("binary.random")
   expect_named(params, c("parameters", "defaults", "var_order", "pretty.names"), ignore.order = TRUE)
   expect_true("conf.level" %in% names(params$parameters))
+  expect_identical(params$parameters$inference.method, c("z", "t", "knha", "adhoc"))
+  expect_identical(params$defaults$inference.method, "z")
+  expect_identical(
+    params$parameters$rm.method,
+    c("HE", "DL", "HS", "HSk", "SJ", "ML", "REML", "EB", "PM", "PMM")
+  )
 
   regression.methods <- rcmetar.available.methods(
     "binary", fixture$data, "OR", workflow = "meta-regression"
@@ -395,13 +401,43 @@ test_that("core method discovery and metadata avoid direct implementation export
   regression.params <- rcmetar.method.parameters("meta.regression")
   expect_identical(
     regression.params$var_order,
-    c("rm.method", "conf.level", "digits")
+    c("rm.method", "inference.method", "conf.level", "digits")
   )
   expect_identical(regression.params$defaults$rm.method, "REML")
+  expect_identical(regression.params$defaults$inference.method, "z")
+
+  fixed.params <- rcmetar.method.parameters("binary.fixed.inv.var")
+  expect_true("inference.method" %in% names(fixed.params$parameters))
+  mh.params <- rcmetar.method.parameters("binary.fixed.mh")
+  expect_false("inference.method" %in% names(mh.params$parameters))
 
   description <- rcmetar.method.description("binary.random")
   expect_type(description, "character")
   expect_true(nzchar(description))
+})
+
+test_that("inference method reaches metafor results and is reported", {
+  fixture <- binary_fixture()
+  fixture$params$inference.method <- "knha"
+  result <- rcmetar.run.analysis(
+    fixture$data,
+    list(method = "binary.random", params = fixture$params)
+  )
+
+  expect_identical(result$res$test, "knha")
+  expect_identical(result[["Inference Method"]], "Knapp-Hartung")
+  expect_true(any(grepl("Knapp-Hartung inference", result$References, fixed = TRUE)))
+})
+
+test_that("non-normal inference requires positive residual degrees of freedom", {
+  expect_error(
+    RCMetaR:::rcmetar.validate.inference.method(
+      list(inference.method = "t"),
+      k = 2,
+      p = 2
+    ),
+    "requires positive residual degrees of freedom"
+  )
 })
 
 test_that("reference normalization preserves declared order while removing repeats", {
@@ -417,7 +453,7 @@ test_that("single factor diagnostic meta-regression returns adjusted means", {
     list(method = "meta.regression", params = fixture$params, workflow = "meta-regression")
   )
 
-  expect_named(result, c("Summary", "Adjusted Mean", "res", "res.info", "References"))
+  expect_named(result, c("Summary", "Adjusted Mean", "res", "res.info", "References", "Inference Method"))
   expect_match(result[["Adjusted Mean"]], "Adjusted Means")
   expect_match(result[["Adjusted Mean"]], "A")
   expect_match(result[["Adjusted Mean"]], "B")

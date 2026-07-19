@@ -88,7 +88,10 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         self.current_prevalence = self._get_prevalence_str()
         self.two_by_two_table.setCurrentCell(0, 0)
         self.two_by_two_table.setFocus()
-        required(self.buttonBox.button(QDialogButtonBox.StandardButton.Ok), "diagnostic calculator OK button").setDefault(True)
+        required(
+            self.buttonBox.button(QDialogButtonBox.StandardButton.Ok),
+            "diagnostic calculator OK button",
+        ).setDefault(True)
         self._request_initial_content_refit()
 
     def _configure_raw_data_table(self):
@@ -108,7 +111,9 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             header.sizeHint().height()
             + sum(table.rowHeight(row) for row in range(table.rowCount()))
             + 2 * table.frameWidth()
-            + required(table.horizontalScrollBar(), "diagnostic table scrollbar").sizeHint().height()
+            + required(table.horizontalScrollBar(), "diagnostic table scrollbar")
+            .sizeHint()
+            .height()
         )
         # layout-audit: allow=compact-table-overflow; reason=compact table keeps rows visible and owns excess overflow
         table.setMinimumHeight(height)
@@ -120,10 +125,10 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         self.effect_cbo_box.setMinimumWidth(0)
         # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
         self.effect_cbo_box.setMaximumWidth(QWIDGETSIZE_MAX)
-        self.effect_cbo_box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self._size_line_edit_for_samples(
-            self.prevalence_txt_box, ("0.0000", "1.0000")
+        self.effect_cbo_box.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
+        self._size_line_edit_for_samples(self.prevalence_txt_box, ("0.0000", "1.0000"))
 
     @staticmethod
     def _size_line_edit_for_samples(line_edit, samples):
@@ -151,7 +156,12 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
     def eventFilter(  # ty: ignore[invalid-method-override] -- PyQt6's QDialog stub rejects this runtime-supported QObject override.
         self, watched: QObject | None, event: QEvent | None
     ) -> bool:
-        if isinstance(watched, QWidget) and event is not None and event.type() == QEvent.Type.FocusIn and self.content_widget.isAncestorOf(watched):
+        if (
+            isinstance(watched, QWidget)
+            and event is not None
+            and event.type() == QEvent.Type.FocusIn
+            and self.content_widget.isAncestorOf(watched)
+        ):
             self.content_scroll.ensureWidgetVisible(watched)
         return super(DiagnosticDataForm, self).eventFilter(watched, event)
 
@@ -165,7 +175,9 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
     def _grow_raw_data_column_to_contents(self, column):
         table = self.two_by_two_table
         header = required(table.horizontalHeader(), "diagnostic table header")
-        required_width = max(header.sectionSizeHint(column), table.sizeHintForColumn(column))
+        required_width = max(
+            header.sectionSizeHint(column), table.sizeHintForColumn(column)
+        )
         if required_width > table.columnWidth(column):
             header.resizeSection(column, required_width)
 
@@ -265,20 +277,28 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
 
     def setup_back_calculation_feedback(self):
         inconsistency_palette = QPalette()
-        inconsistency_palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.red)
+        inconsistency_palette.setColor(
+            QPalette.ColorRole.WindowText, Qt.GlobalColor.red
+        )
         self.inconsistencyLabel.setPalette(inconsistency_palette)
         self.inconsistencyLabel.setVisible(False)
 
     def _mark_table_consistent(self):
         self.inconsistencyLabel.setVisible(False)
-        required(self.buttonBox.button(QDialogButtonBox.StandardButton.Ok), "diagnostic calculator OK button").setEnabled(True)
+        required(
+            self.buttonBox.button(QDialogButtonBox.StandardButton.Ok),
+            "diagnostic calculator OK button",
+        ).setEnabled(True)
 
     def _mark_table_invalid(self, message):
         self.inconsistencyLabel.setText(str(message))
         self.inconsistencyLabel.setVisible(True)
         # The rejected edit has already been rolled back to a valid state, so
         # acceptance must remain available while the inline guidance is shown.
-        required(self.buttonBox.button(QDialogButtonBox.StandardButton.Ok), "diagnostic calculator OK button").setEnabled(True)
+        required(
+            self.buttonBox.button(QDialogButtonBox.StandardButton.Ok),
+            "diagnostic calculator OK button",
+        ).setEnabled(True)
         self.content_layout.invalidate()
         self.content_widget.updateGeometry()
         self.content_scroll.ensureWidgetVisible(self.inconsistencyLabel)
@@ -301,7 +321,10 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
     def _get_int(self, i, j):
         try:
             if not self._is_empty(i, j):
-                text = required(self.two_by_two_table.item(i, j), f"diagnostic table cell ({i}, {j})").text()
+                text = required(
+                    self.two_by_two_table.item(i, j),
+                    f"diagnostic table cell ({i}, {j})",
+                ).text()
                 try:
                     int_val = int(text)
                 except ValueError:
@@ -347,7 +370,10 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             if self.two_by_two_table.item(row, col) == None:
                 self.two_by_two_table.setItem(row, col, QTableWidgetItem(str_val))
             else:
-                required(self.two_by_two_table.item(row, col), f"diagnostic table cell ({row}, {col})").setText(str_val)
+                required(
+                    self.two_by_two_table.item(row, col),
+                    f"diagnostic table cell ({row}, {col})",
+                ).setText(str_val)
             calc_fncs.set_table_item_editable(
                 self.two_by_two_table.item(row, col),
                 self._raw_count_cell_is_editable(row, col),
@@ -393,7 +419,10 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         try:
             # Test if entered data is valid (a number)
             warning_msg = self.cell_data_invalid(
-                required(self.two_by_two_table.item(row, col), f"diagnostic table cell ({row}, {col})").text()
+                required(
+                    self.two_by_two_table.item(row, col),
+                    f"diagnostic table cell ({row}, {col})",
+                ).text()
             )
             if warning_msg:
                 raise ValueError(warning_msg)

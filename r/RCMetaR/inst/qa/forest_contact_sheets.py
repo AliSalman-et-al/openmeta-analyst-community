@@ -34,7 +34,11 @@ def image_metrics(row: dict[str, str]) -> dict[str, str]:
             margins = (left, top, width - right, height - bottom)
             content_width = right - left
             content_height = bottom - top
-        stat = ImageStat.Stat(ImageChops.difference(image.convert("RGB"), Image.new("RGB", image.size, "white")))
+        stat = ImageStat.Stat(
+            ImageChops.difference(
+                image.convert("RGB"), Image.new("RGB", image.size, "white")
+            )
+        )
         mean_delta = sum(stat.mean) / len(stat.mean)
     return {
         **row,
@@ -62,7 +66,9 @@ def make_thumb(image_path: Path, box: tuple[int, int]) -> Image.Image:
         return canvas
 
 
-def contact_sheet(rows: list[dict[str, str]], output: Path, title: str, thumb_size: tuple[int, int]) -> None:
+def contact_sheet(
+    rows: list[dict[str, str]], output: Path, title: str, thumb_size: tuple[int, int]
+) -> None:
     if not rows:
         return
     columns = 6
@@ -119,7 +125,10 @@ def main() -> int:
             f"Plot visual QA: {scenario}",
             (args.thumb_width, args.thumb_height),
         )
-    overview = sorted(rows, key=lambda row: (row["scenario"], row["kind"], row["workflow"], row["style"]))
+    overview = sorted(
+        rows,
+        key=lambda row: (row["scenario"], row["kind"], row["workflow"], row["style"]),
+    )
     contact_sheet(
         overview,
         out_dir / "contact_all.png",

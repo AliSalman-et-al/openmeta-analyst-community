@@ -29,7 +29,9 @@ def _write_png(path: Path, width: int, height: int, *, blank: bool = False) -> N
     image.fill(QtGui.QColor("white"))
     if not blank:
         painter = QtGui.QPainter(image)
-        painter.fillRect(width // 4, height // 4, width // 2, height // 2, QtGui.QColor("navy"))
+        painter.fillRect(
+            width // 4, height // 4, width // 2, height // 2, QtGui.QColor("navy")
+        )
         painter.end()
     assert image.save(str(path), "PNG")
 
@@ -63,8 +65,12 @@ def _valid_bundle(root: Path) -> None:
                 "logical_frame": {"x": 10, "y": 20, "width": 100, "height": 80},
                 "path": path.name,
                 "physical_crop": {
-                    "x": native_results_smoke.logical_extent_to_physical_pixels(10.0, scale),
-                    "y": native_results_smoke.logical_extent_to_physical_pixels(20.0, scale),
+                    "x": native_results_smoke.logical_extent_to_physical_pixels(
+                        10.0, scale
+                    ),
+                    "y": native_results_smoke.logical_extent_to_physical_pixels(
+                        20.0, scale
+                    ),
                     "width": width,
                     "height": height,
                 },
@@ -78,7 +84,11 @@ def _valid_bundle(root: Path) -> None:
             "captures": captures,
             "device_pixel_ratio": scale,
             "navigation": ["Meta-Analysis Summary", "Forest Plot", "References"],
-            "network": {"follow_up": "12 months", "item_count": 1, "outcome": "Mortality"},
+            "network": {
+                "follow_up": "12 months",
+                "item_count": 1,
+                "outcome": "Mortality",
+            },
             "plot_artifact": artifact.name,
             "plot_artifact_sha256": _sha256(artifact),
             "plot_artifact_size": artifact.stat().st_size,
@@ -163,7 +173,9 @@ def test_native_results_evidence_json_rejects_nan_and_infinity_constants(tmp_pat
         root.mkdir()
         _valid_bundle(root)
         path, record = _record(root)
-        text = json.dumps(record).replace('"scale_factor": 1.0', f'"scale_factor": {token}')
+        text = json.dumps(record).replace(
+            '"scale_factor": 1.0', f'"scale_factor": {token}'
+        )
         path.write_text(text, encoding="utf-8")
         with pytest.raises(ValueError, match="nonstandard"):
             native_results_smoke.validate_evidence(root)
@@ -227,8 +239,12 @@ def test_native_results_evidence_uses_exact_capture_dpr_for_physical_geometry(
         native_results_smoke.validate_evidence(tmp_path)
 
 
-@pytest.mark.parametrize("bad_path", ["../results.png", "./results.png", "/results.png", "results.jpg"])
-def test_native_results_evidence_rejects_noncanonical_or_non_png_paths(tmp_path, bad_path):
+@pytest.mark.parametrize(
+    "bad_path", ["../results.png", "./results.png", "/results.png", "results.jpg"]
+)
+def test_native_results_evidence_rejects_noncanonical_or_non_png_paths(
+    tmp_path, bad_path
+):
     _valid_bundle(tmp_path)
     path, record = _record(tmp_path)
     record["captures"]["results"]["path"] = bad_path
@@ -238,7 +254,9 @@ def test_native_results_evidence_rejects_noncanonical_or_non_png_paths(tmp_path,
         native_results_smoke.validate_evidence(tmp_path)
 
 
-def test_native_results_evidence_rejects_corrupted_png_even_with_matching_bytes(tmp_path):
+def test_native_results_evidence_rejects_corrupted_png_even_with_matching_bytes(
+    tmp_path,
+):
     _valid_bundle(tmp_path)
     path, record = _record(tmp_path)
     image = tmp_path / record["captures"]["results"]["path"]
@@ -271,7 +289,11 @@ def test_native_results_evidence_rejects_blank_capture_with_matching_metadata(tm
         ("pixel_size", [99, 80], "pixel size"),
         ("device_pixel_ratio", 1.25, "pixel ratio"),
         ("sha256", "0" * 64, "hash"),
-        ("physical_crop", {"x": 10, "y": 20, "width": 99, "height": 80}, "physical frame"),
+        (
+            "physical_crop",
+            {"x": 10, "y": 20, "width": 99, "height": 80},
+            "physical frame",
+        ),
     ),
 )
 def test_native_results_evidence_rejects_dimension_dpr_hash_and_frame_tampering(

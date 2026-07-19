@@ -13,15 +13,15 @@ sys.path.insert(0, os.path.abspath("src"))
 
 REPO_ROOT = os.getcwd()
 ROOT = Path(__file__).resolve().parents[3]
-os.environ.setdefault(
-    "RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification")
-)
+os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
 prepare_generated_ui_imports()
 
 
-def test_result_owner_exception_still_deletes_real_specs_and_progress(qapp, monkeypatch):
+def test_result_owner_exception_still_deletes_real_specs_and_progress(
+    qapp, monkeypatch
+):
     import ma_specs
 
     class Model:

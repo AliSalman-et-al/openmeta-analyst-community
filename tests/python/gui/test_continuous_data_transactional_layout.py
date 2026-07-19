@@ -82,7 +82,9 @@ def _open_continuous_dialog(
             recorder["metric_choice_exec"].append(dialog.windowTitle())
             dialog.show()
             app.processEvents()
-            QtTest.QTest.mouseClick(dialog.choice2_label, QtCore.Qt.MouseButton.LeftButton)
+            QtTest.QTest.mouseClick(
+                dialog.choice2_label, QtCore.Qt.MouseButton.LeftButton
+            )
             QtTest.QTest.mouseClick(
                 dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok),
                 QtCore.Qt.MouseButton.LeftButton,
@@ -95,6 +97,7 @@ def _open_continuous_dialog(
             choose_second_option,
         )
     else:
+
         def reject_metric_choice(dialog):
             recorder["metric_choice_exec"].append(dialog.windowTitle())
             return False
@@ -144,11 +147,14 @@ def _open_continuous_dialog(
         "effect_triplet",
         lambda effect, _scale, metric=None: effect["calc_scale"],
     )
+
     def back_calc(*args, **kwargs):
         recorder["back_calc"].append((args, kwargs))
         return back_calc_result or {"FAIL": True}
 
-    monkeypatch.setattr(continuous_data_form.meta_py_r, "back_calc_cont_data", back_calc)
+    monkeypatch.setattr(
+        continuous_data_form.meta_py_r, "back_calc_cont_data", back_calc
+    )
     dialog = continuous_data_form.ContinuousDataForm(
         ma_unit or FakeContinuousMAUnit(),
         ["Group 1", "Group 2"],
@@ -181,7 +187,9 @@ def test_continuous_back_calculation_choice_opens_only_after_user_action(monkeyp
         _close(app, dialog)
 
 
-def test_continuous_assumptions_cancel_button_prevents_r_and_state_mutation(monkeypatch):
+def test_continuous_assumptions_cancel_button_prevents_r_and_state_mutation(
+    monkeypatch,
+):
     import continuous_data_form
 
     recorder = {}
@@ -249,9 +257,7 @@ def test_continuous_assumptions_cancel_button_prevents_r_and_state_mutation(monk
 
 
 def test_continuous_data_keyboard_and_accessibility_contract(monkeypatch):
-    app, dialog = _open_continuous_dialog(
-        monkeypatch, QtCore.QRect(20, 30, 1024, 640)
-    )
+    app, dialog = _open_continuous_dialog(monkeypatch, QtCore.QRect(20, 30, 1024, 640))
     try:
         dialog.show()
         app.processEvents()
@@ -277,9 +283,7 @@ def test_continuous_data_keyboard_and_accessibility_contract(monkeypatch):
 def test_failed_pre_post_imputation_restores_value_from_owning_table(
     monkeypatch, table_name
 ):
-    app, dialog = _open_continuous_dialog(
-        monkeypatch, QtCore.QRect(20, 30, 1024, 640)
-    )
+    app, dialog = _open_continuous_dialog(monkeypatch, QtCore.QRect(20, 30, 1024, 640))
     try:
         table = getattr(dialog, table_name)
         dialog.simple_table.blockSignals(True)
@@ -298,9 +302,7 @@ def test_failed_pre_post_imputation_restores_value_from_owning_table(
 
 
 @pytest.mark.parametrize("invalid_n", ["10.5", "10,5", "nan", "inf", "-1"])
-def test_continuous_sample_size_is_rejected_before_model_or_r(
-    monkeypatch, invalid_n
-):
+def test_continuous_sample_size_is_rejected_before_model_or_r(monkeypatch, invalid_n):
     recorder = {}
     warnings = []
     unit = FakeContinuousMAUnit()
@@ -326,7 +328,9 @@ def test_continuous_sample_size_is_rejected_before_model_or_r(
         assert unit.get_raw_data_for_group("Group 1") == before_raw
         assert dialog.simple_table.item(0, 0).text() == "10.0"
         assert warnings
-        assert "numeric" in warnings[-1].lower() or "whole number" in warnings[-1].lower()
+        assert (
+            "numeric" in warnings[-1].lower() or "whole number" in warnings[-1].lower()
+        )
     finally:
         _close(app, dialog)
 
@@ -359,7 +363,10 @@ def test_continuous_variants_are_transactional_and_screen_bounded(monkeypatch, s
             dialog.g1_pre_post_table,
             dialog.g2_pre_post_table,
         ):
-            assert table.horizontalScrollBarPolicy() == QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
+            assert (
+                table.horizontalScrollBarPolicy()
+                == QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
+            )
             assert (
                 table.horizontalHeader().sectionResizeMode(0)
                 == QtWidgets.QHeaderView.ResizeMode.Interactive
@@ -526,11 +533,14 @@ def test_continuous_long_metric_choice_is_fully_accessible(monkeypatch, size):
         assert view.isVisible()
         assert available.contains(popup.frameGeometry())
         assert view.textElideMode() == QtCore.Qt.TextElideMode.ElideNone
-        assert view.horizontalScrollBarPolicy() == QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
-        assert view.horizontalScrollBar().maximum() > 0
-        assert dialog.effect_cbo_box.itemData(smd_index, QtCore.Qt.ItemDataRole.ToolTipRole) == (
-            full_value
+        assert (
+            view.horizontalScrollBarPolicy()
+            == QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
         )
+        assert view.horizontalScrollBar().maximum() > 0
+        assert dialog.effect_cbo_box.itemData(
+            smd_index, QtCore.Qt.ItemDataRole.ToolTipRole
+        ) == (full_value)
         dialog.effect_cbo_box.hidePopup()
     finally:
         _close(app, dialog)
@@ -690,6 +700,7 @@ def test_continuous_back_calculation_apply_failures_restore_exact_transaction(
                 dialog, "_capture_back_calculation_state", fail_new_snapshot
             )
         else:
+
             def fail_before_push(_stack, _command):
                 raise RuntimeError("undo push fault")
 
@@ -781,9 +792,11 @@ def test_continuous_back_calculation_undo_publication_has_one_commit_point(
         original_push = QtGui.QUndoStack.push
 
         if failure_timing == "before_insert":
+
             def injected_push(_stack, _command):
                 raise RuntimeError("pre-insertion push fault")
         else:
+
             def injected_push(stack, command):
                 original_push(stack, command)
                 if failure_timing == "ambiguous_after_insert":

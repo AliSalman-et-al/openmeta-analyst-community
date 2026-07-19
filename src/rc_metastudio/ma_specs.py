@@ -555,9 +555,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                 raise RuntimeError(result)
             succeeded = True
         except Exception as error:
-            app_error_handler.log_exception(
-                type(error), error, error.__traceback__
-            )
+            app_error_handler.log_exception(type(error), error, error.__traceback__)
             QMessageBox.critical(
                 self,
                 "Analysis Failed",
@@ -771,12 +769,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
     def method_changed(self):
         parameter_layout = self.parameter_grp_box.layout()
         if parameter_layout is not None:
-            print(
-                (
-                    "Layout items count before: %d"
-                    % parameter_layout.count()
-                )
-            )
+            print(("Layout items count before: %d" % parameter_layout.count()))
         self.clear_param_ui()
         self.current_widgets = []
         if self.available_method_d is None:
@@ -1100,7 +1093,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             finput.setRange(0, ANALYSIS_NUMERIC_MAX)
         else:
             finput.setRange(ANALYSIS_NUMERIC_MIN, ANALYSIS_NUMERIC_MAX)
-        finput.setCorrectionMode(QtWidgets.QAbstractSpinBox.CorrectionMode.CorrectToPreviousValue)
+        finput.setCorrectionMode(
+            QtWidgets.QAbstractSpinBox.CorrectionMode.CorrectToPreviousValue
+        )
 
         # if a default value has been specified, use it
         if name in self.current_defaults:
@@ -1158,7 +1153,9 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             iinput.setRange(0, ANALYSIS_COUNT_MAX)
         else:
             iinput.setRange(-2147483648, 2147483647)
-        iinput.setCorrectionMode(QtWidgets.QAbstractSpinBox.CorrectionMode.CorrectToPreviousValue)
+        iinput.setCorrectionMode(
+            QtWidgets.QAbstractSpinBox.CorrectionMode.CorrectToPreviousValue
+        )
 
         # if a default value has been specified, use it
         if name in self.current_defaults:
@@ -1275,6 +1272,16 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.current_params, self.current_defaults, self.var_order, self.param_d = (
             meta_py_r.get_params(self.current_method)
         )
+
+        for name, definition in self.current_params.items():
+            if name not in self.current_param_vals:
+                continue
+            saved_value = self.current_param_vals[name]
+            if isinstance(definition, list) and str(saved_value) not in {
+                str(option) for option in definition
+            }:
+                continue
+            self.current_defaults[name] = saved_value
 
         ###
         # user selections overwrite the current parameter defaults.
@@ -1530,18 +1537,14 @@ def _run_binary_request(request):
     parameters = request.parameter_values()
     if request.workflow == "standard":
         return meta_py_r.run_binary_ma(request.method, parameters)
-    return meta_py_r.run_workflow_analysis(
-        request.workflow, request.method, parameters
-    )
+    return meta_py_r.run_workflow_analysis(request.workflow, request.method, parameters)
 
 
 def _run_continuous_request(request):
     parameters = request.parameter_values()
     if request.workflow == "standard":
         return meta_py_r.run_continuous_ma(request.method, parameters)
-    return meta_py_r.run_workflow_analysis(
-        request.workflow, request.method, parameters
-    )
+    return meta_py_r.run_workflow_analysis(request.workflow, request.method, parameters)
 
 
 def _execute_meta_regression_request(
@@ -1562,7 +1565,9 @@ def _execute_meta_regression_request(
             model, include_raw_data=False, **conversion_kwargs
         )
     else:
-        raise ValueError("Unsupported meta-regression data family: %s" % request.data_type)
+        raise ValueError(
+            "Unsupported meta-regression data family: %s" % request.data_type
+        )
     parameters = request.parameter_values()
     return meta_py_r.run_meta_regression(
         model.dataset,
@@ -1610,9 +1615,7 @@ def _display_svg_path(output_path):
     normalized_path = os.path.normcase(os.path.abspath(str(output_path)))
     path_digest = hashlib.sha256(normalized_path.encode("utf-8")).hexdigest()[:12]
     plot_name = os.path.basename(root) or "plot"
-    return analysis_output_path(
-        "%s-%s.display.svg" % (plot_name, path_digest)
-    )
+    return analysis_output_path("%s-%s.display.svg" % (plot_name, path_digest))
 
 
 def add_plot_params(specs_form):
@@ -1653,9 +1656,7 @@ def add_plot_params(specs_form):
     specs_form.current_param_vals["fp_xlabel"] = _text_value(specs_form.x_lbl_le)
     forest_outpath = _text_value(specs_form.image_path)
     specs_form.current_param_vals["fp_outpath"] = forest_outpath
-    specs_form.current_param_vals["fp_display_path"] = _display_svg_path(
-        forest_outpath
-    )
+    specs_form.current_param_vals["fp_display_path"] = _display_svg_path(forest_outpath)
 
     plot_lb = _text_value(specs_form.plot_lb_le)
     specs_form.current_param_vals["fp_plot_lb"] = "[default]"
@@ -1809,13 +1810,9 @@ def _diagnostic_direct_effects_need_metric_specific_data(model, requests):
     return True
 
 
-def _run_diagnostic_analysis_isolating_metric_failures(
-    model, requests
-):
+def _run_diagnostic_analysis_isolating_metric_failures(model, requests):
     if _diagnostic_direct_effects_need_metric_specific_data(model, requests):
-        return _run_diagnostic_with_metric_specific_data(
-            model, requests
-        )
+        return _run_diagnostic_with_metric_specific_data(model, requests)
 
     meta_py_r.ma_dataset_to_simple_diagnostic_robj(model)
     try:

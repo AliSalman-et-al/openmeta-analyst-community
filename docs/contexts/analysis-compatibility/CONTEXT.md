@@ -148,6 +148,10 @@ _Avoid_: Network feature, optional analysis
 An analysis feature that models study-level covariates as predictors of effect estimates and must remain compatible before the first modernization milestone is releasable.
 _Avoid_: Regression feature, covariate analysis
 
+**Heterogeneity Explained**:
+The proportional reduction in estimated between-study heterogeneity from a Meta-Regression relative to its corresponding model without moderators, reported as a percentage and denoted by R².
+_Avoid_: Variance explained, ordinary R², model accuracy
+
 **Meta-Regression Bubble Plot**:
 The generated plot for a single-continuous-covariate Meta-Regression, showing study effect estimates as precision-weighted bubbles against the moderator with the fitted regression line and optional interval bands.
 _Avoid_: Regression scatter, covariate chart
@@ -167,6 +171,10 @@ _Avoid_: Advanced tests, full matrix
 **Confidence Level**:
 The percentage level used to compute confidence intervals for analysis results and displayed confidence intervals; the default Confidence Level is 95.0% unless a project or user action sets another value.
 _Avoid_: CI setting, interval percentage, confidence placeholder
+
+**Inference Method**:
+The statistical procedure used by an applicable analysis model to compute coefficient tests and their corresponding confidence intervals. An Inference Method is offered only when the underlying model supports a user-selectable procedure.
+_Avoid_: Confidence interval method, test method, CI method
 
 **Modern Test Runner**:
 The test runner used by Python 3 modernization tests and compatibility harness work.

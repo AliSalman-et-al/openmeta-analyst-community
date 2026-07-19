@@ -45,7 +45,9 @@ def main(argv: list[str] | None = None) -> int:
 
     missing = [path for path in PACKAGE_TEST_PATHS if not (ROOT / path).exists()]
     if missing:
-        raise FileNotFoundError(f"package verification names missing test paths: {missing}")
+        raise FileNotFoundError(
+            f"package verification names missing test paths: {missing}"
+        )
 
     qt6_build_root = ROOT / "build/package-release-qt6"
     run(

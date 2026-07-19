@@ -143,8 +143,7 @@ def _compare_numbers(expected, actual, accepted):
                     _row(
                         expected,
                         MALFORMED_OUTPUT,
-                        "%s.%s current numeric value is malformed."
-                        % (section, metric),
+                        "%s.%s current numeric value is malformed." % (section, metric),
                     )
                 )
                 continue
@@ -255,9 +254,7 @@ def _compare_texts_and_artifacts(
                     )
                 )
             else:
-                rows.append(
-                    _row(expected, PASS, "Text section %s matched." % section)
-                )
+                rows.append(_row(expected, PASS, "Text section %s matched." % section))
     for section in sorted(set(actual_texts) - set(expected_texts)):
         rows.append(
             _row(
@@ -287,10 +284,9 @@ def _compare_texts_and_artifacts(
         else:
             expected_descriptor = _artifact_descriptor(expected_artifact)
             actual_descriptor = _artifact_descriptor(actual_artifact)
-            descriptor_matches = (
-                _artifact_identity_descriptor(actual_descriptor)
-                == _artifact_identity_descriptor(expected_descriptor)
-            )
+            descriptor_matches = _artifact_identity_descriptor(
+                actual_descriptor
+            ) == _artifact_identity_descriptor(expected_descriptor)
             if cross_platform:
                 hashes_valid = _valid_sha256(
                     expected_descriptor["sha256"]
@@ -305,8 +301,7 @@ def _compare_texts_and_artifacts(
                 if not descriptor_matches:
                     detail = (
                         "Artifact %s descriptor changed under the cross-platform "
-                        "artifact policy (%s -> %s)."
-                        % (label, expected_os, actual_os)
+                        "artifact policy (%s -> %s)." % (label, expected_os, actual_os)
                     )
                 elif not hashes_valid:
                     detail = (
@@ -333,7 +328,9 @@ def _compare_texts_and_artifacts(
                             % (label, expected_os)
                         )
                 else:
-                    detail = "Artifact %s descriptor and content matched exactly." % label
+                    detail = (
+                        "Artifact %s descriptor and content matched exactly." % label
+                    )
                     if not passed:
                         detail = "Artifact %s descriptor or content changed." % label
             rows.append(

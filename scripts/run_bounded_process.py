@@ -99,8 +99,11 @@ def _terminate_owned_pid(path: Path | None) -> None:
 
 
 def run_bounded(
-    command: list[str], *, timeout_seconds: int,
-    stdout_path: Path | None = None, stderr_path: Path | None = None,
+    command: list[str],
+    *,
+    timeout_seconds: int,
+    stdout_path: Path | None = None,
+    stderr_path: Path | None = None,
     owned_pid_path: Path | None = None,
 ) -> int:
     if not command:

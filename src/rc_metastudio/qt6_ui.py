@@ -88,7 +88,10 @@ def prepare_generated_ui_imports(
 
     loaded_forms = sys.modules.get("forms")
     loaded_file = getattr(loaded_forms, "__file__", None)
-    if loaded_file is not None and package_root not in Path(loaded_file).resolve().parents:
+    if (
+        loaded_file is not None
+        and package_root not in Path(loaded_file).resolve().parents
+    ):
         raise RuntimeError(
             "forms was imported before the Qt6 generated-form bootstrap; restart "
             "through the maintained rc-metastudio entry point"
@@ -100,6 +103,11 @@ def prepare_generated_ui_imports(
         sys.path.insert(0, text)
     generated_forms = importlib.import_module("forms")
     generated_file = getattr(generated_forms, "__file__", None)
-    if generated_file is None or package_root not in Path(generated_file).resolve().parents:
-        raise RuntimeError("generated forms package did not bind to the Qt6 build output")
+    if (
+        generated_file is None
+        or package_root not in Path(generated_file).resolve().parents
+    ):
+        raise RuntimeError(
+            "generated forms package did not bind to the Qt6 build output"
+        )
     return GeneratedUiLayout(resolved_build, package_root, forms_root)

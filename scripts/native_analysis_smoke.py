@@ -65,12 +65,16 @@ def main() -> int:
     backend = ma_specs.meta_py_r
     backend.ma_dataset_to_simple_binary_robj = lambda *args, **kwargs: None
     backend.get_available_methods = lambda **kwargs: {"Random": "binary.random"}
-    setattr(backend, "get_params", lambda method: (
-        {"conf.level": "float"},
-        {"conf.level": 95.0},
-        ["conf.level"],
-        {},
-    ))
+    setattr(
+        backend,
+        "get_params",
+        lambda method: (
+            {"conf.level": "float"},
+            {"conf.level": 95.0},
+            ["conf.level"],
+            {},
+        ),
+    )
     backend.get_method_description = lambda method: "Random-effects analysis"
     backend.get_analysis_plot_capabilities = lambda *args, **kwargs: []
 
@@ -115,7 +119,9 @@ def main() -> int:
         return dialog
 
     configuration = make_configuration()
-    confidence_input = configuration.parameter_grp_box.findChild(QtWidgets.QDoubleSpinBox)
+    confidence_input = configuration.parameter_grp_box.findChild(
+        QtWidgets.QDoubleSpinBox
+    )
     if confidence_input is None:
         raise RuntimeError("confidence-level input is missing")
     confidence_input.setLocale(QtCore.QLocale(QtCore.QLocale.Language.German))

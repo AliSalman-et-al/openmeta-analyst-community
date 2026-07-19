@@ -317,7 +317,7 @@ def test_data_type_icons_follow_button_text_color_across_palette_changes(qapp):
         _show(wizard, qapp)
         page = wizard.currentPage()
 
-        for foreground, expected_light in (("#111111", False), ("#f5f5f5", True)):
+        for foreground, theme in (("#111111", "light"), ("#f5f5f5", "dark")):
             palette = qapp.palette()
             palette.setColor(
                 QtGui.QPalette.ColorRole.ButtonText, QtGui.QColor(foreground)
@@ -326,6 +326,7 @@ def test_data_type_icons_follow_button_text_color_across_palette_changes(qapp):
             qapp.processEvents()
 
             for button in page._data_type_buttons():
+                assert page._data_type_icon_themes[button.objectName()] == theme
                 image = button.icon().pixmap(button.iconSize()).toImage()
                 colors = [
                     image.pixelColor(x, y)
@@ -333,11 +334,20 @@ def test_data_type_icons_follow_button_text_color_across_palette_changes(qapp):
                     for x in range(image.width())
                     if image.pixelColor(x, y).alpha() >= 128
                 ]
-                assert colors
-                average_lightness = sum(color.lightness() for color in colors) / len(
-                    colors
-                )
-                assert (average_lightness >= 200) is expected_light
+                assert colors, (theme, button.objectName(), button.icon().isNull())
+
+            diagnostic = (
+                page.diagnostic_Button.icon()
+                .pixmap(page.diagnostic_Button.iconSize())
+                .toImage()
+            )
+            diagnostic_colors = {
+                diagnostic.pixelColor(x, y).rgba()
+                for y in range(diagnostic.height())
+                for x in range(diagnostic.width())
+                if diagnostic.pixelColor(x, y).alpha() >= 128
+            }
+            assert len(diagnostic_colors) >= 3
     finally:
         qapp.setPalette(original_palette)
         wizard.close()

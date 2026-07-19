@@ -71,7 +71,9 @@ def load(path: Path) -> dict:
 
 def write(path: Path, value: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def now() -> str:
@@ -94,7 +96,9 @@ def required_stages(manifest: dict, target: str) -> list[str]:
 def repository_version() -> str:
     import tomllib
 
-    return tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+    return tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))[
+        "project"
+    ]["version"]
 
 
 def assert_commit(commit: str) -> None:
@@ -106,7 +110,9 @@ def init_release(args: argparse.Namespace) -> None:
     assert_commit(args.commit)
     requested_base = args.version.split("-rc.", 1)[0]
     if requested_base != repository_version():
-        raise ValueError(f"requested version {args.version} does not match repository version {repository_version()}")
+        raise ValueError(
+            f"requested version {args.version} does not match repository version {repository_version()}"
+        )
     selected_targets = list(dict.fromkeys(getattr(args, "target", None) or targets()))
     unsupported = sorted(set(selected_targets) - set(targets()))
     if unsupported:
@@ -134,7 +140,13 @@ def inventory(args: argparse.Namespace) -> None:
         raise ValueError(f"inventory root does not exist: {root}")
     files = []
     for path in sorted(item for item in root.rglob("*") if item.is_file()):
-        files.append({"path": path.relative_to(root).as_posix(), "size": path.stat().st_size, "sha256": digest(path)})
+        files.append(
+            {
+                "path": path.relative_to(root).as_posix(),
+                "size": path.stat().st_size,
+                "sha256": digest(path),
+            }
+        )
     write(Path(args.output), {"schema_version": 1, "root": root.name, "files": files})
 
 
@@ -151,9 +163,17 @@ def sbom(args: argparse.Namespace) -> None:
     document = {
         "bomFormat": "CycloneDX",
         "specVersion": "1.5",
-        "serialNumber": "urn:uuid:" + str(uuid.uuid5(uuid.NAMESPACE_URL, canonical_digest(source))),
+        "serialNumber": "urn:uuid:"
+        + str(uuid.uuid5(uuid.NAMESPACE_URL, canonical_digest(source))),
         "version": 1,
-        "metadata": {"timestamp": now(), "component": {"type": "application", "name": "RC MetaStudio", "version": args.version}},
+        "metadata": {
+            "timestamp": now(),
+            "component": {
+                "type": "application",
+                "name": "RC MetaStudio",
+                "version": args.version,
+            },
+        },
         "components": components,
     }
     write(Path(args.output), document)
@@ -168,7 +188,9 @@ def stage_result(args: argparse.Namespace) -> None:
         path = Path(value)
         if not path.is_file() or path.stat().st_size == 0:
             raise ValueError(f"stage output is missing or empty: {path}")
-        outputs.append({"name": path.name, "sha256": digest(path), "size": path.stat().st_size})
+        outputs.append(
+            {"name": path.name, "sha256": digest(path), "size": path.stat().st_size}
+        )
     record = {
         "schema_version": 1,
         "target": args.target,
@@ -192,12 +214,26 @@ def attach(args: argparse.Namespace) -> None:
     required = required_stages(manifest, record["target"])
     expected = required[len(stages)] if len(stages) < len(required) else None
     if record["stage"] != expected:
-        raise ValueError(f"invalid stage transition: expected {expected}, received {record['stage']}")
-    expected_input = release_identity_digest(manifest) if not stages else canonical_digest(stages[-1])
+        raise ValueError(
+            f"invalid stage transition: expected {expected}, received {record['stage']}"
+        )
+    expected_input = (
+        release_identity_digest(manifest)
+        if not stages
+        else canonical_digest(stages[-1])
+    )
     if record["input_digest"] != expected_input:
-        raise ValueError("stage input digest does not bind the preceding immutable state")
+        raise ValueError(
+            "stage input digest does not bind the preceding immutable state"
+        )
     stages.append(record)
-    manifest["history"].append({"event": record["stage"], "target": record["target"], "at": record["completed_at"]})
+    manifest["history"].append(
+        {
+            "event": record["stage"],
+            "target": record["target"],
+            "at": record["completed_at"],
+        }
+    )
     write(path, manifest)
 
 
@@ -206,7 +242,11 @@ def verify(args: argparse.Namespace) -> None:
     assert_commit(manifest["source"]["commit"])
     configured = targets()
     selected = manifest.get("release_targets")
-    if not isinstance(selected, list) or not selected or not set(selected) <= set(configured):
+    if (
+        not isinstance(selected, list)
+        or not selected
+        or not set(selected) <= set(configured)
+    ):
         raise ValueError("release set target selection is invalid")
     if set(manifest["targets"]) != set(selected):
         raise ValueError("release set does not contain exactly its selected targets")
@@ -214,7 +254,9 @@ def verify(args: argparse.Namespace) -> None:
         stages = manifest["targets"][name].get("stages", [])
         if [item["stage"] for item in stages] != required_stages(manifest, name):
             raise ValueError(f"{name} has incomplete or out-of-order stages")
-        if any(item["source_commit"] != manifest["source"]["commit"] for item in stages):
+        if any(
+            item["source_commit"] != manifest["source"]["commit"] for item in stages
+        ):
             raise ValueError(f"{name} contains a foreign source commit")
     print(canonical_digest(manifest))
 
@@ -226,22 +268,39 @@ def promote(args: argparse.Namespace) -> None:
         raise ValueError(f"cannot promote {source['channel']} to {args.channel}")
     source_digest = canonical_digest(source)
     if args.version:
-        if args.channel != "stable" or source["version"].split("-rc.", 1)[0] != args.version:
+        if (
+            args.channel != "stable"
+            or source["version"].split("-rc.", 1)[0] != args.version
+        ):
             raise ValueError("stable version must equal the RC base version")
         source["version"] = args.version
     source["channel"] = args.channel
-    source["history"].append({"event": "promoted", "from": args.from_channel, "to": args.channel, "at": now(), "source_manifest_sha256": source_digest})
+    source["history"].append(
+        {
+            "event": "promoted",
+            "from": args.from_channel,
+            "to": args.channel,
+            "at": now(),
+            "source_manifest_sha256": source_digest,
+        }
+    )
     write(Path(args.output), source)
 
 
 def checksums(args: argparse.Namespace) -> None:
     paths = sorted(Path(value) for value in args.files)
-    Path(args.output).write_text("".join(f"{digest(path)}  {path.name}\n" for path in paths), encoding="utf-8")
+    Path(args.output).write_text(
+        "".join(f"{digest(path)}  {path.name}\n" for path in paths), encoding="utf-8"
+    )
 
 
 def print_digest(args: argparse.Namespace) -> None:
     value = load(Path(args.json))
-    print(release_identity_digest(value) if args.release_identity else canonical_digest(value))
+    print(
+        release_identity_digest(value)
+        if args.release_identity
+        else canonical_digest(value)
+    )
 
 
 def parser() -> argparse.ArgumentParser:

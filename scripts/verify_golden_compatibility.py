@@ -27,9 +27,7 @@ from rc_metastudio.analysis_regression_compare import compare_golden_baseline
 ARCHIVE_RELATIVE_PATH = PurePosixPath(
     "docs/verification/pre-qt6-baseline/observed-golden-baseline.zip"
 )
-OUTER_MANIFEST_RELATIVE_PATH = Path(
-    "docs/verification/pre-qt6-baseline/manifest.json"
-)
+OUTER_MANIFEST_RELATIVE_PATH = Path("docs/verification/pre-qt6-baseline/manifest.json")
 OUTPUT_BASE_RELATIVE_PATH = Path("build/qt6-verification")
 OUTPUT_MARKER = ".rcms-golden-verification-output"
 MAX_ARCHIVE_BYTES = 8 * 1024 * 1024
@@ -88,11 +86,15 @@ def _safe_output_root(root: Path, requested: Path) -> Path:
     try:
         relative = canonical.relative_to(output_base)
     except ValueError as exc:
-        raise ValueError("Golden output must stay under build/qt6-verification") from exc
+        raise ValueError(
+            "Golden output must stay under build/qt6-verification"
+        ) from exc
     if relative == Path(".") or not relative.parts:
         raise ValueError("Golden output cannot be the verification root")
     if not relative.parts[0].startswith("golden-compatibility-"):
-        raise ValueError("Golden output must use a dedicated golden-compatibility directory")
+        raise ValueError(
+            "Golden output must use a dedicated golden-compatibility directory"
+        )
     return canonical
 
 
@@ -116,7 +118,10 @@ def _prepare_output_root(root: Path, requested: Path) -> Path:
 
 
 def _validate_internal_manifest(reference: Any) -> dict[str, Any]:
-    if not isinstance(reference, dict) or reference.get("baseline") != "comprehensive-golden":
+    if (
+        not isinstance(reference, dict)
+        or reference.get("baseline") != "comprehensive-golden"
+    ):
         raise ValueError("frozen internal manifest has the wrong schema")
     rows = reference.get("curated_golden_set")
     if not isinstance(rows, list) or len(rows) != 11:
@@ -129,7 +134,10 @@ def _validate_internal_manifest(reference: Any) -> dict[str, Any]:
         if (
             not isinstance(row_id, str)
             or not row_id
-            or any(character not in "abcdefghijklmnopqrstuvwxyz0123456789-" for character in row_id)
+            or any(
+                character not in "abcdefghijklmnopqrstuvwxyz0123456789-"
+                for character in row_id
+            )
         ):
             raise ValueError("frozen case id is unsafe")
         ids.append(row_id)
@@ -236,7 +244,9 @@ def _load_plot_descriptor_contract(
 ) -> dict[str, Any]:
     outer = _load_json(root / OUTER_MANIFEST_RELATIVE_PATH)
     entry = outer.get("golden_plot_descriptor_contract")
-    expected_relative = "docs/verification/pre-qt6-baseline/golden-plot-descriptors.json"
+    expected_relative = (
+        "docs/verification/pre-qt6-baseline/golden-plot-descriptors.json"
+    )
     if (
         not isinstance(entry, dict)
         or entry.get("path") != expected_relative
@@ -274,11 +284,12 @@ def _load_plot_descriptor_contract(
             for artifact in reference_by_id[row_id]["artifacts"]
         }
         label = row.get("artifact_label")
-        if (
-            label not in artifacts
-            or row.get("artifact_oracle_sha256") != artifacts[label].get("sha256")
-        ):
-            raise ValueError("plot descriptor is not tied to its frozen artifact oracle")
+        if label not in artifacts or row.get("artifact_oracle_sha256") != artifacts[
+            label
+        ].get("sha256"):
+            raise ValueError(
+                "plot descriptor is not tied to its frozen artifact oracle"
+            )
     if seen != set(reference_by_id):
         raise ValueError("plot descriptor contract is missing cases")
     return contract
@@ -417,9 +428,7 @@ def _reference_with_numeric_contract(
     by_id = {case["id"]: case for case in contract["cases"]}
     for row in expected["curated_golden_set"]:
         row["outputs"] = copy.deepcopy(by_id[row["id"]]["sections"])
-        row["numeric_tolerance_policy"] = copy.deepcopy(
-            contract["tolerance_policy"]
-        )
+        row["numeric_tolerance_policy"] = copy.deepcopy(contract["tolerance_policy"])
     return expected
 
 
@@ -437,7 +446,9 @@ def _validate_rpy2_identities(root: Path) -> dict[str, str]:
         try:
             observed = metadata.version(distribution)
         except metadata.PackageNotFoundError as exc:
-            raise ValueError("required distribution is missing: %s" % distribution) from exc
+            raise ValueError(
+                "required distribution is missing: %s" % distribution
+            ) from exc
         if observed != required:
             raise ValueError(
                 "%s identity mismatch: expected %s, observed %s"
@@ -484,10 +495,9 @@ def _compare_plot_descriptors(
             )
             if not passed:
                 detail = "Display identity/content or plot capability metadata drifted."
-        if (
-            len(actual_descriptors) != len(actual_by_label)
-            or set(actual_by_label) - {expected_label}
-        ):
+        if len(actual_descriptors) != len(actual_by_label) or set(actual_by_label) - {
+            expected_label
+        }:
             passed = False
             detail = "Unexpected plot descriptors were produced."
         rows.append(
@@ -513,8 +523,7 @@ def _validate_current_rpy2_identities(
             if not isinstance(identities, dict):
                 raise ValueError("%s is missing %s" % (case_id, field))
             observed = {
-                distribution: identities.get(distribution)
-                for distribution in expected
+                distribution: identities.get(distribution) for distribution in expected
             }
             if observed != expected:
                 raise ValueError(
@@ -532,7 +541,11 @@ def _validate_coverage_contract(
     expected_ids = committed["curated_golden_set"]
     reference_ids = [row["id"] for row in reference["curated_golden_set"]]
     current_ids = [row["id"] for row in current["curated_golden_set"]]
-    if len(expected_ids) != 11 or reference_ids != expected_ids or current_ids != expected_ids:
+    if (
+        len(expected_ids) != 11
+        or reference_ids != expected_ids
+        or current_ids != expected_ids
+    ):
         raise ValueError(
             "curated Golden coverage must contain the same ordered 11 cases in "
             "the committed contract, frozen baseline, and current capture"

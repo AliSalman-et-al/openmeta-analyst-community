@@ -132,6 +132,7 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name="RCMetaStudio.app",
+    icon=str(app_source / "images" / "rc-metastudio-app-icon-rounded.png"),
     bundle_identifier=os.environ.get(
         "RCMS_BUNDLE_IDENTIFIER", "org.researchconsultancy.rc-metastudio"
     ),

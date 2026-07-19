@@ -156,6 +156,7 @@ continuous.fixed <- function(cont.data, params){
     
   results <- NULL
   input.params <- params
+  inference.method <- rcmetar.validate.inference.method(params, length(cont.data@y))
 
   if (length(cont.data@study.names) == 1){
     # handle the case where only one study was passed in
@@ -169,6 +170,7 @@ continuous.fixed <- function(cont.data, params){
       sei=cont.data@SE,
       slab=cont.data@study.names,
       method="FE",
+      test=inference.method,
       level=params$conf.level,
       digits=params$digits)
     pure.res <- res
@@ -220,19 +222,21 @@ continuous.fixed <- function(cont.data, params){
           "Weights"=weights(res))
   }
 	
-  results[["References"]] <- rcmetar.method.references("rma.uni.fixed")
+  results[["References"]] <- rcmetar.unique.references(c(
+    rcmetar.method.references("rma.uni.fixed"),
+    rcmetar.inference.method.references(params)))
 	
   results
 }
 
 continuous.fixed.parameters <- function(){
   # parameters
-  params <- list("conf.level"="float", "digits"="int")
+  params <- list("inference.method"=rcmetar.inference.methods(), "conf.level"="float", "digits"="int")
 
   # default values
-  defaults <- list("conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS)
+  defaults <- list("inference.method"="z", "conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS)
 
-  var_order <- c("conf.level", "digits")
+  var_order <- c("inference.method", "conf.level", "digits")
   parameters <- list("parameters"=params, "defaults"=defaults, "var_order"=var_order)
 }
 
@@ -240,6 +244,7 @@ continuous.fixed.pretty.names <- function() {
   pretty.names <- list(
     "pretty.name"="Continuous Fixed-Effect Inverse Variance",
      "description" = "Performs fixed-effect meta-analysis with inverse variance weighting.",
+     "inference.method"=rcmetar.inference.method.metadata(),
      "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"),
      "digits"=list("pretty.name"="Decimal places", "description"="Decimal places for displayed estimates and intervals; p-values use at least 3"),
      "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
@@ -264,6 +269,7 @@ continuous.random <- function(cont.data, params) {
 
   results <- NULL
 	input.params <- params
+	inference.method <- rcmetar.validate.inference.method(params, length(cont.data@y))
 	
   if (length(cont.data@study.names) == 1) {
       # handle the case where only one study was passed in
@@ -276,6 +282,7 @@ continuous.random <- function(cont.data, params) {
       yi=cont.data@y, sei=cont.data@SE,
       slab=cont.data@study.names,
       method=params$rm.method,
+      test=inference.method,
       level=params$conf.level,
       digits=params$digits)
     pure.res<-res
@@ -326,7 +333,9 @@ continuous.random <- function(cont.data, params) {
       "Weights"=weights(res))
   }
 	
-  results[["References"]] <- rcmetar.method.references("rma.uni.random")
+  results[["References"]] <- rcmetar.unique.references(c(
+    rcmetar.method.references("rma.uni.random"),
+    rcmetar.inference.method.references(params)))
 	
   results
 }
@@ -342,31 +351,26 @@ continuous.fixed.value.info <- function() {
 
 continuous.random.parameters <- function() {
   # parameters
-  rm_method_ls <- c("HE", "DL", "SJ", "ML", "REML", "EB")
+  rm_method_ls <- rcmetar.random.effects.methods()
 
-  params <- list("rm.method"=rm_method_ls, "conf.level"="float", "digits"="int")
+  params <- list("rm.method"=rm_method_ls, "inference.method"=rcmetar.inference.methods(), "conf.level"="float", "digits"="int")
 
   # default values
-  defaults <- list("rm.method"="DL", "conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS)
+  defaults <- list("rm.method"="DL", "inference.method"="z", "conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS)
 
-  var_order <- c("rm.method", "conf.level", "digits")
+  var_order <- c("rm.method", "inference.method", "conf.level", "digits")
   parameters <- list("parameters"=params, "defaults"=defaults, "var_order"=var_order)
 }
 
 continuous.random.pretty.names <- function() {
 	# Keep display names explicit even though rm_method_ls defines the codes.
-	rm_method_names <- list(
-    HE = "Hedges-Olkin",
-    DL = "DerSimonian-Laird",
-    SJ = "Sidik-Jonkman",
-    ML = "Maximum Likelihood",
-    REML = "Restricted Maximum Likelihood",
-    EB = "Empirical Bayes")
+	rm_method_names <- rcmetar.random.effects.method.names()
 	
   pretty.names <- list(
     "pretty.name"="Continuous Random-Effects",
     "description" = "Performs random-effects meta-analysis.",
     "rm.method"=list("pretty.name"="Random-Effects method", "description"="Method for estimating between-studies heterogeneity", "rm.method.names"=rm_method_names),
+    "inference.method"=rcmetar.inference.method.metadata(),
     "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"),
     "digits"=list("pretty.name"="Decimal places", "description"="Decimal places for displayed estimates and intervals; p-values use at least 3"),
     "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),

@@ -73,15 +73,12 @@ def test_numeric_comparison_rejects_malformed_values_without_raising():
         assert report["passed"] is False
         assert any(
             row["classification"] == MALFORMED_OUTPUT
-            and row["detail"]
-            == "Summary.estimate current numeric value is malformed."
+            and row["detail"] == "Summary.estimate current numeric value is malformed."
             for row in report["rows"]
         )
 
     reference = _baseline()
-    reference["curated_golden_set"][0]["outputs"]["Summary"]["estimate"] = float(
-        "nan"
-    )
+    reference["curated_golden_set"][0]["outputs"]["Summary"]["estimate"] = float("nan")
     report = compare_golden_baseline(reference, _current())
     assert report["passed"] is False
     assert any(
@@ -146,11 +143,17 @@ def test_cross_platform_text_normalization_is_limited_to_tau_squared_header():
         " 0.378    33.360         0.015  46.0%"
     )
     actual["texts"]["Summary"] = expected["texts"]["Summary"].replace("t²", "τ²")
-    assert normalize_heterogeneity_header(actual["texts"]["Summary"]) == expected["texts"]["Summary"]
-    assert normalize_heterogeneity_header("Narrative τ² meaning") == "Narrative τ² meaning"
+    assert (
+        normalize_heterogeneity_header(actual["texts"]["Summary"])
+        == expected["texts"]["Summary"]
+    )
+    assert (
+        normalize_heterogeneity_header("Narrative τ² meaning") == "Narrative τ² meaning"
+    )
 
     text_row = next(
-        row for row in compare_golden_baseline(baseline, current)["rows"]
+        row
+        for row in compare_golden_baseline(baseline, current)["rows"]
         if row["detail"].startswith("Text section Summary")
     )
     assert text_row["classification"] == PASS
@@ -159,7 +162,8 @@ def test_cross_platform_text_normalization_is_limited_to_tau_squared_header():
     same_platform = json.loads(json.dumps(current))
     same_platform["curated_golden_set"][0]["tool_versions"]["os"] = "Windows"
     same_platform_row = next(
-        row for row in compare_golden_baseline(baseline, same_platform)["rows"]
+        row
+        for row in compare_golden_baseline(baseline, same_platform)["rows"]
         if row["detail"].startswith("Text section Summary")
     )
     assert same_platform_row["classification"] == TEXT_ARTIFACT_DRIFT
@@ -171,7 +175,8 @@ def test_cross_platform_text_normalization_is_limited_to_tau_squared_header():
         drifted = json.loads(json.dumps(current))
         drifted["curated_golden_set"][0]["texts"]["Summary"] = changed_text
         drifted_row = next(
-            row for row in compare_golden_baseline(baseline, drifted)["rows"]
+            row
+            for row in compare_golden_baseline(baseline, drifted)["rows"]
             if row["detail"].startswith("Text section Summary")
         )
         assert drifted_row["classification"] == TEXT_ARTIFACT_DRIFT
@@ -211,7 +216,9 @@ def test_analysis_regression_comparison_rejects_artifact_content_and_descriptor_
 
         rows = compare_golden_baseline(baseline, current)["rows"]
 
-        artifact_row = next(row for row in rows if row["detail"].startswith("Artifact "))
+        artifact_row = next(
+            row for row in rows if row["detail"].startswith("Artifact ")
+        )
         assert artifact_row["classification"] == TEXT_ARTIFACT_DRIFT
         assert "same-platform exact artifact policy (Windows)" in artifact_row["detail"]
 
@@ -227,11 +234,14 @@ def test_cross_platform_artifact_policy_validates_identity_and_hash_shape():
     actual["artifacts"][0]["sha256"] = "b" * 64
 
     artifact_row = next(
-        row for row in compare_golden_baseline(baseline, current)["rows"]
+        row
+        for row in compare_golden_baseline(baseline, current)["rows"]
         if row["detail"].startswith("Artifact ")
     )
     assert artifact_row["classification"] == PASS
-    assert "cross-platform artifact policy (Windows -> Darwin)" in artifact_row["detail"]
+    assert (
+        "cross-platform artifact policy (Windows -> Darwin)" in artifact_row["detail"]
+    )
 
     for mutation in ("missing-hash", "invalid-hash", "descriptor-drift"):
         candidate = json.loads(json.dumps(current))
@@ -243,11 +253,15 @@ def test_cross_platform_artifact_policy_validates_identity_and_hash_shape():
         else:
             artifact["path"] = "renamed.svg"
         artifact_row = next(
-            row for row in compare_golden_baseline(baseline, candidate)["rows"]
+            row
+            for row in compare_golden_baseline(baseline, candidate)["rows"]
             if row["detail"].startswith("Artifact ")
         )
         assert artifact_row["classification"] == TEXT_ARTIFACT_DRIFT
-        assert "cross-platform artifact policy (Windows -> Darwin)" in artifact_row["detail"]
+        assert (
+            "cross-platform artifact policy (Windows -> Darwin)"
+            in artifact_row["detail"]
+        )
 
 
 def test_analysis_regression_comparison_rejects_extra_cases():
@@ -365,20 +379,21 @@ def test_golden_verifier_rejects_traversal_and_duplicate_zip_members(tmp_path):
 
 def test_numeric_contract_covers_all_cases_and_rejects_shape_and_tolerance_drift():
     archive, frozen = verify_golden_compatibility._load_frozen_reference(ROOT)
-    contract = verify_golden_compatibility._load_numeric_contract(
-        ROOT, archive, frozen
-    )
+    contract = verify_golden_compatibility._load_numeric_contract(ROOT, archive, frozen)
     reference = verify_golden_compatibility._reference_with_numeric_contract(
         frozen, contract
     )
     assert [case["id"] for case in contract["cases"]] == [
         row["id"] for row in frozen["curated_golden_set"]
     ]
-    assert sum(
-        len(metrics)
-        for case in contract["cases"]
-        for metrics in case["sections"].values()
-    ) == 415
+    assert (
+        sum(
+            len(metrics)
+            for case in contract["cases"]
+            for metrics in case["sections"].values()
+        )
+        == 415
+    )
     assert all(case["nonnumeric_omissions"] for case in contract["cases"])
 
     current = json.loads(json.dumps(reference))
@@ -386,23 +401,19 @@ def test_numeric_contract_covers_all_cases_and_rejects_shape_and_tolerance_drift
     assert report["passed"] is True
 
     expected = reference["curated_golden_set"][0]
-    assert {"tau_squared", "q", "i_squared"}.issubset(
-        expected["outputs"]["Summary"]
-    )
+    assert {"tau_squared", "q", "i_squared"}.issubset(expected["outputs"]["Summary"])
     current = {"curated_golden_set": [json.loads(json.dumps(expected))]}
     del current["curated_golden_set"][0]["outputs"]["Summary"]["q"]
-    missing = compare_golden_baseline(
-        {"curated_golden_set": [expected]}, current
-    )["rows"]
+    missing = compare_golden_baseline({"curated_golden_set": [expected]}, current)[
+        "rows"
+    ]
     assert any(
         row["classification"] == MISSING_OUTPUT and "Summary.q" in row["detail"]
         for row in missing
     )
     current = {"curated_golden_set": [json.loads(json.dumps(expected))]}
     current["curated_golden_set"][0]["outputs"]["Summary"]["unexpected"] = 1.0
-    extra = compare_golden_baseline(
-        {"curated_golden_set": [expected]}, current
-    )["rows"]
+    extra = compare_golden_baseline({"curated_golden_set": [expected]}, current)["rows"]
     assert any(
         row["classification"] == UNEXPECTED_OUTPUT
         and "unexpected numeric metric" in row["detail"]
@@ -436,9 +447,7 @@ def test_numeric_oracle_is_independent_from_runtime_parser(monkeypatch):
         "parsed_numeric_sections",
         lambda _result: {"Poison": {"rewritten_oracle": 999.0}},
     )
-    contract = verify_golden_compatibility._load_numeric_contract(
-        ROOT, archive, frozen
-    )
+    contract = verify_golden_compatibility._load_numeric_contract(ROOT, archive, frozen)
     reference = verify_golden_compatibility._reference_with_numeric_contract(
         frozen, contract
     )
@@ -572,6 +581,7 @@ def test_real_r_verifiers_reject_null_or_mismatched_rpy2_identity(monkeypatch):
     )
     with pytest.raises(ValueError, match="required distribution is missing"):
         verify_golden_compatibility._validate_rpy2_identities(ROOT)
+
 
 def test_analysis_regression_comparison_classifies_missing_output_unsupported_and_capture_error():
     baseline = _baseline()
@@ -1069,9 +1079,10 @@ def _update_outer_file_contract(root, key, path):
 
 def _rewrite_zip(source, target, replacements, extra=None):
     extra = extra or {}
-    with zipfile.ZipFile(source) as original, zipfile.ZipFile(
-        target, "w", zipfile.ZIP_DEFLATED
-    ) as rewritten:
+    with (
+        zipfile.ZipFile(source) as original,
+        zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as rewritten,
+    ):
         for info in original.infolist():
             rewritten.writestr(
                 info.filename,

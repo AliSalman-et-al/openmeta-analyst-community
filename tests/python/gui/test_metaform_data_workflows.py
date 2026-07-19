@@ -31,7 +31,9 @@ def test_data_table_return_moves_vertically_from_selected_cells():
         QtTest.QTest.keyClick(table, QtCore.Qt.Key.Key_Enter)
         assert table.currentIndex() == model.index(2, model.NAME)
 
-        QtTest.QTest.keyClick(table, QtCore.Qt.Key.Key_Return, QtCore.Qt.KeyboardModifier.ShiftModifier)
+        QtTest.QTest.keyClick(
+            table, QtCore.Qt.Key.Key_Return, QtCore.Qt.KeyboardModifier.ShiftModifier
+        )
         assert table.currentIndex() == model.index(1, model.NAME)
     finally:
         _close_without_prompt(app, window)
@@ -82,7 +84,9 @@ def test_data_table_ctrl_a_selects_all_cells_without_running_analysis(monkeypatc
         table.setFocus()
         table.setCurrentIndex(model.index(0, model.NAME))
 
-        QtTest.QTest.keyClick(table, QtCore.Qt.Key.Key_A, QtCore.Qt.KeyboardModifier.ControlModifier)
+        QtTest.QTest.keyClick(
+            table, QtCore.Qt.Key.Key_A, QtCore.Qt.KeyboardModifier.ControlModifier
+        )
         app.processEvents()
 
         assert analysis_calls == []
@@ -344,9 +348,7 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
             r_payloads.append(dict(payload))
             return {"succeeded": False, "comment": "complete input"}
 
-        monkeypatch.setattr(
-            continuous_data_form.meta_py_r, "impute_cont_data", impute
-        )
+        monkeypatch.setattr(continuous_data_form.meta_py_r, "impute_cont_data", impute)
         monkeypatch.setattr(
             continuous_data_form.meta_py_r,
             "continuous_effect_for_study",
@@ -433,7 +435,9 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
             model.current_txs
         ) == before_invalid.get_raw_data_for_groups(model.current_txs)
 
-        saved_path = str(tmp_path / ("continuous-" + decimal.replace(",", "c") + ".rcms"))
+        saved_path = str(
+            tmp_path / ("continuous-" + decimal.replace(",", "c") + ".rcms")
+        )
         meta_form = sys.modules["meta_form"]
         monkeypatch.setattr(
             meta_form.QFileDialog,
@@ -489,9 +493,7 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
             r_payloads.append(dict(payload))
             return {"TP": None, "FP": None, "FN": None, "TN": None}
 
-        monkeypatch.setattr(
-            diagnostic_data_form.meta_py_r, "impute_diag_data", impute
-        )
+        monkeypatch.setattr(diagnostic_data_form.meta_py_r, "impute_diag_data", impute)
         monkeypatch.setattr(
             diagnostic_data_form.meta_py_r,
             "diagnostic_effects_for_study",
@@ -938,9 +940,7 @@ def test_multirow_paste_rolls_back_studies_added_before_commit_failure(monkeypat
         table = window.tableView
         origin = model.index(0, model.NAME)
         table.setCurrentIndex(origin)
-        table.selectionModel().select(
-            origin, QItemSelectionModel.SelectionFlag.Select
-        )
+        table.selectionModel().select(origin, QItemSelectionModel.SelectionFlag.Select)
         original_count = len(model.dataset.studies)
         original_names = [study.name for study in model.dataset.studies]
         table.undoStack.clear()
@@ -1009,9 +1009,12 @@ def test_inclusion_edit_undo_redo_restores_semantics_selection_and_dirty_state()
         table.undoStack.setClean()
         window.current_data_unsaved = False
 
-        assert model.setData(
-            inclusion, Qt.CheckState.Checked, Qt.ItemDataRole.CheckStateRole
-        ) is True
+        assert (
+            model.setData(
+                inclusion, Qt.CheckState.Checked, Qt.ItemDataRole.CheckStateRole
+            )
+            is True
+        )
         assert model.dataset.studies[0].include is True
         assert model.dataset.studies[0].manually_excluded is False
         assert table.undoStack.count() == 1
@@ -1756,9 +1759,7 @@ def test_edit_dataset_acceptance_propagates_copied_dataset_mutation(monkeypatch)
             dialog.dataset.studies[0].name = renamed_study
             return QDialog.DialogCode.Accepted
 
-        monkeypatch.setattr(
-            edit_dialog.EditDialog, "exec", accept_after_renaming_study
-        )
+        monkeypatch.setattr(edit_dialog.EditDialog, "exec", accept_after_renaming_study)
 
         window.edit_dataset()
 

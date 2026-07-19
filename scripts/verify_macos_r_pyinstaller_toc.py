@@ -55,7 +55,10 @@ def main() -> int:
         for relative, target in ALIASES.items():
             link = framework / relative
             link.parent.mkdir(parents=True, exist_ok=True)
-            link.symlink_to(target, target_is_directory=relative in {"Versions/Current", "Resources"})
+            link.symlink_to(
+                target,
+                target_is_directory=relative in {"Versions/Current", "Resources"},
+            )
         toc_path = work / "toc.json"
         toc_path.write_text(
             json.dumps({"entries": load_adapter().explicit_toc(framework)}),
@@ -101,9 +104,7 @@ def main() -> int:
             check=True,
         )
         bundled = work / "dist/Fixture.app/Contents/Frameworks/R.framework"
-        observed = {
-            relative: os.readlink(bundled / relative) for relative in ALIASES
-        }
+        observed = {relative: os.readlink(bundled / relative) for relative in ALIASES}
         if observed != ALIASES:
             raise RuntimeError(f"PyInstaller changed CRAN R aliases: {observed}")
         for relative in ALIASES:
@@ -111,7 +112,9 @@ def main() -> int:
         lib_r = list((work / "dist/Fixture.app").rglob("libR.dylib"))
         expected = bundled / "Versions/4.6-x86_64/Resources/lib/libR.dylib"
         if len(lib_r) != 1 or lib_r[0] != expected:
-            raise RuntimeError(f"PyInstaller produced a duplicate/cross-topology libR: {lib_r}")
+            raise RuntimeError(
+                f"PyInstaller produced a duplicate/cross-topology libR: {lib_r}"
+            )
     if args.output is not None:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(

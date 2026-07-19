@@ -53,7 +53,9 @@ def _capture_payloads(
         return record, artifact
     record_path = root / capture["record"]
     artifact_path = root / capture["artifact"]
-    return _json_object(record_path.read_bytes(), str(record_path)), artifact_path.read_bytes()
+    return _json_object(
+        record_path.read_bytes(), str(record_path)
+    ), artifact_path.read_bytes()
 
 
 def validate_sample_analysis_evidence(root: Path) -> list[str]:
@@ -72,13 +74,19 @@ def validate_sample_analysis_evidence(root: Path) -> list[str]:
             cast(str, value["file"]): value
             for value in cast(list[dict[str, Any]], sample_manifest["projects"])
         }
-        expected_projects = sorted(path.name for path in (root / "sample_projects").glob("*.rcms"))
+        expected_projects = sorted(
+            path.name for path in (root / "sample_projects").glob("*.rcms")
+        )
         observed_projects = sorted(cast(str, item["project"]) for item in samples)
         if observed_projects != expected_projects:
-            errors.append("sample analysis evidence does not cover every committed project")
+            errors.append(
+                "sample analysis evidence does not cover every committed project"
+            )
 
         with zipfile.ZipFile(root / GOLDEN_BUNDLE_PATH) as golden:
-            golden_manifest = _json_object(golden.read("manifest.json"), "golden manifest")
+            golden_manifest = _json_object(
+                golden.read("manifest.json"), "golden manifest"
+            )
             if golden_manifest.get("passed") is not True:
                 errors.append("authoritative Golden bundle did not pass")
             for item in samples:
@@ -92,18 +100,27 @@ def validate_sample_analysis_evidence(root: Path) -> list[str]:
                     errors.append(f"{label}: snapshot commit does not match evidence")
                 legacy_digest = cast(str, item["legacy_source_sha256"])
                 if snapshot.get("source_sha256") != legacy_digest:
-                    errors.append(f"{label}: snapshot legacy digest does not match evidence")
+                    errors.append(
+                        f"{label}: snapshot legacy digest does not match evidence"
+                    )
                 frozen_payload = _git_blob(
                     root, source_commit, f"sample_projects/{project_name}"
                 )
                 if _sha256(frozen_payload) != legacy_digest:
-                    errors.append(f"{label}: frozen project blob does not match snapshot")
+                    errors.append(
+                        f"{label}: frozen project blob does not match snapshot"
+                    )
 
                 document = load_project(root / "sample_projects" / project_name)
                 reconstructed = reconstruct_analysis_dataset(document)
                 semantic_digest = cast(str, item["semantic_sha256"])
-                if sample_metadata[project_name].get("semantic_sha256") != semantic_digest:
-                    errors.append(f"{label}: sample manifest semantic digest does not match")
+                if (
+                    sample_metadata[project_name].get("semantic_sha256")
+                    != semantic_digest
+                ):
+                    errors.append(
+                        f"{label}: sample manifest semantic digest does not match"
+                    )
                 if reconstructed.semantic_sha256 != semantic_digest:
                     errors.append(f"{label}: converted semantic digest does not match")
                 snapshot_dataset = cast(dict[str, Any], snapshot["dataset"])
@@ -133,7 +150,10 @@ def validate_sample_analysis_evidence(root: Path) -> list[str]:
                     errors.append(f"{label}: capture commit does not match")
                 if record.get("status") != "success":
                     errors.append(f"{label}: representative analysis did not succeed")
-                if record.get("authoritative") is not True or record.get("authority") != "authoritative":
+                if (
+                    record.get("authoritative") is not True
+                    or record.get("authority") != "authoritative"
+                ):
                     errors.append(f"{label}: capture is not authoritative")
                 outputs = record.get("outputs")
                 if not isinstance(outputs, dict) or not outputs:
@@ -155,12 +175,21 @@ def validate_sample_analysis_evidence(root: Path) -> list[str]:
                     errors.append(f"{label}: plot digest does not match capture")
                 if capture_spec["kind"] == "supplemental-authoritative":
                     if record.get("dataset_semantic_sha256") != semantic_digest:
-                        errors.append(f"{label}: supplemental capture semantic digest does not match")
+                        errors.append(
+                            f"{label}: supplemental capture semantic digest does not match"
+                        )
                     environment = record.get("baseline_environment")
-                    if not isinstance(environment, dict) or environment.get("matches_expected") is not True:
-                        errors.append(f"{label}: supplemental baseline environment is not authoritative")
+                    if (
+                        not isinstance(environment, dict)
+                        or environment.get("matches_expected") is not True
+                    ):
+                        errors.append(
+                            f"{label}: supplemental baseline environment is not authoritative"
+                        )
                     if not record.get("capture_identity_attestation"):
-                        errors.append(f"{label}: supplemental identity attestation is missing")
+                        errors.append(
+                            f"{label}: supplemental identity attestation is missing"
+                        )
     except (KeyError, OSError, ValueError, zipfile.BadZipFile) as exc:
         errors.append(f"sample analysis evidence could not be validated: {exc}")
     return errors

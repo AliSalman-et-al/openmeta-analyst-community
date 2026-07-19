@@ -24,7 +24,7 @@ def text(path: str) -> str:
 
 
 def official_macos_r_config_fixture() -> str:
-    return '''#!/bin/sh
+    return """#!/bin/sh
 ## config -- Simple shell script to get the values of basic R configure
 includes="-I${R_INCLUDE_DIR}"
 MAIN_LDFLAGS="-Wl,-headerpad_max_install_names"
@@ -44,7 +44,7 @@ case "$1" in
       ;;
     CC) echo clang ;;
 esac
-'''
+"""
 
 
 def load_inspector():
@@ -186,6 +186,17 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     assert "macdeployqt" not in build.lower()
     assert "Analysis(" in spec
     assert "BUNDLE(" in spec
+    assert (
+        'icon=str(app_source / "images" / "rc-metastudio-app-icon-rounded.png")'
+        in spec
+    )
+    assert (
+        ROOT
+        / "src"
+        / "rc_metastudio"
+        / "images"
+        / "rc-metastudio-app-icon-rounded.png"
+    ).is_file()
     assert 'target_arch=os.environ.get("RCMS_TARGET_ARCHITECTURE", "x86_64")' in spec
     assert all(f'"{name}"' in spec for name in ("PyQt5", "PySide2", "PySide6", "qtpy"))
     assert "project_schema_data" in spec
@@ -515,7 +526,9 @@ def test_private_r_launcher_configuration_is_exact_and_precedes_rpy2_build(tmp_p
     runtime_rscript.write_text('#!/bin/sh\nexec official "$@"\n', encoding="utf-8")
     runtime_rscript.chmod(0o755)
     runtime_config = runtime_resources / "bin/config"
-    runtime_config.write_text("arm64 build configuration is not adapted\n", encoding="utf-8")
+    runtime_config.write_text(
+        "arm64 build configuration is not adapted\n", encoding="utf-8"
+    )
     runtime_config_snapshot = runtime_config.read_bytes()
     launchers.configure(runtime_resources, configure_build=False)
     assert runtime_config.read_bytes() == runtime_config_snapshot
@@ -567,9 +580,7 @@ def test_private_r_launcher_configuration_is_exact_and_precedes_rpy2_build(tmp_p
         assert delegated.stdout.strip() == "clang"
         real_config = resources / "bin/config.real"
         real_config.write_text(
-            real_config.read_text(encoding="utf-8").replace(
-                "-liconv", "-lunexpected"
-            ),
+            real_config.read_text(encoding="utf-8").replace("-liconv", "-lunexpected"),
             encoding="utf-8",
         )
         rejected = subprocess.run(
@@ -1340,7 +1351,7 @@ def test_macos_surface_smoke_exercises_native_acceptance_surfaces():
     assert "isNativeMenuBar" in launch
     assert "accessible_control.setFocus()" in launch
     assert "accessible_control.setFocus(QtCore.Qt.FocusReason" not in launch
-    assert 'if sys.platform == "darwin" else {}' in launch
+    assert 'if sys.platform == "darwin"\n            else {}' in launch
     assert 'legacy_selector = "accessibilityAttributeValue:"' in launch
     assert 'children_attribute = ns_string("AXChildren")' in launch
     assert "roots, bridge_supported = qnsview_children(native_view)" in launch

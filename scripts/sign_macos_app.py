@@ -149,7 +149,9 @@ def build_signing_plan(app: Path) -> SigningPlan:
     if not native:
         _fail(f"macOS application contains no classified native code: {app}")
     if not _is_valid_code_bundle(app, native):
-        _fail(f"outer application bundle is malformed or has no native executable: {app}")
+        _fail(
+            f"outer application bundle is malformed or has no native executable: {app}"
+        )
 
     candidate_bundles: set[Path] = set()
     try:
@@ -274,7 +276,8 @@ def main() -> int:
     parser.add_argument("--identity")
     parser.add_argument("--inventory-output", type=Path)
     parser.add_argument(
-        "--inventory-only", action="store_true",
+        "--inventory-only",
+        action="store_true",
         help="verify the final bundle and write its native inventory without signing",
     )
     parser.add_argument(
@@ -293,7 +296,9 @@ def main() -> int:
     else:
         if args.identity is None:
             parser.error("--identity is required unless --inventory-only is used")
-        plan = sign_and_verify(args.app, identity=args.identity, timestamp=args.timestamp)
+        plan = sign_and_verify(
+            args.app, identity=args.identity, timestamp=args.timestamp
+        )
         identity = args.identity
     if args.inventory_output is not None:
         _write_inventory(args.inventory_output, plan, identity)

@@ -24,9 +24,7 @@ sys.path.insert(0, os.path.abspath("src"))
 
 REPO_ROOT = os.getcwd()
 ROOT = Path(__file__).resolve().parents[3]
-os.environ.setdefault(
-    "RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification")
-)
+os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
 prepare_generated_ui_imports()
@@ -422,6 +420,7 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
             lambda *args, **kwargs: [],
             raising=False,
         )
+
         def run_diagnostic(*args, **kwargs):
             run_calls.append(args)
             return {
@@ -467,9 +466,7 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
 
         assert form.windowTitle() == "Method & Parameters"
         assert (
-            form.buttonBox.button(
-                ma_specs.QDialogButtonBox.StandardButton.Ok
-            )
+            form.buttonBox.button(ma_specs.QDialogButtonBox.StandardButton.Ok)
             is not None
         )
         assert form.method_lbl.text() == "Sensitivity and Specificity"
@@ -987,7 +984,12 @@ def test_diagnostic_method_selector_exposes_full_choices_without_root_cap(monkey
             > form.method_cbo_box.view().viewport().width()
         ):
             assert form.method_cbo_box.view().horizontalScrollBar().maximum() > 0
-        assert form.method_cbo_box.itemData(label_index, QtCore.Qt.ItemDataRole.ToolTipRole) == label
+        assert (
+            form.method_cbo_box.itemData(
+                label_index, QtCore.Qt.ItemDataRole.ToolTipRole
+            )
+            == label
+        )
         assert form.method_cbo_box.toolTip() == form.method_cbo_box.currentText()
         form.method_cbo_box.hidePopup()
         assert form.method_cbo_box.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX

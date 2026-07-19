@@ -30,7 +30,9 @@ def _terminate_process_tree(process: subprocess.Popen[bytes]) -> None:
         )
         if terminated.returncode != 0:
             details = "\n".join(
-                part.strip() for part in (terminated.stdout, terminated.stderr) if part.strip()
+                part.strip()
+                for part in (terminated.stdout, terminated.stderr)
+                if part.strip()
             )
             raise RuntimeError(
                 f"taskkill /T /F failed for process tree {process.pid} "

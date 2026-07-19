@@ -204,6 +204,7 @@ binary.fixed.inv.var <- function(binary.data, params){
     
     results <- NULL
     input.params <- params
+    inference.method <- rcmetar.validate.inference.method(params, length(binary.data@y))
     
     if (length(binary.data@g1O1) == 1 || length(binary.data@y) == 1){
         res <- get.res.for.one.binary.study(binary.data, params)
@@ -213,7 +214,7 @@ binary.fixed.inv.var <- function(binary.data, params){
     } else {
         # call out to the metafor package
         res<-rma.uni(yi=binary.data@y, sei=binary.data@SE, slab=binary.data@study.names,
-                                level=params$conf.level, digits=params$digits, method="FE", add=c(params$adjust,params$adjust),
+                                level=params$conf.level, digits=params$digits, method="FE", test=inference.method, add=c(params$adjust,params$adjust),
                                 to=c(as.character(params$to), as.character(params$to)))
         pure.res <- res
         # Create forest plot and list to display summary of results
@@ -258,7 +259,9 @@ binary.fixed.inv.var <- function(binary.data, params){
                         "Weights"=weights(res))
     }
     
-    results[["References"]] <- rcmetar.method.references("rma.uni.fixed")
+    results[["References"]] <- rcmetar.unique.references(c(
+        rcmetar.method.references("rma.uni.fixed"),
+        rcmetar.inference.method.references(params)))
     results
 }
 
@@ -274,15 +277,15 @@ binary.fixed.inv.var.parameters <- function(){
     # parameters
     apply_adjustment_to = c("only0", "all")
     
-    params <- list("conf.level"="float",
+    params <- list("inference.method"=rcmetar.inference.methods(), "conf.level"="float",
                    "digits"="int", 
                    "adjust"="float",
                    "to"=apply_adjustment_to)
     
     # default values
-    defaults <- list("conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS, "adjust"=.5, "to"="only0")
+    defaults <- list("inference.method"="z", "conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS, "adjust"=.5, "to"="only0")
     
-    var_order = c("conf.level", "digits", "adjust", "to")
+    var_order = c("inference.method", "conf.level", "digits", "adjust", "to")
     
     parameters <- list("parameters"=params, "defaults"=defaults, "var_order"=var_order)
 }
@@ -290,6 +293,7 @@ binary.fixed.inv.var.parameters <- function(){
 binary.fixed.inv.var.pretty.names <- function() {
     pretty.names <- list("pretty.name"="Binary Fixed-Effect Inverse Variance", 
                          "description" = "Performs fixed-effect meta-analysis with inverse variance weighting.",
+                         "inference.method"=rcmetar.inference.method.metadata(),
                          "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"), 
                          "digits"=list("pretty.name"="Decimal places", "description"="Decimal places for displayed estimates and intervals; p-values use at least 3"),
                          "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),
@@ -307,7 +311,7 @@ binary.fixed.inv.var.overall <- function(results) {
 ############################################
 #  binary fixed effects -- mantel haenszel #
 ############################################
-binary.fixed.mh <- function(binary.data, params){    
+binary.fixed.mh <- function(binary.data, params){
     # assert that the argument is the correct type
     if (!("BinaryData" %in% class(binary.data)))
         stop("Binary data expected.")  
@@ -617,6 +621,7 @@ binary.random <- function(binary.data, params) {
     
     results <- NULL
     input.params <- params
+    inference.method <- rcmetar.validate.inference.method(params, length(binary.data@y))
     
     if (length(binary.data@g1O1) == 1 || length(binary.data@y) == 1){
         res <- get.res.for.one.binary.study(binary.data, params)
@@ -627,7 +632,7 @@ binary.random <- function(binary.data, params) {
         # call out to the metafor package
         res<-rma.uni(yi=binary.data@y, sei=binary.data@SE, 
                      slab=binary.data@study.names,
-                     method=params$rm.method, level=params$conf.level,
+                     method=params$rm.method, test=inference.method, level=params$conf.level,
                      digits=params$digits,
                      add=c(params$adjust,params$adjust),
                      to=as.character(params$to))
@@ -684,7 +689,9 @@ binary.random <- function(binary.data, params) {
                         "Weights"=weights(res))
     }
     
-    results[["References"]] <- rcmetar.method.references("rma.uni.random")
+    results[["References"]] <- rcmetar.unique.references(c(
+        rcmetar.method.references("rma.uni.random"),
+        rcmetar.inference.method.references(params)))
     results
 }
 
@@ -701,30 +708,25 @@ binary.random.is.feasible.for.funnel <- function () {
 binary.random.parameters <- function(){
     # parameters
     apply_adjustment_to = c("only0", "all")
-    rm_method_ls <- c("HE", "DL", "SJ", "ML", "REML", "EB")
-    params <- list("rm.method"=rm_method_ls, "conf.level"="float", "digits"="int",
+    rm_method_ls <- rcmetar.random.effects.methods()
+    params <- list("rm.method"=rm_method_ls, "inference.method"=rcmetar.inference.methods(), "conf.level"="float", "digits"="int",
                    "adjust"="float", "to"=apply_adjustment_to)
        
     # default values
-    defaults <- list("rm.method"="DL", "conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS, "adjust"=.5, "to"="only0")
+    defaults <- list("rm.method"="DL", "inference.method"="z", "conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS, "adjust"=.5, "to"="only0")
     
-    var_order <- c("rm.method", "conf.level", "digits", "adjust", "to")
+    var_order <- c("rm.method", "inference.method", "conf.level", "digits", "adjust", "to")
     parameters <- list("parameters"=params, "defaults"=defaults, "var_order"=var_order)
 }
 
 binary.random.pretty.names <- function() {
     # Keep display names explicit even though rm_method_ls defines the codes.
-    rm_method_names <- list(
-            HE="Hedges-Olkin",
-            DL = "DerSimonian-Laird",
-            SJ = "Sidik-Jonkman",
-            ML = "Maximum Likelihood",
-            REML = "Restricted Maximum Likelihood", 
-            EB = "Empirical Bayes")
+    rm_method_names <- rcmetar.random.effects.method.names()
     
     pretty.names <- list("pretty.name"="Binary Random-Effects", 
                          "description" = "Performs random-effects meta-analysis.",
                          "rm.method"=list("pretty.name"="Random-Effects method", "description"="Method for estimating between-studies heterogeneity", "rm.method.names"=rm_method_names),                      
+                         "inference.method"=rcmetar.inference.method.metadata(),
                          "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"), 
                          "digits"=list("pretty.name"="Decimal places", "description"="Decimal places for displayed estimates and intervals; p-values use at least 3"),
                          "adjust"=list("pretty.name"="Correction factor", "description"="Constant c that is added to the entries of a two-by-two table."),

@@ -84,7 +84,7 @@ exe = EXE(
     upx=False,
     console=False,
     disable_windowed_traceback=False,
-    icon=[str(app_source / "images" / "rc-metastudio-app-icon.ico")],
+    icon=[str(app_source / "images" / "rc-metastudio-app-icon-rounded.ico")],
 )
 coll = COLLECT(
     exe,

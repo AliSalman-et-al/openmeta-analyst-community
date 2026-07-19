@@ -22,40 +22,98 @@ import urllib.request
 
 import py7zr
 from PyQt6 import QtCore, QtGui, QtWidgets
-from rc_metastudio.qt6_macos_feasibility import validate_macos_rcc as _validate_macos_rcc
+from rc_metastudio.qt6_macos_feasibility import (
+    validate_macos_rcc as _validate_macos_rcc,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
 CANONICAL_FORMS = {
-    Path("src/rc_metastudio/forms/about_legal.ui"): Path("rc_metastudio/forms/ui_about_legal.py"),
-    Path("src/rc_metastudio/forms/binary_data_form2.ui"): Path("rc_metastudio/forms/ui_binary_data_form.py"),
-    Path("src/rc_metastudio/forms/change_cov_type_form.ui"): Path("rc_metastudio/forms/ui_change_cov_type.py"),
-    Path("src/rc_metastudio/forms/change_group_name_dlg.ui"): Path("rc_metastudio/forms/ui_edit_group_name.py"),
-    Path("src/rc_metastudio/forms/choose_back_calc_result_form.ui"): Path("rc_metastudio/forms/ui_choose_back_calc_result_form.py"),
-    Path("src/rc_metastudio/forms/choose_metric_page.ui"): Path("rc_metastudio/forms/ui_choose_metric_page.py"),
-    Path("src/rc_metastudio/forms/conf_level_dialog.ui"): Path("rc_metastudio/forms/ui_conf_level_dialog.py"),
-    Path("src/rc_metastudio/forms/continuous_back_calc_result_form.ui"): Path("rc_metastudio/forms/ui_continuous_back_calc_result_form.py"),
-    Path("src/rc_metastudio/forms/continuous_data_form.ui"): Path("rc_metastudio/forms/ui_continuous_data_form.py"),
-    Path("src/rc_metastudio/forms/cov_reg_dlg2.ui"): Path("rc_metastudio/forms/ui_meta_reg.py"),
-    Path("src/rc_metastudio/forms/cov_subgroup_dlg.ui"): Path("rc_metastudio/forms/ui_cov_subgroup_dlg.py"),
-    Path("src/rc_metastudio/forms/csv_import_page.ui"): Path("rc_metastudio/forms/ui_csv_import_page.py"),
-    Path("src/rc_metastudio/forms/data_type_page.ui"): Path("rc_metastudio/forms/ui_data_type_page.py"),
-    Path("src/rc_metastudio/forms/diagnostic_data_form.ui"): Path("rc_metastudio/forms/ui_diagnostic_data_form.py"),
-    Path("src/rc_metastudio/forms/diagnostic_metrics.ui"): Path("rc_metastudio/forms/ui_diagnostic_metrics.py"),
-    Path("src/rc_metastudio/forms/edit_dialog2.ui"): Path("rc_metastudio/forms/ui_edit_dialog.py"),
-    Path("src/rc_metastudio/forms/edit_forest_plot.ui"): Path("rc_metastudio/forms/ui_edit_forest_plot.py"),
-    Path("src/rc_metastudio/forms/ma_specs2.ui"): Path("rc_metastudio/forms/ui_ma_specs.py"),
+    Path("src/rc_metastudio/forms/about_legal.ui"): Path(
+        "rc_metastudio/forms/ui_about_legal.py"
+    ),
+    Path("src/rc_metastudio/forms/binary_data_form2.ui"): Path(
+        "rc_metastudio/forms/ui_binary_data_form.py"
+    ),
+    Path("src/rc_metastudio/forms/change_cov_type_form.ui"): Path(
+        "rc_metastudio/forms/ui_change_cov_type.py"
+    ),
+    Path("src/rc_metastudio/forms/change_group_name_dlg.ui"): Path(
+        "rc_metastudio/forms/ui_edit_group_name.py"
+    ),
+    Path("src/rc_metastudio/forms/choose_back_calc_result_form.ui"): Path(
+        "rc_metastudio/forms/ui_choose_back_calc_result_form.py"
+    ),
+    Path("src/rc_metastudio/forms/choose_metric_page.ui"): Path(
+        "rc_metastudio/forms/ui_choose_metric_page.py"
+    ),
+    Path("src/rc_metastudio/forms/conf_level_dialog.ui"): Path(
+        "rc_metastudio/forms/ui_conf_level_dialog.py"
+    ),
+    Path("src/rc_metastudio/forms/continuous_back_calc_result_form.ui"): Path(
+        "rc_metastudio/forms/ui_continuous_back_calc_result_form.py"
+    ),
+    Path("src/rc_metastudio/forms/continuous_data_form.ui"): Path(
+        "rc_metastudio/forms/ui_continuous_data_form.py"
+    ),
+    Path("src/rc_metastudio/forms/cov_reg_dlg2.ui"): Path(
+        "rc_metastudio/forms/ui_meta_reg.py"
+    ),
+    Path("src/rc_metastudio/forms/cov_subgroup_dlg.ui"): Path(
+        "rc_metastudio/forms/ui_cov_subgroup_dlg.py"
+    ),
+    Path("src/rc_metastudio/forms/csv_import_page.ui"): Path(
+        "rc_metastudio/forms/ui_csv_import_page.py"
+    ),
+    Path("src/rc_metastudio/forms/data_type_page.ui"): Path(
+        "rc_metastudio/forms/ui_data_type_page.py"
+    ),
+    Path("src/rc_metastudio/forms/diagnostic_data_form.ui"): Path(
+        "rc_metastudio/forms/ui_diagnostic_data_form.py"
+    ),
+    Path("src/rc_metastudio/forms/diagnostic_metrics.ui"): Path(
+        "rc_metastudio/forms/ui_diagnostic_metrics.py"
+    ),
+    Path("src/rc_metastudio/forms/edit_dialog2.ui"): Path(
+        "rc_metastudio/forms/ui_edit_dialog.py"
+    ),
+    Path("src/rc_metastudio/forms/edit_forest_plot.ui"): Path(
+        "rc_metastudio/forms/ui_edit_forest_plot.py"
+    ),
+    Path("src/rc_metastudio/forms/ma_specs2.ui"): Path(
+        "rc_metastudio/forms/ui_ma_specs.py"
+    ),
     Path("src/rc_metastudio/forms/meta.ui"): Path("rc_metastudio/ui_meta.py"),
-    Path("src/rc_metastudio/forms/network_view_window.ui"): Path("rc_metastudio/forms/ui_network_view.py"),
-    Path("src/rc_metastudio/forms/new_covariate_dlg.ui"): Path("rc_metastudio/forms/ui_new_covariate.py"),
-    Path("src/rc_metastudio/forms/new_follow_up_dlg.ui"): Path("rc_metastudio/forms/ui_new_follow_up.py"),
-    Path("src/rc_metastudio/forms/new_group_dlg.ui"): Path("rc_metastudio/forms/ui_new_group.py"),
-    Path("src/rc_metastudio/forms/new_outcome_dlg.ui"): Path("rc_metastudio/forms/ui_new_outcome.py"),
-    Path("src/rc_metastudio/forms/new_study_dlg.ui"): Path("rc_metastudio/forms/ui_new_study.py"),
-    Path("src/rc_metastudio/forms/outcome_name_page.ui"): Path("rc_metastudio/forms/ui_outcome_name_page.py"),
-    Path("src/rc_metastudio/forms/results_window.ui"): Path("rc_metastudio/ui_results_window.py"),
-    Path("src/rc_metastudio/forms/running.ui"): Path("rc_metastudio/forms/ui_running.py"),
-    Path("src/rc_metastudio/forms/welcome_page.ui"): Path("rc_metastudio/forms/ui_welcome_page.py"),
+    Path("src/rc_metastudio/forms/network_view_window.ui"): Path(
+        "rc_metastudio/forms/ui_network_view.py"
+    ),
+    Path("src/rc_metastudio/forms/new_covariate_dlg.ui"): Path(
+        "rc_metastudio/forms/ui_new_covariate.py"
+    ),
+    Path("src/rc_metastudio/forms/new_follow_up_dlg.ui"): Path(
+        "rc_metastudio/forms/ui_new_follow_up.py"
+    ),
+    Path("src/rc_metastudio/forms/new_group_dlg.ui"): Path(
+        "rc_metastudio/forms/ui_new_group.py"
+    ),
+    Path("src/rc_metastudio/forms/new_outcome_dlg.ui"): Path(
+        "rc_metastudio/forms/ui_new_outcome.py"
+    ),
+    Path("src/rc_metastudio/forms/new_study_dlg.ui"): Path(
+        "rc_metastudio/forms/ui_new_study.py"
+    ),
+    Path("src/rc_metastudio/forms/outcome_name_page.ui"): Path(
+        "rc_metastudio/forms/ui_outcome_name_page.py"
+    ),
+    Path("src/rc_metastudio/forms/results_window.ui"): Path(
+        "rc_metastudio/ui_results_window.py"
+    ),
+    Path("src/rc_metastudio/forms/running.ui"): Path(
+        "rc_metastudio/forms/ui_running.py"
+    ),
+    Path("src/rc_metastudio/forms/welcome_page.ui"): Path(
+        "rc_metastudio/forms/ui_welcome_page.py"
+    ),
 }
 CANONICAL_RESOURCE = Path("src/rc_metastudio/images/icons.qrc")
 DEFAULT_BUILD_ROOT = ROOT / "build" / "qt6"
@@ -69,21 +127,26 @@ QT_RCC_PACKAGE = (
 )
 QT_RCC_PACKAGE_URL = (
     "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/"
-    "qt6_6111/qt6_6111_msvc2022_64/qt.qt6.6111.win64_msvc2022_64/"
-    + QT_RCC_PACKAGE
+    "qt6_6111/qt6_6111_msvc2022_64/qt.qt6.6111.win64_msvc2022_64/" + QT_RCC_PACKAGE
 )
 QT_RCC_PACKAGE_SIZE = 39_469_569
-QT_RCC_PACKAGE_SHA256 = "7f97edc3937fec7383eb865e010ed5128155bf9c80a563abca450860f3e9bef5"
+QT_RCC_PACKAGE_SHA256 = (
+    "7f97edc3937fec7383eb865e010ed5128155bf9c80a563abca450860f3e9bef5"
+)
 QT_RCC_SHA256 = "912f4565e9486243200517be9e7e8dddc76ea63cd426278e944ba36ad8ff14e7"
 QT_RCC_CORE_SHA256 = "fae4778a42e93adc82b831c879c886a05147e9cc26760808d21116be5547259b"
 WINDOWS_X64_PE_MACHINE = 0x8664
 
 
-def validate_macos_rcc(rcc: Path, *, expected_version: str = QT_RCC_VERSION) -> list[str]:
+def validate_macos_rcc(
+    rcc: Path, *, expected_version: str = QT_RCC_VERSION
+) -> list[str]:
     """Compatibility re-export using this module's historically patched seams."""
     return _validate_macos_rcc(
-        rcc, expected_version=expected_version,
-        command_runner=subprocess.run, host_machine=platform.machine,
+        rcc,
+        expected_version=expected_version,
+        command_runner=subprocess.run,
+        host_machine=platform.machine,
     )
 
 
@@ -110,10 +173,7 @@ def validate_form_manifest(
             and destination.suffix == ".py"
             and destination.name.startswith("ui_")
             and parts[:1] == ("rc_metastudio",)
-            and (
-                len(parts) == 2
-                or (len(parts) == 3 and parts[1] == "forms")
-            )
+            and (len(parts) == 2 or (len(parts) == 3 and parts[1] == "forms"))
         )
         if not canonical:
             raise RuntimeError(
@@ -284,9 +344,7 @@ def _download_official_rcc(tool_root: Path) -> Path:
         if staging.exists():
             shutil.rmtree(staging)
         with py7zr.SevenZipFile(cache) as archive:
-            archive.extract(
-                path=staging, targets=["bin/rcc.exe", "bin/Qt6Core.dll"]
-            )
+            archive.extract(path=staging, targets=["bin/rcc.exe", "bin/Qt6Core.dll"])
         install_root.parent.mkdir(parents=True, exist_ok=True)
         if install_root.exists():
             shutil.rmtree(install_root)
@@ -382,7 +440,9 @@ def generate(build_root: Path) -> tuple[Path, Path]:
 
 
 def _load_generated_form(module_path: Path) -> type[_GeneratedForm]:
-    spec = importlib.util.spec_from_file_location("rcms_generated_about_legal", module_path)
+    spec = importlib.util.spec_from_file_location(
+        "rcms_generated_about_legal", module_path
+    )
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Cannot create an import specification for {module_path}")
     module = importlib.util.module_from_spec(spec)
@@ -402,9 +462,7 @@ def smoke(
     if not QtCore.QResource.registerResource(str(resource_path)):
         raise RuntimeError(f"Qt refused to register binary resource {resource_path}")
 
-    application = cast(
-        QtWidgets.QApplication | None, QtWidgets.QApplication.instance()
-    )
+    application = cast(QtWidgets.QApplication | None, QtWidgets.QApplication.instance())
     owns_application = application is None
     if application is None:
         application = QtWidgets.QApplication(["rc-metastudio-qt6-smoke"])
@@ -430,7 +488,9 @@ def smoke(
     app_icon_pixmap = app_icon.pixmap(QtCore.QSize(32, 32))
     svg_icon_pixmap = svg_icon.pixmap(QtCore.QSize(24, 24))
     if app_icon_pixmap.isNull() or svg_icon_pixmap.isNull():
-        raise RuntimeError("The registered binary resource did not expose required icons")
+        raise RuntimeError(
+            "The registered binary resource did not expose required icons"
+        )
     application.setWindowIcon(app_icon)
     dialog.setWindowIcon(app_icon)
     dialog.show()
@@ -486,7 +546,9 @@ def main(arguments: list[str] | None = None) -> int:
     build_root = options.build_root.resolve()
     if options.command == "generate":
         module, resource = generate(build_root)
-        print(json.dumps({"form": str(module), "resource": str(resource)}, sort_keys=True))
+        print(
+            json.dumps({"form": str(module), "resource": str(resource)}, sort_keys=True)
+        )
         return 0
     expected_qpa = None
     if options.command == "native-smoke":

@@ -16,7 +16,9 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 def _load_script(name: str):
-    spec = importlib.util.spec_from_file_location(name, ROOT / "scripts" / (name + ".py"))
+    spec = importlib.util.spec_from_file_location(
+        name, ROOT / "scripts" / (name + ".py")
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -158,9 +160,9 @@ def test_surface_inventory_matches_canonical_forms_factories_tests_and_document(
     )
 
     assert len(payload["forms"]) == 29
-    assert inventory_validator.render_markdown(payload) == inventory_validator.DOCUMENT_PATH.read_text(
-        encoding="utf-8"
-    )
+    assert inventory_validator.render_markdown(
+        payload
+    ) == inventory_validator.DOCUMENT_PATH.read_text(encoding="utf-8")
     keyboard_setup = "defaults write NSGlobalDomain AppleKeyboardUIMode -int 3"
     native_capture = "uv run python scripts/native_remaining_surfaces_smoke.py"
     assert keyboard_setup in workflow
@@ -242,12 +244,16 @@ def test_surface_inventory_rejects_wrong_top_level_type(monkeypatch):
         inventory_validator.load_and_validate()
 
 
-def test_native_remaining_surface_evidence_accepts_relocated_four_scale_bundle(tmp_path):
+def test_native_remaining_surface_evidence_accepts_relocated_four_scale_bundle(
+    tmp_path,
+):
     _write_bundle(tmp_path)
 
     records = native_smoke.validate_evidence(tmp_path)
 
-    assert [record["scale_factor"] for record in records] == list(native_smoke.SCALE_FACTORS)
+    assert [record["scale_factor"] for record in records] == list(
+        native_smoke.SCALE_FACTORS
+    )
 
 
 def test_native_remaining_surface_evidence_accepts_cocoa_focus_sequences(tmp_path):
@@ -266,12 +272,10 @@ def test_native_remaining_surface_evidence_accepts_cocoa_focus_sequences(tmp_pat
 def test_focus_observer_does_not_accept_programmatic_fallback_after_consumed_tab(qapp):
     class TabConsumingDialog(QtWidgets.QDialog):
         def event(self, event):
-            if (
-                event.type()
-                in {QtCore.QEvent.Type.KeyPress, QtCore.QEvent.Type.KeyRelease}
-                and event.key()
-                in {QtCore.Qt.Key.Key_Tab, QtCore.Qt.Key.Key_Backtab}
-            ):
+            if event.type() in {
+                QtCore.QEvent.Type.KeyPress,
+                QtCore.QEvent.Type.KeyRelease,
+            } and event.key() in {QtCore.Qt.Key.Key_Tab, QtCore.Qt.Key.Key_Backtab}:
                 event.accept()
                 return True
             return super().event(event)
@@ -382,9 +386,7 @@ def test_native_remaining_surface_evidence_rejects_mismatched_scale_surface_path
     _write_bundle(tmp_path)
     record_path = native_smoke._record_path(tmp_path, 1.0)
     record = json.loads(record_path.read_text(encoding="utf-8"))
-    record["surfaces"]["add-group"]["capture"]["path"] = (
-        "scale-1.25/add-group.png"
-    )
+    record["surfaces"]["add-group"]["capture"]["path"] = "scale-1.25/add-group.png"
     record_path.write_text(json.dumps(record), encoding="utf-8")
 
     with pytest.raises(ValueError, match="does not match its scale and surface"):

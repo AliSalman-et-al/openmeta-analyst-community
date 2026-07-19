@@ -20,9 +20,7 @@ PLOT_OPTION_GROUPS = {
     "leave_one_out_forest": frozenset(
         ("style", "appearance", "forest", "axis", "summary")
     ),
-    "subgroup_forest": frozenset(
-        ("style", "appearance", "forest", "axis", "summary")
-    ),
+    "subgroup_forest": frozenset(("style", "appearance", "forest", "axis", "summary")),
     "regression": frozenset(("style", "appearance", "axis", "regression")),
     "roc": frozenset(),
     "sroc": frozenset(),
@@ -71,8 +69,7 @@ def validate_result(result):
         )
     if extra:
         raise ValueError(
-            "Plot capability descriptor has no matching image: %s"
-            % ", ".join(extra)
+            "Plot capability descriptor has no matching image: %s" % ", ".join(extra)
         )
 
     normalized = {
@@ -123,7 +120,10 @@ def _validate_descriptor(title, descriptor):
     normalized["regenerator"] = regenerator
     if normalized["editable"] and regenerator == "none":
         raise ValueError("Editable plot %s requires a regenerator" % title)
-    if normalized["editable"] and plot_kind not in REGENERATORS[regenerator]["plot_kinds"]:
+    if (
+        normalized["editable"]
+        and plot_kind not in REGENERATORS[regenerator]["plot_kinds"]
+    ):
         raise ValueError(
             "Plot regenerator %s does not support plot kind %s for %s"
             % (regenerator, plot_kind, title)

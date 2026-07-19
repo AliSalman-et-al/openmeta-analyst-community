@@ -93,8 +93,7 @@ def _open_data_dialog(
     monkeypatch.setattr(
         diagnostic_data_form.meta_py_r,
         "impute_diag_data",
-        lambda _data: imputed
-        or {"TP": None, "FP": None, "FN": None, "TN": None},
+        lambda _data: imputed or {"TP": None, "FP": None, "FN": None, "TN": None},
     )
     monkeypatch.setattr(
         diagnostic_data_form.meta_py_r,
@@ -320,14 +319,18 @@ def test_large_font_count_overflow_and_focus_stay_inside_content(monkeypatch):
         table.horizontalScrollBar().setValue(table.horizontalScrollBar().maximum())
         table.scrollToItem(table.item(0, 0))
         app.processEvents()
-        assert table.viewport().rect().intersects(table.visualItemRect(table.item(0, 0)))
+        assert (
+            table.viewport().rect().intersects(table.visualItemRect(table.item(0, 0)))
+        )
         dialog.high_txt_box.setFocus()
         app.processEvents()
         mapped = dialog.high_txt_box.mapTo(
             dialog.content_scroll.viewport(), QtCore.QPoint()
         )
-        assert dialog.content_scroll.viewport().rect().intersects(
-            QtCore.QRect(mapped, dialog.high_txt_box.size())
+        assert (
+            dialog.content_scroll.viewport()
+            .rect()
+            .intersects(QtCore.QRect(mapped, dialog.high_txt_box.size()))
         )
         assert dialog.buttonBox.isVisible()
     finally:
@@ -370,8 +373,10 @@ def test_invalid_count_guidance_wraps_and_remains_reachable(monkeypatch):
         mapped = dialog.inconsistencyLabel.mapTo(
             dialog.content_scroll.viewport(), QtCore.QPoint()
         )
-        assert dialog.content_scroll.viewport().rect().intersects(
-            QtCore.QRect(mapped, dialog.inconsistencyLabel.size())
+        assert (
+            dialog.content_scroll.viewport()
+            .rect()
+            .intersects(QtCore.QRect(mapped, dialog.inconsistencyLabel.size()))
         )
         ok = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
         assert ok.isEnabled()
@@ -432,8 +437,10 @@ def test_direct_effect_validation_is_complete_and_reachable_with_large_font(
         mapped = dialog.inconsistencyLabel.mapTo(
             dialog.content_scroll.viewport(), QtCore.QPoint()
         )
-        assert dialog.content_scroll.viewport().rect().intersects(
-            QtCore.QRect(mapped, dialog.inconsistencyLabel.size())
+        assert (
+            dialog.content_scroll.viewport()
+            .rect()
+            .intersects(QtCore.QRect(mapped, dialog.inconsistencyLabel.size()))
         )
         ok = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
         assert ok.isEnabled()
@@ -516,8 +523,10 @@ def test_metric_guidance_and_focus_remain_reachable_with_large_font(monkeypatch)
         mapped = dialog.chk_box_dor.mapTo(
             dialog.content_scroll.viewport(), QtCore.QPoint()
         )
-        assert dialog.content_scroll.viewport().rect().intersects(
-            QtCore.QRect(mapped, dialog.chk_box_dor.size())
+        assert (
+            dialog.content_scroll.viewport()
+            .rect()
+            .intersects(QtCore.QRect(mapped, dialog.chk_box_dor.size()))
         )
         assert AVAILABLE.contains(dialog.frameGeometry())
     finally:

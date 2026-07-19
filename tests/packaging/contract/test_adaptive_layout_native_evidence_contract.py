@@ -26,13 +26,18 @@ def test_packagers_retain_opt_in_controlled_adaptive_layout_evidence():
     assert '"--automation-adaptive-layout-evidence"' in windows
     assert "$quotedOutputDir" in windows
     assert "$quotedSamplePath" in windows
-    assert 'QT_QPA_PLATFORM = "offscreen"' not in windows[
-        windows.index("function Invoke-PackagedAdaptiveLayoutEvidence") :
-        windows.index("function Invoke-PackagedWizardLayoutSmokeTest")
-    ]
+    assert (
+        'QT_QPA_PLATFORM = "offscreen"'
+        not in windows[
+            windows.index(
+                "function Invoke-PackagedAdaptiveLayoutEvidence"
+            ) : windows.index("function Invoke-PackagedWizardLayoutSmokeTest")
+        ]
+    )
     evidence_block = windows[
-        windows.index("function Invoke-PackagedAdaptiveLayoutEvidence") :
-        windows.index("function Invoke-PackagedWizardLayoutSmokeTest")
+        windows.index("function Invoke-PackagedAdaptiveLayoutEvidence") : windows.index(
+            "function Invoke-PackagedWizardLayoutSmokeTest"
+        )
     ]
     assert "-WindowStyle Hidden" not in evidence_block
     assert "validate_adaptive_layout_evidence.py" in evidence_block
@@ -46,10 +51,14 @@ def test_packagers_retain_opt_in_controlled_adaptive_layout_evidence():
     assert "validate_adaptive_layout_evidence.py" in macos
     assert "--capture-adaptive-layout-evidence" in macos
     assert 'if [ "$capture_adaptive_layout_evidence" -eq 1 ]' in macos
-    assert "QT_QPA_PLATFORM=" not in macos[
-        macos.index("run_adaptive_layout_evidence()") :
-        macos.index("if [ \"$skip_smoke\" -eq 0 ]")
-    ]
+    assert (
+        "QT_QPA_PLATFORM="
+        not in macos[
+            macos.index("run_adaptive_layout_evidence()") : macos.index(
+                'if [ "$skip_smoke" -eq 0 ]'
+            )
+        ]
+    )
 
 
 def test_hosted_package_workflow_does_not_require_native_layout_evidence():

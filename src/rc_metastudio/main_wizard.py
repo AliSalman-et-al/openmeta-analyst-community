@@ -15,9 +15,7 @@ from PyQt6.QtGui import (
     QCloseEvent,
     QHideEvent,
     QIcon,
-    QPainter,
     QPalette,
-    QPixmap,
     QShowEvent,
 )
 from PyQt6.QtWidgets import (
@@ -57,7 +55,9 @@ class MainWizardPage(QWizardPage):
     def wizard(self) -> "MainWizard":
         wizard = super().wizard()
         if not isinstance(wizard, MainWizard):
-            raise RuntimeError("RC MetaStudio wizard pages require MainWizard ownership")
+            raise RuntimeError(
+                "RC MetaStudio wizard pages require MainWizard ownership"
+            )
         return wizard
 
 
@@ -181,6 +181,17 @@ class WelcomePage(MainWizardPage, forms.ui_welcome_page.Ui_WizardPage):
 
 
 class DataTypePage(MainWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
+    _ICON_NAMES = {
+        "onearm_proportion_Button": "one-arm-proportion.svg",
+        "onearm_mean_Button": "one-arm-mean.svg",
+        "onearm_single_reg_coef_Button": "single-regression-coefficient.svg",
+        "onearm_generic_effect_size_Button": "generic-effect-size.svg",
+        "twoarm_proportions_Button": "two-arm-proportions.svg",
+        "twoarm_means_Button": "two-arm-means.svg",
+        "twoarm_smds_Button": "standardized-mean-difference.svg",
+        "diagnostic_Button": "diagnostic-data.svg",
+    }
+
     def __init__(self, parent=None):
         super(DataTypePage, self).__init__(parent)
         self.setupUi(self)
@@ -218,11 +229,9 @@ class DataTypePage(MainWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
 
     def _configure_data_type_buttons(self):
         buttons = self._data_type_buttons()
-        self._data_type_source_icons = {
-            button.objectName(): QIcon(button.icon()) for button in buttons
-        }
+        self._data_type_icon_themes = {}
         for button in buttons:
-            self._apply_palette_icon(button)
+            self._apply_theme_icon(button)
             button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
             self._reserve_button_icon_and_text_height(button)
             button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -243,11 +252,10 @@ class DataTypePage(MainWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
         if (
             event is not None
             and event.type() == QEvent.Type.PaletteChange
-            and hasattr(self, "_data_type_source_icons")
             and isinstance(watched, QAbstractButton)
             and watched in self._data_type_buttons()
         ):
-            self._apply_palette_icon(watched)
+            self._apply_theme_icon(watched)
         return super().eventFilter(watched, event)
 
     def _reserve_button_icon_and_text_height(self, button):
@@ -256,11 +264,15 @@ class DataTypePage(MainWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
         text_height = line_count * button.fontMetrics().lineSpacing()
         margin = max(
             0,
-            button.style().pixelMetric(QStyle.PixelMetric.PM_ButtonMargin, None, button),
+            button.style().pixelMetric(
+                QStyle.PixelMetric.PM_ButtonMargin, None, button
+            ),
         )
         frame = max(
             0,
-            button.style().pixelMetric(QStyle.PixelMetric.PM_DefaultFrameWidth, None, button),
+            button.style().pixelMetric(
+                QStyle.PixelMetric.PM_DefaultFrameWidth, None, button
+            ),
         )
         required = QSize(
             button.sizeHint().width(),
@@ -269,36 +281,14 @@ class DataTypePage(MainWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
         # layout-audit: allow=style-metric-control; reason=icon and multiline Required Content need a native-metric minimum
         button.setMinimumSize(button.minimumSizeHint().expandedTo(required))
 
-    def _apply_palette_icon(self, button):
-        icon_size = button.iconSize()
-        source_icon = self._data_type_source_icons.get(button.objectName())
-        if icon_size.isEmpty() or source_icon is None or source_icon.isNull():
+    def _apply_theme_icon(self, button):
+        foreground = button.palette().color(QPalette.ColorRole.ButtonText)
+        theme = "dark" if foreground.lightness() >= 128 else "light"
+        icon_name = self._ICON_NAMES.get(button.objectName())
+        if not icon_name:
             return
-
-        source = source_icon.pixmap(icon_size)
-        if source.isNull():
-            return
-
-        canvas = QPixmap(icon_size)
-        canvas.fill(Qt.GlobalColor.transparent)
-
-        painter = QPainter(canvas)
-        try:
-            painter.drawPixmap(
-                (icon_size.width() - source.width()) // 2,
-                (icon_size.height() - source.height()) // 2,
-                source,
-            )
-            painter.setCompositionMode(
-                QPainter.CompositionMode.CompositionMode_SourceIn
-            )
-            painter.fillRect(
-                canvas.rect(), button.palette().color(QPalette.ColorRole.ButtonText)
-            )
-        finally:
-            painter.end()
-
-        button.setIcon(QIcon(canvas))
+        self._data_type_icon_themes[button.objectName()] = theme
+        button.setIcon(QIcon(f":/icons/dataset-types/{theme}/{icon_name}"))
 
     def _button_selected(self, button):
         # print("button clicked %s" % str(button))
@@ -411,7 +401,6 @@ class ChooseMetricPage(MainWizardPage, forms.ui_choose_metric_page.Ui_WizardPage
             default_item_text += " (DEFAULT)"
             self.metric_cbo_box.setItemText(index_of_default, default_item_text)
             self.metric_cbo_box.blockSignals(False)
-
 
     def _metric_choice_changed(self, newindex):
         self.wizard().set_effect(_qt_item_text(self.metric_cbo_box.itemData(newindex)))
@@ -867,7 +856,11 @@ class MainWizard(QWizard):
             return
         overflow = page.findChild(QScrollArea, "pageScrollArea")
         overflow_content = overflow.widget() if overflow is not None else None
-        if overflow is not None and overflow_content is not None and overflow_content.isAncestorOf(current):
+        if (
+            overflow is not None
+            and overflow_content is not None
+            and overflow_content.isAncestorOf(current)
+        ):
             overflow.ensureWidgetVisible(current)
 
     def set_wizard_path(self, path):

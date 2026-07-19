@@ -378,7 +378,9 @@ def _audit_form(path):
                 findings.append(Finding(path, "platform-font", f"hard-coded {tag}"))
     for prop in root.findall(".//property[@name='styleSheet']"):
         if STYLESHEET_FONT_RE.search("".join(prop.itertext())):
-            findings.append(Finding(path, "platform-font", "hard-coded stylesheet font"))
+            findings.append(
+                Finding(path, "platform-font", "hard-coded stylesheet font")
+            )
     return findings
 
 
@@ -740,9 +742,7 @@ def _audit_source_fonts(path, tree, lines, relative_path):
         if not isinstance(node, ast.Call):
             continue
         name = _call_name(node)
-        bindings = _visible_bindings(
-            node, node_scopes, scope_parents, assignments
-        )
+        bindings = _visible_bindings(node, node_scopes, scope_parents, assignments)
         if name == "setStyleSheet" and node.args:
             values = _static_strings(node.args[0], bindings)
             if any(STYLESHEET_FONT_RE.search(value) for value in values):

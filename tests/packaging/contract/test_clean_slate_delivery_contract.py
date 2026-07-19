@@ -66,7 +66,9 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
                     result=str(result),
                 )
             )
-            delivery.attach(argparse.Namespace(manifest=str(manifest_path), result=str(result)))
+            delivery.attach(
+                argparse.Namespace(manifest=str(manifest_path), result=str(result))
+            )
             previous = delivery.canonical_digest(delivery.load(result))
 
     delivery.verify(argparse.Namespace(manifest=str(manifest_path)))
@@ -102,12 +104,16 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
         delivery.verify(argparse.Namespace(manifest=str(bad_path)))
 
     candidate = (ROOT / ".github/workflows/candidate.yml").read_text(encoding="utf-8")
-    sign = (ROOT / ".github/workflows/release-candidate.yml").read_text(encoding="utf-8")
-    community = (
-        ROOT / ".github/workflows/community-release-candidate.yml"
-    ).read_text(encoding="utf-8")
+    sign = (ROOT / ".github/workflows/release-candidate.yml").read_text(
+        encoding="utf-8"
+    )
+    community = (ROOT / ".github/workflows/community-release-candidate.yml").read_text(
+        encoding="utf-8"
+    )
     promote = (ROOT / ".github/workflows/promote.yml").read_text(encoding="utf-8")
-    legacy = (ROOT / ".github/workflows/package-verification.yml").read_text(encoding="utf-8")
+    legacy = (ROOT / ".github/workflows/package-verification.yml").read_text(
+        encoding="utf-8"
+    )
     assert "contents: write" not in candidate
     assert "run: .\\scripts\\package-windows.ps1\n" in candidate
     assert "-ArtifactName" not in candidate
@@ -124,9 +130,13 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     assert "automation-adaptive-layout-evidence" not in sign
     assert "--clobber" not in sign + promote + legacy
     assert "push:\n    tags:" not in legacy
-    assert "refusing overwrite" in sign.lower() and "refusing overwrite" in promote.lower()
+    assert (
+        "refusing overwrite" in sign.lower() and "refusing overwrite" in promote.lower()
+    )
     assert "sha256sum --check SHA256SUMS" in promote
-    verification_step = promote[promote.index("Verify RC release set") : promote.index("Publish stable release")]
+    verification_step = promote[
+        promote.index("Verify RC release set") : promote.index("Publish stable release")
+    ]
     assert "GH_TOKEN: ${{ github.token }}" in verification_step
     assert 'git fetch origin "refs/tags/$RC_TAG:refs/tags/$RC_TAG"' in verification_step
     for publisher in (community, sign, promote):

@@ -154,7 +154,6 @@ rcmetar.method.references <- function(method) {
     ),
     "meta.regression"=c(
       "Random-effects meta-regression: Berkey, C. S., Hoaglin, D. C., Mosteller, F., & Colditz, G. A. (1995). A random-effects regression model for meta-analysis. Statistics in Medicine, 14(4), 395-411. doi:10.1002/sim.4780140406.",
-      "Meta-regression testing: Knapp, G., & Hartung, J. (2003). Improved tests for a random effects meta-regression with a single covariate. Statistics in Medicine, 22(17), 2693-2710. doi:10.1002/sim.1482.",
       "Implementation reference: Viechtbauer, W. (2010). Conducting meta-analyses in R with the metafor package. Journal of Statistical Software, 36(3), 1-48. doi:10.18637/jss.v036.i03."
     ),
     "bootstrap"=c(
@@ -174,6 +173,84 @@ rcmetar.method.references <- function(method) {
   )
 
   refs[[method]]
+}
+
+rcmetar.random.effects.methods <- function() {
+  c("HE", "DL", "HS", "HSk", "SJ", "ML", "REML", "EB", "PM", "PMM")
+}
+
+rcmetar.random.effects.method.names <- function() {
+  list(
+    HE="Hedges-Olkin",
+    DL="DerSimonian-Laird",
+    HS="Hunter-Schmidt",
+    HSk="Hunter-Schmidt with small-sample correction",
+    SJ="Sidik-Jonkman",
+    ML="Maximum Likelihood",
+    REML="Restricted Maximum Likelihood",
+    EB="Empirical Bayes",
+    PM="Paule-Mandel",
+    PMM="Median-unbiased Paule-Mandel"
+  )
+}
+
+rcmetar.inference.methods <- function() {
+  c("z", "t", "knha", "adhoc")
+}
+
+rcmetar.inference.method.names <- function() {
+  list(
+    z="Normal approximation",
+    t="Student's t-distribution",
+    knha="Knapp-Hartung",
+    adhoc="Modified Knapp-Hartung"
+  )
+}
+
+rcmetar.inference.method <- function(params) {
+  method <- params$inference.method
+  if (is.null(method) || length(method) == 0 || is.na(method[1]) || !nzchar(as.character(method[1]))) {
+    return("z")
+  }
+  match.arg(as.character(method[1]), rcmetar.inference.methods())
+}
+
+rcmetar.validate.inference.method <- function(params, k, p=1) {
+  method <- rcmetar.inference.method(params)
+  if (method != "z" && k - p <= 0) {
+    stop(sprintf(
+      "The selected Inference Method requires positive residual degrees of freedom (studies: %d, fitted coefficients: %d).",
+      k,
+      p
+    ), call.=FALSE)
+  }
+  method
+}
+
+rcmetar.inference.method.metadata <- function() {
+  list(
+    "pretty.name"="Inference method",
+    "description"="Procedure used to compute coefficient tests and their corresponding confidence intervals",
+    "inference.method.names"=rcmetar.inference.method.names()
+  )
+}
+
+rcmetar.inference.method.references <- function(params) {
+  method <- rcmetar.inference.method(params)
+  if (!(method %in% c("knha", "adhoc"))) {
+    return(character())
+  }
+  references <- c(
+    "Knapp-Hartung inference: Knapp, G., & Hartung, J. (2003). Improved tests for a random effects meta-regression with a single covariate. Statistics in Medicine, 22(17), 2693-2710. doi:10.1002/sim.1482.",
+    "Hartung-Knapp-Sidik-Jonkman inference: Sidik, K., & Jonkman, J. N. (2002). A simple confidence interval for meta-analysis. Statistics in Medicine, 21(21), 3153-3159. doi:10.1002/sim.1262."
+  )
+  if (method == "adhoc") {
+    references <- c(
+      references,
+      "Modified Knapp-Hartung inference: Jackson, D., Law, M., Rucker, G., & Schwarzer, G. (2017). The Hartung-Knapp modification for random-effects meta-analysis: A useful refinement but are there any residual concerns? Statistics in Medicine, 36(25), 3923-3934. doi:10.1002/sim.7411."
+    )
+  }
+  references
 }
 
 rcmetar.unique.references <- function(references) {
@@ -470,109 +547,278 @@ update.changed.plot.params <- function(params, changed.params) {
   params
 }
 
+rcmetar.regression.display.value <- function(value, digits, percent=FALSE) {
+  if (display.value.is.missing(value) || length(value) != 1 || !is.finite(as.numeric(value))) {
+    return("Not estimable")
+  }
+  if (percent) {
+    return(sprintf(paste0("%.", digits, "f%%"), as.numeric(value)))
+  }
+  sprintf(paste0("%.", digits, "f"), as.numeric(value))
+}
+
+rcmetar.regression.summary.array <- function(rows, headers=c("Statistic", "Value")) {
+  values <- do.call(rbind, rows)
+  result <- rbind(headers, values)
+  class(result) <- "summary.data"
+  result
+}
+
+rcmetar.regression.factor.tests <- function(res, display.data, params) {
+  factor.levels <- display.data$factor.n.levels
+  factor.names <- display.data$factor.cov.names
+  if (!inherits(res, "rma") || length(factor.levels) == 0 || length(factor.names) != length(factor.levels)) {
+    return(list())
+  }
+  coefficient.index <- 2 + display.data$n.cont.covs
+  tests <- list()
+  for (index in seq_along(factor.levels)) {
+    coefficient.count <- factor.levels[index] - 1
+    btt <- coefficient.index:(coefficient.index + coefficient.count - 1)
+    test <- tryCatch(anova(res, btt=btt), error=function(e) NULL)
+    if (!is.null(test)) {
+      tests[[factor.names[index]]] <- list(result=test, df1=coefficient.count)
+    }
+    coefficient.index <- coefficient.index + coefficient.count
+  }
+  tests
+}
+
+rcmetar.regression.test.row <- function(label, statistic, df1, p.value, df2=NULL, digits=3L) {
+  display.df <- function(value) {
+    if (display.value.is.missing(value) || length(value) != 1 || !is.finite(as.numeric(value))) {
+      return("Not estimable")
+    }
+    as.character(as.numeric(value))
+  }
+  df <- if (is.null(df2) || display.value.is.missing(df2)) {
+    display.df(df1)
+  } else {
+    paste(display.df(df1), display.df(df2), sep=", ")
+  }
+  formatted.p <- if (display.value.is.missing(p.value) || length(p.value) != 1 ||
+                     !is.finite(as.numeric(p.value))) "Not estimable" else
+    format.p.value.display(p.value, digits)
+  c(label, rcmetar.regression.display.value(statistic, digits), df,
+    formatted.p)
+}
+
 create.regression.display <- function(res, params, display.data) {
-  
-  if (is.null(params$bootstrap.type))
-    bootstrap.type <- ""
-  else
-    bootstrap.type <- as.character(params$bootstrap.type) # will be null if not bootstrap
-  
-  
-  # create table for diplaying summary of regression ma results
+  bootstrap.type <- if (is.null(params$bootstrap.type)) "" else as.character(params$bootstrap.type)
   cov.display.col <- display.data$cov.display.col
   levels.display.col <- display.data$levels.display.col
   studies.display.col <- display.data$studies.display.col
-  # first two columns of table
   factor.n.levels <- display.data$factor.n.levels
   n.cont.covs <- display.data$n.cont.covs
-  n.cont.rows <- n.cont.covs + 1 # extra row for intercept
+  n.cont.rows <- n.cont.covs + 1
   n.factor.covs <- length(factor.n.levels)
   n.rows <- length(cov.display.col) + 1
-  # extra row for col. labels
-  if (n.factor.covs==0) {
-    col.labels <- switch(bootstrap.type,
-               boot.meta.reg=c("Covariate", "Coefficients", "Lower bound", "Upper bound"),
-               c("Covariate", "Coefficients", "Lower bound", "Upper bound", "Std. error", "p-value"))
-    #col.labels <- c("Covariate", "Coefficients", "Lower bound", "Upper bound", "Std. error", "p-value")
-  } else {
-    col.labels <- switch(bootstrap.type,
-        boot.meta.reg=col.labels <- c("Covariate", "Level", "Studies", "Coefficients", "Lower bound", "Upper bound"),
-        col.labels <- c("Covariate", "Level", "Studies", "Coefficients", "Lower bound", "Upper bound", "Std. error", "p-value"))
-    #col.labels <- c("Covariate", "Level", "Studies", "Coefficients", "Lower bound", "Upper bound", "Std. error", "p-value")
-  }
-    
-  reg.array <- array(dim=c(length(cov.display.col)+1, length(col.labels)), dimnames=list(NULL, col.labels))
-  reg.array[1,] <- col.labels
   result.digits <- display.digits(params)
   se.digits <- display.digits(params, minimum=3L)
   digits.str <- paste("%.", result.digits, "f", sep="")
-  coeffs <- sprintf(digits.str, res$b)#; print(paste(c("coeffs:", coeffs))); ###
-  if (bootstrap.type!="boot.meta.reg") {
-    se <- round.display(res$se, digits=se.digits)
-    pvals <- format.p.value.display(res$pval, params$digits)
+  inference.method <- rcmetar.inference.method(params)
+  t.inference <- inference.method %in% c("t", "knha", "adhoc")
+
+  if (n.factor.covs == 0) {
+    col.labels <- if (bootstrap.type == "boot.meta.reg") {
+      c("Covariate", "Estimate", "Lower bound", "Upper bound")
+    } else if (t.inference) {
+      c("Covariate", "Estimate", "Lower bound", "Upper bound", "Std. error", "t", "df", "p-value")
+    } else {
+      c("Covariate", "Estimate", "Lower bound", "Upper bound", "Std. error", "z", "p-value")
+    }
+  } else {
+    col.labels <- if (bootstrap.type == "boot.meta.reg") {
+      c("Covariate", "Level", "Studies", "Estimate", "Lower bound", "Upper bound")
+    } else if (t.inference) {
+      c("Covariate", "Level", "Studies", "Estimate", "Lower bound", "Upper bound", "Std. error", "t", "df", "p-value")
+    } else {
+      c("Covariate", "Level", "Studies", "Estimate", "Lower bound", "Upper bound", "Std. error", "z", "p-value")
+    }
   }
-  lbs <- sprintf(digits.str, res$ci.lb)
-  ubs <- sprintf(digits.str, res$ci.ub)
-  
+
+  reg.array <- array(dim=c(length(cov.display.col) + 1, length(col.labels)), dimnames=list(NULL, col.labels))
+  reg.array[1,] <- col.labels
+  display.values <- function(values, digits) {
+    vapply(seq_along(res$b), function(index) {
+      value <- if (length(values) >= index) values[index] else NULL
+      rcmetar.regression.display.value(value, digits)
+    }, character(1))
+  }
+  display.p.values <- function(values) {
+    vapply(seq_along(res$b), function(index) {
+      value <- if (length(values) >= index) values[index] else NULL
+      if (display.value.is.missing(value) || length(value) != 1 || !is.finite(as.numeric(value))) {
+        "Not estimable"
+      } else {
+        format.p.value.display(value, params$digits)
+      }
+    }, character(1))
+  }
+  coeffs <- display.values(res$b, result.digits)
+  lbs <- display.values(res$ci.lb, result.digits)
+  ubs <- display.values(res$ci.ub, result.digits)
   coeffs.tmp <- coeffs[1:n.cont.rows]
-  # extra row for intercept
-  if (bootstrap.type!="boot.meta.reg") {
-    se.tmp <- se[1:n.cont.rows]
-    pvals.tmp <- pvals[1:n.cont.rows]
-  }
   lbs.tmp <- lbs[1:n.cont.rows]
   ubs.tmp <- ubs[1:n.cont.rows]
+
+  if (bootstrap.type != "boot.meta.reg") {
+    se <- display.values(res$se, se.digits)
+    pvals <- display.p.values(res$pval)
+    statistics <- display.values(res$zval, se.digits)
+    dfs <- rep(if (!is.null(res$ddf)) res$ddf else res$k - res$p, length(res$b))
+    se.tmp <- se[1:n.cont.rows]
+    pvals.tmp <- pvals[1:n.cont.rows]
+    statistics.tmp <- statistics[1:n.cont.rows]
+    dfs.tmp <- dfs[1:n.cont.rows]
+  }
+
   if (n.factor.covs > 0) {
-    # there are factor covariants - insert spaces for reference var. row.
     insert.row <- n.cont.rows + 1
-    for (count in 1:n.factor.covs) {
-    n.levels <- factor.n.levels[count]
-    #print(paste(c("n.levels", n.levels))) #####
-    coeffs.tmp <- c(coeffs.tmp,"", coeffs[insert.row:(insert.row + n.levels - 2)])
-    if (bootstrap.type!="boot.meta.reg") {
-      se.tmp <- c(se.tmp,"", se[insert.row:(insert.row + n.levels - 2)])
-      pvals.tmp <- c(pvals.tmp,"",pvals[insert.row:(insert.row + n.levels - 2)])
+    for (count in seq_len(n.factor.covs)) {
+      n.levels <- factor.n.levels[count]
+      coefficient.range <- insert.row:(insert.row + n.levels - 2)
+      coeffs.tmp <- c(coeffs.tmp, "", coeffs[coefficient.range])
+      lbs.tmp <- c(lbs.tmp, "", lbs[coefficient.range])
+      ubs.tmp <- c(ubs.tmp, "", ubs[coefficient.range])
+      if (bootstrap.type != "boot.meta.reg") {
+        se.tmp <- c(se.tmp, "", se[coefficient.range])
+        pvals.tmp <- c(pvals.tmp, "", pvals[coefficient.range])
+        statistics.tmp <- c(statistics.tmp, "", statistics[coefficient.range])
+        dfs.tmp <- c(dfs.tmp, "", dfs[coefficient.range])
+      }
+      insert.row <- insert.row + n.levels - 1
     }
-    lbs.tmp <- c(lbs.tmp,"",lbs[insert.row:(insert.row + n.levels - 2)])
-    ubs.tmp <- c(ubs.tmp,"",ubs[insert.row:(insert.row + n.levels - 2)])
-    insert.row <- insert.row + n.levels - 1
-    #print(paste(c("insert.row after: ", insert.row))) ######
-    }   
     reg.array[2:n.rows, "Level"] <- levels.display.col
     reg.array[2:n.rows, "Studies"] <- studies.display.col
   }
 
-  
-  
-  # add data to array
-  reg.array[2:n.rows,"Covariate"] <- cov.display.col
-  reg.array[2:n.rows,"Coefficients"] <- coeffs.tmp
+  reg.array[2:n.rows, "Covariate"] <- cov.display.col
+  reg.array[2:n.rows, "Estimate"] <- coeffs.tmp
   reg.array[2:n.rows, "Lower bound"] <- lbs.tmp
   reg.array[2:n.rows, "Upper bound"] <- ubs.tmp
-  if (bootstrap.type!="boot.meta.reg") {
-    reg.array[2:n.rows,"Std. error"] <- se.tmp
+  if (bootstrap.type != "boot.meta.reg") {
+    reg.array[2:n.rows, "Std. error"] <- se.tmp
+    reg.array[2:n.rows, if (t.inference) "t" else "z"] <- statistics.tmp
+    if (t.inference) reg.array[2:n.rows, "df"] <- dfs.tmp
     reg.array[2:n.rows, "p-value"] <- pvals.tmp
-    
-    omnibus.pval.array <- array(dim=c(1,1))
-    omnibus.pval.array[1,1] <- format.p.value.display(res$QMp, params$digits)
-    arrays <- list(arr1=reg.array, arr2=omnibus.pval.array)
-  } else {
-    arrays <- list(arr1=reg.array)
   }
-  
-  metric.name <- pretty.metric.name(as.character(params$measure)) 
-  
-  if (bootstrap.type!="boot.meta.reg") {
-    model.title <- paste("Meta-Regression\n\nMetric: ", metric.name, sep="")
-    reg.disp <- list("model.title" = model.title, "table.titles" = c("Model Results", "Omnibus p-value"), "arrays" = arrays, "MAResults" = res)
-  } else {
-    model.title <- paste("Bootstrapped Meta-Regression based on ", params$num.bootstrap.replicates, " replicates.\n\n", params$extra.attempts, " resampling attempts failed.\n\nMetric: ", metric.name, sep="")
-    reg.disp <- list("model.title" = model.title, "table.titles" = c("Model Results"), "arrays" = arrays, "MAResults" = res)
-  }
-  
+  class(reg.array) <- "summary.data"
 
-  class(reg.disp) <-  "summary.display"
-  return(reg.disp)
+  metric.name <- pretty.metric.name(as.character(params$measure))
+  if (bootstrap.type == "boot.meta.reg") {
+    model.title <- paste("Bootstrapped Meta-Regression based on ", params$num.bootstrap.replicates,
+                         " replicates.\n\n", params$extra.attempts,
+                         " resampling attempts failed.\n\nMetric: ", metric.name, sep="")
+    reg.disp <- list(model.title=model.title, table.titles="Coefficient estimates",
+                     arrays=list(reg.array), MAResults=res)
+    class(reg.disp) <- "summary.display"
+    return(reg.disp)
+  }
+
+  model.title <- paste("Meta-Regression\n\nMetric: ", metric.name, sep="")
+  method.names <- rcmetar.random.effects.method.names()
+  estimator <- if (identical(as.character(res$method), "FE")) {
+    "Fixed effect"
+  } else if (as.character(res$method) %in% names(method.names)) {
+    method.names[[as.character(res$method)]]
+  } else {
+    as.character(res$method)
+  }
+  inference.label <- rcmetar.inference.method.names()[[inference.method]]
+  residual.df <- res$k - res$p
+  overview <- rcmetar.regression.summary.array(list(
+    c("Studies analyzed", as.character(res$k)),
+    c("Model coefficients", as.character(res$p)),
+    c("Residual degrees of freedom", as.character(residual.df)),
+    c("Heterogeneity estimator", estimator),
+    c("Inference Method", inference.label)
+  ))
+
+  specification.rows <- list()
+  continuous.names <- display.data$cont.cov.names
+  continuous.ranges <- display.data$cont.cov.ranges
+  if (is.null(continuous.names)) continuous.names <- cov.display.col[seq_len(n.cont.covs) + 1]
+  for (name in continuous.names) {
+    observed.range <- continuous.ranges[[name]]
+    range.label <- if (length(observed.range) == 2 && all(is.finite(observed.range))) {
+      paste0("Continuous; observed range ", sprintf(digits.str, observed.range[1]),
+             " to ", sprintf(digits.str, observed.range[2]))
+    } else {
+      "Continuous"
+    }
+    specification.rows[[length(specification.rows) + 1]] <- c(name, range.label)
+  }
+  factor.names <- display.data$factor.cov.names
+  factor.references <- display.data$factor.ref.levels
+  if (!is.null(factor.names)) {
+    for (index in seq_along(factor.names)) {
+      specification.rows[[length(specification.rows) + 1]] <- c(
+        factor.names[index], paste0("Categorical; reference level: ", factor.references[index]))
+    }
+  }
+  zero.outside <- any(vapply(continuous.names, function(name) {
+    observed.range <- continuous.ranges[[name]]
+    length(observed.range) == 2 && all(is.finite(observed.range)) &&
+      (0 < observed.range[1] || 0 > observed.range[2])
+  }, logical(1)))
+  intercept.note <- "Estimated effect at continuous moderator value zero and categorical reference levels"
+  if (zero.outside) intercept.note <- paste0(intercept.note, "; extrapolated beyond an observed continuous range")
+  specification.rows <- c(list(c("Intercept", intercept.note)), specification.rows)
+  specification <- rcmetar.regression.summary.array(specification.rows, c("Term", "Specification"))
+
+  scale <- get.scale(params)
+  coefficient.title <- if (scale %in% c("log", "logit", "arcsine")) {
+    paste0("Coefficient estimates (", scale, " scale)")
+  } else {
+    "Coefficient estimates"
+  }
+
+  arrays <- list(overview, specification, reg.array)
+  titles <- c("Model overview", "Model specification", coefficient.title)
+
+  if (!identical(as.character(res$method), "FE")) {
+    heterogeneity <- rcmetar.regression.summary.array(list(
+      c("Residual heterogeneity (τ²)", rcmetar.regression.display.value(res$tau2, result.digits)),
+      c("SE of τ²", rcmetar.regression.display.value(res$se.tau2, se.digits)),
+      c("Residual heterogeneity (τ)", rcmetar.regression.display.value(sqrt(res$tau2), result.digits)),
+      c("Residual I²", rcmetar.regression.display.value(res$I2, 1L, percent=TRUE)),
+      c("Residual H²", rcmetar.regression.display.value(res$H2, result.digits)),
+      c("Heterogeneity explained (R²)", rcmetar.regression.display.value(res$R2, 1L, percent=TRUE))
+    ))
+    arrays <- c(arrays, list(heterogeneity))
+    titles <- c(titles, "Residual heterogeneity")
+  }
+
+  moderator.df2 <- if (t.inference) residual.df else NULL
+  moderator.label <- if (t.inference) "Overall moderators (F)" else "Overall moderators (Qₘ)"
+  test.rows <- list(rcmetar.regression.test.row(
+    moderator.label, res$QM, res$m, res$QMp, moderator.df2, params$digits))
+  factor.tests <- rcmetar.regression.factor.tests(res, display.data, params)
+  for (name in names(factor.tests)) {
+    factor.test <- factor.tests[[name]]$result
+    statistic <- if (!is.null(factor.test$QM)) factor.test$QM else factor.test$F
+    df1 <- factor.tests[[name]]$df1
+    test.rows[[length(test.rows) + 1]] <- rcmetar.regression.test.row(
+      paste0(name, " (joint)"), statistic, df1, factor.test$QMp,
+      if (t.inference) residual.df else NULL, params$digits)
+  }
+  test.rows[[length(test.rows) + 1]] <- rcmetar.regression.test.row(
+    "Residual heterogeneity (Qₑ)", res$QE, residual.df, res$QEp,
+    NULL, params$digits)
+  tests <- rcmetar.regression.summary.array(test.rows, c("Test", "Statistic", "df", "p-value"))
+  arrays <- c(arrays, list(tests))
+  titles <- c(titles, "Model tests")
+
+  notes <- if (!identical(as.character(res$method), "FE")) {
+    "Heterogeneity explained (R²) is the proportional reduction in estimated between-study heterogeneity relative to the corresponding model without moderators."
+  } else {
+    NULL
+  }
+  reg.disp <- list(model.title=model.title, table.titles=titles, arrays=arrays,
+                   notes=notes, MAResults=res)
+  class(reg.disp) <- "summary.display"
+  reg.disp
 }
 
 adjusted_means_display <- function(res, params, display.data) {

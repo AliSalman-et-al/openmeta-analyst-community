@@ -152,7 +152,12 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
     def eventFilter(  # ty: ignore[invalid-method-override] -- PyQt6's QDialog stub rejects this runtime-supported QObject override.
         self, watched: QObject | None, event: QEvent | None
     ) -> bool:
-        if isinstance(watched, QWidget) and event is not None and event.type() == QEvent.Type.FocusIn and self.content_widget.isAncestorOf(watched):
+        if (
+            isinstance(watched, QWidget)
+            and event is not None
+            and event.type() == QEvent.Type.FocusIn
+            and self.content_widget.isAncestorOf(watched)
+        ):
             self.content_scroll.ensureWidgetVisible(watched)
         return super(BinaryDataForm2, self).eventFilter(watched, event)
 
@@ -366,20 +371,28 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
 
     def setup_back_calculation_feedback(self):
         inconsistency_palette = QPalette()
-        inconsistency_palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.red)
+        inconsistency_palette.setColor(
+            QPalette.ColorRole.WindowText, Qt.GlobalColor.red
+        )
         self.inconsistencyLabel.setPalette(inconsistency_palette)
         self.inconsistencyLabel.setVisible(False)
         self._request_content_refit()
 
     def _mark_table_consistent(self):
         self.inconsistencyLabel.setVisible(False)
-        required(self.buttonBox.button(QDialogButtonBox.StandardButton.Ok), "binary calculator OK button").setEnabled(True)
+        required(
+            self.buttonBox.button(QDialogButtonBox.StandardButton.Ok),
+            "binary calculator OK button",
+        ).setEnabled(True)
         self._request_content_refit()
 
     def _mark_table_invalid(self, message):
         self.inconsistencyLabel.setText(str(message))
         self.inconsistencyLabel.setVisible(True)
-        required(self.buttonBox.button(QDialogButtonBox.StandardButton.Ok), "binary calculator OK button").setEnabled(False)
+        required(
+            self.buttonBox.button(QDialogButtonBox.StandardButton.Ok),
+            "binary calculator OK button",
+        ).setEnabled(False)
         self._request_content_refit()
         self.inconsistencyLabel.updateGeometry()
         content_layout = self.content_widget.layout()
@@ -477,7 +490,9 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         self.effect_cbo_box.setMinimumWidth(0)
         # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
         self.effect_cbo_box.setMaximumWidth(QWIDGETSIZE_MAX)
-        self.effect_cbo_box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.effect_cbo_box.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
         self.effect_cbo_box.setCurrentIndex(q_effects.index(str(self.cur_effect)))
         self.effect_cbo_box.blockSignals(False)
         self._update_effect_choice_accessibility()
@@ -493,11 +508,13 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             combo.fontMetrics().horizontalAdvance(combo.itemText(index))
             for index in range(combo.count())
         )
-        scrollbar_width = required(combo.style(), "binary metric combo style").pixelMetric(
-            QStyle.PixelMetric.PM_ScrollBarExtent, None, combo
-        )
+        scrollbar_width = required(
+            combo.style(), "binary metric combo style"
+        ).pixelMetric(QStyle.PixelMetric.PM_ScrollBarExtent, None, combo)
         # layout-audit: allow=bounded-native-popup; reason=native choice popup is bounded to the owning screen
-        required(combo.view(), "binary metric combo popup").setMinimumWidth(text_width + scrollbar_width + 24)
+        required(combo.view(), "binary metric combo popup").setMinimumWidth(
+            text_width + scrollbar_width + 24
+        )
 
     def get_effect_names(self):
         return self.ma_unit.get_effect_names()
@@ -780,7 +797,10 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         try:
             # Test if entered data is valid (a number)
             warning_msg = self._cell_data_not_valid(
-                required(self.raw_data_table.item(row, col), f"binary table cell ({row}, {col})").text()
+                required(
+                    self.raw_data_table.item(row, col),
+                    f"binary table cell ({row}, {col})",
+                ).text()
             )
             if warning_msg:
                 raise ValueError(warning_msg)
@@ -871,7 +891,10 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             if self.raw_data_table.item(row, col) == None:
                 self.raw_data_table.setItem(row, col, QTableWidgetItem(str_val))
             else:
-                required(self.raw_data_table.item(row, col), f"binary table cell ({row}, {col})").setText(str_val)
+                required(
+                    self.raw_data_table.item(row, col),
+                    f"binary table cell ({row}, {col})",
+                ).setText(str_val)
             calc_fncs.set_table_item_editable(
                 self.raw_data_table.item(row, col),
                 self._raw_count_cell_is_editable(row, col),
@@ -914,7 +937,9 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
     def _get_int(self, i, j):
         """Get value from cell specified by row=i, col=j as an integer"""
         if not self._is_empty(i, j):
-            text = required(self.raw_data_table.item(i, j), f"binary table cell ({i}, {j})").text()
+            text = required(
+                self.raw_data_table.item(i, j), f"binary table cell ({i}, {j})"
+            ).text()
             try:
                 val = int(text)
             except ValueError:
@@ -1089,7 +1114,12 @@ class ChooseBackCalcResultForm(
     def eventFilter(  # ty: ignore[invalid-method-override] -- PyQt6's QDialog stub rejects this runtime-supported QObject override.
         self, watched: QObject | None, event: QEvent | None
     ) -> bool:
-        if isinstance(watched, QWidget) and event is not None and event.type() == QEvent.Type.FocusIn and self.content_widget.isAncestorOf(watched):
+        if (
+            isinstance(watched, QWidget)
+            and event is not None
+            and event.type() == QEvent.Type.FocusIn
+            and self.content_widget.isAncestorOf(watched)
+        ):
             self.content_scroll.ensureWidgetVisible(watched)
         return super(ChooseBackCalcResultForm, self).eventFilter(watched, event)
 

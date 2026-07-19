@@ -15,7 +15,9 @@ from typing import cast
 
 BASELINE = Path("docs/verification/pre-qt6-baseline/qt-port-inventory.json")
 CLASSIFICATION = Path("docs/verification/qt6-legacy-test-classification.json")
-DELETED_NODE_BASELINE = Path("docs/verification/pre-qt6-baseline/deleted-test-nodeids.json")
+DELETED_NODE_BASELINE = Path(
+    "docs/verification/pre-qt6-baseline/deleted-test-nodeids.json"
+)
 TEST_TAXONOMY = Path("docs/verification/test-taxonomy.json")
 TY_IGNORE_ALLOWLIST = Path("config/qt6-ty-ignore-allowlist.json")
 ALLOWED_DECISIONS = {"ported", "rewritten-at-stronger-seam", "retired"}
@@ -47,7 +49,10 @@ def discover_handwritten_qt_files(root: Path) -> list[Path]:
     """Return every active handwritten source or script importing PyQt6."""
     root = root.resolve()
     modules: list[Path] = []
-    candidates = [*root.glob("src/rc_metastudio/**/*.py"), *root.glob("scripts/**/*.py")]
+    candidates = [
+        *root.glob("src/rc_metastudio/**/*.py"),
+        *root.glob("scripts/**/*.py"),
+    ]
     for path in sorted(set(candidates)):
         if "__pycache__" in path.parts:
             continue
@@ -74,7 +79,11 @@ def discover_handwritten_qt_files(root: Path) -> list[Path]:
 def discover_application_qt_modules(root: Path) -> list[Path]:
     """Return the importable application-module subset of the Qt-bearing files."""
     source_root = root.resolve() / "src/rc_metastudio"
-    return [path for path in discover_handwritten_qt_files(root) if path.parent == source_root]
+    return [
+        path
+        for path in discover_handwritten_qt_files(root)
+        if path.parent == source_root
+    ]
 
 
 _TY_IGNORE_RE = re.compile(r"# ty:" + r" ignore\[([^\]]+)\]\s*--\s*(.+)$")
@@ -85,9 +94,7 @@ def _qualified_function_nodes(
 ) -> dict[int, tuple[str, ast.FunctionDef | ast.AsyncFunctionDef]]:
     nodes: dict[int, tuple[str, ast.FunctionDef | ast.AsyncFunctionDef]] = {}
 
-    def visit(
-        body: list[ast.stmt], prefix: tuple[str, ...]
-    ) -> None:
+    def visit(body: list[ast.stmt], prefix: tuple[str, ...]) -> None:
         for node in body:
             if isinstance(node, ast.ClassDef):
                 visit(node.body, (*prefix, node.name))
@@ -176,8 +183,7 @@ def validate_ty_ignore_allowlist(root: Path) -> dict[str, int]:
         if not isinstance(record, dict):
             raise CutoverAuditError("ty ignore allowlist records must be objects")
         entry = {
-            key: record.get(key)
-            for key in ("path", "qualified_name", "rule", "sha256")
+            key: record.get(key) for key in ("path", "qualified_name", "rule", "sha256")
         }
         if not all(isinstance(value, str) for value in entry.values()):
             raise CutoverAuditError("ty ignore allowlist record is malformed")
@@ -187,8 +193,7 @@ def validate_ty_ignore_allowlist(root: Path) -> dict[str, int]:
         key=lambda entry: (entry["path"], entry["qualified_name"], entry["rule"]),
     )
     identities = [
-        (entry["path"], entry["qualified_name"], entry["rule"])
-        for entry in expected
+        (entry["path"], entry["qualified_name"], entry["rule"]) for entry in expected
     ]
     if len(identities) != len(set(identities)):
         raise CutoverAuditError("duplicate ty ignore allowlist entry")
@@ -225,7 +230,9 @@ def validate_legacy_test_classification(root: Path) -> dict[str, object]:
     manifest = _load_json(root / CLASSIFICATION)
     expected = baseline.get("qt_bearing_tests")
     records = manifest.get("classifications")
-    if not isinstance(expected, list) or not all(isinstance(item, str) for item in expected):
+    if not isinstance(expected, list) or not all(
+        isinstance(item, str) for item in expected
+    ):
         raise CutoverAuditError("frozen qt_bearing_tests must be a list of paths")
     if not isinstance(records, list):
         raise CutoverAuditError("classifications must be a list")
@@ -241,13 +248,17 @@ def validate_legacy_test_classification(root: Path) -> dict[str, object]:
         legacy_test = record["legacy_test"]
         assert isinstance(legacy_test, str)
         if legacy_test in observed:
-            raise CutoverAuditError(f"duplicate legacy test classification: {legacy_test}")
+            raise CutoverAuditError(
+                f"duplicate legacy test classification: {legacy_test}"
+            )
         decision = record.get("decision")
         if decision not in ALLOWED_DECISIONS:
             raise CutoverAuditError(f"invalid decision for {legacy_test}: {decision!r}")
         evidence = record.get("evidence")
-        if not isinstance(evidence, list) or not evidence or not all(
-            isinstance(item, str) and item for item in evidence
+        if (
+            not isinstance(evidence, list)
+            or not evidence
+            or not all(isinstance(item, str) and item for item in evidence)
         ):
             raise CutoverAuditError(f"{legacy_test} needs named stronger evidence")
         evidence_items = cast(list[str], evidence)
@@ -258,7 +269,9 @@ def validate_legacy_test_classification(root: Path) -> dict[str, object]:
                     f"{legacy_test} names missing evidence: {evidence_path}"
                 )
         if decision == "ported" and legacy_test not in evidence_items:
-            raise CutoverAuditError(f"ported test must name its maintained path: {legacy_test}")
+            raise CutoverAuditError(
+                f"ported test must name its maintained path: {legacy_test}"
+            )
         observed[legacy_test] = record
         decisions[str(decision)] += 1
 
@@ -274,7 +287,9 @@ def validate_legacy_test_classification(root: Path) -> dict[str, object]:
     node_records = manifest.get("deleted_test_nodes")
     taxonomy = _load_json(root / TEST_TAXONOMY)
     taxonomy_records = taxonomy.get("tests")
-    if not isinstance(expected_nodes, list) or not all(isinstance(item, str) for item in expected_nodes):
+    if not isinstance(expected_nodes, list) or not all(
+        isinstance(item, str) for item in expected_nodes
+    ):
         raise CutoverAuditError("deleted test node baseline must be a list of nodeids")
     if not isinstance(node_records, list):
         raise CutoverAuditError("deleted test classifications need exact records")
@@ -294,7 +309,9 @@ def validate_legacy_test_classification(root: Path) -> dict[str, object]:
         evidence = record.get("evidence_nodeid")
         rationale = record.get("rationale")
         if not isinstance(nodeid, str) or decision not in ALLOWED_DECISIONS:
-            raise CutoverAuditError("deleted test record needs a nodeid and valid decision")
+            raise CutoverAuditError(
+                "deleted test record needs a nodeid and valid decision"
+            )
         if not isinstance(evidence, str) or "::" not in evidence:
             raise CutoverAuditError(f"{nodeid} needs one exact replacement test nodeid")
         if not isinstance(rationale, str) or len(rationale.strip()) < 20:
@@ -332,9 +349,16 @@ def _python_findings(root: Path, path: Path) -> list[CutoverFinding]:
     generated_name = (
         path.parent.name == "forms" and path.name.startswith("ui_")
     ) or path.name in {"ui_meta.py", "ui_results_window.py", "icons_rc.py"}
-    generated_marker = "generated from reading ui file" in source.lower() or "qt_resource_data" in source
+    generated_marker = (
+        "generated from reading ui file" in source.lower()
+        or "qt_resource_data" in source
+    )
     if generated_name or generated_marker:
-        findings.append(CutoverFinding(relative, "generated-python", "generated Qt Python is tracked"))
+        findings.append(
+            CutoverFinding(
+                relative, "generated-python", "generated Qt Python is tracked"
+            )
+        )
 
     for node in ast.walk(tree):
         imported: list[str] = []
@@ -348,9 +372,17 @@ def _python_findings(root: Path, path: Path) -> list[CutoverFinding]:
                 findings.append(CutoverFinding(relative, "legacy-binding", name))
             if root_name == "pickle":
                 findings.append(
-                    CutoverFinding(relative, "pickle-project-runtime", "pickle import in application source")
+                    CutoverFinding(
+                        relative,
+                        "pickle-project-runtime",
+                        "pickle import in application source",
+                    )
                 )
-        if isinstance(node, ast.Constant) and isinstance(node.value, str) and ".rcms.state" in node.value:
+        if (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and ".rcms.state" in node.value
+        ):
             findings.append(CutoverFinding(relative, "rcms-state-sidecar", node.value))
     return findings
 
@@ -371,16 +403,28 @@ def audit_cutover(root: Path) -> list[CutoverFinding]:
     pyproject = root / "pyproject.toml"
     if pyproject.is_file():
         data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
-        package_data = data.get("tool", {}).get("setuptools", {}).get("package-data", {})
-        packaged_patterns = [
-            pattern
-            for patterns in package_data.values()
-            for pattern in patterns
-            if isinstance(pattern, str)
-        ] if isinstance(package_data, dict) else []
-        if any(pattern.endswith(".py") or ".py" in pattern for pattern in packaged_patterns):
+        package_data = (
+            data.get("tool", {}).get("setuptools", {}).get("package-data", {})
+        )
+        packaged_patterns = (
+            [
+                pattern
+                for patterns in package_data.values()
+                for pattern in patterns
+                if isinstance(pattern, str)
+            ]
+            if isinstance(package_data, dict)
+            else []
+        )
+        if any(
+            pattern.endswith(".py") or ".py" in pattern for pattern in packaged_patterns
+        ):
             findings.append(
-                CutoverFinding("pyproject.toml", "python-package-input", "Python generated output is package data")
+                CutoverFinding(
+                    "pyproject.toml",
+                    "python-package-input",
+                    "Python generated output is package data",
+                )
             )
 
     active_verification: list[Path] = []
