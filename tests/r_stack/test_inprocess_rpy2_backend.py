@@ -539,6 +539,11 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
         )
         meta_reg_result = ro.r(meta_regression_expr)
         parsed_meta_regression = meta_py_r.parse_out_results(meta_reg_result)
+        regression_summary = parsed_meta_regression["texts"]["Summary"]
+        assert "Overall moderators (Qₘ)" in regression_summary, regression_summary
+        assert "Residual heterogeneity (Qₑ)" in regression_summary, regression_summary
+        assert "Q<U+2098>" not in regression_summary, regression_summary
+        assert "Q<U+2091>" not in regression_summary, regression_summary
         weights = parsed_meta_regression["texts"]["Weights"]
         assert weights.splitlines()[0].strip() == "Study names  Weights", weights
         assert "study names" not in weights, weights

@@ -1647,6 +1647,11 @@ def _format_r_table_header(value):
 def _format_result_text(text):
     if not isinstance(text, str):
         text = str(text)
+    text = re.sub(
+        r"<U\+([0-9A-Fa-f]{4,6})>",
+        lambda match: chr(int(match.group(1), 16)),
+        text,
+    )
     insensitive_replacements = (
         (r"\bHPD[._\s]+(?:low|lower)\b", "Lower bound"),
         (r"\bHPD[._\s]+(?:high|upper)\b", "Upper bound"),
