@@ -620,7 +620,7 @@ class DatasetModel(QAbstractTableModel):
         elif role == Qt.ItemDataRole.BackgroundRole:
             row_has_entered_data = self._study_has_entered_data(index.row())
             if row_has_entered_data and column in self.OUTCOMES:
-                return _item_data(QColor(Qt.GlobalColor.yellow))
+                return _item_data(QColor("#D6A93A"))
             elif (
                 row_has_entered_data
                 and column in self.RAW_DATA[len(self.RAW_DATA) // 2 :]

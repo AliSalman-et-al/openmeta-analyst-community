@@ -419,7 +419,7 @@ def test_normal_study_cells_do_not_override_view_alternating_row_background():
     )
     assert model.data(
         model.index(0, model.OUTCOMES[0]), Qt.ItemDataRole.BackgroundRole
-    ) == QColor(Qt.GlobalColor.yellow)
+    ) == QColor("#D6A93A")
 
 
 def test_highlighted_outcome_cells_use_dark_text_for_theme_independent_contrast():
@@ -427,7 +427,7 @@ def test_highlighted_outcome_cells_use_dark_text_for_theme_independent_contrast(
     outcome_index = model.index(0, model.OUTCOMES[0])
 
     assert model.data(outcome_index, Qt.ItemDataRole.BackgroundRole) == QColor(
-        Qt.GlobalColor.yellow
+        "#D6A93A"
     )
     assert model.data(outcome_index, Qt.ItemDataRole.ForegroundRole) == QColor(
         Qt.GlobalColor.black
@@ -499,7 +499,7 @@ def test_named_new_entry_row_keeps_populated_study_chrome(qapp):
     )
     assert model.data(
         model.index(1, model.OUTCOMES[0]), Qt.ItemDataRole.BackgroundRole
-    ) == QColor(Qt.GlobalColor.yellow)
+    ) == QColor("#D6A93A")
 
 
 def test_raw_data_edit_on_placeholder_row_emits_study_name_error():
