@@ -57,7 +57,13 @@ def test_application_wizard_modern_style_renders_sized_nonblank_pages(qapp, tmp_
             assert pixmap.height() >= wizard.minimumHeight()
             assert pixmap.save(str(image_path), "PNG")
             assert image_path.stat().st_size > 0
-            assert not pixmap.toImage().isGrayscale()
+            image = pixmap.toImage()
+            background = image.pixelColor(0, 0)
+            assert any(
+                image.pixelColor(x, y) != background
+                for x in range(0, image.width(), 8)
+                for y in range(0, image.height(), 8)
+            )
             assert wizard.wizardStyle() == QtWidgets.QWizard.WizardStyle.ModernStyle
             assert page.width() >= page.parentWidget().contentsRect().width() - 4
         finally:

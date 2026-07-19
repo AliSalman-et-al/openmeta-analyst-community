@@ -71,6 +71,42 @@ def test_qtsvg_renders_materialized_default_black_plot_stroke():
     ) >= 75
 
 
+def test_plot_graphics_items_paint_an_opaque_white_canvas(qapp, tmp_path):
+    import results_window
+
+    svg_path = tmp_path / "svglite-shaped-transparent.svg"
+    svg_path.write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1127.12pt" '
+        'height="360.00pt" viewBox="0 0 1127.12 360.00">'
+        '<g class="svglite"><line x1="20" y1="20" x2="1100" y2="20" '
+        'stroke="#000000"/></g></svg>',
+        encoding="utf-8",
+    )
+
+    svg_item = results_window._svg_item_class()(str(svg_path))
+    raster_source = QtGui.QPixmap(100, 40)
+    raster_source.fill(QtCore.Qt.GlobalColor.transparent)
+    raster_item = results_window.ResponsivePixmapItem(raster_source)
+    raster_item.setPixmap(raster_source)
+
+    for item in (svg_item, raster_item):
+        bounds = item.boundingRect()
+        rendered = QtGui.QImage(
+            max(1, int(bounds.width())),
+            max(1, int(bounds.height())),
+            QtGui.QImage.Format.Format_ARGB32,
+        )
+        rendered.fill(QtGui.QColor("#2b2b2b"))
+        painter = QtGui.QPainter(rendered)
+        item.paint(painter, QtWidgets.QStyleOptionGraphicsItem())
+        painter.end()
+
+        assert rendered.pixelColor(rendered.width() - 1, rendered.height() - 1) == (
+            QtGui.QColor(QtCore.Qt.GlobalColor.white)
+        )
+
+
 @pytest.mark.parametrize("plot_format", ("svg", "png"))
 def test_results_plot_preview_is_opaque_white_on_dark_theme(
     qapp, tmp_path, plot_format

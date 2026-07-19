@@ -119,7 +119,14 @@ def _svg_item_class():
     if QGraphicsSvgItem is None:
         from PyQt6.QtSvgWidgets import QGraphicsSvgItem as _QGraphicsSvgItem
 
-        QGraphicsSvgItem = _QGraphicsSvgItem
+        class OpaqueGraphicsSvgItem(_QGraphicsSvgItem):
+            """Paint SVG plots on paper instead of the themed scene canvas."""
+
+            def paint(self, painter, option, widget=None):
+                painter.fillRect(self.boundingRect(), Qt.GlobalColor.white)
+                super().paint(painter, option, widget)
+
+        QGraphicsSvgItem = OpaqueGraphicsSvgItem
     return QGraphicsSvgItem
 
 
@@ -198,6 +205,10 @@ class ResponsivePixmapItem(QGraphicsPixmapItem):
 
     def setPixmap(self, pixmap):
         super().setPixmap(_pixmap_with_white_background(pixmap))
+
+    def paint(self, painter, option, widget=None):
+        painter.fillRect(self.boundingRect(), Qt.GlobalColor.white)
+        super().paint(painter, option, widget)
 
 
 def _pixmap_with_white_background(pixmap):

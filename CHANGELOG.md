@@ -26,6 +26,7 @@ RC MetaStudio starts a fresh maintained-product changelog. Historical release hi
 
 - Fixed Windows packaging so R is staged without elevation and the complete Qt/R application is built and qualified through one local-and-CI command.
 - Fixed dark-mode contrast for highlighted effect-size cells and Results-window plot previews.
+- Fixed Results-window SVG and raster plots inheriting the dark themed scene background instead of painting an opaque white canvas.
 - Fixed dataset-type wizard icons so they follow the active light or dark palette, and made the Diagnostic choice match the other button geometry.
 - Fixed standard meta-analysis Method and Parameters dialogs incorrectly using diagnostic likelihood-ratio wording.
 

@@ -9,7 +9,7 @@ import forms.ui_welcome_page
 
 from typing import TypedDict
 
-from PyQt6.QtCore import QEvent, QSize, Qt, QTimer
+from PyQt6.QtCore import QEvent, QObject, QSize, Qt, QTimer
 from PyQt6.QtGui import (
     QAction,
     QCloseEvent,
@@ -235,10 +235,16 @@ class DataTypePage(MainWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
         for current, following in zip(buttons, buttons[1:]):
             self.setTabOrder(current, following)
 
-    def eventFilter(self, watched, event):
+    def eventFilter(  # ty: ignore[invalid-method-override] -- PyQt6 stub rejects the binding's valid override
+        self,
+        watched: QObject | None,
+        event: QEvent | None,
+    ) -> bool:
         if (
-            event.type() == QEvent.Type.PaletteChange
+            event is not None
+            and event.type() == QEvent.Type.PaletteChange
             and hasattr(self, "_data_type_source_icons")
+            and isinstance(watched, QAbstractButton)
             and watched in self._data_type_buttons()
         ):
             self._apply_palette_icon(watched)
