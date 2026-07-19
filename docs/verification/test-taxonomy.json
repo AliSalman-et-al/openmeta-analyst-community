@@ -51,6 +51,36 @@
     },
     {
       "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_analysis_configuration_layout.py::test_method_dialog_wording_is_scoped_to_its_analysis_family[binary-None-Method & Parameters-Analysis method:]",
+      "reason": "Guards generic standard binary Method and Parameters wording against diagnostic-label leakage.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_analysis_configuration_layout.py::test_method_dialog_wording_is_scoped_to_its_analysis_family[continuous-None-Method & Parameters-Analysis method:]",
+      "reason": "Guards generic standard continuous Method and Parameters wording against diagnostic-label leakage.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_analysis_configuration_layout.py::test_method_dialog_wording_is_scoped_to_its_analysis_family[diagnostic-diagnostic_metrics2-Method & Parameters for Likelihood Ratios and Diagnostic Odds Ratio-Method for Likelihood Ratios and Diagnostic Odds Ratio]",
+      "reason": "Guards the intentional LR and DOR wording in the diagnostic Method and Parameters dialog.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
       "evidence": ["r_stack", "release_readiness"],
       "external_dependencies": ["threading"],
       "lane": "fast",
@@ -801,6 +831,26 @@
       "lane": "gui",
       "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_return_activates_visible_default_wizard_action",
       "reason": "Guards the visible forward wizard action as the explicit Return-key default across platforms.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_data_type_icons_follow_button_text_color_across_palette_changes",
+      "reason": "Guards palette-adaptive dataset-type icon contrast in light and dark application themes.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt"],
+      "lane": "gui",
+      "nodeid": "tests/python/gui/test_main_wizard_workflow_layout.py::test_diagnostic_data_type_button_matches_standard_choice_geometry",
+      "reason": "Guards consistent wide rectangular geometry across all dataset-type choices.",
       "runtime_class": "subsecond",
       "size": "small"
     },

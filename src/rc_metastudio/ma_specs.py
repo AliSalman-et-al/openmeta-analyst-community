@@ -303,7 +303,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         # metrics can be selected. we handle this by allowing the
         # user to specify different methods for different groups
         # of metrics.
-        if self.diag_metrics is not None:
+        if self.data_type == "diagnostic":
             # these are the two 'groups' of metrics (sens/spec & DOR/LR+/-)
             # these booleans tell us for which of these groups we're getting parameters
             self.sens_spec = any([m in ("sens", "spec") for m in self.diag_metrics])
