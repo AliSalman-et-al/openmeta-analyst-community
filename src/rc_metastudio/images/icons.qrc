@@ -56,4 +56,24 @@
     <file alias="two-arm-means.svg">icons/dataset-types/two-arm-means.svg</file>
     <file alias="two-arm-proportions.svg">icons/dataset-types/two-arm-proportions.svg</file>
   </qresource>
+  <qresource prefix="icons/dataset-types/light">
+    <file alias="diagnostic-data.svg">icons/dataset-types/light/diagnostic-data.svg</file>
+    <file alias="generic-effect-size.svg">icons/dataset-types/light/generic-effect-size.svg</file>
+    <file alias="one-arm-mean.svg">icons/dataset-types/light/one-arm-mean.svg</file>
+    <file alias="one-arm-proportion.svg">icons/dataset-types/light/one-arm-proportion.svg</file>
+    <file alias="single-regression-coefficient.svg">icons/dataset-types/light/single-regression-coefficient.svg</file>
+    <file alias="standardized-mean-difference.svg">icons/dataset-types/light/standardized-mean-difference.svg</file>
+    <file alias="two-arm-means.svg">icons/dataset-types/light/two-arm-means.svg</file>
+    <file alias="two-arm-proportions.svg">icons/dataset-types/light/two-arm-proportions.svg</file>
+  </qresource>
+  <qresource prefix="icons/dataset-types/dark">
+    <file alias="diagnostic-data.svg">icons/dataset-types/dark/diagnostic-data.svg</file>
+    <file alias="generic-effect-size.svg">icons/dataset-types/dark/generic-effect-size.svg</file>
+    <file alias="one-arm-mean.svg">icons/dataset-types/dark/one-arm-mean.svg</file>
+    <file alias="one-arm-proportion.svg">icons/dataset-types/dark/one-arm-proportion.svg</file>
+    <file alias="single-regression-coefficient.svg">icons/dataset-types/dark/single-regression-coefficient.svg</file>
+    <file alias="standardized-mean-difference.svg">icons/dataset-types/dark/standardized-mean-difference.svg</file>
+    <file alias="two-arm-means.svg">icons/dataset-types/dark/two-arm-means.svg</file>
+    <file alias="two-arm-proportions.svg">icons/dataset-types/dark/two-arm-proportions.svg</file>
+  </qresource>
 </RCC>

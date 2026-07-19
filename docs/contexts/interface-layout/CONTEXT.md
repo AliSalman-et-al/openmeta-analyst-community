@@ -145,7 +145,7 @@ The 28-pixel transparent member of an analysis icon pair, using restrained addit
 _Avoid_: Enlarged compact icon, decorative analysis illustration
 
 **Dataset-Type Icon Family**:
-The monochrome Statistical Concept Icons that use conventional path-rendered notation to distinguish one-arm and two-arm measures, with a 2-by-2 matrix for diagnostic data. A single platform-neutral slate ink preserves the approved notation geometry while remaining legible on both light and dark neutral surfaces.
+The Statistical Concept Icons that use conventional path-rendered notation to distinguish one-arm and two-arm measures, with a 2-by-2 matrix for diagnostic data. Matching light- and dark-palette SVG masters preserve the approved notation geometry and diagnostic detail without runtime recoloring or raster composition.
 _Avoid_: Unrelated dataset illustrations, decorative color, runtime font dependency
 
 **Icon-Bearing Command**:

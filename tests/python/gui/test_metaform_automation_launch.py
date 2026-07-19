@@ -443,9 +443,11 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
         "icons/analyses": 5,
         "icons/analyses/compact": 5,
         "icons/dataset-types": 8,
+        "icons/dataset-types/dark": 8,
+        "icons/dataset-types/light": 8,
         "icons/table": 1,
     }
-    assert len(resources) == 42
+    assert len(resources) == 58
 
     wide_dataset_icon_sizes = {
         ":/icons/dataset-types/generic-effect-size.svg": (54, 40),
@@ -459,6 +461,9 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
     }
 
     for resource_path, source_path in resources.items():
+        base_dataset_path = resource_path.replace(
+            "/dataset-types/light/", "/dataset-types/"
+        ).replace("/dataset-types/dark/", "/dataset-types/")
         root = ET.parse(source_path).getroot()
         assert root.tag == "{http://www.w3.org/2000/svg}svg"
         if "/analyses/compact/" in resource_path:
@@ -467,7 +472,7 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
             expected_width, expected_height = (18, 18)
         else:
             expected_width, expected_height = wide_dataset_icon_sizes.get(
-                resource_path, (48, 48)
+                base_dataset_path, (48, 48)
             )
         assert root.attrib["viewBox"] == (
             f"0 0 {expected_width} {expected_height}"
@@ -475,7 +480,8 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
         assert not root.findall(".//{http://www.w3.org/2000/svg}text")
         if resource_path.startswith(":/icons/dataset-types/"):
             source_text = source_path.read_text(encoding="utf-8").lower()
-            assert "#60798d" in source_text
+            expected_ink = "#e7edf0" if "/dark/" in resource_path else "#60798d"
+            assert expected_ink in source_text
             assert "#243746" not in source_text
 
         embedded_file = QtCore.QFile(resource_path)
@@ -562,7 +568,7 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
                     )
                 elif (
                     family == "dataset-types"
-                    and resource_path not in wide_dataset_icon_sizes
+                    and base_dataset_path not in wide_dataset_icon_sizes
                 ):
                     assert 13 <= visible_height <= 24, (
                         f"{resource_path} is outside the dataset icon optical-size range"
@@ -577,14 +583,14 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
                     ) / 2
                     assert abs(center_x - (rendered_width - 1) / 2) <= 2
                     assert abs(center_y - (rendered_height - 1) / 2) <= 2
-                    if resource_path in simple_dataset_height_ranges:
+                    if base_dataset_path in simple_dataset_height_ranges:
                         minimum_height, maximum_height = (
-                            simple_dataset_height_ranges[resource_path]
+                            simple_dataset_height_ranges[base_dataset_path]
                         )
                         assert minimum_height <= visible_height <= maximum_height
 
-        if resource_path in wide_dataset_icon_sizes:
-            requested_width, requested_height = wide_dataset_icon_sizes[resource_path]
+        if base_dataset_path in wide_dataset_icon_sizes:
+            requested_width, requested_height = wide_dataset_icon_sizes[base_dataset_path]
             ui_pixmap = icon.pixmap(requested_width, requested_height)
             assert ui_pixmap.width() == requested_width
             assert ui_pixmap.height() == requested_height
