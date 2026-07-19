@@ -483,7 +483,16 @@ R_HOME="$r_home" PATH="$r_home/bin:$PATH" RPY2_CFFI_MODE=API MACOSX_DEPLOYMENT_T
   "rpy2-rinterface==3.6.6"
 
 step "Proving and relocating the rpy2 API bridge against staged R"
-rpy2_api_bridge="$($python_exe -c 'from pathlib import Path; import _rinterface_cffi_api as m; print(Path(m.__file__).resolve())')"
+rpy2_api_bridge="$($python_exe - <<'PY'
+from pathlib import Path
+import sysconfig
+
+matches = list(Path(sysconfig.get_paths()["platlib"]).glob("_rinterface_cffi_api*.so"))
+if len(matches) != 1:
+    raise SystemExit(f"expected exactly one rpy2 API bridge, found {matches}")
+print(matches[0].resolve(strict=True))
+PY
+)"
 [ -f "$rpy2_api_bridge" ] || { echo "rpy2 API bridge is absent after source build." >&2; exit 1; }
 [ "$(find "$(dirname "$rpy2_api_bridge")" -maxdepth 1 -name '_rinterface_cffi_api*.so' | wc -l | tr -d ' ')" = 1 ] \
   || { echo "rpy2 API build must contain exactly one API extension." >&2; exit 1; }

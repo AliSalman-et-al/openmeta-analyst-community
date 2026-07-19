@@ -80,6 +80,16 @@ def test_source_r_packages_link_against_the_private_staged_runtime():
     assert build.count('R_MAKEVARS_USER="$r_makevars"') == 2
 
 
+def test_rpy2_bridge_is_relocated_before_it_is_imported():
+    build = (ROOT / "scripts/build-macos-package.sh").read_text(encoding="utf-8")
+
+    locate = build.index('glob("_rinterface_cffi_api*.so")')
+    relocate = build.index('install_name_tool -change "$dependency"')
+    api_proof = build.index("from rpy2 import robjects")
+    assert locate < relocate < api_proof
+    assert "import _rinterface_cffi_api as m" not in build
+
+
 def test_arm64_framework_component_is_selected_by_its_real_package_identifier(
     tmp_path: Path,
 ):
