@@ -109,6 +109,10 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     promote = (ROOT / ".github/workflows/promote.yml").read_text(encoding="utf-8")
     legacy = (ROOT / ".github/workflows/package-verification.yml").read_text(encoding="utf-8")
     assert "contents: write" not in candidate
+    assert "run: .\\scripts\\package-windows.ps1\n" in candidate
+    assert "-ArtifactName" not in candidate
+    assert "Expected exactly one versioned Windows package" in candidate
+    assert "Move-Item -LiteralPath $builtArchives[0].FullName" in candidate
     assert "environment: ${{ matrix.environment }}" in sign
     assert "attestations: write" in sign
     assert "--automation-native-smoke" in sign
