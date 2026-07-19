@@ -2,23 +2,23 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Main RC MetaStudio desktop window."""
 
-import pickle
+from __future__ import annotations
+
 import os
 from functools import cmp_to_key
-from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QTextDocument
-from PyQt5.QtWidgets import (
-    QAction,
+from PyQt6 import QtCore, QtWidgets
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QAction, QCloseEvent, QKeyEvent, QKeySequence, QResizeEvent, QTextDocument, QUndoCommand
+from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
     QFileDialog,
     QLabel,
     QMessageBox,
     QTableView,
-    QUndoCommand,
 )
 import copy
+from typing import cast
 
 ## hand-rolled modules
 import ui_meta
@@ -34,9 +34,11 @@ import qt_layout
 import adaptive_window
 import qt_text
 import name_validation
-import project_pickle
+import project_adapter
+import project_format
 import tabular_data
 from settings import *
+from runtime_types import required
 
 # additional forms
 import add_new_dialogs
@@ -84,8 +86,12 @@ def _resolve_open_file_path(file_path):
     return file_path
 
 
-def _load_project_pickle(file_path):
-    return project_pickle.load_project_pickle(file_path)
+def _load_structured_project(file_path):
+    document = project_format.load_project(file_path)
+    dataset = project_adapter.project_to_dataset(document.project)
+    state = project_adapter.state_to_model_state(dataset, document.state)
+    restored_selection = document.state["active_outcome"] is not None
+    return dataset, state, restored_selection
 
 
 class InvalidProjectFileError(ValueError):
@@ -102,7 +108,12 @@ def _validate_open_project_dataset(dataset):
 
 def _format_open_project_error(file_path, exception):
     if isinstance(
-        exception, (InvalidProjectFileError, project_pickle.ProjectFileFormatError)
+        exception,
+        (
+            InvalidProjectFileError,
+            project_adapter.ProjectAdapterError,
+            project_format.ProjectFormatError,
+        ),
     ):
         return "Could not open %s.\n\n%s" % (file_path, exception)
     return "Could not open %s.\n\nDetails: %s: %s" % (
@@ -123,7 +134,7 @@ def _qt_text(value):
 
 def _connect_action(action, callback):
     parent = getattr(callback, "__self__", None)
-    action.triggered.connect(
+    action.triggered[bool].connect(
         app_error_handler.safe_slot(lambda checked=False: callback(), parent=parent)
     )
 
@@ -143,11 +154,13 @@ class ElidingStatusLabel(QLabel):
         # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
         self.setMinimumWidth(0)
         self.setSizePolicy(
-            QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Preferred
+            QtWidgets.QSizePolicy.Policy.Ignored, QtWidgets.QSizePolicy.Policy.Preferred
         )
         self.setText(text)
 
-    def setText(self, text):
+    def setText(  # ty: ignore[invalid-method-override] -- PyQt6's QLabel overload stubs conflict with this semantic text override.
+        self, text: str | None
+    ) -> None:
         text = qt_text.to_native_text(text)
         if "<" in text and ">" in text:
             document = QTextDocument()
@@ -157,13 +170,20 @@ class ElidingStatusLabel(QLabel):
         self.setToolTip(self._full_text)
         self._refresh_elision()
 
-    def resizeEvent(self, event):
+    def text(self):
+        """Return the semantic status text, not its width-dependent paint form."""
+
+        return self._full_text
+
+    def resizeEvent(  # ty: ignore[invalid-method-override] -- PyQt6's QLabel and QWidget stubs conflict for this runtime-supported override.
+        self, event: QResizeEvent | None
+    ) -> None:
         super(ElidingStatusLabel, self).resizeEvent(event)
         self._refresh_elision()
 
     def _refresh_elision(self):
         width = max(0, self.contentsRect().width())
-        elided = self.fontMetrics().elidedText(self._full_text, Qt.ElideRight, width)
+        elided = self.fontMetrics().elidedText(self._full_text, Qt.TextElideMode.ElideRight, width)
         QLabel.setText(self, elided)
 
 
@@ -196,11 +216,15 @@ class ImportProgress(QDialog, forms.ui_running.Ui_running):
 
 
 class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
+    model: ma_data_table_model.DatasetModel
+    tableView: ma_data_table_view.MADataTable
+
     def __init__(self, parent=None):
         # We follow the advice given by Mark Summerfield in his Python QT book:
         # Namely, we use multiple inheritance to gain access to the ui. We take
         # this approach throughout the application.
         super(MetaForm, self).__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self.setupUi(self)
         qt_layout.configure_analysis_menu(self.menuAnalysis)
         for action, icon_name in (
@@ -237,12 +261,11 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.cl_label = ElidingStatusLabel(
             _format_confidence_level_status(meta_globals.DEFAULT_CONF_LEVEL)
         )
-        self.cl_label.setAlignment(Qt.AlignRight)
+        self.cl_label.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.statusbar.addWidget(self.cl_label, 1)
 
         # Command-line dataset loading can be added here if headless startup
         # needs to open a project directly in the GUI.
-        self.model = None
         self.new_dataset()
 
         # flag maintaining whether the current dataset
@@ -263,13 +286,15 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.update_dimension()
         self._model_signal_connections = []
         self._setup_connections()
-        self.tableView.setSelectionMode(QTableView.ContiguousSelection)
+        self.tableView.undoStack.cleanChanged.connect(self._undo_clean_changed)
+        self._configure_standard_shortcuts()
+        self.tableView.setSelectionMode(QTableView.SelectionMode.ContiguousSelection)
         self.model.reset_model()
         ##
         # we hand off a reference of the main gui to the table view
         # so that it can do things like pass suitable events 'up'
         # to the main form
-        self.tableView.main_gui = self
+        self.tableView.main_gui = cast(ma_data_table_view.MainGuiProtocol, self)
         self.tableView.synchronize_column_widths()
 
         self.out_path = None  # path to output file
@@ -299,8 +324,232 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             wizard_data = start_up_wizard.get_results()
             self._handle_wizard_results(wizard_data)
 
-    def closeEvent(self, event):
-        self.quit()
+    def closeEvent(  # ty: ignore[invalid-method-override] -- PyQt6's QMainWindow and QWidget stubs conflict for this runtime-supported override.
+        self, event: QCloseEvent | None
+    ) -> None:
+        if event is None:
+            return
+        if not self._confirm_close():
+            event.ignore()
+            return
+        self._disconnections()
+        save_main_window_placement(self, self.tableView.column_width_state())
+        save_settings()
+        event.accept()
+
+    def _confirm_close(self):
+        if not self.current_data_unsaved:
+            return True
+        choice = self.prompt_to_save_unsaved_data()
+        if choice == QMessageBox.StandardButton.Yes:
+            return self.save() is True
+        return choice == QMessageBox.StandardButton.No
+
+    def _authorize_destructive_project_action(self):
+        """Return whether New/Open/Import may replace the current project."""
+
+        if not self.current_data_unsaved:
+            return True
+        choice = self.prompt_to_save_unsaved_data()
+        if choice == QMessageBox.StandardButton.Yes:
+            return self.save() is True
+        return choice == QMessageBox.StandardButton.No
+
+    def _capture_project_install_state(self):
+        action_states = {
+            action: action.isEnabled()
+            for action in (
+                self.action_go,
+                self.action_cum_ma,
+                self.action_loo_ma,
+                self.action_meta_regression,
+                self.action_subgroup_ma,
+            )
+        }
+        current = self.tableView.currentIndex()
+        return {
+            "model": self.model,
+            "table_model": self.tableView.model(),
+            "out_path": self.out_path,
+            "dirty": self.current_data_unsaved,
+            "dataset_label": self.dataset_file_lbl.text(),
+            "outcome_label": self.cur_outcome_lbl.text(),
+            "follow_up_label": self.cur_time_lbl.text(),
+            "confidence_label": self.cl_label.text(),
+            "metric_menu_type": self.metric_menu_is_set_for,
+            "metric_menu": self._capture_metric_menu_state(),
+            "action_states": action_states,
+            "current_index": (current.row(), current.column()),
+            "selection": [
+                (index.row(), index.column())
+                for index in required(self.tableView.selectionModel(), "workspace selection model").selectedIndexes()
+            ],
+        }
+
+    def _capture_metric_menu_state(self):
+        submenus = []
+        for menu_action in self.menuMetric.actions():
+            submenu = menu_action.menu()
+            if submenu is None:
+                continue
+            submenus.append(
+                {
+                    "title": submenu.title(),
+                    "actions": [
+                        {
+                            "metric": _qt_item_text(action.data()),
+                            "checked": action.isChecked(),
+                            "enabled": action.isEnabled(),
+                        }
+                        for action in submenu.actions()
+                    ],
+                }
+            )
+        return {"enabled": self.menuMetric.isEnabled(), "submenus": submenus}
+
+    def _restore_metric_menu_state(self, snapshot):
+        self.menuMetric.clear()
+        self.menuMetric.setEnabled(snapshot["enabled"])
+        for submenu_state in snapshot["submenus"]:
+            submenu = self.add_sub_metric_menu(submenu_state["title"])
+            if submenu_state["title"] == "two-arm":
+                self.twoArmMetricMenu = submenu
+            elif submenu_state["title"] == "one-arm":
+                self.oneArmMetricMenu = submenu
+            for action_state in submenu_state["actions"]:
+                action = self.add_metric_action(action_state["metric"], submenu)
+                action.blockSignals(True)
+                action.setChecked(action_state["checked"])
+                action.setEnabled(action_state["enabled"])
+                action.blockSignals(False)
+
+    def _restore_project_install_state(self, previous, primary_error):
+        rollback_errors = []
+
+        def guarded(phase, operation):
+            try:
+                operation()
+            except Exception as exc:
+                rollback_errors.append((phase, exc))
+
+        old_model = previous["model"]
+        if self.model is not old_model:
+            def disconnect_candidate():
+                for connection in self._model_signal_connections:
+                    try:
+                        connection.disconnect()
+                    except Exception as exc:
+                        rollback_errors.append(("disconnect candidate signal", exc))
+                self._model_signal_connections = []
+
+            guarded("disconnect candidate model", disconnect_candidate)
+            guarded(
+                "restore table model",
+                lambda: QTableView.setModel(self.tableView, previous["table_model"]),
+            )
+            self.model = old_model
+            guarded(
+                "restore model signal connections",
+                lambda: self._setup_connections(menu_actions=False),
+            )
+        self.out_path = previous["out_path"]
+        self.current_data_unsaved = previous["dirty"]
+        guarded(
+            "restore project label",
+            lambda: self.dataset_file_lbl.setText(previous["dataset_label"]),
+        )
+        guarded(
+            "restore outcome label",
+            lambda: self.cur_outcome_lbl.setText(previous["outcome_label"]),
+        )
+        guarded(
+            "restore follow-up label",
+            lambda: self.cur_time_lbl.setText(previous["follow_up_label"]),
+        )
+        guarded(
+            "restore Confidence Level label",
+            lambda: self.cl_label.setText(previous["confidence_label"]),
+        )
+        self.metric_menu_is_set_for = previous["metric_menu_type"]
+        guarded(
+            "restore metric menu",
+            lambda: self._restore_metric_menu_state(previous["metric_menu"]),
+        )
+        for action, enabled in previous["action_states"].items():
+            guarded(
+                "restore action availability",
+                lambda action=action, enabled=enabled: action.setEnabled(enabled),
+            )
+
+        def restore_selection():
+            selection_model = required(self.tableView.selectionModel(), "workspace selection model")
+            selection_model.clearSelection()
+            for row, column in previous["selection"]:
+                selection_model.select(
+                    old_model.index(row, column),
+                    QtCore.QItemSelectionModel.SelectionFlag.Select,
+                )
+            row, column = previous["current_index"]
+            if row >= 0 and column >= 0:
+                self.tableView.setCurrentIndex(old_model.index(row, column))
+
+        guarded("restore table selection", restore_selection)
+        for phase, exc in rollback_errors:
+            primary_error.add_note(f"rollback {phase} also failed: {exc}")
+            try:
+                app_error_handler.log_exception(type(exc), exc, exc.__traceback__)
+            except Exception:
+                pass
+
+    def _update_recent_project_nonfatal(self, path, operation):
+        try:
+            add_file_to_recent_files(path)
+            self.populate_open_recent_menu()
+        except Exception as exc:
+            try:
+                app_error_handler.log_exception(type(exc), exc, exc.__traceback__)
+            except Exception:
+                pass
+            try:
+                QMessageBox.warning(
+                    self,
+                    "Recent Projects Not Updated",
+                    "The project was %s successfully, but RC MetaStudio could not "
+                    "update the machine-local recent-project list.\n\nDetails: %s: %s"
+                    % (operation, exc.__class__.__name__, exc),
+                )
+            except Exception:
+                pass
+
+    def _report_durability_uncertain_save(self, destination, exception):
+        try:
+            app_error_handler.log_exception(
+                type(exception), exception, exception.__traceback__
+            )
+        except Exception:
+            pass
+        try:
+            QMessageBox.warning(
+                self,
+                "Project Saved; Durability Uncertain",
+                "RC MetaStudio installed the saved project at %s, but the operating "
+                "system could not confirm final directory durability. The document "
+                "is treated as saved so later actions do not discard work by retrying "
+                "a replacement.\n\nDetails: %s"
+                % (destination, exception),
+            )
+        except Exception:
+            pass
+
+    def _configure_standard_shortcuts(self):
+        """Use platform-native shortcuts for the maintained shell actions."""
+        for action, standard_key in (
+            (self.action_new_dataset, QKeySequence.StandardKey.New),
+            (self.action_open, QKeySequence.StandardKey.Open),
+            (self.action_save, QKeySequence.StandardKey.Save),
+            (self.action_quit, QKeySequence.StandardKey.Quit),
+        ):
+            action.setShortcut(QKeySequence(standard_key))
 
     def _model_about_to_be_reset(self):
         """Call all the functions here that should be called when the model is
@@ -313,15 +562,8 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.tableView.model().recalculate_display_scale()
 
     def create_new_dataset(self, use_undo_framework=True):
-        if self.current_data_unsaved:
-            choice = self.prompt_to_save_unsaved_data()
-            if choice == QMessageBox.Yes:
-                if self.save() is False:
-                    return
-            elif choice == QMessageBox.No:
-                pass
-            else:  # cancel
-                return
+        if not self._authorize_destructive_project_action():
+            return
 
         wizard = main_wizard.MainWizard(parent=self, path="new_dataset")
         if wizard.exec():
@@ -333,9 +575,10 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     ):
 
         data_model = ma_dataset.Dataset(title=name, is_diag=is_diag)
-        if self.model is not None:
+        existing_model = getattr(self, "model", None)
+        if existing_model is not None:
             if use_undo_framework:
-                original_dataset = copy.deepcopy(self.model.dataset)
+                original_dataset = copy.deepcopy(existing_model.dataset)
                 old_state_dict = self.tableView.model().get_stateful_dict()
                 undo_f = lambda: self.set_model(original_dataset, old_state_dict)
                 redo_f = lambda: self.set_model(data_model)
@@ -398,13 +641,17 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def enable_menu_options_that_require_dataset(self):
         self.toggle_menu_options_that_require_dataset(True)
 
-    def keyPressEvent(self, event):
-        if event.modifiers() & QtCore.Qt.ControlModifier:
-            if event.key() == QtCore.Qt.Key_S:
+    def keyPressEvent(  # ty: ignore[invalid-method-override] -- PyQt6's QMainWindow and QWidget stubs conflict for this runtime-supported override.
+        self, event: QKeyEvent | None
+    ) -> None:
+        if event is None:
+            return
+        if event.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier:
+            if event.key() == QtCore.Qt.Key.Key_S:
                 # ctrl + s = save
                 print("saving..")
                 self.save()
-            elif event.key() == QtCore.Qt.Key_O:
+            elif event.key() == QtCore.Qt.Key.Key_O:
                 # ctrl + o = open
                 self.open()
 
@@ -420,7 +667,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self._model_signal_connections = []
 
     def data_error(self, msg):
-        QMessageBox.warning(self.parent(), "Warning", msg)
+        QMessageBox.warning(self, "Warning", msg)
 
     def set_edit_focus(self, index):
         """sets edit focus to the row,col specified by index."""
@@ -461,6 +708,8 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
     def _import_csv(self):
         """Import data from csv file"""
+        if not self._authorize_destructive_project_action():
+            return
         wizard = main_wizard.MainWizard(parent=self, path="csv_import")
         if wizard.exec():
             wizard_data = wizard.get_results()
@@ -471,7 +720,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         model = self.tableView.model()
         self._model_signal_connections.append(
             app_error_handler.connect_safely(
-                model.pyCellContentChanged,
+                model.workspaceEditCommitted,
                 self.tableView.cell_content_changed,
                 parent=self,
             )
@@ -609,6 +858,12 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def data_dirtied(self):
         self._notify_user_that_data_is_unsaved()
         self.current_data_unsaved = True
+
+    def _undo_clean_changed(self, is_clean):
+        """Keep project dirty state aligned with the active undo history."""
+        self.current_data_unsaved = not bool(is_clean)
+        if not is_clean:
+            self._notify_user_that_data_is_unsaved()
 
     def meta_subgroup_get_cov(self):
         form = meta_subgroup_form.MetaSubgroupForm(self.model, parent=self)
@@ -766,7 +1021,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
             # update the new state dict to reflect the currently selected
             # outcomes, etc.
-            outcome_model = edit_window.outcome_list.model()
+            outcome_model = edit_window.outcomes_model
             edited_outcomes = outcome_model.outcome_list
             if outcome_model.current_outcome is not None:
                 new_state_dict["current_outcome"] = outcome_model.current_outcome
@@ -781,7 +1036,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             new_state_dict["current_time_point"] = max(
                 edit_window.follow_up_list.currentIndex().row(), 0
             )
-            grp_list = edit_window.group_list.model().group_list
+            grp_list = edit_window.groups_model.group_list
 
             if len(grp_list) >= 2:
                 new_state_dict["current_txs"] = grp_list[:2]
@@ -802,6 +1057,17 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         current datatype.
         """
 
+        # Clearing a checked QAction emits ``toggled(False)`` while Qt tears the
+        # old submenu down.  Those actions are connected to ``metric_selected``,
+        # which would otherwise recalculate every study just because a restored
+        # project's menu is being rebuilt.  A document open must preserve the
+        # persisted effects rather than treating menu destruction as a user edit.
+        for menu_action in self.menuMetric.actions():
+            menu_action.blockSignals(True)
+            submenu = menu_action.menu()
+            if submenu is not None:
+                for action in submenu.actions():
+                    action.blockSignals(True)
         self.menuMetric.clear()
         self.menuMetric.setDisabled(False)
 
@@ -843,13 +1109,17 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             if metric == metric_to_check or (metric_to_check is None and i == 0):
                 # arbitrarily check the first metric in the case that none
                 # is specificied
+                metric_action.blockSignals(True)
                 metric_action.setChecked(True)
+                metric_action.blockSignals(False)
 
         # now add the one-arm metrics
         for metric in one_arm_metrics:
             metric_action = self.add_metric_action(metric, self.oneArmMetricMenu)
             if metric == metric_to_check:
+                metric_action.blockSignals(True)
                 metric_action.setChecked(True)
+                metric_action.blockSignals(False)
 
     def add_sub_metric_menu(self, name):
         sub_menu = QtWidgets.QMenu(str(name), self.menuMetric)
@@ -889,8 +1159,10 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         data_type = self.tableView.model().get_current_outcome_type(get_str=False)
         if data_type in (meta_globals.BINARY, meta_globals.CONTINUOUS):
             # then there are sub-menus (one-group, two-group)
-            for sub_menu in self.menuMetric.actions():
-                sub_menu = sub_menu.menu()
+            for menu_action in self.menuMetric.actions():
+                sub_menu = menu_action.menu()
+                if sub_menu is None:
+                    continue
                 for action in sub_menu.actions():
                     action.blockSignals(True)
                     action.setChecked(False)
@@ -1290,26 +1562,17 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             "<font color='Blue'>%s</font>" % self.model.get_current_follow_up_name()
         )
 
-    def open(self, file_path=None):
+    def open(self, file_path=None, raise_on_error=False):
         """
-        This gets called when the user opts to open an existing dataset. Note that we make use
-        of the pickled dataset itself (.rcms) and we also look for a corresponding `state`
-        dictionary, which contains things like which outcome was currently displayed, etc.
+        Open a validated structured project and restore its durable working state.
 
         Opening a project is a document boundary, not an undoable edit. The undo stack is
         reset after a successful load so Ctrl+Z cannot step back into the previously open
         dataset.
         """
 
-        if self.current_data_unsaved:
-            choice = self.prompt_to_save_unsaved_data()
-            if choice == QMessageBox.Yes:
-                if self.save() is False:
-                    return
-            elif choice == QMessageBox.No:
-                pass
-            else:  # cancel
-                return
+        if not self._authorize_destructive_project_action():
+            return
 
         # if no file path is provided, prompt the user.
         if file_path is None:
@@ -1326,40 +1589,48 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                 return False
 
         file_path = _resolve_open_file_path(file_path)
-        add_file_to_recent_files(file_path)
 
         data_model = None
         print("loading %s..." % file_path)
         try:
-            data_model = _load_project_pickle(file_path)
+            data_model, state_dict, restored_selection = _load_structured_project(file_path)
             data_model = _validate_open_project_dataset(data_model)
             print("successfully loaded data")
         except Exception as e:
             msg = _format_open_project_error(file_path, e)
             print(msg)
+            if raise_on_error:
+                raise RuntimeError(msg) from e
             QMessageBox.critical(self, "Could Not Open Project", msg)
             return None
 
-        self.out_path = file_path
-
-        state_dict = None
+        previous = self._capture_project_install_state()
         try:
-            state_dict = _load_project_pickle(file_path + ".state")
-            print("found state dictionary: \n%s" % state_dict)
-        except:
-            print("no state dictionary found -- using 'reasonable' defaults")
-            state_dict = self.tableView.model().make_reasonable_stateful_dict(
-                data_model
+            self.set_model(
+                data_model,
+                state_dict,
+                check_for_appropriate_metric=not restored_selection,
+                preserve_state_selection=restored_selection,
+                recalculate_outcomes=False,
             )
-            print("made state dictionary: \n%s" % state_dict)
-
-        self.set_model(data_model, state_dict, check_for_appropriate_metric=True)
-        self.model.analysis_source_path = file_path
+            self.model.analysis_source_path = file_path
+            self.dataset_file_lbl.setText("Open Project: %s" % file_path)
+        except Exception as e:
+            self._restore_project_install_state(previous, e)
+            msg = _format_open_project_error(file_path, e)
+            try:
+                app_error_handler.log_exception(type(e), e, e.__traceback__)
+            except Exception:
+                pass
+            if raise_on_error:
+                raise RuntimeError(msg) from e
+            QMessageBox.critical(self, "Could Not Open Project", msg)
+            return None
+        self.out_path = file_path
         self.tableView.undoStack.clear()
-        self.dataset_file_lbl.setText("Open Project: %s" % file_path)
-
         # we just opened it, so it's 'saved'
         self.current_data_unsaved = False
+        self._update_recent_project_nonfatal(file_path, "opened")
 
         return True
 
@@ -1470,7 +1741,12 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.data_dirtied()
 
     def set_model(
-        self, data_model, state_dict=None, check_for_appropriate_metric=False
+        self,
+        data_model,
+        state_dict=None,
+        check_for_appropriate_metric=False,
+        preserve_state_selection=False,
+        recalculate_outcomes=True,
     ):
         ##
         # we explicitly append a blank study to the
@@ -1511,17 +1787,34 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         #        else:
         #            self.action_cum_ma.setEnabled(True)
 
-        self.model_updated()
+        self.model_updated(
+            preserve_selection=preserve_state_selection,
+            recalculate_outcomes=recalculate_outcomes,
+        )
         self.data_dirtied()
         print("ok -- model set.")
 
-    def model_updated(self):
+    def model_updated(self, preserve_selection=False, recalculate_outcomes=True):
         """Call me when the model is changed."""
-        self.model.update_current_group_names()
-        self.model.update_current_outcome()
-        self.model.update_current_time_points()
+        if preserve_selection:
+            group_names = self.model.dataset.get_group_names()
+            if self.model.current_txs:
+                self.model.tx_index_a = group_names.index(self.model.current_txs[0])
+                if len(self.model.current_txs) > 1:
+                    self.model.tx_index_b = group_names.index(self.model.current_txs[1])
+                else:
+                    self.model.tx_index_b = self.model.tx_index_a
+            self.model.previous_txs = list(self.model.current_txs)
+        else:
+            self.model.update_current_group_names()
+            self.model.update_current_outcome()
+            self.model.update_current_time_points()
 
-        if self.model.current_outcome is not None and not self.model.is_diag():
+        if (
+            recalculate_outcomes
+            and self.model.current_outcome is not None
+            and not self.model.is_diag()
+        ):
             self.model.try_to_update_outcomes()
 
         # This is kind of subtle. We have to reconnect
@@ -1555,26 +1848,14 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         )
 
     def quit(self):
-        if self.current_data_unsaved:
-            choice = self.prompt_to_save_unsaved_data()
-            if choice == QMessageBox.Yes:
-                if self.save() is False:
-                    return
-            elif choice == QMessageBox.No:
-                pass
-            else:  # Cancel
-                return
-
-        save_main_window_placement(self, self.tableView.column_width_state())
-        save_settings()
-        QApplication.quit()
+        self.close()
 
     def prompt_to_save_unsaved_data(self):
         choice = QMessageBox.warning(
             self,
             "Warning",
             "You've made unsaved changes to your data. Do you want to save your changes?",
-            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
         )
         return choice
 
@@ -1584,6 +1865,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
     def save(self, save_as=False):
 
         docs_path = get_user_documents_path()
+        destination = self.out_path
         if self.out_path is None or save_as:
             # use current out_path otherwise base it on the current dataset name
             if self.out_path:
@@ -1600,48 +1882,49 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             out_f = _qt_dialog_path(out_f)
             if out_f == "" or out_f == None:
                 return None
-            else:
-                self.out_path = out_f
+            destination = out_f
 
-        # add proper file extension
+        destination = str(destination)
+        if not destination.lower().endswith(".rcms"):
+            destination += ".rcms"
+            print("added proper file extension")
+
+        durability_error = None
         try:
-            if not self.out_path.lower().endswith(".rcms"):
-                self.out_path += ".rcms"
-                print("added proper file extension")
-        except Exception as e:
-            print("")
-            print(e)
-
-        try:
-            print("trying to write data out to: %s" % self.out_path)
-            with open(self.out_path, "wb") as f:
-                pickle.dump(self.model.dataset, f, protocol=2)
-            # also write out the 'state', which contains things
-            # pertaining to the view
-            d = self.model.get_stateful_dict()
-            with open(self.out_path + ".state", "wb") as f:
-                pickle.dump(d, f, protocol=2)
-            self.model.analysis_source_path = self.out_path
-
-            # add dataset to recent files
-            add_file_to_recent_files(self.out_path)
-
-            self.dataset_file_lbl.setText("Open Project: %s" % self.out_path)
-            self.current_data_unsaved = False
-            return True
+            print("trying to write data out to: %s" % destination)
+            project = project_adapter.dataset_to_project(self.model.dataset)
+            state = project_adapter.model_to_state(self.model)
+            project_format.save_project(destination, project, state)
+        except project_format.ProjectDurabilityError as e:
+            # Atomic replacement already happened. Treat the installed document
+            # as the current saved project while reporting durability uncertainty.
+            durability_error = e
         except Exception as e:
             app_error_handler.log_exception(type(e), e, e.__traceback__)
             QMessageBox.critical(
                 self,
                 "Could Not Save Project",
                 "RC MetaStudio could not save %s.\n\nDetails: %s: %s"
-                % (self.out_path, e.__class__.__name__, e),
+                % (destination, e.__class__.__name__, e),
             )
             return False
+
+        # The durable document commit is complete. Machine-local recent-project
+        # bookkeeping must never turn this successful save into a false failure.
+        self.out_path = destination
+        self.model.analysis_source_path = destination
+        self.dataset_file_lbl.setText("Open Project: %s" % destination)
+        self.tableView.undoStack.setClean()
+        self.current_data_unsaved = False
+        if durability_error is not None:
+            self._report_durability_uncertain_save(destination, durability_error)
+        self._update_recent_project_nonfatal(destination, "saved")
+        return True
 
     def _make_new_dataset_and_setup_spreadsheet(self, dataset_info):
         is_diag = dataset_info["data_type"] == "diagnostic"
         self.new_dataset(is_diag=is_diag)
+        self.model.dataset.summary = copy.deepcopy(dataset_info)
 
         tmp = self.cur_dimension
         self.cur_dimension = "outcome"
@@ -1719,10 +2002,12 @@ class CommandImportCSV(QUndoCommand):
         description="Import a CSV file",
     ):
         super(CommandImportCSV, self).__init__(description)
+        if main_form is None:
+            raise ValueError("CSV import requires a main form")
         self.imported_data = _normalize_imported_csv_rows(imported_data or [])
-        self.covariate_names = covariate_names
-        self.covariate_types = covariate_types
-        self.main_form = main_form
+        self.covariate_names = list(covariate_names or [])
+        self.covariate_types = list(covariate_types or [])
+        self.main_form: MetaForm = main_form
 
         # Undo / redo stuff
         self.original_dataset = original_dataset

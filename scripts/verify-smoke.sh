@@ -67,6 +67,14 @@ else
   step "Skipping dependency sync for warm local smoke verification"
 fi
 
+qt_build_root="$repo_root/build/qt6-verification"
+step "Generating canonical Qt6 forms and resources"
+uv run python scripts/build_qt6.py generate --build-root "$qt_build_root"
+export RCMS_QT6_BUILD_ROOT="$qt_build_root"
+generated_package="$qt_build_root/generated/rc_metastudio"
+generated_forms="$generated_package/forms"
+export PYTHONPATH="$generated_package:$generated_forms${PYTHONPATH:+:$PYTHONPATH}"
+
 step "Collecting pytest verification nodes"
 uv run pytest tests --collect-only -q
 
@@ -76,8 +84,8 @@ uv run python scripts/validate_golden_baseline_manifests.py
 step "Running smoke pytest nodes"
 uv run pytest \
   tests/analysis_regression/golden/test_analysis_regression_compare.py::test_golden_summary_parser_reads_current_RCMetaR_summary_display \
-  tests/python/fast/test_project_pickle_migration.py::test_project_loader_migrates_old_qt_text_values_without_importing_old_qt \
-  tests/python/fast/test_qt_text_boundaries.py::test_old_qt_string_and_item_color_apis_stay_inside_compat_boundaries
+  tests/python/fast/test_project_format.py::test_all_committed_samples_match_the_frozen_semantics_and_round_trip \
+  tests/python/fast/test_qt6_cutover_finalization.py::test_final_cutover_audit_has_zero_active_legacy_findings
 
 step "Checking Default R Evidence prerequisites"
 r_evidence_args=(scripts/verify_rcmetar_r_default.py)

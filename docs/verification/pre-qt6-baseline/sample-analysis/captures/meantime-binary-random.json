@@ -1,0 +1,102 @@
+{
+  "artifacts": [
+    {
+      "label": "Forest Plot",
+      "path": "docs/verification/pre-qt6-baseline/sample-analysis/artifacts/meantime-binary-random.png",
+      "sha256": "5a65b2673f55bf53c4d349a3e49959ca30148117fc276252314b82473ff52923"
+    }
+  ],
+  "authoritative": true,
+  "authority": "authoritative",
+  "baseline_environment": {
+    "expected": {
+      "id": "rc-metastudio-python3-pyqt5-r4-RCMetaR",
+      "os": "Windows",
+      "package": "RCMetaR",
+      "pyqt": "5.15.11",
+      "python": "3.11.9",
+      "qt": "5.15.2",
+      "r": "R version 4.6.1",
+      "rpy2": "3.6.7",
+      "sip": "12.18.0"
+    },
+    "id": "rc-metastudio-python3-pyqt5-r4-RCMetaR",
+    "matches_expected": true,
+    "os": "Windows",
+    "package": "RCMetaR",
+    "pyqt": "5.15.11",
+    "python": "3.11.9",
+    "qt": "5.15.2",
+    "r": "R version 4.6.1",
+    "rpy2": "3.6.7",
+    "sip": "12.18.0"
+  },
+  "capture_command": "python-3.11.9 supplemental_sample_capture.py --locked --tag pre-qt6-baseline",
+  "capture_mode": "authoritative",
+  "capture_identity_attestation": "Run in the retained detached pre-qt6-baseline worktree with locked Python 3.11.9, PyQt5 5.15.11, Qt 5.15.2, SIP 12.18.0, R 4.6.1, rpy2 3.6.7, and freshly installed tagged RCMetaR 0.1.2; exact identities were normalized because the legacy capture helper reported only its older coarse baseline declaration.",
+  "captured_at": "2026-07-15T22:06:59Z",
+  "commit_sha": "e8a21fc3c277e8a8c144413dfa320ea9e68a20e4",
+  "data_family": "binary",
+  "dataset": "meantime.rcms",
+  "dataset_semantic_sha256": "0afd9a70681ce04c734d386ab8cdbab3d873021de38db68586a506b717366676",
+  "id": "meantime-binary-random",
+  "method": "binary.random",
+  "metric": "OR",
+  "outputs": {
+    "Summary": {
+      "estimate": 0.734,
+      "lower_bound": 0.676,
+      "p_value": 0.001,
+      "upper_bound": 0.798
+    }
+  },
+  "package_versions": {
+    "RCMetaR": "0.1.2",
+    "pyqt": "5.15.11",
+    "qt": "5.15.2",
+    "r": "R version 4.6.1 (2026-06-24 ucrt)",
+    "rc_metastudio": "0.1.2",
+    "rpy2": "3.6.7",
+    "sip": "12.18.0"
+  },
+  "parameters": {
+    "adjust": 0.5,
+    "conf.level": 95.0,
+    "digits": 3.0,
+    "fp_col1_str": "Study or Subgroup",
+    "fp_col2_str": "[default]",
+    "fp_col3_str": "Intervention",
+    "fp_col4_str": "Control",
+    "fp_outpath": "C:\\Users\\ALI-SA~1\\AppData\\Local\\Temp\\rcms-issue330-supplemental\\meantime-binary-random.png",
+    "fp_plot_lb": "[default]",
+    "fp_plot_ub": "[default]",
+    "fp_show_col1": true,
+    "fp_show_col2": true,
+    "fp_show_col3": true,
+    "fp_show_col4": true,
+    "fp_show_summary_line": true,
+    "fp_xlabel": "[default]",
+    "fp_xticks": "[default]",
+    "measure": "OR",
+    "rm.method": "DL",
+    "to": "only0"
+  },
+  "snapshot_path": "docs/verification/pre-qt6-baseline/sample-projects/meantime.rcms.json",
+  "status": "success",
+  "texts": {
+    "References": "1. Random-effects meta-analysis: DerSimonian, R., & Laird, N. (1986). Meta-analysis in clinical trials. Controlled Clinical Trials, 7(3), 177-188. doi:10.1016/0197-2456(86)90046-2.\n2. Random-effects meta-analysis: Hedges, L. V. (1983). A random effects model for effect sizes. Psychological Bulletin, 93(2), 388-395. doi:10.1037/0033-2909.93.2.388.\n3. Implementation reference: Viechtbauer, W. (2010). Conducting meta-analyses in R with the metafor package. Journal of Statistical Software, 36(3), 1-48. doi:10.18637/jss.v036.i03.\n",
+    "Summary": "Binary Random-Effects Model\n\nMetric: Odds Ratio\n\nModel Results\n Estimate  Lower bound  Upper bound  p-value\n 0.734           0.676        0.798  < 0.001\n\nHeterogeneity\n t\u00b2     Q(df=64)  Het. p-value     I\u00b2\n 0.017    80.528         0.079  20.5%\n\nCalculation scale: log - estimate: -0.309, lower: -0.392, upper: -0.226, std. error: 0.042",
+    "Weights": "Study names   Weights\nNHF Austra  : 0.3%\nRaizner     : 0.2%\nRentrop     : 0.6%\nBett-c      : 0.2%\nLeiboff     : 0.2%\nBossaert    : 0.2%\nHeikinheim-b: 0.5%\nAmery       : 1.1%\nGISSI-e     : 2.5%\nHeikinheim-a: 1.0%\nEWP-e       : 1.1%\nMaublant    : 0.6%\nAber        : 2.9%\nTICO        : 0.3%\nEWP-d       : 0.8%\nECSG-2-e    : 0.6%\nGISSI-d     : 4.2%\nISAM        : 3.3%\nISIS-2-g    : 5.9%\nGISSI-c     : 6.8%\nISIS-2-f    : 6.6%\nOlson       : 0.3%\nGISSI-b     : 6.6%\nISIS-2-e    : 4.9%\nISIS Pilot  : 1.7%\nASSET-b     : 4.9%\nASSET       : 4.3%\nGuerci      : 0.4%\nEWP-c       : 1.3%\nISIS-2-d    : 5.1%\nEWP-b       : 0.5%\nEWP-a       : 0.5%\nBett-b      : 0.7%\nISIS-2-c    : 5.0%\nWWIVSK-b    : 1.0%\nISIS-2-b    : 4.2%\nGormsen     : 0.2%\nCroydon     : 0.3%\nIkram       : 0.6%\nDurand      : 0.3%\nISIS-2-a    : 2.3%\nAIMS-a      : 1.6%\nECSG-1-c    : 0.7%\nBassand     : 0.4%\nGISSI-a     : 3.6%\nTopol       : 0.2%\nSainsous    : 0.3%\nECSG-1-b    : 0.7%\nSimoons     : 1.5%\nDewar       : 0.3%\nAIMS        : 1.3%\nMeinertz    : 0.9%\nAnderson    : 0.2%\nBrunelli    : 0.4%\nBett-a      : 0.5%\nWWICSK-a    : 0.6%\nWhite       : 0.5%\nECSG-1-a    : 0.5%\nKhaja       : 0.1%\nSchreiber   : 0.1%\nBett        : 0.1%\nECSG-2-d    : 0.3%\nFletcher    : 0.1%\nJulian      : 0.1%\nBuchalter   : 0.1%\n"
+  },
+  "tool_versions": {
+    "os": "Windows",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "pyqt": "5.15.11",
+    "python": "3.11.9",
+    "qt": "5.15.2",
+    "r": "R version 4.6.1 (2026-06-24 ucrt)",
+    "rc_metastudio": "0.1.2",
+    "rpy2": "3.6.7",
+    "sip": "12.18.0"
+  }
+}

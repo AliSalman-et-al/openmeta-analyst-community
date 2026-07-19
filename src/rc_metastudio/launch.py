@@ -1,17 +1,30 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import sys, time, traceback
-from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtCore import QThread
-from PyQt5.QtGui import QIcon, QPixmap
-from PyQt5.QtWidgets import QSplashScreen
+import faulthandler
+import hashlib
+import json
+import platform
+import sys
+import time
+import traceback
+import tempfile
+from pathlib import Path
+from typing import Any, cast
+from PyQt6 import QtCore, QtGui, QtWidgets
+from PyQt6.QtCore import QThread
+from PyQt6.QtGui import QIcon, QPixmap
+from PyQt6.QtWidgets import QSplashScreen
 
 import os
 
 forms_path = os.path.join(os.path.dirname(__file__), "forms")
 if forms_path not in sys.path:
     sys.path.insert(0, forms_path)
+
+from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+
+prepare_generated_ui_imports()
 
 import meta_py_r_backend
 import meta_globals
@@ -20,12 +33,23 @@ meta_py_r_backend.install_meta_py_r_backend()
 import app_error_handler
 import settings
 import adaptive_window
-import icons_rc  # noqa: F401 - registers canonical Qt image resources
+import qt6_resources
+from r_call_serialization import serialized_r_call
+from rc_metastudio.cocoa_accessibility import (
+    bounded_error_message,
+    find_accessibility_element,
+)
+from rc_metastudio.result_text_identity import normalize_heterogeneity_header
 
 SPLASH_DISPLAY_TIME = 0  # Keep startup smoke tests fast; packaged builds may override.
 APPLICATION_ICON_PATH = ":/misc/meta.png"
 AUTOMATION_SMOKE_LOG_ENV = "RCMS_AUTOMATION_SMOKE_LOG"
 ADAPTIVE_LAYOUT_EVIDENCE_LOG_ENV = "RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG"
+PACKAGED_SUMMARY_SHA256 = "78294820c83cd94c19dfdca8c24b6a96cdc8b6f1319a5cd1bedffacde73851e2"
+NATIVE_FILE_DIALOG_OBSERVE_DELAY_MS = 250
+NATIVE_FILE_DIALOG_TIMEOUT_MS = 10_000
+CRITICAL_DIALOG_OBSERVE_DELAY_MS = 100
+CRITICAL_DIALOG_TIMEOUT_MS = 5_000
 
 
 def screen_bounded_splash_pixmap(source, available_logical_size):
@@ -56,15 +80,16 @@ def screen_bounded_splash_pixmap(source, available_logical_size):
     )
     bounded = pixmap.scaled(
         target_physical_size,
-        QtCore.Qt.IgnoreAspectRatio,
-        QtCore.Qt.SmoothTransformation,
+        QtCore.Qt.AspectRatioMode.IgnoreAspectRatio,
+        QtCore.Qt.TransformationMode.SmoothTransformation,
     )
     bounded.setDevicePixelRatio(device_pixel_ratio)
     return bounded
 
 
-def create_startup_splash():
+def create_startup_splash() -> QSplashScreen:
     """Build the startup Transient Window from high-DPI-capable resources."""
+    qt6_resources.ensure_application_resources()
     splash_pixmap = QPixmap(":/misc/splash.png")
     screen = QtWidgets.QApplication.primaryScreen()
     if screen is not None:
@@ -140,11 +165,28 @@ def _startup_project_path(argv):
         arg = args[index]
         if arg in ("--automation-smoke", "--automation-native-smoke"):
             return None
+        if arg in {
+            "--automation-startup-completion-marker",
+            "--automation-pid-file",
+            "--automation-smoke-log",
+        }:
+            index += 2
+            continue
         if arg.startswith("-"):
             index += 1
             continue
         return arg
     return None
+
+
+def _argument_value(argv, option):
+    args = list(argv or [])
+    if option not in args:
+        return None
+    index = args.index(option)
+    if index + 1 >= len(args):
+        raise SystemExit("%s requires a value." % option)
+    return args[index + 1]
 
 
 def _resolve_startup_argv(argv=None, native_argv=None, frozen=None):
@@ -165,31 +207,46 @@ def _resolve_startup_argv(argv=None, native_argv=None, frozen=None):
     return resolved
 
 
-def load_R_libraries(app, splash=None):
+def _emit_automation_phase(phase_callback, phase):
+    if phase_callback is not None:
+        phase_callback(phase)
+
+
+def load_R_libraries(app, splash=None, phase_callback=None):
     """Loads the R libraries while updating the splash screen"""
-    import meta_py_r
+    from rc_metastudio import meta_py_r
 
     def _status(message):
         if splash is not None:
             splash.showMessage(message)
         app.processEvents()
 
+    _emit_automation_phase(phase_callback, "r-library-paths:start")
     meta_py_r.get_R_libpaths()  # print the lib paths
+    _emit_automation_phase(phase_callback, "r-library-paths:complete")
     rloader = meta_py_r.RlibLoader()
 
     _status("Loading R libraries\n..")
 
     _status("Loading metafor\n....")
+    _emit_automation_phase(phase_callback, "r-library:metafor:start")
     rloader.load_metafor()
+    _emit_automation_phase(phase_callback, "r-library:metafor:complete")
 
     _status("Loading RCMetaR\n........")
+    _emit_automation_phase(phase_callback, "r-library:RCMetaR:start")
     rloader.load_RCMetaR()
+    _emit_automation_phase(phase_callback, "r-library:RCMetaR:complete")
 
     _status("Loading igraph\n............")
+    _emit_automation_phase(phase_callback, "r-library:igraph:start")
     rloader.load_igraph()
+    _emit_automation_phase(phase_callback, "r-library:igraph:complete")
 
     _status("Loading grid\n................")
+    _emit_automation_phase(phase_callback, "r-library:grid:start")
     rloader.load_grid()
+    _emit_automation_phase(phase_callback, "r-library:grid:complete")
 
     import meta_form
 
@@ -199,8 +256,18 @@ def load_R_libraries(app, splash=None):
 
 
 def start():
+    _write_automation_smoke_log("automation-dispatch:entered")
+    qt6_resources.ensure_application_resources()
+    _write_automation_smoke_log("automation-dispatch:resources-ready")
     app_error_handler.install_global_exception_handler()
+    pid_path = os.environ.get("RCMS_AUTOMATION_PID_FILE")
     startup_argv = _resolve_startup_argv()
+    pid_path = _argument_value(startup_argv, "--automation-pid-file") or pid_path
+    if pid_path:
+        Path(pid_path).write_text(str(os.getpid()) + "\n", encoding="utf-8")
+    smoke_log = _argument_value(startup_argv, "--automation-smoke-log")
+    if smoke_log:
+        os.environ[AUTOMATION_SMOKE_LOG_ENV] = smoke_log
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-smoke":
         sample_path = (
             startup_argv[2]
@@ -208,13 +275,41 @@ def start():
             else os.path.join("sample_projects", "amino.rcms")
         )
         return start_automation_smoke(sample_path)
+    if len(startup_argv) > 1 and startup_argv[1] == "--automation-shell-smoke":
+        return start_shell_smoke()
+    if (
+        len(startup_argv) > 1
+        and startup_argv[1] == "--automation-native-shell-smoke"
+    ):
+        return start_shell_smoke(require_native_window=True)
+    if len(startup_argv) > 1 and startup_argv[1] == "--automation-shell-failure-smoke":
+        if len(startup_argv) != 3:
+            raise SystemExit(
+                "--automation-shell-failure-smoke requires r-load or meta-form"
+            )
+        return start_shell_failure_smoke(startup_argv[2])
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-native-smoke":
         sample_path = (
             startup_argv[2]
             if len(startup_argv) > 2
             else os.path.join("sample_projects", "amino.rcms")
         )
-        return start_automation_smoke(sample_path, require_native_window=True)
+        return _run_automation_smoke(
+            lambda: start_automation_smoke(sample_path, require_native_window=True)
+        )
+    if len(startup_argv) > 1 and startup_argv[1] == "--automation-package-surface-smoke":
+        if len(startup_argv) != 4:
+            raise SystemExit(
+                "--automation-package-surface-smoke requires an evidence path and scale."
+            )
+        _write_automation_smoke_log("packaged-surface:dispatch")
+        return _run_automation_smoke(
+            lambda: start_package_surface_smoke(startup_argv[2], startup_argv[3])
+        )
+    if len(startup_argv) > 1 and startup_argv[1] == "--automation-package-runtime-probe":
+        if len(startup_argv) != 3:
+            raise SystemExit("--automation-package-runtime-probe requires an output path.")
+        return _run_automation_smoke(lambda: start_package_runtime_probe(startup_argv[2]))
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-wizard-layout-smoke":
         return _run_automation_smoke(start_wizard_layout_smoke)
     if (
@@ -238,60 +333,112 @@ def start():
     startup_project_path = _startup_project_path(startup_argv)
     meta_form = _import_meta_form()
     app = app_error_handler.get_or_create_application(list(sys.argv))
-    app.setApplicationName(meta_globals.APPLICATION_NAME)
-    app.setOrganizationName(meta_globals.ORGANIZATION_NAME)
-    _set_application_icon(app)
-    settings.setup_directories()
-
-    splash = create_startup_splash()
-    splash.show()
-    splash_starttime = time.time()
-
-    load_R_libraries(app, splash)
-
-    # Show splash screen for at least SPLASH_DISPLAY_TIME seconds
-    time_elapsed = time.time() - splash_starttime
-    print(("It took %s seconds to load the R libraries" % str(time_elapsed)))
-    if time_elapsed < SPLASH_DISPLAY_TIME:  # seconds
-        print(
-            (
-                "Going to sleep for %f seconds"
-                % float(SPLASH_DISPLAY_TIME - time_elapsed)
-            )
-        )
-        QThread.sleep(int(SPLASH_DISPLAY_TIME - time_elapsed))
-
-    meta = meta_form.MetaForm()
-    splash.finish(meta)
-    _show_main_window(meta)
-    if startup_project_path:
-        opened = meta.open(startup_project_path)
-        if os.environ.get("RCMS_STARTUP_PROJECT_SMOKE") == "1":
-            return _assert_opened_project_for_startup_smoke(
-                app, meta, startup_project_path, opened
-            )
-    else:
-        if os.environ.get("RCMS_STARTUP_PROJECT_SMOKE") == "1":
-            raise SystemExit(
-                "Startup project smoke test did not receive a project path."
-            )
-        meta.start()
-    sys.exit(app.exec())
+    _configure_application(app)
+    baseline_ids = _top_level_ids(app)
+    try:
+        settings.setup_directories()
+        meta = _create_interactive_shell(app, meta_form.MetaForm, load_R_libraries)
+        if startup_project_path:
+            opened = meta.open(startup_project_path)
+            if (
+                os.environ.get("RCMS_STARTUP_PROJECT_SMOKE") == "1"
+                or "--automation-startup-project-smoke" in startup_argv
+            ):
+                return _assert_opened_project_for_startup_smoke(
+                    app,
+                    meta,
+                    startup_project_path,
+                    opened,
+                    completion_marker=_argument_value(
+                        startup_argv, "--automation-startup-completion-marker"
+                    ),
+                )
+        else:
+            if os.environ.get("RCMS_STARTUP_PROJECT_SMOKE") == "1":
+                raise SystemExit(
+                    "Startup project smoke test did not receive a project path."
+                )
+            meta.start()
+        return app.exec()
+    finally:
+        _dispose_new_top_levels(app, baseline_ids)
 
 
-def start_automation():
+def start_automation(phase_callback=None):
+    qt6_resources.ensure_application_resources()
     app_error_handler.install_global_exception_handler()
     meta_form = _import_meta_form()
     app = app_error_handler.get_or_create_application(sys.argv)
-    app.setApplicationName(meta_globals.APPLICATION_NAME)
-    app.setOrganizationName(meta_globals.ORGANIZATION_NAME)
-    _set_application_icon(app)
-    settings.setup_directories()
-    if os.environ.get("RCMS_REQUIRE_IN_PROCESS_RPY2") == "1":
-        load_R_libraries(app, None)
-    meta = meta_form.MetaForm()
-    _show_main_window(meta)
-    return app, meta
+    _configure_application(app)
+    _emit_automation_phase(phase_callback, "application:configured")
+    baseline_ids = _top_level_ids(app)
+    try:
+        settings.setup_directories()
+        _emit_automation_phase(phase_callback, "settings:ready")
+        if os.environ.get("RCMS_REQUIRE_IN_PROCESS_RPY2") == "1":
+            _emit_automation_phase(phase_callback, "r-libraries:start")
+            load_R_libraries(app, None, phase_callback=phase_callback)
+            _emit_automation_phase(phase_callback, "r-libraries:complete")
+        _emit_automation_phase(phase_callback, "meta-form:create:start")
+        meta = meta_form.MetaForm()
+        _emit_automation_phase(phase_callback, "meta-form:create:complete")
+        _show_main_window(meta)
+        _emit_automation_phase(phase_callback, "main-window:shown")
+        return app, meta
+    except BaseException:
+        _dispose_new_top_levels(app, baseline_ids)
+        raise
+
+
+def _create_interactive_shell(app, meta_factory, r_loader):
+    """Create splash and shell with fail-closed ownership transfer."""
+    baseline_ids = _top_level_ids(app)
+    splash = None
+    try:
+        splash = create_startup_splash()
+        splash.show()
+        splash_starttime = time.time()
+        r_loader(app, splash)
+
+        time_elapsed = time.time() - splash_starttime
+        print("It took %s seconds to load the R libraries" % time_elapsed)
+        if time_elapsed < SPLASH_DISPLAY_TIME:
+            QThread.msleep(max(0, round((SPLASH_DISPLAY_TIME - time_elapsed) * 1000)))
+
+        meta = meta_factory()
+        splash.finish(meta)
+        _show_main_window(meta)
+        _dispose_qobjects(app, (splash,))
+        return meta
+    except BaseException:
+        _dispose_new_top_levels(app, baseline_ids, (splash,))
+        raise
+
+
+def _top_level_ids(app):
+    return {id(widget) for widget in app.topLevelWidgets()}
+
+
+def _dispose_new_top_levels(app, baseline_ids, known=()):
+    owned = list(known)
+    owned.extend(
+        widget for widget in app.topLevelWidgets() if id(widget) not in baseline_ids
+    )
+    _dispose_qobjects(app, owned)
+
+
+def _dispose_qobjects(app, objects):
+    """Hide and delete owned Qt objects without invoking user close prompts."""
+    unique = {id(obj): obj for obj in objects if obj is not None}
+    for obj in unique.values():
+        try:
+            obj.hide()
+            obj.deleteLater()
+        except RuntimeError:
+            pass
+    for _index in range(2):
+        app.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
+        app.processEvents()
 
 
 def _show_main_window(window):
@@ -309,9 +456,28 @@ def _set_application_icon(app):
     app.setWindowIcon(QIcon(APPLICATION_ICON_PATH))
 
 
+def _configure_application(app):
+    """Apply the complete process-wide application identity exactly once."""
+    app.setApplicationName(meta_globals.APPLICATION_NAME)
+    app.setApplicationDisplayName(meta_globals.APPLICATION_DISPLAY_NAME)
+    app.setApplicationVersion(meta_globals.VERSION)
+    app.setOrganizationName(meta_globals.ORGANIZATION_NAME)
+    app.setOrganizationDomain(meta_globals.ORGANIZATION_DOMAIN)
+    _set_application_icon(app)
+
+
 def start_automation_smoke(sample_path, require_native_window=False):
-    app, meta = start_automation()
+    _write_automation_smoke_log("packaged-workflow:start")
+    hang_trace = _start_automation_hang_trace()
+    app = None
+    meta = None
     try:
+        app, meta = start_automation(
+            phase_callback=lambda phase: _write_automation_smoke_log(
+                "packaged-workflow:shell:%s" % phase
+            )
+        )
+        _write_automation_smoke_log("packaged-workflow:shell-created")
         if require_native_window:
             platform_name = app.platformName().lower()
             expected = "windows" if sys.platform == "win32" else "cocoa"
@@ -331,9 +497,12 @@ def start_automation_smoke(sample_path, require_native_window=False):
                 % platform_name
             )
         sample_path = os.path.abspath(sample_path)
-        if not meta.open(sample_path):
+        _write_automation_smoke_log("packaged-workflow:project-open:start")
+        if not meta.open(sample_path, raise_on_error=True):
             raise SystemExit("Could not open smoke-test project: %s" % sample_path)
+        _write_automation_smoke_log("packaged-workflow:project-open:return")
         app.processEvents()
+        _write_automation_smoke_log("packaged-workflow:sample-opened")
         model = meta.tableView.model()
         if model is None or model.rowCount() < 1:
             raise SystemExit(
@@ -345,11 +514,1107 @@ def start_automation_smoke(sample_path, require_native_window=False):
         # This catches paint-time model/data regressions in the packaged build. A
         # paint error aborts the process, failing the smoke test with a non-zero
         # exit code rather than shipping a build that crashes on first render.
+        _write_automation_smoke_log("packaged-workflow:paint:start")
         _force_table_paint(app, meta)
-        _assert_standard_binary_summary_is_formatted(meta)
+        _write_automation_smoke_log("packaged-workflow:paint:complete")
+        _write_automation_smoke_log("packaged-workflow:project-exercise:start")
+        workflow = _exercise_packaged_project_workflow(app, meta, sample_path)
+        _write_automation_smoke_log("packaged-workflow:project-exercise:complete")
+        _write_automation_smoke_log("packaged-workflow:save-reopen-complete")
+        evidence_path = os.environ.get("RCMS_PACKAGE_SMOKE_EVIDENCE")
+        if evidence_path:
+            evidence = {
+                "schema_version": 1,
+                "passed": True,
+                "platform_plugin": app.platformName().lower(),
+                "workflows": workflow,
+                "scales": [],
+            }
+            Path(evidence_path).write_text(
+                json.dumps(evidence, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            _write_automation_smoke_log("packaged-workflow:evidence-written")
     finally:
-        meta.close()
+        try:
+            if meta is not None:
+                # Automation owns this disposable window.  Never let an earlier
+                # smoke failure become an unattended save-confirmation dialog that
+                # masks the real error until the outer watchdog expires.
+                meta.current_data_unsaved = False
+                _write_automation_smoke_log("packaged-workflow:teardown:close:start")
+                meta.close()
+                _write_automation_smoke_log("packaged-workflow:teardown:close:return")
+                app.processEvents()
+                _dispose_qobjects(app, (meta,))
+                _write_automation_smoke_log(
+                    "packaged-workflow:teardown:deferred-delete:complete"
+                )
+                remaining = app.topLevelWidgets()
+                if remaining:
+                    raise RuntimeError(
+                        "automation teardown retained top-level Qt windows: %s"
+                        % ", ".join(type(widget).__name__ for widget in remaining)
+                    )
+                _write_automation_smoke_log(
+                    "packaged-workflow:teardown:top-level-windows:none"
+                )
+            if app is not None:
+                _write_automation_smoke_log("packaged-workflow:teardown:app-quit:start")
+                app.quit()
+                _write_automation_smoke_log("packaged-workflow:teardown:app-quit:return")
+        finally:
+            _stop_automation_hang_trace(hang_trace)
+    _write_automation_smoke_log("packaged-workflow:post-close")
+    _write_automation_smoke_log("packaged-workflow:return")
+    return 0
+
+
+def _start_automation_hang_trace():
+    path = os.environ.get("RCMS_AUTOMATION_HANG_TRACE")
+    if not path:
+        return None
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    trace = open(path, "a", encoding="utf-8")
+    faulthandler.dump_traceback_later(60, repeat=True, file=trace)
+    return trace
+
+
+def _stop_automation_hang_trace(trace):
+    if trace is None:
+        return
+    faulthandler.cancel_dump_traceback_later()
+    trace.flush()
+    trace.close()
+
+
+def _native_accessibility_observation(widget):
+    """Read the platform accessibility object exposed for a packaged control."""
+    if sys.platform != "darwin":
+        return {
+            "role": "qt-focusable-control",
+            "title": widget.accessibleName(),
+            "description": widget.accessibleDescription(),
+            "is_ignored": widget.focusPolicy() == QtCore.Qt.FocusPolicy.NoFocus,
+            "exposed": widget.focusPolicy() != QtCore.Qt.FocusPolicy.NoFocus,
+        }
+
+    import ctypes
+
+    objc = ctypes.CDLL("/usr/lib/libobjc.A.dylib")
+    objc.sel_registerName.argtypes = [ctypes.c_char_p]
+    objc.sel_registerName.restype = ctypes.c_void_p
+    objc.objc_getClass.argtypes = [ctypes.c_char_p]
+    objc.objc_getClass.restype = ctypes.c_void_p
+    message = objc.objc_msgSend
+
+    def selector(name):
+        return objc.sel_registerName(name.encode("ascii"))
+
+    def object_message(receiver, name):
+        message.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        message.restype = ctypes.c_void_p
+        return message(ctypes.c_void_p(receiver), selector(name))
+
+    def object_message_with_object(receiver, name, value):
+        message.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+        message.restype = ctypes.c_void_p
+        return message(
+            ctypes.c_void_p(receiver),
+            selector(name),
+            ctypes.c_void_p(value),
+        )
+
+    def ns_string(value):
+        string_class = objc.objc_getClass(b"NSString")
+        if not string_class:
+            raise RuntimeError("Cocoa NSString class is unavailable")
+        message.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_char_p]
+        message.restype = ctypes.c_void_p
+        result = message(
+            ctypes.c_void_p(string_class),
+            selector("stringWithUTF8String:"),
+            value.encode("utf-8"),
+        )
+        if not result:
+            raise RuntimeError("Cocoa NSString construction failed")
+        return int(result)
+
+    def responds(receiver, name):
+        message.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+        message.restype = ctypes.c_bool
+        return bool(
+            message(
+                ctypes.c_void_p(receiver),
+                selector("respondsToSelector:"),
+                selector(name),
+            )
+        )
+
+    def text_message(receiver, name):
+        if not responds(receiver, name):
+            return ""
+        value = object_message(receiver, name)
+        if not value:
+            return ""
+        raw = object_message(value, "UTF8String")
+        return ctypes.cast(raw, ctypes.c_char_p).value.decode("utf-8") if raw else ""
+
+    def optional_bool_message(receiver, name):
+        if not responds(receiver, name):
+            return None
+        message.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        message.restype = ctypes.c_bool
+        return bool(message(ctypes.c_void_p(receiver), selector(name)))
+
+    def array_values(array):
+        if not array:
+            return []
+        message.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        message.restype = ctypes.c_ulong
+        count = min(256, int(message(ctypes.c_void_p(array), selector("count"))))
+        values = []
+        for index in range(count):
+            message.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_ulong]
+            message.restype = ctypes.c_void_p
+            value = message(
+                ctypes.c_void_p(array), selector("objectAtIndex:"), index
+            )
+            if value:
+                values.append(int(value))
+        return values
+
+    def modern_children(receiver):
+        if not responds(receiver, "accessibilityChildren"):
+            return []
+        return array_values(object_message(receiver, "accessibilityChildren"))
+
+    def qnsview_children(receiver):
+        legacy_selector = "accessibilityAttributeValue:"
+        if not responds(receiver, legacy_selector):
+            return [], False
+        # Qt 6's QNSView activates the Qt accessibility tree only through its
+        # legacy AXChildren attribute handler. Calling accessibilityChildren on
+        # the backing view bypasses that activation path.
+        children_attribute = ns_string("AXChildren")
+        children = object_message_with_object(
+            receiver,
+            legacy_selector,
+            children_attribute,
+        )
+        return array_values(children), True
+
+    def observe(receiver):
+        return {
+            "role": text_message(receiver, "accessibilityRole"),
+            "title": text_message(receiver, "accessibilityTitle"),
+            "description": text_message(receiver, "accessibilityLabel"),
+            "is_ignored": optional_bool_message(
+                receiver, "accessibilityIsIgnored"
+            ),
+        }
+
+    native_view = int(widget.winId())
+    roots, bridge_supported = qnsview_children(native_view)
+    observation = find_accessibility_element(
+        roots,
+        expected_role="AXButton",
+        expected_title=widget.accessibleName(),
+        expected_description=widget.accessibleDescription(),
+        observe=observe,
+        children=modern_children,
+    )
+    return {
+        **observation,
+        "bridge": "accessibilityAttributeValue:AXChildren",
+        "bridge_supported": bridge_supported,
+        "root_count": len(roots),
+    }
+
+
+def _persist_package_surface_failure(
+    evidence_path, expected_scale, platform_name, stage, diagnostics
+):
+    """Persist bounded probe state before failing without creating pass evidence."""
+    path = Path(evidence_path)
+    evidence = json.loads(path.read_text(encoding="utf-8"))
+    failure = {
+        "requested": expected_scale,
+        "platform_plugin": platform_name,
+        "stage": stage,
+        "diagnostics": diagnostics,
+    }
+    evidence.setdefault("failures", []).append(failure)
+    path.write_text(
+        json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    _write_automation_smoke_log(
+        "packaged-surface:failed:" + json.dumps(failure, sort_keys=True)
+    )
+
+
+def _record_package_surface_progress(evidence_path, expected_scale, stage):
+    """Atomically retain the last bounded surface stage for outer-timeout RCA."""
+    path = Path(evidence_path)
+    evidence = json.loads(path.read_text(encoding="utf-8"))
+    evidence["surface_progress"] = {
+        "requested": expected_scale,
+        "stage": stage,
+    }
+    temporary = path.with_name(path.name + ".surface-progress.tmp")
+    temporary.write_text(
+        json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    os.replace(temporary, path)
+    _write_automation_smoke_log("packaged-surface:" + stage)
+
+
+def _native_file_dialog_observation(app, parent, checkpoint):
+    """Exercise a Cocoa sheet without entering NSOpenPanel's blocking runModal."""
+    file_dialog = QtWidgets.QFileDialog(parent, "Packaged native file dialog")
+    file_dialog.setFileMode(QtWidgets.QFileDialog.FileMode.ExistingFile)
+    file_dialog.setOption(QtWidgets.QFileDialog.Option.DontUseNativeDialog, False)
+    file_dialog.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
+    checkpoint("native-file-dialog:configured")
+    observation = {
+        "dont_use_native_dialog": file_dialog.testOption(
+            QtWidgets.QFileDialog.Option.DontUseNativeDialog
+        ),
+        "window_modality": None,
+        "visible_before_cancel": False,
+        "cancel_requested": False,
+        "finished_signal": False,
+        "rejected_signal": False,
+        "result": None,
+        "rejected_value": int(QtWidgets.QDialog.DialogCode.Rejected),
+        "timed_out": False,
+        "timeout_ms": NATIVE_FILE_DIALOG_TIMEOUT_MS,
+    }
+    event_loop = QtCore.QEventLoop()
+    observe_timer = QtCore.QTimer()
+    observe_timer.setSingleShot(True)
+    watchdog = QtCore.QTimer()
+    watchdog.setSingleShot(True)
+
+    def finish(result):
+        observation["finished_signal"] = True
+        observation["result"] = int(result)
+        checkpoint("native-file-dialog:finished-signal")
+        if event_loop.isRunning():
+            event_loop.quit()
+
+    def mark_rejected():
+        observation["rejected_signal"] = True
+        checkpoint("native-file-dialog:rejected-signal")
+
+    def observe_and_cancel():
+        observation["visible_before_cancel"] = file_dialog.isVisible()
+        observation["cancel_requested"] = True
+        checkpoint("native-file-dialog:reject:start")
+        file_dialog.reject()
+        checkpoint("native-file-dialog:reject:return")
+
+    def time_out():
+        observation["timed_out"] = True
+        observation["error_type"] = "TimeoutError"
+        observation["error_message"] = bounded_error_message(
+            TimeoutError("native file dialog did not reject before its 10 second bound")
+        )
+        checkpoint("native-file-dialog:timeout")
+        file_dialog.reject()
+        if event_loop.isRunning():
+            event_loop.quit()
+
+    file_dialog.finished.connect(finish)
+    file_dialog.rejected.connect(mark_rejected)
+    observe_timer.timeout.connect(observe_and_cancel)
+    watchdog.timeout.connect(time_out)
+    watchdog.start(NATIVE_FILE_DIALOG_TIMEOUT_MS)
+    checkpoint("native-file-dialog:open:start")
+    file_dialog.open()
+    checkpoint("native-file-dialog:open:return")
+    observation["window_modality"] = file_dialog.windowModality().name
+    observe_timer.start(NATIVE_FILE_DIALOG_OBSERVE_DELAY_MS)
+    if not observation["finished_signal"]:
+        checkpoint("native-file-dialog:event-loop:start")
+        event_loop.exec()
+        checkpoint("native-file-dialog:event-loop:return")
+    observe_timer.stop()
+    watchdog.stop()
+    file_dialog.deleteLater()
+    checkpoint("native-file-dialog:complete")
+    return observation
+
+
+def _critical_dialog_observation(parent, checkpoint):
+    """Show and close the real critical dialog inside one bounded Qt loop."""
+    dialog = QtWidgets.QMessageBox(
+        QtWidgets.QMessageBox.Icon.Critical,
+        "Packaged critical dialog",
+        "Deployment smoke diagnostic",
+        QtWidgets.QMessageBox.StandardButton.Ok,
+        parent,
+    )
+    dialog.setOption(QtWidgets.QMessageBox.Option.DontUseNativeDialog, False)
+    dialog.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
+    observation = {
+        "dont_use_native_dialog": dialog.testOption(
+            QtWidgets.QMessageBox.Option.DontUseNativeDialog
+        ),
+        "application_dont_use_native_dialogs": QtCore.QCoreApplication.testAttribute(
+            QtCore.Qt.ApplicationAttribute.AA_DontUseNativeDialogs
+        ),
+        "dont_show_on_screen_before_show": dialog.testAttribute(
+            QtCore.Qt.WidgetAttribute.WA_DontShowOnScreen
+        ),
+        "dont_show_on_screen_after_show": None,
+        "native_helper_active": False,
+        "window_modality": None,
+        "visible_before_close": False,
+        "critical_icon": False,
+        "finished_signal": False,
+        "result": None,
+        "accepted_value": int(QtWidgets.QDialog.DialogCode.Accepted),
+        "timed_out": False,
+        "timeout_ms": CRITICAL_DIALOG_TIMEOUT_MS,
+    }
+    event_loop = QtCore.QEventLoop()
+    observe_timer = QtCore.QTimer()
+    observe_timer.setSingleShot(True)
+    watchdog = QtCore.QTimer()
+    watchdog.setSingleShot(True)
+
+    def finish(result):
+        observation["finished_signal"] = True
+        observation["result"] = int(result)
+        checkpoint("critical-dialog:finished-signal")
+        if event_loop.isRunning():
+            event_loop.quit()
+
+    def observe_and_accept():
+        observation["visible_before_close"] = dialog.isVisible()
+        observation["critical_icon"] = (
+            dialog.icon() == QtWidgets.QMessageBox.Icon.Critical
+        )
+        checkpoint("critical-dialog:accept:start")
+        dialog.accept()
+        checkpoint("critical-dialog:accept:return")
+
+    def time_out():
+        observation["timed_out"] = True
+        observation["error_type"] = "TimeoutError"
+        observation["error_message"] = bounded_error_message(
+            TimeoutError("critical dialog did not close before its 5 second bound")
+        )
+        checkpoint("critical-dialog:timeout")
+        dialog.reject()
+        if event_loop.isRunning():
+            event_loop.quit()
+
+    dialog.finished.connect(finish)
+    observe_timer.timeout.connect(observe_and_accept)
+    watchdog.timeout.connect(time_out)
+    watchdog.start(CRITICAL_DIALOG_TIMEOUT_MS)
+    checkpoint("critical-dialog:show:start")
+    dialog.show()
+    checkpoint("critical-dialog:show:return")
+    observation["dont_show_on_screen_after_show"] = dialog.testAttribute(
+        QtCore.Qt.WidgetAttribute.WA_DontShowOnScreen
+    )
+    observation["native_helper_active"] = (
+        observation["dont_use_native_dialog"] is False
+        and observation["application_dont_use_native_dialogs"] is False
+        and observation["dont_show_on_screen_before_show"] is False
+        and observation["dont_show_on_screen_after_show"] is True
+    )
+    observation["window_modality"] = dialog.windowModality().name
+    observe_timer.start(CRITICAL_DIALOG_OBSERVE_DELAY_MS)
+    if not observation["finished_signal"]:
+        checkpoint("critical-dialog:event-loop:start")
+        event_loop.exec()
+        checkpoint("critical-dialog:event-loop:return")
+    observe_timer.stop()
+    watchdog.stop()
+    dialog.deleteLater()
+    checkpoint("critical-dialog:complete")
+    return observation
+
+
+def _finish_package_surface_cleanup(app, native_window, checkpoint):
+    """Close the disposable native window and drain only deferred deletions."""
+    checkpoint("cleanup:native-window-close:start")
+    close_accepted = native_window.close()
+    checkpoint("cleanup:native-window-close:return")
+    checkpoint("cleanup:deferred-delete:start")
+    QtCore.QCoreApplication.sendPostedEvents(
+        None, QtCore.QEvent.Type.DeferredDelete
+    )
+    checkpoint("cleanup:deferred-delete:complete")
+    app.quit()
+    checkpoint("cleanup:application-quit")
+    return {
+        "close_accepted": bool(close_accepted),
+        "window_visible": native_window.isVisible(),
+    }
+
+
+def start_package_surface_smoke(evidence_path, expected_scale):
+    """Exercise native package-only Qt surfaces at a requested scale factor."""
+    def checkpoint(stage):
+        _record_package_surface_progress(evidence_path, expected_scale, stage)
+
+    checkpoint("entry")
+    app_error_handler.install_global_exception_handler()
+    checkpoint("application:create:start")
+    app = app_error_handler.get_or_create_application(sys.argv)
+    checkpoint("application:create:complete")
+    _configure_application(app)
+    checkpoint("application:configured")
+    qt6_resources.ensure_application_resources()
+    checkpoint("resources:ready")
+    from PyQt6 import QtNetwork
+    checkpoint("network-module:ready")
+    platform_name = app.platformName().lower()
+    if sys.platform == "win32" and platform_name != "windows":
+        raise SystemExit("Package surface smoke did not load qwindows.")
+    if sys.platform == "darwin" and platform_name != "cocoa":
+        raise SystemExit("Package surface smoke did not load Cocoa.")
+
+    clipboard = app.clipboard()
+    checkpoint("clipboard:ready")
+    clipboard_text = "RC MetaStudio clipboard – München – 1,25"
+    clipboard.setText(clipboard_text)
+    if clipboard.text() != clipboard_text:
+        raise SystemExit("Package surface smoke clipboard round-trip failed.")
+    checkpoint("clipboard:round-trip:complete")
+
+    locale = QtCore.QLocale(QtCore.QLocale.Language.German)
+    value, valid = locale.toDouble("1,25")
+    if not valid or value != 1.25:
+        raise SystemExit("Package surface smoke locale parsing failed.")
+
+    if QIcon(":/icons/actions/copy.svg").isNull() or QPixmap(":/misc/meta.png").isNull():
+        raise SystemExit("Package surface smoke could not load binary resources.")
+    tls_backends = list(QtNetwork.QSslSocket.availableBackends())
+    if sys.platform == "win32" and "schannel" not in [backend.lower() for backend in tls_backends]:
+        raise SystemExit("Package surface smoke did not load the Schannel TLS backend.")
+    if sys.platform == "darwin" and not tls_backends:
+        raise SystemExit("Package surface smoke did not load a TLS backend.")
+    available_styles = list(QtWidgets.QStyleFactory.keys())
+    if not available_styles or app.style() is None:
+        raise SystemExit("Package surface smoke found no Qt style plugin/style.")
+    image_formats = sorted(value.data().decode("ascii").lower() for value in QtGui.QImageReader.supportedImageFormats())
+    if not {"ico", "jpeg", "svg"} <= set(image_formats):
+        raise SystemExit("Package surface smoke did not load required image/SVG plugins.")
+    checkpoint("runtime-surfaces:ready")
+
+    native_window = QtWidgets.QMainWindow()
+    native_window.setWindowTitle("RC MetaStudio package surfaces")
+    menu_bar = cast(QtWidgets.QMenuBar, native_window.menuBar())
+    menu = cast(QtWidgets.QMenu, menu_bar.addMenu("Package smoke"))
+    menu.addAction("Verified action")
+    accessible_control = QtWidgets.QPushButton("Accessible package control", native_window)
+    accessible_control.setObjectName("packagedAccessibilityControl")
+    accessible_control.setAccessibleName("Packaged accessibility control")
+    accessible_control.setAccessibleDescription("Verifies packaged Qt accessibility metadata.")
+    accessible_control.setAttribute(QtCore.Qt.WidgetAttribute.WA_NativeWindow, True)
+    next_control = QtWidgets.QLineEdit(native_window)
+    next_control.setObjectName("packagedKeyboardTraversalTarget")
+    body = QtWidgets.QWidget(native_window)
+    body_layout = QtWidgets.QVBoxLayout(body)
+    body_layout.addWidget(accessible_control)
+    body_layout.addWidget(next_control)
+    native_window.setCentralWidget(body)
+    native_window.setTabOrder(accessible_control, next_control)
+    checkpoint("native-window:show:start")
+    native_window.show()
+    checkpoint("native-window:events:start")
+    app.processEvents()
+    checkpoint("native-window:visible")
+    native_menu = {
+        "is_native": bool(menu_bar.isNativeMenuBar()),
+        "menu_count": len(menu_bar.actions()),
+        "action_count": len(menu.actions()),
+    }
+    if (
+        native_menu["menu_count"] < 1
+        or native_menu["action_count"] < 1
+        or (sys.platform == "darwin" and native_menu["is_native"] is not True)
+    ):
+        raise SystemExit("Package surface smoke could not exercise the native menu bar.")
+    accessible_control.setFocus()
+    app.processEvents()
+    focus_before = app.focusWidget()
+    for event_type in (QtCore.QEvent.Type.KeyPress, QtCore.QEvent.Type.KeyRelease):
+        app.sendEvent(
+            accessible_control,
+            QtGui.QKeyEvent(
+                event_type,
+                QtCore.Qt.Key.Key_Tab,
+                QtCore.Qt.KeyboardModifier.NoModifier,
+            ),
+        )
+    app.processEvents()
+    focus_after = app.focusWidget()
+    checkpoint("accessibility:observe:start")
+    try:
+        native_accessibility = (
+            _native_accessibility_observation(accessible_control)
+            if sys.platform == "darwin" else {}
+        )
+    except Exception as error:
+        native_accessibility = {
+            "role": "",
+            "title": "",
+            "description": "",
+            "is_ignored": None,
+            "exposed": False,
+            "source": "accessibility-tree",
+            "bridge": "accessibilityAttributeValue:AXChildren",
+            "bridge_supported": False,
+            "root_count": 0,
+            "visited_nodes": 0,
+            "observed_states": {},
+            "error_type": type(error).__name__,
+            "error_message": bounded_error_message(error),
+        }
+    accessibility = {
+        "focus_before": focus_before.objectName() if focus_before else None,
+        "focus_after_tab": focus_after.objectName() if focus_after else None,
+        "accessible_name": accessible_control.accessibleName(),
+        "accessible_description": accessible_control.accessibleDescription(),
+        "native": native_accessibility,
+    }
+    checkpoint("accessibility:observed")
+    if (
+        accessibility["accessible_name"] != "Packaged accessibility control"
+        or accessibility["accessible_description"]
+        != "Verifies packaged Qt accessibility metadata."
+        or (
+            sys.platform == "darwin"
+            and (
+                accessibility["focus_before"] != "packagedAccessibilityControl"
+                or accessibility["focus_after_tab"]
+                != "packagedKeyboardTraversalTarget"
+                or accessibility["native"].get("role") != "AXButton"
+                or accessibility["native"].get("title")
+                != "Packaged accessibility control"
+                or accessibility["native"].get("description")
+                != "Verifies packaged Qt accessibility metadata."
+                or accessibility["native"].get("is_ignored") is not False
+                or accessibility["native"].get("exposed") is not True
+                or accessibility["native"].get("source") != "accessibility-tree"
+                or accessibility["native"].get("bridge")
+                != "accessibilityAttributeValue:AXChildren"
+                or accessibility["native"].get("bridge_supported") is not True
+                or int(accessibility["native"].get("root_count", 0)) < 1
+            )
+        )
+    ):
+        _persist_package_surface_failure(
+            evidence_path,
+            expected_scale,
+            platform_name,
+            "accessibility",
+            accessibility,
+        )
+        raise SystemExit("Package surface smoke could not exercise accessibility metadata.")
+
+    try:
+        native_file_dialog = _native_file_dialog_observation(
+            app, native_window, checkpoint
+        )
+    except Exception as error:
+        native_file_dialog = {
+            "dont_use_native_dialog": False,
+            "window_modality": None,
+            "visible_before_cancel": False,
+            "cancel_requested": False,
+            "finished_signal": False,
+            "rejected_signal": False,
+            "result": None,
+            "rejected_value": int(QtWidgets.QDialog.DialogCode.Rejected),
+            "timed_out": False,
+            "timeout_ms": NATIVE_FILE_DIALOG_TIMEOUT_MS,
+            "error_type": type(error).__name__,
+            "error_message": bounded_error_message(error),
+        }
+    if (
+        native_file_dialog["dont_use_native_dialog"] is not False
+        or native_file_dialog["window_modality"] != "WindowModal"
+        or native_file_dialog["visible_before_cancel"] is not True
+        or native_file_dialog["cancel_requested"] is not True
+        or native_file_dialog["finished_signal"] is not True
+        or native_file_dialog["rejected_signal"] is not True
+        or native_file_dialog["result"] != native_file_dialog["rejected_value"]
+        or native_file_dialog["timed_out"] is not False
+        or native_file_dialog["timeout_ms"] != NATIVE_FILE_DIALOG_TIMEOUT_MS
+    ):
+        _persist_package_surface_failure(
+            evidence_path,
+            expected_scale,
+            platform_name,
+            "native-file-dialog",
+            native_file_dialog,
+        )
+        raise SystemExit("Package surface smoke could not exercise the native file dialog.")
+
+    try:
+        critical_dialog = _critical_dialog_observation(native_window, checkpoint)
+    except Exception as error:
+        critical_dialog = {
+            "dont_use_native_dialog": False,
+            "application_dont_use_native_dialogs": False,
+            "dont_show_on_screen_before_show": None,
+            "dont_show_on_screen_after_show": None,
+            "native_helper_active": False,
+            "window_modality": None,
+            "visible_before_close": False,
+            "critical_icon": False,
+            "finished_signal": False,
+            "result": None,
+            "accepted_value": int(QtWidgets.QDialog.DialogCode.Accepted),
+            "timed_out": False,
+            "timeout_ms": CRITICAL_DIALOG_TIMEOUT_MS,
+            "error_type": type(error).__name__,
+            "error_message": bounded_error_message(error),
+        }
+    critical_dialog_invalid = (
+        critical_dialog["window_modality"] != "WindowModal"
+        or critical_dialog["visible_before_close"] is not True
+        or critical_dialog["critical_icon"] is not True
+        or critical_dialog["finished_signal"] is not True
+        or critical_dialog["result"] != critical_dialog["accepted_value"]
+        or critical_dialog["timed_out"] is not False
+        or critical_dialog["timeout_ms"] != CRITICAL_DIALOG_TIMEOUT_MS
+    )
+    if sys.platform == "darwin":
+        critical_dialog_invalid = critical_dialog_invalid or (
+            critical_dialog["dont_use_native_dialog"] is not False
+            or critical_dialog["application_dont_use_native_dialogs"] is not False
+            or critical_dialog["dont_show_on_screen_before_show"] is not False
+            or critical_dialog["dont_show_on_screen_after_show"] is not True
+            or critical_dialog["native_helper_active"] is not True
+        )
+    if critical_dialog_invalid:
+        _persist_package_surface_failure(
+            evidence_path,
+            expected_scale,
+            platform_name,
+            "critical-dialog",
+            critical_dialog,
+        )
+        raise SystemExit("Package surface smoke could not show a critical dialog.")
+
+    checkpoint("display-metrics:observe:start")
+    primary = app.primaryScreen()
+    if primary is None or primary.devicePixelRatio() <= 0 or primary.logicalDotsPerInch() <= 0:
+        raise SystemExit("Package surface smoke found invalid display metrics.")
+
+    requested_scale = float(expected_scale)
+    environment_scale = float(os.environ.get("QT_SCALE_FACTOR", "0"))
+    observed_dpr = float(primary.devicePixelRatio())
+    baseline_dpr = float(os.environ.get("RCMS_PACKAGE_BASELINE_DPR", "0"))
+    expected_dpr = baseline_dpr * requested_scale
+    tolerance = 0.05
+    if abs(environment_scale - requested_scale) > 1e-9:
+        raise SystemExit("Package surface smoke scale environment differs from request.")
+    if baseline_dpr <= 0 or abs(observed_dpr - expected_dpr) > tolerance:
+        raise SystemExit(
+            "Package surface smoke observed DPR %.4f, expected %.4f ± %.4f."
+            % (observed_dpr, expected_dpr, tolerance)
+        )
+
+    cleanup = _finish_package_surface_cleanup(app, native_window, checkpoint)
+    if cleanup["close_accepted"] is not True or cleanup["window_visible"] is not False:
+        _persist_package_surface_failure(
+            evidence_path,
+            expected_scale,
+            platform_name,
+            "cleanup",
+            cleanup,
+        )
+        raise SystemExit("Package surface smoke could not cleanly close its native window.")
+
+    checkpoint("evidence:write:start")
+    path = Path(evidence_path)
+    evidence = json.loads(path.read_text(encoding="utf-8"))
+    evidence.pop("surface_progress", None)
+    evidence.setdefault("scales", []).append(
+        {
+            "requested": expected_scale,
+            "qt_scale_factor": os.environ.get("QT_SCALE_FACTOR"),
+            "device_pixel_ratio": observed_dpr,
+            "baseline_device_pixel_ratio": baseline_dpr,
+            "expected_device_pixel_ratio": expected_dpr,
+            "dpr_tolerance": tolerance,
+            "logical_dpi": primary.logicalDotsPerInch(),
+            "clipboard": True,
+            "critical_dialog": critical_dialog,
+            "binary_resources": True,
+            "native_menu": native_menu,
+            "native_file_dialog": native_file_dialog,
+            "accessibility": accessibility,
+            "tls_backends": tls_backends,
+            "active_style": app.style().objectName(),
+            "available_styles": available_styles,
+            "image_formats": image_formats,
+            "locale": "de_DE",
+            "platform_plugin": platform_name,
+            "cleanup": cleanup,
+        }
+    )
+    path.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _write_automation_smoke_log("packaged-surface:scale-%s-passed" % expected_scale)
+    return 0
+
+
+def _verified_frozen_runtime_shared_library(configured, api_bridge_path):
+    """Return the private R library after validating the frozen runtime closure."""
+    derivation = configured.get("derivation") or {}
+    direct_spike = configured.get("direct_spike") is True
+    executable_root = Path(sys.executable).resolve().parent
+    if direct_spike:
+        frameworks = executable_root.parent / "Frameworks"
+        if not api_bridge_path.is_relative_to(frameworks.resolve()):
+            raise RuntimeError("Direct-spike rpy2 API bridge is outside the app framework tree.")
+        shared_r_path = (Path(configured["R_HOME"]) / "lib" / "libR.dylib").resolve()
+        if not shared_r_path.is_relative_to(frameworks.resolve()):
+            raise RuntimeError("Direct-spike libR is outside the app framework tree.")
+    elif derivation:
+        final_identity = derivation.get("final", {})
+        api_record = final_identity.get("api_bridge", {})
+        expected_api_bridge = (executable_root / str(api_record.get("path", ""))).resolve()
+        if (
+            api_bridge_path != expected_api_bridge
+            or hashlib.sha256(api_bridge_path.read_bytes()).hexdigest() != api_record.get("sha256")
+        ):
+            raise RuntimeError("Loaded rpy2 API bridge differs from the authenticated kit derivation.")
+        r_shared_record = final_identity.get("r_shared_library", {})
+        shared_r_path = (executable_root / str(r_shared_record.get("path", ""))).resolve()
+    else:
+        if not api_bridge_path.is_relative_to(executable_root):
+            raise RuntimeError("Loaded rpy2 API bridge is outside the frozen application bundle.")
+        shared_r_path = (Path(configured["R_HOME"]) / "bin" / "x64" / "R.dll").resolve()
+        if not shared_r_path.is_relative_to(executable_root) or not shared_r_path.is_file():
+            raise RuntimeError("Frozen application is missing its private R shared library.")
+    return shared_r_path, direct_spike
+
+
+@serialized_r_call
+def start_package_runtime_probe(output_path):
+    """Report the runtime actually loaded by the assembled frozen executable."""
+    import importlib
+    import importlib.metadata
+
+    from PyQt6 import sip
+
+    import project_format
+    import r_runtime
+
+    project_schema_members = ["manifest.json", "project.json", "state.json"]
+    for member in project_schema_members:
+        project_format._schema(1, member)
+    configured = r_runtime.configure_bundled_r_environment()
+    api_bridge = importlib.import_module("_rinterface_cffi_api")
+    from rpy2 import robjects
+    from rpy2.rinterface_lib import openrlib
+
+    app = app_error_handler.get_or_create_application(sys.argv)
+    _configure_application(app)
+    primary = app.primaryScreen()
+    if primary is None:
+        raise SystemExit("Frozen runtime probe found no primary screen.")
+    r_home_values = cast(Any, robjects.r("normalizePath(R.home(), winslash='/', mustWork=TRUE)"))
+    r_version_values = cast(Any, robjects.r("as.character(getRversion())"))
+    r_library_values = cast(Any, robjects.r("normalizePath(.libPaths(), winslash='/', mustWork=TRUE)"))
+    r_home = str(r_home_values[0])
+    r_version = str(r_version_values[0])
+    r_library_paths = [str(value) for value in r_library_values]
+    api_bridge_path = Path(str(api_bridge.__file__)).resolve()
+    shared_r_path, direct_spike = _verified_frozen_runtime_shared_library(
+        configured, api_bridge_path
+    )
+    macos_r_policy = None
+    if sys.platform == "darwin":
+        tcltk_available = bool(cast(Any, robjects.r("requireNamespace('tcltk', quietly=TRUE)"))[0])
+        tcltk_loaded = bool(cast(Any, robjects.r("'tcltk' %in% loadedNamespaces()"))[0])
+        aqua = bool(cast(Any, robjects.r("capabilities('aqua')"))[0])
+        bitmap_type = str(cast(Any, robjects.r("getOption('bitmapType')"))[0])
+        png_path = str(cast(Any, robjects.r(
+            "output <- tempfile(fileext='.png'); grDevices::png(output); "
+            "graphics::plot(1, 1); grDevices::dev.off(); output"
+        ))[0])
+        png = Path(png_path)
+        if tcltk_available or tcltk_loaded or not aqua or bitmap_type != "quartz" or not png.is_file():
+            raise SystemExit("Packaged macOS R runtime violates the non-X11 Quartz policy.")
+        macos_r_policy = {
+            "tcltk_available": tcltk_available,
+            "tcltk_loaded": tcltk_loaded,
+            "aqua": aqua,
+            "bitmap_type": bitmap_type,
+            "default_png": {"size": png.stat().st_size, "sha256": hashlib.sha256(png.read_bytes()).hexdigest()},
+        }
+        if macos_r_policy["default_png"]["size"] <= 0:
+            raise SystemExit("Packaged macOS default Quartz png probe failed.")
+        png.unlink()
+    probe = {
+        "schema_version": 1,
+        "frozen": bool(getattr(sys, "frozen", False)),
+        "python": {
+            "version": platform.python_version(),
+            "executable": str(Path(sys.executable).resolve()),
+            "architecture": platform.machine(),
+            "bundle_root": str(Path(getattr(sys, "_MEIPASS", "")).resolve()),
+        },
+        "qt": {
+            "pyqt_version": QtCore.PYQT_VERSION_STR,
+            "compiled_qt_version": QtCore.QT_VERSION_STR,
+            "runtime_qt_version": QtCore.qVersion(),
+            "sip_runtime_version": sip.SIP_VERSION_STR,
+            "platform_plugin": app.platformName().lower(),
+            "plugins_path": QtCore.QLibraryInfo.path(QtCore.QLibraryInfo.LibraryPath.PluginsPath),
+            "library_paths": list(app.libraryPaths()),
+            "scale_factor_environment": os.environ.get("QT_SCALE_FACTOR"),
+            "baseline_device_pixel_ratio": float(primary.devicePixelRatio()),
+            "baseline_logical_dpi": float(primary.logicalDotsPerInch()),
+        },
+        "rpy2": {
+            "distribution_version": importlib.metadata.version("rpy2"),
+            "rinterface_distribution_version": importlib.metadata.version("rpy2-rinterface"),
+            "robjects_distribution_version": importlib.metadata.version("rpy2-robjects"),
+            "cffi_mode": os.environ.get("RPY2_CFFI_MODE"),
+            "loaded_cffi_mode": openrlib.cffi_mode.name,
+            "api_bridge_loaded": openrlib.cffi_mode.name == "API",
+            "api_bridge_path": str(api_bridge_path),
+            "api_bridge_sha256": hashlib.sha256(api_bridge_path.read_bytes()).hexdigest(),
+        },
+        "project_schemas": {
+            "version": 1,
+            "validated_members": project_schema_members,
+        },
+        "r": {
+            "version": r_version,
+            "home": r_home,
+            "library_paths": r_library_paths,
+            "configured_home": configured.get("R_HOME"),
+            "configured_library": configured.get("R_LIBS"),
+            "macos_product_profile": macos_r_policy,
+            "shared_library_path": str(shared_r_path),
+            "shared_library_sha256": hashlib.sha256(shared_r_path.read_bytes()).hexdigest(),
+            "direct_spike": direct_spike,
+            "lc_numeric": os.environ.get("LC_NUMERIC"),
+        },
+    }
+    if configured.get("kit_sha256") is not None:
+        probe["r"]["kit_sha256"] = configured["kit_sha256"]
+    Path(output_path).write_text(
+        json.dumps(probe, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    _write_automation_smoke_log("packaged-runtime-probe:passed")
+    return 0
+
+
+def _exercise_packaged_project_workflow(app, meta, sample_path):
+    import project_format
+
+    model = meta.tableView.model()
+    study_index = model.index(0, model.NAME)
+    edited_name = "Packaged Smoke – München"
+    if not model.setData(study_index, edited_name):
+        raise SystemExit("Packaged smoke could not edit representative data.")
+    if model.data(study_index, QtCore.Qt.ItemDataRole.DisplayRole) != edited_name:
+        raise SystemExit("Packaged smoke edit did not round-trip through the model.")
+
+    save_root = Path(tempfile.mkdtemp(prefix="rcms-packaged-smoke-"))
+    raw_index = model.index(0, model.RAW_DATA[0])
+    original_raw = model.data(raw_index, QtCore.Qt.ItemDataRole.DisplayRole)
+    numeric_value = float(str(original_raw).replace(",", "."))
+    dot_text = "%.1f" % numeric_value
+    comma_text = dot_text.replace(".", ",")
+
+    variants = []
+    for locale_name, numeric_text, destination in (
+        ("en_US", dot_text, save_root / "dot-decimal.rcms"),
+        ("de_DE", comma_text, save_root / "comma-decimal.rcms"),
+    ):
+        locale = QtCore.QLocale(locale_name)
+        parsed_value, parsed = locale.toDouble(numeric_text)
+        if not parsed or parsed_value != numeric_value:
+            raise SystemExit("Packaged smoke could not parse the %s locale boundary." % locale_name)
+        if locale_name == "de_DE":
+            if not meta.open(os.path.abspath(sample_path), raise_on_error=True):
+                raise SystemExit("Packaged smoke could not reset the locale comparison project.")
+            model = meta.tableView.model()
+            study_index = model.index(0, model.NAME)
+            raw_index = model.index(0, model.RAW_DATA[0])
+            if not model.setData(study_index, edited_name):
+                raise SystemExit("Packaged smoke could not repeat the representative edit.")
+        if not model.setData(raw_index, numeric_text):
+            raise SystemExit("Packaged smoke rejected %s numeric input." % locale_name)
+        result = _assert_standard_binary_summary_is_formatted(meta)
+        identity = _packaged_result_identity(result)
+        _write_automation_smoke_log("packaged-workflow:analysis-%s-complete" % locale_name)
+        meta.out_path = str(destination)
+        if meta.save() is not True or not destination.is_file():
+            raise SystemExit("Packaged smoke could not save the %s project." % locale_name)
+        variants.append(
+            {
+                "locale": locale_name,
+                "input": numeric_text,
+                "canonical_value": numeric_value,
+                "raw_summary_sha256": identity["raw_summary_sha256"],
+                "normalized_summary_sha256": identity["normalized_summary_sha256"],
+                "svg_sha256": identity["svg_sha256"],
+                "path": destination,
+            }
+        )
+
+    dot_project = project_format.load_project(variants[0]["path"]).project
+    comma_project = project_format.load_project(variants[1]["path"]).project
+    if dot_project != comma_project:
+        raise SystemExit("Dot/comma packaged inputs did not persist canonically.")
+    if variants[0]["raw_summary_sha256"] != variants[1]["raw_summary_sha256"]:
+        raise SystemExit("Dot/comma packaged analyses produced different result text.")
+    if variants[0]["svg_sha256"] != variants[1]["svg_sha256"]:
+        raise SystemExit("Dot/comma packaged analyses produced different SVG content.")
+
+    saved_path = variants[1]["path"]
+    if not meta.open(str(saved_path), raise_on_error=True):
+        raise SystemExit("Packaged smoke could not reopen the saved project.")
+    reopened = meta.tableView.model()
+    reopened_index = reopened.index(0, reopened.NAME)
+    if reopened.data(reopened_index, QtCore.Qt.ItemDataRole.DisplayRole) != edited_name:
+        raise SystemExit("Packaged smoke save/reopen lost the representative edit.")
+    reopened_identity = _packaged_result_identity(
+        _assert_standard_binary_summary_is_formatted(meta)
+    )
+    if reopened_identity["raw_summary_sha256"] != variants[1]["raw_summary_sha256"]:
+        raise SystemExit("Reopened packaged analysis changed result text.")
+    if reopened_identity["svg_sha256"] != variants[1]["svg_sha256"]:
+        raise SystemExit("Reopened packaged analysis changed SVG content.")
+    return {
+        "automation_entry_point": True,
+        "converted_sample": Path(sample_path).name,
+        "representative_edit": True,
+        "real_r_analysis": True,
+        "result_text": True,
+        "expected_normalized_summary_sha256": PACKAGED_SUMMARY_SHA256,
+        "raw_summary_sha256": reopened_identity["raw_summary_sha256"],
+        "normalized_summary_sha256": reopened_identity["normalized_summary_sha256"],
+        "svg_sha256": reopened_identity["svg_sha256"],
+        "locale_variants": [
+            {key: value for key, value in variant.items() if key != "path"}
+            for variant in variants
+        ],
+        "save_reopen": True,
+        "analysis_after_reopen": True,
+    }
+
+
+def _packaged_result_identity(result):
+    summary = result.get("texts", {}).get("Summary", "").replace("\r\n", "\n")
+    raw_summary_sha256 = hashlib.sha256(summary.encode("utf-8")).hexdigest()
+    normalized_summary = normalize_heterogeneity_header(summary)
+    normalized_summary_sha256 = hashlib.sha256(
+        normalized_summary.encode("utf-8")
+    ).hexdigest()
+    if normalized_summary_sha256 != PACKAGED_SUMMARY_SHA256:
+        raise SystemExit(
+            "Packaged summary identity mismatch: %s != %s"
+            % (normalized_summary_sha256, PACKAGED_SUMMARY_SHA256)
+        )
+    display_images = result.get("display_images", {})
+    svg_hashes = {}
+    for label, raw_path in sorted(display_images.items()):
+        path = Path(raw_path)
+        if path.suffix.lower() != ".svg":
+            continue
+        payload = path.read_bytes() if path.is_file() else b""
+        if b"<svg" not in payload[:4096].lower():
+            raise SystemExit("Packaged smoke analysis produced an invalid SVG: %s" % path)
+        svg_hashes[label] = hashlib.sha256(payload).hexdigest()
+    if not svg_hashes:
+        raise SystemExit("Packaged smoke analysis produced no display SVG.")
+    return {
+        "raw_summary_sha256": raw_summary_sha256,
+        "normalized_summary_sha256": normalized_summary_sha256,
+        "svg_sha256": svg_hashes,
+    }
+
+
+def start_shell_smoke(require_native_window=False):
+    """Exercise the maintained full shell without invoking analysis."""
+    app, meta = start_automation()
+    try:
+        if require_native_window:
+            platform_name = app.platformName().lower()
+            expected = "windows" if sys.platform == "win32" else "cocoa"
+            if platform_name != expected:
+                raise SystemExit(
+                    "Native shell smoke loaded Qt platform %s, expected %s."
+                    % (platform_name, expected)
+                )
         app.processEvents()
+        if not meta.isVisible():
+            raise SystemExit("Application shell did not become visible.")
+        if meta.menuBar() is None or not meta.menuBar().actions():
+            raise SystemExit("Application shell did not expose its menus.")
+        print(
+            "Application shell smoke passed with Qt platform %s."
+            % app.platformName().lower()
+        )
+    finally:
+        meta.current_data_unsaved = False
+        meta.close()
+        app.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
+        app.processEvents()
+    if meta in app.topLevelWidgets():
+        raise SystemExit("Application shell remained owned after close.")
+    return 0
+
+
+class _InjectedStartupFailure(RuntimeError):
+    pass
+
+
+def start_shell_failure_smoke(stage):
+    """Prove startup failures release every newly owned top-level object."""
+    if stage not in {"r-load", "meta-form"}:
+        raise SystemExit("Unknown shell failure stage: %s" % stage)
+    app = app_error_handler.get_or_create_application(sys.argv)
+    _configure_application(app)
+    baseline_ids = _top_level_ids(app)
+
+    def r_loader(_app, _splash):
+        if stage == "r-load":
+            raise _InjectedStartupFailure(stage)
+
+    def meta_factory():
+        if stage == "meta-form":
+            partial = QtWidgets.QMainWindow()
+            partial.setWindowTitle("Injected partial shell")
+            partial.show()
+            app.processEvents()
+            raise _InjectedStartupFailure(stage)
+        return QtWidgets.QMainWindow()
+
+    try:
+        _create_interactive_shell(app, meta_factory, r_loader)
+    except _InjectedStartupFailure:
+        pass
+    else:
+        raise SystemExit("Injected startup failure did not fire: %s" % stage)
+
+    leaked = [
+        widget for widget in app.topLevelWidgets() if id(widget) not in baseline_ids
+    ]
+    if leaked:
+        raise SystemExit(
+            "Startup failure leaked top-level objects at %s: %s"
+            % (stage, [type(widget).__name__ for widget in leaked])
+        )
+    print("Application shell failure teardown passed at %s." % stage)
     return 0
 
 
@@ -481,9 +1746,12 @@ def _assert_wizard_layout_smoke_page(
     body_rect = parent.contentsRect()
     if body_rect.width() <= 0 or body_rect.height() <= 0:
         raise SystemExit("Wizard layout smoke saw an empty body: %s" % scenario_name)
-    if wizard.wizardStyle() != QtWidgets.QWizard.ModernStyle:
+    if wizard.wizardStyle() != QtWidgets.QWizard.WizardStyle.ModernStyle:
         raise SystemExit("Wizard layout smoke expected ModernStyle: %s" % scenario_name)
-    if wizard.property("RCMS_window_archetype") != "workflow":
+    if (
+        adaptive_window.adaptive_window_state(wizard).policy.archetype
+        is not adaptive_window.WindowArchetype.WORKFLOW
+    ):
         raise SystemExit(
             "Wizard layout smoke expected Workflow Window policy: %s"
             % scenario_name
@@ -495,10 +1763,10 @@ def _assert_wizard_layout_smoke_page(
             % scenario_name
         )
     for button_role in (
-        QtWidgets.QWizard.BackButton,
-        QtWidgets.QWizard.NextButton,
-        QtWidgets.QWizard.FinishButton,
-        QtWidgets.QWizard.CancelButton,
+        QtWidgets.QWizard.WizardButton.BackButton,
+        QtWidgets.QWizard.WizardButton.NextButton,
+        QtWidgets.QWizard.WizardButton.FinishButton,
+        QtWidgets.QWizard.WizardButton.CancelButton,
     ):
         if overflow.isAncestorOf(wizard.button(button_role)):
             raise SystemExit(
@@ -550,7 +1818,9 @@ def _flush_gui_events(app):
         app.processEvents()
 
 
-def _assert_opened_project_for_startup_smoke(app, meta, sample_path, opened):
+def _assert_opened_project_for_startup_smoke(
+    app, meta, sample_path, opened, completion_marker=None
+):
     try:
         if not opened:
             raise SystemExit("Could not open startup project: %s" % sample_path)
@@ -561,9 +1831,30 @@ def _assert_opened_project_for_startup_smoke(app, meta, sample_path, opened):
                 "Startup project opened without table rows: %s" % sample_path
             )
         _force_table_paint(app, meta)
+        _write_automation_smoke_log("startup-project:normal-entry-point-passed")
     finally:
         meta.close()
         app.processEvents()
+    completion_marker = completion_marker or os.environ.get(
+        "RCMS_STARTUP_COMPLETION_MARKER"
+    )
+    if completion_marker:
+        Path(completion_marker).write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "pid": os.getpid(),
+                    "platform_plugin": app.platformName().lower(),
+                    "project": Path(sample_path).name,
+                    "post_close": True,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        _write_automation_smoke_log("startup-project:launchservices-completion-written")
     return 0
 
 
@@ -582,6 +1873,8 @@ def _assert_standard_binary_summary_is_formatted(meta):
         conf_level=meta.model.get_global_conf_level(),
     )
     try:
+        if specs.available_method_d is None:
+            raise SystemExit("Packaged summary smoke test found no analysis methods.")
         if "binary.random" not in set(specs.available_method_d.values()):
             raise SystemExit(
                 "Packaged summary smoke test could not find binary.random."
@@ -624,6 +1917,7 @@ def _assert_standard_binary_summary_is_formatted(meta):
         raise SystemExit(
             "Packaged summary smoke test saw raw R list output: %s" % ", ".join(leaked)
         )
+    return result
 
 
 def _force_table_paint(app, meta):

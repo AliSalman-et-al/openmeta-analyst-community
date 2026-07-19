@@ -1,10 +1,61 @@
 {
   "manifest": "RCMetaR-r-dependencies",
-  "schema_version": 1,
+  "schema_version": 2,
   "target_runtime": {
-    "r": "4.6.0",
+    "r": "4.6.1",
     "rpy2": "3.6.7",
-    "cran_policy": "latest-compatible"
+    "cran_policy": "dated-native-binary-only"
+  },
+  "binary_package_policy": {
+    "provider": "Posit Public Package Manager",
+    "repository": "https://packagemanager.posit.co/cran/2026-07-16",
+    "snapshot": "2026-07-16",
+    "normal_install_type": "binary",
+    "source_fallback": false,
+    "required_normal_packages": [
+      "metafor", "lme4", "pdftools", "rsvg", "svglite", "tiff", "xml2", "roxygen2", "testthat",
+      "mcmc", "MCMCpack", "igraph", "quantreg", "ape", "Hmisc", "mice", "ggplot2", "RColorBrewer", "coda",
+      "Rcpp", "magrittr", "irlba", "minqa", "nloptr", "RcppEigen", "SparseM", "MatrixModels", "Formula",
+      "latticeExtra", "acepack", "gridExtra", "data.table", "htmlTable", "viridis", "htmltools", "viridisLite",
+      "htmlwidgets", "rmarkdown", "knitr", "stringr", "stringi", "colorspace", "gtable", "scales", "vctrs",
+      "rlang", "withr", "cli", "glue", "lifecycle", "isoband", "S7", "farver", "labeling"
+    ],
+    "install_options": {
+      "install.packages.check.source": "no",
+      "install.packages.compile.from.source": "never"
+    },
+    "platforms": {
+      "windows-x64": {
+        "system": "Windows",
+        "r_arch": "x86_64",
+        "pkg_type": "win.binary",
+        "contrib_path": "bin/windows/contrib/4.6"
+      },
+      "macos-x64": {
+        "system": "Darwin",
+        "r_arch": "x86_64",
+        "pkg_type": "mac.binary.big-sur-x86_64",
+        "contrib_path": "bin/macosx/big-sur-x86_64/contrib/4.6"
+      },
+      "macos-arm64": {
+        "system": "Darwin",
+        "r_arch": "aarch64",
+        "pkg_type": "mac.binary.sonoma-arm64",
+        "contrib_path": "bin/macosx/sonoma-arm64/contrib/4.6"
+      }
+    },
+    "source_exceptions": [
+      {
+        "name": "HSROC",
+        "version": "2.1.9",
+        "url": "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz",
+        "sha256": "5476fa76d7723717e203925a1da442813e3645790ef9b633a145cbc04a08b874",
+        "dependencies": ["lattice", "coda", "MASS", "MCMCpack"],
+        "install_type": "source",
+        "repos": null,
+        "dependencies_install": false
+      }
+    ]
   },
   "package_metadata": {
     "package": "RCMetaR",
@@ -27,7 +78,7 @@
       "declared_in": ["r/RCMetaR/DESCRIPTION"],
       "evidence": ["r/RCMetaR/DESCRIPTION: Depends: R (>= 4.6.0)"],
       "reason": "RCMetaR is an R package and declares a minimum R runtime.",
-      "installed_version": "4.6.0"
+      "installed_version": "4.6.1"
     },
     {
       "name": "graphics",
@@ -36,7 +87,7 @@
       "declared_in": ["r/RCMetaR/DESCRIPTION"],
       "evidence": ["r/RCMetaR/R/rcmetar-package.R: @import graphics"],
       "reason": "Diagnostic and plotting code relies on graphics behavior from the base R distribution.",
-      "installed_version": "4.6.0"
+      "installed_version": "4.6.1"
     },
     {
       "name": "grDevices",
@@ -45,7 +96,7 @@
       "declared_in": ["r/RCMetaR/DESCRIPTION"],
       "evidence": ["r/RCMetaR/R/plotting.R: forest and diagnostic plot functions call png(...), pdf(...), dev.off(...), and graphics.off(...)"],
       "reason": "RCMetaR writes plot image/PDF devices and closes graphics devices through the base grDevices package.",
-      "installed_version": "4.6.0"
+      "installed_version": "4.6.1"
     },
     {
       "name": "metafor",

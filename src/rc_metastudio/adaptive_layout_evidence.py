@@ -13,7 +13,9 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
+
+import adaptive_window
 
 
 EVIDENCE_SCHEMA_VERSION = 2
@@ -27,10 +29,10 @@ def configure_isolated_evidence_settings(output_dir):
     """Keep package verification from reading or overwriting user geometry."""
     settings_root = Path(output_dir).resolve() / "settings"
     settings_root.mkdir(parents=True, exist_ok=True)
-    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.IniFormat)
+    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.Format.IniFormat)
     QtCore.QSettings.setPath(
-        QtCore.QSettings.IniFormat,
-        QtCore.QSettings.UserScope,
+        QtCore.QSettings.Format.IniFormat,
+        QtCore.QSettings.Scope.UserScope,
         str(settings_root),
     )
 
@@ -284,8 +286,8 @@ def _normalize_window_for_exact_size(app, window):
     available = screen.availableGeometry()
     window.setWindowState(
         window.windowState()
-        & ~QtCore.Qt.WindowMaximized
-        & ~QtCore.Qt.WindowFullScreen
+        & ~QtCore.Qt.WindowState.WindowMaximized
+        & ~QtCore.Qt.WindowState.WindowFullScreen
     )
     window.showNormal()
     window.show()
@@ -296,8 +298,8 @@ def _normalize_window_for_exact_size(app, window):
     # callbacks have run before requesting the exact client size.
     window.setWindowState(
         window.windowState()
-        & ~QtCore.Qt.WindowMaximized
-        & ~QtCore.Qt.WindowFullScreen
+        & ~QtCore.Qt.WindowState.WindowMaximized
+        & ~QtCore.Qt.WindowState.WindowFullScreen
     )
     window.showNormal()
     _flush(app)
@@ -355,7 +357,9 @@ def _capture_surface(
     window.activateWindow()
     window.repaint()
     _flush(app)
-    actual_archetype = str(window.property("RCMS_window_archetype") or "")
+    actual_archetype = adaptive_window.adaptive_window_state(
+        window
+    ).policy.archetype.value
     if actual_archetype != archetype:
         raise RuntimeError(
             "%s declared %s, expected %s." % (name, actual_archetype, archetype)
@@ -450,7 +454,7 @@ def _grab_painted_native_frame(app, screen, window, attempts=5):
 def _pixmap_has_pixel_variation(pixmap):
     if pixmap.isNull() or pixmap.width() < 1 or pixmap.height() < 1:
         return False
-    image = pixmap.toImage().convertToFormat(QtGui.QImage.Format_ARGB32)
+    image = pixmap.toImage().convertToFormat(QtGui.QImage.Format.Format_ARGB32)
     first = image.pixel(0, 0)
     for y in range(0, image.height(), max(1, image.height() // 32)):
         for x in range(0, image.width(), max(1, image.width() // 32)):
@@ -462,7 +466,10 @@ def _pixmap_has_pixel_variation(pixmap):
 def _exercise_main_workspace(window):
     if window.tableView.viewport().width() < 1 or window.tableView.viewport().height() < 1:
         raise RuntimeError("Main Workspace table viewport is not reachable.")
-    if window.windowIcon().isNull() and QtWidgets.QApplication.instance().windowIcon().isNull():
+    application = QtWidgets.QApplication.instance()
+    if not isinstance(application, QtWidgets.QApplication):
+        raise RuntimeError("Native package evidence requires QApplication")
+    if window.windowIcon().isNull() and application.windowIcon().isNull():
         raise RuntimeError("Native package evidence did not load the application icon.")
 
 
@@ -529,11 +536,11 @@ def _exercise_results_splitter(app, window):
 
 def _create_intrinsic_ratio_artifact(output):
     path = output / "intrinsic-ratio-evidence.png"
-    image = QtGui.QImage(640, 360, QtGui.QImage.Format_ARGB32)
+    image = QtGui.QImage(640, 360, QtGui.QImage.Format.Format_ARGB32)
     image.fill(QtGui.QColor("white"))
     painter = QtGui.QPainter(image)
     try:
-        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
         painter.setPen(QtGui.QPen(QtGui.QColor("#2457a6"), 8))
         painter.drawRect(20, 20, 600, 320)
         painter.setBrush(QtGui.QColor("#7cb342"))
@@ -541,7 +548,7 @@ def _create_intrinsic_ratio_artifact(output):
         painter.setPen(QtGui.QColor("#202124"))
         painter.drawText(
             image.rect(),
-            QtCore.Qt.AlignHCenter | QtCore.Qt.AlignBottom,
+            QtCore.Qt.AlignmentFlag.AlignHCenter | QtCore.Qt.AlignmentFlag.AlignBottom,
             "16:9 intrinsic-ratio artifact",
         )
     finally:
@@ -599,13 +606,13 @@ def _assert_multiline_tool_button_content(window):
         margin = max(
             0,
             button.style().pixelMetric(
-                QtWidgets.QStyle.PM_ButtonMargin, None, button
+                QtWidgets.QStyle.PixelMetric.PM_ButtonMargin, None, button
             ),
         )
         frame = max(
             0,
             button.style().pixelMetric(
-                QtWidgets.QStyle.PM_DefaultFrameWidth, None, button
+                QtWidgets.QStyle.PixelMetric.PM_DefaultFrameWidth, None, button
             ),
         )
         required_height = (
@@ -623,7 +630,7 @@ def _assert_multiline_tool_button_content(window):
 
 def _flush(app):
     for _index in range(4):
-        app.processEvents(QtCore.QEventLoop.AllEvents, 100)
+        app.processEvents(QtCore.QEventLoop.ProcessEventsFlag.AllEvents, 100)
 
 
 def _rect_record(rect):

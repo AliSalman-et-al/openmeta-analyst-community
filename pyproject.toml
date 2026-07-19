@@ -1,6 +1,6 @@
 [project]
 name = "rc-metastudio"
-version = "0.1.2"
+version = "0.2.0"
 description = "RC MetaStudio open-source desktop software for advanced meta-analysis."
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
@@ -11,8 +11,8 @@ maintainers = [
     { name = "Ali Salman", email = "alisalman.et.al@gmail.com" },
 ]
 dependencies = [
-    "PyQt5==5.15.11",
-    "PyQt5-Qt5==5.15.2",
+    "PyQt6==6.11.0",
+    "jsonschema==4.25.1",
     "pyinstaller==6.21.0",
     "pytest==9.1.1",
     "pytest-xdist==3.8.0",
@@ -44,6 +44,7 @@ include = ["rc_metastudio*"]
 rc_metastudio = [
     "forms/*.ui",
     "images/**/*",
+    "project_schemas/**/*.json",
 ]
 
 [tool.pytest.ini_options]
@@ -65,6 +66,21 @@ markers = [
 
 [dependency-groups]
 dev = [
+    "aqtinstall==3.3.0",
+    "libcst==1.8.6",
     "matplotlib>=3.11.0",
     "pillow>=12.3.0",
+    "py7zr==1.1.3",
+    "pyyaml==6.0.3",
+    "ty==0.0.18",
 ]
+
+[tool.ty.environment]
+python-version = "3.11"
+root = ["./src"]
+
+[tool.ty.src]
+exclude = ["build", "src/rc_metastudio/forms/ui_*.py"]
+
+[tool.ty.rules]
+all = "error"

@@ -1,9 +1,23 @@
+import os
+import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from PyQt5 import QtCore, QtGui, QtTest, QtWidgets
+from PyQt6 import QtCore, QtGui, QtTest, QtWidgets, sip
+
+
+ROOT = Path(__file__).resolve().parents[3]
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ.setdefault("RCMS_STUB_BACKEND", "1")
+os.environ.setdefault(
+    "RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification")
+)
+sys.path.insert(0, os.path.abspath("src/rc_metastudio"))
+from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+
+prepare_generated_ui_imports()
 
 
 LONG_OUTCOME = "Cardiovascular mortality after extended follow-up"
@@ -52,7 +66,7 @@ def _network_dialog(qapp, tmp_path, monkeypatch, parent=None):
     import network_view
 
     image_path = tmp_path / "network.png"
-    image = QtGui.QImage(640, 320, QtGui.QImage.Format_ARGB32)
+    image = QtGui.QImage(640, 320, QtGui.QImage.Format.Format_ARGB32)
     image.fill(QtGui.QColor("white"))
     assert image.save(str(image_path))
     monkeypatch.setattr(
@@ -66,6 +80,8 @@ def _network_dialog(qapp, tmp_path, monkeypatch, parent=None):
 def _dispose(qapp, *widgets):
     for widget in widgets:
         if widget is None:
+            continue
+        if sip.isdeleted(widget):
             continue
         widget.close()
         widget.deleteLater()
@@ -85,8 +101,9 @@ def test_network_view_first_use_tracks_owning_screen(qapp, tmp_path, monkeypatch
     )
     dialog = _network_dialog(qapp, tmp_path, monkeypatch)
     try:
-        assert dialog.property("RCMS_window_archetype") == "workspace"
-        assert dialog.property("RCMS_window_role") == "network_view"
+        state = adaptive_window.adaptive_window_state(dialog)
+        assert state.policy.archetype is adaptive_window.WindowArchetype.WORKSPACE
+        assert state.role is adaptive_window.WindowRole.NETWORK_VIEW
         assert dialog.frameGeometry().width() == pytest.approx(
             available.width() * 0.80, abs=8
         )
@@ -131,10 +148,10 @@ def test_network_viewport_owns_surplus_space_and_preserves_image_ratio(
         assert dialog.network_viewer.viewport().height() > initial_viewport.height()
         assert dialog.frame.height() == initial_controls_height
         assert dialog.network_viewer.sizePolicy().horizontalPolicy() == (
-            QtWidgets.QSizePolicy.Expanding
+            QtWidgets.QSizePolicy.Policy.Expanding
         )
         assert dialog.network_viewer.sizePolicy().verticalPolicy() == (
-            QtWidgets.QSizePolicy.Expanding
+            QtWidgets.QSizePolicy.Policy.Expanding
         )
         item = dialog.network_viewer.scene().items()[0]
         assert item.pixmap().devicePixelRatioF() == pytest.approx(2.0)
@@ -167,13 +184,22 @@ def test_network_selectors_keep_content_and_refresh_only_the_graph(
             for index in range(dialog.outcome_cbo_box.count())
         ] == [LONG_OUTCOME, "Readmission"]
 
+        graph_calls = []
+        monkeypatch.setattr(
+            dialog,
+            "graph_network",
+            lambda outcome, follow_up: graph_calls.append((outcome, follow_up)),
+        )
         dialog.outcome_cbo_box.setCurrentText("Readmission")
         qapp.processEvents()
 
+        assert graph_calls == [("Readmission", LONG_FOLLOW_UP)]
         assert dialog.scene.items()
         assert len(dialog.scene.items()) == 1
         assert dialog.frameGeometry() == original_frame
-        assert dialog.frame.sizePolicy().verticalPolicy() == QtWidgets.QSizePolicy.Fixed
+        assert dialog.frame.sizePolicy().verticalPolicy() == (
+            QtWidgets.QSizePolicy.Policy.Fixed
+        )
     finally:
         _dispose(qapp, dialog)
 
@@ -205,9 +231,9 @@ def test_network_selectors_are_usable_with_large_font_on_constrained_screen(
             assert combo.width() >= dialog.frame.contentsRect().width() * 0.65
             assert combo.toolTip() == combo.currentText()
             for index in range(combo.count()):
-                assert combo.itemData(index, QtCore.Qt.ToolTipRole) == combo.itemText(
-                    index
-                )
+                assert combo.itemData(
+                    index, QtCore.Qt.ItemDataRole.ToolTipRole
+                ) == combo.itemText(index)
     finally:
         qapp.setFont(old_font)
         _dispose(qapp, dialog)
@@ -347,12 +373,12 @@ def test_repeated_network_view_close_releases_owned_qt_objects(
             scene_destroyed = QtTest.QSignalSpy(scene.destroyed)
             dialog.show()
             qapp.processEvents()
-            assert dialog.testAttribute(QtCore.Qt.WA_DeleteOnClose)
+            assert dialog.testAttribute(QtCore.Qt.WidgetAttribute.WA_DeleteOnClose)
             assert len(scene.items()) == 1
 
             dialog.close()
             QtWidgets.QApplication.sendPostedEvents(
-                None, QtCore.QEvent.DeferredDelete
+                None, QtCore.QEvent.Type.DeferredDelete
             )
             qapp.processEvents()
 

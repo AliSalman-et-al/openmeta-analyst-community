@@ -1,0 +1,3 @@
+# Automate native artifact qualification
+
+The first-release Windows x64, macOS Intel x64, and macOS ARM64 artifacts will be qualified entirely through automated tests on their native architectures; a human smoke test is not a release gate. Automation launches the final downloadable artifact, opens every converted sample project, runs representative analyses, verifies result text and SVG artifacts, saves and reopens a project, exercises clipboard and critical dialogs, and proves clean shutdown. Evidence records the exact artifact hash, runner architecture and OS, locked runtime identities, test results, and retained diagnostics so a passing source checkout cannot substitute for the packaged artifact.

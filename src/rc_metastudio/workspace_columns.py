@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """User-owned column sizing for persistent workspace tables."""
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QTableView
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QTableView
 
 from workspace_column_identity import (
     WORKSPACE_COLUMN_IDENTITY_ROLE,
@@ -47,7 +47,10 @@ class WorkspaceColumnWidthController(object):
 
     def synchronize_schema(self):
         """Restore known sections and content-fit only previously unseen ones."""
-        model = self.table.model()
+        # The controller is constructed before the workspace installs its
+        # DatasetModel, so query the Qt base class without invoking the
+        # workspace view's maintained-model contract.
+        model = QTableView.model(self.table)
         if model is None:
             return
         keys = self._schema_keys()
@@ -85,13 +88,13 @@ class WorkspaceColumnWidthController(object):
             self._widths[keys[logical_index]] = int(new_size)
 
     def _schema_keys(self):
-        model = self.table.model()
+        model = QTableView.model(self.table)
         if model is None:
             return []
         identities = []
         for column in range(model.columnCount()):
             value = model.headerData(
-                column, Qt.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
+                column, Qt.Orientation.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
             )
             identities.append(
                 WorkspaceColumnIdentity.coerce(

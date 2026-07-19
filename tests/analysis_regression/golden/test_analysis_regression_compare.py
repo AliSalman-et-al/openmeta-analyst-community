@@ -1,22 +1,36 @@
 import json
 import os
+from pathlib import Path
+import shutil
 import sys
 import types
 from contextlib import contextmanager
+from decimal import Decimal
+import zipfile
+
+import pytest
 
 sys.path.insert(0, os.path.abspath("src"))
+ROOT = Path(__file__).resolve().parents[3]
 
 from analysis_regression_compare import (
     ACCEPTED_EXCEPTION,
     CAPTURE_ERROR,
     MISSING_OUTPUT,
+    MALFORMED_OUTPUT,
     NUMERIC_DRIFT,
     PASS,
     TEXT_ARTIFACT_DRIFT,
+    UNEXPECTED_OUTPUT,
     UNSUPPORTED_WORKFLOW,
+    normalize_heterogeneity_header,
     compare_golden_baseline,
     main,
 )
+
+sys.path.insert(0, os.path.abspath("scripts"))
+import verify_golden_compatibility
+import verify_rcmetar_r_stack
 
 
 def test_analysis_regression_comparison_classifies_compatible_capture_as_pass():
@@ -31,22 +45,533 @@ def test_analysis_regression_comparison_classifies_numeric_drift_with_row_contex
     current = _current()
     current["curated_golden_set"][0]["outputs"]["Summary"]["estimate"] = 0.773
 
-    row = compare_golden_baseline(_baseline(), current)["rows"][0]
+    row = next(
+        row
+        for row in compare_golden_baseline(_baseline(), current)["rows"]
+        if row["classification"] == NUMERIC_DRIFT
+    )
 
     assert row["classification"] == NUMERIC_DRIFT
     assert row["id"] == "amino-binary-random"
     assert "Summary.estimate" in row["detail"]
 
 
+def test_numeric_comparison_rejects_malformed_values_without_raising():
+    malformed = [
+        float("nan"),
+        float("inf"),
+        float("-inf"),
+        True,
+        "0.7705",
+        Decimal("0.7705"),
+        None,
+    ]
+    for value in malformed:
+        current = _current()
+        current["curated_golden_set"][0]["outputs"]["Summary"]["estimate"] = value
+        report = compare_golden_baseline(_baseline(), current)
+        assert report["passed"] is False
+        assert any(
+            row["classification"] == MALFORMED_OUTPUT
+            and row["detail"]
+            == "Summary.estimate current numeric value is malformed."
+            for row in report["rows"]
+        )
+
+    reference = _baseline()
+    reference["curated_golden_set"][0]["outputs"]["Summary"]["estimate"] = float(
+        "nan"
+    )
+    report = compare_golden_baseline(reference, _current())
+    assert report["passed"] is False
+    assert any(
+        row["classification"] == MALFORMED_OUTPUT
+        and row["detail"] == "Summary.estimate reference numeric value is malformed."
+        for row in report["rows"]
+    )
+
+    current = _current()
+    current["curated_golden_set"][0]["outputs"]["Summary"]["estimate"] = None
+    report = compare_golden_baseline(
+        _baseline(),
+        current,
+        exceptions=[{"id": "amino-binary-random", "reason": "not applicable"}],
+    )
+    assert any(row["classification"] == MALFORMED_OUTPUT for row in report["rows"])
+
+
+def test_numeric_comparison_accepts_finite_int_float_within_policy_only():
+    reference = _baseline()
+    reference["curated_golden_set"][0]["numeric_tolerance_policy"] = {
+        "absolute": 0.001,
+        "relative": 1e-9,
+        "rule": "max(absolute, relative * abs(expected))",
+    }
+    for value in (0.77, 0.7705, 1):
+        current = _current()
+        current["curated_golden_set"][0]["outputs"]["Summary"]["estimate"] = value
+        report = compare_golden_baseline(reference, current)
+        expected_pass = value in (0.77, 0.7705)
+        numeric_rows = [
+            row for row in report["rows"] if "Summary.estimate" in row["detail"]
+        ]
+        assert numeric_rows[0]["classification"] == (
+            PASS if expected_pass else NUMERIC_DRIFT
+        )
+
+
 def test_analysis_regression_comparison_classifies_non_numeric_result_drift():
     current = _current()
     current["curated_golden_set"][0]["texts"]["Summary"] = "changed"
 
-    row = compare_golden_baseline(_baseline(), current)["rows"][0]
+    row = next(
+        row
+        for row in compare_golden_baseline(_baseline(), current)["rows"]
+        if row["classification"] == TEXT_ARTIFACT_DRIFT
+    )
 
     assert row["classification"] == TEXT_ARTIFACT_DRIFT
     assert row["id"] == "amino-binary-random"
 
+
+def test_cross_platform_text_normalization_is_limited_to_tau_squared_header():
+    baseline = _baseline()
+    current = _current()
+    expected = baseline["curated_golden_set"][0]
+    actual = current["curated_golden_set"][0]
+    expected["tool_versions"] = {"os": "Windows"}
+    actual["tool_versions"] = {"os": "Darwin"}
+    expected["texts"]["Summary"] = (
+        "Heterogeneity\n t²     Q(df=18)  Het. p-value     I²\n"
+        " 0.378    33.360         0.015  46.0%"
+    )
+    actual["texts"]["Summary"] = expected["texts"]["Summary"].replace("t²", "τ²")
+    assert normalize_heterogeneity_header(actual["texts"]["Summary"]) == expected["texts"]["Summary"]
+    assert normalize_heterogeneity_header("Narrative τ² meaning") == "Narrative τ² meaning"
+
+    text_row = next(
+        row for row in compare_golden_baseline(baseline, current)["rows"]
+        if row["detail"].startswith("Text section Summary")
+    )
+    assert text_row["classification"] == PASS
+    assert "Windows -> Darwin: t² <-> τ²" in text_row["detail"]
+
+    same_platform = json.loads(json.dumps(current))
+    same_platform["curated_golden_set"][0]["tool_versions"]["os"] = "Windows"
+    same_platform_row = next(
+        row for row in compare_golden_baseline(baseline, same_platform)["rows"]
+        if row["detail"].startswith("Text section Summary")
+    )
+    assert same_platform_row["classification"] == TEXT_ARTIFACT_DRIFT
+
+    for changed_text in (
+        actual["texts"]["Summary"].replace("33.360", "99.999"),
+        "Narrative τ² meaning",
+    ):
+        drifted = json.loads(json.dumps(current))
+        drifted["curated_golden_set"][0]["texts"]["Summary"] = changed_text
+        drifted_row = next(
+            row for row in compare_golden_baseline(baseline, drifted)["rows"]
+            if row["detail"].startswith("Text section Summary")
+        )
+        assert drifted_row["classification"] == TEXT_ARTIFACT_DRIFT
+
+
+def test_analysis_regression_comparison_rejects_warning_and_reference_tampering():
+    for section in ("Warnings", "References"):
+        baseline = _baseline()
+        current = _current()
+        baseline["curated_golden_set"][0]["texts"][section] = "committed text\r\n"
+        current["curated_golden_set"][0]["texts"][section] = "tampered text"
+
+        rows = compare_golden_baseline(baseline, current)["rows"]
+
+        assert any(
+            row["classification"] == TEXT_ARTIFACT_DRIFT and section in row["detail"]
+            for row in rows
+        )
+
+
+def test_analysis_regression_comparison_rejects_artifact_content_and_descriptor_tampering():
+    for field, value in (
+        ("sha256", "tampered"),
+        ("bundle_path", "artifacts/renamed.png"),
+    ):
+        baseline = _baseline()
+        current = _current()
+        baseline_artifact = baseline["curated_golden_set"][0]["artifacts"][0]
+        current_artifact = current["curated_golden_set"][0]["artifacts"][0]
+        baseline["curated_golden_set"][0]["tool_versions"] = {"os": "Windows"}
+        current["curated_golden_set"][0]["tool_versions"] = {"os": "Windows"}
+        baseline_artifact["bundle_path"] = "artifacts/reference.png"
+        current_artifact["bundle_path"] = "artifacts/reference.png"
+        baseline_artifact["sha256"] = "a" * 64
+        current_artifact["sha256"] = baseline_artifact["sha256"]
+        current_artifact[field] = value
+
+        rows = compare_golden_baseline(baseline, current)["rows"]
+
+        artifact_row = next(row for row in rows if row["detail"].startswith("Artifact "))
+        assert artifact_row["classification"] == TEXT_ARTIFACT_DRIFT
+        assert "same-platform exact artifact policy (Windows)" in artifact_row["detail"]
+
+
+def test_cross_platform_artifact_policy_validates_identity_and_hash_shape():
+    baseline = _baseline()
+    current = _current()
+    expected = baseline["curated_golden_set"][0]
+    actual = current["curated_golden_set"][0]
+    expected["tool_versions"] = {"os": "Windows"}
+    actual["tool_versions"] = {"os": "Darwin"}
+    expected["artifacts"][0]["sha256"] = "a" * 64
+    actual["artifacts"][0]["sha256"] = "b" * 64
+
+    artifact_row = next(
+        row for row in compare_golden_baseline(baseline, current)["rows"]
+        if row["detail"].startswith("Artifact ")
+    )
+    assert artifact_row["classification"] == PASS
+    assert "cross-platform artifact policy (Windows -> Darwin)" in artifact_row["detail"]
+
+    for mutation in ("missing-hash", "invalid-hash", "descriptor-drift"):
+        candidate = json.loads(json.dumps(current))
+        artifact = candidate["curated_golden_set"][0]["artifacts"][0]
+        if mutation == "missing-hash":
+            artifact.pop("sha256")
+        elif mutation == "invalid-hash":
+            artifact["sha256"] = "not-a-sha256"
+        else:
+            artifact["path"] = "renamed.svg"
+        artifact_row = next(
+            row for row in compare_golden_baseline(baseline, candidate)["rows"]
+            if row["detail"].startswith("Artifact ")
+        )
+        assert artifact_row["classification"] == TEXT_ARTIFACT_DRIFT
+        assert "cross-platform artifact policy (Windows -> Darwin)" in artifact_row["detail"]
+
+
+def test_analysis_regression_comparison_rejects_extra_cases():
+    current = _current()
+    extra = dict(current["curated_golden_set"][0])
+    extra["id"] = "unexpected-case"
+    current["curated_golden_set"].append(extra)
+
+    rows = compare_golden_baseline(_baseline(), current)["rows"]
+
+    assert any(
+        row["id"] == "unexpected-case" and row["classification"] == UNEXPECTED_OUTPUT
+        for row in rows
+    )
+
+
+def test_golden_output_root_rejects_unsafe_or_unowned_deletion_targets(tmp_path):
+    root = tmp_path / "repo"
+    (root / "build/qt6-verification").mkdir(parents=True)
+    unsafe = [
+        root,
+        root / "build",
+        root / "build/qt6-verification",
+        root / "build/qt6-verification/arbitrary-existing",
+        tmp_path / "outside/golden-compatibility-output",
+    ]
+    for path in unsafe:
+        path.mkdir(parents=True, exist_ok=True)
+        with pytest.raises(ValueError):
+            verify_golden_compatibility._prepare_output_root(root, path)
+
+    unowned = root / "build/qt6-verification/golden-compatibility-unowned"
+    unowned.mkdir()
+    sentinel = unowned / "do-not-delete.txt"
+    sentinel.write_text("preserve", encoding="utf-8")
+    with pytest.raises(ValueError, match="unowned"):
+        verify_golden_compatibility._prepare_output_root(root, unowned)
+    assert sentinel.read_text(encoding="utf-8") == "preserve"
+
+
+def test_golden_output_root_only_replaces_owned_bounded_directory(tmp_path):
+    root = tmp_path / "repo"
+    (root / "build/qt6-verification").mkdir(parents=True)
+    output = root / "build/qt6-verification/golden-compatibility-owned"
+
+    prepared = verify_golden_compatibility._prepare_output_root(root, output)
+    (prepared / "old.txt").write_text("old", encoding="utf-8")
+    replaced = verify_golden_compatibility._prepare_output_root(root, output)
+
+    assert replaced == prepared
+    assert not (replaced / "old.txt").exists()
+    assert (replaced / verify_golden_compatibility.OUTPUT_MARKER).is_file()
+
+
+def test_golden_output_root_rejects_symlink_escape(tmp_path):
+    root = tmp_path / "repo"
+    base = root / "build/qt6-verification"
+    outside = tmp_path / "outside"
+    base.mkdir(parents=True)
+    outside.mkdir()
+    link = base / "golden-compatibility-link"
+    try:
+        link.symlink_to(outside, target_is_directory=True)
+    except OSError:
+        pytest.skip("directory symlinks are unavailable on this Windows host")
+
+    with pytest.raises(ValueError, match="symlink|reparse"):
+        verify_golden_compatibility._prepare_output_root(root, link)
+
+
+def test_golden_verifier_rejects_outer_archive_byte_tampering(tmp_path):
+    root = _copy_frozen_contract(tmp_path)
+    archive = root / verify_golden_compatibility.ARCHIVE_RELATIVE_PATH
+    with archive.open("ab") as stream:
+        stream.write(b"tamper")
+
+    with pytest.raises(ValueError, match="size|hash"):
+        verify_golden_compatibility._load_frozen_reference(root)
+
+
+def test_golden_verifier_rejects_internal_manifest_tampering(tmp_path):
+    source = ROOT / verify_golden_compatibility.ARCHIVE_RELATIVE_PATH
+    target = tmp_path / "manifest-tampered.zip"
+    with zipfile.ZipFile(source) as archive:
+        manifest = json.loads(archive.read("manifest.json"))
+    manifest["curated_golden_set"][0]["texts"]["Summary"] += " tampered"
+    _rewrite_zip(source, target, {"manifest.json": json.dumps(manifest).encode()})
+
+    with pytest.raises(ValueError, match="manifest and case capture disagree"):
+        verify_golden_compatibility._read_validated_zip(target)
+
+
+def test_golden_verifier_rejects_internal_artifact_tampering(tmp_path):
+    source = ROOT / verify_golden_compatibility.ARCHIVE_RELATIVE_PATH
+    target = tmp_path / "artifact-tampered.zip"
+    member = "artifacts/amino-binary-random/golden_amino_forest.png"
+    _rewrite_zip(source, target, {member: b"tampered image"})
+
+    with pytest.raises(ValueError, match="artifact hash mismatch"):
+        verify_golden_compatibility._read_validated_zip(target)
+
+
+def test_golden_verifier_rejects_traversal_and_duplicate_zip_members(tmp_path):
+    source = ROOT / verify_golden_compatibility.ARCHIVE_RELATIVE_PATH
+    traversal = tmp_path / "traversal.zip"
+    duplicate = tmp_path / "duplicate.zip"
+    _rewrite_zip(source, traversal, {}, {"../escape": b"bad"})
+    _rewrite_zip(source, duplicate, {}, {"MANIFEST.JSON": b"{}"})
+
+    with pytest.raises(ValueError, match="unsafe"):
+        verify_golden_compatibility._read_validated_zip(traversal)
+    with pytest.raises(ValueError, match="duplicate"):
+        verify_golden_compatibility._read_validated_zip(duplicate)
+
+
+def test_numeric_contract_covers_all_cases_and_rejects_shape_and_tolerance_drift():
+    archive, frozen = verify_golden_compatibility._load_frozen_reference(ROOT)
+    contract = verify_golden_compatibility._load_numeric_contract(
+        ROOT, archive, frozen
+    )
+    reference = verify_golden_compatibility._reference_with_numeric_contract(
+        frozen, contract
+    )
+    assert [case["id"] for case in contract["cases"]] == [
+        row["id"] for row in frozen["curated_golden_set"]
+    ]
+    assert sum(
+        len(metrics)
+        for case in contract["cases"]
+        for metrics in case["sections"].values()
+    ) == 415
+    assert all(case["nonnumeric_omissions"] for case in contract["cases"])
+
+    current = json.loads(json.dumps(reference))
+    report = compare_golden_baseline(reference, current)
+    assert report["passed"] is True
+
+    expected = reference["curated_golden_set"][0]
+    assert {"tau_squared", "q", "i_squared"}.issubset(
+        expected["outputs"]["Summary"]
+    )
+    current = {"curated_golden_set": [json.loads(json.dumps(expected))]}
+    del current["curated_golden_set"][0]["outputs"]["Summary"]["q"]
+    missing = compare_golden_baseline(
+        {"curated_golden_set": [expected]}, current
+    )["rows"]
+    assert any(
+        row["classification"] == MISSING_OUTPUT and "Summary.q" in row["detail"]
+        for row in missing
+    )
+    current = {"curated_golden_set": [json.loads(json.dumps(expected))]}
+    current["curated_golden_set"][0]["outputs"]["Summary"]["unexpected"] = 1.0
+    extra = compare_golden_baseline(
+        {"curated_golden_set": [expected]}, current
+    )["rows"]
+    assert any(
+        row["classification"] == UNEXPECTED_OUTPUT
+        and "unexpected numeric metric" in row["detail"]
+        for row in extra
+    )
+
+    for case_id, section, metric in (
+        ("amino-binary-random", "Summary", "estimate"),
+        (
+            "continuous-leave-one-out",
+            "Leave-one-out Summary",
+            "model.without_young.estimate",
+        ),
+    ):
+        current = json.loads(json.dumps(reference))
+        row = next(row for row in current["curated_golden_set"] if row["id"] == case_id)
+        row["outputs"][section][metric] += 0.0005
+        assert compare_golden_baseline(reference, current)["passed"] is True
+        row["outputs"][section][metric] += 0.001
+        assert any(
+            result["classification"] == NUMERIC_DRIFT
+            and "%s.%s" % (section, metric) in result["detail"]
+            for result in compare_golden_baseline(reference, current)["rows"]
+        )
+
+
+def test_numeric_oracle_is_independent_from_runtime_parser(monkeypatch):
+    archive, frozen = verify_golden_compatibility._load_frozen_reference(ROOT)
+    monkeypatch.setattr(
+        verify_golden_compatibility.golden_analysis,
+        "parsed_numeric_sections",
+        lambda _result: {"Poison": {"rewritten_oracle": 999.0}},
+    )
+    contract = verify_golden_compatibility._load_numeric_contract(
+        ROOT, archive, frozen
+    )
+    reference = verify_golden_compatibility._reference_with_numeric_contract(
+        frozen, contract
+    )
+    assert reference["curated_golden_set"][0]["outputs"]["Summary"]["estimate"] == 0.77
+
+    current = json.loads(json.dumps(reference))
+    current["curated_golden_set"][0]["outputs"] = (
+        verify_golden_compatibility.golden_analysis.parsed_numeric_sections({})
+    )
+    rows = compare_golden_baseline(reference, current)["rows"]
+    assert any(row["classification"] == MISSING_OUTPUT for row in rows)
+    assert any(row["classification"] == UNEXPECTED_OUTPUT for row in rows)
+
+
+def test_numeric_contract_rejects_hash_canonicalization_and_coverage_tamper(tmp_path):
+    root = _copy_frozen_contract(tmp_path)
+    archive, frozen = verify_golden_compatibility._load_frozen_reference(root)
+    contract_path = root / verify_golden_compatibility.NUMERIC_CONTRACT_RELATIVE_PATH
+    original = contract_path.read_bytes()
+    contract_path.write_bytes(original + b" ")
+    with pytest.raises(ValueError, match="size or hash"):
+        verify_golden_compatibility._load_numeric_contract(root, archive, frozen)
+
+    contract_path.write_bytes(original + b" ")
+    _update_outer_file_contract(root, "golden_numeric_contract", contract_path)
+    with pytest.raises(ValueError, match="canonically serialized"):
+        verify_golden_compatibility._load_numeric_contract(root, archive, frozen)
+
+    contract = json.loads(original)
+    del contract["cases"][0]["sections"]["Summary"]["estimate"]
+    contract_path.write_bytes(
+        verify_golden_compatibility._canonical_json_bytes(contract)
+    )
+    _update_outer_file_contract(root, "golden_numeric_contract", contract_path)
+    with pytest.raises(ValueError, match="coverage drifted"):
+        verify_golden_compatibility._load_numeric_contract(root, archive, frozen)
+
+
+def test_plot_descriptor_contract_rejects_outer_and_semantic_tampering(tmp_path):
+    root = _copy_frozen_contract(tmp_path)
+    archive, reference = verify_golden_compatibility._load_frozen_reference(root)
+    descriptor_path = (
+        root / "docs/verification/pre-qt6-baseline/golden-plot-descriptors.json"
+    )
+    descriptor_path.write_text(
+        descriptor_path.read_text(encoding="utf-8") + " ", encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="size or hash"):
+        verify_golden_compatibility._load_plot_descriptor_contract(
+            root, archive, reference
+        )
+
+    shutil.copy2(
+        ROOT / "docs/verification/pre-qt6-baseline/golden-plot-descriptors.json",
+        descriptor_path,
+    )
+    contract = verify_golden_compatibility._load_plot_descriptor_contract(
+        root, archive, reference
+    )
+    current = _current_plot_descriptors(contract)
+    assert all(
+        row["classification"] == PASS
+        for row in verify_golden_compatibility._compare_plot_descriptors(
+            contract, current
+        )
+    )
+    current["curated_golden_set"][0]["plot_descriptors"][0]["capability"][
+        "editable"
+    ] = False
+    rows = verify_golden_compatibility._compare_plot_descriptors(contract, current)
+    assert any(row["classification"] == TEXT_ARTIFACT_DRIFT for row in rows)
+
+    current = _current_plot_descriptors(contract)
+    current["curated_golden_set"][0]["plot_descriptors"] = []
+    rows = verify_golden_compatibility._compare_plot_descriptors(contract, current)
+    assert any(
+        row["classification"] == TEXT_ARTIFACT_DRIFT
+        and row["detail"] == "Required plot descriptor is missing."
+        for row in rows
+    )
+
+    current = _current_plot_descriptors(contract)
+    extra = json.loads(
+        json.dumps(current["curated_golden_set"][0]["plot_descriptors"][0])
+    )
+    extra["artifact_label"] = "Unexpected Plot"
+    current["curated_golden_set"][0]["plot_descriptors"].append(extra)
+    rows = verify_golden_compatibility._compare_plot_descriptors(contract, current)
+    assert any(
+        row["classification"] == TEXT_ARTIFACT_DRIFT
+        and row["detail"] == "Unexpected plot descriptors were produced."
+        for row in rows
+    )
+
+
+def test_current_golden_manifest_requires_exact_rpy2_identities():
+    expected = dict(verify_golden_compatibility.REQUIRED_RPY2_IDENTITIES)
+    case = {
+        "id": "case",
+        "tool_versions": dict(expected),
+        "package_versions": dict(expected),
+    }
+    verify_golden_compatibility._validate_current_rpy2_identities(
+        {"curated_golden_set": [case]}, expected
+    )
+
+    case["package_versions"]["rpy2-robjects"] = "0.0.0"
+    with pytest.raises(ValueError, match="locked runtime"):
+        verify_golden_compatibility._validate_current_rpy2_identities(
+            {"curated_golden_set": [case]}, expected
+        )
+
+
+def test_real_r_verifiers_reject_null_or_mismatched_rpy2_identity(monkeypatch):
+    monkeypatch.setattr(
+        verify_rcmetar_r_stack.metadata,
+        "version",
+        lambda distribution: "0.0.0" if distribution == "rpy2" else "3.6.6",
+    )
+    with pytest.raises(
+        verify_rcmetar_r_stack.VerificationError, match="identity mismatch"
+    ):
+        verify_rcmetar_r_stack.verify_rpy2_identities()
+
+    monkeypatch.setattr(
+        verify_golden_compatibility.metadata,
+        "version",
+        lambda _distribution: (_ for _ in ()).throw(
+            verify_golden_compatibility.metadata.PackageNotFoundError
+        ),
+    )
+    with pytest.raises(ValueError, match="required distribution is missing"):
+        verify_golden_compatibility._validate_rpy2_identities(ROOT)
 
 def test_analysis_regression_comparison_classifies_missing_output_unsupported_and_capture_error():
     baseline = _baseline()
@@ -153,6 +678,36 @@ alt.col.vals   "-0.262"   "-0.724"      "0.200"       "0.236"
         "tau_squared": 0.378,
         "q": 33.360,
         "i_squared": 46.044,
+    }
+
+
+def test_golden_summary_parser_reads_modern_plain_text_heterogeneity_table():
+    with _import_legacy_golden_modules() as (golden_analysis, _, _):
+        parsed = golden_analysis._parse_summary(
+            """Binary Random-Effects Model
+
+Metric: Odds Ratio
+
+Model Results
+ Estimate  Lower bound  Upper bound  p-value
+ 0.770           0.485        1.222    0.267
+
+Heterogeneity
+ t²     Q(df=18)  Het. p-value     I²
+ 0.378    33.360         0.015  46.0%
+"""
+        )
+
+    assert parsed == {
+        "estimate": 0.770,
+        "lower_bound": 0.485,
+        "upper_bound": 1.222,
+        "p_value": 0.267,
+        "tau_squared": 0.378,
+        "q": 33.360,
+        "heterogeneity_df": 18.0,
+        "heterogeneity_p_value": 0.015,
+        "i_squared": 46.0,
     }
 
 
@@ -290,7 +845,7 @@ def test_headless_analysis_dispatches_meta_regression_with_selected_covariates(
         monkeypatch.setattr(
             headless_analysis.meta_py_r,
             "run_meta_regression",
-            lambda dataset, studies, covs, metric, conf_level=None: {
+            lambda dataset, studies, covs, metric, conf_level=None, params=None: {
                 "texts": {"Summary": metric}
             },
             raising=False,
@@ -395,6 +950,7 @@ def _import_legacy_golden_modules():
         "ma_dataset",
         "meta_globals",
         "meta_py_r",
+        "rc_metastudio.meta_py_r",
     ]
     previous = dict((name, sys.modules.get(name)) for name in names)
     try:
@@ -410,7 +966,9 @@ def _import_legacy_golden_modules():
             DIAGNOSTIC="diagnostic",
             VERSION="0.1.0",
         )
-        sys.modules["meta_py_r"] = types.SimpleNamespace(RlibLoader=lambda: None)
+        r_boundary = types.SimpleNamespace(RlibLoader=lambda: None)
+        sys.modules["meta_py_r"] = r_boundary
+        sys.modules["rc_metastudio.meta_py_r"] = r_boundary
         import golden_analysis
         import headless_analysis
         import meta_globals
@@ -440,7 +998,7 @@ def _baseline():
                         "label": "Forest Plot",
                         "kind": "plot",
                         "path": "reference.png",
-                        "sha256": "abc",
+                        "sha256": "a" * 64,
                     }
                 ],
             }
@@ -473,11 +1031,77 @@ def _current(status="success", failure=None):
             {
                 "label": "Forest Plot",
                 "kind": "plot",
-                "path": "current.png",
-                "sha256": "def",
+                "path": "reference.png",
+                "sha256": "a" * 64,
             }
         ],
     }
     if failure:
         row["failure"] = failure
     return {"curated_golden_set": [row]}
+
+
+def _copy_frozen_contract(tmp_path):
+    root = tmp_path / "repo"
+    relative_dir = Path("docs/verification/pre-qt6-baseline")
+    target_dir = root / relative_dir
+    target_dir.mkdir(parents=True)
+    for filename in (
+        "manifest.json",
+        "observed-golden-baseline.zip",
+        "golden-plot-descriptors.json",
+        "golden-numeric-contract.json",
+    ):
+        shutil.copy2(ROOT / relative_dir / filename, target_dir / filename)
+    return root
+
+
+def _update_outer_file_contract(root, key, path):
+    outer_path = root / verify_golden_compatibility.OUTER_MANIFEST_RELATIVE_PATH
+    outer = json.loads(outer_path.read_text(encoding="utf-8"))
+    payload = path.read_bytes()
+    outer[key]["size"] = len(payload)
+    import hashlib
+
+    outer[key]["sha256"] = hashlib.sha256(payload).hexdigest()
+    outer_path.write_text(json.dumps(outer), encoding="utf-8")
+
+
+def _rewrite_zip(source, target, replacements, extra=None):
+    extra = extra or {}
+    with zipfile.ZipFile(source) as original, zipfile.ZipFile(
+        target, "w", zipfile.ZIP_DEFLATED
+    ) as rewritten:
+        for info in original.infolist():
+            rewritten.writestr(
+                info.filename,
+                replacements.get(info.filename, original.read(info.filename)),
+            )
+        for name, payload in extra.items():
+            rewritten.writestr(name, payload)
+
+
+def _current_plot_descriptors(contract):
+    rows = []
+    for expected in contract["rows"]:
+        rows.append(
+            {
+                "id": expected["id"],
+                "dataset": "sample.rcms",
+                "method": "method",
+                "metric": "metric",
+                "plot_descriptors": [
+                    {
+                        "artifact_label": expected["artifact_label"],
+                        "capability": dict(expected["capability"]),
+                        "display": {
+                            "identity": expected["display"]["identity"],
+                            "name": expected["display"]["name"],
+                            "type": expected["display"]["type"],
+                            "sha256": "a" * 64,
+                        },
+                    }
+                ],
+            }
+        )
+    return {"curated_golden_set": rows}

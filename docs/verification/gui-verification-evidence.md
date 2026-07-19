@@ -66,6 +66,14 @@ Record one entry for every Release Cutover workflow that is verified through GUI
 - Verified workflow: copy displayed raw-data cells to the clipboard, paste them through the real table path into another study, undo the paste, and redo the paste while preserving the study row.
 - Command: `uv run pytest tests\\python\\gui\\test_metaform_data_workflows.py`
 
+## Native Qt6 Main Workspace Editing
+
+- Issue: #335
+- Dataset: synthetic binary, continuous, and diagnostic projects created through the native PyQt6 `MetaForm`.
+- Evidence: the complete `tests/python/gui/test_metaform_data_workflows.py` module, `tests/python/fast/test_dataset_model_edit_values.py`, `tests/python/fast/test_workspace_model_contracts.py`, and `tests/python/gui/test_main_workspace_window.py::test_workspace_table_uses_valid_logical_geometry_at_fractional_scale_factors`.
+- Verified workflow: run the complete hermetic MetaForm data-workflow contract; enforce native PyQt6 dialog codes, strict roles and check states, project save/reopen state, confidence-level status, diagnostic display precision, unambiguous finite dot- or comma-decimal scientific values, one typed settled edit event, exact undo/redo and clipboard rollback, and native Windows or macOS workspace geometry at 100%, 125%, 150%, and 175% scaling.
+- Command: `powershell -ExecutionPolicy Bypass -File scripts\\verify-qt6.ps1`
+
 ## Metric and Confidence Level Workflow
 
 - Issue: #42
@@ -89,4 +97,3 @@ Record one entry for every Release Cutover workflow that is verified through GUI
 - Evidence: `tests/packaging/contract/test_windows_distributable_contract.py::test_windows_distributable_contract_is_declared` and `tests/packaging/contract/test_windows_distributable_contract.py::test_lane_named_local_scripts_replace_old_workflow_wrappers`
 - Verified workflow: package the Windows package artifact around the real `launch.py` entry point, include the sample project files needed for real `.rcms` launch checks, and run the local verification workflow through the targeted `MetaForm` automation suite before packaging.
 - Command: `uv run pytest tests\\packaging\\contract\\test_windows_distributable_contract.py`
-

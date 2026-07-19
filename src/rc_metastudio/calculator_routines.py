@@ -4,17 +4,31 @@
 
 import sys
 from functools import partial
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QMessageBox, QSizePolicy, QStyle, QUndoCommand
+from weakref import WeakKeyDictionary
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QUndoCommand
+from PyQt6.QtWidgets import QMessageBox, QSizePolicy, QStyle
 
 from meta_globals import *
-import meta_py_r
+from rc_metastudio import meta_py_r
 import qt_text
+from runtime_types import required
+
+
+_EFFECT_CI_BASE_MINIMUM_WIDTHS = WeakKeyDictionary()
 
 
 def cell_text_is_blank(value):
     """Return whether Qt item text is blank."""
     return qt_text.is_blank(value)
+
+
+def numeric_value(value):
+    """Return finite interface numeric input using explicit decimal rules."""
+    number, valid = qt_text.parse_decimal(value)
+    if not valid:
+        raise ValueError("Enter an unambiguous finite number using '.' or ',' as decimal separator.")
+    return number
 
 
 def set_table_item_text_color(item, color):
@@ -24,9 +38,9 @@ def set_table_item_text_color(item, color):
 
 def between_bounds(est=None, low=None, high=None):
     def my_lt(a, b):
-        if is_a_float(a) and is_a_float(b):
-            return float(a) < float(b)
-        else:
+        try:
+            return numeric_value(a) < numeric_value(b)
+        except ValueError:
             return None
 
     good_result = my_lt(low, est)
@@ -89,9 +103,9 @@ def set_table_item_editable(item, editable):
         return
     flags = item.flags()
     if editable:
-        flags = flags | Qt.ItemIsEditable
+        flags = flags | Qt.ItemFlag.ItemIsEditable
     else:
-        flags = flags & ~Qt.ItemIsEditable
+        flags = flags & ~Qt.ItemFlag.ItemIsEditable
     item.setFlags(flags)
 
 
@@ -118,8 +132,8 @@ class ConsistencyChecker:
         assert not table_2x2 is None, "No table argument passed."
 
         self.inconsistent = False
-        self.inconsistent_action = fn_inconsistent
-        self.consistent_action = fn_consistent
+        self.inconsistent_action = required(fn_inconsistent, "inconsistency callback")
+        self.consistent_action = required(fn_consistent, "consistency callback")
         self.table = table_2x2
 
     def run(self):
@@ -270,7 +284,7 @@ def fit_effect_ci_line_edits_to_contents(
             continue
 
         policy = line_edit.sizePolicy()
-        line_edit.setSizePolicy(QSizePolicy.Fixed, policy.verticalPolicy())
+        line_edit.setSizePolicy(QSizePolicy.Policy.Fixed, policy.verticalPolicy())
 
         if semantic_samples:
             content_width = max(
@@ -279,7 +293,7 @@ def fit_effect_ci_line_edits_to_contents(
             )
             text_margins = line_edit.textMargins()
             frame_width = line_edit.style().pixelMetric(
-                QStyle.PM_DefaultFrameWidth, None, line_edit
+                QStyle.PixelMetric.PM_DefaultFrameWidth, None, line_edit
             )
             required_width = (
                 content_width
@@ -289,14 +303,10 @@ def fit_effect_ci_line_edits_to_contents(
             )
         else:
             signed_precision_sample = "-0." + ("8" * digits)
-            base_minimum_width = line_edit.property(
-                "RCMS_effect_ci_base_minimum_width"
-            )
-            if not isinstance(base_minimum_width, int):
+            base_minimum_width = _EFFECT_CI_BASE_MINIMUM_WIDTHS.get(line_edit)
+            if base_minimum_width is None:
                 base_minimum_width = line_edit.minimumWidth()
-                line_edit.setProperty(
-                    "RCMS_effect_ci_base_minimum_width", base_minimum_width
-                )
+                _EFFECT_CI_BASE_MINIMUM_WIDTHS[line_edit] = base_minimum_width
             content_width = max(
                 line_edit.fontMetrics().horizontalAdvance(value)
                 for value in (signed_precision_sample, str(line_edit.text()))
@@ -325,7 +335,10 @@ def binary_effect_display_samples(metric, digits=CALC_NUM_DIGITS):
     if metric in signed_unit_metrics:
         return ("-1." + ("0" * digits), "1." + ("0" * digits))
     if metric == "AS":
-        return ("-1.5708", "1.5708")
+        # Keep a signed-unit value in the semantic sample set. It is inside the
+        # arcsine domain and prevents native proportional fonts from making the
+        # field narrower than the signed-unit metrics when users switch scales.
+        return ("-1.5708", "-1.0000", "1.5708")
     if metric in positive_ratio_metrics:
         # Ratios are positive and unbounded, so use the exact text produced by
         # the renderer at the largest accepted finite binary64 value.
@@ -431,7 +444,12 @@ def save_table_data(table):
 
 class CommandFieldChanged(QUndoCommand):
     def __init__(
-        self, restore_new_f=None, restore_old_f=None, parent=None, description=""
+        self,
+        restore_new_f=None,
+        restore_old_f=None,
+        parent=None,
+        description="",
+        refresh_on_initial_redo=True,
     ):
         super(CommandFieldChanged, self).__init__(description)
 
@@ -439,19 +457,21 @@ class CommandFieldChanged(QUndoCommand):
         self.just_created = True
         self.restore_new_f = restore_new_f
         self.restore_old_f = restore_old_f
+        self.refresh_on_initial_redo = refresh_on_initial_redo
 
     def redo(self):
         if self.just_created:
             self.just_created = False
-            self.parent.enable_back_calculation_btn()
+            if self.refresh_on_initial_redo:
+                required(self.parent, "calculator command owner").enable_back_calculation_btn()
         else:
             print("Restoring new ma_unit")
-            self.restore_new_f()
+            required(self.restore_new_f, "calculator redo callback")()
             # self.parent.enable_back_calculation_btn() ##
 
     def undo(self):
         print("Restoring old ma_unit")
-        self.restore_old_f()
+        required(self.restore_old_f, "calculator undo callback")()
         # self.parent.enable_back_calculation_btn() ##
 
 
@@ -487,7 +507,7 @@ def table_cells_editable(table):
             item = table.item(row, col)
             if item is None:
                 continue
-            if (item.flags() & Qt.ItemIsEditable) == Qt.ItemIsEditable:
+            if (item.flags() & Qt.ItemFlag.ItemIsEditable) == Qt.ItemFlag.ItemIsEditable:
                 cells_uneditable = False
     return cells_uneditable
 
@@ -523,10 +543,14 @@ def evaluate(
     is_between_bounds = partial(between_bounds, est=d_est, low=d_lower, high=d_upper)
     ###### ERROR CHECKING CODE#####
     # Make sure entered value is numeric and between the appropriate bounds
-    if not is_a_float(new_text):
+    try:
+        parsed_value = numeric_value(new_text)
+    except ValueError:
         QMessageBox.warning(parent, "Warning", "Must be numeric!")
         raise Exception("error")
     if not opt_cmp_fn:  # est, lower, upper
+        if ci_param is None:
+            raise ValueError("ci_param is required for confidence-bound validation")
         (good_result, msg) = is_between_bounds(**{ci_param: new_text})
         if not good_result:
             QMessageBox.warning(parent, "Warning", msg)
@@ -537,4 +561,4 @@ def evaluate(
             QMessageBox.warning(parent, "Warning", opt_cmp_msg)
             print("raising exception")
             raise Exception("error")
-    return float(new_text)  # display_scale_val
+    return parsed_value  # display_scale_val

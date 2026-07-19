@@ -1,25 +1,46 @@
 import os
+from pathlib import Path
 import sys
 
 import pytest
-from PyQt5 import QtCore, QtGui, QtSvg, QtWidgets
+from PyQt6 import QtCore, QtGui, QtSvg, QtTest, QtWidgets
 
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("RCMS_STUB_BACKEND", "1")
+ROOT = Path(__file__).resolve().parents[3]
+os.environ.setdefault(
+    "RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification")
+)
 sys.path.insert(0, os.path.abspath("src/rc_metastudio"))
-sys.path.insert(0, os.path.abspath("src/rc_metastudio/forms"))
+from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+
+prepare_generated_ui_imports()
 
 
 def _empty_results(summary="Summary text"):
     return {"texts": {"Summary": summary}}
 
 
+def _plot_capability(
+    plot_kind="forest", editable=True, styleable=True, regenerator="forest"
+):
+    return {
+        "plot_kind": plot_kind,
+        "editable": editable,
+        "styleable": styleable,
+        "regenerator": regenerator,
+        "composition": "single",
+    }
+
+
 def _use_isolated_settings(tmp_path):
     QtCore.QSettings.setPath(
-        QtCore.QSettings.IniFormat, QtCore.QSettings.UserScope, str(tmp_path)
+        QtCore.QSettings.Format.IniFormat,
+        QtCore.QSettings.Scope.UserScope,
+        str(tmp_path),
     )
-    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.IniFormat)
+    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.Format.IniFormat)
     store = QtCore.QSettings()
     store.clear()
     store.sync()
@@ -38,26 +59,31 @@ def test_qtsvg_renders_materialized_default_black_plot_stroke():
     renderer = QtSvg.QSvgRenderer(QtCore.QByteArray(svg))
     assert renderer.isValid()
 
-    image = QtGui.QImage(100, 40, QtGui.QImage.Format_ARGB32)
-    image.fill(QtCore.Qt.white)
+    image = QtGui.QImage(100, 40, QtGui.QImage.Format.Format_ARGB32)
+    image.fill(QtCore.Qt.GlobalColor.white)
     painter = QtGui.QPainter(image)
     renderer.render(painter)
     painter.end()
 
-    assert sum(image.pixelColor(x, 20) != QtGui.QColor(QtCore.Qt.white) for x in range(100)) >= 75
+    assert sum(
+        image.pixelColor(x, 20) != QtGui.QColor(QtCore.Qt.GlobalColor.white)
+        for x in range(100)
+    ) >= 75
 
 
 def test_results_workspace_defaults_maximized_and_restores_screen_safe_state(
     qapp, tmp_path
 ):
+    import adaptive_window
     import results_window
     import settings
 
     _use_isolated_settings(tmp_path)
     fresh = results_window.ResultsWindow(_empty_results())
     try:
-        assert fresh.property("RCMS_window_archetype") == "workspace"
-        assert fresh.property("RCMS_window_role") == "results"
+        state = adaptive_window.adaptive_window_state(fresh)
+        assert state.policy.archetype is adaptive_window.WindowArchetype.WORKSPACE
+        assert state.role is adaptive_window.WindowRole.RESULTS
         assert fresh.isMaximized()
 
         fresh.showNormal()
@@ -190,7 +216,7 @@ def test_results_refit_does_not_dispatch_unrelated_layout_requests(
             self.layout_requests = 0
 
         def event(self, event):
-            if event.type() == QtCore.QEvent.LayoutRequest:
+            if event.type() == QtCore.QEvent.Type.LayoutRequest:
                 self.layout_requests += 1
             return super().event(event)
 
@@ -228,8 +254,10 @@ def test_results_regeneration_burst_runs_one_scheduled_expensive_reflow(
 
     _use_isolated_settings(tmp_path)
     plot_path = tmp_path / "plot.png"
-    image = results_window.QImage(600, 300, results_window.QImage.Format_RGB32)
-    image.fill(results_window.Qt.white)
+    image = results_window.QImage(
+        600, 300, results_window.QImage.Format.Format_RGB32
+    )
+    image.fill(results_window.Qt.GlobalColor.white)
     assert image.save(str(plot_path), "PNG")
     window = results_window.ResultsWindow(
         {
@@ -281,7 +309,7 @@ def test_dpr_raster_uses_device_independent_dimensions_for_viewport_fit(qapp, tm
         qapp.processEvents()
 
         source = results_window.QPixmap(1200, 600)
-        source.fill(results_window.Qt.white)
+        source.fill(results_window.Qt.GlobalColor.white)
         source.setDevicePixelRatio(2.0)
         item = results_window.ResponsivePixmapItem(source)
         item.setPixmap(source)
@@ -303,6 +331,7 @@ def test_dpr_raster_uses_device_independent_dimensions_for_viewport_fit(qapp, tm
 def test_plot_editor_is_screen_bounded_transactional_dialog_with_fixed_actions(
     qapp, tmp_path
 ):
+    import adaptive_window
     import results_window
 
     _use_isolated_settings(tmp_path)
@@ -310,8 +339,9 @@ def test_plot_editor_is_screen_bounded_transactional_dialog_with_fixed_actions(
     try:
         dialog.show()
         qapp.processEvents()
-        assert dialog.property("RCMS_window_archetype") == "transactional"
-        assert dialog.property("RCMS_window_role") == "transactional"
+        state = adaptive_window.adaptive_window_state(dialog)
+        assert state.policy.archetype is adaptive_window.WindowArchetype.TRANSACTIONAL
+        assert state.role is adaptive_window.WindowRole.TRANSACTIONAL
         assert isinstance(dialog.content_scroll, QtWidgets.QScrollArea)
         assert dialog.content_scroll.widgetResizable()
         assert not dialog.content_scroll.isAncestorOf(dialog.buttonBox)
@@ -319,7 +349,430 @@ def test_plot_editor_is_screen_bounded_transactional_dialog_with_fixed_actions(
         assert dialog.frameGeometry().width() <= int(available.width() * 0.9) + 1
         assert dialog.frameGeometry().height() <= int(available.height() * 0.9) + 1
         assert dialog.buttonBox.isVisible()
-        assert dialog.buttonBox.button(QtWidgets.QDialogButtonBox.Apply).isVisible()
-        assert dialog.buttonBox.button(QtWidgets.QDialogButtonBox.Ok).isVisible()
+        assert dialog.buttonBox.button(
+            QtWidgets.QDialogButtonBox.StandardButton.Apply
+        ).isVisible()
+        assert dialog.buttonBox.button(
+            QtWidgets.QDialogButtonBox.StandardButton.Ok
+        ).isVisible()
     finally:
         _dispose(dialog, qapp)
+
+
+def test_results_window_presents_summary_references_and_vector_plot_artifacts(
+    qapp, tmp_path
+):
+    import results_window
+
+    _use_isolated_settings(tmp_path)
+    svg_path = tmp_path / "forest.display.svg"
+    svg_path.write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="801.5" height="400.75" '
+        'viewBox="0 0 801.5 400.75"><rect width="801.5" height="400.75" '
+        'fill="white"/><text x="24" y="48">Forest Plot</text></svg>',
+        encoding="utf-8",
+    )
+    window = results_window.ResultsWindow(
+        {
+            "texts": {
+                "Summary": "Random-effects model\nEstimate  Lower bound  Upper bound",
+                "References": "A maintained analysis reference.",
+            },
+            "images": {"Forest Plot": str(svg_path)},
+            "display_images": {"Forest Plot": str(svg_path)},
+            "image_params_paths": {"Forest Plot": str(tmp_path / "forest")},
+            "image_order": ["Forest Plot"],
+            "plot_capabilities": {"Forest Plot": _plot_capability()},
+        }
+    )
+    try:
+        window.show()
+        qapp.processEvents()
+        nav_titles = [
+            window.nav_tree.topLevelItem(index).text(0)
+            for index in range(window.nav_tree.topLevelItemCount())
+        ]
+        assert nav_titles == ["Meta-Analysis Summary", "Forest Plot", "References"]
+        svg_items = [
+            item
+            for item in window.scene.items()
+            if isinstance(item, results_window._svg_item_class())
+        ]
+        assert len(svg_items) == 1
+        assert svg_items[0].renderer().isValid()
+        assert svg_items[0].sceneBoundingRect().width() > 0.0
+        assert all(
+            isinstance(position, QtCore.QPointF)
+            for position in window.items_to_coords.values()
+        )
+        assert window.graphics_view.scene() is window.scene
+    finally:
+        _dispose(window, qapp)
+
+
+@pytest.mark.parametrize(
+    ("title", "plot_kind", "regenerator"),
+    (
+        ("Forest Plot", "forest", "forest"),
+        ("Cumulative Forest Plot", "cumulative_forest", "forest"),
+        ("Leave-one-out Forest Plot", "leave_one_out_forest", "forest"),
+        ("Subgroup Forest Plot", "subgroup_forest", "forest"),
+        ("Diagnostic Forest Plot", "forest", "forest"),
+        ("Meta-Regression Bubble Plot", "regression", "regression"),
+    ),
+)
+def test_regenerable_plot_families_expose_native_edit_and_export_actions(
+    qapp, tmp_path, monkeypatch, title, plot_kind, regenerator
+):
+    import results_window
+
+    _use_isolated_settings(tmp_path)
+    window = results_window.ResultsWindow(_empty_results())
+    captured = []
+
+    class Event:
+        def screenPos(self):
+            return QtCore.QPoint(20, 30)
+
+        def accept(self):
+            pass
+
+    monkeypatch.setattr(
+        results_window.app_error_handler,
+        "popup_context_menu",
+        lambda menu, *_args, **_kwargs: captured.append(
+            [action.text() for action in menu.actions()]
+        ),
+    )
+    artifact = results_window.PlotArtifact(
+        title,
+        str(tmp_path / "plot.svg"),
+        _plot_capability(plot_kind=plot_kind, regenerator=regenerator),
+        params_path=str(tmp_path / "plot-params"),
+    )
+    try:
+        window._make_context_menu(artifact, None)(Event())
+        assert captured == [
+            [
+                "Edit Plot",
+                "Save PDF Image As",
+                "Save PNG Image As",
+                "Save TIFF Image As",
+                "Save SVG Image As",
+            ]
+        ]
+    finally:
+        _dispose(window, qapp)
+
+
+@pytest.mark.parametrize("extension", ["pdf", "png", "tiff", "svg"])
+def test_results_window_regenerates_each_supported_export_format(
+    qapp, tmp_path, monkeypatch, extension
+):
+    import results_window
+
+    _use_isolated_settings(tmp_path)
+    window = results_window.ResultsWindow(_empty_results())
+    calls = []
+    artifact = results_window.PlotArtifact(
+        "Forest Plot",
+        str(tmp_path / "forest.svg"),
+        _plot_capability(),
+        params_path=str(tmp_path / "forest-params"),
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "load_in_R",
+        lambda path: calls.append(("load", path)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.meta_py_r,
+        "generate_forest_plot",
+        lambda path: calls.append(("generate", path)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.QFileDialog,
+        "getSaveFileName",
+        lambda *_args, **_kwargs: (str(tmp_path / "export"), ""),
+    )
+    try:
+        window.save_image_as(artifact, format=extension)
+        assert calls == [
+            ("load", f"{artifact.params_path}.plotdata"),
+            ("generate", str(tmp_path / f"export.{extension}")),
+        ]
+    finally:
+        _dispose(window, qapp)
+
+
+@pytest.mark.parametrize("scale", [1.0, 1.25, 1.5, 1.75])
+def test_results_plot_geometry_preserves_fractional_logical_coordinates(
+    qapp, tmp_path, scale
+):
+    import results_window
+
+    _use_isolated_settings(tmp_path)
+    window = results_window.ResultsWindow(_empty_results())
+    try:
+        window._viewport_width_override = 1003.0 * scale
+        width, height = window._fit_size_to_viewport(801.5, 400.75, max_scale=4.0)
+        assert isinstance(width, float)
+        assert isinstance(height, float)
+        assert width / height == pytest.approx(2.0)
+        window.x_coord = 5.25
+        window.y_coord = 9.75
+        assert window.position() == QtCore.QPointF(5.25, 9.75)
+    finally:
+        _dispose(window, qapp)
+
+
+def test_plot_editor_apply_signal_fires_exactly_once(qapp, tmp_path):
+    import results_window
+
+    _use_isolated_settings(tmp_path)
+    dialog = results_window.EditPlotDialog({}, "forest.png")
+    try:
+        applied = QtTest.QSignalSpy(dialog.applied)
+        button = dialog.buttonBox.button(
+            QtWidgets.QDialogButtonBox.StandardButton.Apply
+        )
+        assert button is not None
+        button.click()
+        qapp.processEvents()
+        assert len(applied) == 1
+    finally:
+        _dispose(dialog, qapp)
+
+
+@pytest.mark.parametrize(
+    ("plot_type", "field_name", "parameter_name"),
+    (
+        ("forest", "x_lbl_le", "fp_xlabel"),
+        ("regression", "x_lbl_le", "bp_xlabel"),
+    ),
+)
+@pytest.mark.parametrize("dismissal", ["cancel", "escape", "close"])
+def test_generated_plot_editor_dismissal_never_commits_or_regenerates(
+    qapp, tmp_path, plot_type, field_name, parameter_name, dismissal
+):
+    import results_window
+
+    _use_isolated_settings(tmp_path)
+    dialog = results_window.EditPlotDialog(
+        {parameter_name: "Committed label"},
+        "plot.svg",
+        plot_type=plot_type,
+    )
+    committed = []
+    regenerations = []
+    dialog.applied.connect(lambda: committed.append(dialog.plot_params()))
+    dialog.applied.connect(lambda: regenerations.append(plot_type))
+    try:
+        dialog.show()
+        qapp.processEvents()
+        getattr(dialog, field_name).setText("Uncommitted draft")
+        if dismissal == "cancel":
+            cancel = dialog.buttonBox.button(
+                QtWidgets.QDialogButtonBox.StandardButton.Cancel
+            )
+            assert cancel is not None
+            cancel.click()
+        elif dismissal == "escape":
+            QtTest.QTest.keyClick(dialog, QtCore.Qt.Key.Key_Escape)
+        else:
+            dialog.close()
+        qapp.processEvents()
+        assert committed == []
+        assert regenerations == []
+    finally:
+        _dispose(dialog, qapp)
+
+
+@pytest.mark.parametrize(
+    ("plot_type", "parameter_name"),
+    (("forest", "fp_xlabel"), ("regression", "bp_xlabel")),
+)
+def test_generated_plot_editor_apply_then_cancel_preserves_only_committed_draft(
+    qapp, tmp_path, plot_type, parameter_name
+):
+    import results_window
+
+    _use_isolated_settings(tmp_path)
+    dialog = results_window.EditPlotDialog(
+        {parameter_name: "Original"}, "plot.svg", plot_type=plot_type
+    )
+    committed = []
+    dialog.applied.connect(lambda: committed.append(dialog.plot_params()))
+    try:
+        dialog.show()
+        qapp.processEvents()
+        dialog.x_lbl_le.setText("Applied label")
+        apply_button = dialog.buttonBox.button(
+            QtWidgets.QDialogButtonBox.StandardButton.Apply
+        )
+        cancel_button = dialog.buttonBox.button(
+            QtWidgets.QDialogButtonBox.StandardButton.Cancel
+        )
+        assert apply_button is not None and cancel_button is not None
+        apply_button.click()
+        dialog.x_lbl_le.setText("Cancelled later draft")
+        cancel_button.click()
+        qapp.processEvents()
+        assert [entry[parameter_name] for entry in committed] == ["Applied label"]
+    finally:
+        _dispose(dialog, qapp)
+
+
+@pytest.mark.parametrize("plot_type", ["forest", "regression"])
+def test_generated_plot_editor_ok_commits_once_and_accepts(qapp, tmp_path, plot_type):
+    import results_window
+
+    _use_isolated_settings(tmp_path)
+    dialog = results_window.EditPlotDialog({}, "plot.svg", plot_type=plot_type)
+    applied = QtTest.QSignalSpy(dialog.applied)
+    accepted = QtTest.QSignalSpy(dialog.accepted)
+    try:
+        ok = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
+        assert ok is not None
+        ok.click()
+        qapp.processEvents()
+        assert len(applied) == 1
+        assert len(accepted) == 1
+    finally:
+        _dispose(dialog, qapp)
+
+
+def test_plot_color_chooser_is_named_described_and_keyboard_focusable(qapp, tmp_path):
+    import results_window
+
+    _use_isolated_settings(tmp_path)
+    dialog = results_window.EditPlotDialog({}, "plot.svg")
+    try:
+        dialog.show()
+        dialog.color_btn.setFocus()
+        qapp.processEvents()
+        assert dialog.color_btn.accessibleName() == "Choose plot accent color"
+        assert "color picker" in dialog.color_btn.accessibleDescription().lower()
+        assert dialog.color_btn.toolTip() == "Choose the plot accent color"
+        assert dialog.color_btn.hasFocus()
+        assert dialog.color_btn.focusPolicy() == QtCore.Qt.FocusPolicy.StrongFocus
+    finally:
+        _dispose(dialog, qapp)
+
+
+def test_plot_save_path_browser_is_accessible_and_keyboard_operable_for_all_editors(
+    qapp, tmp_path, monkeypatch
+):
+    import results_window
+
+    _use_isolated_settings(tmp_path)
+    selections = iter(
+        (
+            (str(tmp_path / "forest-selected.svg"), ""),
+            (str(tmp_path / "regression-selected.png"), ""),
+        )
+    )
+    calls = []
+
+    def choose_path(parent, title, initial_path, file_filter):
+        calls.append((parent.plot_type, title, initial_path, file_filter))
+        return next(selections)
+
+    monkeypatch.setattr(results_window.QFileDialog, "getSaveFileName", choose_path)
+    for plot_type in ("forest", "regression"):
+        initial = str(tmp_path / f"{plot_type}-initial.svg")
+        prefix = "bp" if plot_type == "regression" else "fp"
+        dialog = results_window.EditPlotDialog(
+            {f"{prefix}_outpath": initial}, "", plot_type=plot_type
+        )
+        applied = QtTest.QSignalSpy(dialog.applied)
+        try:
+            dialog.show()
+            dialog.save_btn.setFocus()
+            qapp.processEvents()
+            assert dialog.save_btn.accessibleName() == "Browse save image path"
+            assert "file chooser" in dialog.save_btn.accessibleDescription().lower()
+            assert dialog.save_btn.toolTip() == "Browse for the plot image save path"
+            assert dialog.save_btn.focusPolicy() == QtCore.Qt.FocusPolicy.StrongFocus
+            assert dialog.save_btn.hasFocus()
+            QtTest.QTest.keyClick(dialog.save_btn, QtCore.Qt.Key.Key_Space)
+            qapp.processEvents()
+            assert dialog.image_path.text() == str(
+                tmp_path / f"{plot_type}-selected.{'svg' if plot_type == 'forest' else 'png'}"
+            )
+            assert len(applied) == 0
+        finally:
+            _dispose(dialog, qapp)
+    assert [call[0] for call in calls] == ["forest", "regression"]
+    assert calls[0][1] == "Save Forest Plot Image"
+    assert calls[1][1] == "Save Regression Plot Image"
+    assert [call[2] for call in calls] == [
+        str(tmp_path / "forest-initial.svg"),
+        str(tmp_path / "regression-initial.svg"),
+    ]
+    assert all(call[3] == results_window.PLOT_EDITOR_SAVE_FILTER for call in calls)
+
+
+def test_plot_save_path_browser_cancellation_never_mutates_or_applies(
+    qapp, tmp_path, monkeypatch
+):
+    import results_window
+
+    _use_isolated_settings(tmp_path)
+    monkeypatch.setattr(
+        results_window.QFileDialog,
+        "getSaveFileName",
+        lambda *_args, **_kwargs: ("", ""),
+    )
+    for plot_type in ("forest", "regression"):
+        initial = str(tmp_path / f"{plot_type}-initial.svg")
+        prefix = "bp" if plot_type == "regression" else "fp"
+        dialog = results_window.EditPlotDialog(
+            {f"{prefix}_outpath": initial}, "", plot_type=plot_type
+        )
+        applied = QtTest.QSignalSpy(dialog.applied)
+        try:
+            dialog.save_btn.click()
+            qapp.processEvents()
+            assert dialog.image_path.text() == initial
+            assert len(applied) == 0
+        finally:
+            _dispose(dialog, qapp)
+
+
+@pytest.mark.parametrize(
+    ("logical_extent", "device_pixel_ratio", "expected"),
+    (
+        (0.0, 1.0, 0),
+        (0.5, 1.0, 1),
+        (2.5, 1.0, 3),
+        (515.0, 1.0, 515),
+        (515.0, 1.25, 644),
+        (515.0, 1.5, 773),
+        (515.0, 1.75, 901),
+    ),
+)
+def test_logical_extent_boundary_uses_qt_consistent_half_up_rounding(
+    logical_extent, device_pixel_ratio, expected
+):
+    from rc_metastudio.qt_geometry import logical_extent_to_physical_pixels
+
+    assert (
+        logical_extent_to_physical_pixels(logical_extent, device_pixel_ratio)
+        == expected
+    )
+
+
+@pytest.mark.parametrize(
+    ("logical_extent", "device_pixel_ratio"),
+    ((-1.0, 1.0), (1.0, 0.0), (1.0, -1.0), (float("nan"), 1.0), (1.0, float("inf"))),
+)
+def test_logical_extent_boundary_rejects_invalid_values(
+    logical_extent, device_pixel_ratio
+):
+    from rc_metastudio.qt_geometry import logical_extent_to_physical_pixels
+
+    with pytest.raises(ValueError):
+        logical_extent_to_physical_pixels(logical_extent, device_pixel_ratio)

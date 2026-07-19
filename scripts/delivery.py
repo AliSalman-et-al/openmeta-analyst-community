@@ -14,13 +14,26 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS_PATH = ROOT / "delivery" / "targets.json"
 POLICY_INPUTS = (
+    ".github/workflows/release-candidate.yml",
     "uv.lock",
     "pyproject.toml",
     "docs/verification/RCMetaR-r-dependencies.json",
     "r/RCMetaR/DESCRIPTION",
     "delivery/targets.json",
     "scripts/build-windows-package.ps1",
+    "scripts/test-bounded-package-process.ps1",
+    "scripts/inspect_windows_deployment.py",
+    "packaging/pyinstaller/rc-metastudio.spec",
     "scripts/build-macos-package.sh",
+    "scripts/package-macos.sh",
+    "scripts/inspect_macos_deployment.py",
+    "scripts/normalize_macos_macho.py",
+    "scripts/sign_macos_app.py",
+    "scripts/sign-notarize-macos-package.sh",
+    "scripts/qt6_macos_feasibility.py",
+    "scripts/run_bounded_process.py",
+    "scripts/package_input_policy.py",
+    "packaging/pyinstaller/rc-metastudio-macos.spec",
 )
 
 
@@ -47,6 +60,7 @@ def release_identity_digest(manifest: dict) -> str:
             "trust_profile": manifest["trust_profile"],
             "source": manifest["source"],
             "policy_inputs": manifest["policy_inputs"],
+            "release_targets": manifest["release_targets"],
         }
     )
 
@@ -93,6 +107,12 @@ def init_release(args: argparse.Namespace) -> None:
     requested_base = args.version.split("-rc.", 1)[0]
     if requested_base != repository_version():
         raise ValueError(f"requested version {args.version} does not match repository version {repository_version()}")
+    selected_targets = list(dict.fromkeys(getattr(args, "target", None) or targets()))
+    unsupported = sorted(set(selected_targets) - set(targets()))
+    if unsupported:
+        raise ValueError(f"unsupported release targets: {', '.join(unsupported)}")
+    if not selected_targets:
+        raise ValueError("release set must contain at least one target")
     manifest = {
         "schema_version": 1,
         "product": "RC MetaStudio",
@@ -101,6 +121,7 @@ def init_release(args: argparse.Namespace) -> None:
         "trust_profile": args.trust_profile,
         "source": {"repository": args.repository, "commit": args.commit},
         "policy_inputs": {name: digest(ROOT / name) for name in POLICY_INPUTS},
+        "release_targets": selected_targets,
         "targets": {},
         "history": [{"event": "initialized", "at": now(), "commit": args.commit}],
     }
@@ -184,9 +205,12 @@ def verify(args: argparse.Namespace) -> None:
     manifest = load(Path(args.manifest))
     assert_commit(manifest["source"]["commit"])
     configured = targets()
-    if set(manifest["targets"]) != set(configured):
-        raise ValueError("release set does not contain exactly all supported targets")
-    for name in configured:
+    selected = manifest.get("release_targets")
+    if not isinstance(selected, list) or not selected or not set(selected) <= set(configured):
+        raise ValueError("release set target selection is invalid")
+    if set(manifest["targets"]) != set(selected):
+        raise ValueError("release set does not contain exactly its selected targets")
+    for name in selected:
         stages = manifest["targets"][name].get("stages", [])
         if [item["stage"] for item in stages] != required_stages(manifest, name):
             raise ValueError(f"{name} has incomplete or out-of-order stages")
@@ -224,17 +248,60 @@ def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description=__doc__)
     commands = root.add_subparsers(required=True)
     init = commands.add_parser("init")
-    init.add_argument("--version", required=True); init.add_argument("--commit", required=True)
-    init.add_argument("--repository", required=True); init.add_argument("--trust-profile", choices=("unsigned-community", "trusted-signed"), default="unsigned-community"); init.add_argument("--output", required=True); init.set_defaults(func=init_release)
-    inv = commands.add_parser("inventory"); inv.add_argument("--root", required=True); inv.add_argument("--output", required=True); inv.set_defaults(func=inventory)
-    bom = commands.add_parser("sbom"); bom.add_argument("--inventory", required=True); bom.add_argument("--version", required=True); bom.add_argument("--output", required=True); bom.set_defaults(func=sbom)
-    stage = commands.add_parser("stage-result"); stage.add_argument("--target", required=True); stage.add_argument("--stage", required=True)
-    stage.add_argument("--commit", required=True); stage.add_argument("--input-digest", required=True); stage.add_argument("--output-file", action="append", required=True); stage.add_argument("--result", required=True); stage.set_defaults(func=stage_result)
-    attach_parser = commands.add_parser("attach"); attach_parser.add_argument("--manifest", required=True); attach_parser.add_argument("--result", required=True); attach_parser.set_defaults(func=attach)
-    verify_parser = commands.add_parser("verify"); verify_parser.add_argument("--manifest", required=True); verify_parser.set_defaults(func=verify)
-    promote_parser = commands.add_parser("promote"); promote_parser.add_argument("--manifest", required=True); promote_parser.add_argument("--from-channel", required=True); promote_parser.add_argument("--channel", required=True); promote_parser.add_argument("--version"); promote_parser.add_argument("--output", required=True); promote_parser.set_defaults(func=promote)
-    sums = commands.add_parser("checksums"); sums.add_argument("--files", action="append", required=True); sums.add_argument("--output", required=True); sums.set_defaults(func=checksums)
-    digest_parser = commands.add_parser("digest"); digest_parser.add_argument("--json", required=True); digest_parser.add_argument("--release-identity", action="store_true"); digest_parser.set_defaults(func=print_digest)
+    init.add_argument("--version", required=True)
+    init.add_argument("--commit", required=True)
+    init.add_argument("--repository", required=True)
+    init.add_argument(
+        "--trust-profile",
+        choices=("unsigned-community", "trusted-signed"),
+        default="unsigned-community",
+    )
+    init.add_argument(
+        "--target",
+        action="append",
+        help="Release target to include; repeat as needed. Defaults to all configured targets.",
+    )
+    init.add_argument("--output", required=True)
+    init.set_defaults(func=init_release)
+    inv = commands.add_parser("inventory")
+    inv.add_argument("--root", required=True)
+    inv.add_argument("--output", required=True)
+    inv.set_defaults(func=inventory)
+    bom = commands.add_parser("sbom")
+    bom.add_argument("--inventory", required=True)
+    bom.add_argument("--version", required=True)
+    bom.add_argument("--output", required=True)
+    bom.set_defaults(func=sbom)
+    stage = commands.add_parser("stage-result")
+    stage.add_argument("--target", required=True)
+    stage.add_argument("--stage", required=True)
+    stage.add_argument("--commit", required=True)
+    stage.add_argument("--input-digest", required=True)
+    stage.add_argument("--output-file", action="append", required=True)
+    stage.add_argument("--result", required=True)
+    stage.set_defaults(func=stage_result)
+    attach_parser = commands.add_parser("attach")
+    attach_parser.add_argument("--manifest", required=True)
+    attach_parser.add_argument("--result", required=True)
+    attach_parser.set_defaults(func=attach)
+    verify_parser = commands.add_parser("verify")
+    verify_parser.add_argument("--manifest", required=True)
+    verify_parser.set_defaults(func=verify)
+    promote_parser = commands.add_parser("promote")
+    promote_parser.add_argument("--manifest", required=True)
+    promote_parser.add_argument("--from-channel", required=True)
+    promote_parser.add_argument("--channel", required=True)
+    promote_parser.add_argument("--version")
+    promote_parser.add_argument("--output", required=True)
+    promote_parser.set_defaults(func=promote)
+    sums = commands.add_parser("checksums")
+    sums.add_argument("--files", action="append", required=True)
+    sums.add_argument("--output", required=True)
+    sums.set_defaults(func=checksums)
+    digest_parser = commands.add_parser("digest")
+    digest_parser.add_argument("--json", required=True)
+    digest_parser.add_argument("--release-identity", action="store_true")
+    digest_parser.set_defaults(func=print_digest)
     return root
 
 

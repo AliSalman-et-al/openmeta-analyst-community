@@ -1,4 +1,4 @@
-name: Fast Verification
+name: Qt6 Integration Verification
 
 on:
   workflow_dispatch:
@@ -12,8 +12,7 @@ permissions:
   pull-requests: read
 
 env:
-  RCMS_CRAN_REPO: https://cloud.r-project.org
-  RCMS_CRAN_REPO_KEY: cloud-r-project-org
+  RCMS_CRAN_REPO: https://packagemanager.posit.co/cran/2026-07-16
 
 concurrency:
   group: fast-verification-${{ github.ref }}
@@ -21,14 +20,18 @@ concurrency:
 
 jobs:
   change-classifier:
-    name: Fast Verification Change Classifier
+    name: Qt6 Verification Change Classifier
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       run-windows: ${{ steps.classify.outputs.run-windows }}
+      run-windows-package: ${{ steps.classify.outputs.run-windows-package }}
       reason: ${{ steps.classify.outputs.reason }}
 
     steps:
+      - name: Check out classifier policy
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
       - name: Classify changed paths
         id: classify
         shell: bash
@@ -41,22 +44,24 @@ jobs:
           set -euo pipefail
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             echo "run-windows=true" >> "$GITHUB_OUTPUT"
+            echo "run-windows-package=true" >> "$GITHUB_OUTPUT"
             echo "reason=manual dispatch" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           if [ "$EVENT_NAME" = "push" ]; then
             echo "run-windows=true" >> "$GITHUB_OUTPUT"
+            echo "run-windows-package=true" >> "$GITHUB_OUTPUT"
             echo "reason=push to ${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           changed_files="$(gh api --paginate "repos/$REPOSITORY/pulls/$PR_NUMBER/files" --jq '.[].filename')"
           run_windows=false
-          reason="no fast verification inputs changed"
+          reason="no Qt6 integration verification inputs changed"
           while IFS= read -r file; do
             case "$file" in
-              .github/workflows/fast-verification.yml|pyproject.toml|uv.lock|src/*|tests/*|scripts/verify-smoke.ps1|scripts/verify-fast.ps1|scripts/verify_rcmetar_r_default.py|scripts/validate_rcmetar_r_manifests.py|scripts/validate_golden_baseline_manifests.py|scripts/validate_test_taxonomy.py|docs/verification/RCMetaR-r-dependencies.json|docs/verification/RCMetaR-statistical-drift.json|docs/verification/comprehensive-golden-baseline-manifest.json|docs/verification/golden-coverage-manifest.json|docs/verification/workflow-traceability.json|docs/verification/test-taxonomy.json)
+              .github/workflows/*|.python-version|pyproject.toml|uv.lock|config/*|docs/verification/*|r/*|scripts/*|src/*|tests/*)
                 run_windows=true
                 reason="matched $file"
                 break
@@ -64,16 +69,22 @@ jobs:
             esac
           done <<< "$changed_files"
 
+          package_required="$(printf '%s\n' "$changed_files" | python3 scripts/package_input_policy.py)"
+          if [ "$package_required" = "true" ] && [ "$run_windows" != "true" ]; then
+            reason="matched a release-package qualification input"
+          fi
+
           echo "run-windows=$run_windows" >> "$GITHUB_OUTPUT"
+          echo "run-windows-package=$package_required" >> "$GITHUB_OUTPUT"
           echo "reason=$reason" >> "$GITHUB_OUTPUT"
           echo "$reason"
 
-  smoke-verification:
-    name: Smoke Verification Lane
+  qt6-verification:
+    name: Native Qt6 Vertical Slice
     needs: change-classifier
     if: ${{ needs.change-classifier.outputs.run-windows == 'true' }}
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     defaults:
       run:
         shell: powershell
@@ -81,6 +92,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
@@ -90,84 +103,200 @@ jobs:
       - name: Install Python
         run: uv python install 3.11.9
 
-      - name: Set up R for Default R Evidence
-        uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
-        with:
-          r-version: 4.6.1
-
-      - name: Resolve R cache version
-        id: r-cache-key
-        run: |
-          $version = Rscript -e "cat(paste0('R-', getRversion()))"
-          "version=$version" >> $env:GITHUB_OUTPUT
-
-      - name: Cache default R evidence library
+      - name: Cache official Qt rcc package
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
-          path: artifacts\r-default-library-cache
-          key: default-r-evidence-library-v2-windows-${{ steps.r-cache-key.outputs.version }}-${{ env.RCMS_CRAN_REPO_KEY }}-${{ hashFiles('scripts/verify_rcmetar_r_default.py', 'docs/verification/RCMetaR-r-dependencies.json', 'r/RCMetaR/DESCRIPTION') }}
+          path: build\qt-rcc
+          key: qt-rcc-6.11.1-windows-x64-7f97edc3937fec7383eb865e010ed5128155bf9c80a563abca450860f3e9bef5
 
-      - name: Run Smoke Verification Lane
-        run: .\scripts\verify-smoke.ps1 -Sync -RequireREvidence
+      - name: Run Native Qt6 Vertical Slice
+        run: .\scripts\verify-qt6.ps1 -Sync
+
+      - name: Upload native calculator evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-calculator-evidence
+          path: build/qt6-verification/native-calculators
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload native remaining-surface evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-remaining-surface-evidence
+          path: build/qt6-verification/native-remaining-surfaces
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Prune uv cache
         if: ${{ always() }}
         run: uv cache prune --ci
 
-  fast-verification:
-    name: Fast Verification Lane
-    needs:
-      - change-classifier
-      - smoke-verification
-    if: ${{ needs.change-classifier.outputs.run-windows == 'true' && needs.smoke-verification.result == 'success' }}
-    runs-on: windows-latest
-    timeout-minutes: 20
-    defaults:
-      run:
-        shell: powershell
+  source-fast-targets:
+    name: Source Smoke and Fast Verification (${{ matrix.target }})
+    needs: change-classifier
+    if: ${{ needs.change-classifier.outputs.run-windows == 'true' }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: windows-x64
+            runner: windows-latest
+            platform: windows
+          - target: macos-x64
+            runner: macos-15-intel
+            platform: macos
+          - target: macos-arm64
+            runner: macos-15
+            platform: macos
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - name: Check out repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           enable-cache: true
 
-      - name: Install Python
+      - name: Install locked Python
         run: uv python install 3.11.9
 
-      - name: Set up R for Default R Evidence
+      - name: Install pinned R
         uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
         with:
           r-version: 4.6.1
+          use-public-rspm: true
 
-      - name: Resolve R cache version
-        id: r-cache-key
-        run: |
-          $version = Rscript -e "cat(paste0('R-', getRversion()))"
-          "version=$version" >> $env:GITHUB_OUTPUT
-
-      - name: Cache default R evidence library
+      - name: Cache Default R Evidence library
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
-          path: artifacts\r-default-library-cache
-          key: default-r-evidence-library-v2-windows-${{ steps.r-cache-key.outputs.version }}-${{ env.RCMS_CRAN_REPO_KEY }}-${{ hashFiles('scripts/verify_rcmetar_r_default.py', 'docs/verification/RCMetaR-r-dependencies.json', 'r/RCMetaR/DESCRIPTION') }}
+          path: artifacts/r-default-library-cache
+          key: r-default-evidence-v2-${{ matrix.target }}-r-4.6.1-public-ppm-2026-07-16-${{ hashFiles('scripts/install-r-deps.R', 'scripts/r_binary_policy.R', 'scripts/r_dependency_policy.py', 'docs/verification/RCMetaR-r-dependencies.json', 'r/RCMetaR/DESCRIPTION') }}
 
-      - name: Run Fast Verification Lane
-        run: .\scripts\verify-fast.ps1 -Sync -RequireREvidence -StrictTaxonomy
+      - name: Provision macOS native R build libraries
+        if: ${{ matrix.platform == 'macos' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install libpng pkg-config
+          libpng_prefix="$(brew --prefix libpng)"
+          mkdir -p "$HOME/.R"
+          printf 'CPPFLAGS += -I%s/include\nLDFLAGS += -L%s/lib\n' \
+            "$libpng_prefix" "$libpng_prefix" >> "$HOME/.R/Makevars"
+          echo "CPPFLAGS=-I$libpng_prefix/include ${CPPFLAGS:-}" >> "$GITHUB_ENV"
+          echo "LDFLAGS=-L$libpng_prefix/lib ${LDFLAGS:-}" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=$libpng_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" >> "$GITHUB_ENV"
+
+      - name: Provision Default R Evidence on Windows
+        if: ${{ matrix.platform == 'windows' }}
+        shell: powershell
+        run: |
+          uv sync --locked
+          $rscript = (Get-Command Rscript).Source
+          uv run python scripts\verify_rcmetar_r_default.py --rscript $rscript --require-r --require-installed-packages --install-missing --r-library-cache-root artifacts\r-default-library-cache
+
+      - name: Provision Default R Evidence on macOS
+        if: ${{ matrix.platform == 'macos' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv sync --locked
+          uv run python scripts/verify_rcmetar_r_default.py --rscript "$(command -v Rscript)" --require-r --require-installed-packages --install-missing --r-library-cache-root artifacts/r-default-library-cache
+
+      - name: Rebuild and prove macOS rpy2 API bridge against installed R
+        if: ${{ matrix.platform == 'macos' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          export R_HOME="$(R RHOME)"
+          export RPY2_CFFI_MODE=API
+          echo "R_HOME=$R_HOME" >> "$GITHUB_ENV"
+          echo "RPY2_CFFI_MODE=API" >> "$GITHUB_ENV"
+          uv sync --locked --reinstall-package rpy2-rinterface \
+            --no-binary-package rpy2-rinterface
+          bridge="$(uv run python -c 'from pathlib import Path; import _rinterface_cffi_api as module; print(Path(module.__file__).resolve())')"
+          test "$(uv run python -c 'from importlib import metadata; print(metadata.version("rpy2-rinterface"))')" = "3.6.6"
+          test "$(lipo -archs "$bridge")" = "$(uname -m)"
+          test "$(otool -L "$bridge" | awk 'NR > 1 && ($1 ~ /libR[.]dylib$/ || $1 ~ /\/R$/) { count++ } END { print count + 0 }')" = "1"
+          uv run python - <<'PY'
+          from rpy2 import robjects
+          from rpy2.rinterface_lib import openrlib
+
+          if openrlib.cffi_mode.name != "API":
+              raise SystemExit(f"rpy2 loaded {openrlib.cffi_mode.name}, expected API")
+          result = float(robjects.r("sum(c(1.25, 2.5, 3.75))")[0])
+          if result != 7.5:
+              raise SystemExit(f"embedded R calculation returned {result}, expected 7.5")
+          PY
+
+      - name: Cache official Qt rcc package on Windows
+        if: ${{ matrix.platform == 'windows' }}
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: build\qt-rcc
+          key: qt-rcc-6.11.1-windows-x64-7f97edc3937fec7383eb865e010ed5128155bf9c80a563abca450860f3e9bef5
+
+      - name: Cache official Qt SDK on macOS
+        if: ${{ matrix.platform == 'macos' }}
+        id: macos_qt_sdk_cache
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: build/qt-sdk
+          key: qt-sdk-6.11.1-${{ matrix.target }}
+
+      - name: Install official Qt SDK on macOS
+        if: ${{ matrix.platform == 'macos' && steps.macos_qt_sdk_cache.outputs.cache-hit != 'true' }}
+        shell: bash
+        run: uv run aqt install-qt mac desktop 6.11.1 clang_64 --outputdir "$PWD/build/qt-sdk"
+
+      - name: Resolve official Qt rcc on macOS
+        if: ${{ matrix.platform == 'macos' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run python scripts/qt6_macos_feasibility.py resolve-rcc \
+            --sdk-root "$PWD/build/qt-sdk/6.11.1/macos" \
+            --github-env "$GITHUB_ENV" \
+            --diagnostic "build/qt-sdk/${{ matrix.target }}-rcc.json"
+
+      - name: Run source smoke and Fast Verification on Windows
+        if: ${{ matrix.platform == 'windows' }}
+        shell: powershell
+        run: |
+          .\scripts\verify-smoke.ps1 -Sync -RequireREvidence
+          .\scripts\verify-fast.ps1 -StrictTaxonomy -RequireREvidence
+
+      - name: Run source smoke and Fast Verification on macOS
+        if: ${{ matrix.platform == 'macos' }}
+        shell: bash
+        run: |
+          bash ./scripts/verify-smoke.sh --require-r-evidence
+          bash ./scripts/verify-fast.sh --strict-taxonomy --require-r-evidence
 
       - name: Prune uv cache
         if: ${{ always() }}
         run: uv cache prune --ci
+
+  windows-package-qualification:
+    name: Required Windows x64 Package Qualification
+    needs: change-classifier
+    if: ${{ needs.change-classifier.outputs.run-windows-package == 'true' }}
+    uses: ./.github/workflows/package-windows.yml
 
   fast-verification-gate:
-    name: Fast Verification Gate
+    name: Qt6 Integration Verification Gate
     needs:
       - change-classifier
-      - smoke-verification
-      - fast-verification
+      - qt6-verification
+      - source-fast-targets
+      - windows-package-qualification
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -178,21 +307,27 @@ jobs:
         env:
           RUN_WINDOWS: ${{ needs.change-classifier.outputs.run-windows }}
           REASON: ${{ needs.change-classifier.outputs.reason }}
-          SMOKE_RESULT: ${{ needs.smoke-verification.result }}
-          FAST_RESULT: ${{ needs.fast-verification.result }}
+          QT6_RESULT: ${{ needs.qt6-verification.result }}
+          SOURCE_FAST_RESULT: ${{ needs.source-fast-targets.result }}
+          RUN_WINDOWS_PACKAGE: ${{ needs.change-classifier.outputs.run-windows-package }}
+          WINDOWS_PACKAGE_RESULT: ${{ needs.windows-package-qualification.result }}
         run: |
           set -euo pipefail
-          echo "Fast verification classifier: $REASON"
+          echo "Qt6 integration verification classifier: $REASON"
           if [ "$RUN_WINDOWS" != "true" ]; then
-            echo "No fast verification inputs changed; Windows lanes intentionally skipped."
-            exit 0
+            echo "No Qt6 verification inputs changed; Windows lane intentionally skipped."
+          else
+            if [ "$QT6_RESULT" != "success" ]; then
+              echo "Native Qt6 Vertical Slice result: $QT6_RESULT" >&2
+              exit 1
+            fi
+            if [ "$SOURCE_FAST_RESULT" != "success" ]; then
+              echo "Three-target source smoke and Fast Verification result: $SOURCE_FAST_RESULT" >&2
+              exit 1
+            fi
           fi
-          if [ "$SMOKE_RESULT" != "success" ]; then
-            echo "Smoke Verification Lane result: $SMOKE_RESULT" >&2
+          if [ "$RUN_WINDOWS_PACKAGE" = "true" ] && [ "$WINDOWS_PACKAGE_RESULT" != "success" ]; then
+            echo "Required Windows x64 package qualification result: $WINDOWS_PACKAGE_RESULT" >&2
             exit 1
           fi
-          if [ "$FAST_RESULT" != "success" ]; then
-            echo "Fast Verification Lane result: $FAST_RESULT" >&2
-            exit 1
-          fi
-          echo "Fast verification passed."
+          echo "Required classified Qt6 verification passed."

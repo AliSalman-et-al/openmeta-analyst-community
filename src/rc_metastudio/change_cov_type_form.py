@@ -3,8 +3,8 @@ import string
 import math
 from functools import cmp_to_key
 
-from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
-from PyQt5.QtWidgets import QDialog, QMessageBox
+from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
+from PyQt6.QtWidgets import QDialog, QMessageBox
 
 from meta_globals import *
 import app_error_handler
@@ -39,6 +39,7 @@ class ChangeCovTypeForm(QDialog, Ui_ChangeCovTypeForm):
             app_error_handler.safe_slot(self.data_error, parent=self)
         )
         self.cov_prev_table.setModel(self.cov_model)
+        self.cov_prev_table.setTabKeyNavigation(False)
         self.cov_prev_table.resizeColumnsToContents()
         qt_layout.configure_spreadsheet_table_view(self.cov_prev_table)
         adaptive_window.register_adaptive_window(
@@ -170,13 +171,13 @@ class CovModel(QAbstractTableModel):
                 study_list.append(study)
         self.included_studies = study_list
 
-    def data(self, index, role=Qt.DisplayRole):
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
 
         if not index.isValid() or not (0 <= index.row() < len(self.included_studies)):
             return None
 
         orig_cov_val = self.orig_cov_list[index.row()]
-        if role == Qt.DisplayRole:
+        if role == Qt.ItemDataRole.DisplayRole:
             row, column = index.row(), index.column()
             if column == self.STUDY_COL:
                 return self.included_studies[row].name
@@ -188,17 +189,19 @@ class CovModel(QAbstractTableModel):
                 if self.new_covariate.data_type == FACTOR:
                     return _to_native_text(self.new_cov_list[row])
                 return self.new_cov_list[row]
-        elif role == Qt.TextAlignmentRole:
-            return int(Qt.AlignLeft | Qt.AlignVCenter)
+        elif role == Qt.ItemDataRole.TextAlignmentRole:
+            return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         return None
 
-    def rowCount(self, index=QModelIndex()):
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        del parent
         return len(self.included_studies)  # don't show blank study!
 
-    def columnCount(self, index=QModelIndex()):
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        del parent
         return 3  # study, orig_val, new_val
 
-    def setData(self, index, value, role=Qt.EditRole):
+    def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
         # don't allow users to mess with the original
         # covariate.
         if index.isValid() and 0 <= index.row() < len(self.dataset):
@@ -230,15 +233,15 @@ class CovModel(QAbstractTableModel):
 
     def flags(self, index):
         if not index.isValid():
-            return Qt.ItemIsEnabled
-        return Qt.ItemFlags(QAbstractTableModel.flags(self, index) | Qt.ItemIsEditable)
+            return Qt.ItemFlag.ItemIsEnabled
+        return Qt.ItemFlag(QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsEditable)
 
-    def headerData(self, section, orientation, role=Qt.DisplayRole):
-        if role == Qt.TextAlignmentRole:
-            return int(Qt.AlignLeft | Qt.AlignVCenter)
-        if role != Qt.DisplayRole:
+    def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
+        if role == Qt.ItemDataRole.TextAlignmentRole:
+            return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        if role != Qt.ItemDataRole.DisplayRole:
             return None
-        if orientation == Qt.Horizontal:
+        if orientation == Qt.Orientation.Horizontal:
             if section == self.STUDY_COL:
                 return "study"
             elif section == self.ORIG_VAL:

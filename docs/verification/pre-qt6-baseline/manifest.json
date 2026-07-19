@@ -1,0 +1,130 @@
+{
+  "dependency_lock": {
+    "path": "uv.lock",
+    "sha256": "d9b943f24d18fecf8d72dc4fee73856b809dc69f626c6fda9d9400f8090109ed"
+  },
+  "golden_plot_descriptor_contract": {
+    "path": "docs/verification/pre-qt6-baseline/golden-plot-descriptors.json",
+    "sha256": "438bf2e4d4a7bb6e34324a527e7bad94addd0490c8e78e30fa06443df25830f1",
+    "size": 5400
+  },
+  "golden_numeric_contract": {
+    "path": "docs/verification/pre-qt6-baseline/golden-numeric-contract.json",
+    "sha256": "ebefe0f77a2ea04d5541d0d0394895db7ed8cdc24bd6f28b3a3774350e78cbd4",
+    "size": 42290
+  },
+  "observed_golden_analysis_bundle": {
+    "path": "docs/verification/pre-qt6-baseline/observed-golden-baseline.zip",
+    "sha256": "73f0973b0916d202e2d95ad83f3b7ac0622439ecf5501a05b74c9a7c2ae0e938",
+    "size": 7116014
+  },
+  "observed_golden_analysis_summary": {
+    "path": "docs/verification/pre-qt6-baseline/observed-golden-summary.json",
+    "sha256": "0f031829b09fef5ca0ced497a4341fd136f23e94ca492b102427022d639871d5"
+  },
+  "purpose": "Immutable diagnostic oracle for the Native Qt6 Port; not a maintained Qt5 release line.",
+  "qt_port_inventory": {
+    "path": "docs/verification/pre-qt6-baseline/qt-port-inventory.json",
+    "sha256": "b7562715bb732eb1b56ae8bf0f53a12184e26f5f655200f9aa1026a9c9aa12dc"
+  },
+  "rendered_interface_evidence": [
+    {
+      "height": 360,
+      "path": "docs/verification/pre-qt6-baseline/rendered-interface/startup-welcome.png",
+      "platform_plugin": "offscreen",
+      "pyqt": "5.15.11",
+      "qt": "5.15.2",
+      "sha256": "fc3ed2539e0bc0c9cc7ee4a0d226dfaf961b987a68f2de1aa508b02feaab86f8",
+      "source_commit": "e8a21fc3c277e8a8c144413dfa320ea9e68a20e4",
+      "surface": "startup-welcome",
+      "width": 500
+    },
+    {
+      "height": 527,
+      "path": "docs/verification/pre-qt6-baseline/rendered-interface/new-dataset-data-type.png",
+      "platform_plugin": "offscreen",
+      "pyqt": "5.15.11",
+      "qt": "5.15.2",
+      "sha256": "270320396a400e7a87978056c9420b90d39367f1de2b54dd24f67b8cc106f6d6",
+      "source_commit": "e8a21fc3c277e8a8c144413dfa320ea9e68a20e4",
+      "surface": "new-dataset-data-type",
+      "width": 616
+    }
+  ],
+  "rendered_interface_manifest": {
+    "path": "docs/verification/pre-qt6-baseline/rendered-interface-evidence.json",
+    "sha256": "9bd6757b8c9316ff99d126c81b5df73c457c6f0d9c90bfd6d1e09f1ec5d8c5cb"
+  },
+  "reproduce": "uv run python scripts/capture_pre_qt6_baseline.py --check",
+  "retained_evidence": [
+    {
+      "path": "src/rc_metastudio/golden_analysis.py",
+      "role": "Golden Analysis Test expected outputs and capture logic",
+      "sha256": "3bb4bad0dc7a2e868d9fc07a9b180931d8b4e983750ebbae036ed41437d153b5"
+    },
+    {
+      "path": "docs/verification/comprehensive-golden-baseline-manifest.json",
+      "role": "Golden Output Bundle manifest",
+      "sha256": "fea1acf57b3f17e96fb993fb2c2eb1c30654d8f4a2ed2af541ccd31d25ddae7c"
+    },
+    {
+      "path": "docs/verification/golden-coverage-manifest.json",
+      "role": "Golden Analysis Test coverage",
+      "sha256": "4000641b252f480065932d9e1d8607089ed3c9afe693d98bf7d2079592a252dd"
+    },
+    {
+      "path": "docs/verification/gui-verification-evidence.md",
+      "role": "representative interface evidence",
+      "sha256": "d984fca4b88a097b15b1b0783becba62514f3537343c887694f648ae458a187e"
+    },
+    {
+      "path": "docs/verification/adaptive-layout-native-evidence.md",
+      "role": "native interface rendering evidence",
+      "sha256": "c9a97b51b3365432e8125f5aa811682f125c5da8e4c4fc743b47919ecda0af5f"
+    }
+  ],
+  "runtime_identities": {
+    "PyInstaller": "6.21.0",
+    "PyQt5": "5.15.11",
+    "PyQt5-sip": "12.18.0",
+    "Qt5": "5.15.2",
+    "R_ci": "4.6.1",
+    "R_minimum": "4.6.0",
+    "pyinstaller-hooks-contrib": "2026.6",
+    "python": "3.11.9",
+    "rpy2": "3.6.7",
+    "rpy2-rinterface": "3.6.6",
+    "rpy2-robjects": "3.6.5"
+  },
+  "sample_semantic_snapshots": [
+    {
+      "path": "docs/verification/pre-qt6-baseline/sample-projects/amino.rcms.json",
+      "sha256": "626b63a69d5a24030b550d591b190728a4d89ea5fb55863652dc563dc5c8ba39"
+    },
+    {
+      "path": "docs/verification/pre-qt6-baseline/sample-projects/BCG.rcms.json",
+      "sha256": "1d717add044295c1120cb809564fb780da217725921577854e840036ea8093c0"
+    },
+    {
+      "path": "docs/verification/pre-qt6-baseline/sample-projects/continuous.rcms.json",
+      "sha256": "82ba5256b07eb2c999deb55daf7bc73421fc5c539de000c68e1c185eb658f650"
+    },
+    {
+      "path": "docs/verification/pre-qt6-baseline/sample-projects/lymph.rcms.json",
+      "sha256": "6f3c7ccb4df15107f4e52eede5fa28d5c4ad4ff3d76f8603ea6de6f62eb3547d"
+    },
+    {
+      "path": "docs/verification/pre-qt6-baseline/sample-projects/meantime.rcms.json",
+      "sha256": "350d06de17acdd654d35a59d99941bcab9ce22369fa3fa646a0646b1b6831680"
+    }
+  ],
+  "schema_version": 1,
+  "source_commit": "e8a21fc3c277e8a8c144413dfa320ea9e68a20e4",
+  "support_policy": {
+    "diagnostic_only": true,
+    "forward_ci": false,
+    "packaged": false,
+    "supported_runtime": false
+  },
+  "tag": "pre-qt6-baseline"
+}

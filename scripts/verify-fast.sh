@@ -81,6 +81,14 @@ else
   step "Skipping dependency sync for warm local verification"
 fi
 
+qt_build_root="$repo_root/build/qt6-verification"
+step "Generating canonical Qt6 forms and resources"
+uv run python scripts/build_qt6.py generate --build-root "$qt_build_root"
+export RCMS_QT6_BUILD_ROOT="$qt_build_root"
+generated_package="$qt_build_root/generated/rc_metastudio"
+generated_forms="$generated_package/forms"
+export PYTHONPATH="$generated_package:$generated_forms${PYTHONPATH:+:$PYTHONPATH}"
+
 step "Validating Comprehensive Golden Baseline manifests"
 uv run python scripts/validate_golden_baseline_manifests.py
 

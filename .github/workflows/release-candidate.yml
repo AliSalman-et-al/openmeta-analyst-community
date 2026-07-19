@@ -75,11 +75,39 @@ jobs:
           trusted-signing-account-name: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
           certificate-profile-name: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
           files-folder: signed/tree
-          files-folder-filter: exe,dll
+          files-folder-filter: exe,dll,pyd
           files-folder-recurse: true
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
+      - name: Refresh signed Windows R integration derivation
+        if: matrix.target == 'windows-x64'
+        shell: pwsh
+        run: |
+          $derivations = @(Get-ChildItem signed/tree -Recurse -File -Filter derivation.json | Where-Object { $_.Directory.Name -eq 'r-integration-kit' })
+          if ($derivations.Count -ne 1) { throw "Expected one signed R integration-kit derivation, found $($derivations.Count)." }
+          $derivationPath = $derivations[0]
+          $appRoot = $derivationPath.Directory.Parent.FullName
+          $derivation = Get-Content -Raw -LiteralPath $derivationPath.FullName | ConvertFrom-Json
+          $apiBridge = Join-Path $appRoot $derivation.final.api_bridge.path
+          $rSharedLibrary = Join-Path $appRoot $derivation.final.r_shared_library.path
+          function Get-SignedMemberEvidence([string]$native) {
+            $signature = Get-AuthenticodeSignature -LiteralPath $native
+            if ($signature.Status -ne 'Valid' -or -not $signature.SignerCertificate -or -not $signature.TimeStamperCertificate) { throw "Azure Artifact Signing did not produce a valid timestamped signature: $native" }
+            return [ordered]@{
+              path = [IO.Path]::GetRelativePath($appRoot, $native).Replace('\','/')
+              sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $native).Hash.ToLowerInvariant()
+              status = $signature.Status.ToString()
+              signer_subject = $signature.SignerCertificate.Subject
+              signer_thumbprint = $signature.SignerCertificate.Thumbprint.ToLowerInvariant()
+              timestamp_subject = $signature.TimeStamperCertificate.Subject
+              timestamp_thumbprint = $signature.TimeStamperCertificate.Thumbprint.ToLowerInvariant()
+            }
+          }
+          $signingEvidence = Join-Path $env:RUNNER_TEMP 'windows-r-signing-evidence.json'
+          [ordered]@{ schema_version = 1; members = [ordered]@{ api_bridge = Get-SignedMemberEvidence $apiBridge; r_shared_library = Get-SignedMemberEvidence $rSharedLibrary } } | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 -LiteralPath $signingEvidence
+          uv run --no-project --offline --python 3.11.9 python scripts/r_kit_derivation.py finalize --app-root $appRoot --api-bridge $apiBridge --r-shared-library $rSharedLibrary --derivation $derivationPath.FullName --signing-evidence $signingEvidence --require-signed
+          if ($LASTEXITCODE -ne 0) { throw "Signed Windows R derivation refresh failed." }
       - name: Verify and archive Windows signed bytes
         if: matrix.target == 'windows-x64'
         shell: pwsh
@@ -163,11 +191,15 @@ jobs:
           if (-not $assembled) { throw "Missing assembled stage result." }
           Copy-Item -LiteralPath $assembled.FullName -Destination "signed/records/$env:TARGET.assembled.json"
           $input = uv run python scripts/delivery.py digest --json $assembled.FullName
-          uv run python scripts/delivery.py stage-result --target "$env:TARGET" --stage signed --commit "$env:SOURCE_SHA" --input-digest "$input" --output-file "signed/$env:ARTIFACT" --result "signed/records/$env:TARGET.signed.json"
+          if ($env:TARGET -eq 'macos-x64') {
+            uv run python scripts/delivery.py stage-result --target "$env:TARGET" --stage signed --commit "$env:SOURCE_SHA" --input-digest "$input" --output-file "signed/$env:ARTIFACT" --output-file "signed/$env:ARTIFACT.signing-inventory.json" --result "signed/records/$env:TARGET.signed.json"
+          } else {
+            uv run python scripts/delivery.py stage-result --target "$env:TARGET" --stage signed --commit "$env:SOURCE_SHA" --input-digest "$input" --output-file "signed/$env:ARTIFACT" --result "signed/records/$env:TARGET.signed.json"
+          }
           $previous = "signed/records/$env:TARGET.signed.json"
           if ($env:TARGET -eq 'macos-x64') {
             $input = uv run python scripts/delivery.py digest --json $previous
-            uv run python scripts/delivery.py stage-result --target "$env:TARGET" --stage notarized --commit "$env:SOURCE_SHA" --input-digest "$input" --output-file "signed/$env:ARTIFACT" --result "signed/records/$env:TARGET.notarized.json"
+            uv run python scripts/delivery.py stage-result --target "$env:TARGET" --stage notarized --commit "$env:SOURCE_SHA" --input-digest "$input" --output-file "signed/$env:ARTIFACT" --output-file "signed/$env:ARTIFACT.signing-inventory.json" --result "signed/records/$env:TARGET.notarized.json"
             $previous = "signed/records/$env:TARGET.notarized.json"
           }
           $input = uv run python scripts/delivery.py digest --json $previous
@@ -261,9 +293,10 @@ jobs:
           python scripts/delivery.py promote --manifest "$manifest" --from-channel candidate --channel rc --output release/release-set-rc.json
           cp release/targets/attested-windows-x64/RCMetaStudio-windows-x64.zip release/
           cp release/targets/attested-macos-x64/RCMetaStudio-macos-x64.zip release/
+          cp release/targets/attested-macos-x64/RCMetaStudio-macos-x64.zip.signing-inventory.json release/
           cp release/targets/attested-windows-x64/windows-x64.cdx.json release/
           cp release/targets/attested-macos-x64/macos-x64.cdx.json release/
-          python scripts/delivery.py checksums --files release/RCMetaStudio-windows-x64.zip --files release/RCMetaStudio-macos-x64.zip --files release/windows-x64.cdx.json --files release/macos-x64.cdx.json --output release/SHA256SUMS
+          python scripts/delivery.py checksums --files release/RCMetaStudio-windows-x64.zip --files release/RCMetaStudio-macos-x64.zip --files release/RCMetaStudio-macos-x64.zip.signing-inventory.json --files release/windows-x64.cdx.json --files release/macos-x64.cdx.json --output release/SHA256SUMS
       - name: Publish immutable RC
         env:
           GH_TOKEN: ${{ github.token }}
@@ -278,4 +311,4 @@ jobs:
           else
             tag_args=(--target "${{ inputs.source_sha }}")
           fi
-          gh release create "$TAG" release/RCMetaStudio-*.zip release/*.cdx.json release/SHA256SUMS release/release-set-rc.json "${tag_args[@]}" --prerelease --title "RC MetaStudio ${{ inputs.version }}" --notes "Immutable signed release candidate. Verify SHA256SUMS and GitHub artifact attestations before promotion."
+          gh release create "$TAG" release/RCMetaStudio-*.zip release/*.signing-inventory.json release/*.cdx.json release/SHA256SUMS release/release-set-rc.json "${tag_args[@]}" --prerelease --title "RC MetaStudio ${{ inputs.version }}" --notes "Immutable signed release candidate. Verify SHA256SUMS and GitHub artifact attestations before promotion."

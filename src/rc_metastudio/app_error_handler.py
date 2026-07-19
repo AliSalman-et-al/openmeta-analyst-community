@@ -2,10 +2,10 @@ import os
 import inspect
 import sys
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone
 
-from PyQt5.QtCore import QEvent, Qt
-from PyQt5.QtWidgets import QApplication, QMenu, QMessageBox
+from PyQt6.QtCore import QEvent, QObject, Qt
+from PyQt6.QtWidgets import QApplication, QMenu, QMessageBox
 
 import settings
 
@@ -23,10 +23,9 @@ _active_context_menu = None
 
 def enable_qt_native_high_dpi():
     """Enable Qt's logical-pixel scaling before constructing an application."""
-    if QApplication.instance() is not None:
-        return
-    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
-    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+    # Qt 6 enables high-DPI scaling and pixmaps natively.  This retained entry
+    # point intentionally has no Qt 5 application attributes to toggle.
+    return None
 
 
 enable_qt_native_high_dpi()
@@ -40,7 +39,7 @@ def exception_log_path():
 
 def log_exception(exc_type, exc_value, exc_traceback):
     path = exception_log_path()
-    timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     with open(path, "a", encoding="utf-8") as log_file:
         log_file.write("\n[%s] Unhandled exception\n" % timestamp)
         traceback.print_exception(exc_type, exc_value, exc_traceback, file=log_file)
@@ -219,7 +218,7 @@ def popup_context_menu(menu, pos, parent=None, event=None):
 
 
 def should_suppress_context_menu_event(event):
-    return event.type() == QEvent.ContextMenu and is_context_menu_active()
+    return event.type() == QEvent.Type.ContextMenu and is_context_menu_active()
 
 
 def _resolve_parent(parent):
@@ -232,9 +231,11 @@ def _resolve_parent(parent):
 
 
 class SafeApplication(QApplication):
-    def notify(self, receiver, event):
+    def notify(  # ty: ignore[invalid-method-override] -- PyQt6 exposes conflicting QApplication notify stubs across QtCore and QtWidgets.
+        self, receiver: QObject | None, event: QEvent | None
+    ) -> bool:
         try:
-            if should_suppress_context_menu_event(event):
+            if event is not None and should_suppress_context_menu_event(event):
                 event.accept()
                 return True
             return super(SafeApplication, self).notify(receiver, event)

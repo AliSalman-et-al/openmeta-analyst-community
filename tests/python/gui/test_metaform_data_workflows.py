@@ -7,13 +7,14 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, os.path.abspath("src"))
 
 import pytest
+from PyQt6.QtWidgets import QDialog
 
 
 REPO_ROOT = os.getcwd()
 
 
 def test_data_table_return_moves_vertically_from_selected_cells():
-    from PyQt5 import QtCore, QtTest
+    from PyQt6 import QtCore, QtTest
 
     import launch
 
@@ -24,20 +25,20 @@ def test_data_table_return_moves_vertically_from_selected_cells():
         model = window.model
 
         table.setCurrentIndex(model.index(0, model.NAME))
-        QtTest.QTest.keyClick(table, QtCore.Qt.Key_Return)
+        QtTest.QTest.keyClick(table, QtCore.Qt.Key.Key_Return)
         assert table.currentIndex() == model.index(1, model.NAME)
 
-        QtTest.QTest.keyClick(table, QtCore.Qt.Key_Enter)
+        QtTest.QTest.keyClick(table, QtCore.Qt.Key.Key_Enter)
         assert table.currentIndex() == model.index(2, model.NAME)
 
-        QtTest.QTest.keyClick(table, QtCore.Qt.Key_Return, QtCore.Qt.ShiftModifier)
+        QtTest.QTest.keyClick(table, QtCore.Qt.Key.Key_Return, QtCore.Qt.KeyboardModifier.ShiftModifier)
         assert table.currentIndex() == model.index(1, model.NAME)
     finally:
         _close_without_prompt(app, window)
 
 
 def test_data_table_return_commits_editor_and_moves_down_same_column():
-    from PyQt5 import QtCore, QtTest, QtWidgets
+    from PyQt6 import QtCore, QtTest, QtWidgets
 
     import launch
 
@@ -54,7 +55,7 @@ def test_data_table_return_commits_editor_and_moves_down_same_column():
         assert editor is not None
 
         editor.setText("Alpha")
-        QtTest.QTest.keyClick(editor, QtCore.Qt.Key_Return)
+        QtTest.QTest.keyClick(editor, QtCore.Qt.Key.Key_Return)
         app.processEvents()
 
         assert _cell_text(model, 0, model.NAME) == "Alpha"
@@ -64,7 +65,7 @@ def test_data_table_return_commits_editor_and_moves_down_same_column():
 
 
 def test_data_table_ctrl_a_selects_all_cells_without_running_analysis(monkeypatch):
-    from PyQt5 import QtCore, QtTest
+    from PyQt6 import QtCore, QtTest
 
     import launch
 
@@ -81,7 +82,7 @@ def test_data_table_ctrl_a_selects_all_cells_without_running_analysis(monkeypatc
         table.setFocus()
         table.setCurrentIndex(model.index(0, model.NAME))
 
-        QtTest.QTest.keyClick(table, QtCore.Qt.Key_A, QtCore.Qt.ControlModifier)
+        QtTest.QTest.keyClick(table, QtCore.Qt.Key.Key_A, QtCore.Qt.KeyboardModifier.ControlModifier)
         app.processEvents()
 
         assert analysis_calls == []
@@ -93,7 +94,7 @@ def test_data_table_ctrl_a_selects_all_cells_without_running_analysis(monkeypatc
 
 
 def test_data_table_delete_and_backspace_clear_selected_cells(monkeypatch):
-    from PyQt5 import QtCore, QtTest
+    from PyQt6 import QtCore, QtTest
 
     import launch
     import ma_data_table_model
@@ -124,7 +125,7 @@ def test_data_table_delete_and_backspace_clear_selected_cells(monkeypatch):
 
         table.setFocus()
         table.setCurrentIndex(model.index(0, model.RAW_DATA[0]))
-        QtTest.QTest.keyClick(table, QtCore.Qt.Key_Delete)
+        QtTest.QTest.keyClick(table, QtCore.Qt.Key.Key_Delete)
         app.processEvents()
 
         assert _cell_text(model, 0, model.RAW_DATA[0]) == ""
@@ -134,7 +135,7 @@ def test_data_table_delete_and_backspace_clear_selected_cells(monkeypatch):
         assert _cell_text(model, 0, model.RAW_DATA[0]) == "41.0"
 
         table.setCurrentIndex(model.index(0, model.RAW_DATA[0]))
-        QtTest.QTest.keyClick(table, QtCore.Qt.Key_Backspace)
+        QtTest.QTest.keyClick(table, QtCore.Qt.Key.Key_Backspace)
         app.processEvents()
 
         assert _cell_text(model, 0, model.RAW_DATA[0]) == ""
@@ -181,6 +182,409 @@ def test_real_metaform_creates_binary_continuous_and_diagnostic_datasets():
                 assert window.model.current_effect == effect
         finally:
             _close_without_prompt(app, window)
+
+
+@pytest.mark.parametrize("count", ["7.0", "7,0"])
+def test_binary_calculator_accept_cancel_and_project_round_trip(
+    monkeypatch, tmp_path, count
+):
+    from PyQt6 import QtCore, QtWidgets
+
+    import launch
+    import binary_data_form
+    import ma_data_table_model
+
+    app, window = launch.start_automation()
+    try:
+        warnings = []
+        monkeypatch.setattr(
+            binary_data_form.QMessageBox,
+            "warning",
+            lambda *args: warnings.append(args),
+        )
+        monkeypatch.setattr(
+            binary_data_form.meta_py_r,
+            "get_mult_from_r",
+            lambda confidence: 1.96,
+        )
+        monkeypatch.setattr(
+            binary_data_form.meta_py_r,
+            "effect_for_study",
+            lambda *args, **kwargs: {"calc_scale": (1.2, 0.8, 1.8)},
+        )
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "effect_for_study",
+            lambda *args, **kwargs: {"calc_scale": (1.2, 0.8, 1.8)},
+        )
+        monkeypatch.setattr(
+            binary_data_form.meta_py_r,
+            "binary_convert_scale",
+            lambda value, *args, **kwargs: value,
+        )
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "binary_convert_scale",
+            lambda value, *args, **kwargs: value,
+        )
+        monkeypatch.setattr(
+            binary_data_form.meta_py_r,
+            "impute_bin_data",
+            lambda data: {"FAIL": True},
+        )
+        monkeypatch.setattr(
+            binary_data_form.meta_py_r,
+            "effect_triplet",
+            lambda result, scale, metric=None: result[scale],
+        )
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "effect_triplet",
+            lambda result, scale, metric=None: result[scale],
+        )
+        _create_binary_dataset(window)
+        model = window.model
+        table = window.tableView
+        table.set_data_in_model(model.index(0, model.NAME), _variant("Alpha"))
+        for offset, value in enumerate(("6", "21", "9", "18")):
+            table.set_data_in_model(model.index(0, model.RAW_DATA[offset]), value)
+
+        opened_dialogs = []
+        callback_errors = []
+
+        def accept_edit():
+            dialog = QtWidgets.QApplication.activeModalWidget()
+            opened_dialogs.append(dialog)
+            try:
+                dialog.raw_data_table.setCurrentCell(0, 0)
+                dialog.raw_data_table.item(0, 0).setText(count)
+                dialog.accept()
+            except Exception as error:
+                callback_errors.append(error)
+                if isinstance(dialog, QtWidgets.QDialog):
+                    dialog.reject()
+
+        QtCore.QTimer.singleShot(0, accept_edit)
+        table.row_header_clicked(0)
+        assert callback_errors == []
+        assert warnings == []
+        assert isinstance(opened_dialogs[-1], binary_data_form.BinaryDataForm2)
+        committed = model.get_current_ma_unit_for_study(0)
+        assert committed.get_raw_data_for_group(model.current_txs[0]) == [7, 22]
+
+        def reject_edit():
+            dialog = QtWidgets.QApplication.activeModalWidget()
+            opened_dialogs.append(dialog)
+            try:
+                dialog.raw_data_table.setCurrentCell(0, 0)
+                dialog.raw_data_table.item(0, 0).setText("8")
+                dialog.reject()
+            except Exception as error:
+                callback_errors.append(error)
+                if isinstance(dialog, QtWidgets.QDialog):
+                    dialog.reject()
+
+        QtCore.QTimer.singleShot(0, reject_edit)
+        table.row_header_clicked(0)
+        assert callback_errors == []
+        unchanged = model.get_current_ma_unit_for_study(0)
+        assert unchanged.get_raw_data_for_group(model.current_txs[0]) == [7, 22]
+
+        saved_path = str(
+            tmp_path / ("binary-" + count.replace(",", "c") + "-round-trip.rcms")
+        )
+        meta_form = sys.modules["meta_form"]
+        monkeypatch.setattr(
+            meta_form.QFileDialog,
+            "getSaveFileName",
+            lambda **kwargs: (saved_path, ""),
+        )
+        assert window.save_as() is True
+        assert window.open(file_path=saved_path) is True
+        reopened = window.model.get_current_ma_unit_for_study(0)
+        assert reopened.get_raw_data_for_group(window.model.current_txs[0]) == [7, 22]
+    finally:
+        _close_without_prompt(app, window)
+
+
+@pytest.mark.parametrize("decimal", ["95.5", "95,5"])
+def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
+    monkeypatch, tmp_path, decimal
+):
+    from PyQt6 import QtCore, QtWidgets
+
+    import launch
+    import continuous_data_form
+    import ma_data_table_model
+
+    app, window = launch.start_automation()
+    r_payloads = []
+    warnings = []
+    try:
+        monkeypatch.setattr(
+            continuous_data_form.QMessageBox,
+            "warning",
+            lambda *args: warnings.append(args[2]),
+        )
+        monkeypatch.setattr(
+            continuous_data_form.meta_py_r, "get_mult_from_r", lambda _level: 1.96
+        )
+        monkeypatch.setattr(
+            continuous_data_form.meta_py_r,
+            "continuous_convert_scale",
+            lambda value, *args, **kwargs: value,
+        )
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "continuous_convert_scale",
+            lambda value, *args, **kwargs: value,
+        )
+
+        def impute(payload, alpha):
+            r_payloads.append(dict(payload))
+            return {"succeeded": False, "comment": "complete input"}
+
+        monkeypatch.setattr(
+            continuous_data_form.meta_py_r, "impute_cont_data", impute
+        )
+        monkeypatch.setattr(
+            continuous_data_form.meta_py_r,
+            "continuous_effect_for_study",
+            lambda *args, **kwargs: {"calc_scale": (1.5, 1.0, 2.0)},
+        )
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "continuous_effect_for_study",
+            lambda *args, **kwargs: {"calc_scale": (1.5, 1.0, 2.0)},
+        )
+        monkeypatch.setattr(
+            continuous_data_form.meta_py_r,
+            "effect_triplet",
+            lambda result, scale, metric=None: result[scale],
+        )
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "effect_triplet",
+            lambda result, scale, metric=None: result[scale],
+        )
+        monkeypatch.setattr(
+            continuous_data_form.meta_py_r,
+            "back_calc_cont_data",
+            lambda *args, **kwargs: {"FAIL": True},
+        )
+        _create_continuous_dataset(window)
+        model = window.model
+        table = window.tableView
+        unit = model.get_current_ma_unit_for_study(0)
+        unit.get_raw_data_for_group(model.current_txs[0])[:] = [10, 94, 2]
+        unit.get_raw_data_for_group(model.current_txs[1])[:] = [12, 90, 3]
+        table.undoStack.clear()
+        table.undoStack.setClean()
+        window.current_data_unsaved = False
+
+        callback_errors = []
+
+        def accept_edit():
+            dialog = QtWidgets.QApplication.activeModalWidget()
+            try:
+                dialog.simple_table.setCurrentCell(0, 1)
+                dialog.simple_table.item(0, 1).setText(decimal)
+                dialog.accept()
+            except Exception as error:
+                callback_errors.append(error)
+                dialog.reject()
+
+        QtCore.QTimer.singleShot(0, accept_edit)
+        table.row_header_clicked(0)
+        assert callback_errors == []
+        assert warnings == []
+        committed = model.get_current_ma_unit_for_study(0)
+        assert committed.get_raw_data_for_group(model.current_txs[0]) == [
+            10.0,
+            95.5,
+            2.0,
+        ]
+        assert any(payload.get("mean") == 95.5 for payload in r_payloads)
+        assert table.undoStack.count() == 1
+        assert window.current_data_unsaved is True
+
+        window.undo()
+        assert model.get_current_ma_unit_for_study(0).get_raw_data_for_group(
+            model.current_txs[0]
+        ) == [10, 94, 2]
+        assert window.current_data_unsaved is False
+        window.redo()
+        assert window.current_data_unsaved is True
+
+        undo_count = table.undoStack.count()
+        before_invalid = copy.deepcopy(model.get_current_ma_unit_for_study(0))
+
+        def reject_invalid_edit():
+            dialog = QtWidgets.QApplication.activeModalWidget()
+            dialog.simple_table.setCurrentCell(0, 0)
+            dialog.simple_table.item(0, 0).setText("10,5")
+            dialog.reject()
+
+        QtCore.QTimer.singleShot(0, reject_invalid_edit)
+        table.row_header_clicked(0)
+        assert warnings[-1] == "N must be a non-negative whole number."
+        assert table.undoStack.count() == undo_count
+        assert model.get_current_ma_unit_for_study(0).get_raw_data_for_groups(
+            model.current_txs
+        ) == before_invalid.get_raw_data_for_groups(model.current_txs)
+
+        saved_path = str(tmp_path / ("continuous-" + decimal.replace(",", "c") + ".rcms"))
+        meta_form = sys.modules["meta_form"]
+        monkeypatch.setattr(
+            meta_form.QFileDialog,
+            "getSaveFileName",
+            lambda **kwargs: (saved_path, ""),
+        )
+        assert window.save_as() is True
+        assert window.open(file_path=saved_path) is True
+        reopened = window.model.get_current_ma_unit_for_study(0)
+        assert reopened.get_raw_data_for_group(window.model.current_txs[0]) == [
+            10.0,
+            95.5,
+            2.0,
+        ]
+    finally:
+        _close_without_prompt(app, window)
+
+
+@pytest.mark.parametrize("count", ["13.0", "13,0"])
+def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
+    monkeypatch, tmp_path, count
+):
+    from PyQt6 import QtCore, QtWidgets
+
+    import launch
+    import diagnostic_data_form
+    import ma_data_table_model
+
+    app, window = launch.start_automation()
+    r_payloads = []
+    warnings = []
+    try:
+        monkeypatch.setattr(
+            diagnostic_data_form.QMessageBox,
+            "warning",
+            lambda *args: warnings.append(args[2]),
+        )
+        monkeypatch.setattr(
+            diagnostic_data_form.meta_py_r, "get_mult_from_r", lambda _level: 1.96
+        )
+        monkeypatch.setattr(
+            diagnostic_data_form.meta_py_r,
+            "diagnostic_convert_scale",
+            lambda value, *args, **kwargs: value,
+        )
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "diagnostic_convert_scale",
+            lambda value, *args, **kwargs: value,
+        )
+
+        def impute(payload):
+            r_payloads.append(dict(payload))
+            return {"TP": None, "FP": None, "FN": None, "TN": None}
+
+        monkeypatch.setattr(
+            diagnostic_data_form.meta_py_r, "impute_diag_data", impute
+        )
+        monkeypatch.setattr(
+            diagnostic_data_form.meta_py_r,
+            "diagnostic_effects_for_study",
+            lambda *args, metrics, **kwargs: {
+                metric: {"calc_scale": (0.8, 0.7, 0.9)} for metric in metrics
+            },
+        )
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "diagnostic_effects_for_study",
+            lambda *args, metrics, **kwargs: {
+                metric: {"calc_scale": (0.8, 0.7, 0.9)} for metric in metrics
+            },
+        )
+        monkeypatch.setattr(
+            diagnostic_data_form.meta_py_r,
+            "effect_triplet",
+            lambda result, scale, metric=None: result[scale],
+        )
+        monkeypatch.setattr(
+            ma_data_table_model.meta_py_r,
+            "effect_triplet",
+            lambda result, scale, metric=None: result[scale],
+        )
+        _create_diagnostic_dataset(window)
+        model = window.model
+        table = window.tableView
+        unit = model.get_current_ma_unit_for_study(0)
+        unit.get_raw_data_for_group(model.current_txs[0])[:] = [12, 3, 4, 21]
+        table.undoStack.clear()
+        table.undoStack.setClean()
+        window.current_data_unsaved = False
+
+        def accept_edit():
+            dialog = QtWidgets.QApplication.activeModalWidget()
+            dialog.two_by_two_table.setCurrentCell(0, 0)
+            dialog.two_by_two_table.item(0, 0).setText(count)
+            dialog.accept()
+
+        QtCore.QTimer.singleShot(0, accept_edit)
+        table.row_header_clicked(0)
+        committed = model.get_current_ma_unit_for_study(0)
+        assert committed.get_raw_data_for_group(model.current_txs[0]) == [
+            13.0,
+            3.0,
+            4.0,
+            21.0,
+        ]
+        assert any(payload.get("TP") == 13 for payload in r_payloads)
+        assert table.undoStack.count() == 1
+        assert window.current_data_unsaved is True
+
+        window.undo()
+        assert model.get_current_ma_unit_for_study(0).get_raw_data_for_group(
+            model.current_txs[0]
+        ) == [12, 3, 4, 21]
+        assert window.current_data_unsaved is False
+        window.redo()
+
+        undo_count = table.undoStack.count()
+
+        def reject_invalid_edit():
+            dialog = QtWidgets.QApplication.activeModalWidget()
+            dialog.two_by_two_table.setCurrentCell(0, 0)
+            dialog.two_by_two_table.item(0, 0).setText("13,5")
+            dialog.reject()
+
+        QtCore.QTimer.singleShot(0, reject_invalid_edit)
+        table.row_header_clicked(0)
+        assert "whole number" in warnings[-1]
+        assert table.undoStack.count() == undo_count
+        assert model.get_current_ma_unit_for_study(0).get_raw_data_for_group(
+            model.current_txs[0]
+        ) == [13.0, 3.0, 4.0, 21.0]
+
+        saved_path = str(tmp_path / ("diagnostic-" + count.replace(",", "c") + ".rcms"))
+        meta_form = sys.modules["meta_form"]
+        monkeypatch.setattr(
+            meta_form.QFileDialog,
+            "getSaveFileName",
+            lambda **kwargs: (saved_path, ""),
+        )
+        assert window.save_as() is True
+        assert window.open(file_path=saved_path) is True
+        reopened = window.model.get_current_ma_unit_for_study(0)
+        assert reopened.get_raw_data_for_group(window.model.current_txs[0]) == [
+            13.0,
+            3.0,
+            4.0,
+            21.0,
+        ]
+    finally:
+        _close_without_prompt(app, window)
 
 
 @pytest.mark.parametrize(
@@ -320,13 +724,26 @@ def test_data_table_editing_preserves_project_state_and_round_trips(
         model.add_new_outcome("Readmission", "binary", "proportions")
         model.add_follow_up_to_current_outcome("week 4")
         model.add_covariate("Dose", "continuous", {"Alpha": 5.5})
+        model.set_current_groups(["tx B", "Tx C"])
+        model.set_conf_level(90.0)
 
         meta_form = sys.modules["meta_form"]
+        critical_messages = []
         monkeypatch.setattr(
             meta_form.QFileDialog, "getSaveFileName", lambda **kwargs: (saved_path, "")
         )
-        window.save_as()
-        reopened = meta_form._load_project_pickle(saved_path)
+        monkeypatch.setattr(
+            meta_form.QMessageBox,
+            "critical",
+            lambda *args, **kwargs: critical_messages.append(args),
+        )
+        assert window.save_as() is True
+        assert critical_messages == []
+
+        # Exercise the real project install boundary so both the normalized
+        # dataset and project-scoped workspace selection are covered.
+        assert window.open(file_path=saved_path) is True
+        reopened = window.model.dataset
 
         assert [
             (str(study.name), str(study.year)) for study in reopened.studies[:1]
@@ -338,11 +755,18 @@ def test_data_table_editing_preserves_project_state_and_round_trips(
             ("Dose", 1)
         ]
         assert reopened.studies[0].covariate_dict["Dose"] == 5.5
+        assert window.model.current_outcome == "Mortality"
+        assert window.model.get_current_follow_up_name() == "first"
+        assert window.model.current_txs == ["tx B", "Tx C"]
+        assert window.model.current_effect == "OR"
+        assert window.model.get_global_conf_level() == 90.0
+        assert window.current_data_unsaved is False
+        assert window.tableView.undoStack.isClean()
     finally:
         _close_without_prompt(app, window)
 
 
-def test_copy_paste_undo_and_redo_work_through_real_table_path():
+def test_copy_paste_undo_and_redo_work_through_real_table_path(tmp_path):
     import launch
 
     app, window = launch.start_automation()
@@ -363,17 +787,247 @@ def test_copy_paste_undo_and_redo_work_through_real_table_path():
         assert copied == "1.0\t10.0\t2.0\t12.0"
 
         table.set_data_in_model(model.index(1, model.NAME), _variant("Beta"))
-        table.paste_from_clipboard(model.index(1, model.RAW_DATA[0]))
+        paste_origin = model.index(1, model.RAW_DATA[0])
+        table.setCurrentIndex(paste_origin)
+        table.selectRow(1)
+        table.undoStack.clear()
+        table.undoStack.setClean()
+        window.current_data_unsaved = False
+        table.paste_from_clipboard(paste_origin)
         assert _cell_text(model, 1, model.NAME) == "Beta"
         assert _cell_text(model, 1, model.RAW_DATA[-1]) == "12.0"
+        assert window.current_data_unsaved is True
+        assert table.currentIndex() == paste_origin
 
         window.undo()
         assert _cell_text(window.model, 1, window.model.NAME) == "Beta"
         assert _cell_text(window.model, 1, window.model.RAW_DATA[-1]) == ""
+        assert window.current_data_unsaved is False
+        assert table.currentIndex() == window.model.index(1, window.model.RAW_DATA[0])
 
         window.redo()
         assert _cell_text(window.model, 1, window.model.NAME) == "Beta"
         assert _cell_text(window.model, 1, window.model.RAW_DATA[-1]) == "12.0"
+        assert window.current_data_unsaved is True
+        assert table.currentIndex() == window.model.index(1, window.model.RAW_DATA[0])
+
+        window.out_path = str(tmp_path / "workspace-edits.rcms")
+        assert window.save() is True
+        assert window.current_data_unsaved is False
+
+        window.undo()
+        assert window.current_data_unsaved is True
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_clipboard_preserves_platform_newlines_unicode_blanks_and_comma_decimals():
+    from PyQt6.QtWidgets import QApplication
+
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        model = window.model
+        table = window.tableView
+        QApplication.clipboard().setText(
+            "Étude Ω\t2020\t1\t10\t\t12\r\nBeta\t2021\t2\t20\t3\t30\r\n"
+        )
+
+        table.paste_from_clipboard(model.index(0, model.NAME))
+
+        assert _cell_text(model, 0, model.NAME) == "Étude Ω"
+        assert _cell_text(model, 1, model.NAME) == "Beta"
+        assert _cell_text(model, 0, model.RAW_DATA[2]) == ""
+        assert _cell_text(model, 1, model.RAW_DATA[-1]) == "30.0"
+
+        model.add_covariate("Dose", "continuous", {"Étude Ω": None, "Beta": None})
+        table.synchronize_column_widths()
+        comma_decimal = model.index(0, model.columnCount() - 1)
+        QApplication.clipboard().setText("1,25\r\n")
+        table.paste_from_clipboard(comma_decimal)
+
+        assert model.dataset.studies[0].covariate_dict["Dose"] == 1.25
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_invalid_clipboard_paste_is_rejected_before_mutation_or_undo(monkeypatch):
+    from PyQt6.QtWidgets import QApplication
+
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        model = window.model
+        table = window.tableView
+        table.set_data_in_model(model.index(0, model.NAME), _variant("Alpha"))
+        table.undoStack.clear()
+        table.undoStack.setClean()
+        window.current_data_unsaved = False
+        warnings = []
+        monkeypatch.setattr(
+            sys.modules["meta_form"].QMessageBox,
+            "warning",
+            lambda *args, **kwargs: warnings.append(args),
+        )
+        QApplication.clipboard().setText("1\tnot numeric")
+
+        assert table.paste_from_clipboard(model.index(0, model.RAW_DATA[0])) is False
+
+        assert [_cell_text(model, 0, column) for column in model.RAW_DATA] == [
+            "",
+            "",
+            "",
+            "",
+        ]
+        assert table.undoStack.count() == 0
+        assert table.undoStack.isClean()
+        assert window.current_data_unsaved is False
+        assert warnings[-1][1:] == ("Warning", "Raw data needs to be numeric.")
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_clipboard_paste_rolls_back_if_commit_fails_after_preflight(monkeypatch):
+    from PyQt6.QtWidgets import QApplication
+
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        model = window.model
+        table = window.tableView
+        table.undoStack.clear()
+        table.undoStack.setClean()
+        window.current_data_unsaved = False
+        warnings = []
+        monkeypatch.setattr(
+            sys.modules["meta_form"].QMessageBox,
+            "warning",
+            lambda *args, **kwargs: warnings.append(args),
+        )
+        monkeypatch.setattr(model, "setData", lambda *args, **kwargs: False)
+        model.last_data_error = "Simulated commit failure."
+        QApplication.clipboard().setText("Alpha")
+
+        assert table.paste_from_clipboard(model.index(0, model.NAME)) is False
+
+        assert _cell_text(window.model, 0, window.model.NAME) == ""
+        assert table.undoStack.count() == 0
+        assert table.undoStack.isClean()
+        assert window.current_data_unsaved is False
+        assert warnings[-1][1:] == ("Warning", "Simulated commit failure.")
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_multirow_paste_rolls_back_studies_added_before_commit_failure(monkeypatch):
+    from PyQt6.QtCore import QItemSelectionModel
+    from PyQt6.QtWidgets import QApplication
+
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        model = window.model
+        table = window.tableView
+        origin = model.index(0, model.NAME)
+        table.setCurrentIndex(origin)
+        table.selectionModel().select(
+            origin, QItemSelectionModel.SelectionFlag.Select
+        )
+        original_count = len(model.dataset.studies)
+        original_names = [study.name for study in model.dataset.studies]
+        table.undoStack.clear()
+        table.undoStack.setClean()
+        window.current_data_unsaved = False
+        warnings = []
+        monkeypatch.setattr(
+            sys.modules["meta_form"].QMessageBox,
+            "warning",
+            lambda *args, **kwargs: warnings.append(args),
+        )
+        real_set_data = model.setData
+        calls = 0
+
+        def fail_after_first_write(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                model.last_data_error = "Simulated post-growth commit failure."
+                return False
+            return real_set_data(*args, **kwargs)
+
+        monkeypatch.setattr(model, "setData", fail_after_first_write)
+        QApplication.clipboard().setText("Alpha\r\nBeta\r\nGamma")
+
+        assert table.paste_from_clipboard(origin) is False
+
+        assert calls == 2
+        assert len(window.model.dataset.studies) == original_count
+        assert [study.name for study in window.model.dataset.studies] == original_names
+        assert table.undoStack.count() == 0
+        assert table.undoStack.isClean()
+        assert window.current_data_unsaved is False
+        assert table.currentIndex() == window.model.index(0, window.model.NAME)
+        assert [
+            (index.row(), index.column())
+            for index in table.selectionModel().selectedIndexes()
+        ] == [(0, window.model.NAME)]
+        assert warnings[-1][1:] == (
+            "Warning",
+            "Simulated post-growth commit failure.",
+        )
+    finally:
+        _close_without_prompt(app, window)
+
+
+def test_inclusion_edit_undo_redo_restores_semantics_selection_and_dirty_state():
+    from PyQt6.QtCore import Qt
+
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        _create_binary_dataset(window)
+        model = window.model
+        table = window.tableView
+        table.paste_contents(
+            model.index(0, model.NAME), [["Alpha", "2020", "1", "10", "2", "12"]]
+        )
+        inclusion = model.index(0, model.INCLUDE_STUDY)
+        model.dataset.studies[0].include = False
+        model.dataset.studies[0].manually_excluded = False
+        table.setCurrentIndex(inclusion)
+        table.selectRow(0)
+        table.undoStack.clear()
+        table.undoStack.setClean()
+        window.current_data_unsaved = False
+
+        assert model.setData(
+            inclusion, Qt.CheckState.Checked, Qt.ItemDataRole.CheckStateRole
+        ) is True
+        assert model.dataset.studies[0].include is True
+        assert model.dataset.studies[0].manually_excluded is False
+        assert table.undoStack.count() == 1
+        assert window.current_data_unsaved is True
+
+        window.undo()
+        assert window.model.dataset.studies[0].include is False
+        assert window.model.dataset.studies[0].manually_excluded is False
+        assert window.current_data_unsaved is False
+        assert table.currentIndex() == window.model.index(0, window.model.INCLUDE_STUDY)
+
+        window.redo()
+        assert window.model.dataset.studies[0].include is True
+        assert window.model.dataset.studies[0].manually_excluded is False
+        assert window.current_data_unsaved is True
+        assert table.currentIndex() == window.model.index(0, window.model.INCLUDE_STUDY)
     finally:
         _close_without_prompt(app, window)
 
@@ -445,8 +1099,20 @@ def test_diagnostic_complete_paste_recomputes_sens_spec_confidence_intervals(
             model.index(0, model.RAW_DATA[0]), [["30", "10", "1", "81"]]
         )
 
+        ma_unit = model.get_current_ma_unit_for_study(0)
+        group_str = model.get_cur_group_str()
         assert _cell_text(model, 0, model.OUTCOMES[0]) == "0.750"
         assert all(_cell_text(model, 0, col) != "" for col in model.OUTCOMES)
+        assert ma_unit.get_entered_effect_and_ci("Sens", group_str) == (
+            0.750,
+            0.588,
+            0.873,
+        )
+        assert ma_unit.get_entered_effect_and_ci("PLR", group_str) == (
+            61.5,
+            8.8,
+            431.0,
+        )
     finally:
         _close_without_prompt(app, window)
 
@@ -656,7 +1322,7 @@ def test_invalid_paste_reports_validation_error_when_model_signals_are_blocked(
 
 def test_add_outcome_dialog_rejects_blank_and_duplicate_names(monkeypatch):
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
 
     app, window = launch.start_automation()
     try:
@@ -712,7 +1378,7 @@ def test_add_outcome_dialog_rejects_blank_and_duplicate_names(monkeypatch):
 def test_edit_dialog_rejects_blank_outcome_name(monkeypatch):
     import launch
     import edit_dialog
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
 
     app, window = launch.start_automation()
     dialog = None
@@ -753,7 +1419,7 @@ def test_edit_dialog_rejects_blank_outcome_name(monkeypatch):
 def test_edit_dialog_rejects_blank_names_for_other_dataset_entities(monkeypatch):
     import launch
     import edit_dialog
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
 
     app, window = launch.start_automation()
     dialog = None
@@ -839,7 +1505,7 @@ def test_edit_dialog_rejects_blank_names_for_other_dataset_entities(monkeypatch)
 
 def test_add_dialogs_reject_blank_names_for_other_dataset_entities(monkeypatch):
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
 
     app, window = launch.start_automation()
     try:
@@ -906,9 +1572,9 @@ def test_add_dialogs_reject_blank_names_for_other_dataset_entities(monkeypatch):
         _close_without_prompt(app, window)
 
 
-def test_metaform_dialog_text_slots_accept_pyqt5_line_edit_strings(monkeypatch):
+def test_metaform_dialog_text_slots_accept_native_pyqt6_line_edit_strings(monkeypatch):
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
 
     app, window = launch.start_automation()
     try:
@@ -1018,7 +1684,7 @@ def test_edit_dataset_rejection_leaves_main_dataset_unchanged(monkeypatch):
 
         def reject_after_editing_copy(dialog):
             dialog.dataset.studies[0].name = "Rejected dataset edit"
-            return dialog.Rejected
+            return QDialog.DialogCode.Rejected
 
         monkeypatch.setattr(edit_dialog.EditDialog, "exec", reject_after_editing_copy)
 
@@ -1039,7 +1705,9 @@ def test_edit_empty_dataset_can_be_cancelled(monkeypatch):
     try:
         original_dataset = window.model.dataset
         monkeypatch.setattr(
-            edit_dialog.EditDialog, "exec", lambda dialog: dialog.Rejected
+            edit_dialog.EditDialog,
+            "exec",
+            lambda dialog: QDialog.DialogCode.Rejected,
         )
 
         window.edit_dataset()
@@ -1058,7 +1726,9 @@ def test_edit_empty_dataset_acceptance_preserves_empty_outcome_state(monkeypatch
     try:
         original_undo_count = window.tableView.undoStack.count()
         monkeypatch.setattr(
-            edit_dialog.EditDialog, "exec", lambda dialog: dialog.Accepted
+            edit_dialog.EditDialog,
+            "exec",
+            lambda dialog: QDialog.DialogCode.Accepted,
         )
 
         window.edit_dataset()
@@ -1084,7 +1754,7 @@ def test_edit_dataset_acceptance_propagates_copied_dataset_mutation(monkeypatch)
 
         def accept_after_renaming_study(dialog):
             dialog.dataset.studies[0].name = renamed_study
-            return dialog.Accepted
+            return QDialog.DialogCode.Accepted
 
         monkeypatch.setattr(
             edit_dialog.EditDialog, "exec", accept_after_renaming_study
@@ -1131,7 +1801,7 @@ def test_metric_selection_and_confidence_level_are_preserved_in_model_state():
 
 
 def test_confidence_level_dialog_rejects_represented_100_percent():
-    from PyQt5.QtWidgets import QApplication
+    from PyQt6.QtWidgets import QApplication
 
     import conf_level_dialog
 
@@ -1189,6 +1859,24 @@ def _create_binary_dataset(window):
                 "effect": "OR",
                 "metric_choices": [],
                 "name": "Mortality",
+            },
+            "csv_data": None,
+            "selected_dataset": None,
+        }
+    )
+
+
+def _create_continuous_dataset(window):
+    window._handle_wizard_results(
+        {
+            "path": "new_dataset",
+            "outcome_info": {
+                "arms": "two",
+                "data_type": "continuous",
+                "sub_type": "means",
+                "effect": "MD",
+                "metric_choices": [],
+                "name": "Recovery",
             },
             "csv_data": None,
             "selected_dataset": None,

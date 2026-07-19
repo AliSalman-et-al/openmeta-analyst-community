@@ -1,0 +1,103 @@
+name: macOS x64 Direct R PyInstaller Spike
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  r-substrate:
+    name: Private R.framework substrate gate
+    runs-on: macos-15-intel
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            uv.lock
+            docs/verification/RCMetaR-r-dependencies.json
+
+      - name: Install locked Python
+        run: uv python install 3.11.9
+
+      - name: Acquire, adapt, and prove private R without host R inputs
+        shell: bash
+        run: bash scripts/package-macos.sh --architecture x64 --stop-after-r-substrate
+
+      - name: Upload substrate diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: RCMetaStudio-macos-x64-r-substrate-${{ github.sha }}
+          path: build/macos-package/x64/work/qualification/**
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 0
+
+  feasibility:
+    name: Direct staged R.framework feasibility
+    needs: r-substrate
+    runs-on: macos-15-intel
+    timeout-minutes: 90
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            uv.lock
+            docs/verification/RCMetaR-r-dependencies.json
+
+      - name: Install locked Python
+        run: uv python install 3.11.9
+
+      - name: Prove explicit R.framework collection
+        run: |
+          uv sync --locked
+          uv run --no-sync python scripts/verify_macos_r_pyinstaller_toc.py \
+            --output build/macos-r-pyinstaller-toc-preflight.json
+
+      - name: Run direct target-native R and PyInstaller feasibility path
+        shell: bash
+        run: bash scripts/package-macos-x64-direct-r-spike.sh
+
+      - name: Upload direct feasibility application
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: RCMetaStudio-macos-x64-direct-r-spike-${{ github.sha }}
+          path: artifacts/RCMetaStudio-macos-x64-direct-r-spike.zip
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Upload direct feasibility evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: RCMetaStudio-macos-x64-direct-r-spike-evidence-${{ github.sha }}
+          path: |
+            build/macos-r-pyinstaller-toc-preflight.json
+            build/macos-direct-r-spike/evidence/**
+            build/macos-direct-r-spike/pyinstaller/RCMetaStudio/warn-RCMetaStudio.txt
+            build/macos-direct-r-spike/pyinstaller/RCMetaStudio/xref-RCMetaStudio.html
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 0
+
+      - name: Prune uv cache
+        if: ${{ always() }}
+        run: uv cache prune --ci

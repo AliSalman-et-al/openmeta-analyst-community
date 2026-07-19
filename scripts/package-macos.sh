@@ -4,13 +4,11 @@ set -euo pipefail
 architecture=""
 artifact_name=""
 archive_root_name=""
-r_package_cache_root=""
-r_runtime_root="${RCMS_R_HOME:-${R_HOME:-}}"
 recreate_venv=0
-skip_tests=0
 skip_clean=0
 skip_smoke=0
 capture_adaptive_layout_evidence=0
+stop_after_r_substrate=0
 bundle_identifier="org.researchconsultancy.rc-metastudio"
 
 while [ "$#" -gt 0 ]; do
@@ -27,24 +25,12 @@ while [ "$#" -gt 0 ]; do
       archive_root_name="$2"
       shift 2
       ;;
-    --r-package-cache-root)
-      r_package_cache_root="$2"
-      shift 2
-      ;;
-    --r-runtime-root)
-      r_runtime_root="$2"
-      shift 2
-      ;;
     --bundle-identifier)
       bundle_identifier="$2"
       shift 2
       ;;
     --recreate-venv)
       recreate_venv=1
-      shift
-      ;;
-    --skip-tests)
-      skip_tests=1
       shift
       ;;
     --skip-clean)
@@ -59,6 +45,10 @@ while [ "$#" -gt 0 ]; do
       capture_adaptive_layout_evidence=1
       shift
       ;;
+    --stop-after-r-substrate)
+      stop_after_r_substrate=1
+      shift
+      ;;
     *)
       echo "Unknown argument: $1" >&2
       exit 2
@@ -70,7 +60,6 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
 venv_root="$repo_root/.venv"
 python_exe="$venv_root/bin/python"
-r_package_cache_root="${r_package_cache_root:-$repo_root/artifacts/r-library-cache}"
 
 step() {
   printf '[%s] %s\n' "$(date '+%H:%M:%S')" "$1"
@@ -81,33 +70,39 @@ if [ "$(uname -s)" != "Darwin" ]; then
   exit 1
 fi
 
+if ! command -v uv >/dev/null 2>&1; then
+  echo "macOS packaging requires uv. Install it from https://docs.astral.sh/uv/." >&2
+  exit 1
+fi
+if ! xcode-select -p >/dev/null 2>&1 || ! command -v clang >/dev/null 2>&1; then
+  echo "macOS packaging requires the Xcode Command Line Tools. Run: xcode-select --install" >&2
+  exit 1
+fi
+macos_major="$(sw_vers -productVersion | awk -F. '{print $1}')"
+if [ "$macos_major" -lt 13 ]; then
+  echo "macOS Intel packaging requires macOS 13 or later; found $(sw_vers -productVersion)." >&2
+  exit 1
+fi
+
 case "${architecture:-}" in
   x64)
     default_artifact="RCMetaStudio-macos-x64"
     ;;
-  arm64)
-    default_artifact="RCMetaStudio-macos-arm64"
-    ;;
   "")
-    echo "--architecture is required and must be x64 or arm64." >&2
+    echo "--architecture x64 is required." >&2
     exit 2
     ;;
   *)
-    echo "--architecture must be x64 or arm64." >&2
+    echo "Issue #342 packages macOS Intel only; use --architecture x64." >&2
     exit 2
     ;;
 esac
 
+if [ "$(uname -m)" != "x86_64" ]; then
+  echo "macOS Intel packaging requires a native x86_64 host; found $(uname -m)." >&2
+  exit 2
+fi
 artifact_name="${artifact_name:-$default_artifact}"
-
-if [ -z "$r_runtime_root" ]; then
-  r_runtime_root="$(R RHOME)"
-fi
-if [ -z "$r_runtime_root" ] || [ ! -d "$r_runtime_root" ]; then
-  echo "No source R runtime was found. Pass --r-runtime-root or set RCMS_R_HOME/R_HOME." >&2
-  exit 1
-fi
-r_runtime_root="$(cd "$r_runtime_root" && pwd -P)"
 
 cd "$repo_root"
 
@@ -116,24 +111,15 @@ if [ "$recreate_venv" -eq 1 ] && [ -d "$venv_root" ]; then
   rm -rf "$venv_root"
 fi
 
-step "Syncing locked verification environment with uv"
+step "Syncing the locked Python environment"
+uv python install 3.11.9
 uv sync --locked
-
-if [ "$skip_tests" -eq 0 ]; then
-  step "Running shared release-package verification"
-  "$python_exe" scripts/verify_package_release.py \
-    --rscript "$r_runtime_root/bin/Rscript" \
-    --r-library-cache-root "$r_package_cache_root"
-fi
 
 build_args=(
   --architecture "$architecture"
   --artifact-name "$artifact_name"
   --bundle-identifier "$bundle_identifier"
   --python-exe "$python_exe"
-  --r-runtime-root "$r_runtime_root"
-  --r-package-cache-root "$r_package_cache_root"
-  --skip-dependency-install
 )
 if [ -n "$archive_root_name" ]; then
   build_args+=(--archive-root-name "$archive_root_name")
@@ -146,6 +132,9 @@ if [ "$skip_smoke" -eq 1 ]; then
 fi
 if [ "$capture_adaptive_layout_evidence" -eq 1 ]; then
   build_args+=(--capture-adaptive-layout-evidence)
+fi
+if [ "$stop_after_r_substrate" -eq 1 ]; then
+  build_args+=(--stop-after-r-substrate)
 fi
 
 step "Building ad-hoc macOS package artifact"

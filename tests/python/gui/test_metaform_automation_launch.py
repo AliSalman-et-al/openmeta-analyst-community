@@ -9,10 +9,37 @@ sys.path.insert(0, os.path.abspath("src"))
 sys.path.insert(0, os.path.abspath(os.path.join("src", "forms")))
 
 import pytest
-from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtWidgets import QHeaderView
+from PyQt6 import QtCore, QtWidgets
+from PyQt6.QtWidgets import QHeaderView
+
+from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+
+prepare_generated_ui_imports()
 
 REPO_ROOT = os.getcwd()
+
+
+def _sample_project_path(name):
+    return os.path.join(REPO_ROOT, "sample_projects", name)
+
+
+def _window_archetype(widget):
+    import adaptive_window
+
+    return adaptive_window.adaptive_window_state(widget).policy.archetype.value
+
+
+@pytest.fixture(autouse=True)
+def _fail_instead_of_blocking_on_unexpected_critical_dialog(monkeypatch):
+    messages = []
+    monkeypatch.setattr(
+        QtWidgets.QMessageBox,
+        "critical",
+        lambda _parent, title, message: messages.append((title, message))
+        or QtWidgets.QMessageBox.StandardButton.Ok,
+    )
+    yield
+    assert messages == []
 
 
 def _plot_capability(
@@ -40,7 +67,7 @@ def _assert_compact_table_fits_visible_cells(table):
     if not table_is_measurable:
         header = table.horizontalHeader()
         assert (
-            header.sectionResizeMode(0) == QHeaderView.Stretch
+            header.sectionResizeMode(0) == QHeaderView.ResizeMode.Stretch
             or header.stretchLastSection()
         )
 
@@ -60,30 +87,30 @@ def _assert_compact_table_fits_visible_cells(table):
         )
         for column in range(table.columnCount())
     ]
-    vertical_header_width = 0
-    if not table.verticalHeader().isHidden():
-        vertical_header_width = table.verticalHeader().sizeHint().width()
-    required_width = (
-        vertical_header_width + sum(content_widths) + 2 * table.frameWidth()
-    )
-    assert table.minimumWidth() >= required_width
+    assert table.minimumWidth() == 0
 
     if not table_is_measurable:
         return
 
     for column, content_width in enumerate(content_widths):
-        assert table.columnWidth(column) >= content_width
+        if (
+            table.horizontalHeader().sectionResizeMode(column)
+            != QHeaderView.ResizeMode.Stretch
+        ):
+            assert table.columnWidth(column) >= content_width
+        else:
+            assert table.columnWidth(column) > 0
 
     section_width = sum(
         table.horizontalHeader().sectionSize(column)
         for column in range(table.columnCount())
     )
     header = table.horizontalHeader()
-    assert (
-        header.sectionResizeMode(0) == QHeaderView.Stretch
-        or header.stretchLastSection()
-    )
-    assert section_width >= table.viewport().width() - 1
+    if header.sectionResizeMode(0) == QHeaderView.ResizeMode.Stretch:
+        assert section_width >= table.viewport().width() - 1
+    else:
+        assert header.sectionResizeMode(0) == QHeaderView.ResizeMode.Interactive
+        assert section_width >= sum(content_widths)
 
 
 def _assert_table_view_leaves_spare_width_outside_data_columns(table_view):
@@ -103,7 +130,12 @@ def _assert_table_view_leaves_spare_width_outside_data_columns(table_view):
         header.sectionSize(column) for column in range(model.columnCount())
     )
 
-    owner.resize(owner.width() + 320, owner.height())
+    # Qt 6's offscreen platform can report a freshly shown top-level window at
+    # its minimum layout width. Give the real workspace a deterministic desktop
+    # viewport before asserting that fixed data columns leave spare table space.
+    owner.showNormal()
+    owner.setMaximumSize(16777215, 16777215)
+    owner.resize(max(owner.width() + 320, 1920), max(owner.height(), 1080))
     owner.show()
     QtWidgets.QApplication.processEvents()
 
@@ -118,7 +150,7 @@ def _assert_table_view_leaves_spare_width_outside_data_columns(table_view):
 
 def test_full_app_imports_representative_csv_into_dataset():
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
 
     meta_form = launch._import_meta_form()
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
@@ -182,7 +214,7 @@ def test_full_app_imports_representative_csv_into_dataset():
 
 def test_full_app_import_pads_ragged_csv_rows_into_dataset():
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
 
     meta_form = launch._import_meta_form()
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
@@ -260,16 +292,34 @@ def test_automation_launch_shows_main_window_maximized():
         assert window.isVisible()
         assert window.isMaximized()
     finally:
+        # This test owns window state, not the interactive save prompt.
+        window.current_data_unsaved = False
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
 
 
-def test_open_project_preserves_main_window_state_without_duplicate_windows():
+def test_open_project_preserves_main_window_state_without_duplicate_windows(monkeypatch):
     import launch
+    import ma_data_table_model
+    import project_adapter
+    import project_format
 
     app, window = launch.start_automation()
+    recalculations = []
+    monkeypatch.setattr(
+        ma_data_table_model.DatasetModel,
+        "try_to_update_outcomes",
+        lambda model: recalculations.append(model),
+    )
     meta_form = sys.modules["meta_form"]
+    critical_messages = []
+    monkeypatch.setattr(
+        QtWidgets.QMessageBox,
+        "critical",
+        lambda _parent, title, message: critical_messages.append((title, message))
+        or QtWidgets.QMessageBox.StandardButton.Ok,
+    )
 
     try:
         window.showMaximized()
@@ -280,7 +330,13 @@ def test_open_project_preserves_main_window_state_without_duplicate_windows():
             if isinstance(widget, meta_form.MetaForm) and widget.isVisible()
         ]
 
-        assert window.open(os.path.abspath("sample_projects/amino.rcms")) is True
+        # The automation shell begins with an empty unsaved dataset. This test is
+        # about replacing that dataset in the same window, so authorize the open
+        # without driving the separate interactive save-confirmation contract.
+        window.current_data_unsaved = False
+        project_path = _sample_project_path("amino.rcms")
+        expected_dataset = project_format.load_project(project_path).project["dataset"]
+        assert window.open(project_path) is True, critical_messages
         app.processEvents()
 
         visible_metaforms_after = [
@@ -292,16 +348,25 @@ def test_open_project_preserves_main_window_state_without_duplicate_windows():
         assert window.isMaximized()
         assert window.tableView.model() is window.model
         assert window.model.rowCount() >= 20
+        assert recalculations == []
+        observed_dataset = project_adapter.dataset_to_project(window.model.dataset)[
+            "dataset"
+        ]
+        assert observed_dataset == expected_dataset
     finally:
+        # This test owns window identity, not the interactive save prompt.
+        window.current_data_unsaved = False
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
 
 
 def test_rc_metastudio_logo_resource_is_valid_and_used_consistently():
-    import icons_rc  # noqa: F401
-    from PyQt5 import QtGui
+    from PyQt6 import QtGui
     import launch
+    import qt6_resources
+
+    qt6_resources.ensure_application_resources()
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     app_icon = QtGui.QIcon(launch.APPLICATION_ICON_PATH)
@@ -354,8 +419,10 @@ def test_rc_metastudio_logo_resource_is_valid_and_used_consistently():
 def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
     import xml.etree.ElementTree as ET
 
-    import icons_rc  # noqa: F401
-    from PyQt5 import QtGui
+    from PyQt6 import QtGui
+    import qt6_resources
+
+    qt6_resources.ensure_application_resources()
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     qrc_path = Path("src", "rc_metastudio", "images", "icons.qrc")
@@ -412,7 +479,7 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
             assert "#243746" not in source_text
 
         embedded_file = QtCore.QFile(resource_path)
-        assert embedded_file.open(QtCore.QIODevice.ReadOnly)
+        assert embedded_file.open(QtCore.QIODevice.OpenModeFlag.ReadOnly)
         assert bytes(embedded_file.readAll()) == source_path.read_bytes(), (
             f"{resource_path} is stale; regenerate the checked-in Qt resources"
         )
@@ -596,7 +663,7 @@ def test_automation_launch_shows_default_confidence_level_at_startup():
 def test_automation_launch_opens_sample_project_in_real_data_table():
     import launch
 
-    sample_project = os.path.abspath("sample_projects/amino.rcms")
+    sample_project = _sample_project_path("amino.rcms")
     app, window = launch.start_automation()
 
     try:
@@ -628,14 +695,21 @@ def test_automation_launch_opens_sample_project_in_real_data_table():
     "sample_project",
     ["amino.rcms", "continuous.rcms", "lymph.rcms", "meantime.rcms"],
 )
-def test_main_data_grid_leaves_spare_width_outside_data_columns(sample_project):
+def test_main_data_grid_leaves_spare_width_outside_data_columns(
+    sample_project, monkeypatch
+):
     import launch
 
+    critical_messages = []
+    monkeypatch.setattr(
+        QtWidgets.QMessageBox,
+        "critical",
+        lambda _parent, title, message: critical_messages.append((title, message))
+        or QtWidgets.QMessageBox.StandardButton.Ok,
+    )
     app, window = launch.start_automation()
     try:
-        assert window.open(
-            os.path.abspath(os.path.join("sample_projects", sample_project))
-        )
+        assert window.open(_sample_project_path(sample_project)), critical_messages
 
         _assert_table_view_leaves_spare_width_outside_data_columns(window.tableView)
     finally:
@@ -648,14 +722,21 @@ def test_main_data_grid_leaves_spare_width_outside_data_columns(sample_project):
     "sample_project",
     ["amino.rcms", "continuous.rcms", "lymph.rcms", "meantime.rcms"],
 )
-def test_undo_immediately_after_open_does_not_clear_loaded_project(sample_project):
+def test_undo_immediately_after_open_does_not_clear_loaded_project(
+    sample_project, monkeypatch
+):
     import launch
 
+    critical_messages = []
+    monkeypatch.setattr(
+        QtWidgets.QMessageBox,
+        "critical",
+        lambda _parent, title, message: critical_messages.append((title, message))
+        or QtWidgets.QMessageBox.StandardButton.Ok,
+    )
     app, window = launch.start_automation()
     try:
-        assert window.open(
-            os.path.abspath(os.path.join("sample_projects", sample_project))
-        )
+        assert window.open(_sample_project_path(sample_project)), critical_messages
 
         loaded_model = window.model
         loaded_row_count = loaded_model.rowCount()
@@ -690,7 +771,7 @@ def test_undo_immediately_after_open_does_not_clear_loaded_project(sample_projec
 def test_frozen_startup_argv_falls_back_to_native_windows_command_line():
     import launch
 
-    sample_project = os.path.abspath("sample_projects/amino.rcms")
+    sample_project = _sample_project_path("amino.rcms")
 
     argv = launch._resolve_startup_argv(
         argv=["RCMetaStudio.exe"],
@@ -705,8 +786,8 @@ def test_frozen_startup_argv_falls_back_to_native_windows_command_line():
 def test_frozen_startup_argv_keeps_existing_project_argument():
     import launch
 
-    sample_project = os.path.abspath("sample_projects/amino.rcms")
-    other_project = os.path.abspath("sample_projects/continuous.rcms")
+    sample_project = _sample_project_path("amino.rcms")
+    other_project = _sample_project_path("continuous.rcms")
 
     argv = launch._resolve_startup_argv(
         argv=["RCMetaStudio.exe", sample_project],
@@ -721,7 +802,7 @@ def test_frozen_startup_argv_keeps_existing_project_argument():
 def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch):
     import launch
 
-    sample_project = os.path.abspath("sample_projects/amino.rcms")
+    sample_project = _sample_project_path("amino.rcms")
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     opened = []
     started = []
@@ -760,6 +841,12 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch):
         def finish(self, window):
             pass
 
+        def hide(self):
+            pass
+
+        def deleteLater(self):
+            pass
+
     monkeypatch.setattr(
         launch, "_resolve_startup_argv", lambda: ["RCMetaStudio.exe", sample_project]
     )
@@ -771,6 +858,7 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch):
     monkeypatch.setattr(launch.QtWidgets, "QApplication", lambda argv: app)
     monkeypatch.setattr(launch, "QPixmap", lambda path: object())
     monkeypatch.setattr(launch, "QSplashScreen", Splash)
+    monkeypatch.setattr(launch, "create_startup_splash", lambda: Splash(object()))
     monkeypatch.setattr(launch, "load_R_libraries", lambda app, splash: None)
     monkeypatch.setattr(launch, "_force_table_paint", lambda app, meta: None)
     monkeypatch.setenv("RCMS_STARTUP_PROJECT_SMOKE", "1")
@@ -788,9 +876,7 @@ def test_meantime_sample_project_loads_native_factor_covariate():
     test_backend_compat.install()
     import headless_analysis
 
-    model = headless_analysis.load_dataset_model(
-        os.path.abspath(os.path.join("sample_projects", "meantime.rcms"))
-    )
+    model = headless_analysis.load_dataset_model(_sample_project_path("meantime.rcms"))
     dataset = model.dataset
 
     assert ("treatment group", 4) in [
@@ -809,9 +895,7 @@ def test_automation_launch_opens_meantime_project_and_enables_subgroup_analysis(
     app, window = launch.start_automation()
     try:
         assert (
-            window.open(
-                os.path.abspath(os.path.join("sample_projects", "meantime.rcms"))
-            )
+            window.open(_sample_project_path("meantime.rcms"))
             is True
         )
 
@@ -829,8 +913,8 @@ def test_automation_launch_opens_meantime_project_and_enables_subgroup_analysis(
         os.chdir(REPO_ROOT)
 
 
-def test_opened_sample_projects_return_native_table_values_for_pyqt5_rendering():
-    from PyQt5 import QtCore, QtGui
+def test_opened_sample_projects_return_native_table_values_for_pyqt6_rendering():
+    from PyQt6 import QtCore, QtGui
     import launch
 
     cases = [
@@ -863,7 +947,7 @@ def test_opened_sample_projects_return_native_table_values_for_pyqt5_rendering()
         try:
             assert (
                 window.open(
-                    os.path.abspath(os.path.join("sample_projects", project_name))
+                    _sample_project_path(project_name)
                 )
                 is True
             )
@@ -871,53 +955,54 @@ def test_opened_sample_projects_return_native_table_values_for_pyqt5_rendering()
 
             assert (
                 model.headerData(
-                    model.NAME, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole
+                    model.NAME, QtCore.Qt.Orientation.Horizontal, QtCore.Qt.ItemDataRole.DisplayRole
                 )
                 == "Study Name"
             )
             assert (
                 model.headerData(
-                    model.YEAR, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole
+                    model.YEAR, QtCore.Qt.Orientation.Horizontal, QtCore.Qt.ItemDataRole.DisplayRole
                 )
                 == "Year"
             )
             raw_headers = raw_headers_for_groups(model.current_txs)
             assert [
-                model.headerData(column, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole)
+                model.headerData(column, QtCore.Qt.Orientation.Horizontal, QtCore.Qt.ItemDataRole.DisplayRole)
                 for column in model.RAW_DATA
             ] == raw_headers
-            assert model.headerData(0, QtCore.Qt.Vertical, QtCore.Qt.DisplayRole) == 1
+            assert model.headerData(0, QtCore.Qt.Orientation.Vertical, QtCore.Qt.ItemDataRole.DisplayRole) == 1
 
             assert (
-                model.data(model.index(0, model.NAME), QtCore.Qt.DisplayRole)
+                model.data(model.index(0, model.NAME), QtCore.Qt.ItemDataRole.DisplayRole)
                 == first_study
             )
             assert isinstance(
-                model.data(model.index(0, model.YEAR), QtCore.Qt.DisplayRole), int
+                model.data(model.index(0, model.YEAR), QtCore.Qt.ItemDataRole.DisplayRole), int
             )
             assert (
                 model.data(
-                    model.index(0, model.INCLUDE_STUDY), QtCore.Qt.CheckStateRole
+                    model.index(0, model.INCLUDE_STUDY), QtCore.Qt.ItemDataRole.CheckStateRole
                 )
-                == QtCore.Qt.Checked
+                == QtCore.Qt.CheckState.Checked
             )
             assert model.data(
-                model.index(0, model.NAME), QtCore.Qt.TextAlignmentRole
-            ) == int(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+                model.index(0, model.NAME), QtCore.Qt.ItemDataRole.TextAlignmentRole
+            ) == int(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter)
             assert isinstance(
                 model.data(
-                    model.index(0, model.OUTCOMES[0]), QtCore.Qt.BackgroundColorRole
+                    model.index(0, model.OUTCOMES[0]), QtCore.Qt.ItemDataRole.BackgroundRole
                 ),
                 QtGui.QColor,
             )
 
             visible_values = [
                 model.headerData(
-                    model.NAME, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole
+                    model.NAME,
+                    QtCore.Qt.Orientation.Horizontal,
+                    QtCore.Qt.ItemDataRole.DisplayRole,
                 ),
-                model.data(model.index(0, model.NAME), QtCore.Qt.DisplayRole),
                 model.data(
-                    model.index(0, model.INCLUDE_STUDY), QtCore.Qt.CheckStateRole
+                    model.index(0, model.NAME), QtCore.Qt.ItemDataRole.DisplayRole
                 ),
             ]
             assert all(not hasattr(value, "value") for value in visible_values)
@@ -928,14 +1013,14 @@ def test_opened_sample_projects_return_native_table_values_for_pyqt5_rendering()
 
 
 def test_edit_list_models_return_native_values_and_accept_native_edits():
-    from PyQt5 import QtCore
+    from PyQt6 import QtCore
     import launch
     import edit_list_models
 
     app, window = launch.start_automation()
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "amino.rcms")))
+            window.open(_sample_project_path("amino.rcms"))
             is True
         )
         dataset = window.model.dataset
@@ -966,12 +1051,12 @@ def test_edit_list_models_return_native_values_and_accept_native_edits():
 
         for list_model in models:
             index = list_model.index(0, 0)
-            display_value = list_model.data(index, QtCore.Qt.DisplayRole)
-            alignment_value = list_model.data(index, QtCore.Qt.TextAlignmentRole)
+            display_value = list_model.data(index, QtCore.Qt.ItemDataRole.DisplayRole)
+            alignment_value = list_model.data(index, QtCore.Qt.ItemDataRole.TextAlignmentRole)
 
             assert display_value not in (None, "")
             assert not hasattr(display_value, "value")
-            assert alignment_value == int(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+            assert alignment_value == int(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter)
 
         group_model = edit_list_models.TXGroupsModel(
             dataset=dataset,
@@ -980,7 +1065,7 @@ def test_edit_list_models_return_native_values_and_accept_native_edits():
         )
         assert group_model.setData(group_model.index(0, 0), "Renamed Group") is True
         assert "Renamed Group" in [
-            group_model.data(group_model.index(row, 0), QtCore.Qt.DisplayRole)
+            group_model.data(group_model.index(row, 0), QtCore.Qt.ItemDataRole.DisplayRole)
             for row in range(group_model.rowCount())
         ]
 
@@ -992,14 +1077,14 @@ def test_edit_list_models_return_native_values_and_accept_native_edits():
             is True
         )
         assert (
-            follow_up_model.data(follow_up_model.index(0, 0), QtCore.Qt.DisplayRole)
+            follow_up_model.data(follow_up_model.index(0, 0), QtCore.Qt.ItemDataRole.DisplayRole)
             == "Renamed Follow Up"
         )
 
         studies_model = edit_list_models.StudiesModel(dataset=dataset)
         assert studies_model.setData(studies_model.index(0, 0), "Renamed Study") is True
         assert (
-            studies_model.data(studies_model.index(0, 0), QtCore.Qt.DisplayRole)
+            studies_model.data(studies_model.index(0, 0), QtCore.Qt.ItemDataRole.DisplayRole)
             == "Renamed Study"
         )
 
@@ -1009,7 +1094,7 @@ def test_edit_list_models_return_native_values_and_accept_native_edits():
             is True
         )
         assert (
-            covariates_model.data(covariates_model.index(0, 0), QtCore.Qt.DisplayRole)
+            covariates_model.data(covariates_model.index(0, 0), QtCore.Qt.ItemDataRole.DisplayRole)
             == "Renamed Dose"
         )
 
@@ -1019,7 +1104,7 @@ def test_edit_list_models_return_native_values_and_accept_native_edits():
             is True
         )
         assert (
-            outcomes_model.data(outcomes_model.index(0, 0), QtCore.Qt.DisplayRole)
+            outcomes_model.data(outcomes_model.index(0, 0), QtCore.Qt.ItemDataRole.DisplayRole)
             == "Renamed Outcome"
         )
 
@@ -1039,7 +1124,7 @@ def test_edit_list_models_return_native_values_and_accept_native_edits():
 
 
 def test_change_covariate_type_model_returns_native_values_and_accepts_native_edits():
-    from PyQt5 import QtCore
+    from PyQt6 import QtCore
     import launch
     import change_cov_type_form
     import ma_dataset
@@ -1047,7 +1132,7 @@ def test_change_covariate_type_model_returns_native_values_and_accepts_native_ed
     app, window = launch.start_automation()
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "amino.rcms")))
+            window.open(_sample_project_path("amino.rcms"))
             is True
         )
         dataset = window.model.dataset
@@ -1062,29 +1147,29 @@ def test_change_covariate_type_model_returns_native_values_and_accepts_native_ed
         cov_model = change_cov_type_form.CovModel(dataset, dataset.covariates[0])
         assert (
             cov_model.headerData(
-                cov_model.STUDY_COL, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole
+                cov_model.STUDY_COL, QtCore.Qt.Orientation.Horizontal, QtCore.Qt.ItemDataRole.DisplayRole
             )
             == "study"
         )
         assert (
             cov_model.headerData(
-                cov_model.NEW_VAL, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole
+                cov_model.NEW_VAL, QtCore.Qt.Orientation.Horizontal, QtCore.Qt.ItemDataRole.DisplayRole
             )
             == "Dose (factor)"
         )
         assert cov_model.headerData(
-            cov_model.NEW_VAL, QtCore.Qt.Horizontal, QtCore.Qt.TextAlignmentRole
-        ) == int(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+            cov_model.NEW_VAL, QtCore.Qt.Orientation.Horizontal, QtCore.Qt.ItemDataRole.TextAlignmentRole
+        ) == int(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter)
 
         display_value = cov_model.data(
-            cov_model.index(0, cov_model.STUDY_COL), QtCore.Qt.DisplayRole
+            cov_model.index(0, cov_model.STUDY_COL), QtCore.Qt.ItemDataRole.DisplayRole
         )
         assert display_value not in (None, "")
         assert not hasattr(display_value, "value")
 
         assert cov_model.setData(cov_model.index(0, cov_model.NEW_VAL), "High") is True
         assert (
-            cov_model.data(cov_model.index(0, cov_model.NEW_VAL), QtCore.Qt.DisplayRole)
+            cov_model.data(cov_model.index(0, cov_model.NEW_VAL), QtCore.Qt.ItemDataRole.DisplayRole)
             == "High"
         )
 
@@ -1099,7 +1184,7 @@ def test_change_covariate_type_model_returns_native_values_and_accepts_native_ed
         continuous_cov_model.dataError.connect(errors.append)
         old_value = continuous_cov_model.data(
             continuous_cov_model.index(0, continuous_cov_model.NEW_VAL),
-            QtCore.Qt.DisplayRole,
+            QtCore.Qt.ItemDataRole.DisplayRole,
         )
 
         assert (
@@ -1116,7 +1201,7 @@ def test_change_covariate_type_model_returns_native_values_and_accepts_native_ed
         assert (
             continuous_cov_model.data(
                 continuous_cov_model.index(0, continuous_cov_model.NEW_VAL),
-                QtCore.Qt.DisplayRole,
+                QtCore.Qt.ItemDataRole.DisplayRole,
             )
             == old_value
         )
@@ -1136,13 +1221,13 @@ def test_change_covariate_type_model_returns_native_values_and_accepts_native_ed
 
 
 def test_factor_covariate_edits_render_as_native_paint_text():
-    from PyQt5 import QtCore, QtWidgets
+    from PyQt6 import QtCore, QtWidgets
     import launch
 
     app, window = launch.start_automation()
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "amino.rcms")))
+            window.open(_sample_project_path("amino.rcms"))
             is True
         )
         model = window.tableView.model()
@@ -1152,7 +1237,7 @@ def test_factor_covariate_edits_render_as_native_paint_text():
 
         assert model.setData(factor_index, "North") is True
         stored_value = model.dataset.studies[0].covariate_dict["Region"]
-        display_value = model.data(factor_index, QtCore.Qt.DisplayRole)
+        display_value = model.data(factor_index, QtCore.Qt.ItemDataRole.DisplayRole)
 
         assert stored_value == "North"
         assert type(stored_value) is str
@@ -1189,7 +1274,7 @@ def test_sequential_analysis_actions_open_real_specs_dialog(monkeypatch):
     monkeypatch.setattr(meta_form.ma_specs, "MA_Specs", SpecsDialog)
 
     try:
-        assert window.open(os.path.abspath("sample_projects/amino.rcms")) is True
+        assert window.open(_sample_project_path("amino.rcms")) is True
         window.action_cum_ma.trigger()
         window.action_loo_ma.trigger()
 
@@ -1262,7 +1347,7 @@ def test_standard_meta_analysis_opens_specs_and_runs_through_backend(monkeypatch
 
         try:
             assert (
-                window.open(os.path.abspath(os.path.join("sample_projects", name)))
+                window.open(_sample_project_path(name))
                 is True
             )
 
@@ -1288,7 +1373,7 @@ def test_standard_meta_analysis_opens_specs_and_runs_through_backend(monkeypatch
 
 def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
 
     app, window = launch.start_automation()
     meta_form = sys.modules["meta_form"]
@@ -1381,14 +1466,16 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
 
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "amino.rcms")))
+            window.open(_sample_project_path("amino.rcms"))
             is True
         )
 
         window.action_go.trigger()
         specs = window.findChildren(meta_form.ma_specs.MA_Specs)
         assert len(specs) == 1
-        assert specs[0].property("RCMS_window_archetype") == "transactional"
+        assert _window_archetype(specs[0]) == "transactional"
+        specs[0].show()
+        app.processEvents()
 
         enum_combos = [
             combo
@@ -1400,9 +1487,7 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
             "Only zero-event studies",
         ]
         method_combo = specs[0].method_cbo_box
-        assert method_combo.sizeAdjustPolicy() == (
-            QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon
-        )
+        assert method_combo.sizeAdjustPolicy() == QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
         widest_method_label = (
             max(
                 method_combo.fontMetrics().horizontalAdvance(
@@ -1416,13 +1501,11 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         assert method_combo.width() <= method_combo.maximumWidth()
         assert (
             method_combo.sizePolicy().horizontalPolicy()
-            == QtWidgets.QSizePolicy.Expanding
+            == QtWidgets.QSizePolicy.Policy.Expanding
         )
 
         for combo in enum_combos:
-            assert combo.sizeAdjustPolicy() == (
-                QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon
-            )
+            assert combo.sizeAdjustPolicy() == QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
             widest_enum_label = (
                 max(
                     combo.fontMetrics().horizontalAdvance(str(combo.itemText(index)))
@@ -1432,7 +1515,7 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
             assert combo.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
             assert combo.view().minimumWidth() >= widest_enum_label
             assert (
-                combo.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Expanding
+                combo.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Policy.Expanding
             )
 
         confidence_spinboxes = specs[0].parameter_grp_box.findChildren(
@@ -1473,7 +1556,7 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         digit_spinbox.lineEdit().setText("-5")
         digit_spinbox.interpretText()
         assert digit_spinbox.minimum() == 0
-        assert digit_spinbox.value() == 3
+        assert digit_spinbox.value() == 2
 
         parameter_labels = [
             label
@@ -1483,7 +1566,7 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
                 "Random-Effects method",
                 "Correction factor target",
                 "Confidence level",
-                "Number of digits",
+                "Decimal places",
                 "Correction factor",
                 "Prior lower bound",
             }
@@ -1507,7 +1590,7 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
 
 def test_method_parameters_dialog_normalizes_missing_parameter_metadata(monkeypatch):
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
 
     app, window = launch.start_automation()
     meta_form = sys.modules["meta_form"]
@@ -1558,7 +1641,7 @@ def test_method_parameters_dialog_normalizes_missing_parameter_metadata(monkeypa
 
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "amino.rcms")))
+            window.open(_sample_project_path("amino.rcms"))
             is True
         )
 
@@ -1587,7 +1670,7 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
     monkeypatch,
 ):
     import launch
-    from PyQt5 import QtCore, QtWidgets
+    from PyQt6 import QtCore, QtWidgets
 
     app, window = launch.start_automation()
     meta_form = sys.modules["meta_form"]
@@ -1663,7 +1746,7 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
 
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "amino.rcms")))
+            window.open(_sample_project_path("amino.rcms"))
             is True
         )
 
@@ -1676,11 +1759,11 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
 
         stable_width = specs.width()
         stable_height = specs.height()
-        assert specs.property("RCMS_window_archetype") == "transactional"
-        assert specs.layout().sizeConstraint() == QtWidgets.QLayout.SetMinimumSize
+        assert _window_archetype(specs) == "transactional"
+        assert specs.layout().sizeConstraint() == QtWidgets.QLayout.SizeConstraint.SetMinimumSize
         assert specs.maximumSize() == QtCore.QSize(16777215, 16777215)
-        assert specs.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Preferred
-        assert specs.sizePolicy().verticalPolicy() == QtWidgets.QSizePolicy.Preferred
+        assert specs.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Policy.Preferred
+        assert specs.sizePolicy().verticalPolicy() == QtWidgets.QSizePolicy.Policy.Preferred
         assert specs.isSizeGripEnabled() is False
 
         specs.resize(stable_width + 300, stable_height + 200)
@@ -1706,8 +1789,8 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
 
         assert specs.width() == stable_width
         assert (
-            specs.parameter_grp_box.layout().alignment() & QtCore.Qt.AlignTop
-        ) == QtCore.Qt.AlignTop
+            specs.parameter_grp_box.layout().alignment() & QtCore.Qt.AlignmentFlag.AlignTop
+        ) == QtCore.Qt.AlignmentFlag.AlignTop
 
         descriptions = [
             label
@@ -1740,7 +1823,8 @@ def test_required_advanced_analysis_actions_open_real_gui_dialogs(monkeypatch):
     shown = []
 
     class MetaRegDialog(object):
-        def __init__(self, model, parent=None):
+        def __init__(self, model, meta_f_str=None, parent=None, **_kwargs):
+            assert meta_f_str == "meta-regression"
             shown.append(("meta-regression", parent, model.get_current_outcome_type()))
 
         def show(self):
@@ -1759,14 +1843,14 @@ def test_required_advanced_analysis_actions_open_real_gui_dialogs(monkeypatch):
     ]:
         app, window = launch.start_automation()
         meta_form = sys.modules["meta_form"]
-        monkeypatch.setattr(meta_form.meta_reg_form, "MetaRegForm", MetaRegDialog)
+        monkeypatch.setattr(meta_form.ma_specs, "MA_Specs", MetaRegDialog)
         monkeypatch.setattr(
             meta_form.meta_subgroup_form, "MetaSubgroupForm", SubgroupDialog
         )
 
         try:
             assert (
-                window.open(os.path.abspath(os.path.join("sample_projects", name)))
+                window.open(_sample_project_path(name))
                 is True
             )
             cov_values = {
@@ -1877,14 +1961,14 @@ def test_meta_regression_dialog_disables_ok_and_does_not_run_without_covariates(
         form = meta_reg_form.MetaRegForm(window.model, parent=window)
 
         assert form.covs_and_check_boxes == []
-        assert form.buttonBox.button(QtWidgets.QDialogButtonBox.Ok).isEnabled() is False
+        assert form.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok).isEnabled() is False
 
         form.run_meta_reg()
 
         assert calls == []
         assert warnings
         assert warnings[0][1:3] == (
-            "No covariates selected",
+            "No Covariates Selected",
             "Select at least one covariate before running meta-regression.",
         )
     finally:
@@ -1902,7 +1986,7 @@ def test_diagnostic_meta_regression_dialog_fits_radio_group_labels():
 
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "lymph.rcms")))
+            window.open(_sample_project_path("lymph.rcms"))
             is True
         )
         cov_values = {
@@ -1939,7 +2023,7 @@ def test_diagnostic_metric_dialog_fits_checkbox_group_labels():
 
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "lymph.rcms")))
+            window.open(_sample_project_path("lymph.rcms"))
             is True
         )
 
@@ -1988,7 +2072,7 @@ def test_deleting_last_covariate_refreshes_advanced_analysis_actions():
 
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "amino.rcms")))
+            window.open(_sample_project_path("amino.rcms"))
             is True
         )
         window._add_new_covariate("region", "factor")
@@ -2038,7 +2122,7 @@ def test_subgroup_dialog_disables_ok_and_does_not_run_without_factor_covariates(
         form = meta_subgroup_form.MetaSubgroupForm(window.model, parent=window)
 
         assert form.cov_subgroup_cbo_box.count() == 0
-        assert form.buttonBox.button(QtWidgets.QDialogButtonBox.Ok).isEnabled() is False
+        assert form.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok).isEnabled() is False
 
         form.get_selected_cov()
 
@@ -2056,7 +2140,7 @@ def test_subgroup_dialog_disables_ok_and_does_not_run_without_factor_covariates(
 
 
 def test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe(monkeypatch):
-    from PyQt5 import QtCore
+    from PyQt6 import QtCore
     import launch
     import meta_reg_form
 
@@ -2103,7 +2187,7 @@ def test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe(monke
 
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "amino.rcms")))
+            window.open(_sample_project_path("amino.rcms"))
             is True
         )
         group_values = {
@@ -2140,16 +2224,16 @@ def test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe(monke
 
         factor_column = window.model.columnCount() - 1
         factor_index = window.model.index(0, factor_column)
-        assert window.model.data(factor_index, QtCore.Qt.DisplayRole) in (
+        assert window.model.data(factor_index, QtCore.Qt.ItemDataRole.DisplayRole) in (
             "East",
             "West",
         )
 
         for role in (
-            QtCore.Qt.DecorationRole,
-            QtCore.Qt.ForegroundRole,
-            QtCore.Qt.FontRole,
-            QtCore.Qt.SizeHintRole,
+            QtCore.Qt.ItemDataRole.DecorationRole,
+            QtCore.Qt.ItemDataRole.ForegroundRole,
+            QtCore.Qt.ItemDataRole.FontRole,
+            QtCore.Qt.ItemDataRole.SizeHintRole,
         ):
             value = window.model.data(factor_index, role)
             assert value is None
@@ -2169,7 +2253,7 @@ def test_subgroup_covariate_dialog_constructs_with_factor_covariate():
     app, window = launch.start_automation()
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "amino.rcms")))
+            window.open(_sample_project_path("amino.rcms"))
             is True
         )
         group_values = {
@@ -2248,6 +2332,7 @@ def test_analysis_opens_results_window_maximized_and_fits_svg_plot(tmp_path):
             }
         )
         app.processEvents()
+        app.processEvents()
 
         result_windows = window.findChildren(results_window.ResultsWindow)
         assert len(result_windows) == 1
@@ -2279,8 +2364,10 @@ def test_results_window_renders_summary_text_and_plot_navigation(tmp_path):
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     plot_path = tmp_path / "forest.png"
-    image = results_window.QImage(80, 40, results_window.QImage.Format_RGB32)
-    image.fill(results_window.Qt.white)
+    image = results_window.QImage(
+        80, 40, results_window.QImage.Format.Format_RGB32
+    )
+    image.fill(results_window.Qt.GlobalColor.white)
     assert image.save(str(plot_path), "PNG")
 
     window = results_window.ResultsWindow(
@@ -2335,8 +2422,10 @@ def test_results_window_displays_canonical_svg_plot_artifact(tmp_path):
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     plot_path = tmp_path / "forest.png"
     svg_path = tmp_path / "forest.display.svg"
-    image = results_window.QImage(1600, 800, results_window.QImage.Format_RGB32)
-    image.fill(results_window.Qt.white)
+    image = results_window.QImage(
+        1600, 800, results_window.QImage.Format.Format_RGB32
+    )
+    image.fill(results_window.Qt.GlobalColor.white)
     assert image.save(str(plot_path), "PNG")
     svg_path.write_text(
         '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="800">'
@@ -2421,6 +2510,8 @@ def test_results_window_refits_svg_plots_and_reflows_sections_on_resize(tmp_path
         window.resize(1200, 800)
         window.show()
         app.processEvents()
+        app.processEvents()
+        app.processEvents()
 
         svg_items = sorted(
             (
@@ -2462,6 +2553,7 @@ def test_results_window_refits_svg_plots_and_reflows_sections_on_resize(tmp_path
 
         window.resize(1600, 800)
         app.processEvents()
+        app.processEvents()
 
         second_width = svg_items[0].sceneBoundingRect().width()
         second_height = svg_items[0].sceneBoundingRect().height()
@@ -2472,6 +2564,7 @@ def test_results_window_refits_svg_plots_and_reflows_sections_on_resize(tmp_path
         assert_sections_are_separated()
 
         window.resize(3000, 800)
+        app.processEvents()
         app.processEvents()
 
         assert svg_items[0].scale() == pytest.approx(4.0)
@@ -2571,7 +2664,7 @@ def test_results_window_refits_raster_fallback_from_original_source(tmp_path):
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     plot_path = tmp_path / "legacy-plot.png"
     image = results_window.QImage(
-        1600, 800, results_window.QImage.Format_ARGB32
+        1600, 800, results_window.QImage.Format.Format_ARGB32
     )
     image.fill(0xFFFFFFFF)
     assert image.save(str(plot_path), "PNG")
@@ -2669,6 +2762,7 @@ def test_results_window_refits_svg_plot_after_in_place_regenerate(tmp_path):
         window.resize(1200, 800)
         window.show()
         app.processEvents()
+        app.processEvents()
         plot_item = next(
             item
             for item in window.scene.items()
@@ -2689,6 +2783,7 @@ def test_results_window_refits_svg_plot_after_in_place_regenerate(tmp_path):
         write_svg(800, 400)
         artifact = window.create_plot_artifact("Forest Plot", str(plot_path))
         window._refresh_plot_item(plot_item, artifact, str(plot_path))
+        app.processEvents()
         app.processEvents()
 
         refreshed_width = plot_item.sceneBoundingRect().width()
@@ -2766,7 +2861,7 @@ def test_results_window_reflows_sections_after_raster_plot_regenerate(tmp_path):
 
     def write_plot(width, height):
         image = results_window.QImage(
-            width, height, results_window.QImage.Format_ARGB32
+            width, height, results_window.QImage.Format.Format_ARGB32
         )
         image.fill(0xFFFFFFFF)
         assert image.save(str(plot_path))
@@ -2825,8 +2920,10 @@ def test_results_window_places_references_after_images_and_wraps_them(tmp_path):
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     plot_path = tmp_path / "forest.png"
-    image = results_window.QImage(80, 40, results_window.QImage.Format_RGB32)
-    image.fill(results_window.Qt.white)
+    image = results_window.QImage(
+        80, 40, results_window.QImage.Format.Format_RGB32
+    )
+    image.fill(results_window.Qt.GlobalColor.white)
     assert image.save(str(plot_path), "PNG")
 
     long_reference = (
@@ -2869,7 +2966,7 @@ def test_results_window_places_references_after_images_and_wraps_them(tmp_path):
         )
         assert (
             reference_item.document().defaultTextOption().wrapMode()
-            == results_window.QTextOption.WordWrap
+            == results_window.QTextOption.WrapMode.WordWrap
         )
     finally:
         window.close()
@@ -2933,7 +3030,7 @@ def test_results_window_text_context_menu_is_reentrant_safe(monkeypatch):
             self.accepted = False
 
         def screenPos(self):
-            return results_window.QPoint(10, 20)
+            return QtCore.QPoint(10, 20)
 
         def accept(self):
             self.accepted = True
@@ -2993,7 +3090,7 @@ def test_results_window_text_context_menu_is_reentrant_safe(monkeypatch):
         assert second_event.accepted is True
         assert popups == [
             (
-                results_window.QPoint(10, 20),
+                QtCore.QPoint(10, 20),
                 ["Select All", "Copy"],
             )
         ]
@@ -3024,7 +3121,7 @@ def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_p
             self.accepted = False
 
         def screenPos(self):
-            return results_window.QPoint(10, 20)
+            return QtCore.QPoint(10, 20)
 
         def accept(self):
             self.accepted = True
@@ -3110,7 +3207,7 @@ def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_p
                 expected_actions.insert(0, "Edit Plot")
             if params_path is None:
                 expected_actions = ["Save PNG Image As"]
-            assert popups[-1] == (results_window.QPoint(10, 20), expected_actions)
+            assert popups[-1] == (QtCore.QPoint(10, 20), expected_actions)
     finally:
         window.close()
         app.processEvents()
@@ -3525,7 +3622,7 @@ def test_plot_text_inputs_enforce_publication_readability_limit():
 
 
 def test_edit_plot_dialog_flags_truncated_legacy_plot_text():
-    from PyQt5 import QtTest
+    from PyQt6 import QtTest
 
     import test_backend_compat
 
@@ -3566,8 +3663,8 @@ def test_edit_forest_plot_dialog_apply_stays_open_and_ok_applies_and_closes():
     try:
         dialog.show()
         app.processEvents()
-        apply_button = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.Apply)
-        ok_button = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.Ok)
+        apply_button = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Apply)
+        ok_button = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
 
         assert apply_button is not None
         assert ok_button is not None
@@ -3581,7 +3678,7 @@ def test_edit_forest_plot_dialog_apply_stays_open_and_ok_applies_and_closes():
         app.processEvents()
 
         assert applied == [True, True]
-        assert dialog.result() == QtWidgets.QDialog.Accepted
+        assert dialog.result() == QtWidgets.QDialog.DialogCode.Accepted
         assert dialog.isVisible() is False
     finally:
         dialog.close()
@@ -3917,7 +4014,7 @@ def test_meta_regression_acceptance_passes_all_dialog_choices_to_adapter(monkeyp
         def analysis(self, result):
             calls.append(("analysis", result))
 
-    class Form(object):
+    class Form(QtWidgets.QWidget):
         meta_f_str = "meta-regression"
         data_type = "binary"
         conf_level = 95.0
@@ -3937,6 +4034,13 @@ def test_meta_regression_acceptance_passes_all_dialog_choices_to_adapter(monkeyp
 
         def accept(self):
             calls.append(("accepted",))
+
+        def _deliver_result(self, result):
+            self._parent.analysis(result)
+
+        def done(self, result):
+            assert result == QtWidgets.QDialog.DialogCode.Accepted.value
+            self.accept()
 
     form = Form()
     form.fixed_effects_radio = QtWidgets.QRadioButton()
@@ -4139,7 +4243,7 @@ def test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog(
 
         def exec(self):
             self.applied.emit()
-            return results_window.QDialog.Rejected
+            return results_window.QDialog.DialogCode.Rejected
 
         def plot_params(self):
             return dict(self._params)
@@ -4301,8 +4405,10 @@ def test_results_window_uses_reader_oriented_section_names_and_order(tmp_path):
     plot_paths = {}
     for name in ["forest", "roc", "density", "trace"]:
         plot_path = tmp_path / ("%s.png" % name)
-        image = results_window.QImage(80, 40, results_window.QImage.Format_RGB32)
-        image.fill(results_window.Qt.white)
+        image = results_window.QImage(
+            80, 40, results_window.QImage.Format.Format_RGB32
+        )
+        image.fill(results_window.Qt.GlobalColor.white)
         assert image.save(str(plot_path), "PNG")
         plot_paths[name] = str(plot_path)
 
@@ -4397,7 +4503,7 @@ def test_real_metaform_save_as_round_trips_representative_projects(
 
         try:
             assert (
-                window.open(os.path.abspath(os.path.join("sample_projects", name)))
+                window.open(_sample_project_path(name))
                 is True
             )
             expected = _dataset_summary(window.model.dataset)
@@ -4412,7 +4518,9 @@ def test_real_metaform_save_as_round_trips_representative_projects(
             assert os.path.exists(saved_path)
             assert window.current_data_unsaved is False
             meta_form = sys.modules["meta_form"]
-            reopened = meta_form._load_project_pickle(saved_path)
+            reopened, _state, _restored_selection = meta_form._load_structured_project(
+                saved_path
+            )
             assert _dataset_summary(reopened) == expected
             if name == "meantime.rcms":
                 values = [
@@ -4426,15 +4534,15 @@ def test_real_metaform_save_as_round_trips_representative_projects(
             os.chdir(REPO_ROOT)
 
 
-def test_recent_files_persist_through_pyqt5_settings(tmp_path):
-    from PyQt5 import QtCore
+def test_recent_files_persist_through_pyqt6_settings(tmp_path):
+    from PyQt6 import QtCore
     import launch
     import settings
 
     QtCore.QSettings.setPath(
-        QtCore.QSettings.IniFormat, QtCore.QSettings.UserScope, str(tmp_path)
+        QtCore.QSettings.Format.IniFormat, QtCore.QSettings.Scope.UserScope, str(tmp_path)
     )
-    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.IniFormat)
+    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.Format.IniFormat)
     settings.reset_settings()
 
     settings.add_file_to_recent_files("first.rcms")
@@ -4444,14 +4552,14 @@ def test_recent_files_persist_through_pyqt5_settings(tmp_path):
     assert settings.get_setting("recent_files") == ["first.rcms", "second.rcms"]
 
 
-def test_main_window_maximized_state_persists_through_pyqt5_settings(tmp_path):
-    from PyQt5 import QtCore, QtWidgets
+def test_main_window_maximized_state_persists_through_pyqt6_settings(tmp_path):
+    from PyQt6 import QtCore, QtWidgets
     import settings
 
     QtCore.QSettings.setPath(
-        QtCore.QSettings.IniFormat, QtCore.QSettings.UserScope, str(tmp_path)
+        QtCore.QSettings.Format.IniFormat, QtCore.QSettings.Scope.UserScope, str(tmp_path)
     )
-    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.IniFormat)
+    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.Format.IniFormat)
     settings.reset_settings()
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
@@ -4473,13 +4581,19 @@ def test_main_window_maximized_state_persists_through_pyqt5_settings(tmp_path):
         app.processEvents()
 
 
-def test_welcome_wizard_recent_action_selects_project():
+def test_welcome_wizard_recent_action_selects_project(monkeypatch):
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
     import main_wizard
 
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-    wizard = main_wizard.MainWizard(recent_datasets=["first.rcms", "second.rcms"])
+    app, window = launch.start_automation()
+    opened = []
+    monkeypatch.setattr(
+        window, "open", lambda file_path=None: opened.append(file_path) or True
+    )
+    wizard = main_wizard.MainWizard(
+        parent=window, recent_datasets=["first.rcms", "second.rcms"]
+    )
     try:
         page = wizard.page(main_wizard.Page_Welcome)
         action = page.open_recent_btn.menu().actions()[0]
@@ -4488,18 +4602,27 @@ def test_welcome_wizard_recent_action_selects_project():
 
         assert wizard.get_wizard_path() == "open"
         assert wizard.get_selected_dataset() == "second.rcms"
+        results = wizard.get_results()
+        assert results["outcome_info"] is None
+        window._handle_wizard_results(results)
+        assert opened == ["second.rcms"]
     finally:
         wizard.close()
+        window.close()
         app.processEvents()
 
 
 def test_welcome_wizard_open_existing_selects_project(monkeypatch):
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
     import main_wizard
 
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-    wizard = main_wizard.MainWizard()
+    app, window = launch.start_automation()
+    opened = []
+    monkeypatch.setattr(
+        window, "open", lambda file_path=None: opened.append(file_path) or True
+    )
+    wizard = main_wizard.MainWizard(parent=window)
     try:
         page = wizard.page(main_wizard.Page_Welcome)
         monkeypatch.setattr(
@@ -4512,14 +4635,28 @@ def test_welcome_wizard_open_existing_selects_project(monkeypatch):
 
         assert wizard.get_wizard_path() == "open"
         assert wizard.get_selected_dataset() == "chosen.rcms"
+        results = wizard.get_results()
+        assert results["outcome_info"] is None
+        window._handle_wizard_results(results)
+        assert opened == ["chosen.rcms"]
+
+        incomplete_new_dataset = main_wizard.MainWizard(
+            parent=window, path="new_dataset"
+        )
+        try:
+            with pytest.raises(RuntimeError, match="dataset information is required"):
+                incomplete_new_dataset.get_results()
+        finally:
+            incomplete_new_dataset.close()
     finally:
         wizard.close()
+        window.close()
         app.processEvents()
 
 
 def test_modal_dialogs_center_over_parent_window():
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
     import main_wizard
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
@@ -4546,12 +4683,12 @@ def test_modal_dialogs_center_over_parent_window():
 
 def test_startup_wizard_cancel_preserves_loaded_dataset(monkeypatch):
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
 
     meta_form = launch._import_meta_form()
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     window = meta_form.MetaForm()
-    sample_project = os.path.abspath(os.path.join("sample_projects", "amino.rcms"))
+    sample_project = _sample_project_path("amino.rcms")
 
     class RejectedWizard:
         def __init__(self, *args, **kwargs):
@@ -4583,7 +4720,7 @@ def test_startup_wizard_cancel_preserves_loaded_dataset(monkeypatch):
 
 def test_data_type_page_multiline_buttons_fit_icon_and_caption():
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
     import main_wizard
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
@@ -4609,7 +4746,7 @@ def test_data_type_page_multiline_buttons_fit_icon_and_caption():
 
 def test_data_type_page_reflows_buttons_without_horizontal_overflow():
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
     import main_wizard
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
@@ -4631,13 +4768,14 @@ def test_data_type_page_reflows_buttons_without_horizontal_overflow():
 
 def test_data_type_page_buttons_center_icons_inside_declared_slots():
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
     import main_wizard
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     wizard = main_wizard.MainWizard(path="new_dataset")
     try:
         wizard.restart()
+        wizard.show()
         app.processEvents()
 
         data_type_page = wizard.page(main_wizard.Page_DataType)
@@ -4658,13 +4796,14 @@ def test_data_type_page_buttons_center_icons_inside_declared_slots():
 
 def test_new_dataset_wizard_overflow_keeps_diagnostic_choice_reachable():
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
     import main_wizard
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     wizard = main_wizard.MainWizard(path="new_dataset")
     try:
         wizard.restart()
+        wizard.show()
         app.processEvents()
 
         data_type_page = wizard.page(main_wizard.Page_DataType)
@@ -4687,7 +4826,7 @@ def test_new_dataset_wizard_overflow_keeps_diagnostic_choice_reachable():
 
 def test_new_dataset_wizard_uses_replacement_workflow_policy():
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
     import main_wizard
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
@@ -4696,8 +4835,7 @@ def test_new_dataset_wizard_uses_replacement_workflow_policy():
         wizard.restart()
         app.processEvents()
 
-        assert wizard.property("RCMS_window_archetype") == "workflow"
-        assert wizard.property("RCMS_window_role") == "workflow"
+        assert _window_archetype(wizard) == "workflow"
         assert not hasattr(wizard, "_oma_first_show_refit_filter")
         assert wizard.property("RCMS_first_show_refit_options") is None
     finally:
@@ -4708,14 +4846,19 @@ def test_new_dataset_wizard_uses_replacement_workflow_policy():
 @pytest.mark.parametrize("path", [None, "new_dataset", "csv_import"])
 def test_wizard_uses_modern_style_with_explicit_back_navigation(path):
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
     import main_wizard
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     wizard = main_wizard.MainWizard(path=path)
     try:
-        assert wizard.wizardStyle() == main_wizard.QWizard.ModernStyle
-        assert wizard.button(main_wizard.QWizard.BackButton) is not None
+        assert (
+            wizard.wizardStyle()
+            == main_wizard.QWizard.WizardStyle.ModernStyle
+        )
+        assert (
+            wizard.button(main_wizard.QWizard.WizardButton.BackButton) is not None
+        )
     finally:
         wizard.close()
         app.processEvents()
@@ -4723,7 +4866,7 @@ def test_wizard_uses_modern_style_with_explicit_back_navigation(path):
 
 def test_wizard_layout_smoke_renders_core_wizard_pages():
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
 
@@ -4737,7 +4880,7 @@ def test_wizard_layout_smoke_renders_core_wizard_pages():
 
 def test_new_dataset_wizard_pages_fill_body_without_clipping_content():
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
     import main_wizard
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
@@ -4895,7 +5038,7 @@ def test_data_type_page_canonical_form_declares_reflow_and_overflow():
 )
 def test_data_type_page_records_every_supported_selection(button_name, expected):
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
     import main_wizard
     import meta_globals
 
@@ -4935,7 +5078,7 @@ def test_data_type_page_records_every_supported_selection(button_name, expected)
 
 def test_new_project_data_type_selection_populates_metric_defaults_and_results():
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
     import main_wizard
     import meta_globals
 
@@ -4946,7 +5089,7 @@ def test_new_project_data_type_selection_populates_metric_defaults_and_results()
         app.processEvents()
 
         data_type_page = wizard.page(main_wizard.Page_DataType)
-        next_button = wizard.button(main_wizard.QWizard.NextButton)
+        next_button = wizard.button(main_wizard.QWizard.WizardButton.NextButton)
         assert not next_button.isEnabled()
 
         data_type_page.twoarm_proportions_Button.click()
@@ -5024,7 +5167,7 @@ def test_welcome_wizard_open_existing_dialog_starts_in_sample_projects_when_no_r
     tmp_path, monkeypatch
 ):
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
     import main_wizard
 
     app_data = tmp_path / "app-data"
@@ -5055,7 +5198,7 @@ def test_welcome_wizard_open_existing_dialog_starts_in_sample_projects_when_no_r
 def test_removed_help_surfaces_do_not_leave_active_ui_or_urls():
     import launch
     import main_wizard
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
 
     app, window = launch.start_automation()
 
@@ -5078,7 +5221,7 @@ def test_removed_help_surfaces_do_not_leave_active_ui_or_urls():
         finally:
             about_legal_dialog.AboutLegalDialog.exec = original_exec
         about_text = about_dialogs[0].content_scroll_area.toPlainText()
-        assert about_dialogs[0].property("RCMS_window_archetype") == "transactional"
+        assert _window_archetype(about_dialogs[0]) == "transactional"
         assert "RC MetaStudio" in about_text
         assert "Ali Salman" in about_text
         assert "GPL-3.0-or-later" in about_text
@@ -5127,11 +5270,24 @@ def test_load_r_libraries_runs_against_stub_bridge():
             pass
 
     # Must not raise AttributeError: module 'meta_py_r' has no attribute 'get_R_libpaths'
-    launch.load_R_libraries(app, _Splash())
+    phases = []
+    launch.load_R_libraries(app, _Splash(), phase_callback=phases.append)
+    assert phases == [
+        "r-library-paths:start",
+        "r-library-paths:complete",
+        "r-library:metafor:start",
+        "r-library:metafor:complete",
+        "r-library:RCMetaR:start",
+        "r-library:RCMetaR:complete",
+        "r-library:igraph:start",
+        "r-library:igraph:complete",
+        "r-library:grid:start",
+        "r-library:grid:complete",
+    ]
 
 
 def test_stub_backend_exposes_data_entry_imputation_methods():
-    # Regression for GitHub #48: the maintained PyQt5 path plants a stub meta_py_r,
+    # Regression for GitHub #48: the maintained PyQt6 path plants a stub meta_py_r,
     # and data-entry dialogs call these methods during construction. The no-R
     # stub must expose them, returning a benign "couldn't impute" result rather
     # than crashing.
@@ -5184,7 +5340,7 @@ def test_data_entry_dialogs_construct_with_stub_backend(monkeypatch):
 
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "amino.rcms")))
+            window.open(_sample_project_path("amino.rcms"))
             is True
         )
         model = window.model
@@ -5200,7 +5356,7 @@ def test_data_entry_dialogs_construct_with_stub_backend(monkeypatch):
 
         assert (
             window.open(
-                os.path.abspath(os.path.join("sample_projects", "continuous.rcms"))
+                _sample_project_path("continuous.rcms")
             )
             is True
         )
@@ -5216,7 +5372,7 @@ def test_data_entry_dialogs_construct_with_stub_backend(monkeypatch):
         continuous_dialog.close()
 
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "lymph.rcms")))
+            window.open(_sample_project_path("lymph.rcms"))
             is True
         )
         model = window.model
@@ -5249,7 +5405,7 @@ def test_data_entry_dialog_tables_expand_and_show_all_rows(monkeypatch):
 
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "amino.rcms")))
+            window.open(_sample_project_path("amino.rcms"))
             is True
         )
         model = window.model
@@ -5266,7 +5422,7 @@ def test_data_entry_dialog_tables_expand_and_show_all_rows(monkeypatch):
 
         assert (
             window.open(
-                os.path.abspath(os.path.join("sample_projects", "continuous.rcms"))
+                _sample_project_path("continuous.rcms")
             )
             is True
         )
@@ -5283,7 +5439,7 @@ def test_data_entry_dialog_tables_expand_and_show_all_rows(monkeypatch):
         )
 
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "lymph.rcms")))
+            window.open(_sample_project_path("lymph.rcms"))
             is True
         )
         model = window.model
@@ -5352,7 +5508,7 @@ def test_analysis_dialog_family_declares_migrated_transactional_surfaces(monkeyp
 
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "amino.rcms")))
+            window.open(_sample_project_path("amino.rcms"))
             is True
         )
         model = window.model
@@ -5378,7 +5534,7 @@ def test_analysis_dialog_family_declares_migrated_transactional_surfaces(monkeyp
 
         assert (
             window.open(
-                os.path.abspath(os.path.join("sample_projects", "continuous.rcms"))
+                _sample_project_path("continuous.rcms")
             )
             is True
         )
@@ -5395,7 +5551,7 @@ def test_analysis_dialog_family_declares_migrated_transactional_surfaces(monkeyp
         )
 
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "lymph.rcms")))
+            window.open(_sample_project_path("lymph.rcms"))
             is True
         )
         model = window.model
@@ -5412,7 +5568,7 @@ def test_analysis_dialog_family_declares_migrated_transactional_surfaces(monkeyp
         for dialog in dialogs:
             dialog.show()
             app.processEvents()
-            assert dialog.property("RCMS_window_archetype") == "transactional"
+            assert _window_archetype(dialog) == "transactional"
             assert dialog.maximumSize() == QtCore.QSize(16777215, 16777215)
     finally:
         for dialog in dialogs:
@@ -5436,13 +5592,11 @@ def test_add_covariate_dialog_fields_and_buttons_fill_fitted_width():
         dialog.show()
         app.processEvents()
 
-        assert dialog.property("RCMS_window_archetype") == "transactional"
+        assert _window_archetype(dialog) == "transactional"
         assert dialog.layout() is not None
         assert dialog.minimumSize() == dialog.minimumSizeHint()
         assert dialog.maximumSize() == QtCore.QSize(16777215, 16777215)
-        assert dialog.covariate_name_le.sizePolicy().horizontalPolicy() == (
-            QtWidgets.QSizePolicy.Expanding
-        )
+        assert dialog.covariate_name_le.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Policy.Expanding
         assert dialog.buttonBox.isVisible()
         assert dialog.contentsRect().contains(dialog.buttonBox.geometry().center())
     finally:
@@ -5454,7 +5608,7 @@ def test_add_covariate_dialog_fields_and_buttons_fill_fitted_width():
 
 def test_csv_import_wizard_accepts_representative_csv(tmp_path, monkeypatch):
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
     import main_wizard
 
     csv_path = tmp_path / "studies.csv"
@@ -5491,7 +5645,7 @@ def test_csv_import_wizard_accepts_representative_csv(tmp_path, monkeypatch):
 
 def test_csv_import_wizard_pads_ragged_rows_before_previewing(tmp_path, monkeypatch):
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
     import main_wizard
 
     csv_path = tmp_path / "ragged-studies.csv"
@@ -5535,7 +5689,7 @@ def test_csv_import_wizard_pads_ragged_rows_before_previewing(tmp_path, monkeypa
 
 
 def test_csv_import_wizard_reports_empty_file_as_no_data(tmp_path, monkeypatch):
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
     import main_wizard
 
     csv_path = tmp_path / "empty.csv"
@@ -5575,7 +5729,7 @@ def test_csv_import_wizard_reports_empty_file_as_no_data(tmp_path, monkeypatch):
 
 
 def test_csv_import_preview_failure_preserves_error_details(tmp_path, monkeypatch):
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
     import main_wizard
 
     csv_path = tmp_path / "studies.csv"
@@ -5624,7 +5778,7 @@ def test_csv_import_preview_failure_preserves_error_details(tmp_path, monkeypatc
 
 def test_csv_import_file_selection_enables_finish_button(tmp_path, monkeypatch):
     import launch
-    from PyQt5 import QtWidgets
+    from PyQt6 import QtWidgets
     import main_wizard
 
     csv_path = tmp_path / "studies.csv"
@@ -5649,7 +5803,7 @@ def test_csv_import_file_selection_enables_finish_button(tmp_path, monkeypatch):
         app.processEvents()
 
         page = wizard.page(main_wizard.Page_CsvImport)
-        finish_button = wizard.button(main_wizard.QWizard.FinishButton)
+        finish_button = wizard.button(main_wizard.QWizard.WizardButton.FinishButton)
         assert not finish_button.isEnabled()
         monkeypatch.setattr(
             main_wizard.QFileDialog,
@@ -5674,24 +5828,24 @@ def test_table_paint_roles_do_not_raise_across_all_cells():
     # Offscreen tests never paint, so only a direct per-cell role sweep catches it.
     # Calling data()/headerData() in-process turns a paint-time abort into a clean
     # test failure; the packaged smoke test forces an actual paint pass as well.
-    from PyQt5 import QtCore
+    from PyQt6 import QtCore
     import launch
 
     paint_roles = [
-        QtCore.Qt.DisplayRole,
-        QtCore.Qt.DecorationRole,
-        QtCore.Qt.BackgroundColorRole,
-        QtCore.Qt.ForegroundRole,
-        QtCore.Qt.FontRole,
-        QtCore.Qt.TextAlignmentRole,
-        QtCore.Qt.CheckStateRole,
-        QtCore.Qt.SizeHintRole,
+        QtCore.Qt.ItemDataRole.DisplayRole,
+        QtCore.Qt.ItemDataRole.DecorationRole,
+        QtCore.Qt.ItemDataRole.BackgroundRole,
+        QtCore.Qt.ItemDataRole.ForegroundRole,
+        QtCore.Qt.ItemDataRole.FontRole,
+        QtCore.Qt.ItemDataRole.TextAlignmentRole,
+        QtCore.Qt.ItemDataRole.CheckStateRole,
+        QtCore.Qt.ItemDataRole.SizeHintRole,
     ]
 
     app, window = launch.start_automation()
     try:
         assert (
-            window.open(os.path.abspath(os.path.join("sample_projects", "amino.rcms")))
+            window.open(_sample_project_path("amino.rcms"))
             is True
         )
         model = window.tableView.model()
@@ -5702,10 +5856,10 @@ def test_table_paint_roles_do_not_raise_across_all_cells():
                     model.data(index, role)  # must not raise
         for section in range(model.columnCount()):
             for role in paint_roles:
-                model.headerData(section, QtCore.Qt.Horizontal, role)  # must not raise
+                model.headerData(section, QtCore.Qt.Orientation.Horizontal, role)  # must not raise
         for section in range(model.rowCount()):
             for role in paint_roles:
-                model.headerData(section, QtCore.Qt.Vertical, role)  # must not raise
+                model.headerData(section, QtCore.Qt.Orientation.Vertical, role)  # must not raise
     finally:
         window.close()
         app.processEvents()
@@ -5737,6 +5891,10 @@ def _dataset_summary(dataset):
 def test_native_packaged_smoke_requires_expected_plugin_and_visible_window(monkeypatch):
     import launch
 
+    phases = []
+    close_states = []
+    open_modes = []
+
     class Model:
         def rowCount(self):
             return 1
@@ -5752,22 +5910,89 @@ def test_native_packaged_smoke_requires_expected_plugin_and_visible_window(monke
         def processEvents(self):
             pass
 
+        def sendPostedEvents(self, *_args):
+            pass
+
+        def topLevelWidgets(self):
+            return []
+
+        def quit(self):
+            pass
+
     class Meta:
         tableView = Table()
 
         def isVisible(self):
             return True
 
-        def open(self, _path):
+        def open(self, _path, raise_on_error=False):
+            open_modes.append(raise_on_error)
             return True
 
         def close(self):
+            close_states.append(self.current_data_unsaved)
+
+        def hide(self):
             pass
 
-    monkeypatch.setattr(launch, "start_automation", lambda: (App(), Meta()))
+        def deleteLater(self):
+            pass
+
+    def start_automation(phase_callback=None):
+        if phase_callback is not None:
+            phase_callback("application:configured")
+        return App(), Meta()
+
+    monkeypatch.setattr(launch, "start_automation", start_automation)
+    monkeypatch.setattr(launch, "_write_automation_smoke_log", phases.append)
     monkeypatch.setattr(launch, "_force_table_paint", lambda _app, _meta: None)
     monkeypatch.setattr(
         launch, "_assert_standard_binary_summary_is_formatted", lambda _meta: None
     )
+    monkeypatch.setattr(
+        launch,
+        "_exercise_packaged_project_workflow",
+        lambda _app, _meta, _sample: {},
+    )
 
     assert launch.start_automation_smoke("sample.rcms", require_native_window=True) == 0
+    assert close_states == [False]
+    assert open_modes == [True]
+    assert phases == [
+        "packaged-workflow:start",
+        "packaged-workflow:shell:application:configured",
+        "packaged-workflow:shell-created",
+        "packaged-workflow:project-open:start",
+        "packaged-workflow:project-open:return",
+        "packaged-workflow:sample-opened",
+        "packaged-workflow:paint:start",
+        "packaged-workflow:paint:complete",
+        "packaged-workflow:project-exercise:start",
+        "packaged-workflow:project-exercise:complete",
+        "packaged-workflow:save-reopen-complete",
+        "packaged-workflow:teardown:close:start",
+        "packaged-workflow:teardown:close:return",
+        "packaged-workflow:teardown:deferred-delete:complete",
+        "packaged-workflow:teardown:top-level-windows:none",
+        "packaged-workflow:teardown:app-quit:start",
+        "packaged-workflow:teardown:app-quit:return",
+        "packaged-workflow:post-close",
+        "packaged-workflow:return",
+    ]
+
+    trace = object()
+    stopped_traces = []
+    monkeypatch.setattr(launch, "_start_automation_hang_trace", lambda: trace)
+    monkeypatch.setattr(
+        launch,
+        "_stop_automation_hang_trace",
+        stopped_traces.append,
+    )
+
+    def fail_start_automation(phase_callback=None):
+        raise RuntimeError("injected startup failure")
+
+    monkeypatch.setattr(launch, "start_automation", fail_start_automation)
+    with pytest.raises(RuntimeError, match="injected startup failure"):
+        launch.start_automation_smoke("sample.rcms", require_native_window=True)
+    assert stopped_traces == [trace]

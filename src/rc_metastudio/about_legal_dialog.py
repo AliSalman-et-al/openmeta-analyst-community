@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Screen-bounded About/Legal Transactional Dialog."""
 
-from PyQt5.QtWidgets import QDialog
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QDialog, QDialogButtonBox
 
 import adaptive_window
 import meta_globals
@@ -30,6 +31,15 @@ class AboutLegalDialog(QDialog, forms.ui_about_legal.Ui_AboutLegalDialog):
         self.content_scroll_area.setHtml(
             ABOUT_LEGAL_TEXT.format(version=meta_globals.VERSION)
         )
+        self.content_scroll_area.setAccessibleName("About and legal information")
+        self.content_scroll_area.setTabChangesFocus(True)
+        close_button = self.buttonBox.button(QDialogButtonBox.StandardButton.Close)
+        if close_button is None:
+            raise RuntimeError("About dialog is missing its Close button")
+        close_button.setObjectName("about_legal_close_button")
+        close_button.setAccessibleName("Close About and Legal")
+        close_button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setTabOrder(self.content_scroll_area, close_button)
         self._layout_controller = adaptive_window.register_adaptive_window(
             self, adaptive_window.WindowRole.TRANSACTIONAL
         )

@@ -2,18 +2,18 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Custom QTableView with copy, paste, undo, and redo support."""
 
-from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtCore import QRegExp, Qt, pyqtSignal
-from PyQt5.QtWidgets import (
-    QAction,
+from typing import TYPE_CHECKING, Protocol, cast
+
+from PyQt6 import QtCore, QtWidgets
+from PyQt6.QtCore import QEvent, QObject, QRegularExpression, Qt, pyqtSignal
+from PyQt6.QtGui import QAction, QKeyEvent, QUndoCommand, QUndoStack
+from PyQt6.QtWidgets import (
     QApplication,
     QItemDelegate,
     QLineEdit,
     QMenu,
     QMessageBox,
     QTableView,
-    QUndoCommand,
-    QUndoStack,
     QWidget,
 )
 
@@ -25,6 +25,29 @@ import app_error_handler
 import qt_layout
 from workspace_columns import WorkspaceColumnWidthController
 
+if TYPE_CHECKING:
+    from ma_data_table_model import DatasetModel
+
+
+class MainGuiProtocol(Protocol):
+    model: "DatasetModel"
+    current_data_unsaved: bool | None
+    oneArmMetricMenu: QMenu
+    twoArmMetricMenu: QMenu
+
+    def data_dirtied(self) -> None: ...
+    def delete_study(self, study, *, study_index: int) -> None: ...
+    def edit_group_name(self, group: str) -> None: ...
+    def rename_covariate(self, covariate) -> None: ...
+    def delete_covariate(self, covariate) -> None: ...
+    def change_cov_type(self, covariate) -> None: ...
+    def keyPressEvent(self, event: QKeyEvent | None) -> None: ...
+    def metric_selected(self, metric: str, menu: QMenu) -> None: ...
+    def enable_menu_options_that_require_dataset(self) -> None: ...
+    def disable_menu_options_that_require_dataset(self) -> None: ...
+    def set_model(self, dataset, state_dict=None) -> None: ...
+    def data_error(self, message: str) -> None: ...
+
 # it's a questionable practice to import the
 # underlying model into the view, but sometimes
 # it's easiest to manipulate the model directly
@@ -35,10 +58,11 @@ from ma_dataset import *
 from meta_globals import *
 import qt_text
 import tabular_data
+from runtime_types import required
 
 # for issue #169 -- normalizing new lines, e.g., for pasting
-# use QRegExp for Qt regular-expression matching
-_newlines_re = QRegExp("(\r\n|\r|\r)")
+# This Qt6 regular expression site is behavior-owned by the table editing slice.
+_newlines_re = QRegularExpression("(\r\n|\r|\r)")
 
 
 def _connect_action(action, callback):
@@ -62,6 +86,25 @@ def DebugHelper(function):
     return _DebugHelper
 
 
+def _restore_table_selection(table, selected_cells, current_cell):
+    model = table.model()
+    selection_model = table.selectionModel()
+    if model is None or selection_model is None:
+        return
+    selection_model.clearSelection()
+    select = QtCore.QItemSelectionModel.SelectionFlag.Select
+    for row, column in selected_cells:
+        index = model.index(row, column)
+        if index.isValid():
+            selection_model.select(index, select)
+    if current_cell is not None:
+        index = model.index(*current_cell)
+        if index.isValid():
+            selection_model.setCurrentIndex(
+                index, QtCore.QItemSelectionModel.SelectionFlag.NoUpdate
+            )
+
+
 class MADataTable(QtWidgets.QTableView):
     dataDirtied = pyqtSignal()
 
@@ -72,19 +115,19 @@ class MADataTable(QtWidgets.QTableView):
         # that owns this table view, i.e., the 'main'
         # user interface/form. it is assumed that this
         # is set elsewhere.
-        self.main_gui = None
+        self.main_gui: MainGuiProtocol | None = None
 
         # None maps to the special, no outcome/no follow up
         # undo stack
         self.undo_stack_dict = {None: QUndoStack(self)}
         self.undoStack = QUndoStack(self)
 
-        header = self.horizontalHeader()
+        header = required(self.horizontalHeader(), "workspace column header")
         header.sectionClicked.connect(
             app_error_handler.safe_slot(self.header_clicked, parent=self)
         )
 
-        self.vert_header = self.verticalHeader()
+        self.vert_header = required(self.verticalHeader(), "workspace row header")
 
         self.vert_header.sectionClicked.connect(
             app_error_handler.safe_slot(self.row_header_clicked, parent=self)
@@ -98,14 +141,26 @@ class MADataTable(QtWidgets.QTableView):
         self.contextMenuEvent = self._make_context_menu()
 
         ### vertical (column) header
-        headers = self.horizontalHeader()
-        headers.setContextMenuPolicy(Qt.CustomContextMenu)
+        headers = required(self.horizontalHeader(), "workspace column header")
+        headers.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         headers.customContextMenuRequested.connect(
             app_error_handler.safe_slot(self.header_context_menu, parent=self)
         )
         qt_layout.configure_spreadsheet_table_view(self)
         self._column_widths = WorkspaceColumnWidthController(self)
         self._column_model = None
+
+    def model(self) -> "DatasetModel":
+        """Return the concrete model required by the maintained workspace view."""
+        from ma_data_table_model import DatasetModel
+
+        model = super().model()
+        if model is None:
+            raise RuntimeError("MADataTable requires a model")
+        return cast(DatasetModel, model)
+
+    def _main_gui(self) -> MainGuiProtocol:
+        return required(self.main_gui, "workspace owner")
 
     def setModel(self, model):
         self._disconnect_column_model()
@@ -183,7 +238,7 @@ class MADataTable(QtWidgets.QTableView):
             action = QAction("Delete Study %s" % study.name, self)
             _connect_action(
                 action,
-                lambda: self.main_gui.delete_study(study, study_index=study_index),
+                lambda: self._main_gui().delete_study(study, study_index=study_index),
             )
             context_menu.addAction(action)
 
@@ -258,23 +313,23 @@ class MADataTable(QtWidgets.QTableView):
             action_rename = QAction("Rename Group %s" % corresponding_tx_group, self)
             _connect_action(
                 action_rename,
-                lambda: self.main_gui.edit_group_name(corresponding_tx_group),
+                lambda: self._main_gui().edit_group_name(corresponding_tx_group),
             )
             context_menu.addAction(action_rename)
             # sorting
-            col_name = _to_text(self.model().headerData(column_clicked, Qt.Horizontal))
+            col_name = _to_text(self.model().headerData(column_clicked, Qt.Orientation.Horizontal))
             action_sort = QAction("Sort Studies by %s" % col_name, self)
             _connect_action(action_sort, lambda: self.sort_by_col(column_clicked))
             context_menu.addAction(action_sort)
         elif column_clicked in raw_data_columns and data_type == "diagnostic":
             # sorting
-            col_name = _to_text(self.model().headerData(column_clicked, Qt.Horizontal))
+            col_name = _to_text(self.model().headerData(column_clicked, Qt.Orientation.Horizontal))
             action_sort = QAction("Sort Studies by %s" % col_name, self)
             _connect_action(action_sort, lambda: self.sort_by_col(column_clicked))
             context_menu.addAction(action_sort)
         elif column_clicked in outcomes_columns:
             # sorting
-            col_name = _to_text(self.model().headerData(column_clicked, Qt.Horizontal))
+            col_name = _to_text(self.model().headerData(column_clicked, Qt.Orientation.Horizontal))
             action_sort = QAction("Sort Studies by %s" % col_name, self)
             _connect_action(action_sort, lambda: self.sort_by_col(column_clicked))
             context_menu.addAction(action_sort)
@@ -287,12 +342,12 @@ class MADataTable(QtWidgets.QTableView):
             context_menu.addAction(action_sort)
 
             action_ren = QAction("Rename Covariate %s" % cov.name, self)
-            _connect_action(action_ren, lambda: self.main_gui.rename_covariate(cov))
+            _connect_action(action_ren, lambda: self._main_gui().rename_covariate(cov))
             context_menu.addAction(action_ren)
 
             # allow deletion of covariate
             action_del = QAction("Delete Covariate %s" % cov.name, self)
-            _connect_action(action_del, lambda: self.main_gui.delete_covariate(cov))
+            _connect_action(action_del, lambda: self._main_gui().delete_covariate(cov))
             context_menu.addAction(action_del)
 
             convert_to_str = "*continuous*"
@@ -302,7 +357,7 @@ class MADataTable(QtWidgets.QTableView):
             action_change = QAction(
                 "Create a %s Copy of %s" % (convert_to_str, cov.name), self
             )
-            _connect_action(action_change, lambda: self.main_gui.change_cov_type(cov))
+            _connect_action(action_change, lambda: self._main_gui().change_cov_type(cov))
             context_menu.addAction(action_change)
 
         app_error_handler.popup_context_menu(
@@ -317,32 +372,36 @@ class MADataTable(QtWidgets.QTableView):
         self.model().exclude_all_studies()
         self.model().reset_model()
 
-    def keyPressEvent(self, event):
-        if event.modifiers() & QtCore.Qt.ControlModifier:
+    def keyPressEvent(  # ty: ignore[invalid-method-override] -- PyQt6's QTableView stub rejects this runtime-supported nullable event override.
+        self, event: QKeyEvent | None
+    ) -> None:
+        if event is None:
+            return
+        if event.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier:
             ## undo/redo
 
-            if event.key() == QtCore.Qt.Key_Z:
+            if event.key() == QtCore.Qt.Key.Key_Z:
                 self.undoStack.undo()
-            elif event.key() == QtCore.Qt.Key_Y:
+            elif event.key() == QtCore.Qt.Key.Key_Y:
                 self.undoStack.redo()
             ### copy/paste
-            elif event.key() == QtCore.Qt.Key_C:
+            elif event.key() == QtCore.Qt.Key.Key_C:
                 # ctrl + c = copy
                 self.copy()
-            elif event.key() == QtCore.Qt.Key_V:
+            elif event.key() == QtCore.Qt.Key.Key_V:
                 # ctrl + v = paste
                 self.paste()
-            elif event.key() == QtCore.Qt.Key_A:
+            elif event.key() == QtCore.Qt.Key.Key_A:
                 self.selectAll()
                 event.accept()
             else:
                 ###
                 # if the command hasn't anything to do with the table view
                 # in particular, we pass the event up to the main UI
-                self.main_gui.keyPressEvent(event)
+                self._main_gui().keyPressEvent(event)
         elif self._is_return_key(event):
             self._move_current_index_vertically(
-                -1 if event.modifiers() & QtCore.Qt.ShiftModifier else 1
+                -1 if event.modifiers() & QtCore.Qt.KeyboardModifier.ShiftModifier else 1
             )
             event.accept()
         elif self._is_clear_key(event):
@@ -357,10 +416,10 @@ class MADataTable(QtWidgets.QTableView):
             QTableView.keyPressEvent(self, event)
 
     def _is_return_key(self, event):
-        return event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter)
+        return event.key() in (QtCore.Qt.Key.Key_Return, QtCore.Qt.Key.Key_Enter)
 
     def _is_clear_key(self, event):
-        return event.key() in (QtCore.Qt.Key_Delete, QtCore.Qt.Key_Backspace)
+        return event.key() in (QtCore.Qt.Key.Key_Delete, QtCore.Qt.Key.Key_Backspace)
 
     def clear_selected_cells(self):
         model = self.model()
@@ -381,7 +440,7 @@ class MADataTable(QtWidgets.QTableView):
             if key in seen:
                 continue
             seen.add(key)
-            if model.flags(index) & Qt.ItemIsEditable:
+            if model.flags(index) & Qt.ItemFlag.ItemIsEditable:
                 editable_indexes.append(index)
 
         if not editable_indexes:
@@ -413,7 +472,7 @@ class MADataTable(QtWidgets.QTableView):
             self.scrollTo(target)
 
     def copy(self):
-        selected_indexes = self.selectionModel().selectedIndexes()
+        selected_indexes = required(self.selectionModel(), "workspace selection model").selectedIndexes()
         if not selected_indexes:
             return
         upper_left_index = self._upper_left(selected_indexes)
@@ -423,7 +482,7 @@ class MADataTable(QtWidgets.QTableView):
         )
 
     def paste(self):
-        selected_indexes = self.selectionModel().selectedIndexes()
+        selected_indexes = required(self.selectionModel(), "workspace selection model").selectedIndexes()
         if not selected_indexes:
             return
         upper_left_index = self._upper_left(selected_indexes)
@@ -525,7 +584,11 @@ class MADataTable(QtWidgets.QTableView):
         cur_outcome = self.model().current_outcome
         cur_follow_up = self.model().current_time_point
 
-    def cell_content_changed(self, index, old_val, new_val, study_added):
+    def cell_content_changed(self, edit):
+        index = edit.index
+        old_val = edit.old_value
+        new_val = edit.new_value
+        study_added = edit.added_study_id
         # Only make a cell edit if the old values and new values are different
         try:
             print(("Old val: %s, new val: %s" % (_to_text(old_val), _to_text(new_val))))
@@ -544,6 +607,9 @@ class MADataTable(QtWidgets.QTableView):
 
     def _new_eq_old(self, old, new):
         """None and "" are the same for table-edit comparisons."""
+
+        if hasattr(old, "include") or hasattr(new, "include"):
+            return old == new
 
         blank_vals = meta_globals.EMPTY_VALS
 
@@ -621,7 +687,7 @@ class MADataTable(QtWidgets.QTableView):
     def paste_from_clipboard(self, upper_left_index):
         """pastes the data in the clipboard starting at the currently selected cell."""
 
-        clipboard = QApplication.clipboard()
+        clipboard = required(QApplication.clipboard(), "application clipboard")
         clipboard_text = clipboard.text()
 
         # Some spreadsheet applications use carriage returns between copied
@@ -635,7 +701,12 @@ class MADataTable(QtWidgets.QTableView):
             new_content = new_content[:-1]
         new_content = self._normalize_matrix_rows(new_content)
         if not new_content:
-            return
+            return False
+
+        valid, message = self._preflight_paste(upper_left_index, new_content)
+        if not valid:
+            self._report_model_data_error(message)
+            return False
 
         lower_row = upper_left_index.row() + len(new_content)
         lower_col = upper_left_index.column() + len(new_content[0])
@@ -663,7 +734,38 @@ class MADataTable(QtWidgets.QTableView):
             self.column_widths(),
             "paste %s" % new_content,
         )
+        self._last_paste_committed = True
         self.undoStack.push(paste_command)
+        return self._last_paste_committed
+
+    def _preflight_paste(self, upper_left_index, content):
+        model = self.model()
+        if model is None or upper_left_index is None or not upper_left_index.isValid():
+            return False, "Select a valid workspace cell before pasting."
+        if not content or not content[0]:
+            return False, "The clipboard does not contain a rectangular range."
+        width = len(content[0])
+        if any(len(row) != width for row in content):
+            return False, "Clipboard rows must form one rectangular range."
+        if upper_left_index.column() + width > model.columnCount():
+            return False, "Clipboard data extends beyond the workspace columns."
+        if upper_left_index.row() + len(content) > model.rowCount():
+            return False, "Clipboard data extends beyond the workspace rows."
+
+        candidate = type(model)(dataset=copy.deepcopy(model.dataset), add_blank_study=False)
+        candidate.set_state(copy.deepcopy(model.get_stateful_dict()))
+        for row_offset, row in enumerate(content):
+            for column_offset, value in enumerate(row):
+                index = candidate.index(
+                    upper_left_index.row() + row_offset,
+                    upper_left_index.column() + column_offset,
+                )
+                if not candidate.setData(index, value):
+                    return False, (
+                        getattr(candidate, "last_data_error", None)
+                        or "The clipboard data could not be validated."
+                    )
+        return True, None
 
     def copy_contents_in_range(self, upper_left_index, lower_right_index, to_clipboard):
         """
@@ -696,7 +798,7 @@ class MADataTable(QtWidgets.QTableView):
         copied_str = self._matrix_to_str(text_matrix)
 
         if to_clipboard:
-            clipboard = QApplication.clipboard()
+            clipboard = required(QApplication.clipboard(), "application clipboard")
             clipboard.setText(copied_str)
         print("copied str: %s" % copied_str)
         return copied_str
@@ -709,7 +811,7 @@ class MADataTable(QtWidgets.QTableView):
         origin_row, origin_col = upper_left_index.row(), upper_left_index.column()
         source_content = self._normalize_matrix_rows(source_content)
         if not source_content:
-            return
+            return True
 
         if (
             isinstance(source_content[-1], list)
@@ -721,21 +823,28 @@ class MADataTable(QtWidgets.QTableView):
             source_content = source_content[:-1]
             source_content = self._normalize_matrix_rows(source_content)
             if not source_content:
-                return
+                return True
 
         # temporarily disable sorting to prevent automatic sorting of pasted data.
         # (note: this is consistent with Excel's approach.)
-        self.model().blockSignals(True)
-        failed_messages = []
+        original_dataset = copy.deepcopy(self.model().dataset)
+        original_state_dict = copy.deepcopy(self.model().get_stateful_dict())
+        original_model = self.model()
+        original_unsaved = (
+            self._main_gui().current_data_unsaved
+            if self.main_gui is not None
+            else None
+        )
+        original_model.blockSignals(True)
+        failure = None
+        try:
+            for src_row in range(len(source_content)):
+                # do we need to append a row?
+                cur_row_count = self.model().rowCount()
+                if cur_row_count <= origin_row + src_row:
+                    self._add_new_row()
 
-        for src_row in range(len(source_content)):
-            # do we need to append a row?
-            cur_row_count = self.model().rowCount()
-            if cur_row_count <= origin_row + src_row:
-                self._add_new_row()
-
-            for src_col in range(len(source_content[0])):
-                try:
+                for src_col in range(len(source_content[0])):
                     # note that we treat all of the data pasted as
                     # one event; i.e., when undo is called, it undos the
                     # whole paste
@@ -745,14 +854,29 @@ class MADataTable(QtWidgets.QTableView):
                     if not self.model().setData(
                         index, source_content[src_row][src_col]
                     ):
-                        failed_messages.append(self._model_data_error_message())
-                except Exception as e:
-                    print("Exception while pasting: %s" % e)
+                        failure = self._model_data_error_message()
+                        break
+                if failure is not None:
+                    break
+        except Exception as exc:
+            failure = "Exception while pasting: %s" % exc
+        finally:
+            original_model.blockSignals(False)
 
-        self.model().blockSignals(False)
+        if failure is not None:
+            if self.main_gui is not None:
+                self._main_gui().set_model(
+                    original_dataset, state_dict=original_state_dict
+                )
+                self._main_gui().current_data_unsaved = original_unsaved
+            else:
+                original_model.dataset = original_dataset
+                original_model.set_state(original_state_dict)
+                original_model.reset_model()
+            self._report_model_data_error(failure)
+            return False
         self.model().reset_model()
-        if failed_messages:
-            self._report_model_data_error(failed_messages[0])
+        return True
 
     def set_data_in_model(self, index, val):
         if not self.model().setData(index, val):
@@ -767,7 +891,7 @@ class MADataTable(QtWidgets.QTableView):
 
     def _report_model_data_error(self, msg):
         if self.main_gui is not None and hasattr(self.main_gui, "data_error"):
-            self.main_gui.data_error(msg)
+            self._main_gui().data_error(msg)
         else:
             QMessageBox.warning(self, "Warning", msg)
 
@@ -785,10 +909,11 @@ class MADataTable(QtWidgets.QTableView):
         method binded to the menu items, so call
         this to programmatically change the metric.
         """
-        menu = self.main_gui.oneArmMetricMenu
+        owner = self._main_gui()
+        menu = owner.oneArmMetricMenu
         if metric in TWO_ARM_METRICS:
-            menu = self.main_gui.twoArmMetricMenu
-        self.main_gui.metric_selected(metric, menu)
+            menu = owner.twoArmMetricMenu
+        owner.metric_selected(metric, menu)
 
     def _enable_analysis_menus_if_appropriate(self):
 
@@ -796,9 +921,9 @@ class MADataTable(QtWidgets.QTableView):
             len(self.model().dataset) >= 2
             and self._get_number_of_included_studies() >= 2
         ):
-            self.main_gui.enable_menu_options_that_require_dataset()
+            self._main_gui().enable_menu_options_that_require_dataset()
         else:
-            self.main_gui.disable_menu_options_that_require_dataset()
+            self._main_gui().disable_menu_options_that_require_dataset()
 
     def _get_number_of_included_studies(self):
         studies = self.model().dataset.studies
@@ -907,7 +1032,7 @@ class MADataTable(QtWidgets.QTableView):
             # Newly appended placeholder studies remain excluded until populated.
             new_study.include = False
             self.model().dataset.add_study(new_study)
-            self.model().dataset.study_auto_added = int(new_study.id)
+            self.model().study_auto_added = int(new_study.id)
 
         self.model().reset_model()
 
@@ -940,6 +1065,14 @@ class CommandCellEdit(QUndoCommand):
         self.ma_data_table_view = ma_data_table_view
         self.added_study = added_study
         self.something_else = added_study
+        self.selection = [
+            (selected.row(), selected.column())
+            for selected in ma_data_table_view.selectionModel().selectedIndexes()
+        ]
+        current = ma_data_table_view.currentIndex()
+        self.current_cell = (
+            (current.row(), current.column()) if current.isValid() else None
+        )
 
         debug_params = dict(
             first_call=True,
@@ -978,7 +1111,7 @@ class CommandCellEdit(QUndoCommand):
             # side of things, when the model emits
             # the data edited signal.
             model.blockSignals(True)
-            edit_ok = model.setData(index, self.new_content)
+            edit_ok = self._apply_content(model, index, self.new_content)
             self.added_study = self.ma_data_table_view.model().study_auto_added
             self.ma_data_table_view.model().study_auto_added = None
 
@@ -995,6 +1128,7 @@ class CommandCellEdit(QUndoCommand):
 
         # let everyone know that the data is dirty
         self.ma_data_table_view.dataDirtied.emit()
+        self._restore_selection()
 
     @DebugHelper
     def undo(self):
@@ -1010,7 +1144,9 @@ class CommandCellEdit(QUndoCommand):
         # as in the redo method, we block signals before
         # editing the model data
         model.blockSignals(True)
-        edit_ok = model.setData(index, self.original_content, allow_empty_names=True)
+        edit_ok = self._apply_content(
+            model, index, self.original_content, allow_empty_names=True
+        )
 
         model.blockSignals(False)
         if not edit_ok:
@@ -1024,9 +1160,29 @@ class CommandCellEdit(QUndoCommand):
         self.ma_data_table_view._enable_analysis_menus_if_appropriate()
         self.ma_data_table_view.synchronize_column_widths()
         self.ma_data_table_view.dataDirtied.emit()
+        self._restore_selection()
 
     def _get_index(self):
         return self.ma_data_table_view.model().createIndex(self.row, self.col)
+
+    def _apply_content(self, model, index, content, allow_empty_names=False):
+        if index.column() == model.INCLUDE_STUDY and hasattr(
+            content, "manually_excluded"
+        ):
+            study = model.dataset.studies[index.row()]
+            study.include = bool(content.include)
+            study.manually_excluded = bool(content.manually_excluded)
+            return True
+        return model.setData(
+            index, content, allow_empty_names=allow_empty_names
+        )
+
+    def _restore_selection(self):
+        _restore_table_selection(
+            self.ma_data_table_view,
+            self.selection,
+            self.current_cell,
+        )
 
 
 class CommandPaste(QUndoCommand):
@@ -1054,6 +1210,14 @@ class CommandPaste(QUndoCommand):
         self.metric_changed = None
         self.old_metric = None
         self.new_metric = None
+        self.selection = [
+            (index.row(), index.column())
+            for index in ma_data_table_view.selectionModel().selectedIndexes()
+        ]
+        current = ma_data_table_view.currentIndex()
+        self.current_cell = (
+            (current.row(), current.column()) if current.isValid() else None
+        )
         # is this the first time?
         self.first_call = True
 
@@ -1061,40 +1225,55 @@ class CommandPaste(QUndoCommand):
 
     @DebugHelper
     def redo(self):
-        # cache the original dataset
+        # Snapshot before any row growth so every paste mutation shares one
+        # rollback boundary.
         self.original_dataset = copy.deepcopy(self.ma_data_table_view.model().dataset)
-        self.original_state_dict = copy.copy(
+        self.original_state_dict = copy.deepcopy(
             self.ma_data_table_view.model().get_stateful_dict()
         )
+        self.original_unsaved = self.ma_data_table_view.main_gui.current_data_unsaved
 
-        # paste the data
-        self.ma_data_table_view._add_studies_if_necessary(
-            self.upper_left_coord, self.new_content
-        )
-        self.ma_data_table_view.paste_contents(self.upper_left_coord, self.new_content)
-
-        if self.first_call:
-            # on the first application of the paste, we need to ascertain
-            # whether the metric changed automatically (e.g., because it
-            # looks like tpasted data is single-arm)
-            self.metric_changed, self.old_metric = (
-                self.ma_data_table_view.change_metric_if_appropriate()
+        try:
+            self.ma_data_table_view._add_studies_if_necessary(
+                self.upper_left_coord, self.new_content
             )
+            committed = self.ma_data_table_view.paste_contents(
+                self.upper_left_coord, self.new_content
+            )
+            if not committed:
+                self._rollback_failed_redo()
+                return
 
-            if self.metric_changed:
-                self.new_metric = self.ma_data_table_view.model().current_effect
-                # self.ma_data_table_view.set_metric_in_ui(self.new_metric)
-            self.first_call = False
-        else:
-            # did the metric change on the original paste?
-            # if so re-change it here
-            if self.metric_changed:
+            if self.first_call:
+                # On the first application, record any automatic metric change.
+                self.metric_changed, self.old_metric = (
+                    self.ma_data_table_view.change_metric_if_appropriate()
+                )
+
+                if self.metric_changed:
+                    self.new_metric = self.ma_data_table_view.model().current_effect
+                self.first_call = False
+            elif self.metric_changed:
                 self.ma_data_table_view.set_metric_in_ui(self.new_metric)
 
-        self.ma_data_table_view.model().reset_model()
-        self.ma_data_table_view._enable_analysis_menus_if_appropriate()
-        self.ma_data_table_view.dataDirtied.emit()
-        self.ma_data_table_view.synchronize_column_widths()
+            self.ma_data_table_view.model().reset_model()
+            self.ma_data_table_view._enable_analysis_menus_if_appropriate()
+            self.ma_data_table_view.dataDirtied.emit()
+            self.ma_data_table_view.synchronize_column_widths()
+            self._restore_selection()
+        except Exception as exc:
+            self._rollback_failed_redo("Exception while pasting: %s" % exc)
+
+    def _rollback_failed_redo(self, message=None):
+        self.ma_data_table_view.main_gui.set_model(
+            self.original_dataset, state_dict=self.original_state_dict
+        )
+        self.ma_data_table_view.main_gui.current_data_unsaved = self.original_unsaved
+        self.ma_data_table_view._last_paste_committed = False
+        self.setObsolete(True)
+        self._restore_selection()
+        if message is not None:
+            self.ma_data_table_view._report_model_data_error(message)
 
     @DebugHelper
     def undo(self):
@@ -1113,6 +1292,14 @@ class CommandPaste(QUndoCommand):
         self.ma_data_table_view.model().reset_model()
         self.ma_data_table_view._enable_analysis_menus_if_appropriate()
         self.ma_data_table_view.dataDirtied.emit()
+        self._restore_selection()
+
+    def _restore_selection(self):
+        _restore_table_selection(
+            self.ma_data_table_view,
+            self.selection,
+            self.current_cell,
+        )
 
 
 class CommandEditMAUnit(QUndoCommand):
@@ -1152,45 +1339,6 @@ class CommandEditMAUnit(QUndoCommand):
         self.ma_data_table_view.dataDirtied.emit()
 
 
-# IS THIS CLASS USED ANYWHERE?
-class CommandEditRawData(QUndoCommand):
-    def __init__(
-        self,
-        ma_unit,
-        model,
-        old_raw_data_dict,
-        new_raw_data_dict,
-        description="Raw data edit",
-    ):
-        super(CommandEditRawData, self).__init__(description)
-        self.ma_unit = ma_unit
-        # we take the model in as a parameter so we can refresh it, in turn
-        # notifying the view to refresh. otherwise, the old data is displayed
-        # until the user interacts with it in some way
-        self.model = model
-        self.old_raw_data_dict = old_raw_data_dict
-        self.new_raw_data_dict = new_raw_data_dict
-        self.group_names = list(self.old_raw_data_dict.keys())
-
-        print("Command Edit RawData created")
-
-    @DebugHelper
-    def undo(self):
-        for group_name in self.group_names:
-            raw_data = self.old_raw_data_dict[group_name]
-            self.ma_unit.set_raw_data_for_group(group_name, raw_data)
-        self.model.reset_model()
-        self.ma_data_table_view.dataDirtied.emit()
-
-    @DebugHelper
-    def redo(self):
-        for group_name in self.group_names:
-            raw_data = self.new_raw_data_dict[group_name]
-            self.ma_unit.set_raw_data_for_group(group_name, raw_data)
-        self.model.reset_model()
-        self.ma_data_table_view.dataDirtied.emit()
-
-
 class CommandSort(QUndoCommand):
     def __init__(self, ma_data_table_model, col, reverse_order, description="Sort"):
         super(CommandSort, self).__init__(description)
@@ -1215,17 +1363,21 @@ class StudyDelegate(QItemDelegate):
     def __init__(self, parent=None):
         super(StudyDelegate, self).__init__(parent)
 
-    def eventFilter(self, editor, event):
+    def eventFilter(  # ty: ignore[invalid-method-override] -- PyQt6's delegate stub rejects this runtime-supported QObject override.
+        self, editor: QObject | None, event: QEvent | None
+    ) -> bool:
         if (
-            event.type() == QtCore.QEvent.KeyPress
-            and event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter)
-            and not event.modifiers() & QtCore.Qt.ControlModifier
+            isinstance(editor, QWidget)
+            and isinstance(event, QKeyEvent)
+            and event.type() == QtCore.QEvent.Type.KeyPress
+            and event.key() in (QtCore.Qt.Key.Key_Return, QtCore.Qt.Key.Key_Enter)
+            and not event.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier
         ):
-            direction = -1 if event.modifiers() & QtCore.Qt.ShiftModifier else 1
+            direction = -1 if event.modifiers() & QtCore.Qt.KeyboardModifier.ShiftModifier else 1
             table = self._table_for_editor(editor)
             edited_index = table.currentIndex() if table is not None else None
             self.commitData.emit(editor)
-            self.closeEditor.emit(editor, QtWidgets.QAbstractItemDelegate.NoHint)
+            self.closeEditor.emit(editor, QtWidgets.QAbstractItemDelegate.EndEditHint.NoHint)
             if table is not None:
                 QtCore.QTimer.singleShot(
                     0,
@@ -1253,5 +1405,5 @@ class StudyDelegate(QItemDelegate):
 
     def setEditorData(self, editor, index):
         # used to be Qt.DisplayRole
-        text = index.model().data(index, Qt.EditRole)
+        text = index.model().data(index, Qt.ItemDataRole.EditRole)
         editor.setText(_to_text(text))

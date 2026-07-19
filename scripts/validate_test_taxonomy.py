@@ -7,6 +7,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import cast
 
 
 DEFAULT_MANIFEST = Path("docs") / "verification" / "test-taxonomy.json"
@@ -63,6 +64,7 @@ def require_list(value: object, label: str) -> list:
 def validate_entry(entry: object, index: int) -> str:
     if not isinstance(entry, dict):
         raise TaxonomyError(f"tests[{index}]: expected an object")
+    entry = cast(dict[str, object], entry)
     nodeid = require_string(entry.get("nodeid"), f"tests[{index}].nodeid").replace(
         "\\", "/"
     )
@@ -161,12 +163,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--tests-path", default="tests")
     parser.add_argument("--strict", action="store_true")
+    parser.add_argument(
+        "--require-covered",
+        action="store_true",
+        help="fail on collected tests missing from the manifest while allowing stale entries",
+    )
     args = parser.parse_args(argv)
 
     try:
         missing, stale = validate(
             args.root.resolve(), args.manifest, args.tests_path, args.strict
         )
+        if args.require_covered and missing:
+            raise TaxonomyError(
+                "missing taxonomy entries:\n" + "\n".join(sorted(missing))
+            )
     except TaxonomyError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
@@ -175,11 +186,13 @@ def main(argv: list[str] | None = None) -> int:
         print("taxonomy warning: missing entries")
         for nodeid in sorted(missing):
             print(f"  {nodeid}")
-    if stale:
+    if stale and not args.require_covered:
         print("taxonomy warning: stale entries")
         for nodeid in sorted(stale):
             print(f"  {nodeid}")
-    if not missing and not stale:
+    if args.require_covered and not missing:
+        print("collected tests are covered by the verification taxonomy")
+    elif not missing and not stale:
         print("validated verification test taxonomy")
     return 0
 

@@ -5,7 +5,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $signtool = (Get-Command signtool.exe -ErrorAction Stop).Source
-$signables = Get-ChildItem -LiteralPath $Tree -Recurse -File | Where-Object { $_.Extension -in '.exe', '.dll' }
+$signables = Get-ChildItem -LiteralPath $Tree -Recurse -File | Where-Object { $_.Extension -in '.exe', '.dll', '.pyd' }
 if (-not $signables) { throw "No Authenticode-signable files found." }
 foreach ($file in $signables) {
     & $signtool verify /pa /all /v $file.FullName

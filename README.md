@@ -15,12 +15,11 @@ RC MetaStudio is a desktop application for performing and reviewing meta-analyse
 
 Download RC MetaStudio from the [GitHub Releases page](https://github.com/AliSalman-et-al/rc-metastudio/releases).
 
-Choose the ZIP file for your computer:
+RC MetaStudio 0.2.0 is the Windows x64 Qt 6 release. Download:
 
 - **Windows x64:** `RCMetaStudio-windows-x64.zip`
-- **macOS Intel x64:** `RCMetaStudio-macos-x64.zip`
 
-RC MetaStudio 0.1.1 does not include a native Apple Silicon build.
+Native Intel and Apple Silicon macOS packages are planned for RC MetaStudio 0.2.1. The project is not publishing a partially qualified macOS build in 0.2.0.
 
 ## Get Started
 
@@ -29,14 +28,6 @@ RC MetaStudio 0.1.1 does not include a native Apple Silicon build.
 1. Download and extract `RCMetaStudio-windows-x64.zip`.
 2. Open the extracted folder.
 3. Run `RCMetaStudio.exe`.
-
-### macOS Intel
-
-1. Download and extract `RCMetaStudio-macos-x64.zip`.
-2. Open the extracted folder.
-3. Open `RCMetaStudio.app`.
-
-If macOS blocks the first launch, Control-click `RCMetaStudio.app`, choose **Open**, and confirm that you want to open it.
 
 ## Feedback
 

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://rc-metastudio.org/schemas/release-set-v1.json",
   "type": "object",
-  "required": ["schema_version", "product", "version", "channel", "trust_profile", "source", "policy_inputs", "targets", "history"],
+  "required": ["schema_version", "product", "version", "channel", "trust_profile", "source", "policy_inputs", "release_targets", "targets", "history"],
   "properties": {
     "schema_version": {"const": 1},
     "product": {"const": "RC MetaStudio"},
@@ -19,6 +19,12 @@
       "additionalProperties": false
     },
     "policy_inputs": {"type": "object", "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+    "release_targets": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"enum": ["windows-x64", "macos-x64", "macos-arm64"]}
+    },
     "targets": {"type": "object"},
     "history": {"type": "array"}
   },

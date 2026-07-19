@@ -15,18 +15,17 @@
 import sys
 import copy
 
-from PyQt5.QtCore import QEvent, QTimer, Qt
-from PyQt5.QtGui import QKeySequence, QPalette
-from PyQt5.QtWidgets import (
-    QAction,
+from PyQt6.QtCore import QEvent, QObject, QTimer, Qt
+from PyQt6.QtGui import QAction, QKeySequence, QPalette, QUndoStack
+from PyQt6.QtWidgets import (
     QDialog,
+    QDialogButtonBox,
     QHeaderView,
     QMessageBox,
     QSizePolicy,
     QStyle,
     QTableWidgetItem,
     QTreeView,
-    QUndoStack,
     QWidget,
     QWIDGETSIZE_MAX,
 )
@@ -35,11 +34,12 @@ import calculator_routines as calc_fncs
 
 import app_error_handler
 import adaptive_window
-import meta_py_r
+from rc_metastudio import meta_py_r
 import tabular_data
 from meta_globals import *
 import forms.ui_continuous_data_form
 import forms.ui_continuous_back_calc_result_form
+from runtime_types import required
 
 CONTINUOUS_IMPUTATION_FIELD_NAMES = {
     "n": "n",
@@ -66,6 +66,10 @@ def continuous_imputation_field_name(visible_header):
     return CONTINUOUS_IMPUTATION_FIELD_NAMES.get(
         str(visible_header), str(visible_header)
     )
+
+
+class _BackCalculationCancelled(Exception):
+    """Internal control flow for a nested choice that rejects the transaction."""
 
 
 # because the output from R is a string ("TRUE"/"FALSE")
@@ -154,6 +158,9 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             self.grp_box_pre_post.setVisible(False)
 
         self.current_correlation = self._get_correlation_str()
+        self.simple_table.setCurrentCell(0, 0)
+        self.simple_table.setFocus()
+        required(self.buttonBox.button(QDialogButtonBox.StandardButton.Ok), "continuous calculator OK button").setDefault(True)
         self._request_initial_content_refit()
 
     def _configure_tables(self):
@@ -165,11 +172,12 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         ):
             # layout-audit: allow=compact-table-overflow; reason=compact table keeps rows visible and owns excess overflow
             table.setMinimumWidth(0)
-            table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-            table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-            table.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
             header = table.horizontalHeader()
-            header.setSectionResizeMode(QHeaderView.Interactive)
+            header = required(header, "continuous table header")
+            header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
             header.setStretchLastSection(False)
             table.resizeColumnsToContents()
             table.resizeRowsToContents()
@@ -177,7 +185,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                 header.sizeHint().height()
                 + sum(table.rowHeight(row) for row in range(table.rowCount()))
                 + 2 * table.frameWidth()
-                + table.horizontalScrollBar().sizeHint().height()
+                + required(table.horizontalScrollBar(), "continuous table scrollbar").sizeHint().height()
             )
             # layout-audit: allow=compact-table-overflow; reason=compact table keeps rows visible and owns excess overflow
             table.setMinimumHeight(height)
@@ -189,21 +197,21 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         self.effect_cbo_box.setMinimumWidth(0)
         # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
         self.effect_cbo_box.setMaximumWidth(QWIDGETSIZE_MAX)
-        self.effect_cbo_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.effect_cbo_box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         effect_view = QTreeView(self.effect_cbo_box)
         effect_view.setHeaderHidden(True)
         effect_view.setRootIsDecorated(False)
         self.effect_cbo_box.setView(effect_view)
-        effect_view.setTextElideMode(Qt.ElideNone)
-        effect_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        effect_view.window().installEventFilter(self)
+        effect_view.setTextElideMode(Qt.TextElideMode.ElideNone)
+        effect_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        required(effect_view.window(), "continuous metric popup").installEventFilter(self)
         correlation_width = (
             self.correlation_pre_post.fontMetrics().horizontalAdvance("-1.0000")
             + self.correlation_pre_post.textMargins().left()
             + self.correlation_pre_post.textMargins().right()
             + 2
-            * self.correlation_pre_post.style().pixelMetric(
-                QStyle.PM_DefaultFrameWidth, None, self.correlation_pre_post
+            * required(self.correlation_pre_post.style(), "correlation field style").pixelMetric(
+                QStyle.PixelMetric.PM_DefaultFrameWidth, None, self.correlation_pre_post
             )
             + 12
         )
@@ -212,20 +220,25 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         # layout-audit: allow=numeric-domain-control; reason=editor width follows representative values from its numeric domain
         self.correlation_pre_post.setMaximumWidth(QWIDGETSIZE_MAX)
         self.correlation_pre_post.setSizePolicy(
-            QSizePolicy.MinimumExpanding, QSizePolicy.Fixed
+            QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Fixed
         )
 
     def _configure_focus_revelation(self):
         for widget in self.content_widget.findChildren(QWidget):
             widget.installEventFilter(self)
 
-    def eventFilter(self, watched, event):
+    def eventFilter(  # ty: ignore[invalid-method-override] -- PyQt6's QDialog stub rejects this runtime-supported QObject override.
+        self, watched: QObject | None, event: QEvent | None
+    ) -> bool:
+        if event is None:
+            return super(ContinuousDataForm, self).eventFilter(watched, event)
+        popup = required(self.effect_cbo_box.view(), "continuous metric popup view").window()
         if (
-            watched is self.effect_cbo_box.view().window()
-            and event.type() == QEvent.Show
+            watched is popup
+            and event.type() == QEvent.Type.Show
         ):
             QTimer.singleShot(0, self._bound_effect_popup_to_screen)
-        if event.type() == QEvent.FocusIn and self.content_widget.isAncestorOf(watched):
+        if isinstance(watched, QWidget) and event.type() == QEvent.Type.FocusIn and self.content_widget.isAncestorOf(watched):
             self.content_scroll.ensureWidgetVisible(watched)
             QTimer.singleShot(
                 0, lambda target=watched: self._ensure_content_widget_visible(target)
@@ -262,17 +275,23 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         full_text = combo.currentText()
         combo.setToolTip(full_text)
         for index in range(combo.count()):
-            combo.setItemData(index, combo.itemText(index), Qt.ToolTipRole)
-        combo.view().resizeColumnToContents(0)
+            combo.setItemData(index, combo.itemText(index), Qt.ItemDataRole.ToolTipRole)
+        view = combo.view()
+        if not isinstance(view, QTreeView):
+            raise RuntimeError("Continuous metric combo requires a tree view")
+        view.resizeColumnToContents(0)
 
     def _bound_effect_popup_to_screen(self):
         """Keep the native metric popup local to the dialog's owning screen."""
         try:
             combo = self.effect_cbo_box
             view = combo.view()
+            if not isinstance(view, QTreeView):
+                raise RuntimeError("Continuous metric combo requires a tree view")
             popup = view.window()
+            popup = required(popup, "continuous metric popup")
             available = adaptive_window.available_geometry_for_window(self)
-            content_width = view.columnWidth(0) + 2 * popup.frameWidth()
+            content_width = view.columnWidth(0) + 2 * required(self.effect_cbo_box.style(), "continuous metric combo style").pixelMetric(QStyle.PixelMetric.PM_DefaultFrameWidth)
             popup_width = min(
                 available.width(), max(combo.width(), content_width)
             )
@@ -297,10 +316,10 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             pass
 
     def _grow_table_column_to_contents(self, table, column):
-        header = table.horizontalHeader()
-        required = max(header.sectionSizeHint(column), table.sizeHintForColumn(column))
-        if required > table.columnWidth(column):
-            header.resizeSection(column, required)
+        header = required(table.horizontalHeader(), "continuous table header")
+        required_width = max(header.sectionSizeHint(column), table.sizeHintForColumn(column))
+        if required_width > table.columnWidth(column):
+            header.resizeSection(column, required_width)
 
     def _fit_tables_to_contents(self):
         for table in self.__dict__.get("tables", (self.simple_table,)):
@@ -335,12 +354,22 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         self.simple_table.cellChanged.connect(
             app_error_handler.safe_slot(self._cell_changed, parent=self)
         )
+        self.simple_table.currentCellChanged.connect(
+            app_error_handler.safe_slot(
+                self.on_simple_table_currentCellChanged, parent=self
+            )
+        )
         self.g1_pre_post_table.cellChanged.connect(
             app_error_handler.safe_slot(
                 lambda row, col: self.impute_pre_post_data(
                     self.g1_pre_post_table, 0, row, col
                 ),
                 parent=self,
+            )
+        )
+        self.g1_pre_post_table.currentCellChanged.connect(
+            app_error_handler.safe_slot(
+                self.on_g1_pre_post_table_currentCellChanged, parent=self
             )
         )
         self.g2_pre_post_table.cellChanged.connect(
@@ -351,8 +380,13 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                 parent=self,
             )
         )
+        self.g2_pre_post_table.currentCellChanged.connect(
+            app_error_handler.safe_slot(
+                self.on_g2_pre_post_table_currentCellChanged, parent=self
+            )
+        )
 
-        self.effect_cbo_box.currentIndexChanged[str].connect(
+        self.effect_cbo_box.currentTextChanged.connect(
             app_error_handler.safe_slot(
                 lambda _text: self.effect_changed(), parent=self
             )
@@ -384,8 +418,8 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         # Add undo/redo actions
         undo = QAction(self)
         redo = QAction(self)
-        undo.setShortcut(QKeySequence.Undo)
-        redo.setShortcut(QKeySequence.Redo)
+        undo.setShortcut(QKeySequence.StandardKey.Undo)
+        redo.setShortcut(QKeySequence.StandardKey.Redo)
         self.addAction(undo)
         self.addAction(redo)
         undo.triggered.connect(
@@ -465,7 +499,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                 display_scale_val = get_disp_scale_val_if_valid(ci_param="high")
             elif val_str == "correlation_pre_post" and not is_empty(new_text):
                 get_disp_scale_val_if_valid(
-                    opt_cmp_fn=lambda x: -1 <= float(x) <= 1,
+                    opt_cmp_fn=lambda x: -1 <= calc_fncs.numeric_value(x) <= 1,
                     opt_cmp_msg="Correlation must be between -1 and +1",
                 )
         except:
@@ -559,7 +593,9 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             new_ma_unit, new_tables_data, new_correlation
         )
         command = calc_fncs.CommandFieldChanged(
-            restore_new_f=restore_new_f, restore_old_f=restore_old_f, parent=self
+            restore_new_f=restore_new_f,
+            restore_old_f=restore_old_f,
+            parent=self,
         )
         self.undoStack.push(command)
 
@@ -569,7 +605,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         # Color for clear_button_pallette
         self.orig_palette = self.clear_Btn.palette()
         self.pushme_palette = QPalette()
-        self.pushme_palette.setColor(QPalette.ButtonText, Qt.red)
+        self.pushme_palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.red)
         self.set_clear_btn_color()
 
     def set_clear_btn_color(self):
@@ -612,7 +648,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             # also insert the SEs, if we have them
             se_col = 3
             se = self.ma_unit.get_se(self.cur_effect, self.group_str, self.mult)
-            self._set_val(row_index, col, grp_raw_data[col], self.simple_table)
+            self._set_val(row_index, se_col, se, self.simple_table)
         self.simple_table.blockSignals(False)
         self.impute_data()
 
@@ -621,17 +657,21 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         if calc_fncs.cell_text_is_blank(celldata_string):
             return None
 
-        if not is_a_float(celldata_string):
+        try:
+            value = calc_fncs.numeric_value(celldata_string)
+        except ValueError:
             return "Raw data needs to be numeric."
 
         field_name = continuous_imputation_field_name(cell_header)
+        if field_name == "n" and (value < 0 or not value.is_integer()):
+            return "N must be a non-negative whole number."
         if (
             field_name in ["n", "sd", "se", "var", "pval"]
-            and float(celldata_string) < 0
+            and value < 0
         ):
             return "%s cannot be negative." % (field_name,)
 
-        if field_name == "pval" and not (0 <= float(celldata_string) <= 1):
+        if field_name == "pval" and not (0 <= value <= 1):
             return "pval must be between 0 and 1"
         return None
 
@@ -655,14 +695,21 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         column_headers = self.get_column_header_strs()
         try:
             warning_msg = self._cell_data_not_valid(
-                self.simple_table.item(row, col).text(), column_headers[col]
+                required(self.simple_table.item(row, col), f"continuous table cell ({row}, {col})").text(), column_headers[col]
             )
             if warning_msg:
-                raise Exception("Invalid Cell Data")
+                QMessageBox.warning(self, "Warning", warning_msg)
+                self._set_val(
+                    row,
+                    col,
+                    self.current_item_data[self.simple_table],
+                    self.simple_table,
+                )
+                return
             self.impute_data()
         except Exception as e:
             msg = e.args[0]
-            QMessageBox.warning(self.parent(), "Warning", msg)
+            QMessageBox.warning(self, "Warning", msg)
             self.restore_ma_unit_and_tables(
                 old_ma_unit, old_tables_data, old_correlation
             )
@@ -673,7 +720,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             self.try_to_update_cur_outcome()
         except Exception as e:
             msg = "Could not compute study effects from the edited raw data: %s" % e
-            QMessageBox.warning(self.parent(), "Warning", msg)
+            QMessageBox.warning(self, "Warning", msg)
             self.restore_ma_unit_and_tables(
                 old_ma_unit, old_tables_data, old_correlation
             )
@@ -717,7 +764,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             if table.item(row, col) is None:
                 table.setItem(row, col, QTableWidgetItem(str_val))
             else:
-                table.item(row, col).setText(str_val)
+                required(table.item(row, col), f"continuous table cell ({row}, {col})").setText(str_val)
             table.blockSignals(False)
 
             ###self._disable_row_if_filled(table, row, col)
@@ -747,7 +794,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
     def _disable_cell(self, table, row, col):
         table.blockSignals(True)
         item = table.item(row, col)
-        newflags = item.flags() & ~Qt.ItemIsEditable
+        newflags = item.flags() & ~Qt.ItemFlag.ItemIsEditable
         item.setFlags(newflags)
         table.blockSignals(False)
 
@@ -904,6 +951,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         being modified.
         """
 
+        old_ma_unit = old_tables_data = old_correlation = None
         if not (row, col) == (
             None,
             None,
@@ -918,6 +966,17 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                 use_old_value=True,
             )
             old_correlation = self._get_correlation_str()
+
+            column_headers = self.get_column_header_strs(table)
+            warning_msg = self._cell_data_not_valid(
+                required(table.item(row, col), f"continuous pre/post cell ({row}, {col})").text(), column_headers[col]
+            )
+            if warning_msg:
+                QMessageBox.warning(self, "Warning", warning_msg)
+                self.restore_ma_unit_and_tables(
+                    old_ma_unit, old_tables_data, old_correlation
+                )
+                return None
 
         group_name = self.cur_groups[group_index]
         var_names = self.get_column_header_strs_pre_post()
@@ -937,13 +996,17 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         # imputation routine
         results_from_r = meta_py_r.impute_pre_post_cont_data(
             params_dict,
-            float(self.correlation_pre_post.text()),
+            calc_fncs.numeric_value(self.correlation_pre_post.text()),
             self.conf_level_to_alpha(),
         )
 
         print("imputation results from R: %s" % results_from_r)
 
         if not results_from_r["succeeded"]:
+            if old_ma_unit is not None and old_tables_data is not None and old_correlation is not None:
+                self.restore_ma_unit_and_tables(
+                    old_ma_unit, old_tables_data, old_correlation
+                )
             self._fit_tables_to_contents()
             return None
 
@@ -967,9 +1030,9 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         try:
             self.try_to_update_cur_outcome()
         except Exception as e:
-            if not (row, col) == (None, None):
+            if old_ma_unit is not None and old_tables_data is not None and old_correlation is not None:
                 msg = "Could not compute study effects from the edited raw data: %s" % e
-                QMessageBox.warning(self.parent(), "Warning", msg)
+                QMessageBox.warning(self, "Warning", msg)
                 self.restore_ma_unit_and_tables(
                     old_ma_unit, old_tables_data, old_correlation
                 )
@@ -1027,7 +1090,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             table = self.simple_table
 
         return [
-            str(h_item.text())
+            str(required(h_item, "continuous table header item").text())
             for h_item in [
                 table.horizontalHeaderItem(col) for col in range(table.columnCount())
             ]
@@ -1048,7 +1111,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         self, currentRow, currentColumn, previousRow, previousColumn
     ):
         self.current_item_data[self.g1_pre_post_table] = self._get_float(
-            currentRow, currentColumn
+            currentRow, currentColumn, self.g1_pre_post_table
         )
         ###print "Current Item Data:",self.current_item_data
 
@@ -1056,7 +1119,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         self, currentRow, currentColumn, previousRow, previousColumn
     ):
         self.current_item_data[self.g2_pre_post_table] = self._get_float(
-            currentRow, currentColumn
+            currentRow, currentColumn, self.g2_pre_post_table
         )
         ###print "Current Item Data:",self.current_item_data
 
@@ -1067,14 +1130,14 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
     def _get_float(self, i, j, table=None):
         if table is None:
             table = self.simple_table
-
-        if not self._is_empty(i, j, table) and not table.item(i, j).text() == "NA":
-            try:
-                return float(table.item(i, j).text())
-            except:
-                print(("Could not convert %s to float" % table.item(i, j)))
-                return None
-        return None
+        item = table.item(i, j)
+        if item is None:
+            return None
+        try:
+            return calc_fncs.numeric_value(item.text())
+        except ValueError:
+            print(("Could not convert %s to float" % item))
+            return None
 
     def no_val(self, x):
         return x is None or x == ""
@@ -1132,7 +1195,182 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         # meta_globals.enable_txt_box_input(self.effect_txt_box, self.low_txt_box,
         #                                  self.high_txt_box, self.correlation_pre_post)
 
+    def _capture_back_calculation_state(self):
+        return {
+            "ma_unit": copy.deepcopy(self.ma_unit),
+            "tables": self.save_tables_data(),
+            "correlation": self.correlation_pre_post.text(),
+            "metric_parameter": self.metric_parameter,
+            "button": {
+                "enabled": self.back_calc_btn.isEnabled(),
+                "text": self.back_calc_btn.text(),
+                "hidden": self.back_calc_btn.isHidden(),
+                "checked": self.back_calc_btn.isChecked(),
+                "down": self.back_calc_btn.isDown(),
+            },
+        }
+
+    def _restore_back_calculation_state(self, state):
+        """Restore directly without invoking R, imputation, or calculator setters."""
+        self.ma_unit.__dict__ = copy.deepcopy(state["ma_unit"].__dict__)
+        for table, rows in zip(self.tables, state["tables"]):
+            blocked = table.blockSignals(True)
+            try:
+                for row_index, row in enumerate(rows):
+                    for column_index, text in enumerate(row):
+                        item = table.item(row_index, column_index)
+                        if item is None:
+                            item = QTableWidgetItem()
+                            table.setItem(row_index, column_index, item)
+                        item.setText(text)
+            finally:
+                table.blockSignals(blocked)
+
+        blocked = self.correlation_pre_post.blockSignals(True)
+        try:
+            self.correlation_pre_post.setText(state["correlation"])
+        finally:
+            self.correlation_pre_post.blockSignals(blocked)
+        self.metric_parameter = state["metric_parameter"]
+        button = state["button"]
+        blocked = self.back_calc_btn.blockSignals(True)
+        try:
+            self.back_calc_btn.setText(button["text"])
+            self.back_calc_btn.setEnabled(button["enabled"])
+            self.back_calc_btn.setVisible(not button["hidden"])
+            self.back_calc_btn.setChecked(button["checked"])
+            self.back_calc_btn.setDown(button["down"])
+        finally:
+            self.back_calc_btn.blockSignals(blocked)
+
+    def _restore_back_calculation_undo_state(self, count, index, clean, commands):
+        if self.undoStack.index() != index:
+            self.undoStack.setIndex(index)
+        if self.undoStack.count() != count:
+            if count == 0:
+                self.undoStack.clear()
+            else:
+                raise RuntimeError(
+                    "Back-calculation could not restore the prior undo history"
+                )
+        if any(
+            self.undoStack.command(command_index) is not command
+            for command_index, command in enumerate(commands)
+        ):
+            raise RuntimeError(
+                "Back-calculation changed the identity of prior undo commands"
+            )
+        if clean:
+            self.undoStack.setClean()
+        elif self.undoStack.isClean():
+            self.undoStack.resetClean()
+
+    def _rollback_back_calculation_transaction(self, state, undo_state):
+        errors = []
+        try:
+            self._restore_back_calculation_undo_state(*undo_state)
+        except BaseException as error:
+            errors.append(error)
+        try:
+            self._restore_back_calculation_state(state)
+        except BaseException as error:
+            errors.append(error)
+        return errors
+
+    def _back_calculation_state_matches(self, expected):
+        try:
+            current = self._capture_back_calculation_state()
+            return (
+                current["tables"] == expected["tables"]
+                and current["correlation"] == expected["correlation"]
+                and current["metric_parameter"] == expected["metric_parameter"]
+                and current["button"] == expected["button"]
+                and current["ma_unit"].__dict__ == expected["ma_unit"].__dict__
+            )
+        except BaseException:
+            return False
+
+    def _back_calculation_command_is_committed(
+        self, command, token, committed_state, prior_index
+    ):
+        expected_index = prior_index + 1
+        if (
+            self.undoStack.index() != expected_index
+            or self.undoStack.count() != expected_index
+            or self.undoStack.isClean()
+        ):
+            return False
+        published = self.undoStack.command(prior_index)
+        identity_matches = published is command or (
+            getattr(published, "_back_calculation_commit_token", None) is token
+        )
+        return identity_matches and self._back_calculation_state_matches(
+            committed_state
+        )
+
+    def _publish_back_calculation_command(
+        self, command, committed_state, prior_index
+    ):
+        token = object()
+        command._back_calculation_commit_token = token
+        try:
+            self.undoStack.push(command)
+        except BaseException as error:
+            if self._back_calculation_command_is_committed(
+                command, token, committed_state, prior_index
+            ):
+                print(
+                    "Back-calculation undo command committed despite a "
+                    "post-commit push exception: %s" % error
+                )
+                return
+            raise
+
     def enable_back_calculation_btn(self, engage=False):
+        if not engage:
+            return self._enable_back_calculation_btn_impl(engage=False)
+
+        state = self._capture_back_calculation_state()
+        undo_state = (
+            self.undoStack.count(),
+            self.undoStack.index(),
+            self.undoStack.isClean(),
+            tuple(
+                self.undoStack.command(command_index)
+                for command_index in range(self.undoStack.count())
+            ),
+        )
+        try:
+            return self._enable_back_calculation_btn_impl(
+                engage=True, transaction_state=state
+            )
+        except _BackCalculationCancelled:
+            rollback_errors = self._rollback_back_calculation_transaction(
+                state, undo_state
+            )
+            if rollback_errors:
+                raise RuntimeError("Back-calculation cancellation rollback failed") from (
+                    rollback_errors[0]
+                )
+            return None
+        except BaseException as error:
+            rollback_errors = self._rollback_back_calculation_transaction(
+                state, undo_state
+            )
+            if rollback_errors:
+                # Qt does not expose removal of one arbitrary command. If a
+                # push changed an existing branch but cannot be proven to have
+                # committed this transaction, discard the compromised history
+                # so no ghost redo command can reapply it later.
+                self.undoStack.clear()
+                self.undoStack.resetClean()
+            for rollback_error in rollback_errors:
+                error.add_note("Rollback error: %s" % rollback_error)
+            raise
+
+    def _enable_back_calculation_btn_impl(
+        self, engage=False, transaction_state=None
+    ):
         # For undo/redo
         old_ma_unit, old_tables_data = self._save_ma_unit_and_table_states(
             tables=[self.simple_table, self.g1_pre_post_table, self.g2_pre_post_table],
@@ -1142,7 +1380,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         old_correlation = self._get_correlation_str()
 
         # Choose metric parameter if not already chosen
-        if (self.metric_parameter is None) and self.cur_effect in ["MD", "SMD"]:
+        if engage and self.metric_parameter is None and self.cur_effect in ["MD", "SMD"]:
             print(
                 (
                     "need to choose metric parameter because it is %s"
@@ -1155,16 +1393,18 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                 option1_txt = "no"
                 dialog = ChooseBackCalcResultForm(info, option0_txt, option1_txt)
                 dialog.setWindowTitle("Population SD Assumptions")
-                if dialog.exec():
-                    self.metric_parameter = True if dialog.getChoice() == 0 else False
+                if not dialog.exec():
+                    raise _BackCalculationCancelled()
+                self.metric_parameter = True if dialog.getChoice() == 0 else False
             elif self.cur_effect == "SMD":
                 info = "In order to perform back-calculation most accurately, we need to know if the the bias in the SMD been corrected i.e. should we use Hedge's g or Cohen's d when performing the back calculation?"
                 option0_txt = "Hedges' g (default)"
                 option1_txt = "Cohen's d"
                 dialog = ChooseBackCalcResultForm(info, option0_txt, option1_txt)
                 dialog.setWindowTitle("SMD Bias Correction")
-                if dialog.exec():
-                    self.metric_parameter = True if dialog.getChoice() == 0 else False
+                if not dialog.exec():
+                    raise _BackCalculationCancelled()
+                self.metric_parameter = True if dialog.getChoice() == 0 else False
             print(("metric_parameter is now %s" % str(self.metric_parameter)))
 
         def build_data_dicts():
@@ -1295,7 +1535,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                 if dialog.exec():
                     imputed[key] = value[0] if dialog.getChoice() == 0 else value[1]
                 else:  # pressed cancel
-                    return None  # do nothing and leave
+                    raise _BackCalculationCancelled()
 
         # Write the data to the table
         var_names = self.get_column_header_strs()
@@ -1323,24 +1563,24 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         self._copy_raw_data_from_table_to_ma_unit()
         # self.set_clear_btn_color()
 
-        # For undo/redo
-        self.enable_back_calculation_btn()
-        new_ma_unit, new_tables_data = self._save_ma_unit_and_table_states(
-            tables=[self.simple_table, self.g1_pre_post_table, self.g2_pre_post_table],
-            ma_unit=self.ma_unit,
-            use_old_value=False,
+        # The committed result has filled every value exposed by this
+        # back-calculation, so no second R probe is needed to refresh the button.
+        self.back_calc_btn.setEnabled(False)
+        new_state = self._capture_back_calculation_state()
+        restore_old_f = lambda: self._restore_back_calculation_state(
+            transaction_state
         )
-        new_correlation = self._get_correlation_str()
-        restore_old_f = lambda: self.restore_ma_unit_and_tables(
-            old_ma_unit, old_tables_data, old_correlation
-        )
-        restore_new_f = lambda: self.restore_ma_unit_and_tables(
-            new_ma_unit, new_tables_data, new_correlation
-        )
+        restore_new_f = lambda: self._restore_back_calculation_state(new_state)
         command = calc_fncs.CommandFieldChanged(
-            restore_new_f=restore_new_f, restore_old_f=restore_old_f, parent=self
+            restore_new_f=restore_new_f,
+            restore_old_f=restore_old_f,
+            parent=self,
+            description="Apply continuous back-calculation",
+            refresh_on_initial_redo=False,
         )
-        self.undoStack.push(command)
+        self._publish_back_calculation_command(
+            command, new_state, self.undoStack.index()
+        )
 
     def clear_form(self):
         # For undo/redo
@@ -1463,15 +1703,19 @@ class ChooseBackCalcResultForm(
         self.info_label.setText(info_text)
         self._layout_controller.request_content_refit()
 
-    def eventFilter(self, watched, event):
-        if event.type() == QEvent.MouseButtonRelease:
+    def eventFilter(  # ty: ignore[invalid-method-override] -- PyQt6's QDialog stub rejects this runtime-supported QObject override.
+        self, watched: QObject | None, event: QEvent | None
+    ) -> bool:
+        if event is None:
+            return super(ChooseBackCalcResultForm, self).eventFilter(watched, event)
+        if event.type() == QEvent.Type.MouseButtonRelease:
             if watched is self.choice1_label:
                 self.choice1_btn.setChecked(True)
                 return True
             if watched is self.choice2_label:
                 self.choice2_btn.setChecked(True)
                 return True
-        if event.type() == QEvent.FocusIn and self.content_widget.isAncestorOf(watched):
+        if isinstance(watched, QWidget) and event.type() == QEvent.Type.FocusIn and self.content_widget.isAncestorOf(watched):
             self.content_scroll.ensureWidgetVisible(watched)
             QTimer.singleShot(
                 0, lambda target=watched: self._ensure_content_widget_visible(target)

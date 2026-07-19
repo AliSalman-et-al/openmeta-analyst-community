@@ -1,0 +1,1874 @@
+{
+  "baseline_commit": "e8a21fc3c277e8a8c144413dfa320ea9e68a20e4",
+  "dataset": {
+    "analysis_family": "diagnostic",
+    "covariates": [],
+    "is_diagnostic": true,
+    "notes": "",
+    "outcomes": [
+      {
+        "data_type": 2,
+        "follow_ups": [
+          "first"
+        ],
+        "name": "LAG positive",
+        "sub_type": null
+      }
+    ],
+    "studies": [
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  "",
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          },
+          {
+            "entered_effects": {
+              "DOR": {
+                "test 1": {
+                  "SE": 1.0793411221480045,
+                  "display_est": 153.89999999925612,
+                  "display_lower": 18.55674462102468,
+                  "display_upper": 1276.3666517872255,
+                  "est": 5.0363030408448335,
+                  "lower": 2.9208333144016976,
+                  "upper": 7.151772767287969
+                }
+              },
+              "NLR": {
+                "test 1": {
+                  "SE": 1.0029724315131792,
+                  "display_est": 0.34908471690102316,
+                  "display_lower": 0.04888764916823662,
+                  "display_upper": 2.492656972618075,
+                  "est": -1.052440644400614,
+                  "lower": -3.0182304876530113,
+                  "upper": 0.913349198851783
+                }
+              },
+              "PLR": {
+                "test 1": {
+                  "SE": 1.0029724315131794,
+                  "display_est": 53.7241379308078,
+                  "display_lower": 7.523809206955249,
+                  "display_upper": 383.61990808713637,
+                  "est": 3.9838623964442195,
+                  "lower": 2.018072553191822,
+                  "upper": 5.949652239696617
+                }
+              },
+              "Sens": {
+                "test 1": {
+                  "SE": 0.3906809170504345,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.6551724137931034,
+                  "display_lower": 0.469072872485805,
+                  "display_se": 0.3906809170504345,
+                  "display_upper": 0.8033830829869842,
+                  "est": 0.6418538861723947,
+                  "lower": -0.12386664069353703,
+                  "upper": 1.4075744130383265
+                }
+              },
+              "Spec": {
+                "test 1": {
+                  "SE": 1.0061539042374905,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.9878048780487805,
+                  "display_lower": 0.9185213210665681,
+                  "display_se": 1.0061539042374905,
+                  "display_upper": 0.998284741192233,
+                  "est": 4.394449154672438,
+                  "lower": 2.4224237394625945,
+                  "upper": 6.366474569882282
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  19.0,
+                  10.0,
+                  1.0,
+                  81.0
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          }
+        ],
+        "covariates": {},
+        "id": 0,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Kinderman",
+        "notes": "",
+        "sample_size": null,
+        "year": 1970
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  "",
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          },
+          {
+            "entered_effects": {
+              "DOR": {
+                "test 1": {
+                  "SE": 0.901684084385539,
+                  "display_est": 5.777777777805465,
+                  "display_lower": 0.9868381945800717,
+                  "display_upper": 33.82795298418769,
+                  "est": 1.754019141245208,
+                  "lower": -0.013249189583423249,
+                  "upper": 3.521287472073839
+                }
+              },
+              "NLR": {
+                "test 1": {
+                  "SE": 0.3010922876072478,
+                  "display_est": 0.3384615384606318,
+                  "display_lower": 0.18759406933361253,
+                  "display_upper": 0.610660099355813,
+                  "est": -1.0833448165373212,
+                  "lower": -1.6734748562703023,
+                  "upper": -0.4932147768043399
+                }
+              },
+              "PLR": {
+                "test 1": {
+                  "SE": 0.3010922876072478,
+                  "display_est": 1.955555555555777,
+                  "display_lower": 1.0838768450383163,
+                  "display_upper": 3.528258351829324,
+                  "est": 0.6706743247078867,
+                  "lower": 0.0805442849749054,
+                  "upper": 1.260804364440868
+                }
+              },
+              "Sens": {
+                "test 1": {
+                  "SE": 0.7905694150420947,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.8,
+                  "display_lower": 0.4592919997273032,
+                  "display_se": 0.7905694150420947,
+                  "display_upper": 0.9495871851179073,
+                  "est": 1.3862943611198908,
+                  "lower": -0.1631932196415129,
+                  "upper": 2.9357819418812943
+                }
+              },
+              "Spec": {
+                "test 1": {
+                  "SE": 0.4336290903919938,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.5909090909090909,
+                  "display_lower": 0.38173922414103806,
+                  "display_se": 0.4336290903919938,
+                  "display_upper": 0.7716448265823702,
+                  "est": 0.3677247801253175,
+                  "lower": -0.482172619691854,
+                  "upper": 1.217622179942489
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  8.0,
+                  2.0,
+                  9.0,
+                  13.0
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          }
+        ],
+        "covariates": {},
+        "id": 1,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Lecart Lenfant",
+        "notes": "",
+        "sample_size": null,
+        "year": 1971
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  "",
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          },
+          {
+            "entered_effects": {
+              "DOR": {
+                "test 1": {
+                  "SE": 1.062135462406316,
+                  "display_est": 167.41666666717995,
+                  "display_lower": 20.878887104686818,
+                  "display_upper": 1342.4250122822846,
+                  "est": 5.120485715026934,
+                  "lower": 3.0387384620077587,
+                  "upper": 7.2022329680461095
+                }
+              },
+              "NLR": {
+                "test 1": {
+                  "SE": 0.9927347678882497,
+                  "display_est": 0.23103581054985028,
+                  "display_lower": 0.03301124731985133,
+                  "display_upper": 1.6169502848380586,
+                  "est": -1.4651825564466021,
+                  "lower": -3.4109069477083014,
+                  "upper": 0.48054183481509716
+                }
+              },
+              "PLR": {
+                "test 1": {
+                  "SE": 0.9927347678882499,
+                  "display_est": 38.67924528300603,
+                  "display_lower": 5.526632988815389,
+                  "display_upper": 270.70442685278147,
+                  "est": 3.655303158580332,
+                  "lower": 1.7095787673186327,
+                  "upper": 5.601027549842032
+                }
+              },
+              "Sens": {
+                "test 1": {
+                  "SE": 0.3282127012103163,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.7735849056603774,
+                  "display_lower": 0.6423044813387337,
+                  "display_se": 0.3282127012103163,
+                  "display_upper": 0.8666838042015301,
+                  "est": 1.2286654169163078,
+                  "lower": 0.5853803432754822,
+                  "upper": 1.8719504905571336
+                }
+              },
+              "Spec": {
+                "test 1": {
+                  "SE": 1.0101525445522108,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.98,
+                  "display_lower": 0.8712389246394433,
+                  "display_se": 1.0101525445522108,
+                  "display_upper": 0.9971897928164493,
+                  "est": 3.8918202981106256,
+                  "lower": 1.9119576918968004,
+                  "upper": 5.871682904324451
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  41.0,
+                  12.0,
+                  1.0,
+                  49.0
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          }
+        ],
+        "covariates": {},
+        "id": 2,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Piver",
+        "notes": "",
+        "sample_size": null,
+        "year": 1971
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  "",
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          },
+          {
+            "entered_effects": {
+              "DOR": {
+                "test 1": {
+                  "SE": 1.3249737942901194,
+                  "display_est": 44.999999999985604,
+                  "display_lower": 3.352685184898352,
+                  "display_upper": 603.9934823346975,
+                  "est": 3.8066624897703196,
+                  "lower": 1.2097615725023037,
+                  "upper": 6.403563407038336
+                }
+              },
+              "NLR": {
+                "test 1": {
+                  "SE": 1.002253100865988,
+                  "display_est": 0.3015873015858215,
+                  "display_lower": 0.04229545149756585,
+                  "display_upper": 2.1504652925527354,
+                  "est": -1.1986957472250923,
+                  "lower": -3.163075728316019,
+                  "upper": 0.7656842338658343
+                }
+              },
+              "PLR": {
+                "test 1": {
+                  "SE": 1.0022531008659883,
+                  "display_est": 13.57142857149334,
+                  "display_lower": 1.9032953173974676,
+                  "display_upper": 96.77093816522923,
+                  "est": 2.6079667425452273,
+                  "lower": 0.6435867614543007,
+                  "upper": 4.572346723636154
+                }
+              },
+              "Sens": {
+                "test 1": {
+                  "SE": 0.8366600265340756,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.7142857142857143,
+                  "display_lower": 0.3266155139499562,
+                  "display_se": 0.8366600265340756,
+                  "display_upper": 0.9279832031505588,
+                  "est": 0.9162907318741551,
+                  "lower": -0.7235327874369586,
+                  "upper": 2.556114251185269
+                }
+              },
+              "Spec": {
+                "test 1": {
+                  "SE": 1.0274023338281626,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.9473684210526315,
+                  "display_lower": 0.7061379521764862,
+                  "display_se": 1.0274023338281626,
+                  "display_upper": 0.9926380651785139,
+                  "est": 2.8903717578961636,
+                  "lower": 0.8767001859605674,
+                  "upper": 4.90404332983176
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  5.0,
+                  2.0,
+                  1.0,
+                  18.0
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          }
+        ],
+        "covariates": {},
+        "id": 3,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Piver Barlow",
+        "notes": "",
+        "sample_size": null,
+        "year": 1973
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  "",
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          },
+          {
+            "entered_effects": {
+              "DOR": {
+                "test 1": {
+                  "SE": 0.2770815901375859,
+                  "display_est": 4.000538793084428,
+                  "display_lower": 2.32416099808826,
+                  "display_upper": 6.886059377226357,
+                  "est": 1.3864290503247545,
+                  "lower": 0.8433591128759976,
+                  "upper": 1.9294989877735114
+                }
+              },
+              "NLR": {
+                "test 1": {
+                  "SE": 0.14829795552474292,
+                  "display_est": 0.5616686343961426,
+                  "display_lower": 0.41999945164866165,
+                  "display_upper": 0.7511239684379656,
+                  "est": -0.5768432214944192,
+                  "lower": -0.8675018733038381,
+                  "upper": -0.2861845696850004
+                }
+              },
+              "PLR": {
+                "test 1": {
+                  "SE": 0.14829795552474287,
+                  "display_est": 2.246977160769511,
+                  "display_lower": 1.6802240994030595,
+                  "display_upper": 3.004900574166629,
+                  "est": 0.8095858288303355,
+                  "lower": 0.5189271770209166,
+                  "upper": 1.1002444806397542
+                }
+              },
+              "Sens": {
+                "test 1": {
+                  "SE": 0.23124061542519347,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.5844155844155843,
+                  "display_lower": 0.4719552926424832,
+                  "display_se": 0.23124061542519347,
+                  "display_upper": 0.6887216917705452,
+                  "est": 0.340926586970593,
+                  "lower": -0.11229669102566336,
+                  "upper": 0.7941498649668495
+                }
+              },
+              "Spec": {
+                "test 1": {
+                  "SE": 0.15264987838498553,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.7399103139013453,
+                  "display_lower": 0.6783750518605286,
+                  "display_se": 0.15264987838498553,
+                  "display_upper": 0.7932602715197472,
+                  "est": 1.0455024633541614,
+                  "lower": 0.7463141994751705,
+                  "upper": 1.3446907272331523
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  45.0,
+                  32.0,
+                  58.0,
+                  165.0
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          }
+        ],
+        "covariates": {},
+        "id": 4,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Kolbenstvedt",
+        "notes": "",
+        "sample_size": null,
+        "year": 1975
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  "",
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          },
+          {
+            "entered_effects": {
+              "DOR": {
+                "test 1": {
+                  "SE": 0.9071475440448848,
+                  "display_est": 21.333333333300008,
+                  "display_lower": 3.6049008961741706,
+                  "display_upper": 126.24788426020032,
+                  "est": 3.060270794691562,
+                  "lower": 1.2822942796996253,
+                  "upper": 4.838247309683498
+                }
+              },
+              "NLR": {
+                "test 1": {
+                  "SE": 0.40663359083206885,
+                  "display_est": 0.23749999999939228,
+                  "display_lower": 0.10703762739501939,
+                  "display_upper": 0.5269758997179271,
+                  "est": -1.4375876555074412,
+                  "lower": -2.2345748484424925,
+                  "upper": -0.6406004625723896
+                }
+              },
+              "PLR": {
+                "test 1": {
+                  "SE": 0.40663359083206885,
+                  "display_est": 5.066666666645787,
+                  "display_lower": 2.2834693844212293,
+                  "display_upper": 11.2421525273207,
+                  "est": 1.622683139184121,
+                  "lower": 0.8256959462490694,
+                  "upper": 2.4196703321191726
+                }
+              },
+              "Sens": {
+                "test 1": {
+                  "SE": 0.7905694150420947,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.8,
+                  "display_lower": 0.4592919997273032,
+                  "display_se": 0.7905694150420947,
+                  "display_upper": 0.9495871851179073,
+                  "est": 1.3862943611198908,
+                  "lower": -0.1631932196415129,
+                  "upper": 2.9357819418812943
+                }
+              },
+              "Spec": {
+                "test 1": {
+                  "SE": 0.4448782605013047,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.8421052631578947,
+                  "display_lower": 0.690408778005955,
+                  "display_se": 0.4448782605013047,
+                  "display_upper": 0.9272990594508091,
+                  "est": 1.6739764335716711,
+                  "lower": 0.8020310654842862,
+                  "upper": 2.5459218016590563
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  8.0,
+                  2.0,
+                  6.0,
+                  32.0
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          }
+        ],
+        "covariates": {},
+        "id": 5,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Lehman",
+        "notes": "",
+        "sample_size": null,
+        "year": 1975
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  "",
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          },
+          {
+            "entered_effects": {
+              "DOR": {
+                "test 1": {
+                  "SE": 1.2115515436237712,
+                  "display_est": 4.375000000001847,
+                  "display_lower": 0.4071022603745568,
+                  "display_upper": 47.016749507760395,
+                  "est": 1.4759065198095778,
+                  "lower": -0.8986908711069215,
+                  "upper": 3.850503910726077
+                }
+              },
+              "NLR": {
+                "test 1": {
+                  "SE": 0.30276503540974914,
+                  "display_est": 0.3571428571432708,
+                  "display_lower": 0.19730037163336084,
+                  "display_upper": 0.6464813996675289,
+                  "est": -1.0296194171811581,
+                  "lower": -1.6230279823622604,
+                  "upper": -0.4362108520000557
+                }
+              },
+              "PLR": {
+                "test 1": {
+                  "SE": 0.30276503540974914,
+                  "display_est": 1.5624999999993445,
+                  "display_lower": 0.8631891258937286,
+                  "display_upper": 2.8283561235466332,
+                  "est": 0.44628710262841953,
+                  "lower": -0.14712146255268288,
+                  "upper": 1.039695667809522
+                }
+              },
+              "Sens": {
+                "test 1": {
+                  "SE": 1.095445115010332,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.8333333333333334,
+                  "display_lower": 0.3687472097280247,
+                  "display_se": 1.095445115010332,
+                  "display_upper": 0.9771674501107463,
+                  "est": 1.6094379124341007,
+                  "lower": -0.5375950600264872,
+                  "upper": 3.7564708848946884
+                }
+              },
+              "Spec": {
+                "test 1": {
+                  "SE": 0.5175491695067657,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.4666666666666667,
+                  "display_lower": 0.24087119709068655,
+                  "display_se": 0.5175491695067657,
+                  "display_upper": 0.7069975727971142,
+                  "est": -0.13353139262452263,
+                  "lower": -1.1479091250863989,
+                  "upper": 0.8808463398373535
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  5.0,
+                  1.0,
+                  8.0,
+                  7.0
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          }
+        ],
+        "covariates": {},
+        "id": 6,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Brown",
+        "notes": "",
+        "sample_size": null,
+        "year": 1979
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  "",
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          },
+          {
+            "entered_effects": {
+              "DOR": {
+                "test 1": {
+                  "SE": 0.4854174041155627,
+                  "display_est": 4.171122994656366,
+                  "display_lower": 1.6108865398143495,
+                  "display_upper": 10.800429829435288,
+                  "est": 1.4281853028290508,
+                  "lower": 0.47678467329362306,
+                  "upper": 2.3795859323644786
+                }
+              },
+              "NLR": {
+                "test 1": {
+                  "SE": 0.2693249041468399,
+                  "display_est": 0.5613905325445356,
+                  "display_lower": 0.33114279510912753,
+                  "display_upper": 0.9517324087576803,
+                  "est": -0.5773384792072795,
+                  "lower": -1.105205591474788,
+                  "upper": -0.049471366939771166
+                }
+              },
+              "PLR": {
+                "test 1": {
+                  "SE": 0.2693249041468399,
+                  "display_est": 2.341628959276554,
+                  "display_lower": 1.381237327186176,
+                  "display_upper": 3.9697929349280576,
+                  "est": 0.8508468236217713,
+                  "lower": 0.32297971135426295,
+                  "upper": 1.3787139358892797
+                }
+              },
+              "Sens": {
+                "test 1": {
+                  "SE": 0.3969581307590985,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.5769230769230769,
+                  "display_lower": 0.38512081493923744,
+                  "display_se": 0.3969581307590985,
+                  "display_upper": 0.7480385789314419,
+                  "est": 0.3101549283038393,
+                  "lower": -0.46786871135433516,
+                  "upper": 1.0881785679620137
+                }
+              },
+              "Spec": {
+                "test 1": {
+                  "SE": 0.27938199412727716,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.7536231884057972,
+                  "display_lower": 0.63886740251693,
+                  "display_se": 0.27938199412727716,
+                  "display_upper": 0.8409895112277919,
+                  "est": 1.1180303745252114,
+                  "lower": 0.5704517281067674,
+                  "upper": 1.6656090209436554
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  15.0,
+                  11.0,
+                  17.0,
+                  52.0
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          }
+        ],
+        "covariates": {},
+        "id": 7,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Lagasse",
+        "notes": "",
+        "sample_size": null,
+        "year": 1979
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  "",
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          },
+          {
+            "entered_effects": {
+              "DOR": {
+                "test 1": {
+                  "SE": 0.5657523818560181,
+                  "display_est": 4.363636363638457,
+                  "display_lower": 1.439724024407872,
+                  "display_upper": 13.225675192837953,
+                  "est": 1.4733057381095203,
+                  "lower": 0.3644514455039731,
+                  "upper": 2.5821600307150674
+                }
+              },
+              "NLR": {
+                "test 1": {
+                  "SE": 0.28839382044523015,
+                  "display_est": 0.4861111111109369,
+                  "display_lower": 0.276219466998766,
+                  "display_upper": 0.8554936946117218,
+                  "est": -0.7213180575266417,
+                  "lower": -1.2865595589632037,
+                  "upper": -0.15607655609007953
+                }
+              },
+              "PLR": {
+                "test 1": {
+                  "SE": 0.28839382044523015,
+                  "display_est": 2.1212121212123787,
+                  "display_lower": 1.2053213105358267,
+                  "display_upper": 3.733063394671121,
+                  "est": 0.7519876805828787,
+                  "lower": 0.18674617914631653,
+                  "upper": 1.3172291820194408
+                }
+              },
+              "Sens": {
+                "test 1": {
+                  "SE": 0.43301270189221924,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.6666666666666666,
+                  "display_lower": 0.46119267840046824,
+                  "display_se": 0.43301270189221924,
+                  "display_upper": 0.8237315369594944,
+                  "est": 0.6931471805599452,
+                  "lower": -0.15554211999718337,
+                  "upper": 1.5418364811170737
+                }
+              },
+              "Spec": {
+                "test 1": {
+                  "SE": 0.36410954062720946,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.6857142857142857,
+                  "display_lower": 0.5166231142339991,
+                  "display_se": 0.36410954062720946,
+                  "display_upper": 0.8166479683607238,
+                  "est": 0.7801585575495752,
+                  "lower": 0.06651697149282099,
+                  "upper": 1.4938001436063293
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  16.0,
+                  8.0,
+                  11.0,
+                  24.0
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          }
+        ],
+        "covariates": {},
+        "id": 8,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Kjorstad",
+        "notes": "",
+        "sample_size": null,
+        "year": 1980
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  "",
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          },
+          {
+            "entered_effects": {
+              "DOR": {
+                "test 1": {
+                  "SE": 0.9565563234854494,
+                  "display_est": 6.250000000010561,
+                  "display_lower": 0.9586449716547893,
+                  "display_upper": 40.7476189359467,
+                  "est": 1.8325814637483102,
+                  "lower": -0.042234479467216035,
+                  "upper": 3.7073974069638362
+                }
+              },
+              "NLR": {
+                "test 1": {
+                  "SE": 0.421936373201343,
+                  "display_est": 0.4399999999999253,
+                  "display_lower": 0.19244196575401967,
+                  "display_upper": 1.006017576477214,
+                  "est": -0.8209805520698302,
+                  "lower": -1.6479606473119137,
+                  "upper": 0.005999543172253152
+                }
+              },
+              "PLR": {
+                "test 1": {
+                  "SE": 0.421936373201343,
+                  "display_est": 2.75000000000418,
+                  "display_lower": 1.2027622859598444,
+                  "display_upper": 6.287609852979065,
+                  "est": 1.0116009116784799,
+                  "lower": 0.1846208164363965,
+                  "upper": 1.8385810069205633
+                }
+              },
+              "Sens": {
+                "test 1": {
+                  "SE": 0.8660254037844384,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.6666666666666666,
+                  "display_lower": 0.26811028743921594,
+                  "display_se": 0.8660254037844384,
+                  "display_upper": 0.9161019880694965,
+                  "est": 0.6931471805599452,
+                  "lower": -1.004231420554312,
+                  "upper": 2.390525781674202
+                }
+              },
+              "Spec": {
+                "test 1": {
+                  "SE": 0.4062019202317979,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.7575757575757576,
+                  "display_lower": 0.5849902457726156,
+                  "display_se": 0.4062019202317979,
+                  "display_upper": 0.8738652510662602,
+                  "est": 1.1394342831883648,
+                  "lower": 0.343293149083029,
+                  "upper": 1.9355754172937005
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  4.0,
+                  2.0,
+                  8.0,
+                  25.0
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          }
+        ],
+        "covariates": {},
+        "id": 9,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Ashraf",
+        "notes": "",
+        "sample_size": null,
+        "year": 1982
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  "",
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          },
+          {
+            "entered_effects": {
+              "DOR": {
+                "test 1": {
+                  "SE": 0.5679956404929948,
+                  "display_est": 4.666666666679971,
+                  "display_lower": 1.5329500898818733,
+                  "display_upper": 14.206449330304826,
+                  "est": 1.540445040947149,
+                  "lower": 0.4271940422051188,
+                  "upper": 2.653696039689179
+                }
+              },
+              "NLR": {
+                "test 1": {
+                  "SE": 0.3749435368512948,
+                  "display_est": 0.6507936507937971,
+                  "display_lower": 0.31209785948678165,
+                  "display_upper": 1.3570499221314918,
+                  "est": -0.42956265968722485,
+                  "lower": -1.164438488151829,
+                  "upper": 0.30531316877737935
+                }
+              },
+              "PLR": {
+                "test 1": {
+                  "SE": 0.3749435368512948,
+                  "display_est": 3.0370370370372677,
+                  "display_lower": 1.4564566776018513,
+                  "display_upper": 6.332899636587354,
+                  "est": 1.110882381259924,
+                  "lower": 0.3760065527953198,
+                  "upper": 1.8457582097245282
+                }
+              },
+              "Sens": {
+                "test 1": {
+                  "SE": 0.47434164902525683,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.4444444444444445,
+                  "display_lower": 0.239971439177387,
+                  "display_se": 0.47434164902525683,
+                  "display_upper": 0.6696381664049438,
+                  "est": -0.22314355131420985,
+                  "lower": -1.152836099771052,
+                  "upper": 0.7065489971426323
+                }
+              },
+              "Spec": {
+                "test 1": {
+                  "SE": 0.312440470520462,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.8536585365853658,
+                  "display_lower": 0.7597330496388406,
+                  "display_se": 0.312440470520462,
+                  "display_upper": 0.9149757196226683,
+                  "est": 1.7635885922613586,
+                  "lower": 1.1512165227285047,
+                  "upper": 2.3759606617942124
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  8.0,
+                  10.0,
+                  12.0,
+                  70.0
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          }
+        ],
+        "covariates": {},
+        "id": 10,
+        "include": true,
+        "manually_excluded": false,
+        "name": "De Muylder",
+        "notes": "",
+        "sample_size": null,
+        "year": 1984
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  "",
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          },
+          {
+            "entered_effects": {
+              "DOR": {
+                "test 1": {
+                  "SE": 0.7862453931068963,
+                  "display_est": 34.37500000011222,
+                  "display_lower": 7.361891540378143,
+                  "display_upper": 160.5077470276097,
+                  "est": 3.5373295559867355,
+                  "lower": 1.9963169024866818,
+                  "upper": 5.078342209486789
+                }
+              },
+              "NLR": {
+                "test 1": {
+                  "SE": 0.5114902501798599,
+                  "display_est": 0.3064935064941561,
+                  "display_lower": 0.11247085263225176,
+                  "display_upper": 0.8352232362785722,
+                  "est": -1.1825587098221195,
+                  "lower": -2.1850611786180267,
+                  "upper": -0.18005624102621232
+                }
+              },
+              "PLR": {
+                "test 1": {
+                  "SE": 0.5114902501798599,
+                  "display_est": 10.535714285665655,
+                  "display_lower": 3.8661855592462753,
+                  "display_upper": 28.71079874705481,
+                  "est": 2.354770846164616,
+                  "lower": 1.3522683773687088,
+                  "upper": 3.357273314960523
+                }
+              },
+              "Sens": {
+                "test 1": {
+                  "SE": 0.5916079783099614,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.7142857142857143,
+                  "display_lower": 0.4394881576961144,
+                  "display_se": 0.5916079783099614,
+                  "display_upper": 0.8885308069058542,
+                  "est": 0.9162907318741551,
+                  "lower": -0.24323959857992272,
+                  "upper": 2.0758210623282327
+                }
+              },
+              "Spec": {
+                "test 1": {
+                  "SE": 0.5178627406773132,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.9322033898305084,
+                  "display_lower": 0.83286177167357,
+                  "display_se": 0.5178627406773132,
+                  "display_upper": 0.9743200958739777,
+                  "est": 2.6210388241125795,
+                  "lower": 1.6060465034498401,
+                  "upper": 3.636031144775319
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  10.0,
+                  4.0,
+                  4.0,
+                  55.0
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          }
+        ],
+        "covariates": {},
+        "id": 11,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Smales",
+        "notes": "",
+        "sample_size": null,
+        "year": 1986
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  "",
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          },
+          {
+            "entered_effects": {
+              "DOR": {
+                "test 1": {
+                  "SE": 0.9540151610620409,
+                  "display_est": 1.533333333333426,
+                  "display_lower": 0.23636186038380205,
+                  "display_upper": 9.94708328697481,
+                  "est": 0.42744401482693967,
+                  "lower": -1.442391341559839,
+                  "upper": 2.2972793712137185
+                }
+              },
+              "NLR": {
+                "test 1": {
+                  "SE": 0.7343607521414214,
+                  "display_est": 0.9130434782608939,
+                  "display_lower": 0.21647236066376122,
+                  "display_upper": 3.851061588831634,
+                  "est": -0.09097177820572676,
+                  "lower": -1.5302924040626578,
+                  "upper": 1.3483488476512044
+                }
+              },
+              "PLR": {
+                "test 1": {
+                  "SE": 0.7343607521414214,
+                  "display_est": 1.399999999999702,
+                  "display_lower": 0.331924286348797,
+                  "display_upper": 5.9049611028932425,
+                  "est": 0.3364722366212129,
+                  "lower": -1.1028483892357182,
+                  "upper": 1.775792862478144
+                }
+              },
+              "Sens": {
+                "test 1": {
+                  "SE": 0.8164965809277259,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.25,
+                  "display_lower": 0.06303734004978719,
+                  "display_se": 0.8164965809277259,
+                  "display_upper": 0.6228567818645292,
+                  "est": -1.0986122886681098,
+                  "lower": -2.6989161807865463,
+                  "upper": 0.5016916034503265
+                }
+              },
+              "Spec": {
+                "test 1": {
+                  "SE": 0.49343516379516894,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.8214285714285714,
+                  "display_lower": 0.6362075083108757,
+                  "display_se": 0.49343516379516894,
+                  "display_upper": 0.923661724851558,
+                  "est": 1.526056303495049,
+                  "lower": 0.5589411537508956,
+                  "upper": 2.4931714532392024
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  2.0,
+                  6.0,
+                  5.0,
+                  23.0
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          }
+        ],
+        "covariates": {},
+        "id": 12,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Feigen",
+        "notes": "",
+        "sample_size": null,
+        "year": 1987
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  "",
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          },
+          {
+            "entered_effects": {
+              "DOR": {
+                "test 1": {
+                  "SE": 0.6473388749701496,
+                  "display_est": 3.000000000005671,
+                  "display_lower": 0.8435394640117045,
+                  "display_upper": 10.669328921705489,
+                  "est": 1.0986122886681098,
+                  "lower": -0.17014859206606037,
+                  "upper": 2.36737316940228
+                }
+              },
+              "NLR": {
+                "test 1": {
+                  "SE": 0.38265986388511064,
+                  "display_est": 0.6666666666667762,
+                  "display_lower": 0.3149111763851329,
+                  "display_upper": 1.4113327114879173,
+                  "est": -0.40546510810816444,
+                  "lower": -1.1554646596519806,
+                  "upper": 0.3445344434356517
+                }
+              },
+              "PLR": {
+                "test 1": {
+                  "SE": 0.38265986388511064,
+                  "display_est": 2.0000000000001092,
+                  "display_lower": 0.9447335291535001,
+                  "display_upper": 4.2339981344463515,
+                  "est": 0.6931471805599453,
+                  "lower": -0.05685237098387086,
+                  "upper": 1.4431467321037614
+                }
+              },
+              "Sens": {
+                "test 1": {
+                  "SE": 0.5345224838248488,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.5,
+                  "display_lower": 0.25967761695444735,
+                  "display_se": 0.5345224838248488,
+                  "display_upper": 0.7403223830455526,
+                  "est": 0.0,
+                  "lower": -1.047644817223597,
+                  "upper": 1.047644817223597
+                }
+              },
+              "Spec": {
+                "test 1": {
+                  "SE": 0.36514837167011066,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.7500000000000001,
+                  "display_lower": 0.5945807048514665,
+                  "display_se": 0.36514837167011066,
+                  "display_upper": 0.8598795541824685,
+                  "est": 1.0986122886681098,
+                  "lower": 0.38293463118124715,
+                  "upper": 1.8142899461549724
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  7.0,
+                  7.0,
+                  10.0,
+                  30.0
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          }
+        ],
+        "covariates": {},
+        "id": 13,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Swart",
+        "notes": "",
+        "sample_size": null,
+        "year": 1989
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  "",
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          },
+          {
+            "entered_effects": {
+              "DOR": {
+                "test 1": {
+                  "SE": 0.3653327434928512,
+                  "display_est": 9.899999999994611,
+                  "display_lower": 4.837972546034908,
+                  "display_upper": 20.25848618761181,
+                  "est": 2.2925347571405443,
+                  "lower": 1.5764957375213462,
+                  "upper": 3.0085737767597425
+                }
+              },
+              "NLR": {
+                "test 1": {
+                  "SE": 0.13951603658620915,
+                  "display_est": 0.29365079364998714,
+                  "display_lower": 0.22339575344473736,
+                  "display_upper": 0.3860001243631622,
+                  "est": -1.2253639943072536,
+                  "lower": -1.498810401281996,
+                  "upper": -0.9519175873325112
+                }
+              },
+              "PLR": {
+                "test 1": {
+                  "SE": 0.13951603658620915,
+                  "display_est": 2.9071428571332905,
+                  "display_lower": 2.2116179590994847,
+                  "display_upper": 3.8214012312046903,
+                  "est": 1.0671707628332907,
+                  "lower": 0.7937243558585483,
+                  "upper": 1.3406171698080331
+                }
+              },
+              "Sens": {
+                "test 1": {
+                  "SE": 0.32566947363946475,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.7857142857142857,
+                  "display_lower": 0.6594810689913807,
+                  "display_se": 0.32566947363946475,
+                  "display_upper": 0.8740864169688486,
+                  "est": 1.2992829841302609,
+                  "lower": 0.6609825449327935,
+                  "upper": 1.9375834233277283
+                }
+              },
+              "Spec": {
+                "test 1": {
+                  "SE": 0.1655518269527926,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.7297297297297297,
+                  "display_lower": 0.6612290656035493,
+                  "display_se": 0.1655518269527926,
+                  "display_upper": 0.7888033551876338,
+                  "est": 0.9932517730102833,
+                  "lower": 0.6687761546080024,
+                  "upper": 1.3177273914125642
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  44.0,
+                  12.0,
+                  50.0,
+                  135.0
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          }
+        ],
+        "covariates": {},
+        "id": 14,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Heller",
+        "notes": "",
+        "sample_size": null,
+        "year": 1990
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  "",
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          },
+          {
+            "entered_effects": {
+              "DOR": {
+                "test 1": {
+                  "SE": 1.2187536093732645,
+                  "display_est": 98.66666666706622,
+                  "display_lower": 9.052436837328043,
+                  "display_upper": 1075.4133153458608,
+                  "est": 4.591747165655951,
+                  "lower": 2.203033985256155,
+                  "upper": 6.980460346055747
+                }
+              },
+              "NLR": {
+                "test 1": {
+                  "SE": 0.5676462121975465,
+                  "display_est": 0.12012012011970061,
+                  "display_lower": 0.03948520762462375,
+                  "display_upper": 0.3654240189107548,
+                  "est": -2.1192630358665077,
+                  "lower": -3.23182916773428,
+                  "upper": -1.0066969039987355
+                }
+              },
+              "PLR": {
+                "test 1": {
+                  "SE": 0.5676462121975466,
+                  "display_est": 11.851851851858454,
+                  "display_lower": 3.8958738189396938,
+                  "display_upper": 36.05516986600715,
+                  "est": 2.4724841297894433,
+                  "lower": 1.3599179979216711,
+                  "upper": 3.5850502616572157
+                }
+              },
+              "Sens": {
+                "test 1": {
+                  "SE": 1.060660171779821,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.8888888888888888,
+                  "display_lower": 0.5001464512846419,
+                  "display_se": 1.060660171779821,
+                  "display_upper": 0.9846065083608596,
+                  "est": 2.0794415416798353,
+                  "lower": 0.0005858051553193633,
+                  "upper": 4.158297278204351
+                }
+              },
+              "Spec": {
+                "test 1": {
+                  "SE": 0.6003002251876641,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.925,
+                  "display_lower": 0.7917883156880721,
+                  "display_se": 0.6003002251876641,
+                  "display_upper": 0.9756095893186894,
+                  "est": 2.5123056239761152,
+                  "lower": 1.3357388026970094,
+                  "upper": 3.688872445255221
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  8.0,
+                  1.0,
+                  3.0,
+                  37.0
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          }
+        ],
+        "covariates": {},
+        "id": 15,
+        "include": true,
+        "manually_excluded": false,
+        "name": "La Fianza",
+        "notes": "",
+        "sample_size": null,
+        "year": 1990
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  "",
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          },
+          {
+            "entered_effects": {
+              "DOR": {
+                "test 1": {
+                  "SE": 1.6052731933156694,
+                  "display_est": 37.28571428581197,
+                  "display_lower": 1.6037307183472014,
+                  "display_upper": 866.8690285009011,
+                  "est": 3.6186102582673803,
+                  "lower": 0.4723326140210644,
+                  "upper": 6.764887902513696
+                }
+              },
+              "NLR": {
+                "test 1": {
+                  "SE": 0.5023753102820165,
+                  "display_est": 0.12413793103503018,
+                  "display_lower": 0.04637478012062545,
+                  "display_upper": 0.33229755227777386,
+                  "est": -2.0863619845244097,
+                  "lower": -3.0709994993992966,
+                  "upper": -1.1017244696495228
+                }
+              },
+              "PLR": {
+                "test 1": {
+                  "SE": 0.5023753102820165,
+                  "display_est": 4.62857142855768,
+                  "display_lower": 1.7291168016415353,
+                  "display_upper": 12.38995159210374,
+                  "est": 1.5322482737429706,
+                  "lower": 0.5476107588680836,
+                  "upper": 2.5168857886178575
+                }
+              },
+              "Sens": {
+                "test 1": {
+                  "SE": 1.4907119849998598,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.9,
+                  "display_lower": 0.3263990359568072,
+                  "display_se": 1.4907119849998598,
+                  "display_upper": 0.9940533709129095,
+                  "est": 2.1972245773362196,
+                  "lower": -0.7245172245857181,
+                  "upper": 5.118966379258158
+                }
+              },
+              "Spec": {
+                "test 1": {
+                  "SE": 0.5955500003825579,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.8055555555555556,
+                  "display_lower": 0.5631925580102726,
+                  "display_se": 0.5955500003825579,
+                  "display_upper": 0.9301270263365558,
+                  "est": 1.421385680931161,
+                  "lower": 0.2541291291885319,
+                  "upper": 2.5886422326737897
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  4.0,
+                  0.0,
+                  3.0,
+                  14.0
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          }
+        ],
+        "covariates": {},
+        "id": 16,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Stellato",
+        "notes": "",
+        "sample_size": null,
+        "year": 1992
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  "",
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          },
+          {
+            "entered_effects": {},
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "test 1",
+                "raw_data": [
+                  "",
+                  "",
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "LAG positive"
+          }
+        ],
+        "covariates": {},
+        "id": 17,
+        "include": false,
+        "manually_excluded": false,
+        "name": "",
+        "notes": "",
+        "sample_size": null,
+        "year": null
+      }
+    ],
+    "summary": null,
+    "title": "Lymph"
+  },
+  "project_file": "sample_projects/lymph.rcms",
+  "schema_version": 1,
+  "source_sha256": "9749e3fb75c6a87b29cecbd65f49b90b18b819c11c40dee0f2f3441d9e36f8f5"
+}

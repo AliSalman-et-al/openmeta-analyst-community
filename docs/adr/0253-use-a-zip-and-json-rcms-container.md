@@ -1,0 +1,3 @@
+# Use a ZIP and JSON RCMS container
+
+The Versioned Project Format will use one `.rcms` ZIP container with UTF-8 JSON members: `manifest.json` for format/application versions and integrity metadata, `project.json` for analysis data, and `state.json` for project-scoped selection and view state. The existing `.rcms.state` sidecar will be removed. Readers will validate member names, counts, compressed and uncompressed size limits, schemas, and integrity metadata and will consume entries directly without extracting archive paths; future optional artifacts must live under explicitly versioned named directories.

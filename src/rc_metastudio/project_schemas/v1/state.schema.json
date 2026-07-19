@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rcmetastudio.org/schemas/project/v1/state.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["active_effect", "active_follow_up", "active_groups", "active_outcome", "confidence_level", "schema_version"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "active_outcome": {"type": ["string", "null"]},
+    "active_follow_up": {"type": ["string", "null"]},
+    "active_groups": {
+      "type": "array",
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "active_effect": {
+      "enum": ["OR", "RD", "RR", "AS", "YUQ", "YUY", "PR", "PLN", "PLO", "PAS", "PFT", "MD", "SMD", "TX Mean", "Sens", "Spec", "PLR", "NLR", "DOR", null]
+    },
+    "confidence_level": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 100}
+  }
+}

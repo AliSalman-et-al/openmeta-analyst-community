@@ -6,10 +6,10 @@ import json
 import uuid
 from dataclasses import dataclass
 
-from PyQt5.QtCore import Qt
+from PyQt6.QtCore import Qt
 
 
-WORKSPACE_COLUMN_IDENTITY_ROLE = Qt.UserRole + 73
+WORKSPACE_COLUMN_IDENTITY_ROLE = Qt.ItemDataRole.UserRole + 73
 WORKSPACE_COLUMN_WIDTH_STATE_VERSION = 1
 
 

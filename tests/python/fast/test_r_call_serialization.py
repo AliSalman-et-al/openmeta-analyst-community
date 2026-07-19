@@ -1,3 +1,4 @@
+import ast
 import os
 from pathlib import Path
 import sys
@@ -6,15 +7,40 @@ import threading
 
 sys.path.insert(0, os.path.abspath("src"))
 
-import r_call_serialization
+from rc_metastudio import r_call_serialization
+
+
+def test_public_rpy2_paths_are_serialized_and_raw_gateways_enforce_transaction():
+    source = (Path("src/rc_metastudio/meta_py_r.py")).read_text(encoding="utf-8")
+    module = ast.parse(source)
+    functions = {
+        node.name: node for node in module.body if isinstance(node, ast.FunctionDef)
+    }
+    for name in ("get_R_libpaths", "get_params", "ma_dataset_to_simple_network"):
+        decorators = {
+            decorator.id
+            for decorator in functions[name].decorator_list
+            if isinstance(decorator, ast.Name)
+        }
+        assert "RfunctionCaller" in decorators
+    assert any(
+        isinstance(node, ast.For) for node in ast.walk(functions["get_R_libpaths"])
+    )
+    for name in ("execute_r_string", "execute_r_function"):
+        calls = {
+            node.func.id
+            for node in ast.walk(functions[name])
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        }
+        assert "require_r_transaction" in calls
 
 
 def test_application_code_does_not_bypass_serialized_r_backend_entrypoints():
     root = Path(__file__).resolve().parents[3]
     offenders = []
 
-    for path in (root / "src").glob("*.py"):
-        if path.name in {"meta_py_r.py", "meta_py_r_backend.py"}:
+    for path in (root / "src").rglob("*.py"):
+        if path.name in {"meta_py_r.py", "meta_py_r_backend.py", "launch.py"}:
             continue
         text = path.read_text(encoding="utf-8")
         if "meta_py_r.ro.r" in text:
@@ -67,3 +93,52 @@ def test_r_backend_calls_are_serialized_across_threads():
     assert not second_thread.is_alive()
     assert second_call_entered.is_set()
     assert max_active_calls == 1
+
+
+def test_nested_result_parsing_remains_inside_one_reentrant_transaction():
+    observations = []
+
+    @r_call_serialization.serialized_r_call
+    def parse_summary():
+        observations.append(r_call_serialization.r_transaction_active())
+
+    @r_call_serialization.serialized_r_call
+    def analyze_and_parse():
+        observations.append(r_call_serialization.r_transaction_active())
+        parse_summary()
+        observations.append(r_call_serialization.r_transaction_active())
+
+    analyze_and_parse()
+    assert observations == [True, True, True]
+    assert r_call_serialization.r_transaction_active() is False
+
+
+def test_direct_rpy2_access_requires_gateway_transaction():
+    try:
+        r_call_serialization.require_r_transaction()
+    except RuntimeError as exc:
+        assert "R transaction" in str(exc)
+    else:
+        raise AssertionError("direct rpy2 access was accepted outside the gateway")
+
+
+def test_packaged_r_gateway_rejects_background_thread(monkeypatch):
+    monkeypatch.setenv("RCMS_ENFORCE_R_MAIN_THREAD", "1")
+    errors = []
+
+    @r_call_serialization.serialized_r_call
+    def guarded_call():
+        return None
+
+    thread = threading.Thread(target=lambda: _capture_error(guarded_call, errors))
+    thread.start()
+    thread.join(timeout=2)
+    assert len(errors) == 1
+    assert "main thread" in str(errors[0])
+
+
+def _capture_error(function, errors):
+    try:
+        function()
+    except Exception as exc:
+        errors.append(exc)

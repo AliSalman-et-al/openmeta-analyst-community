@@ -5,7 +5,7 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from PyQt5.QtCore import (
+from PyQt6.QtCore import (
     QEvent,
     QMargins,
     QObject,
@@ -16,8 +16,8 @@ from PyQt5.QtCore import (
     Qt,
     pyqtSignal,
 )
-from PyQt5.QtGui import QGuiApplication
-from PyQt5.QtWidgets import QApplication, QLayout, QSizePolicy, QWIDGETSIZE_MAX
+from PyQt6.QtGui import QGuiApplication
+from PyQt6.QtWidgets import QApplication, QLayout, QSizePolicy, QWIDGETSIZE_MAX
 
 
 class WindowArchetype(str, Enum):
@@ -54,6 +54,14 @@ class WindowPolicy:
     first_use_behavior: FirstUseBehavior
     maximum_screen_fraction: float
     application_owns_geometry: bool
+
+
+@dataclass(frozen=True)
+class AdaptiveWindowState:
+    """Application-owned window role state, independent of Qt properties."""
+
+    role: WindowRole
+    policy: WindowPolicy
 
 
 WINDOW_POLICIES = {
@@ -213,6 +221,14 @@ def register_adaptive_window(
     return controller
 
 
+def adaptive_window_state(window):
+    """Return the typed adaptive policy registered for ``window``."""
+    controller = getattr(window, "_adaptive_window_controller", None)
+    if not isinstance(controller, AdaptiveWindowController):
+        raise LookupError("window is not registered with the adaptive policy")
+    return controller.state
+
+
 class AdaptiveWindowController(QObject):
     """Own local sizing and reachability work for one registered window."""
 
@@ -231,6 +247,10 @@ class AdaptiveWindowController(QObject):
         self.window = window
         self.role = WindowRole(role)
         self.policy = WINDOW_POLICIES[self.role]
+        self.state = AdaptiveWindowState(self.role, self.policy)
+        self._uses_default_available_geometry_provider = (
+            available_geometry_provider is None
+        )
         self._available_geometry_provider = (
             available_geometry_provider or available_geometry_for_window
         )
@@ -245,29 +265,31 @@ class AdaptiveWindowController(QObject):
         self._window_handle = None
         self._runtime_screen = None
 
-        window.setProperty("RCMS_window_archetype", self.policy.archetype.value)
-        window.setProperty("RCMS_window_role", self.role.value)
         # layout-audit: allow=adaptive-window-policy; reason=central adaptive policy owns screen-safe outer geometry
         window.setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX)
-        window.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        window.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         if window.layout() is not None:
             constraint = (
-                QLayout.SetMinimumSize
+                QLayout.SizeConstraint.SetMinimumSize
                 if self.policy.application_owns_geometry
-                else QLayout.SetNoConstraint
+                else QLayout.SizeConstraint.SetNoConstraint
             )
             window.layout().setSizeConstraint(constraint)
         window.installEventFilter(self)
 
-    def eventFilter(self, watched, event):
+    def eventFilter(  # ty: ignore[invalid-method-override] -- PyQt6's QObject stub rejects this runtime-supported filter override.
+        self, watched: QObject | None, event: QEvent | None
+    ) -> bool:
+        if event is None:
+            return super().eventFilter(watched, event)
         if (
             watched is self.window
-            and event.type() in (QEvent.Move, QEvent.Resize)
+            and event.type() in (QEvent.Type.Move, QEvent.Type.Resize)
             and not self.window.isMaximized()
             and not self.window.isFullScreen()
         ):
             self._normal_frame_geometry = QRect(self.window.frameGeometry())
-        if watched is self.window and event.type() == QEvent.Show:
+        if watched is self.window and event.type() == QEvent.Type.Show:
             if self._first_show_pending:
                 self._first_show_pending = False
                 self.apply_first_use_geometry()
@@ -284,7 +306,9 @@ class AdaptiveWindowController(QObject):
         ):
             self._screen_placer(self.window, screen)
         if self.policy.first_use_behavior == FirstUseBehavior.MAXIMIZED:
-            self.window.setWindowState(self.window.windowState() | Qt.WindowMaximized)
+            self.window.setWindowState(
+                self.window.windowState() | Qt.WindowState.WindowMaximized
+            )
             self.refitApplied.emit()
             return
 
@@ -453,7 +477,10 @@ class AdaptiveWindowController(QObject):
         handle = self.window.windowHandle()
         if handle is None:
             return
-        if handle is not self._window_handle:
+        if (
+            handle is not self._window_handle
+            and self._uses_default_available_geometry_provider
+        ):
             if self._window_handle is not None:
                 try:
                     self._window_handle.screenChanged.disconnect(
@@ -463,7 +490,8 @@ class AdaptiveWindowController(QObject):
                     pass
             self._window_handle = handle
             handle.screenChanged.connect(self.handle_screen_assignment_change)
-        self._connect_runtime_screen(handle.screen())
+        if self._uses_default_available_geometry_provider:
+            self._connect_runtime_screen(handle.screen())
 
     def _connect_runtime_screen(self, screen):
         if screen is self._runtime_screen:

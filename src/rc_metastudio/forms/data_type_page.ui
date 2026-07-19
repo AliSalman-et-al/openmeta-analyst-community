@@ -46,6 +46,7 @@
      <property name="text">
       <string>One piece of data from each study or studies with one group</string>
      </property>
+     <property name="wordWrap"><bool>true</bool></property>
     </widget>
    </item>
    <item>
@@ -195,6 +196,7 @@ Effect Size</string>
      <property name="text">
       <string>Data on two or more groups per study</string>
      </property>
+     <property name="wordWrap"><bool>true</bool></property>
     </widget>
    </item>
    <item>
@@ -312,6 +314,7 @@ Effect Size</string>
      <property name="text">
       <string>Data on test performance</string>
      </property>
+     <property name="wordWrap"><bool>true</bool></property>
     </widget>
    </item>
    <item>
@@ -352,6 +355,10 @@ Effect Size</string>
      <item>
       <spacer name="diagnosticDataTypeSpacer">
        <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeType"><enum>QSizePolicy::Expanding</enum></property>
+       <property name="sizeHint" stdset="0">
+        <size><width>40</width><height>20</height></size>
+       </property>
       </spacer>
      </item>
     </layout>

@@ -5,11 +5,10 @@
 import hashlib
 import importlib.util
 import json
-import platform
 from pathlib import Path
 
 import pytest
-from PyQt5 import QtGui
+from PyQt6 import QtGui
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -56,12 +55,14 @@ def test_packagers_retain_opt_in_controlled_adaptive_layout_evidence():
 def test_hosted_package_workflow_does_not_require_native_layout_evidence():
     workflow = _text(".github", "workflows", "package-verification.yml")
     target = _text(".github", "workflows", "package-target.yml")
+    windows = _text(".github", "workflows", "package-windows.yml")
 
-    assert "artifact_name: RCMetaStudio-windows-x64" in workflow
+    assert "uses: ./.github/workflows/package-windows.yml" in workflow
     assert "artifact_name: RCMetaStudio-macos-x64" in workflow
     assert "Upload adaptive-layout evidence" not in target
     assert "evidence_path" not in target
     assert "adaptive-layout-evidence" not in workflow
+    assert "adaptive-layout-evidence" not in windows
     assert target.count("if-no-files-found: error") >= 1
 
 
@@ -118,7 +119,7 @@ def _write_validator_fixture(tmp_path, validator):
     screenshots.mkdir()
 
     def write_nonblank_png(path, size):
-        image = QtGui.QImage(size[0], size[1], QtGui.QImage.Format_ARGB32)
+        image = QtGui.QImage(size[0], size[1], QtGui.QImage.Format.Format_ARGB32)
         image.fill(QtGui.QColor("white"))
         painter = QtGui.QPainter(image)
         painter.fillRect(
@@ -185,7 +186,9 @@ def _write_validator_fixture(tmp_path, validator):
         "schema_version": 2,
         "platform_plugin": "windows",
         "scale_factor_environment": "1.0",
-        "machine": platform.machine(),
+        # This fixture exercises the Windows x64 release-evidence contract even
+        # when the contract suite itself runs on an Apple Silicon host.
+        "machine": "x86_64",
         "surfaces": surfaces,
         "unavailable_scenarios": [],
         "intrinsic_artifact": {

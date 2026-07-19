@@ -5,9 +5,9 @@ overflow belong to canonical ``.ui`` resources.  This module deliberately has
 no root-fitting, coordinate inference, or descendant-repair surface.
 """
 
-from PyQt5.QtCore import QSize
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QHeaderView, QProxyStyle, QSizePolicy, QStyle, QToolButton
+from PyQt6.QtCore import QSize
+from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import QHeaderView, QProxyStyle, QSizePolicy, QStyle, QToolButton
 
 
 OUTCOME_NAVIGATION_ICON_EXTENT = 24
@@ -31,7 +31,7 @@ class _MenuIconProxyStyle(QProxyStyle):
         self.setParent(parent)
 
     def pixelMetric(self, metric, option=None, widget=None):
-        if metric == QStyle.PM_SmallIconSize:
+        if metric == QStyle.PixelMetric.PM_SmallIconSize:
             return self._icon_extent
         return super(_MenuIconProxyStyle, self).pixelMetric(metric, option, widget)
 
@@ -68,7 +68,7 @@ def configure_navigation_tool_buttons(buttons):
         button.setMinimumSize(
             QSize(OUTCOME_NAVIGATION_CONTROL_EXTENT, OUTCOME_NAVIGATION_CONTROL_EXTENT)
         )
-        button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
 
 
 def configure_icon_only_action_buttons(buttons, icon_name):
@@ -110,16 +110,16 @@ def configure_compact_table(table, stretch_columns=False, fill_available_width=F
     if table is None:
         return
 
-    table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
     # layout-audit: allow=compact-table-overflow; reason=compact table keeps rows visible and owns excess overflow
     table.setMinimumWidth(0)
     header = table.horizontalHeader()
     header.setStretchLastSection(False)
 
     if stretch_columns:
-        header.setSectionResizeMode(QHeaderView.Stretch)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
     else:
-        header.setSectionResizeMode(QHeaderView.Interactive)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         table.resizeColumnsToContents()
         header.setStretchLastSection(fill_available_width)
 
@@ -141,7 +141,7 @@ def configure_spreadsheet_table_view(table_view):
     if table_view is None:
         return
 
-    table_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+    table_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     header = table_view.horizontalHeader()
     header.setStretchLastSection(False)
-    header.setSectionResizeMode(QHeaderView.Interactive)
+    header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)

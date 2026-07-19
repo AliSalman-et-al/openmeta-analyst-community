@@ -8,11 +8,12 @@
 import os
 import math
 
-from PyQt5.QtGui import QColor
-from PyQt5.QtWidgets import QUndoCommand
+from PyQt6.QtGui import QColor, QUndoCommand
 
 APPLICATION_NAME = "RCMetaStudio"
+APPLICATION_DISPLAY_NAME = "RC MetaStudio"
 ORGANIZATION_NAME = "Research Consultancy"
+ORGANIZATION_DOMAIN = "rcmetastudio.org"
 
 # Default display precision. Editing and calculations retain their full values.
 NUM_DIGITS = 2
@@ -24,7 +25,7 @@ PERCENTAGE_DISPLAY_DIGITS = 1
 #   levels of granularity).
 CALC_NUM_DIGITS = 4
 
-VERSION = "0.1.2"
+VERSION = "0.2.0"
 
 DISABLE_NETWORK_STUFF = True  # disable this until we can package jags, rjags, getmc
 DEFAULT_DATASET_NAME = "untitled_dataset"

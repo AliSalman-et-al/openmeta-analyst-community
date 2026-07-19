@@ -14,7 +14,12 @@ on:
         default: true
         type: boolean
       build_macos_arm64:
-        description: Attempt the unsupported experimental Apple Silicon package.
+        description: Qualify the supported Apple Silicon package.
+        required: true
+        default: false
+        type: boolean
+      build_macos_direct_r_spike:
+        description: Run the non-release direct staged R.framework feasibility path.
         required: true
         default: false
         type: boolean
@@ -29,32 +34,16 @@ concurrency:
 jobs:
   windows-package:
     if: ${{ inputs.build_windows }}
-    uses: ./.github/workflows/package-target.yml
-    with:
-      runner: windows-latest
-      target_os: windows
-      artifact_name: RCMetaStudio-windows-x64
-      archive_platform: windows-x64
+    uses: ./.github/workflows/package-windows.yml
 
   macos-package-intel:
     if: ${{ inputs.build_macos }}
     uses: ./.github/workflows/package-target.yml
     with:
-      runner: macos-15-intel
-      target_os: macos
       artifact_name: RCMetaStudio-macos-x64
-      archive_platform: macos-x64
 
-  macos-package-arm64:
-    if: ${{ inputs.build_macos_arm64 }}
-    runs-on: macos-14
-    timeout-minutes: 60
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
-      - run: uv python install 3.11.9
-      - uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
-        with:
-          r-version: 4.6.1
-      - run: bash scripts/package-macos.sh --architecture arm64 --artifact-name RCMetaStudio-macos-arm64 --r-runtime-root "$(R RHOME)"
+  # Apple Silicon qualification is intentionally deferred to Issue #343.
+
+  macos-direct-r-spike:
+    if: ${{ inputs.build_macos_direct_r_spike }}
+    uses: ./.github/workflows/macos-x64-direct-r-spike.yml

@@ -5,7 +5,7 @@ import sys
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt5 import QtCore, QtGui
+from PyQt6 import QtCore, QtGui
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -43,7 +43,7 @@ def _alpha_bounds(image):
 
 def _render_square_master():
     source = QtGui.QImage(str(ICON_SOURCE_IMAGE)).convertToFormat(
-        QtGui.QImage.Format_ARGB32
+        QtGui.QImage.Format.Format_ARGB32
     )
     if source.isNull():
         raise ValueError(f"Could not load {ICON_SOURCE_IMAGE}")
@@ -53,15 +53,15 @@ def _render_square_master():
     scaled = artwork.scaled(
         target_extent,
         target_extent,
-        QtCore.Qt.KeepAspectRatio,
-        QtCore.Qt.SmoothTransformation,
+        QtCore.Qt.AspectRatioMode.KeepAspectRatio,
+        QtCore.Qt.TransformationMode.SmoothTransformation,
     )
 
-    master = QtGui.QImage(MASTER_SIZE, MASTER_SIZE, QtGui.QImage.Format_ARGB32)
-    master.fill(QtCore.Qt.transparent)
+    master = QtGui.QImage(MASTER_SIZE, MASTER_SIZE, QtGui.QImage.Format.Format_ARGB32)
+    master.fill(QtCore.Qt.GlobalColor.transparent)
 
     painter = QtGui.QPainter(master)
-    painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform, True)
+    painter.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, True)
     painter.drawImage(
         (MASTER_SIZE - scaled.width()) // 2,
         (MASTER_SIZE - scaled.height()) // 2,
@@ -73,7 +73,7 @@ def _render_square_master():
 
 def _render_splash():
     source = QtGui.QImage(str(SPLASH_SOURCE_IMAGE)).convertToFormat(
-        QtGui.QImage.Format_ARGB32
+        QtGui.QImage.Format.Format_ARGB32
     )
     if source.isNull():
         raise ValueError(f"Could not load {SPLASH_SOURCE_IMAGE}")
@@ -83,15 +83,15 @@ def _render_splash():
     scaled = source.scaled(
         target_width,
         target_height,
-        QtCore.Qt.KeepAspectRatio,
-        QtCore.Qt.SmoothTransformation,
+        QtCore.Qt.AspectRatioMode.KeepAspectRatio,
+        QtCore.Qt.TransformationMode.SmoothTransformation,
     )
 
-    splash = QtGui.QImage(SPLASH_SIZE, QtGui.QImage.Format_ARGB32)
+    splash = QtGui.QImage(SPLASH_SIZE, QtGui.QImage.Format.Format_ARGB32)
     splash.fill(QtGui.QColor("white"))
 
     painter = QtGui.QPainter(splash)
-    painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform, True)
+    painter.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, True)
     painter.drawImage(
         (SPLASH_SIZE.width() - scaled.width()) // 2,
         (SPLASH_SIZE.height() - scaled.height()) // 2,
@@ -104,10 +104,10 @@ def _render_splash():
 def _png_bytes(image):
     data = QtCore.QByteArray()
     buffer = QtCore.QBuffer(data)
-    buffer.open(QtCore.QIODevice.WriteOnly)
+    buffer.open(QtCore.QIODevice.OpenModeFlag.WriteOnly)
     if not image.save(buffer, "PNG"):
         raise ValueError("Could not encode PNG frame")
-    return bytes(data)
+    return bytes(data.data())
 
 
 def _ico_dimension_byte(size):
@@ -120,8 +120,8 @@ def _write_ico(master):
         frame = master.scaled(
             size,
             size,
-            QtCore.Qt.KeepAspectRatio,
-            QtCore.Qt.SmoothTransformation,
+            QtCore.Qt.AspectRatioMode.KeepAspectRatio,
+            QtCore.Qt.TransformationMode.SmoothTransformation,
         )
         frames.append((size, _png_bytes(frame)))
 

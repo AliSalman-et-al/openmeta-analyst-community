@@ -5,8 +5,17 @@ import subprocess
 import sys
 
 import pytest
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtTest import QTest
+from PyQt6 import QtCore, QtGui, QtWidgets
+from PyQt6.QtTest import QTest
+
+
+ROOT = Path(__file__).resolve().parents[3]
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
+from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+
+prepare_generated_ui_imports()
+import adaptive_window
 
 
 def _show(wizard, qapp):
@@ -40,13 +49,13 @@ def _assert_multiline_data_type_labels_fit(page):
         margin = max(
             0,
             button.style().pixelMetric(
-                QtWidgets.QStyle.PM_ButtonMargin, None, button
+                QtWidgets.QStyle.PixelMetric.PM_ButtonMargin, None, button
             ),
         )
         frame = max(
             0,
             button.style().pixelMetric(
-                QtWidgets.QStyle.PM_DefaultFrameWidth, None, button
+                QtWidgets.QStyle.PixelMetric.PM_DefaultFrameWidth, None, button
             ),
         )
         required_height = (
@@ -66,8 +75,14 @@ def test_main_wizard_is_a_stable_workflow_window(qapp):
         _show(wizard, qapp)
         initial_geometry = _frame_tuple(wizard)
 
-        assert wizard.property("RCMS_window_archetype") == "workflow"
-        assert wizard.property("RCMS_window_role") == "workflow"
+        assert (
+            adaptive_window.adaptive_window_state(wizard).policy.archetype
+            is adaptive_window.WindowArchetype.WORKFLOW
+        )
+        assert (
+            adaptive_window.adaptive_window_state(wizard).role
+            is adaptive_window.WindowRole.WORKFLOW
+        )
 
         welcome_page = wizard.page(main_wizard.Page_Welcome)
         for button in (
@@ -112,15 +127,15 @@ def test_every_wizard_page_declares_a_focus_revealing_overflow_boundary(qapp):
             overflow = page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
             assert overflow is not None, page_id
             assert overflow.widgetResizable() is True
-            assert overflow.focusPolicy() == QtCore.Qt.NoFocus
+            assert overflow.focusPolicy() == QtCore.Qt.FocusPolicy.NoFocus
             assert overflow.widget() is not None
 
         overflow = wizard.currentPage().findChild(
             QtWidgets.QScrollArea, "pageScrollArea"
         )
         for button_id in (
-            main_wizard.QWizard.NextButton,
-            main_wizard.QWizard.CancelButton,
+            main_wizard.QWizard.WizardButton.NextButton,
+            main_wizard.QWizard.WizardButton.CancelButton,
         ):
             button = wizard.button(button_id)
             assert button.isVisible()
@@ -164,13 +179,18 @@ def test_workflow_path_matrix_is_bounded_stable_and_scrollable(
         assert initial_geometry[3] <= int(available.height() * 0.9)
 
         if path is None:
-            _assert_page_contract(wizard, [main_wizard.QWizard.CancelButton])
+            _assert_page_contract(
+                wizard, [main_wizard.QWizard.WizardButton.CancelButton]
+            )
             wizard.currentPage().create_new_btn.click()
             qapp.processEvents()
 
         _assert_page_contract(
             wizard,
-            [main_wizard.QWizard.NextButton, main_wizard.QWizard.CancelButton],
+            [
+                main_wizard.QWizard.WizardButton.NextButton,
+                main_wizard.QWizard.WizardButton.CancelButton,
+            ],
         )
         _assert_multiline_data_type_labels_fit(wizard.currentPage())
         wizard.currentPage().twoarm_proportions_Button.click()
@@ -179,9 +199,9 @@ def test_workflow_path_matrix_is_bounded_stable_and_scrollable(
         _assert_page_contract(
             wizard,
             [
-                main_wizard.QWizard.BackButton,
-                main_wizard.QWizard.NextButton,
-                main_wizard.QWizard.CancelButton,
+                main_wizard.QWizard.WizardButton.BackButton,
+                main_wizard.QWizard.WizardButton.NextButton,
+                main_wizard.QWizard.WizardButton.CancelButton,
             ],
         )
         wizard.currentPage().label_2.setText("Long translated metric guidance. " * 80)
@@ -189,11 +209,11 @@ def test_workflow_path_matrix_is_bounded_stable_and_scrollable(
         qapp.processEvents()
 
         outcome_buttons = [
-            main_wizard.QWizard.BackButton,
-            main_wizard.QWizard.CancelButton,
-            main_wizard.QWizard.NextButton
+            main_wizard.QWizard.WizardButton.BackButton,
+            main_wizard.QWizard.WizardButton.CancelButton,
+            main_wizard.QWizard.WizardButton.NextButton
             if path == "csv_import"
-            else main_wizard.QWizard.FinishButton,
+            else main_wizard.QWizard.WizardButton.FinishButton,
         ]
         _assert_page_contract(wizard, outcome_buttons)
         wizard.currentPage().outcome_name_LineEdit.setText("Outcome")
@@ -209,9 +229,9 @@ def test_workflow_path_matrix_is_bounded_stable_and_scrollable(
             _assert_page_contract(
                 wizard,
                 [
-                    main_wizard.QWizard.BackButton,
-                    main_wizard.QWizard.FinishButton,
-                    main_wizard.QWizard.CancelButton,
+                    main_wizard.QWizard.WizardButton.BackButton,
+                    main_wizard.QWizard.WizardButton.FinishButton,
+                    main_wizard.QWizard.WizardButton.CancelButton,
                 ],
             )
             assert page.pageScrollArea.verticalScrollBar().maximum() > 0
@@ -232,22 +252,22 @@ def test_tab_and_backtab_follow_logical_order_and_reveal_controls(qapp):
         wizard.resize(500, 330)
         page = wizard.currentPage()
         diagnostic = page.diagnostic_Button
-        QTest.mouseClick(diagnostic, QtCore.Qt.LeftButton)
+        QTest.mouseClick(diagnostic, QtCore.Qt.MouseButton.LeftButton)
         qapp.processEvents()
         assert qapp.focusWidget() is diagnostic
 
-        next_button = wizard.button(main_wizard.QWizard.NextButton)
-        cancel_button = wizard.button(main_wizard.QWizard.CancelButton)
-        QTest.keyClick(diagnostic, QtCore.Qt.Key_Tab)
+        next_button = wizard.button(main_wizard.QWizard.WizardButton.NextButton)
+        cancel_button = wizard.button(main_wizard.QWizard.WizardButton.CancelButton)
+        QTest.keyClick(diagnostic, QtCore.Qt.Key.Key_Tab)
         qapp.processEvents()
         assert qapp.focusWidget() is next_button
-        QTest.keyClick(next_button, QtCore.Qt.Key_Tab)
+        QTest.keyClick(next_button, QtCore.Qt.Key.Key_Tab)
         qapp.processEvents()
         assert qapp.focusWidget() is cancel_button
-        QTest.keyClick(cancel_button, QtCore.Qt.Key_Backtab)
+        QTest.keyClick(cancel_button, QtCore.Qt.Key.Key_Backtab)
         qapp.processEvents()
         assert qapp.focusWidget() is next_button
-        QTest.keyClick(next_button, QtCore.Qt.Key_Backtab)
+        QTest.keyClick(next_button, QtCore.Qt.Key.Key_Backtab)
         qapp.processEvents()
         assert qapp.focusWidget() is diagnostic
 
@@ -261,9 +281,32 @@ def test_tab_and_backtab_follow_logical_order_and_reveal_controls(qapp):
         qapp.processEvents()
 
 
-def test_hidden_and_closed_wizards_stop_observing_application_focus(
-    qapp, monkeypatch
-):
+def test_return_activates_visible_default_wizard_action(qapp):
+    import main_wizard
+
+    wizard = main_wizard.MainWizard(path="new_dataset")
+    try:
+        _show(wizard, qapp)
+        choice = wizard.currentPage().diagnostic_Button
+        QTest.mouseClick(choice, QtCore.Qt.MouseButton.LeftButton)
+        qapp.processEvents()
+        next_button = wizard.button(main_wizard.QWizard.WizardButton.NextButton)
+        assert next_button.isVisible()
+        assert next_button.isEnabled()
+        assert next_button.isDefault()
+        before_page = wizard.currentId()
+
+        assert qapp.focusWidget() is choice
+        QTest.keyClick(choice, QtCore.Qt.Key.Key_Return)
+        qapp.processEvents()
+
+        assert wizard.currentId() != before_page
+    finally:
+        wizard.close()
+        qapp.processEvents()
+
+
+def test_hidden_and_closed_wizards_stop_observing_application_focus(qapp, monkeypatch):
     import main_wizard
 
     calls = []
@@ -329,8 +372,8 @@ def test_csv_preview_overflows_inside_stable_wizard_and_finish_stays_reachable(q
         qapp.processEvents()
 
         overflow = page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
-        finish = wizard.button(main_wizard.QWizard.FinishButton)
-        cancel = wizard.button(main_wizard.QWizard.CancelButton)
+        finish = wizard.button(main_wizard.QWizard.WizardButton.FinishButton)
+        cancel = wizard.button(main_wizard.QWizard.WizardButton.CancelButton)
         assert _frame_tuple(wizard) == initial_geometry
         assert overflow.verticalScrollBar().maximum() > 0
         assert finish.isVisible()
@@ -344,31 +387,42 @@ def test_csv_preview_overflows_inside_stable_wizard_and_finish_stays_reachable(q
 
 def test_workflow_layout_survives_process_level_scale_factors():
     root = Path(__file__).resolve().parents[3]
-    script = r'''
+    script = r"""
 import json
-from PyQt5 import QtWidgets
+from PyQt6 import QtCore, QtWidgets
+from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+prepare_generated_ui_imports()
 import app_error_handler
+import adaptive_window
 import main_wizard
 
 app = app_error_handler.get_or_create_application([])
 wizard = main_wizard.MainWizard(path="new_dataset")
-wizard.restart()
-wizard.show()
-app.processEvents()
-page = wizard.currentPage()
-overflow = page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
-buttons = [wizard.button(role) for role in (
-    main_wizard.QWizard.NextButton,
-    main_wizard.QWizard.CancelButton,
-)]
-print("WORKFLOW_LAYOUT=" + json.dumps({
-    "archetype": wizard.property("RCMS_window_archetype"),
-    "overflow": overflow is not None,
-    "buttons": all(button.isVisible() for button in buttons),
-    "bounded": wizard.frameGeometry().width() <= app.primaryScreen().availableGeometry().width()
-        and wizard.frameGeometry().height() <= app.primaryScreen().availableGeometry().height(),
-}))
-'''
+try:
+    wizard.restart()
+    wizard.show()
+    app.processEvents()
+    page = wizard.currentPage()
+    overflow = page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
+    buttons = [wizard.button(role) for role in (
+        main_wizard.QWizard.WizardButton.NextButton,
+        main_wizard.QWizard.WizardButton.CancelButton,
+    )]
+    print("WORKFLOW_LAYOUT=" + json.dumps({
+        "archetype": adaptive_window.adaptive_window_state(wizard).policy.archetype.value,
+        "overflow": overflow is not None,
+        "buttons": all(button.isVisible() for button in buttons),
+        "bounded": wizard.frameGeometry().width() <= app.primaryScreen().availableGeometry().width()
+            and wizard.frameGeometry().height() <= app.primaryScreen().availableGeometry().height(),
+    }), flush=True)
+finally:
+    wizard.close()
+    wizard.deleteLater()
+    QtWidgets.QApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
+    app.processEvents()
+    app.quit()
+    app.processEvents()
+"""
     for scale_factor in ("1", "1.5", "2"):
         environment = os.environ.copy()
         environment["QT_QPA_PLATFORM"] = "offscreen"
@@ -377,9 +431,12 @@ print("WORKFLOW_LAYOUT=" + json.dumps({
             [
                 str(root / "src"),
                 str(root / "src" / "rc_metastudio"),
-                str(root / "src" / "rc_metastudio" / "forms"),
+                str(
+                    root / "build" / "qt6-verification" / "generated" / "rc_metastudio"
+                ),
             ]
         )
+        environment["RCMS_QT6_BUILD_ROOT"] = str(root / "build" / "qt6-verification")
         completed = subprocess.run(
             [sys.executable, "-c", script],
             cwd=root,
@@ -390,7 +447,9 @@ print("WORKFLOW_LAYOUT=" + json.dumps({
             check=True,
         )
         marker = next(
-            line for line in completed.stdout.splitlines() if line.startswith("WORKFLOW_LAYOUT=")
+            line
+            for line in completed.stdout.splitlines()
+            if line.startswith("WORKFLOW_LAYOUT=")
         )
         assert json.loads(marker.split("=", 1)[1]) == {
             "archetype": "workflow",

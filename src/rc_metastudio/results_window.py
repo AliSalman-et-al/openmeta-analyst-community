@@ -4,20 +4,32 @@
 
 import random
 from collections import namedtuple
-from PyQt5.QtCore import QByteArray, QEvent, QPoint, QRectF, QTimer, Qt, pyqtSignal
-from PyQt5.QtGui import (
+from PyQt6.QtCore import (
+    QByteArray,
+    QEvent,
+    QObject,
+    QPointF,
+    QRectF,
+    QTimer,
+    Qt,
+    pyqtSignal,
+)
+from PyQt6.QtGui import (
+    QAction,
+    QCloseEvent,
     QColor,
     QFont,
     QFontDatabase,
     QFontMetricsF,
     QImage,
     QPixmap,
+    QResizeEvent,
+    QShowEvent,
     QTextOption,
     QTransform,
 )
-from PyQt5.QtGui import QTextCursor
-from PyQt5.QtWidgets import (
-    QAction,
+from PyQt6.QtGui import QTextCursor
+from PyQt6.QtWidgets import (
     QApplication,
     QColorDialog,
     QDialog,
@@ -36,14 +48,15 @@ import os
 import sys
 import ui_results_window
 import app_error_handler
-import forms.ui_edit_forest_plot
-import meta_py_r
+import ui_edit_forest_plot
+from rc_metastudio import meta_py_r
 from plot_defaults import FOREST_ARM_LABELS
 import plot_capabilities
 from plot_text import apply_plot_text_input_limits, plot_text_value, set_plot_text_value
 import qt_text
 import result_sections
 import adaptive_window
+from rc_metastudio.qt_geometry import logical_extent_to_physical_pixels
 from settings import (
     restore_results_window_state,
     save_results_window_state,
@@ -75,6 +88,9 @@ PLOT_EXPORT_GUIDANCE = {
     "tiff": "Publication-grade 600 dpi raster export with lossless compression.",
     "png": "Publication-grade 600 dpi raster export for compatible submission systems.",
 }
+PLOT_EDITOR_SAVE_FILTER = (
+    "Plot images (*.pdf *.png *.tif *.tiff *.svg);;All files (*)"
+)
 
 FOREST_STYLE_LABELS = {
     "default": "Default (metafor)",
@@ -98,7 +114,7 @@ QSvgRenderer = None
 def _svg_item_class():
     global QGraphicsSvgItem
     if QGraphicsSvgItem is None:
-        from PyQt5.QtSvg import QGraphicsSvgItem as _QGraphicsSvgItem
+        from PyQt6.QtSvgWidgets import QGraphicsSvgItem as _QGraphicsSvgItem
 
         QGraphicsSvgItem = _QGraphicsSvgItem
     return QGraphicsSvgItem
@@ -107,7 +123,7 @@ def _svg_item_class():
 def _svg_renderer_class():
     global QSvgRenderer
     if QSvgRenderer is None:
-        from PyQt5.QtSvg import QSvgRenderer as _QSvgRenderer
+        from PyQt6.QtSvg import QSvgRenderer as _QSvgRenderer
 
         QSvgRenderer = _QSvgRenderer
     return QSvgRenderer
@@ -172,7 +188,7 @@ class ResponsivePixmapItem(QGraphicsPixmapItem):
     def __init__(self, source_pixmap):
         super(ResponsivePixmapItem, self).__init__()
         self.source_pixmap = QPixmap(source_pixmap)
-        self.setTransformationMode(Qt.SmoothTransformation)
+        self.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
 
     def replace_source(self, source_pixmap):
         self.source_pixmap = QPixmap(source_pixmap)
@@ -184,7 +200,7 @@ def _pixmap_device_independent_size(pixmap):
     return (float(pixmap.width()) / dpr, float(pixmap.height()) / dpr)
 
 
-class EditPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg):
+class EditPlotDialog(QDialog, ui_edit_forest_plot.Ui_edit_forest_plot_dlg):
     applied = pyqtSignal()
 
     def __init__(self, plot_params, image_path, parent=None, plot_type="forest"):
@@ -199,13 +215,16 @@ class EditPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
         self.color_btn.clicked.connect(
             app_error_handler.safe_slot(self._choose_color, parent=self)
         )
-        self.style_cbo.currentIndexChanged[str].connect(
+        self.save_btn.clicked.connect(
+            app_error_handler.safe_slot(self._browse_image_path, parent=self)
+        )
+        self.style_cbo.currentTextChanged.connect(
             app_error_handler.safe_slot(self._style_changed, parent=self)
         )
-        apply_button = self.buttonBox.button(QDialogButtonBox.Apply)
+        apply_button = self.buttonBox.button(QDialogButtonBox.StandardButton.Apply)
         if apply_button is not None:
             apply_button.clicked.connect(self.applied.emit)
-        ok_button = self.buttonBox.button(QDialogButtonBox.Ok)
+        ok_button = self.buttonBox.button(QDialogButtonBox.StandardButton.Ok)
         if ok_button is not None:
             ok_button.clicked.connect(self.applied.emit)
 
@@ -271,7 +290,8 @@ class EditPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
                 self._bool_param("fp_show_summary_line", True)
             )
             self._set_text(
-                self.image_path, image_path or self._params.get("fp_outpath", "")
+                self.image_path,
+                image_path or self._params.get(self._param_name("outpath"), ""),
             )
             color = (
                 self._params.get(self._param_name("accent_color"))
@@ -305,6 +325,16 @@ class EditPlotDialog(QDialog, forms.ui_edit_forest_plot.Ui_edit_forest_plot_dlg)
         color = QColorDialog.getColor(current, self, "Plot Accent Color")
         if color.isValid():
             self._set_accent_color(color.name())
+
+    def _browse_image_path(self):
+        selected_path, _selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "Save %s Plot Image" % self.plot_type.title(),
+            qt_text.to_native_text(self.image_path.text()),
+            PLOT_EDITOR_SAVE_FILTER,
+        )
+        if selected_path:
+            self.image_path.setText(selected_path)
 
     def _set_accent_color(self, color):
         text = str(color or FOREST_STYLE_DEFAULT_COLORS["default"])
@@ -405,7 +435,10 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self._layout_items = []
         self._nav_items_to_sections = {}
         self.setupUi(self)
-        self.graphics_view.viewport().installEventFilter(self)
+        viewport = self.graphics_view.viewport()
+        if viewport is None:
+            raise RuntimeError("Results graphics view has no viewport")
+        viewport.installEventFilter(self)
         adaptive_window.register_adaptive_window(
             self, adaptive_window.WindowRole.RESULTS
         )
@@ -414,7 +447,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self.paste_offset = 5
         self.add_offset = 5
         self.buffer_size = 2
-        self.prev_point = QPoint()
         self.borders = []
         self._active_text_context_menu = None
 
@@ -431,13 +463,13 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self.nav_tree.setItemsExpandable(True)
         # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
         self.nav_tree.setMinimumWidth(0)
-        self.nav_tree.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-        self.graphics_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.nav_tree.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        self.graphics_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.results_nav_splitter.setChildrenCollapsible(False)
         self.results_nav_splitter.setStretchFactor(0, 1)
         self.results_nav_splitter.setStretchFactor(1, 1)
-        self.x_coord = 5
-        self.y_coord = 5
+        self.x_coord = 5.0
+        self.y_coord = 5.0
 
         self._restored_splitter_proportions = restored_state["splitter_proportions"]
         self._splitter_restore_pending = True
@@ -557,9 +589,9 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
         dpr = max(1.0, float(pixmap.devicePixelRatioF()))
         pixmap = pixmap.scaled(
-            max(1, int(round(scaled_width * dpr))),
-            max(1, int(round(scaled_height * dpr))),
-            transformMode=Qt.SmoothTransformation,
+            max(1, logical_extent_to_physical_pixels(scaled_width, dpr)),
+            max(1, logical_extent_to_physical_pixels(scaled_height, dpr)),
+            transformMode=Qt.TransformationMode.SmoothTransformation,
         )
         pixmap.setDevicePixelRatio(dpr)
 
@@ -571,7 +603,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
         viewport_width = self._plot_viewport_width()
         scale = min(max_scale, float(viewport_width) / float(width))
-        return (max(1, int(width * scale)), max(1, int(height * scale)))
+        return (max(1.0, float(width) * scale), max(1.0, float(height) * scale))
 
     def _fit_vector_plot_to_viewport(self, svg_item):
         """Fit one SVG item to the current viewport while preserving its ratio."""
@@ -600,7 +632,10 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
     def _layout_viewport_width(self):
         if self._viewport_width_override is not None:
             return self._viewport_width_override
-        viewport_width = self.graphics_view.viewport().width()
+        viewport = self.graphics_view.viewport()
+        if viewport is None:
+            raise RuntimeError("Results graphics view has no viewport")
+        viewport_width = viewport.width()
         if viewport_width <= horizontal_padding:
             viewport_width = self.graphics_view.width()
         if viewport_width <= horizontal_padding:
@@ -624,9 +659,12 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         title_font = QFont(self.font())
         title_font.setBold(True)
         text.setFont(title_font)
-        text_option = text.document().defaultTextOption()
-        text_option.setWrapMode(QTextOption.WordWrap)
-        text.document().setDefaultTextOption(text_option)
+        document = text.document()
+        if document is None:
+            raise RuntimeError("Results title has no text document")
+        text_option = document.defaultTextOption()
+        text_option.setWrapMode(QTextOption.WrapMode.WordWrap)
+        document.setDefaultTextOption(text_option)
         text.setTextWidth(self._text_wrap_width())
         self._wrapped_text_items.append(text)
         print("  title at: %s" % self.y_coord)
@@ -640,19 +678,22 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             self.scene.width(),
             self.y_coord + text.boundingRect().height() + padding,
         )
-        print(("  Setting position at (%d,%d)" % (self.x_coord, self.y_coord)))
+        print(("  Setting position at (%.2f,%.2f)" % (self.x_coord, self.y_coord)))
         text.setPos(self.position())  #####
         self.y_coord += text.boundingRect().height()
         return qt_item
 
     def _advance_past_text_item(self, txt_item, text):
         bounding_height = txt_item.boundingRect().height()
-        document_height = txt_item.document().size().height()
+        document = txt_item.document()
+        if document is None:
+            raise RuntimeError("Results text item has no text document")
+        document_height = document.size().height()
         line_count = max(1, str(text).count("\n") + 1)
         font_metrics = QFontMetricsF(txt_item.font())
         line_height = (
             line_count * font_metrics.lineSpacing()
-            + 2 * txt_item.document().documentMargin()
+            + 2 * document.documentMargin()
         )
         return max(bounding_height, document_height, line_height)
 
@@ -662,11 +703,14 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
     def create_text_item(self, text, position, wrap=False):
         txt_item = SelectableResultsTextItem(text, self)
-        txt_item.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+        txt_item.setFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
         if wrap:
-            text_option = txt_item.document().defaultTextOption()
-            text_option.setWrapMode(QTextOption.WordWrap)
-            txt_item.document().setDefaultTextOption(text_option)
+            document = txt_item.document()
+            if document is None:
+                raise RuntimeError("Results text item has no text document")
+            text_option = document.defaultTextOption()
+            text_option.setWrapMode(QTextOption.WrapMode.WordWrap)
+            document.setDefaultTextOption(text_option)
             txt_item.setTextWidth(self._text_wrap_width())
             self._wrapped_text_items.append(txt_item)
         txt_item.setToolTip(
@@ -675,7 +719,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             "2) Right click again and choose copy."
         )
         txt_item.setTextInteractionFlags(
-            Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard
+            Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard
         )
         self.scene.addItem(txt_item)
         self._layout_items.append(txt_item)
@@ -734,13 +778,16 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
     def _select_all_text(self, text_item):
         cursor = text_item.textCursor()
-        cursor.select(QTextCursor.Document)
+        cursor.select(QTextCursor.SelectionType.Document)
         text_item.setTextCursor(cursor)
 
     def _copy_text_selection(self, text_item):
         selected_text = text_item.textCursor().selectedText()
         if selected_text:
-            QApplication.clipboard().setText(selected_text.replace("\u2029", "\n"))
+            clipboard = QApplication.clipboard()
+            if clipboard is None:
+                raise RuntimeError("Qt application has no clipboard")
+            clipboard.setText(selected_text.replace("\u2029", "\n"))
 
     def _text_wrap_width(self):
         viewport_width = self._layout_viewport_width()
@@ -779,33 +826,20 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             if self._first_show_refit_pending:
                 self._first_show_refit_pending = False
                 self._set_restored_splitter_sizes()
-                splitter_extent = self.results_nav_splitter.width()
-                screen = self.screen()
-                if self.isMaximized() and screen is not None:
-                    window_chrome_width = max(0, self.width() - splitter_extent)
-                    splitter_extent = min(
-                        splitter_extent,
-                        screen.availableGeometry().width() - window_chrome_width,
-                    )
-                splitter_extent = max(
-                    2, splitter_extent - self.results_nav_splitter.handleWidth()
-                )
-                proportion_total = sum(self._restored_splitter_proportions)
-                content_proportion = (
-                    self._restored_splitter_proportions[1] / proportion_total
-                )
-                self._viewport_width_override = max(
-                    1,
-                    int(splitter_extent * content_proportion)
-                    - (2 * self.graphics_view.frameWidth()),
-                )
+                self._viewport_width_override = self._layout_viewport_width()
             try:
                 self._refit_viewport_items()
             finally:
                 self._viewport_width_override = None
 
-    def eventFilter(self, watched, event):
-        if watched is self.graphics_view.viewport() and event.type() == QEvent.Resize:
+    def eventFilter(  # ty: ignore[invalid-method-override] -- PyQt6 generated-form multiple inheritance
+        self, watched: QObject | None, event: QEvent | None
+    ) -> bool:
+        if (
+            event is not None
+            and watched is self.graphics_view.viewport()
+            and event.type() == QEvent.Type.Resize
+        ):
             self._schedule_viewport_refit()
         return super(ResultsWindow, self).eventFilter(watched, event)
 
@@ -860,11 +894,13 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self.scene.setSceneRect(
             0,
             0,
-            max(self.graphics_view.viewport().width(), scene_bounds.right() + padding),
+            max(self._viewport_width(), scene_bounds.right() + padding),
             max(1, scene_bounds.bottom() + padding),
         )
 
-    def showEvent(self, event):
+    def showEvent(  # ty: ignore[invalid-method-override] -- PyQt6 generated-form multiple inheritance
+        self, event: QShowEvent | None
+    ) -> None:
         super(ResultsWindow, self).showEvent(event)
         self._schedule_viewport_refit()
 
@@ -887,11 +923,15 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             ]
         )
 
-    def resizeEvent(self, event):
+    def resizeEvent(  # ty: ignore[invalid-method-override] -- PyQt6 generated-form multiple inheritance
+        self, event: QResizeEvent | None
+    ) -> None:
         super(ResultsWindow, self).resizeEvent(event)
         self._schedule_viewport_refit()
 
-    def closeEvent(self, event):
+    def closeEvent(  # ty: ignore[invalid-method-override] -- PyQt6 generated-form multiple inheritance
+        self, event: QCloseEvent | None
+    ) -> None:
         save_results_window_state(self)
         super(ResultsWindow, self).closeEvent(event)
 
@@ -908,7 +948,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self.y_coord += item.boundingRect().size().height() + SECTION_SPACING
         #        item.setFlags(QGraphicsItem.ItemIsSelectable|
         #                      QGraphicsItem.ItemIsMovable)
-        item.setFlags(QGraphicsItem.ItemIsSelectable)
+        item.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
 
         # layout-audit: allow=intrinsic-ratio; reason=scene follows its intrinsic-ratio visual artifact
         self.scene.setSceneRect(
@@ -956,7 +996,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         item.setToolTip(
             'To save the image:\nright-click on the image and choose "save image as".'
         )
-        item.setFlags(QGraphicsItem.ItemIsSelectable)
+        item.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
 
         scaled_width, scaled_height = self._fit_vector_plot_to_viewport(item)
 
@@ -1151,7 +1191,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             # where to save the graphic?
             file_path, _selected_filter = QFileDialog.getSaveFileName(
                 self,
-                "RC MetaStudio -- save plot as",
+                "Save Plot As",
                 default_path,
             )
 
@@ -1166,7 +1206,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             default_path = ".".join([artifact.title.replace(" ", "_"), "png"])
             file_path, _selected_filter = QFileDialog.getSaveFileName(
                 self,
-                "RC MetaStudio -- save plot as",
+                "Save Plot As",
                 default_path,
             )
             if file_path != "":
@@ -1174,8 +1214,13 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                 unscaled_image.save(file_path, export_format.qt_format)
 
     def position(self):
-        point = QPoint(int(self.x_coord), int(self.y_coord))
-        return self.graphics_view.mapToScene(point)
+        return QPointF(float(self.x_coord), float(self.y_coord))
+
+    def _viewport_width(self) -> int:
+        viewport = self.graphics_view.viewport()
+        if viewport is None:
+            raise RuntimeError("Results graphics view has no viewport")
+        return viewport.width()
 
 
 def _normalize_results(results):

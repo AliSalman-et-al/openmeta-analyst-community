@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QDialog
+from PyQt6.QtWidgets import QDialog
 
 # from meta_globals import *
 from meta_globals import DIAGNOSTIC

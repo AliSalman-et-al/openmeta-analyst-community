@@ -1,18 +1,9 @@
-name: Package Supported Target
+name: Package macOS Intel x64
 
 on:
   workflow_call:
     inputs:
-      runner:
-        required: true
-        type: string
-      target_os:
-        required: true
-        type: string
       artifact_name:
-        required: true
-        type: string
-      archive_platform:
         required: true
         type: string
 
@@ -20,50 +11,57 @@ permissions:
   contents: read
 
 env:
-  RCMS_CRAN_REPO: https://cloud.r-project.org
-  RCMS_CRAN_REPO_KEY: cloud-r-project-org
+  RCMS_CRAN_REPO: https://packagemanager.posit.co/cran/2026-07-16
 
 jobs:
   package:
     name: ${{ inputs.artifact_name }}
-    runs-on: ${{ inputs.runner }}
-    timeout-minutes: 60
+    runs-on: macos-15-intel
+    timeout-minutes: 90
     steps:
-      - name: Check out repository
+      - name: Check out exact source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           enable-cache: true
 
-      - name: Install Python
+      - name: Install locked Python
         run: uv python install 3.11.9
 
-      - name: Set up R for bundled runtime
-        uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
-        with:
-          r-version: 4.6.1
-
-      - name: Resolve shared package metadata
+      - name: Resolve package metadata
         id: package-metadata
-        run: uv run python scripts/resolve_package_ci_metadata.py
+        shell: bash
+        run: uv run --no-project --python 3.11.9 python scripts/resolve_package_ci_metadata.py --version-only
 
-      - name: Cache bundled R package library
+      - name: Cache official Qt SDK on macOS
+        id: macos_qt_sdk_cache
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
-          path: artifacts/r-library-cache
-          key: bundled-r-library-v3-${{ inputs.archive_platform }}-${{ steps.package-metadata.outputs.r-version }}-${{ env.RCMS_CRAN_REPO_KEY }}-${{ hashFiles('scripts/install-r-deps.R', 'docs/verification/RCMetaR-r-dependencies.json', 'r/RCMetaR/DESCRIPTION') }}
+          path: build/qt-sdk
+          key: qt-sdk-6.11.1-macos-x64
 
-      - name: Build Windows package
-        if: ${{ inputs.target_os == 'windows' }}
-        shell: powershell
-        run: .\scripts\package-windows.ps1 -ArtifactName "${{ inputs.artifact_name }}" -ArchiveRootName "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ inputs.archive_platform }}" -RRuntimeRoot "${{ steps.package-metadata.outputs.r-runtime-root }}"
-
-      - name: Build macOS package
-        if: ${{ inputs.target_os == 'macos' }}
+      - name: Install official Qt SDK on macOS
+        if: ${{ steps.macos_qt_sdk_cache.outputs.cache-hit != 'true' }}
         shell: bash
-        run: bash scripts/package-macos.sh --architecture x64 --artifact-name "${{ inputs.artifact_name }}" --archive-root-name "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ inputs.archive_platform }}" --r-runtime-root "${{ steps.package-metadata.outputs.r-runtime-root }}"
+        run: uv tool run --from aqtinstall==3.3.0 aqt install-qt mac desktop 6.11.1 clang_64 --outputdir "$PWD/build/qt-sdk"
+
+      - name: Resolve official Qt rcc on macOS
+        shell: bash
+        run: PYTHONPATH="$PWD/src" uv run --no-project --python 3.11.9 python scripts/qt6_macos_feasibility.py resolve-rcc --sdk-root "$PWD/build/qt-sdk/6.11.1/macos" --github-env "$GITHUB_ENV" --diagnostic "build/qt-sdk/macos-x64-rcc.json"
+
+      - name: Build, inspect, smoke, archive, and requalify macOS Intel package
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = x86_64
+          test ! -e /opt/X11
+          bash scripts/package-macos.sh --architecture x64 \
+            --artifact-name "${{ inputs.artifact_name }}" \
+            --archive-root-name "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-macos-x64"
 
       - name: Upload package artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -74,31 +72,31 @@ jobs:
           retention-days: 30
           compression-level: 0
 
-      - name: Upload Windows packaging diagnostics
-        if: ${{ failure() && inputs.target_os == 'windows' }}
+      - name: Upload qualification evidence
+        if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: ${{ inputs.artifact_name }}-diagnostics
+          name: ${{ inputs.artifact_name }}-evidence
           path: |
-            build/windows-package/work/RCMetaStudio/warn-RCMetaStudio.txt
-            build/windows-package/work/RCMetaStudio/xref-RCMetaStudio.html
-            build/windows-package/dist/RCMetaStudio/automation-wizard-layout-smoke.log
-          if-no-files-found: ignore
-          retention-days: 14
+            artifacts/${{ inputs.artifact_name }}-evidence.json
+            artifacts/${{ inputs.artifact_name }}-archive-inspection.json
+            build/macos-package/x64/work/qualification/**
+            build/macos-package/x64/work/qualification/packaged-smoke*.log
+          if-no-files-found: warn
+          retention-days: 30
           compression-level: 0
 
-      - name: Upload macOS packaging diagnostics
-        if: ${{ failure() && inputs.target_os == 'macos' }}
+      - name: Upload failure diagnostics
+        if: ${{ failure() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ inputs.artifact_name }}-diagnostics
           path: |
             build/macos-package/x64/work/RCMetaStudio/warn-RCMetaStudio.txt
             build/macos-package/x64/work/RCMetaStudio/xref-RCMetaStudio.html
+            build/macos-package/x64/work/qualification/**
+            artifacts/*-archive-inspection.json
+            artifacts/*-evidence.json
           if-no-files-found: ignore
           retention-days: 14
           compression-level: 0
-
-      - name: Prune uv cache
-        if: ${{ always() }}
-        run: uv cache prune --ci

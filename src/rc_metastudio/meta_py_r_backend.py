@@ -21,27 +21,35 @@ def install_meta_py_r_backend():
     # set RCMS_REQUIRE_IN_PROCESS_RPY2=1 to fail loudly instead of falling back.
     if os.environ.get("RCMS_STUB_BACKEND") == "1":
         return install_stub_meta_py_r()
-    if "meta_py_r" in sys.modules:
-        return sys.modules["meta_py_r"]
+    for module_name in ("rc_metastudio.meta_py_r", "meta_py_r"):
+        if module_name in sys.modules:
+            backend = sys.modules[module_name]
+            sys.modules["rc_metastudio.meta_py_r"] = backend
+            sys.modules["meta_py_r"] = backend
+            return backend
     try:
         import r_runtime
 
         r_runtime.configure_bundled_r_environment()
-        import meta_py_r
+        from rc_metastudio import meta_py_r
 
         return meta_py_r
     except Exception:
-        if os.environ.get("RCMS_REQUIRE_IN_PROCESS_RPY2") == "1":
+        if getattr(sys, "frozen", False) or os.environ.get("RCMS_REQUIRE_IN_PROCESS_RPY2") == "1":
             raise
         return install_stub_meta_py_r()
 
 
 def install_stub_meta_py_r():
-    existing = sys.modules.get("meta_py_r")
+    existing = sys.modules.get("rc_metastudio.meta_py_r") or sys.modules.get(
+        "meta_py_r"
+    )
     if getattr(existing, "_oma_stub_backend", False):
+        sys.modules["rc_metastudio.meta_py_r"] = existing
+        sys.modules["meta_py_r"] = existing
         return existing
 
-    meta_py_r = types.ModuleType("meta_py_r")
+    meta_py_r = existing or types.ModuleType("rc_metastudio.meta_py_r")
     meta_py_r._oma_stub_backend = True
     meta_py_r.AnalysisBackendUnavailableError = AnalysisBackendUnavailableError
 
@@ -92,6 +100,7 @@ def install_stub_meta_py_r():
     meta_py_r.get_available_methods = _analysis_unavailable
     meta_py_r.get_params = _analysis_unavailable
     meta_py_r.get_method_description = _analysis_unavailable
+    meta_py_r.get_analysis_plot_capabilities = lambda *args, **kwargs: []
     meta_py_r.run_binary_ma = _analysis_unavailable
     meta_py_r.run_continuous_ma = _analysis_unavailable
     meta_py_r.run_diagnostic_multi = _analysis_unavailable
@@ -110,6 +119,7 @@ def install_stub_meta_py_r():
             "load_gemtc": lambda self: None,
         },
     )()
+    sys.modules["rc_metastudio.meta_py_r"] = meta_py_r
     sys.modules["meta_py_r"] = meta_py_r
     return meta_py_r
 

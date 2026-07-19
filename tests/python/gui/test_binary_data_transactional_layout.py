@@ -1,10 +1,20 @@
 import copy
+import os
 from pathlib import Path
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore, QtGui, QtTest, QtWidgets
+
+import adaptive_window
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+os.environ.setdefault(
+    "RCMS_QT6_BUILD_ROOT", str(REPO_ROOT / "build" / "qt6-verification")
+)
+
+from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+
+prepare_generated_ui_imports()
 AVAILABLE = QtCore.QRect(20, 30, 1024, 640)
 
 
@@ -63,23 +73,49 @@ def test_binary_data_declares_transactional_overflow_and_reachable_actions(
 ):
     app, window, dialog = _open_binary_dialog(monkeypatch)
     try:
-        assert dialog.property("RCMS_window_archetype") == "transactional"
+        assert (
+            adaptive_window.adaptive_window_state(dialog).role
+            is adaptive_window.WindowRole.TRANSACTIONAL
+        )
         assert isinstance(dialog.content_scroll, QtWidgets.QScrollArea)
         assert dialog.content_scroll.widgetResizable()
         assert not dialog.content_scroll.isAncestorOf(dialog.buttonBox)
         assert dialog.layout().indexOf(dialog.buttonBox) >= 0
         assert (
             dialog.raw_data_table.horizontalScrollBarPolicy()
-            == QtCore.Qt.ScrollBarAsNeeded
+            == QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
         )
         assert (
             dialog.raw_data_table.verticalScrollBarPolicy()
-            == QtCore.Qt.ScrollBarAsNeeded
+            == QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
         )
         assert (
             dialog.raw_data_table.horizontalHeader().sectionResizeMode(0)
-            == QtWidgets.QHeaderView.Interactive
+            == QtWidgets.QHeaderView.ResizeMode.Interactive
         )
+    finally:
+        _close(app, window, dialog)
+
+
+def test_binary_data_keyboard_and_accessibility_contract(monkeypatch):
+    app, window, dialog = _open_binary_dialog(monkeypatch)
+    try:
+        dialog.show()
+        app.processEvents()
+        ok = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
+        assert dialog.focusWidget() is dialog.raw_data_table
+        assert ok.isDefault()
+        assert dialog.label_17.buddy() is dialog.effect_cbo_box
+        assert dialog.est_lbl.buddy() is dialog.effect_txt_box
+        assert dialog.raw_data_table.accessibleName() == "Binary study counts"
+        assert dialog.effect_txt_box.accessibleDescription()
+
+        dialog.effect_cbo_box.setFocus()
+        QtTest.QTest.keyClick(dialog.effect_cbo_box, QtCore.Qt.Key.Key_Tab)
+        assert dialog.focusWidget() is dialog.effect_txt_box
+
+        QtTest.QTest.keyClick(dialog, QtCore.Qt.Key.Key_Escape)
+        assert dialog.result() == QtWidgets.QDialog.DialogCode.Rejected
     finally:
         _close(app, window, dialog)
 
@@ -106,8 +142,8 @@ def test_binary_data_is_screen_bounded_with_large_font_and_long_metric(monkeypat
         assert frame.width() <= int(available.width() * 0.9) + 2
         assert frame.height() <= int(available.height() * 0.9) + 2
         assert dialog.effect_cbo_box.sizePolicy().horizontalPolicy() in (
-            QtWidgets.QSizePolicy.Expanding,
-            QtWidgets.QSizePolicy.MinimumExpanding,
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.MinimumExpanding,
         )
         assert dialog.effect_cbo_box.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
         full_metric = dialog.effect_cbo_box.currentText()
@@ -146,7 +182,10 @@ def test_binary_back_calculation_choices_are_scrollable_and_screen_bounded(monke
         dialog._layout_controller.request_content_refit()
         dialog.show()
         app.processEvents()
-        assert dialog.property("RCMS_window_archetype") == "transactional"
+        assert (
+            adaptive_window.adaptive_window_state(dialog).role
+            is adaptive_window.WindowRole.TRANSACTIONAL
+        )
         assert isinstance(dialog.content_scroll, QtWidgets.QScrollArea)
         assert not dialog.content_scroll.isAncestorOf(dialog.buttonBox)
         assert QtCore.QRect(20, 30, 800, 600).contains(dialog.frameGeometry())
@@ -160,6 +199,99 @@ def test_binary_back_calculation_choices_are_scrollable_and_screen_bounded(monke
         )
     finally:
         dialog.close()
+
+
+def _binary_table_snapshot(dialog):
+    return [
+        dialog.raw_data_table.item(row, column).text()
+        for row in range(dialog.raw_data_table.rowCount())
+        for column in range(dialog.raw_data_table.columnCount())
+    ]
+
+
+def test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction(
+    monkeypatch,
+):
+    import binary_data_form
+
+    app, window, dialog = _open_binary_dialog(monkeypatch)
+    imputed = {
+        "op1": {"a": 2, "b": 10, "c": 3, "d": 12},
+        "op2": {"a": 4, "b": 14, "c": 5, "d": 16},
+    }
+    monkeypatch.setattr(binary_data_form.meta_py_r, "impute_bin_data", lambda _d: imputed)
+
+    def cancel_choice(chooser):
+        chooser.show()
+        app.processEvents()
+        QtTest.QTest.mouseClick(
+            chooser.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Cancel),
+            QtCore.Qt.MouseButton.LeftButton,
+        )
+        return chooser.result()
+
+    monkeypatch.setattr(binary_data_form.ChooseBackCalcResultForm, "exec", cancel_choice)
+    try:
+        dialog.clear_form()
+        dialog.undoStack.clear()
+        dialog.enable_back_calculation_btn()
+        table_before = _binary_table_snapshot(dialog)
+        model_before = copy.deepcopy(dialog.ma_unit)
+        dirty_before = window.current_data_unsaved
+        ok = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
+        assert dialog.back_calc_btn.isEnabled()
+
+        QtTest.QTest.mouseClick(dialog.back_calc_btn, QtCore.Qt.MouseButton.LeftButton)
+        app.processEvents()
+
+        assert _binary_table_snapshot(dialog) == table_before
+        assert dialog.ma_unit.get_raw_data_for_groups(dialog.cur_groups) == (
+            model_before.get_raw_data_for_groups(dialog.cur_groups)
+        )
+        assert dialog.ma_unit.get_effects_dict() == model_before.get_effects_dict()
+        assert dialog.undoStack.count() == 0
+        assert window.current_data_unsaved is dirty_before
+        assert dialog.result() == 0
+        assert ok.isEnabled()
+    finally:
+        _close(app, window, dialog)
+
+
+def test_binary_back_calculation_chooser_accept_commits_selected_option(monkeypatch):
+    import binary_data_form
+
+    app, window, dialog = _open_binary_dialog(monkeypatch)
+    imputed = {
+        "op1": {"a": 2, "b": 10, "c": 3, "d": 12},
+        "op2": {"a": 4, "b": 14, "c": 5, "d": 16},
+    }
+    monkeypatch.setattr(binary_data_form.meta_py_r, "impute_bin_data", lambda _d: imputed)
+
+    def accept_second_choice(chooser):
+        chooser.show()
+        app.processEvents()
+        QtTest.QTest.mouseClick(chooser.choice2_btn, QtCore.Qt.MouseButton.LeftButton)
+        QtTest.QTest.mouseClick(
+            chooser.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok),
+            QtCore.Qt.MouseButton.LeftButton,
+        )
+        return chooser.result()
+
+    monkeypatch.setattr(
+        binary_data_form.ChooseBackCalcResultForm, "exec", accept_second_choice
+    )
+    try:
+        dialog.clear_form()
+        dialog.undoStack.clear()
+        dialog.enable_back_calculation_btn()
+        QtTest.QTest.mouseClick(dialog.back_calc_btn, QtCore.Qt.MouseButton.LeftButton)
+        app.processEvents()
+
+        assert _binary_table_snapshot(dialog)[:6] == ["4", "10", "14", "5", "11", "16"]
+        assert dialog.ma_unit.get_raw_data_for_groups(dialog.cur_groups) == [4, 14, 5, 16]
+        assert dialog.undoStack.count() == 1
+    finally:
+        _close(app, window, dialog)
 
 
 def test_binary_data_focus_reveals_offscreen_controls_without_moving_actions(monkeypatch):
@@ -186,6 +318,20 @@ def test_binary_data_focus_reveals_offscreen_controls_without_moving_actions(mon
 def test_binary_table_long_count_overflows_inside_table_and_remains_accessible(
     monkeypatch,
 ):
+    import app_error_handler
+    import binary_data_form
+
+    warnings = []
+    monkeypatch.setattr(
+        binary_data_form.QMessageBox,
+        "warning",
+        lambda *args: warnings.append(args),
+    )
+    monkeypatch.setattr(
+        app_error_handler.QMessageBox,
+        "critical",
+        lambda *args: warnings.append(args),
+    )
     app, window, dialog = _open_binary_dialog(monkeypatch)
     long_count = "9" * 80
     try:
@@ -196,6 +342,7 @@ def test_binary_table_long_count_overflows_inside_table_and_remains_accessible(
         app.processEvents()
 
         table = dialog.raw_data_table
+        assert warnings == []
         assert table.horizontalScrollBar().maximum() > 0
         assert table.item(0, 0).text() == long_count
         assert table.columnWidth(0) >= table.fontMetrics().horizontalAdvance(long_count)
@@ -234,7 +381,7 @@ def test_binary_validation_message_wraps_and_is_revealed(monkeypatch):
         assert dialog.content_scroll.viewport().rect().intersects(
             QtCore.QRect(mapped, dialog.inconsistencyLabel.size())
         )
-        assert not dialog.buttonBox.button(QtWidgets.QDialogButtonBox.Ok).isEnabled()
+        assert not dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok).isEnabled()
     finally:
         _close(app, window, dialog)
 

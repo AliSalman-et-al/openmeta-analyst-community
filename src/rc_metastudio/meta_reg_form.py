@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
     QDialogButtonBox,
@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import (
 import forms.ui_meta_reg
 import adaptive_window
 import app_error_handler
-import meta_py_r
+from rc_metastudio import meta_py_r
 
 
 class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
@@ -20,7 +20,7 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
         super(MetaRegForm, self).__init__(parent)
         self.model = model
         self.setupUi(self)
-        self.covs_and_check_boxes = None
+        self.covs_and_check_boxes = []
         self._populate_chk_boxes()
         self._update_ok_button()
 
@@ -117,10 +117,10 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
                 self,
                 "Missing Covariate Values",
                 "Some studies do not have values for the covariate(s) you have selected. Do you want me to run the regression without them (i.e., drop studies with missing values)?",
-                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
 
-            if run_with_missing == QMessageBox.No:
+            if run_with_missing == QMessageBox.StandardButton.No:
                 self.accept()
                 return
 
@@ -140,7 +140,11 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
                 "Sorry, there was an error performing the regression.\n%s" % result,
             )
         else:
-            self.parent().analysis(result)
+            parent = self.parentWidget()
+            callback = getattr(parent, "analysis", None)
+            if not callable(callback):
+                raise RuntimeError("meta-regression configuration has no results owner")
+            callback(result)
             self.accept()
 
     def _selected_covariates(self):
@@ -149,17 +153,9 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
         ]
 
     def _update_ok_button(self):
-        ok_button = self.buttonBox.button(QDialogButtonBox.Ok)
+        ok_button = self.buttonBox.button(QDialogButtonBox.StandardButton.Ok)
         if ok_button is not None:
             ok_button.setEnabled(bool(self._selected_covariates()))
-
-    def _populate_combo_box(self):
-        studies = self.model.get_studies(only_if_included=True)
-
-        for cov in self.model.dataset.covariates:
-            cov_vals = [study.covariate_dict[cov.name] for study in studies]
-            if not None in cov_vals:
-                self.cov_cbo_box.addItem(cov.name)
 
     def _populate_chk_boxes(self):
         self.covs_and_check_boxes = []

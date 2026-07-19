@@ -3,8 +3,9 @@ import os
 import ma_data_table_model
 import ma_dataset
 import meta_globals
-import meta_py_r
-import project_pickle
+from rc_metastudio import meta_py_r
+import project_adapter
+import project_format
 import settings
 
 
@@ -28,23 +29,12 @@ class HeadlessAnalysisCase:
         self.covariates = covariates or []
 
 
-def _load_pickle(path):
-    return project_pickle.load_project_pickle(path)
-
-
 def load_dataset_model(dataset_path):
     dataset_path = os.path.abspath(dataset_path)
-    dataset = _load_pickle(dataset_path)
+    document = project_format.load_project(dataset_path)
+    dataset = project_adapter.project_to_dataset(document.project)
     model = ma_data_table_model.DatasetModel(dataset=dataset, add_blank_study=False)
-    state_path = dataset_path + ".state"
-    if os.path.exists(state_path):
-        state = _load_pickle(state_path)
-    else:
-        state = model.make_reasonable_stateful_dict(dataset)
-    if isinstance(state.get("current_time_point"), str):
-        state["current_time_point"] = dataset.outcome_names_to_follow_ups[
-            state["current_outcome"]
-        ].get_key(state["current_time_point"])
+    state = project_adapter.state_to_model_state(dataset, document.state)
     model.set_state(state)
     return model
 
@@ -87,6 +77,7 @@ def run_headless_analysis(case):
                 selected_covariates,
                 case.metric,
                 conf_level=case.parameters.get("conf.level"),
+                params=case.parameters,
             )
         if case.analysis_type == "subgroup":
             return meta_py_r.run_workflow_analysis(
@@ -108,6 +99,7 @@ def run_headless_analysis(case):
                 selected_covariates,
                 case.metric,
                 conf_level=case.parameters.get("conf.level"),
+                params=case.parameters,
             )
         if case.analysis_type == "subgroup":
             return meta_py_r.run_workflow_analysis(

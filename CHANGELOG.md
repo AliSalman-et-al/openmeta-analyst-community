@@ -4,6 +4,28 @@ All notable RC MetaStudio changes will be recorded in this file.
 
 RC MetaStudio starts a fresh maintained-product changelog. Historical release history for the Original OpenMeta[Analyst] Project is not reconstructed here; see [NOTICE.md](NOTICE.md) for provenance.
 
+## 0.2.0 - 2026-07-19
+
+### Added
+
+- Added the first native Qt 6 / PyQt6 release of RC MetaStudio for Windows x64.
+- Added a self-contained Windows package with Python 3.11, Qt 6.11, R 4.6.1, RCMetaR 0.2.0, and an API-mode rpy2 bridge.
+- Added the versioned ZIP-and-JSON `.rcms` project format with schema validation, atomic saves, and converted sample projects.
+
+### Changed
+
+- Replaced the Qt 5 and PyQt5 application runtime with the locked native Qt 6 stack.
+- Updated generated forms, resources, layouts, accessibility behavior, and packaged automation for Qt 6.
+- Made the Windows x64 package the sole 0.2.0 downloadable artifact; native Intel and Apple Silicon macOS packages are deferred to 0.2.1.
+
+### Removed
+
+- Removed the PyQt5 compatibility surface and legacy pickle-based project loading from the maintained application.
+
+### Fixed
+
+- Fixed Windows packaging so R is staged without elevation and the complete Qt/R application is built and qualified through one local-and-CI command.
+
 ## 0.1.2 - 2026-07-15 (Prerelease)
 
 ### Added

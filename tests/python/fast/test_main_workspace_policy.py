@@ -1,11 +1,58 @@
 import os
 import sys
+import uuid
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 sys.path.insert(0, os.path.abspath("src/rc_metastudio"))
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
+
+import pytest
+
+
+def test_save_settings_never_constructs_or_syncs_qsettings(monkeypatch, capsys):
+    import settings
+
+    capsys.readouterr()
+
+    class UnexpectedSettings:
+        def __init__(self):
+            raise AssertionError("save_settings must not construct QSettings")
+
+    monkeypatch.setattr(settings, "QSettings", UnexpectedSettings)
+
+    settings.save_settings()
+
+    assert capsys.readouterr().out.splitlines() == [
+        "saved settings",
+        "RCMS_SETTINGS_PHASE before-former-sync",
+        "RCMS_SETTINGS_PHASE after-former-sync",
+    ]
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows registry contract")
+def test_native_user_settings_are_immediately_readable_without_sync():
+    identity = uuid.uuid4().hex
+    organization = "RCMetaStudio-QSettings-Test-" + identity
+    application = "Issue340-" + identity
+    key = "hosted-exit/immediate-readback"
+    expected = "visible-without-RegFlushKey-" + identity
+    constructor = (
+        QtCore.QSettings.Format.NativeFormat,
+        QtCore.QSettings.Scope.UserScope,
+        organization,
+        application,
+    )
+    writer = QtCore.QSettings(*constructor)
+    reader = QtCore.QSettings(*constructor)
+    try:
+        writer.setValue(key, expected)
+
+        assert reader.value(key, type=str) == expected
+    finally:
+        writer.remove(key)
+        reader.remove(key)
 
 
 class IdentityTableModel(QtGui.QStandardItemModel):
@@ -13,11 +60,11 @@ class IdentityTableModel(QtGui.QStandardItemModel):
         super(IdentityTableModel, self).__init__(1, len(identities))
         self.identities = list(identities)
 
-    def headerData(self, section, orientation, role=QtCore.Qt.DisplayRole):
+    def headerData(self, section, orientation, role=QtCore.Qt.ItemDataRole.DisplayRole):
         from workspace_column_identity import WORKSPACE_COLUMN_IDENTITY_ROLE
 
         if (
-            orientation == QtCore.Qt.Horizontal
+            orientation == QtCore.Qt.Orientation.Horizontal
             and role == WORKSPACE_COLUMN_IDENTITY_ROLE
         ):
             return self.identities[section]
@@ -28,9 +75,9 @@ def test_layout_settings_migration_deletes_only_legacy_main_geometry(tmp_path):
     import settings
 
     QtCore.QSettings.setPath(
-        QtCore.QSettings.IniFormat, QtCore.QSettings.UserScope, str(tmp_path)
+        QtCore.QSettings.Format.IniFormat, QtCore.QSettings.Scope.UserScope, str(tmp_path)
     )
-    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.IniFormat)
+    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.Format.IniFormat)
     store = QtCore.QSettings()
     store.clear()
     store.setValue("main_window/geometry", b"obsolete")
@@ -44,21 +91,22 @@ def test_layout_settings_migration_deletes_only_legacy_main_geometry(tmp_path):
     assert not store.contains("main_window/maximized")
     assert not store.contains("main_window/full_screen")
     assert store.value("unrelated/preference") == "keep-me"
-    assert store.value("workspace_layout/schema_version", type=int) == 1
+    assert store.value("workspace_layout/schema_version", type=int) == 2
 
 
 def test_stale_main_placement_is_clamped_to_available_screen(tmp_path):
     import settings
 
     QtCore.QSettings.setPath(
-        QtCore.QSettings.IniFormat, QtCore.QSettings.UserScope, str(tmp_path)
+        QtCore.QSettings.Format.IniFormat, QtCore.QSettings.Scope.UserScope, str(tmp_path)
     )
-    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.IniFormat)
+    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.Format.IniFormat)
     store = QtCore.QSettings()
     store.clear()
-    store.setValue("workspace_layout/schema_version", 1)
+    store.setValue("workspace_layout/schema_version", 2)
     store.setValue(
-        "workspace_layout/main/frame_geometry", QtCore.QRect(5000, 4000, 900, 700)
+        "workspace_layout/main/frame_geometry",
+        '{"height":700,"width":900,"x":5000,"y":4000}',
     )
     store.setValue("workspace_layout/main/maximized", False)
 
@@ -72,9 +120,9 @@ def test_fresh_main_placement_defaults_to_maximized(tmp_path):
     import settings
 
     QtCore.QSettings.setPath(
-        QtCore.QSettings.IniFormat, QtCore.QSettings.UserScope, str(tmp_path)
+        QtCore.QSettings.Format.IniFormat, QtCore.QSettings.Scope.UserScope, str(tmp_path)
     )
-    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.IniFormat)
+    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.Format.IniFormat)
     QtCore.QSettings().clear()
 
     assert settings.load_main_window_placement([QtCore.QRect(0, 0, 1200, 800)]) == {
@@ -88,17 +136,19 @@ def test_main_and_results_share_typed_workspace_placement_policy(tmp_path):
     import settings
 
     QtCore.QSettings.setPath(
-        QtCore.QSettings.IniFormat, QtCore.QSettings.UserScope, str(tmp_path)
+        QtCore.QSettings.Format.IniFormat, QtCore.QSettings.Scope.UserScope, str(tmp_path)
     )
-    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.IniFormat)
+    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.Format.IniFormat)
     store = QtCore.QSettings()
     store.clear()
-    store.setValue("workspace_layout/schema_version", 1)
+    store.setValue("workspace_layout/schema_version", 2)
     store.setValue(
-        "workspace_layout/main/frame_geometry", QtCore.QRect(20, 30, 900, 600)
+        "workspace_layout/main/frame_geometry",
+        '{"height":600,"width":900,"x":20,"y":30}',
     )
     store.setValue(
-        "workspace_layout/results/frame_geometry", QtCore.QRect(40, 50, 700, 500)
+        "workspace_layout/results/frame_geometry",
+        '{"height":500,"width":700,"x":40,"y":50}',
     )
 
     main = settings.load_main_window_placement([QtCore.QRect(0, 0, 1200, 800)])
@@ -120,9 +170,9 @@ def test_main_column_widths_round_trip_in_versioned_workspace_state(tmp_path, qa
     )
 
     QtCore.QSettings.setPath(
-        QtCore.QSettings.IniFormat, QtCore.QSettings.UserScope, str(tmp_path)
+        QtCore.QSettings.Format.IniFormat, QtCore.QSettings.Scope.UserScope, str(tmp_path)
     )
-    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.IniFormat)
+    QtCore.QSettings.setDefaultFormat(QtCore.QSettings.Format.IniFormat)
     QtCore.QSettings().clear()
     window = QtWidgets.QMainWindow()
 
@@ -207,7 +257,7 @@ def test_workspace_columns_survive_middle_insertion_and_removal_by_identity(qapp
     widths.begin_schema_change()
     model.identities.insert(1, ("raw", "events"))
     model.insertColumn(1, [QtGui.QStandardItem("new")])
-    model.setHeaderData(1, QtCore.Qt.Horizontal, "Events")
+    model.setHeaderData(1, QtCore.Qt.Orientation.Horizontal, "Events")
     widths.end_schema_change()
 
     assert table.columnWidth(0) == 210
@@ -233,12 +283,12 @@ def test_dataset_model_covariate_identity_survives_rename(qapp):
     dataset.add_covariate(ma_dataset.Covariate("Age", "continuous"))
     model = ma_data_table_model.DatasetModel(dataset=dataset, add_blank_study=False)
     identity_before = model.headerData(
-        3, QtCore.Qt.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
+        3, QtCore.Qt.Orientation.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
     )
 
     model.rename_covariate("Age", "Baseline age")
     identity_after = model.headerData(
-        3, QtCore.Qt.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
+        3, QtCore.Qt.Orientation.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
     )
 
     assert identity_after == identity_before
@@ -259,7 +309,7 @@ def test_legacy_covariate_identity_and_widths_are_deterministic_across_loads(qap
 
     first_model = legacy_model()
     first_identity = first_model.headerData(
-        3, QtCore.Qt.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
+        3, QtCore.Qt.Orientation.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
     )
     first_table = QtWidgets.QTableView()
     first_table.setModel(first_model)
@@ -270,7 +320,7 @@ def test_legacy_covariate_identity_and_widths_are_deterministic_across_loads(qap
 
     second_model = legacy_model()
     second_identity = second_model.headerData(
-        3, QtCore.Qt.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
+        3, QtCore.Qt.Orientation.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
     )
     second_table = QtWidgets.QTableView()
     second_table.setModel(second_model)

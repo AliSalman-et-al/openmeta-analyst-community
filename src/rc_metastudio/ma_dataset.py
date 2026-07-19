@@ -3,7 +3,7 @@
 """UI-independent dataset model for studies, outcomes, follow-ups, and groups."""
 
 import pdb
-from PyQt5.QtCore import pyqtRemoveInputHook
+from PyQt6.QtCore import pyqtRemoveInputHook
 import copy
 import uuid
 
@@ -14,7 +14,7 @@ import meta_globals
 import meta_py_r_backend
 
 meta_py_r_backend.install_meta_py_r_backend()
-import meta_py_r
+from rc_metastudio import meta_py_r
 
 BINARY = meta_globals.BINARY
 CONTINUOUS = meta_globals.CONTINUOUS
@@ -503,6 +503,8 @@ class Dataset:
             def f(study_a, study_b):
                 ma_unit_A = study_a.get_ma_unit(outcome_name, follow_up)
                 ma_unit_B = study_b.get_ma_unit(outcome_name, follow_up)
+                outcome_data_A = []
+                outcome_data_B = []
 
                 if outcome_type is BINARY:
                     to_display_scale = lambda x: meta_py_r.binary_convert_scale(
@@ -516,6 +518,8 @@ class Dataset:
                     to_display_scale = lambda x: meta_py_r.diagnostic_convert_scale(
                         x, current_effect, convert_to="display.scale"
                     )
+                else:
+                    raise ValueError(f"Unsupported outcome type: {outcome_type!r}")
 
                 if outcome_type in (BINARY, CONTINUOUS):
                     outcome_data_A = ma_unit_A.get_effect_and_ci(
@@ -532,7 +536,6 @@ class Dataset:
                     ]
                 elif outcome_type == DIAGNOSTIC:
                     #                                  /\/\/\/\
-                    (outcome_data_A, outcome_data_B) = ([], [])
                     #                                     |
                     #                                  \_____/
                     for diag_metric in [
@@ -565,6 +568,8 @@ class Dataset:
 
         elif compare_by == "ordered_list":
             # then just use the list order
+            if ordered_list is None:
+                raise ValueError("ordered_list must be specified")
             return lambda study_a, study_b: self._meta_cmp_wrapper(
                 study_a,
                 study_b,

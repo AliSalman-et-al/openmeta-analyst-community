@@ -17,7 +17,6 @@ def test_full_app_import_path_has_no_python2_syntax():
     for module in [
         "launch.py",
         "meta_form.py",
-        "ui_meta.py",
         "ma_data_table_view.py",
         "ma_data_table_model.py",
         "ma_dataset.py",
@@ -56,7 +55,9 @@ def test_application_source_lives_under_rc_metastudio_package():
 
     assert loose_python_source == []
     assert (APP_PACKAGE / "launch.py").exists()
-    assert (APP_PACKAGE / "forms" / "ui_binary_data_form.py").exists()
+    assert not any((APP_PACKAGE / "forms").glob("ui_*.py"))
+    assert not (APP_PACKAGE / "ui_meta.py").exists()
+    assert not (APP_PACKAGE / "ui_results_window.py").exists()
     assert (APP_PACKAGE / "images" / "icons.qrc").exists()
 
 

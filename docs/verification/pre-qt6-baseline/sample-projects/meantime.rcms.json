@@ -1,0 +1,4912 @@
+{
+  "baseline_commit": "e8a21fc3c277e8a8c144413dfa320ea9e68a20e4",
+  "dataset": {
+    "analysis_family": "binary",
+    "covariates": [
+      {
+        "data_type": 1,
+        "name": "time to treatment",
+        "stable_id": "6ba17bdd964a50cd9b0c16603a6bb928"
+      },
+      {
+        "data_type": 4,
+        "name": "treatment group",
+        "stable_id": "585db2c503f451f9a86991f765fbd313"
+      }
+    ],
+    "is_diagnostic": false,
+    "notes": "",
+    "outcomes": [
+      {
+        "data_type": 0,
+        "follow_ups": [
+          "first"
+        ],
+        "name": "Death",
+        "sub_type": null
+      }
+    ],
+    "studies": [
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.8200618340295115,
+                  "display_conf_level": 95.0,
+                  "display_est": 3.65909090909091,
+                  "display_lower": 0.7333905352534803,
+                  "display_se": 0.8200618340295115,
+                  "display_upper": 18.256229985793514,
+                  "est": 1.297214731066202,
+                  "lower": -0.3100769287275036,
+                  "upper": 2.9045063908599076
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  7.0,
+                  73.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  2.0,
+                  71.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 3.2,
+          "treatment group": "2"
+        },
+        "id": 23,
+        "include": true,
+        "manually_excluded": false,
+        "name": "NHF Austra",
+        "notes": "",
+        "sample_size": null,
+        "year": 1988
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.9057058188523637,
+                  "display_conf_level": 95.0,
+                  "display_est": 2.6399999999999997,
+                  "display_lower": 0.44736884484019707,
+                  "display_se": 0.9057058188523637,
+                  "display_upper": 15.579091124438007,
+                  "est": 0.9707789171582246,
+                  "lower": -0.8043718683807659,
+                  "upper": 2.7459297026972154
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  4.0,
+                  29.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  2.0,
+                  35.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 3.5,
+          "treatment group": "2"
+        },
+        "id": 30,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Raizner",
+        "notes": "",
+        "sample_size": null,
+        "year": 1985
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.5308215912823835,
+                  "display_conf_level": 95.0,
+                  "display_est": 2.383333333333333,
+                  "display_lower": 0.8420708418275137,
+                  "display_se": 0.5308215912823835,
+                  "display_upper": 6.745605589964483,
+                  "est": 0.8685000680378063,
+                  "lower": -0.17189113309190573,
+                  "upper": 1.9088912691675184
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  13.0,
+                  63.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  6.0,
+                  61.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 4.1,
+          "treatment group": "2"
+        },
+        "id": 36,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Rentrop",
+        "notes": "",
+        "sample_size": null,
+        "year": 1984
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.8880258900770428,
+                  "display_conf_level": 95.0,
+                  "display_est": 2.2448979591836737,
+                  "display_lower": 0.3938289132937562,
+                  "display_se": 0.8880258900770428,
+                  "display_upper": 12.796335355367928,
+                  "est": 0.8086600676817897,
+                  "lower": -0.931838694208339,
+                  "upper": 2.549158829571918
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  4.0,
+                  53.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  2.0,
+                  57.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 20.5,
+          "treatment group": "4"
+        },
+        "id": 61,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Bett-c",
+        "notes": "",
+        "sample_size": null,
+        "year": 1973
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.9316949906249123,
+                  "display_conf_level": 95.0,
+                  "display_est": 1.7777777777777777,
+                  "display_lower": 0.2862973046643613,
+                  "display_se": 0.9316949906249123,
+                  "display_upper": 11.039202170854093,
+                  "est": 0.5753641449035618,
+                  "lower": -1.2507244812976492,
+                  "upper": 2.401452771104773
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  4.0,
+                  22.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  2.0,
+                  18.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 4.0,
+          "treatment group": "2"
+        },
+        "id": 33,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Leiboff",
+        "notes": "",
+        "sample_size": null,
+        "year": 1984
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.8942898298394653,
+                  "display_conf_level": 95.0,
+                  "display_est": 1.6818181818181812,
+                  "display_lower": 0.2914460408391378,
+                  "display_se": 0.8942898298394653,
+                  "display_upper": 9.70509802963972,
+                  "est": 0.5198754592859083,
+                  "lower": -1.2329003989398966,
+                  "upper": 2.272651317511713
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  4.0,
+                  48.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  2.0,
+                  39.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 2.5,
+          "treatment group": "1"
+        },
+        "id": 10,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Bossaert",
+        "notes": "",
+        "sample_size": null,
+        "year": 1987
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.5960730075276268,
+                  "display_conf_level": 95.0,
+                  "display_est": 1.6000000000000003,
+                  "display_lower": 0.49744116152714274,
+                  "display_se": 0.5960730075276268,
+                  "display_upper": 5.14633729171267,
+                  "est": 0.4700036292457357,
+                  "lower": -0.6982779976648852,
+                  "upper": 1.6382852561563566
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  8.0,
+                  74.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  5.0,
+                  71.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 22.0,
+          "treatment group": "4"
+        },
+        "id": 64,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Heikinheim-b",
+        "notes": "",
+        "sample_size": null,
+        "year": 1971
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.38344808796350904,
+                  "display_conf_level": 95.0,
+                  "display_est": 1.46031746031746,
+                  "display_lower": 0.6887405826639278,
+                  "display_se": 0.38344808796350904,
+                  "display_upper": 3.0962704080247394,
+                  "est": 0.37865385065750745,
+                  "lower": -0.3728905916917167,
+                  "upper": 1.1301982930067316
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  20.0,
+                  83.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  15.0,
+                  84.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 21.0,
+          "treatment group": "4"
+        },
+        "id": 62,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Amery",
+        "notes": "",
+        "sample_size": null,
+        "year": 1969
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.23243457705803844,
+                  "display_conf_level": 95.0,
+                  "display_est": 1.1903628792385486,
+                  "display_lower": 0.7547979370342608,
+                  "display_se": 0.23243457705803844,
+                  "display_upper": 1.8772756452363895,
+                  "est": 0.17425820117511792,
+                  "lower": -0.28130519862043724,
+                  "upper": 0.6298216009706731
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  46.0,
+                  292.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  41.0,
+                  302.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 10.5,
+          "treatment group": "4"
+        },
+        "id": 57,
+        "include": true,
+        "manually_excluded": false,
+        "name": "GISSI-e",
+        "notes": "",
+        "sample_size": null,
+        "year": 1986
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.41286802816056917,
+                  "display_conf_level": 95.0,
+                  "display_est": 1.1043256997455468,
+                  "display_lower": 0.49165818821590723,
+                  "display_se": 0.41286802816056917,
+                  "display_upper": 2.48045345394094,
+                  "est": 0.0992349222311435,
+                  "lower": -0.7099715433316407,
+                  "upper": 0.9084413877939277
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  14.0,
+                  145.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  12.0,
+                  136.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 9.5,
+          "treatment group": "3"
+        },
+        "id": 55,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Heikinheim-a",
+        "notes": "",
+        "sample_size": null,
+        "year": 1971
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.38549439514717193,
+                  "display_conf_level": 95.0,
+                  "display_est": 1.0746268656716418,
+                  "display_lower": 0.504805722773214,
+                  "display_se": 0.38549439514717193,
+                  "display_upper": 2.287658099593426,
+                  "est": 0.07197349962508914,
+                  "lower": -0.6835816311054198,
+                  "upper": 0.8275286303555981
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  18.0,
+                  85.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  16.0,
+                  80.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 9.0,
+          "treatment group": "3"
+        },
+        "id": 54,
+        "include": true,
+        "manually_excluded": false,
+        "name": "EWP-e",
+        "notes": "",
+        "sample_size": null,
+        "year": 1971
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.5515130702591432,
+                  "display_conf_level": 95.0,
+                  "display_est": 1.0666666666666667,
+                  "display_lower": 0.3618928036317785,
+                  "display_se": 0.5515130702591432,
+                  "display_upper": 3.143963533840956,
+                  "est": 0.06453852113757108,
+                  "lower": -1.0164072335734577,
+                  "upper": 1.1454842758486
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  7.0,
+                  112.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  7.0,
+                  119.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 3.1,
+          "treatment group": "2"
+        },
+        "id": 20,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Maublant",
+        "notes": "",
+        "sample_size": null,
+        "year": 1988
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.20978320036711975,
+                  "display_conf_level": 95.0,
+                  "display_est": 1.0067532467532467,
+                  "display_lower": 0.6673524435129711,
+                  "display_se": 0.20978320036711975,
+                  "display_upper": 1.5187658480919364,
+                  "est": 0.00673054572882692,
+                  "lower": -0.40443697155227754,
+                  "upper": 0.4178980630099314
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  57.0,
+                  302.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  55.0,
+                  293.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 7.0,
+          "treatment group": "3"
+        },
+        "id": 48,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Aber",
+        "notes": "",
+        "sample_size": null,
+        "year": 1976
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.7274689597639494,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.9571428571428573,
+                  "display_lower": 0.2300138892896077,
+                  "display_se": 0.7274689597639494,
+                  "display_upper": 3.982900562261758,
+                  "est": -0.04380262265839274,
+                  "lower": -1.469615583666551,
+                  "upper": 1.3820103383497655
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  4.0,
+                  74.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  4.0,
+                  71.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 1.9,
+          "treatment group": "1"
+        },
+        "id": 3,
+        "include": true,
+        "manually_excluded": false,
+        "name": "TICO",
+        "notes": "",
+        "sample_size": null,
+        "year": 1988
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.45567410381641055,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.9000000000000001,
+                  "display_lower": 0.3684444415844367,
+                  "display_se": 0.45567410381641055,
+                  "display_upper": 2.198431862662181,
+                  "est": -0.10536051565782611,
+                  "lower": -0.9984653478255562,
+                  "upper": 0.787744316509904
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  12.0,
+                  108.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  10.0,
+                  82.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 2.0,
+          "treatment group": "1"
+        },
+        "id": 4,
+        "include": true,
+        "manually_excluded": false,
+        "name": "EWP-d",
+        "notes": "",
+        "sample_size": null,
+        "year": 1971
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.5124206255691435,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.898809523809524,
+                  "display_lower": 0.32922623714642035,
+                  "display_se": 0.5124206255691435,
+                  "display_upper": 2.453809778627745,
+                  "est": -0.10668414258833447,
+                  "lower": -1.1110101136393398,
+                  "upper": 0.8976418284626708
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  8.0,
+                  176.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  8.0,
+                  159.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 4.0,
+          "treatment group": "2"
+        },
+        "id": 34,
+        "include": true,
+        "manually_excluded": false,
+        "name": "ECSG-2-e",
+        "notes": "",
+        "sample_size": null,
+        "year": 1988
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.1601995334400344,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.8737357606728413,
+                  "display_lower": 0.6382899714109287,
+                  "display_se": 0.1601995334400344,
+                  "display_upper": 1.1960303524603955,
+                  "est": -0.13497728236480389,
+                  "lower": -0.44896259824739126,
+                  "upper": 0.1790080335177835
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  87.0,
+                  693.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  93.0,
+                  659.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 7.5,
+          "treatment group": "3"
+        },
+        "id": 50,
+        "include": true,
+        "manually_excluded": false,
+        "name": "GISSI-d",
+        "notes": "",
+        "sample_size": null,
+        "year": 1986
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.19197596630146266,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.872049689440994,
+                  "display_lower": 0.5985921166830457,
+                  "display_se": 0.19197596630146266,
+                  "display_upper": 1.2704321351041166,
+                  "est": -0.13690887339275193,
+                  "lower": -0.5131748532408937,
+                  "upper": 0.23935710645538988
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  54.0,
+                  859.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  63.0,
+                  882.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 3.0,
+          "treatment group": "1"
+        },
+        "id": 19,
+        "include": true,
+        "manually_excluded": false,
+        "name": "ISAM",
+        "notes": "",
+        "sample_size": null,
+        "year": 1986
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.11289545912439737,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.8483473611964023,
+                  "display_lower": 0.6799499156959523,
+                  "display_se": 0.11289545912439737,
+                  "display_upper": 1.0584503779403636,
+                  "est": -0.16446510301090145,
+                  "lower": -0.38573613691283404,
+                  "upper": 0.05680593089103117
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  164.0,
+                  1621.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  190.0,
+                  1622.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 5.0,
+          "treatment group": "2"
+        },
+        "id": 42,
+        "include": true,
+        "manually_excluded": false,
+        "name": "ISIS-2-g",
+        "notes": "",
+        "sample_size": null,
+        "year": 1988
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.09515356065233538,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.8413096158803818,
+                  "display_lower": 0.6981696971919111,
+                  "display_se": 0.09515356065233538,
+                  "display_upper": 1.0137963200345501,
+                  "est": -0.1727955347030008,
+                  "lower": -0.3592930865823257,
+                  "upper": 0.013702017176324105
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  226.0,
+                  2381.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  270.0,
+                  2436.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 2.0,
+          "treatment group": "1"
+        },
+        "id": 5,
+        "include": true,
+        "manually_excluded": false,
+        "name": "GISSI-c",
+        "notes": "",
+        "sample_size": null,
+        "year": 1986
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.09905448001295196,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.8379994479024748,
+                  "display_lower": 0.6901260267116883,
+                  "display_se": 0.09905448001295196,
+                  "display_upper": 1.0175577322172582,
+                  "est": -0.17673783732786674,
+                  "lower": -0.3708810506605952,
+                  "upper": 0.017405376004861667
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  214.0,
+                  2018.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  249.0,
+                  2008.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 9.0,
+          "treatment group": "3"
+        },
+        "id": 53,
+        "include": true,
+        "manually_excluded": false,
+        "name": "ISIS-2-f",
+        "notes": "",
+        "sample_size": null,
+        "year": 1988
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.704350651179463,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.8260869565217391,
+                  "display_lower": 0.20772147781761194,
+                  "display_se": 0.704350651179463,
+                  "display_upper": 3.2852628765454024,
+                  "est": -0.1910552367627092,
+                  "lower": -1.571557145561791,
+                  "upper": 1.1894466720363726
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  5.0,
+                  28.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  5.0,
+                  24.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 4.9,
+          "treatment group": "2"
+        },
+        "id": 41,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Olson",
+        "notes": "",
+        "sample_size": null,
+        "year": 1986
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.09901958610967618,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.809310830631465,
+                  "display_lower": 0.6665453881756085,
+                  "display_se": 0.09901958610967618,
+                  "display_upper": 0.9826547932019137,
+                  "est": -0.21157221985476227,
+                  "lower": -0.4056470423937901,
+                  "upper": -0.01749739731573441
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  217.0,
+                  1849.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  254.0,
+                  1800.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 4.5,
+          "treatment group": "2"
+        },
+        "id": 40,
+        "include": true,
+        "manually_excluded": false,
+        "name": "GISSI-b",
+        "notes": "",
+        "sample_size": null,
+        "year": 1986
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.13717658776871297,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.7865100016262809,
+                  "display_lower": 0.6010897558101876,
+                  "display_se": 0.13717658776871297,
+                  "display_upper": 1.0291274750214068,
+                  "est": -0.24014983993874672,
+                  "lower": -0.5090110114875217,
+                  "upper": 0.028711331610028312
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  106.0,
+                  1224.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  132.0,
+                  1227.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 18.0,
+          "treatment group": "4"
+        },
+        "id": 60,
+        "include": true,
+        "manually_excluded": false,
+        "name": "ISIS-2-e",
+        "notes": "",
+        "sample_size": null,
+        "year": 1988
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.30042005533797334,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.7547120418848168,
+                  "display_lower": 0.41885457626455647,
+                  "display_se": 0.30042005533797334,
+                  "display_upper": 1.359875953238208,
+                  "est": -0.28141900396221864,
+                  "lower": -0.8702314926581762,
+                  "upper": 0.30739348473373895
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  31.0,
+                  413.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  20.0,
+                  206.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 6.5,
+          "treatment group": "3"
+        },
+        "id": 46,
+        "include": true,
+        "manually_excluded": false,
+        "name": "ISIS Pilot",
+        "notes": "",
+        "sample_size": null,
+        "year": 1987
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.13892633670643406,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.7423156500868989,
+                  "display_lower": 0.5653720108090184,
+                  "display_se": 0.13892633670643406,
+                  "display_upper": 0.9746370775862002,
+                  "est": -0.29798072184378466,
+                  "lower": -0.5702713382924802,
+                  "upper": -0.025690105395089036
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  99.0,
+                  1504.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  129.0,
+                  1488.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 4.1,
+          "treatment group": "2"
+        },
+        "id": 35,
+        "include": true,
+        "manually_excluded": false,
+        "name": "ASSET-b",
+        "notes": "",
+        "sample_size": null,
+        "year": 1988
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.15471249864354522,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.7246017009140617,
+                  "display_lower": 0.5350665868440835,
+                  "display_se": 0.15471249864354522,
+                  "display_upper": 0.9812752989574146,
+                  "est": -0.3221331531404461,
+                  "lower": -0.6253640784399966,
+                  "upper": -0.01890222784089557
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  81.0,
+                  992.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  107.0,
+                  979.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 2.1,
+          "treatment group": "1"
+        },
+        "id": 7,
+        "include": true,
+        "manually_excluded": false,
+        "name": "ASSET",
+        "notes": "",
+        "sample_size": null,
+        "year": 1988
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.6936132387547775,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.7176470588235293,
+                  "display_lower": 0.1842919010830892,
+                  "display_se": 0.6936132387547775,
+                  "display_upper": 2.794573706230657,
+                  "est": -0.3317773923170053,
+                  "lower": -1.6912343594765507,
+                  "upper": 1.02767957484254
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  4.0,
+                  72.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  5.0,
+                  66.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 3.2,
+          "treatment group": "2"
+        },
+        "id": 22,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Guerci",
+        "notes": "",
+        "sample_size": null,
+        "year": 1987
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.3400184111674368,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.6718597857838363,
+                  "display_lower": 0.3450280874707416,
+                  "display_se": 0.3400184111674368,
+                  "display_upper": 1.3082864501336597,
+                  "est": -0.3977056123372533,
+                  "lower": -1.064129452305961,
+                  "upper": 0.26871822763145436
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  20.0,
+                  99.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  26.0,
+                  95.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 4.5,
+          "treatment group": "2"
+        },
+        "id": 38,
+        "include": true,
+        "manually_excluded": false,
+        "name": "EWP-c",
+        "notes": "",
+        "sample_size": null,
+        "year": 1971
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.1334503930025256,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.6691547470258761,
+                  "display_lower": 0.5151496187539664,
+                  "display_se": 0.1334503930025256,
+                  "display_upper": 0.86920005211363,
+                  "est": -0.40173993465167435,
+                  "lower": -0.6632978986593405,
+                  "upper": -0.14018197064400822
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  106.0,
+                  1243.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  152.0,
+                  1243.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 2.5,
+          "treatment group": "1"
+        },
+        "id": 12,
+        "include": true,
+        "manually_excluded": false,
+        "name": "ISIS-2-d",
+        "notes": "",
+        "sample_size": null,
+        "year": 1988
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.5666655449353998,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.6608695652173913,
+                  "display_lower": 0.21765525926101778,
+                  "display_se": 0.5666655449353998,
+                  "display_upper": 2.006607070803024,
+                  "est": -0.4141987880769191,
+                  "lower": -1.5248428474300662,
+                  "upper": 0.6964452712762279
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  8.0,
+                  31.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  10.0,
+                  29.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 21.0,
+          "treatment group": "4"
+        },
+        "id": 63,
+        "include": true,
+        "manually_excluded": false,
+        "name": "EWP-b",
+        "notes": "",
+        "sample_size": null,
+        "year": 1971
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.5564152819558082,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.6548387096774194,
+                  "display_lower": 0.2200456549810491,
+                  "display_se": 0.5564152819558082,
+                  "display_upper": 1.9487489345286915,
+                  "est": -0.4233663184374046,
+                  "lower": -1.5139202315184879,
+                  "upper": 0.6671875946436787
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  7.0,
+                  38.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  10.0,
+                  39.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 15.0,
+          "treatment group": "4"
+        },
+        "id": 59,
+        "include": true,
+        "manually_excluded": false,
+        "name": "EWP-a",
+        "notes": "",
+        "sample_size": null,
+        "year": 1971
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.4711378138272266,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.6538461538461537,
+                  "display_lower": 0.25968229412564253,
+                  "display_se": 0.4711378138272266,
+                  "display_upper": 1.646299353365089,
+                  "est": -0.4248831939652662,
+                  "lower": -1.3482963408215671,
+                  "upper": 0.49852995289103474
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  9.0,
+                  87.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  12.0,
+                  80.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 12.5,
+          "treatment group": "4"
+        },
+        "id": 58,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Bett-b",
+        "notes": "",
+        "sample_size": null,
+        "year": 1973
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.13673873943260048,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.6525059003193113,
+                  "display_lower": 0.4991053407659408,
+                  "display_se": 0.13673873943260048,
+                  "display_upper": 0.8530542856907238,
+                  "est": -0.42693509719121314,
+                  "lower": -0.694938101770517,
+                  "upper": -0.15893209261190938
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  100.0,
+                  1178.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  147.0,
+                  1181.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 3.5,
+          "treatment group": "2"
+        },
+        "id": 27,
+        "include": true,
+        "manually_excluded": false,
+        "name": "ISIS-2-c",
+        "notes": "",
+        "sample_size": null,
+        "year": 1988
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.392419998119195,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.6309562931317779,
+                  "display_lower": 0.2923955564615117,
+                  "display_se": 0.392419998119195,
+                  "display_upper": 1.3615317847519925,
+                  "est": -0.4605186848751437,
+                  "lower": -1.2296477480020416,
+                  "upper": 0.3086103782517541
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  12.0,
+                  191.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  17.0,
+                  177.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 3.5,
+          "treatment group": "2"
+        },
+        "id": 29,
+        "include": true,
+        "manually_excluded": false,
+        "name": "WWIVSK-b",
+        "notes": "",
+        "sample_size": null,
+        "year": 1988
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.15880046417622157,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.6242966516004057,
+                  "display_lower": 0.45731958997598854,
+                  "display_se": 0.15880046417622157,
+                  "display_upper": 0.8522405725500232,
+                  "est": -0.47112962037523287,
+                  "lower": -0.7823728108888701,
+                  "upper": -0.15988642986159562
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  72.0,
+                  951.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  111.0,
+                  957.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 1.5,
+          "treatment group": "1"
+        },
+        "id": 2,
+        "include": true,
+        "manually_excluded": false,
+        "name": "ISIS-2-b",
+        "notes": "",
+        "sample_size": null,
+        "year": 1988
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 1.0037807318213263,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.6111111111111112,
+                  "display_lower": 0.08544771865026758,
+                  "display_se": 1.0037807318213263,
+                  "display_upper": 4.3705881914998015,
+                  "est": -0.49247648509779407,
+                  "lower": -2.4598505678428517,
+                  "upper": 1.4748975976472636
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  2.0,
+                  14.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  3.0,
+                  14.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 8.5,
+          "treatment group": "3"
+        },
+        "id": 51,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Gormsen",
+        "notes": "",
+        "sample_size": null,
+        "year": 1973
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.8081119178646431,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.609375,
+                  "display_lower": 0.12503123514657757,
+                  "display_se": 0.8081119178646431,
+                  "display_upper": 2.9699609876657656,
+                  "est": -0.4953214372300254,
+                  "lower": -2.0791916917223157,
+                  "upper": 1.088548817262265
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  3.0,
+                  35.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  4.0,
+                  30.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 2.7,
+          "treatment group": "1"
+        },
+        "id": 15,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Croydon",
+        "notes": "",
+        "sample_size": null,
+        "year": 1987
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.5130694094375499,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.6053459119496856,
+                  "display_lower": 0.22145125241263455,
+                  "display_se": 0.5130694094375499,
+                  "display_upper": 1.6547374156701296,
+                  "est": -0.5019552290523379,
+                  "lower": -1.5075527931191703,
+                  "upper": 0.5036423350144945
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  7.0,
+                  60.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  12.0,
+                  67.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 2.6,
+          "treatment group": "1"
+        },
+        "id": 13,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Ikram",
+        "notes": "",
+        "sample_size": null,
+        "year": 1986
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.8090632443346647,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.5859375,
+                  "display_lower": 0.1199983878955142,
+                  "display_se": 0.8090632443346647,
+                  "display_upper": 2.861061385301195,
+                  "est": -0.5345421503833068,
+                  "lower": -2.120276970494379,
+                  "upper": 1.0511926697277656
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  3.0,
+                  35.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  4.0,
+                  29.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 2.3,
+          "treatment group": "1"
+        },
+        "id": 8,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Durand",
+        "notes": "",
+        "sample_size": null,
+        "year": 1987
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.24819572598358824,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.5691692073170733,
+                  "display_lower": 0.34992648253843905,
+                  "display_se": 0.24819572598358824,
+                  "display_upper": 0.925776135055339,
+                  "est": -0.5635775124078148,
+                  "lower": -1.0500321964524197,
+                  "upper": -0.07712282836320988
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  29.0,
+                  357.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  48.0,
+                  357.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 0.7,
+          "treatment group": "1"
+        },
+        "id": 1,
+        "include": true,
+        "manually_excluded": false,
+        "name": "ISIS-2-a",
+        "notes": "",
+        "sample_size": null,
+        "year": 1988
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.3089204173072615,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.5620253164556963,
+                  "display_lower": 0.30676255257448237,
+                  "display_se": 0.3089204173072615,
+                  "display_upper": 1.0296969225421715,
+                  "est": -0.5762083830288423,
+                  "lower": -1.1816812750401586,
+                  "upper": 0.029264508982474124
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  18.0,
+                  334.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  30.0,
+                  326.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 2.3,
+          "treatment group": "1"
+        },
+        "id": 9,
+        "include": true,
+        "manually_excluded": false,
+        "name": "AIMS-a",
+        "notes": "",
+        "sample_size": null,
+        "year": 1988
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.48677658863750306,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.5464285714285714,
+                  "display_lower": 0.2104691349295554,
+                  "display_se": 0.48677658863750306,
+                  "display_upper": 1.4186601934454959,
+                  "est": -0.6043516817768143,
+                  "lower": -1.5584162640235895,
+                  "upper": 0.34971290046996073
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  9.0,
+                  49.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  14.0,
+                  48.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 4.5,
+          "treatment group": "2"
+        },
+        "id": 37,
+        "include": true,
+        "manually_excluded": false,
+        "name": "ECSG-1-c",
+        "notes": "",
+        "sample_size": null,
+        "year": 1979
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.6613543320757127,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.5227963525835866,
+                  "display_lower": 0.1430166894860157,
+                  "display_se": 0.6613543320757127,
+                  "display_upper": 1.9110778417327783,
+                  "est": -0.6485632739519189,
+                  "lower": -1.9447939458398587,
+                  "upper": 0.6476673979360208
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  4.0,
+                  51.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  7.0,
+                  50.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 3.3,
+          "treatment group": "2"
+        },
+        "id": 25,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Bassand",
+        "notes": "",
+        "sample_size": null,
+        "year": 1986
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.18135232511368474,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.48921461614429024,
+                  "display_lower": 0.3428720190643014,
+                  "display_se": 0.18135232511368474,
+                  "display_upper": 0.6980182906214977,
+                  "est": -0.7149539979697195,
+                  "lower": -1.0703980237051403,
+                  "upper": -0.3595099722342987
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  52.0,
+                  635.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  99.0,
+                  642.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 0.7,
+          "treatment group": "1"
+        },
+        "id": 0,
+        "include": true,
+        "manually_excluded": false,
+        "name": "GISSI-a",
+        "notes": "",
+        "sample_size": null,
+        "year": 1986
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.9437692954805149,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.47916666666666674,
+                  "display_lower": 0.07536135836710393,
+                  "display_se": 0.9437692954805149,
+                  "display_upper": 3.0466634283050253,
+                  "est": -0.735706794978741,
+                  "lower": -2.5854606238352904,
+                  "upper": 1.1140470338778081
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  3.0,
+                  75.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  2.0,
+                  25.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 3.6,
+          "treatment group": "2"
+        },
+        "id": 32,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Topol",
+        "notes": "",
+        "sample_size": null,
+        "year": 1987
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.7372237231444082,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.4787234042553191,
+                  "display_lower": 0.1128648449614451,
+                  "display_se": 0.7372237231444082,
+                  "display_upper": 2.0305357071999595,
+                  "est": -0.7366322924996842,
+                  "lower": -2.181564238411252,
+                  "upper": 0.7082996534118835
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  3.0,
+                  50.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  6.0,
+                  51.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 2.5,
+          "treatment group": "1"
+        },
+        "id": 11,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Sainsous",
+        "notes": "",
+        "sample_size": null,
+        "year": 1986
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.4958619978170548,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.4786324786324786,
+                  "display_lower": 0.181102175568573,
+                  "display_se": 0.4958619978170548,
+                  "display_upper": 1.2649712731646738,
+                  "est": -0.736822244062607,
+                  "lower": -1.708693901086113,
+                  "upper": 0.2350494129608991
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  8.0,
+                  47.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  15.0,
+                  50.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 7.5,
+          "treatment group": "3"
+        },
+        "id": 49,
+        "include": true,
+        "manually_excluded": false,
+        "name": "ECSG-1-b",
+        "notes": "",
+        "sample_size": null,
+        "year": 1979
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.3209399931134351,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.4753283182455692,
+                  "display_lower": 0.2534014357651854,
+                  "display_se": 0.3209399931134351,
+                  "display_upper": 0.8916169296512028,
+                  "est": -0.7437495174071849,
+                  "lower": -1.3727803451080505,
+                  "upper": -0.11471868970631927
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  16.0,
+                  269.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  31.0,
+                  264.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 3.2,
+          "treatment group": "2"
+        },
+        "id": 21,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Simoons",
+        "notes": "",
+        "sample_size": null,
+        "year": 1985
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.7232629146427176,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.47058823529411775,
+                  "display_lower": 0.11402459976779838,
+                  "display_se": 0.7232629146427176,
+                  "display_upper": 1.9421536023647799,
+                  "est": -0.75377180237638,
+                  "lower": -2.171341066429574,
+                  "upper": 0.6637974616768136
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  4.0,
+                  21.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  7.0,
+                  21.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 6.2,
+          "treatment group": "3"
+        },
+        "id": 45,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Dewar",
+        "notes": "",
+        "sample_size": null,
+        "year": 1963
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.3421647178806501,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.42521994134897356,
+                  "display_lower": 0.21745153982308282,
+                  "display_se": 0.3421647178806501,
+                  "display_upper": 0.8315047971972606,
+                  "est": -0.8551487348629425,
+                  "lower": -1.5257792586893248,
+                  "upper": -0.1845182110365602
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  14.0,
+                  168.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  31.0,
+                  176.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 5.0,
+          "treatment group": "2"
+        },
+        "id": 43,
+        "include": true,
+        "manually_excluded": false,
+        "name": "AIMS",
+        "notes": "",
+        "sample_size": null,
+        "year": 1988
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.42172786882853186,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.40866873065015474,
+                  "display_lower": 0.17881172634342307,
+                  "display_se": 0.42172786882853186,
+                  "display_upper": 0.933999882594118,
+                  "est": -0.8948504006362858,
+                  "lower": -1.7214218348170403,
+                  "upper": -0.06827896645553144
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  9.0,
+                  162.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  19.0,
+                  151.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 2.8,
+          "treatment group": "1"
+        },
+        "id": 16,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Meinertz",
+        "notes": "",
+        "sample_size": null,
+        "year": 1988
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.8905467944322707,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.3818181818181817,
+                  "display_lower": 0.06665332199966705,
+                  "display_se": 0.8905467944322707,
+                  "display_upper": 2.1872146742764045,
+                  "est": -0.9628107475090482,
+                  "lower": -2.7082503911438938,
+                  "upper": 0.7826288961257972
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  2.0,
+                  24.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  5.0,
+                  26.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 2.7,
+          "treatment group": "1"
+        },
+        "id": 14,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Anderson",
+        "notes": "",
+        "sample_size": null,
+        "year": 1983
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.697942492422211,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.35915492957746487,
+                  "display_lower": 0.09145176782246643,
+                  "display_se": 0.697942492422211,
+                  "display_upper": 1.410495023892857,
+                  "est": -1.0240014248769347,
+                  "lower": -2.3919435733045873,
+                  "upper": 0.34394072355071814
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  3.0,
+                  74.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  8.0,
+                  76.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 3.5,
+          "treatment group": "2"
+        },
+        "id": 28,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Brunelli",
+        "notes": "",
+        "sample_size": null,
+        "year": 1988
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.614533575284146,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.33000000000000007,
+                  "display_lower": 0.09895141574362444,
+                  "display_se": 0.614533575284146,
+                  "display_upper": 1.100540090120101,
+                  "est": -1.108662624521611,
+                  "lower": -2.313126299369171,
+                  "upper": 0.09580105032594877
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  4.0,
+                  84.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  10.0,
+                  76.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 6.5,
+          "treatment group": "3"
+        },
+        "id": 47,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Bett-a",
+        "notes": "",
+        "sample_size": null,
+        "year": 1973
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.5425714264238863,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.30709600477042337,
+                  "display_lower": 0.10603189689935273,
+                  "display_se": 0.5425714264238863,
+                  "display_upper": 0.8894300574050334,
+                  "est": -1.1805948611594728,
+                  "lower": -2.2440153159908136,
+                  "upper": -0.11717440632813192
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  5.0,
+                  134.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  13.0,
+                  116.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 4.5,
+          "treatment group": "2"
+        },
+        "id": 39,
+        "include": true,
+        "manually_excluded": false,
+        "name": "WWICSK-a",
+        "notes": "",
+        "sample_size": null,
+        "year": 1983
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.5842442904516073,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.2718446601941748,
+                  "display_lower": 0.08649901559508172,
+                  "display_se": 0.5842442904516073,
+                  "display_upper": 0.8543394253412552,
+                  "est": -1.3025244780544316,
+                  "lower": -2.4476222455127403,
+                  "upper": -0.1574267105961229
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  4.0,
+                  107.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  14.0,
+                  112.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 3.0,
+          "treatment group": "1"
+        },
+        "id": 18,
+        "include": true,
+        "manually_excluded": false,
+        "name": "White",
+        "notes": "",
+        "sample_size": null,
+        "year": 1987
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.6000236473837358,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.268065268065268,
+                  "display_lower": 0.08269885441803058,
+                  "display_se": 0.6000236473837358,
+                  "display_upper": 0.8689236199049063,
+                  "est": -1.3165247905647672,
+                  "lower": -2.49254952930925,
+                  "upper": -0.14050005182028436
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  5.0,
+                  44.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  11.0,
+                  34.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 10.5,
+          "treatment group": "4"
+        },
+        "id": 56,
+        "include": true,
+        "manually_excluded": false,
+        "name": "ECSG-1-a",
+        "notes": "",
+        "sample_size": null,
+        "year": 1979
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 1.168388453788965,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.21052631578947373,
+                  "display_lower": 0.02131927027705314,
+                  "display_se": 1.168388453788965,
+                  "display_upper": 2.078932771333839,
+                  "est": -1.5581446180465497,
+                  "lower": -3.848143907425362,
+                  "upper": 0.7318546713322627
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  1.0,
+                  20.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  4.0,
+                  20.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 5.0,
+          "treatment group": "2"
+        },
+        "id": 44,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Khaja",
+        "notes": "",
+        "sample_size": null,
+        "year": 1983
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 1.171418892720372,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.2083333333333333,
+                  "display_lower": 0.020972258079167114,
+                  "display_se": 1.171418892720372,
+                  "display_upper": 2.0695328854880004,
+                  "est": -1.5686159179138455,
+                  "lower": -3.8645547584555633,
+                  "upper": 0.7273229226278721
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  1.0,
+                  19.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  4.0,
+                  19.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 3.4,
+          "treatment group": "2"
+        },
+        "id": 26,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Schreiber",
+        "notes": "",
+        "sample_size": null,
+        "year": 1986
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 1.1241158141563368,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.18181818181818182,
+                  "display_lower": 0.020081132176891347,
+                  "display_se": 1.1241158141563368,
+                  "display_upper": 1.6462145136274347,
+                  "est": -1.7047480922384253,
+                  "lower": -3.9079746024367656,
+                  "upper": 0.4984784179599151
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  1.0,
+                  34.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  5.0,
+                  35.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 3.5,
+          "treatment group": "2"
+        },
+        "id": 31,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Bett",
+        "notes": "",
+        "sample_size": null,
+        "year": 1973
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 0.7666338328122878,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.16862233811386354,
+                  "display_lower": 0.0375279814574912,
+                  "display_se": 0.7666338328122878,
+                  "display_upper": 0.7576611319527907,
+                  "est": -1.7800937504120924,
+                  "lower": -3.282668452054077,
+                  "upper": -0.2775190487701076
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  2.0,
+                  179.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  13.0,
+                  207.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 2.0,
+          "treatment group": "1"
+        },
+        "id": 6,
+        "include": true,
+        "manually_excluded": false,
+        "name": "ECSG-2-d",
+        "notes": "",
+        "sample_size": null,
+        "year": 1988
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 1.218099435089859,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.15909090909090906,
+                  "display_lower": 0.014614946994286549,
+                  "display_se": 1.218099435089859,
+                  "display_upper": 1.731783041379921,
+                  "est": -1.838279484862948,
+                  "lower": -4.225710507227657,
+                  "upper": 0.5491515375017606
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  1.0,
+                  12.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  4.0,
+                  11.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 9.0,
+          "treatment group": "3"
+        },
+        "id": 52,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Fletcher",
+        "notes": "",
+        "sample_size": null,
+        "year": 1959
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 1.0917418216126467,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.12337662337662342,
+                  "display_lower": 0.014519128761690273,
+                  "display_se": 1.0917418216126467,
+                  "display_upper": 1.0483956334887616,
+                  "est": -2.0925136232471884,
+                  "lower": -4.232288274024128,
+                  "upper": 0.04726102752975114
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  1.0,
+                  45.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  7.0,
+                  45.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 3.3,
+          "treatment group": "2"
+        },
+        "id": 24,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Julian",
+        "notes": "",
+        "sample_size": null,
+        "year": 1987
+      },
+      {
+        "analysis_units": [
+          {
+            "entered_effects": {},
+            "follow_up": null,
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  "",
+                  ""
+                ]
+              }
+            ],
+            "outcome": "Death"
+          },
+          {
+            "entered_effects": {
+              "OR": {
+                "tx A-tx B": {
+                  "SE": 1.5117779820026536,
+                  "display_conf_level": 95.0,
+                  "display_est": 0.07399577167019025,
+                  "display_lower": 0.0038227786544002725,
+                  "display_se": 1.5117779820026536,
+                  "display_upper": 1.4323021864643957,
+                  "est": -2.6037473270025195,
+                  "lower": -5.566777724348362,
+                  "upper": 0.35928307034332274
+                }
+              }
+            },
+            "follow_up": "first",
+            "groups": [
+              {
+                "id": 0,
+                "name": "tx A",
+                "raw_data": [
+                  0.0,
+                  21.0
+                ]
+              },
+              {
+                "id": 1,
+                "name": "tx B",
+                "raw_data": [
+                  5.0,
+                  22.0
+                ]
+              }
+            ],
+            "outcome": "Death"
+          }
+        ],
+        "covariates": {
+          "time to treatment": 2.9,
+          "treatment group": "1"
+        },
+        "id": 17,
+        "include": true,
+        "manually_excluded": false,
+        "name": "Buchalter",
+        "notes": "",
+        "sample_size": null,
+        "year": 1987
+      }
+    ],
+    "summary": null,
+    "title": "meantime"
+  },
+  "project_file": "sample_projects/meantime.rcms",
+  "schema_version": 1,
+  "source_sha256": "58d12ce1d141ce9c40fb77af2d7f8d6012b1a851e1cf96a4f273b109f0613488"
+}

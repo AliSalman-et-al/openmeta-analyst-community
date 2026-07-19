@@ -256,6 +256,18 @@ _Avoid_: Mechanical conversion batch, big-bang port
 A migration approach that preserves existing code organization unless a local change is required to make a compatibility slice run under the target runtime.
 _Avoid_: Cleanup port, rewrite
 
+**Native Qt6 Port**:
+The complete replacement of RC MetaStudio's Qt5/PyQt5-facing implementation with Qt6/PyQt6-native APIs while preserving Analysis Behavior, project behavior, user workflows, canonical forms, and established interface contracts.
+_Avoid_: Compatibility-layer migration, dual-binding port, clean-sheet GUI redesign
+
+**Qt6 Runtime Baseline**:
+The exact PyQt6, Qt6, and SIP wheel set locked for implementing, verifying, packaging, and releasing the Native Qt6 Port.
+_Avoid_: Latest available Qt, floating Qt6 dependency, development environment version
+
+**Qt6 Hard Cutover**:
+The one-way repository transition after which Qt6/PyQt6 is the only supported GUI runtime for development, verification, packaging, and release.
+_Avoid_: Parallel Qt line, dual-runtime transition, PyQt5 fallback
+
 **Post-Port Refactor**:
 A planned modernization phase after compatibility slices are stable, focused on improving module boundaries and maintainability without changing Analysis Behavior.
 _Avoid_: Future cleanup, code reorganization
@@ -301,8 +313,16 @@ A compatibility check that opens a representative `.rcms` project file, saves it
 _Avoid_: Byte-perfect save, file snapshot
 
 **Versioned Project Format**:
-A future project file format that can evolve beyond the current `.rcms` representation while preserving access to existing projects through migration tooling.
-_Avoid_: New save format, file rewrite
+The structured, schema-versioned `.rcms` representation used by the Qt6 application, with older supported project data converted through isolated one-way migration tooling rather than loaded as pickle at runtime.
+_Avoid_: Pickle project, unversioned save, runtime legacy loader
+
+**Project Format Schema**:
+The committed JSON Schema selected by an `.rcms` manifest version that defines the exact accepted structure of each Versioned Project Format member and rejects unknown fields.
+_Avoid_: Implementation model, informal JSON shape, permissive project data
+
+**Project Format Migration**:
+An explicit, pure JSON-to-JSON transformation that advances one supported structured `.rcms` version to the next while preserving project semantics.
+_Avoid_: Runtime pickle conversion, implicit coercion, best-effort project repair
 
 **Windows Distributable**:
 The packaged Windows application artifact that users can run without setting up the source development environment.

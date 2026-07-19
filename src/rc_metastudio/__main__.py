@@ -17,6 +17,9 @@ def _ensure_transitional_source_path() -> None:
 
 def main() -> int:
     _ensure_transitional_source_path()
+    from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+
+    prepare_generated_ui_imports()
     import launch
 
     return launch.start() or 0

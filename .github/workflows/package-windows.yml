@@ -1,0 +1,58 @@
+name: Package Windows x64
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: RCMetaStudio Windows x64
+    runs-on: windows-2025
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+      - run: uv python install 3.11.9
+      - name: Resolve authoritative package version
+        id: package-metadata
+        shell: powershell
+        run: uv run python scripts\resolve_package_ci_metadata.py
+      - name: Cache immutable official R download
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: artifacts/download-cache/windows-x64
+          key: official-r-4.6.1-windows-x64-C5424C40CD70EF85765A55D2FF96BB602B5F30ED536938FF004F14DB5DB3C2DF
+      - name: Build and qualify the public Windows package command
+        shell: powershell
+        run: .\scripts\package-windows.ps1
+      - name: Upload package and qualification evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: RCMetaStudio-${{ steps.package-metadata.outputs.version }}-windows-x64
+          path: |
+            artifacts/RCMetaStudio-${{ steps.package-metadata.outputs.version }}-windows-x64.zip
+            artifacts/RCMetaStudio-${{ steps.package-metadata.outputs.version }}-windows-x64-evidence.json
+            artifacts/RCMetaStudio-${{ steps.package-metadata.outputs.version }}-windows-x64-archive-inspection.json
+            build/windows-package/work/archive-qualification/deployment-reinspection.json
+            build/windows-package/work/archive-qualification/RCMetaStudio-${{ steps.package-metadata.outputs.version }}-windows-x64/qualification/packaged-smoke.json
+            build/windows-package/work/archive-qualification/RCMetaStudio-${{ steps.package-metadata.outputs.version }}-windows-x64/qualification/packaged-smoke.log
+          if-no-files-found: error
+          compression-level: 0
+      - name: Upload diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: RCMetaStudio-${{ steps.package-metadata.outputs.version }}-windows-x64-diagnostics
+          path: |
+            build/windows-package/work/RCMetaStudio/warn-RCMetaStudio.txt
+            build/windows-package/work/RCMetaStudio/xref-RCMetaStudio.html
+            build/windows-package/dist/RCMetaStudio/qualification
+            build/windows-package/work/archive-qualification
+          if-no-files-found: ignore
+          retention-days: 14
