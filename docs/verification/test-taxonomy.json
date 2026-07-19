@@ -1159,6 +1159,16 @@
       "evidence": ["gui_compatibility", "release_readiness"],
       "external_dependencies": ["qt", "filesystem"],
       "lane": "gui",
+      "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_plot_graphics_items_paint_an_opaque_white_canvas",
+      "reason": "Guards direct SVG and raster graphics-item painting against transparent dark scene backgrounds.",
+      "runtime_class": "seconds",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
+      "evidence": ["gui_compatibility", "release_readiness"],
+      "external_dependencies": ["qt", "filesystem"],
+      "lane": "gui",
       "nodeid": "tests/python/gui/test_results_workspace_layout.py::test_results_plot_preview_is_opaque_white_on_dark_theme[svg]",
       "reason": "Guards opaque white SVG plot previews independently of the active application theme.",
       "runtime_class": "seconds",
