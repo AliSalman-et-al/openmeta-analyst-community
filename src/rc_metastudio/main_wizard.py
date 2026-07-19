@@ -9,8 +9,17 @@ import forms.ui_welcome_page
 
 from typing import TypedDict
 
-from PyQt6.QtCore import QSize, Qt, QTimer
-from PyQt6.QtGui import QAction, QCloseEvent, QHideEvent, QIcon, QPainter, QPixmap, QShowEvent
+from PyQt6.QtCore import QEvent, QSize, Qt, QTimer
+from PyQt6.QtGui import (
+    QAction,
+    QCloseEvent,
+    QHideEvent,
+    QIcon,
+    QPainter,
+    QPalette,
+    QPixmap,
+    QShowEvent,
+)
 from PyQt6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -209,13 +218,31 @@ class DataTypePage(MainWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
 
     def _configure_data_type_buttons(self):
         buttons = self._data_type_buttons()
+        self._data_type_source_icons = {
+            button.objectName(): QIcon(button.icon()) for button in buttons
+        }
         for button in buttons:
-            self._center_button_icon_in_declared_slot(button)
+            self._apply_palette_icon(button)
             button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
             self._reserve_button_icon_and_text_height(button)
             button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            button.installEventFilter(self)
+        self.diagnostic_Button.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
+        )
+        self.diagnosticDataTypeLayout.setStretch(0, 1)
+        self.diagnosticDataTypeLayout.setStretch(1, 1)
         for current, following in zip(buttons, buttons[1:]):
             self.setTabOrder(current, following)
+
+    def eventFilter(self, watched, event):
+        if (
+            event.type() == QEvent.Type.PaletteChange
+            and hasattr(self, "_data_type_source_icons")
+            and watched in self._data_type_buttons()
+        ):
+            self._apply_palette_icon(watched)
+        return super().eventFilter(watched, event)
 
     def _reserve_button_icon_and_text_height(self, button):
         """Keep multiline Required Content below the icon at native font scales."""
@@ -236,13 +263,14 @@ class DataTypePage(MainWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
         # layout-audit: allow=style-metric-control; reason=icon and multiline Required Content need a native-metric minimum
         button.setMinimumSize(button.minimumSizeHint().expandedTo(required))
 
-    def _center_button_icon_in_declared_slot(self, button):
+    def _apply_palette_icon(self, button):
         icon_size = button.iconSize()
-        if icon_size.isEmpty() or button.icon().isNull():
+        source_icon = self._data_type_source_icons.get(button.objectName())
+        if icon_size.isEmpty() or source_icon is None or source_icon.isNull():
             return
 
-        source = button.icon().pixmap(icon_size)
-        if source.isNull() or source.size() == icon_size:
+        source = source_icon.pixmap(icon_size)
+        if source.isNull():
             return
 
         canvas = QPixmap(icon_size)
@@ -254,6 +282,12 @@ class DataTypePage(MainWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
                 (icon_size.width() - source.width()) // 2,
                 (icon_size.height() - source.height()) // 2,
                 source,
+            )
+            painter.setCompositionMode(
+                QPainter.CompositionMode.CompositionMode_SourceIn
+            )
+            painter.fillRect(
+                canvas.rect(), button.palette().color(QPalette.ColorRole.ButtonText)
             )
         finally:
             painter.end()

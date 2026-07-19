@@ -131,6 +131,42 @@ def test_method_parameters_declares_scroll_body_with_actions_outside(qapp):
         dialog.close()
 
 
+@pytest.mark.parametrize(
+    ("data_type", "diagnostic_metrics", "expected_title", "expected_method_label"),
+    (
+        ("binary", None, "Method & Parameters", "Analysis method:"),
+        ("continuous", None, "Method & Parameters", "Analysis method:"),
+        (
+            "diagnostic",
+            ["lr", "dor"],
+            "Method & Parameters for Likelihood Ratios and Diagnostic Odds Ratio",
+            "Method for Likelihood Ratios and Diagnostic Odds Ratio",
+        ),
+    ),
+)
+def test_method_dialog_wording_is_scoped_to_its_analysis_family(
+    qapp,
+    monkeypatch,
+    data_type,
+    diagnostic_metrics,
+    expected_title,
+    expected_method_label,
+):
+    import ma_specs
+
+    _install_analysis_backend(monkeypatch, ma_specs)
+    dialog = ma_specs.MA_Specs(
+        _AnalysisModel(data_type),
+        diag_metrics=diagnostic_metrics,
+        conf_level=95.0,
+    )
+    try:
+        assert dialog.windowTitle() == expected_title
+        assert dialog.method_lbl.text() == expected_method_label
+    finally:
+        dialog.close()
+
+
 def test_method_parameters_variants_stay_bounded_and_stable(
     qapp, monkeypatch
 ):

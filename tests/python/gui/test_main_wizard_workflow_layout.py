@@ -306,6 +306,63 @@ def test_return_activates_visible_default_wizard_action(qapp):
         qapp.processEvents()
 
 
+def test_data_type_icons_follow_button_text_color_across_palette_changes(qapp):
+    import main_wizard
+    import qt6_resources
+
+    qt6_resources.ensure_application_resources()
+    original_palette = qapp.palette()
+    wizard = main_wizard.MainWizard(path="new_dataset")
+    try:
+        _show(wizard, qapp)
+        page = wizard.currentPage()
+
+        for foreground, expected_light in (("#111111", False), ("#f5f5f5", True)):
+            palette = qapp.palette()
+            palette.setColor(
+                QtGui.QPalette.ColorRole.ButtonText, QtGui.QColor(foreground)
+            )
+            qapp.setPalette(palette)
+            qapp.processEvents()
+
+            for button in page._data_type_buttons():
+                image = button.icon().pixmap(button.iconSize()).toImage()
+                colors = [
+                    image.pixelColor(x, y)
+                    for y in range(image.height())
+                    for x in range(image.width())
+                    if image.pixelColor(x, y).alpha() >= 128
+                ]
+                assert colors
+                average_lightness = sum(color.lightness() for color in colors) / len(
+                    colors
+                )
+                assert (average_lightness >= 200) is expected_light
+    finally:
+        qapp.setPalette(original_palette)
+        wizard.close()
+        qapp.processEvents()
+
+
+def test_diagnostic_data_type_button_matches_standard_choice_geometry(qapp):
+    import main_wizard
+
+    wizard = main_wizard.MainWizard(path="new_dataset")
+    try:
+        _show(wizard, qapp)
+        page = wizard.currentPage()
+        page.layout().activate()
+        qapp.processEvents()
+
+        standard = page.onearm_proportion_Button
+        diagnostic = page.diagnostic_Button
+        assert diagnostic.width() == pytest.approx(standard.width(), abs=4)
+        assert diagnostic.height() == pytest.approx(standard.height(), abs=2)
+    finally:
+        wizard.close()
+        qapp.processEvents()
+
+
 def test_hidden_and_closed_wizards_stop_observing_application_focus(qapp, monkeypatch):
     import main_wizard
 

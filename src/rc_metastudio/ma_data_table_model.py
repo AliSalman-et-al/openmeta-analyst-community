@@ -623,6 +623,10 @@ class DatasetModel(QAbstractTableModel):
                 and self.current_effect in ONE_ARM_METRICS
             ):
                 return _item_data(QColor(Qt.GlobalColor.gray))
+        elif role == Qt.ItemDataRole.ForegroundRole:
+            row_has_entered_data = self._study_has_entered_data(index.row())
+            if row_has_entered_data and column in self.OUTCOMES:
+                return _item_data(QColor(Qt.GlobalColor.black))
 
         return _item_data()
 

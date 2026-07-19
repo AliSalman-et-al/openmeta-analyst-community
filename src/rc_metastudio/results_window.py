@@ -2,7 +2,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Render and export meta-analysis results."""
 
+import gzip
 import random
+import re
 from collections import namedtuple
 from PyQt6.QtCore import (
     QByteArray,
@@ -22,6 +24,7 @@ from PyQt6.QtGui import (
     QFontDatabase,
     QFontMetricsF,
     QImage,
+    QPainter,
     QPixmap,
     QResizeEvent,
     QShowEvent,
@@ -192,6 +195,38 @@ class ResponsivePixmapItem(QGraphicsPixmapItem):
 
     def replace_source(self, source_pixmap):
         self.source_pixmap = QPixmap(source_pixmap)
+
+    def setPixmap(self, pixmap):
+        super().setPixmap(_pixmap_with_white_background(pixmap))
+
+
+def _pixmap_with_white_background(pixmap):
+    if pixmap.isNull():
+        return QPixmap(pixmap)
+    opaque = QPixmap(pixmap.size())
+    opaque.setDevicePixelRatio(pixmap.devicePixelRatioF())
+    opaque.fill(Qt.GlobalColor.white)
+    painter = QPainter(opaque)
+    painter.drawPixmap(0, 0, pixmap)
+    painter.end()
+    return opaque
+
+
+def _svg_bytes_with_white_background(path):
+    opener = gzip.open if str(path).lower().endswith(".svgz") else open
+    with opener(path, "rb") as svg_file:
+        svg = svg_file.read()
+    root = re.search(br"<svg\b[^>]*>", svg, flags=re.IGNORECASE)
+    if root is None:
+        return svg
+    white_canvas = b'<rect width="100%" height="100%" fill="#ffffff"/>'
+    return svg[: root.end()] + white_canvas + svg[root.end() :]
+
+
+def _opaque_svg_renderer(path, parent):
+    return _svg_renderer_class()(
+        QByteArray(_svg_bytes_with_white_background(path)), parent
+    )
 
 
 def _pixmap_device_independent_size(pixmap):
@@ -989,9 +1024,11 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         )
 
     def create_svg_item(self, artifact, position):
-        item = _svg_item_class()(artifact.display_path())
-        if not item.renderer().isValid():
+        renderer = _opaque_svg_renderer(artifact.display_path(), self)
+        if not renderer.isValid():
             return None
+        item = _svg_item_class()()
+        item.setSharedRenderer(renderer)
 
         item.setToolTip(
             'To save the image:\nright-click on the image and choose "save image as".'
@@ -1152,7 +1189,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                 isinstance(plot_item, _svg_item_class())
                 and refreshed_artifact.has_vector_display()
             ):
-                renderer = _svg_renderer_class()(
+                renderer = _opaque_svg_renderer(
                     refreshed_artifact.display_path(), self
                 )
                 if renderer.isValid():
