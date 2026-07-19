@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "maximum_total": 30,
+  "maximum_total": 31,
   "entries": [
     {"path":"src/rc_metastudio/adaptive_controls.py","qualified_name":"ChoiceControlController.eventFilter","rule":"invalid-method-override","sha256":"45825ea8dfd8b074f27b065552df0ec093c9c7a22c90a9d448d5962926c3d775"},
     {"path":"src/rc_metastudio/adaptive_window.py","qualified_name":"AdaptiveWindowController.eventFilter","rule":"invalid-method-override","sha256":"0b19b921898735e39426c45645cf645c1b59369c239db7bd352d480ae549d2cb"},
@@ -18,6 +18,7 @@
     {"path":"src/rc_metastudio/ma_specs.py","qualified_name":"MA_Specs.done","rule":"invalid-method-override","sha256":"d567dec54f3e5386ecc62c415d641d04a38ec4c14fbf80be8eaf2ad1b27a5599"},
     {"path":"src/rc_metastudio/ma_specs.py","qualified_name":"MA_Specs.hideEvent","rule":"invalid-method-override","sha256":"de19e46ca0498bdd3f0ed7febdd2bc0709171d8fd34b759a6844fce9e2ababcc"},
     {"path":"src/rc_metastudio/ma_specs.py","qualified_name":"MA_Specs.showEvent","rule":"invalid-method-override","sha256":"7b9f26ed794b922ba7b46209ac6cae6fa4a19a8f25bcc100a640dbb7f89c3089"},
+    {"path":"src/rc_metastudio/main_wizard.py","qualified_name":"DataTypePage.eventFilter","rule":"invalid-method-override","sha256":"398cd8c77a43f24428339d409c7cc460238b872119a340267facb3f86e6e368a"},
     {"path":"src/rc_metastudio/main_wizard.py","qualified_name":"MainWizard.closeEvent","rule":"invalid-method-override","sha256":"c471c06628a3408bebdda7be215d7a32d6e246314a42d447a6c8794505926e84"},
     {"path":"src/rc_metastudio/main_wizard.py","qualified_name":"MainWizard.hideEvent","rule":"invalid-method-override","sha256":"83571980cea1ee67494b5722d38b7407518be2ca2ba83d3f7a39bfed4fbb610a"},
     {"path":"src/rc_metastudio/main_wizard.py","qualified_name":"MainWizard.showEvent","rule":"invalid-method-override","sha256":"07729689a73f630efa3d677665e4fc84c3ff126d07a5ae057e3e09026d126f43"},
