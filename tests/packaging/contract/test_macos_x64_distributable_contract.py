@@ -186,6 +186,17 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     assert "macdeployqt" not in build.lower()
     assert "Analysis(" in spec
     assert "BUNDLE(" in spec
+    assert (
+        'icon=str(app_source / "images" / "rc-metastudio-app-icon-rounded.png")'
+        in spec
+    )
+    assert (
+        ROOT
+        / "src"
+        / "rc_metastudio"
+        / "images"
+        / "rc-metastudio-app-icon-rounded.png"
+    ).is_file()
     assert 'target_arch=os.environ.get("RCMS_TARGET_ARCHITECTURE", "x86_64")' in spec
     assert all(f'"{name}"' in spec for name in ("PyQt5", "PySide2", "PySide6", "qtpy"))
     assert "project_schema_data" in spec
@@ -1340,7 +1351,7 @@ def test_macos_surface_smoke_exercises_native_acceptance_surfaces():
     assert "isNativeMenuBar" in launch
     assert "accessible_control.setFocus()" in launch
     assert "accessible_control.setFocus(QtCore.Qt.FocusReason" not in launch
-    assert 'if sys.platform == "darwin" else {}' in launch
+    assert 'if sys.platform == "darwin"\n            else {}' in launch
     assert 'legacy_selector = "accessibilityAttributeValue:"' in launch
     assert 'children_attribute = ns_string("AXChildren")' in launch
     assert "roots, bridge_supported = qnsview_children(native_view)" in launch

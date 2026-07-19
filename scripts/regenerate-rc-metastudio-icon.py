@@ -10,14 +10,15 @@ from PyQt6 import QtCore, QtGui
 
 ROOT = Path(__file__).resolve().parents[1]
 IMAGE_DIR = ROOT / "src" / "rc_metastudio" / "images"
-ICON_SOURCE_IMAGE = IMAGE_DIR / "rc-metastudio-app-icon-source.png"
-PNG_TARGET = IMAGE_DIR / "rc-metastudio-app-icon.png"
-ICO_TARGET = IMAGE_DIR / "rc-metastudio-app-icon.ico"
-SPLASH_SOURCE_IMAGE = IMAGE_DIR / "rc-metastudio-splash-source.png"
-SPLASH_TARGET = IMAGE_DIR / "rc-metastudio-splash.png"
+ICON_SOURCE_IMAGE = IMAGE_DIR / "RC_MetaStudio_Icon_4K.png"
+PNG_TARGET = IMAGE_DIR / "rc-metastudio-app-icon-rounded.png"
+ICO_TARGET = IMAGE_DIR / "rc-metastudio-app-icon-rounded.ico"
+SPLASH_SOURCE_IMAGE = IMAGE_DIR / "RC_MetaStudio_Logo_4K_Preview.png"
+SPLASH_TRIM_GUIDE = IMAGE_DIR / "RC_MetaStudio_Logo_4K_Transparent.png"
+SPLASH_TARGET = IMAGE_DIR / "rc-metastudio-splash-logo.png"
 MASTER_SIZE = 1024
-MASTER_MARGIN = 32
-SPLASH_SIZE = QtCore.QSize(600, 480)
+CORNER_RADIUS = round(MASTER_SIZE * 0.18)
+SPLASH_ARTWORK_WIDTH = 1024
 SPLASH_MARGIN = 32
 ICO_SIZES = (16, 24, 32, 48, 64, 128, 256)
 
@@ -48,11 +49,9 @@ def _render_square_master():
     if source.isNull():
         raise ValueError(f"Could not load {ICON_SOURCE_IMAGE}")
 
-    artwork = source.copy(_alpha_bounds(source))
-    target_extent = MASTER_SIZE - (2 * MASTER_MARGIN)
-    scaled = artwork.scaled(
-        target_extent,
-        target_extent,
+    scaled = source.scaled(
+        MASTER_SIZE,
+        MASTER_SIZE,
         QtCore.Qt.AspectRatioMode.KeepAspectRatio,
         QtCore.Qt.TransformationMode.SmoothTransformation,
     )
@@ -61,12 +60,17 @@ def _render_square_master():
     master.fill(QtCore.Qt.GlobalColor.transparent)
 
     painter = QtGui.QPainter(master)
+    painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
     painter.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, True)
-    painter.drawImage(
-        (MASTER_SIZE - scaled.width()) // 2,
-        (MASTER_SIZE - scaled.height()) // 2,
-        scaled,
+    rounded_tile = QtGui.QPainterPath()
+    rounded_tile.addRoundedRect(
+        QtCore.QRectF(0, 0, MASTER_SIZE, MASTER_SIZE),
+        CORNER_RADIUS,
+        CORNER_RADIUS,
     )
+    painter.setClipPath(rounded_tile)
+    painter.fillPath(rounded_tile, QtGui.QColor("white"))
+    painter.drawImage(0, 0, scaled)
     painter.end()
     return master
 
@@ -78,23 +82,30 @@ def _render_splash():
     if source.isNull():
         raise ValueError(f"Could not load {SPLASH_SOURCE_IMAGE}")
 
-    target_width = SPLASH_SIZE.width() - (2 * SPLASH_MARGIN)
-    target_height = SPLASH_SIZE.height() - (2 * SPLASH_MARGIN)
-    scaled = source.scaled(
-        target_width,
-        target_height,
-        QtCore.Qt.AspectRatioMode.KeepAspectRatio,
+    trim_guide = QtGui.QImage(str(SPLASH_TRIM_GUIDE)).convertToFormat(
+        QtGui.QImage.Format.Format_ARGB32
+    )
+    if trim_guide.isNull():
+        raise ValueError(f"Could not load {SPLASH_TRIM_GUIDE}")
+
+    artwork = source.copy(_alpha_bounds(trim_guide))
+    scaled = artwork.scaledToWidth(
+        SPLASH_ARTWORK_WIDTH,
         QtCore.Qt.TransformationMode.SmoothTransformation,
     )
+    splash_size = QtCore.QSize(
+        scaled.width() + (2 * SPLASH_MARGIN),
+        scaled.height() + (2 * SPLASH_MARGIN),
+    )
 
-    splash = QtGui.QImage(SPLASH_SIZE, QtGui.QImage.Format.Format_ARGB32)
+    splash = QtGui.QImage(splash_size, QtGui.QImage.Format.Format_ARGB32)
     splash.fill(QtGui.QColor("white"))
 
     painter = QtGui.QPainter(splash)
     painter.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, True)
     painter.drawImage(
-        (SPLASH_SIZE.width() - scaled.width()) // 2,
-        (SPLASH_SIZE.height() - scaled.height()) // 2,
+        SPLASH_MARGIN,
+        SPLASH_MARGIN,
         scaled,
     )
     painter.end()

@@ -384,7 +384,12 @@ def test_rc_metastudio_logo_resource_is_valid_and_used_consistently():
     assert splash_pixmap.isNull() is False
     assert logo_pixmap.width() == logo_pixmap.height()
     assert logo_pixmap.width() >= 1024
-    assert (splash_pixmap.width(), splash_pixmap.height()) == (600, 480)
+    assert (splash_pixmap.width(), splash_pixmap.height()) == (1088, 183)
+    logo_image = logo_pixmap.toImage().convertToFormat(
+        QtGui.QImage.Format.Format_ARGB32
+    )
+    assert QtGui.qAlpha(logo_image.pixel(0, 0)) == 0
+    assert QtGui.qAlpha(logo_image.pixel(512, 512)) == 255
     assert sorted(
         (size.width(), size.height()) for size in app_icon.availableSizes()
     ) == [(1024, 1024)]

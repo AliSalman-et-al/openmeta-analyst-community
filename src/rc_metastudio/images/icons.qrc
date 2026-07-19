@@ -1,8 +1,8 @@
 <RCC>
   <qresource prefix="misc">
-    <file alias="splash.png">rc-metastudio-splash.png</file>
-    <file alias="meta.ico">rc-metastudio-app-icon.ico</file>
-    <file alias="meta.png">rc-metastudio-app-icon.png</file>
+    <file alias="splash.png">rc-metastudio-splash-logo.png</file>
+    <file alias="meta.ico">rc-metastudio-app-icon-rounded.ico</file>
+    <file alias="meta.png">rc-metastudio-app-icon-rounded.png</file>
   </qresource>
   <qresource prefix="icons/actions">
     <file alias="about-legal.svg">icons/actions/about-legal.svg</file>

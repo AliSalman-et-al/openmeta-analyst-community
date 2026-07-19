@@ -197,6 +197,17 @@ def test_windows_distributable_contract_is_declared():
     assert "Bundled help" not in script["text"]
     assert "packaging\\pyinstaller\\rc-metastudio.spec" in script["text"]
     assert "__main__.py" in spec
+    assert (
+        'icon=[str(app_source / "images" / "rc-metastudio-app-icon-rounded.ico")]'
+        in spec
+    )
+    assert (
+        ROOT
+        / "src"
+        / "rc_metastudio"
+        / "images"
+        / "rc-metastudio-app-icon-rounded.ico"
+    ).is_file()
     assert (ROOT / "packaging" / "pyinstaller" / "rc-metastudio.spec").exists()
     assert "sole authoritative" in script["text"]
     assert "src\\rc_metastudio\\launch.py" not in script["text"]
