@@ -14,7 +14,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS_PATH = ROOT / "delivery" / "targets.json"
 POLICY_INPUTS = (
-    ".github/workflows/release-candidate.yml",
+    ".github/workflows/candidate.yml",
+    ".github/workflows/community-release-candidate.yml",
     "uv.lock",
     "pyproject.toml",
     "docs/verification/RCMetaR-r-dependencies.json",
@@ -29,7 +30,8 @@ POLICY_INPUTS = (
     "scripts/inspect_macos_deployment.py",
     "scripts/normalize_macos_macho.py",
     "scripts/sign_macos_app.py",
-    "scripts/sign-notarize-macos-package.sh",
+    "config/macos-package-targets.json",
+    "scripts/resolve_macos_package_target.py",
     "scripts/qt6_macos_feasibility.py",
     "scripts/run_bounded_process.py",
     "scripts/package_input_policy.py",

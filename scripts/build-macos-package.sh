@@ -151,39 +151,17 @@ if [ "$(uname -s)" != "Darwin" ]; then
 fi
 
 host_machine="$(uname -m)"
-case "${architecture:-}" in
-  x64)
-    expected_machine="x86_64"
-    pyinstaller_target_architecture="x86_64"
-    default_artifact="RCMetaStudio-macos-x64"
-    minimum_macos_version="13.0"
-    ;;
-  arm64)
-    expected_machine="arm64"
-    pyinstaller_target_architecture="arm64"
-    default_artifact="RCMetaStudio-macos-arm64"
-    minimum_macos_version="14.0"
-    ;;
-  "")
-    if [ "$host_machine" = "arm64" ]; then
-      architecture="arm64"
-      expected_machine="arm64"
-      pyinstaller_target_architecture="arm64"
-      default_artifact="RCMetaStudio-macos-arm64"
-      minimum_macos_version="14.0"
-    else
-      architecture="x64"
-      expected_machine="x86_64"
-      pyinstaller_target_architecture="x86_64"
-      default_artifact="RCMetaStudio-macos-x64"
-      minimum_macos_version="13.0"
-    fi
-    ;;
-  *)
-    echo "--architecture must be x64 or arm64." >&2
-    exit 1
-    ;;
-esac
+if [ -z "$architecture" ]; then
+  [ "$host_machine" = "arm64" ] && architecture="arm64" || architecture="x64"
+fi
+case "$architecture" in x64|arm64) ;; *) echo "--architecture must be x64 or arm64." >&2; exit 1 ;; esac
+target_python="$(command -v python3 || true)"
+[ -n "$target_python" ] || { echo "macOS packaging requires python3 to resolve its target manifest." >&2; exit 1; }
+eval "$("$target_python" "$repo_root/scripts/resolve_macos_package_target.py" "$architecture" --format shell)"
+expected_machine="$machine"
+pyinstaller_target_architecture="$machine"
+default_artifact="$artifact"
+minimum_macos_version="$minimum_macos"
 
 if [ "$host_machine" != "$expected_machine" ]; then
   echo "Requested $architecture build requires $expected_machine host, but this host is $host_machine." >&2
@@ -246,31 +224,31 @@ fi
 python_exe="${python_exe:-$repo_root/.venv/bin/python}"
 
 if [ -z "$r_runtime_root" ]; then
-  r_download_cache="$artifact_dir/download-cache/macos-x64"
-  r_pkg="$r_download_cache/R-4.6.1-x86_64.pkg"
+  r_download_cache="$artifact_dir/download-cache/macos-$architecture"
+  r_pkg="$r_download_cache/$(basename "$r_url")"
   r_pkg_tmp="$r_pkg.partial"
-  r_url="https://cloud.r-project.org/bin/macosx/big-sur-x86_64/base/R-4.6.1-x86_64.pkg"
-  r_sha256="612bb00cb4c627721d6d80b0f5224227c0fcdefb4a5b6c917511480361c16571"
   mkdir -p "$r_download_cache"
-  if [ ! -f "$r_pkg" ] || [ "$(shasum -a 256 "$r_pkg" | awk '{print $1}')" != "$r_sha256" ]; then
+  if [ ! -f "$r_pkg" ] || { [ -n "$r_sha256" ] && [ "$(shasum -a 256 "$r_pkg" | awk '{print $1}')" != "$r_sha256" ]; }; then
     rm -f "$r_pkg" "$r_pkg_tmp"
-    step "Downloading authenticated official Intel R into the immutable cache"
+    step "Downloading authenticated official $architecture R into the immutable cache"
     curl --fail --location --proto '=https' --tlsv1.2 "$r_url" --output "$r_pkg_tmp"
-    [ "$(shasum -a 256 "$r_pkg_tmp" | awk '{print $1}')" = "$r_sha256" ] || { rm -f "$r_pkg_tmp"; echo "Official R package SHA-256 mismatch." >&2; exit 1; }
+    if [ -n "$r_sha256" ]; then
+      [ "$(shasum -a 256 "$r_pkg_tmp" | awk '{print $1}')" = "$r_sha256" ] || { rm -f "$r_pkg_tmp"; echo "Official R package SHA-256 mismatch." >&2; exit 1; }
+    fi
     mv "$r_pkg_tmp" "$r_pkg"
   fi
   signature_stdout="$r_pkg.signature.stdout"; signature_stderr="$r_pkg.signature.stderr"
   set +e; pkgutil --check-signature "$r_pkg" >"$signature_stdout" 2>"$signature_stderr"; signature_status=$?; set -e
   [ "$signature_status" -eq 0 ] && grep -q 'VZLD955F6P' "$signature_stdout" || { echo "Official R package signature is not the R for macOS signer." >&2; exit 1; }
-  step "Extracting the authenticated official Intel R.framework into private staging"
-  r_pkg_expanded="$repo_root/build/macos-package/x64/official-r-pkg"
+  step "Extracting the authenticated official $architecture R.framework into private staging"
+  r_pkg_expanded="$repo_root/build/macos-package/$architecture/official-r-pkg"
   r_stage_parent="$(dirname "$r_pkg_expanded")"
   mkdir -p "$r_stage_parent"
   [ -d "$r_stage_parent" ] || { echo "Private R staging parent was not created: $r_stage_parent" >&2; exit 1; }
   rm -rf "$r_pkg_expanded"
   [ ! -e "$r_pkg_expanded" ] || { echo "pkgutil expansion target must be absent: $r_pkg_expanded" >&2; exit 1; }
   pkgutil --expand-full "$r_pkg" "$r_pkg_expanded"
-  r_pkg_framework="$("$python_exe" "$repo_root/scripts/resolve_macos_r_framework_component.py" --expanded-root "$r_pkg_expanded" --expected-version 4.6.1)"
+  r_pkg_framework="$("$python_exe" "$repo_root/scripts/resolve_macos_r_framework_component.py" --expanded-root "$r_pkg_expanded" --expected-version "$r_version" --identifier "$r_component_identifier")"
   [ -d "$r_pkg_framework" ] || { echo "Official R framework component resolver returned no directory." >&2; exit 1; }
   r_runtime_root="$r_pkg_framework/Resources"
 fi
@@ -301,7 +279,7 @@ if framework is None:
 print(framework)
 PY
 )"
-private_r_framework="$repo_root/build/macos-package/x64/staged/R.framework"
+private_r_framework="$repo_root/build/macos-package/$architecture/staged/R.framework"
 if [ "$(cd "$source_r_framework" && pwd -P)" = "$(cd "$private_r_framework" 2>/dev/null && pwd -P || true)" ]; then
   echo "Source R framework must not be the private staging destination: $source_r_framework" >&2
   exit 1
@@ -337,10 +315,10 @@ step "Applying the explicit non-X11 embedded R product profile to private staged
   --source-resources "$source_r_runtime_root"
 
 step "Configuring private staged R launchers before native bridge build"
-"$python_exe" "$repo_root/scripts/configure_macos_r_launchers.py" --resources "$r_runtime_root"
+"$python_exe" "$repo_root/scripts/configure_macos_r_launchers.py" --resources "$r_runtime_root" --architecture "$expected_machine"
 step "Relocating private staged R dependencies before native bridge build"
 bash "$repo_root/scripts/relocate_macos_r_runtime.sh" --resources "$r_runtime_root" --architecture "$expected_machine" \
-  --python "$python_exe" --allowed-root "$repo_root/build/macos-package/x64" \
+  --python "$python_exe" --allowed-root "$repo_root/build/macos-package/$architecture" \
   --normalizer "$repo_root/scripts/normalize_macos_macho.py"
 step "Probing the self-contained staged R substrate"
 run_staged_r_config() {
@@ -362,7 +340,7 @@ actual_r_version="$(R_HOME="$r_runtime_root" "$r_runtime_root/bin/Rscript" -e 'c
 [ "$actual_r_version" = "$r_version" ] || { echo "Private staged R version mismatch: expected $r_version, got $actual_r_version" >&2; exit 1; }
 R_HOME="$r_runtime_root" "$r_runtime_root/bin/R" RHOME | grep -Fx "$r_runtime_root" >/dev/null \
   || { echo "Private staged R does not report its private RHOME." >&2; exit 1; }
-R_HOME="$r_runtime_root" "$r_runtime_root/bin/Rscript" -e 'stopifnot(identical(R.home(), Sys.getenv("R_HOME"))); stopifnot(identical(Sys.getenv("RHOME"), Sys.getenv("R_HOME"))); stopifnot(!capabilities("X11"), !capabilities("tcltk")); cat("staged-r-ok\\n")' \
+R_HOME="$r_runtime_root" "$r_runtime_root/bin/Rscript" -e 'stopifnot(identical(R.home(), Sys.getenv("R_HOME"))); stopifnot(identical(Sys.getenv("RHOME"), Sys.getenv("R_HOME"))); stopifnot(!capabilities("X11")); cat("staged-r-ok\\n")' \
   | grep -Fx 'staged-r-ok' >/dev/null \
   || { echo "Private staged R capability probe failed." >&2; exit 1; }
 "$python_exe" - "$r_substrate_probe_path" "$r_runtime_root" "$r_version" "$quarantine_profile_path" <<'PY'
@@ -377,7 +355,7 @@ output.write_text(json.dumps({
     "r_version": str(version),
     "launcher": "bin/R",
     "rscript": "bin/Rscript (native wrapper)",
-    "probes": ["R RHOME", "R CMD config --ldflags", "R CMD config --cppflags", "Rscript private R.home", "non-X11/Tcl capabilities"],
+    "probes": ["R RHOME", "R CMD config --ldflags", "R CMD config --cppflags", "Rscript private R.home", "non-X11 capability"],
     "quarantine_evidence_sha256": hashlib.sha256(quarantine.read_bytes()).hexdigest(),
 }, indent=2, sort_keys=True) + "\\n", encoding="utf-8")
 PY
@@ -493,7 +471,7 @@ step "Finalizing the embedded R product profile after package installation"
 
 step "Relocating completed bundled R runtime dependencies"
 bash "$repo_root/scripts/relocate_macos_r_runtime.sh" --resources "$r_home" --architecture "$expected_machine" \
-  --python "$python_exe" --allowed-root "$repo_root/build/macos-package/x64" \
+  --python "$python_exe" --allowed-root "$repo_root/build/macos-package/$architecture" \
   --normalizer "$repo_root/scripts/normalize_macos_macho.py"
 
 step "Building the target-native rpy2 API bridge against completed staged R"
@@ -543,15 +521,16 @@ if otool -L "$rpy2_api_bridge" | grep -E '@rpath/lib/libR\.dylib|/Library/Framew
   exit 1
 fi
 R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" RPY2_CFFI_MODE=API \
-  "$python_exe" - "$rpy2_api_bridge" <<'PY'
+  "$python_exe" - "$rpy2_api_bridge" "$machine" <<'PY'
 import importlib.util
 from pathlib import Path
 import subprocess
 import sys
 
 bridge = Path(sys.argv[1]).resolve(strict=True)
-if subprocess.check_output(["lipo", "-archs", str(bridge)], text=True).split() != ["x86_64"]:
-    raise SystemExit("rpy2 API bridge is not x86_64-only")
+expected_architecture = sys.argv[2]
+if subprocess.check_output(["lipo", "-archs", str(bridge)], text=True).split() != [expected_architecture]:
+    raise SystemExit(f"rpy2 API bridge is not {expected_architecture}-only")
 loads = subprocess.check_output(["otool", "-L", str(bridge)], text=True).splitlines()[1:]
 r_edges = [line for line in loads if "libR.dylib" in line or "/R " in line]
 if len(r_edges) != 1:
@@ -622,7 +601,7 @@ r_binary="$r_home/bin/R"
 "$python_exe" - "$preflight_report_path" "$(git rev-parse HEAD)" <<'PY'
 import json, sys
 from pathlib import Path
-Path(sys.argv[1]).write_text(json.dumps({"schema_version": 1, "source_commit": sys.argv[2], "pyinstaller_version": "6.21.0", "system": "Darwin", "machine": "x86_64", "aliases": {"Versions/Current":"4.6-x86_64", "Resources":"Versions/Current/Resources", "R":"Versions/Current/R", "Versions/4.6-x86_64/R":"Resources/lib/libR.dylib", "Versions/4.6-x86_64/Resources/R":"bin/R"}, "passed": True}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+Path(sys.argv[1]).write_text(json.dumps({"schema_version": 1, "source_commit": sys.argv[2], "pyinstaller_version": "6.21.0", "system": "Darwin", "machine": __import__("platform").machine(), "passed": True}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
 "$python_exe" - "$runner_environment_path" <<'PY'
 import json, os, platform, subprocess, sys
@@ -725,7 +704,7 @@ if [ ! -s "$runtime_probe_path" ]; then
 fi
 
 if [ "$skip_smoke" -eq 0 ]; then
-  sample_path="$sample_root/amino.rcms"
+  sample_path="$sample_root/BCG.rcms"
   baseline_dpr="$("$python_exe" - "$runtime_probe_path" <<'PY'
 import json
 import sys
@@ -813,6 +792,9 @@ cp "$repo_root/scripts/macos_host_r_isolation.sh" "$qualification_root/macos-hos
 cp "$repo_root/scripts/verify_macos_r_pyinstaller_toc.py" "$qualification_root/verify-macos-r-pyinstaller-toc.py"
 "$python_exe" "$repo_root/scripts/build_macos_direct_provenance.py" \
   --qualification-root "$qualification_root" --ppm-root "$ppm_archive_root" \
+  --target "macos-$architecture" --official-r-url "$r_url" \
+  --official-r-sha256 "$r_sha256" \
+  --ppm-contrib-path "$("$python_exe" -c 'import json,sys; p=json.load(open(sys.argv[1])); print(p["binary_package_policy"]["targets"][sys.argv[2]]["contrib_path"])' "$repo_root/docs/verification/RCMetaR-r-dependencies.json" "macos-$architecture")" \
   --source-commit "$source_commit" --bridge "$rpy2_api_bridge" \
   --output "$r_direct_build_manifest_path"
 

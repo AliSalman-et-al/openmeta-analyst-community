@@ -28,6 +28,13 @@
       "architecture": "x86_64",
       "artifact": "RCMetaStudio-macos-x64.zip",
       "signing_profile": "developer-id-notarized"
+    },
+    "macos-arm64": {
+      "runner": "macos-15",
+      "os": "macos",
+      "architecture": "arm64",
+      "artifact": "RCMetaStudio-macos-arm64.zip",
+      "signing_profile": "developer-id-notarized"
     }
   }
 }

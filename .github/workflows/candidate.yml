@@ -43,8 +43,8 @@ jobs:
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
           git fetch origin master --depth=1
           git merge-base --is-ancestor "$SOURCE_SHA" origin/master
-      - name: Initialize Windows-only 0.2.0 release set
-        run: python scripts/delivery.py init --version "${{ inputs.version }}" --commit "${{ inputs.source_sha }}" --repository "${{ github.repository }}" --trust-profile "${{ inputs.trust_profile }}" --target windows-x64 --output candidate/release-set.json
+      - name: Initialize unsigned three-platform release set
+        run: python scripts/delivery.py init --version "${{ inputs.version }}" --commit "${{ inputs.source_sha }}" --repository "${{ github.repository }}" --trust-profile "${{ inputs.trust_profile }}" --target windows-x64 --target macos-x64 --target macos-arm64 --output candidate/release-set.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-set-initial
@@ -60,6 +60,15 @@ jobs:
           - target: windows-x64
             runner: windows-2025
             artifact: RCMetaStudio-windows-x64.zip
+            architecture: ""
+          - target: macos-x64
+            runner: macos-15-intel
+            artifact: RCMetaStudio-macos-x64.zip
+            architecture: x64
+          - target: macos-arm64
+            runner: macos-15
+            artifact: RCMetaStudio-macos-arm64.zip
+            architecture: arm64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     steps:
@@ -74,10 +83,29 @@ jobs:
         with:
           enable-cache: true
       - run: uv python install 3.11.9
+      - name: Cache official Qt SDK for macOS
+        if: startsWith(matrix.target, 'macos-')
+        id: macos_qt_sdk_cache
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: build/qt-sdk
+          key: qt-sdk-6.11.1-${{ matrix.target }}
+      - name: Install official Qt SDK for macOS
+        if: startsWith(matrix.target, 'macos-') && steps.macos_qt_sdk_cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: uv tool run --from aqtinstall==3.3.0 aqt install-qt mac desktop 6.11.1 clang_64 --outputdir "$PWD/build/qt-sdk"
+      - name: Resolve official Qt rcc for macOS
+        if: startsWith(matrix.target, 'macos-')
+        shell: bash
+        run: PYTHONPATH="$PWD/src" uv run --no-project --python 3.11.9 python scripts/qt6_macos_feasibility.py resolve-rcc --sdk-root "$PWD/build/qt-sdk/6.11.1/macos" --github-env "$GITHUB_ENV" --diagnostic "build/qt-sdk/${{ matrix.target }}-rcc.json"
       - name: Build Windows unsigned candidate
         if: matrix.target == 'windows-x64'
         shell: powershell
         run: .\scripts\package-windows.ps1
+      - name: Build native macOS unsigned candidate
+        if: startsWith(matrix.target, 'macos-')
+        shell: bash
+        run: bash scripts/package-macos.sh --architecture "${{ matrix.architecture }}" --artifact-name "RCMetaStudio-${{ matrix.target }}"
       - name: Normalize authoritative package filename for the release set
         if: matrix.target == 'windows-x64'
         shell: pwsh
@@ -89,6 +117,7 @@ jobs:
           $destination = Join-Path artifacts $env:ARTIFACT
           Move-Item -LiteralPath $builtArchives[0].FullName -Destination $destination
       - name: Inventory and describe candidate
+        if: matrix.target == 'windows-x64'
         shell: pwsh
         env:
           TARGET: ${{ matrix.target }}
@@ -101,6 +130,22 @@ jobs:
           uv run python scripts/delivery.py sbom --inventory "candidate/$env:TARGET.inventory.json" --version "$env:VERSION" --output "candidate/$env:TARGET.cdx.json"
           $identity = uv run python scripts/delivery.py digest --json candidate/release-set.json --release-identity
           uv run python scripts/delivery.py stage-result --target "$env:TARGET" --stage assembled --commit "$env:SOURCE_SHA" --input-digest "$identity" --output-file "artifacts/$env:ARTIFACT" --output-file "candidate/$env:TARGET.inventory.json" --output-file "candidate/$env:TARGET.cdx.json" --result "candidate/$env:TARGET.assembled.json"
+      - name: Inventory and describe native macOS candidate
+        if: startsWith(matrix.target, 'macos-')
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+          ARTIFACT: ${{ matrix.artifact }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p candidate/tree
+          ditto -x -k "artifacts/$ARTIFACT" candidate/tree
+          uv run python scripts/delivery.py inventory --root candidate/tree --output "candidate/$TARGET.inventory.json"
+          uv run python scripts/delivery.py sbom --inventory "candidate/$TARGET.inventory.json" --version "$VERSION" --output "candidate/$TARGET.cdx.json"
+          identity="$(uv run python scripts/delivery.py digest --json candidate/release-set.json --release-identity)"
+          uv run python scripts/delivery.py stage-result --target "$TARGET" --stage assembled --commit "$SOURCE_SHA" --input-digest "$identity" --output-file "artifacts/$ARTIFACT" --output-file "candidate/$TARGET.inventory.json" --output-file "candidate/$TARGET.cdx.json" --result "candidate/$TARGET.assembled.json"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: candidate-${{ matrix.target }}
@@ -115,4 +160,4 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - run: echo "The Windows x64 candidate was built once and is ready for protected qualification."
+      - run: echo "All three unsigned candidate artifacts were built once and are ready for native qualification."

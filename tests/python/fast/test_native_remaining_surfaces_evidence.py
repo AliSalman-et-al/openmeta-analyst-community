@@ -155,18 +155,13 @@ def _write_bundle(root: Path) -> None:
 
 def test_surface_inventory_matches_canonical_forms_factories_tests_and_document():
     payload = inventory_validator.load_and_validate()
-    workflow = (ROOT / ".github/workflows/qt6-macos-feasibility.yml").read_text(
-        encoding="utf-8"
-    )
 
     assert len(payload["forms"]) == 29
     assert inventory_validator.render_markdown(
         payload
     ) == inventory_validator.DOCUMENT_PATH.read_text(encoding="utf-8")
-    keyboard_setup = "defaults write NSGlobalDomain AppleKeyboardUIMode -int 3"
-    native_capture = "uv run python scripts/native_remaining_surfaces_smoke.py"
-    assert keyboard_setup in workflow
-    assert workflow.index(keyboard_setup) < workflow.index(native_capture)
+    assert not (ROOT / ".github/workflows/qt6-macos-feasibility.yml").exists()
+    assert (ROOT / ".github/workflows/package-target.yml").exists()
 
 
 def test_surface_inventory_rejects_canonical_form_drift(tmp_path):

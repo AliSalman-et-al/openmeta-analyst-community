@@ -9,19 +9,9 @@ on:
         default: true
         type: boolean
       build_macos:
-        description: Qualify the macOS Intel package without publishing it.
+        description: Build both native macOS packages without publishing them.
         required: true
         default: true
-        type: boolean
-      build_macos_arm64:
-        description: Qualify the supported Apple Silicon package.
-        required: true
-        default: false
-        type: boolean
-      build_macos_direct_r_spike:
-        description: Run the non-release direct staged R.framework feasibility path.
-        required: true
-        default: false
         type: boolean
 
 permissions:
@@ -36,14 +26,6 @@ jobs:
     if: ${{ inputs.build_windows }}
     uses: ./.github/workflows/package-windows.yml
 
-  macos-package-intel:
+  macos-packages:
     if: ${{ inputs.build_macos }}
     uses: ./.github/workflows/package-target.yml
-    with:
-      artifact_name: RCMetaStudio-macos-x64
-
-  # Apple Silicon qualification is intentionally deferred to Issue #343.
-
-  macos-direct-r-spike:
-    if: ${{ inputs.build_macos_direct_r_spike }}
-    uses: ./.github/workflows/macos-x64-direct-r-spike.yml

@@ -1,11 +1,9 @@
 # Native macOS Qt6 feasibility
 
-Issue #329 owns the pre-codemod native feasibility gate for macOS Intel x64 and
-Apple Silicon ARM64. The gate is implemented by
-`.github/workflows/qt6-macos-feasibility.yml`; it is separate from full release
-packaging because it answers one bounded question before broad source
-conversion: can the exact locked Qt6, R, rpy2, and PyInstaller chain work
-natively on both supported Mac architectures?
+Issue #329 originally owned a separate pre-codemod native feasibility gate for
+macOS Intel x64 and Apple Silicon ARM64. That workflow has been retired now that
+the same native proof is part of `.github/workflows/package-target.yml` and the
+full distributable path. The evidence below is retained as historical context.
 
 This remains a small, supplementary architecture proof. It does not replace
 issue #342's full Intel distributable build, archive inspection, launch

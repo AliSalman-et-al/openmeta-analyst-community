@@ -58,8 +58,7 @@ def test_qt_port_inventory_classifies_required_surfaces_and_completion_rules():
         in inventory["packaging_entry_points"]
     )
     for entry_point in (
-        "scripts/sign-windows-package.ps1",
-        "scripts/sign-notarize-macos-package.sh",
+        "scripts/package-macos.sh",
         "scripts/resolve_package_ci_metadata.py",
         "scripts/verify_package_release.py",
     ):

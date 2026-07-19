@@ -45,7 +45,11 @@ MAX_ARCHIVE_UNCOMPRESSED_BYTES = 3_000_000_000
 PORTABLE_FORBIDDEN = set('<>:"/\\|?*')
 TARGET_CONTRACTS = {
     "macos-x64": {"architecture": "x86_64", "minimum_macos": "13.0"},
-    "macos-arm64": {"architecture": "arm64", "minimum_macos": "14.0"},
+    "macos-arm64": {"architecture": "arm64", "minimum_macos": "13.0"},
+}
+TARGET_RUNNERS = {
+    "macos-x64": {"architecture": "X64", "image": "macos-15-intel"},
+    "macos-arm64": {"architecture": "ARM64", "image": "macos-15"},
 }
 DIRECT_R_MARKER_RELATIVE = Path("Contents/Resources/direct-r-spike.marker")
 DIRECT_R_MARKER_SHA256 = (
@@ -57,6 +61,16 @@ DIRECT_R_OFFICIAL_URL = (
 DIRECT_R_OFFICIAL_SHA256 = (
     "612bb00cb4c627721d6d80b0f5224227c0fcdefb4a5b6c917511480361c16571"
 )
+DIRECT_R_OFFICIAL_INPUTS = {
+    "macos-x64": {
+        "url": DIRECT_R_OFFICIAL_URL,
+        "sha256": DIRECT_R_OFFICIAL_SHA256,
+    },
+    "macos-arm64": {
+        "url": "https://cloud.r-project.org/bin/macosx/sonoma-arm64/base/R-4.6.1-arm64.pkg",
+        "sha256": "67f6eea4ced4ce48f0a0d4fa3a1cac43d1859a05a88993ee3dff7c52e7edbc4b",
+    },
+}
 DIRECT_R_PPM_SNAPSHOT = "https://packagemanager.posit.co/cran/2026-07-16"
 DIRECT_R_HSROC_URL = (
     "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz"
@@ -183,10 +197,6 @@ def validate_r_delivery_identity(
         )
 
     if probe_direct:
-        if target != "macos-x64" or architecture != "x86_64":
-            raise MacOSDeploymentInspectionError(
-                "direct R spike identity is only valid for macOS Intel x64"
-            )
         if kit_root.exists():
             raise MacOSDeploymentInspectionError(
                 "deployment mixes direct R spike and integration-kit identities"
@@ -198,17 +208,14 @@ def validate_r_delivery_identity(
             )
         return {
             "direct_r_build": {
-                "kind": "non-release-macos-x64-direct-r-spike",
+                "kind": "target-native-macos-r",
                 "source_commit": source_commit,
                 "runtime_probe_sha256": _canonical_json_sha256(runtime_probe),
                 "marker": {
                     "path": DIRECT_R_MARKER_RELATIVE.as_posix(),
                     "sha256": marker_sha256,
                 },
-                "official_r": {
-                    "url": DIRECT_R_OFFICIAL_URL,
-                    "sha256": DIRECT_R_OFFICIAL_SHA256,
-                },
+                "official_r": DIRECT_R_OFFICIAL_INPUTS[target],
                 "ppm_snapshot": DIRECT_R_PPM_SNAPSHOT,
             }
         }
@@ -1361,11 +1368,7 @@ def validate_direct_build_manifest(payload: dict, *, target: str) -> dict:
     official_r = payload.get("official_r")
     if (
         not isinstance(official_r, dict)
-        or official_r
-        != {
-            "url": DIRECT_R_OFFICIAL_URL,
-            "sha256": DIRECT_R_OFFICIAL_SHA256,
-        }
+        or official_r != DIRECT_R_OFFICIAL_INPUTS[target]
         or payload.get("ppm_snapshot") != DIRECT_R_PPM_SNAPSHOT
         or not valid_sha256(payload.get("rpy2_api_bridge_source_sha256"))
     ):
@@ -1496,16 +1499,17 @@ def validate_direct_build_runner(runner: dict, *, target: str) -> None:
         and runner.get("macos_build")
     ):
         raise MacOSDeploymentInspectionError(
-            "direct-build runner is not native macOS Intel"
+            f"direct-build runner is not native {target}"
         )
     hosted = runner.get("github_actions") == "true"
     if hosted:
+        expected = TARGET_RUNNERS[target]
         if (
-            runner.get("runner_arch") != "X64"
-            or runner.get("runner_image") != "macos-15-intel"
+            runner.get("runner_arch") != expected["architecture"]
+            or runner.get("runner_image") != expected["image"]
         ):
             raise MacOSDeploymentInspectionError(
-                "hosted direct-build runner is not macos-15-intel"
+                f"hosted direct-build runner does not match {target}"
             )
     elif runner.get("github_actions") not in ("false", False):
         raise MacOSDeploymentInspectionError(

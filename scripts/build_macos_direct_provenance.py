@@ -25,6 +25,10 @@ def main() -> int:
     parser.add_argument("--qualification-root", type=Path, required=True)
     parser.add_argument("--ppm-root", type=Path, required=True)
     parser.add_argument("--source-commit", required=True)
+    parser.add_argument("--target", choices=("macos-x64", "macos-arm64"), required=True)
+    parser.add_argument("--official-r-url", required=True)
+    parser.add_argument("--official-r-sha256", required=True)
+    parser.add_argument("--ppm-contrib-path", required=True)
     parser.add_argument("--bridge", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -77,7 +81,9 @@ def main() -> int:
             "path": relative,
             "package": package,
             "version": version,
-            "archive_url": "https://packagemanager.posit.co/cran/2026-07-16/bin/macosx/big-sur-x86_64/contrib/4.6/"
+            "archive_url": "https://packagemanager.posit.co/cran/2026-07-16/"
+            + args.ppm_contrib_path.strip("/")
+            + "/"
             + relative,
             **record(path),
         }
@@ -104,11 +110,11 @@ def main() -> int:
     payload = {
         "schema_version": 1,
         "kind": "rc-metastudio-direct-macos-target-build",
-        "target": "macos-x64",
+        "target": args.target,
         "source_commit": args.source_commit,
         "official_r": {
-            "url": "https://cloud.r-project.org/bin/macosx/big-sur-x86_64/base/R-4.6.1-x86_64.pkg",
-            "sha256": "612bb00cb4c627721d6d80b0f5224227c0fcdefb4a5b6c917511480361c16571",
+            "url": args.official_r_url,
+            "sha256": args.official_r_sha256,
         },
         "ppm_snapshot": "https://packagemanager.posit.co/cran/2026-07-16",
         "ppm_archives": archives,

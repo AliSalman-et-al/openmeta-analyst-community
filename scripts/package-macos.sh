@@ -80,26 +80,28 @@ if ! xcode-select -p >/dev/null 2>&1 || ! command -v clang >/dev/null 2>&1; then
 fi
 macos_major="$(sw_vers -productVersion | awk -F. '{print $1}')"
 if [ "$macos_major" -lt 13 ]; then
-  echo "macOS Intel packaging requires macOS 13 or later; found $(sw_vers -productVersion)." >&2
+  echo "macOS packaging requires macOS 13 or later; found $(sw_vers -productVersion)." >&2
   exit 1
 fi
 
 case "${architecture:-}" in
-  x64)
-    default_artifact="RCMetaStudio-macos-x64"
-    ;;
+  x64|arm64) ;;
   "")
-    echo "--architecture x64 is required." >&2
+    echo "--architecture x64 or arm64 is required." >&2
     exit 2
     ;;
   *)
-    echo "Issue #342 packages macOS Intel only; use --architecture x64." >&2
+    echo "--architecture must be x64 or arm64." >&2
     exit 2
     ;;
 esac
 
-if [ "$(uname -m)" != "x86_64" ]; then
-  echo "macOS Intel packaging requires a native x86_64 host; found $(uname -m)." >&2
+target_python="$(command -v python3 || true)"
+[ -n "$target_python" ] || { echo "macOS packaging requires python3 to resolve its target manifest." >&2; exit 1; }
+eval "$("$target_python" "$repo_root/scripts/resolve_macos_package_target.py" "$architecture" --format shell)"
+default_artifact="$artifact"
+if [ "$(uname -m)" != "$machine" ]; then
+  echo "macOS $architecture packaging requires a native $machine host; found $(uname -m)." >&2
   exit 2
 fi
 artifact_name="${artifact_name:-$default_artifact}"

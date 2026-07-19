@@ -16,9 +16,10 @@ contract.
 
 RC MetaStudio uses the versioned target registry in `delivery/targets.json` and
 the state machine exposed by `scripts/delivery.py`. A protected-main commit is
-built once into unsigned candidates. Protected platform adapters sign the
-candidate bytes, macOS notarizes and staples its app, and both final artifacts
-are inventoried, launched, attested, and bound into one release-set manifest.
+built once into unsigned candidates. Each unsigned artifact is inventoried,
+launched, attested, and bound into one release-set manifest. A future protected
+signing stage may consume those exact bytes without rebuilding Python, Qt, R,
+or rpy2; macOS notarization and stapling belong to that future stage.
 
 An RC is immutable. Stable release is promotion of the RC deliverables with
 identical checksums; it never runs a builder, dependency resolver, signer,
@@ -47,8 +48,9 @@ ZIP digest; they never determine whether artifact bytes can be constructed.
 
 - `candidate.yml` has no write or signing authority.
 - `community-release-candidate.yml` publishes explicitly unsigned builds
-  without signing secrets; `release-candidate.yml` is the future protected
-  signed path.
+  without signing secrets. Future signing is introduced as a fresh protected
+  no-rebuild stage when credentials and policy are available; no dormant
+  signing workflow is maintained.
 - `promote.yml` requires production approval and verifies RC checksums and
   GitHub attestations before creating a stable release.
 - `package-verification.yml` is manual qualification only and cannot publish.

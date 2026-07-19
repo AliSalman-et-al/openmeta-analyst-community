@@ -67,7 +67,9 @@ def test_hosted_package_workflow_does_not_require_native_layout_evidence():
     windows = _text(".github", "workflows", "package-windows.yml")
 
     assert "uses: ./.github/workflows/package-windows.yml" in workflow
-    assert "artifact_name: RCMetaStudio-macos-x64" in workflow
+    assert "uses: ./.github/workflows/package-target.yml" in workflow
+    assert "target: macos-x64" in target
+    assert "target: macos-arm64" in target
     assert "Upload adaptive-layout evidence" not in target
     assert "evidence_path" not in target
     assert "adaptive-layout-evidence" not in workflow

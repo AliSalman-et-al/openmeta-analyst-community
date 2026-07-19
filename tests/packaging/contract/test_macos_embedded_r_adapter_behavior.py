@@ -352,7 +352,7 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
     inspector.validate_direct_build_runner(json.loads(runner), target="macos-x64")
     valid_local_runner["uname_machine"] = "arm64"
     with pytest.raises(
-        inspector.MacOSDeploymentInspectionError, match="native macOS Intel"
+        inspector.MacOSDeploymentInspectionError, match="native macos-x64"
     ):
         inspector.validate_direct_build_runner(valid_local_runner, target="macos-x64")
     ppm = json.dumps(

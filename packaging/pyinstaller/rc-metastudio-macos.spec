@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""Authoritative PyInstaller definition for the native macOS Intel app."""
+"""Authoritative PyInstaller definition for both native macOS applications."""
 
 import os
 import hashlib

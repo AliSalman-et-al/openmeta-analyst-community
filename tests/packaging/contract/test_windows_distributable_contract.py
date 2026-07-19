@@ -413,7 +413,7 @@ def test_package_workflow_builds_path_aware_artifacts():
 
     assert {
         "windows-package",
-        "macos-package-intel",
+        "macos-packages",
     } <= workflow["jobs"]
     assert (
         target["env"]["RCMS_CRAN_REPO"]
@@ -434,9 +434,10 @@ def test_package_workflow_builds_path_aware_artifacts():
         target["text"],
     )
     assert target["text"].count("fetch-depth: 0") == 1
-    assert "artifacts/${{ inputs.artifact_name }}.zip" in target["text"]
-    assert "artifacts/${{ inputs.artifact_name }}-evidence.json" in target["text"]
-    assert any("RCMetaStudio-macos-x64" in run for run in workflow["text"].splitlines())
+    assert "artifacts/${{ matrix.artifact }}.zip" in target["text"]
+    assert "artifacts/${{ matrix.artifact }}-evidence.json" in target["text"]
+    assert "RCMetaStudio-macos-x64" in target["text"]
+    assert "RCMetaStudio-macos-arm64" in target["text"]
     r_cache_keys = [
         key for key in target["cache_keys"] if key.startswith("bundled-r-library-v4-")
     ]
@@ -445,12 +446,8 @@ def test_package_workflow_builds_path_aware_artifacts():
     assert "produce-r-integration-kit" not in target["text"]
     assert all("RCMS_CRAN_REPO_KEY" in key for key in r_cache_keys)
     assert workflow["restore_keys"] == []
-    assert qt_cache_keys == ["qt-sdk-6.11.1-macos-x64"]
-    producer = Path(".github/workflows/r-integration-kit-producer.yml").read_text(
-        encoding="utf-8"
-    )
-    assert "packagemanager.posit.co/cran/2026-07-16" in producer
-    assert "RCMS_PRODUCER_R_HOME" in producer
+    assert qt_cache_keys == ["qt-sdk-6.11.1-${{ matrix.target }}"]
+    assert not Path(".github/workflows/r-integration-kit-producer.yml").exists()
     assert all(
         "steps.package-metadata.outputs.r-version" in key for key in r_cache_keys
     )
@@ -459,7 +456,7 @@ def test_package_workflow_builds_path_aware_artifacts():
     assert "scripts/resolve_package_ci_metadata.py" in target["text"]
     assert "resolve_package_ci_metadata.py --version-only" in target["text"]
     assert (
-        '--archive-root-name "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-macos-x64"'
+        '--archive-root-name "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ matrix.target }}"'
         in target["text"]
     )
     assert "if: ${{ inputs.build_windows }}" in workflow["text"]
@@ -865,37 +862,6 @@ def test_windows_packager_qualifies_qt6_deployment_and_packaged_surfaces():
         "function Copy-DirectoryTree",
         'Copy-DirectoryTree -Source $Root -Destination (Join-Path $DestinationRoot "R")',
     )
-
-
-def test_future_windows_signing_refreshes_r_derivation_after_nested_signing():
-    script = read_repo_text("scripts", "sign-windows-package.ps1")
-    assert "'.exe', '.dll', '.pyd'" in script
-    assert (
-        script.index("signtool sign")
-        < script.index("r_kit_derivation.py")
-        < script.index("signtool verify")
-    )
-    assert "Get-SignedMemberEvidence" in script
-    assert "--signing-evidence $signingEvidence --require-signed" in script
-
-
-def test_release_candidate_azure_signing_refreshes_real_r_derivation_before_archive():
-    workflow = read_repo_text(".github", "workflows", "release-candidate.yml")
-    azure = workflow.index("Sign Windows candidate with Azure Artifact Signing")
-    refresh = workflow.index("Refresh signed Windows R integration derivation")
-    archive = workflow.index("Verify and archive Windows signed bytes")
-    assert azure < refresh < archive
-    assert "files-folder-filter: exe,dll,pyd" in workflow
-    refresh_body = workflow[refresh:archive]
-    assert "Get-AuthenticodeSignature" in refresh_body
-    assert "r_kit_derivation.py finalize" in refresh_body
-    assert "--api-bridge $apiBridge" in refresh_body
-    assert "--r-shared-library $rSharedLibrary" in refresh_body
-    assert "signer_subject" in refresh_body
-    assert "timestamp_subject" in refresh_body
-    assert "--signing-evidence $signingEvidence --require-signed" in refresh_body
-    verifier = read_repo_text("scripts", "verify-archive-windows.ps1")
-    assert "'.exe', '.dll', '.pyd'" in verifier
 
 
 def _load_windows_deployment_inspector():

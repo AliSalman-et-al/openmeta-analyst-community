@@ -212,19 +212,9 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
         '"LSMinimumSystemVersion": os.environ.get("RCMS_MINIMUM_MACOS_VERSION", "13.0")'
         in spec
     )
-    assert 'minimum_macos_version="14.0"' in build
+    assert 'minimum_macos_version="$minimum_macos"' in build
     spike = text("scripts/package-macos-x64-direct-r-spike.sh")
-    spike_workflow_text = text(".github/workflows/macos-x64-direct-r-spike.yml")
-    spike_workflow = yaml.safe_load(spike_workflow_text)
-    assert list(spike_workflow["jobs"]) == ["r-substrate", "feasibility"]
-    assert spike_workflow["jobs"]["feasibility"]["needs"] == "r-substrate"
-    assert "--stop-after-r-substrate" in spike_workflow_text
-    assert "verify_macos_r_pyinstaller_toc.py" in spike_workflow_text
-    assert spike_workflow_text.index(
-        "verify_macos_r_pyinstaller_toc.py"
-    ) < spike_workflow_text.index("package-macos-x64-direct-r-spike.sh")
-    assert "produce-r-integration-kit" not in spike_workflow_text
-    assert "r-integration-kit-producer.yml" not in spike_workflow_text
+    assert not (ROOT / ".github/workflows/macos-x64-direct-r-spike.yml").exists()
     assert "build-macos-package.sh" in spike
     assert "sudo installer" not in spike
     assert 'installed_framework="/Library/Frameworks/R.framework"' not in spike
@@ -290,32 +280,20 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
         "src/rc_metastudio/launch.py"
     )
     assert "codesign --force --deep" not in build
-    signer = text("scripts/sign-notarize-macos-package.sh")
-    assert 'scripts/sign_macos_app.py "$app"' in signer
-    assert 'find "$app" -type f' not in signer
-    assert "codesign --force --deep" not in signer
-    assert 'signing_inventory="${output}.signing-inventory.json"' in signer
-    assert (
-        signer.index("scripts/sign_macos_app.py")
-        < signer.index("r_kit_derivation.py finalize")
-        < signer.index(
-            'codesign --force --options runtime --timestamp --sign "$RCMS_APPLE_SIGNING_IDENTITY" "$app"'
-        )
-        < signer.index("notarytool submit")
-    )
-    release_workflow = text(".github/workflows/release-candidate.yml")
-    assert "$env:ARTIFACT.signing-inventory.json" in release_workflow
-    assert "release/*.signing-inventory.json" in release_workflow
+    assert not (ROOT / "scripts/sign-notarize-macos-package.sh").exists()
+    assert not (ROOT / ".github/workflows/release-candidate.yml").exists()
+    community = text(".github/workflows/community-release-candidate.yml")
+    assert "future no-rebuild signing stage" in community
     assert (
         build.index('if [ "$skip_clean" -eq 0 ]')
         < build.index('rm -rf "$qualification_root"')
         < build.index('mkdir -p "$qualification_root"')
     )
-    assert "${{ inputs.artifact_name }}-evidence" in workflow_text
-    assert "*-archive-inspection.json" in workflow_text
-    assert "packaged-smoke*.log" in workflow_text
+    assert "${{ matrix.artifact }}-evidence" in workflow_text
+    assert "${{ matrix.artifact }}-archive-inspection.json" in workflow_text
+    assert "work/qualification/**" in workflow_text
     public_command = text("scripts/package-macos.sh")
-    assert "--architecture x64 is required" in public_command
+    assert "--architecture x64 or arm64 is required" in public_command
     assert "r-integration-kit" not in public_command
     assert "Xcode Command Line Tools" in public_command
     assert 'ditto -x -k "$zip_path" "$extracted_root"' in build
@@ -328,13 +306,13 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
         'extracted_smoke_log="$qualification_root/extracted-packaged-smoke.log"'
         in build
     )
-    sdk_cache = steps_by_name["Cache official Qt SDK on macOS"]
+    sdk_cache = steps_by_name["Cache official Qt SDK"]
     assert sdk_cache["id"] == "macos_qt_sdk_cache"
     assert sdk_cache["with"] == {
         "path": "build/qt-sdk",
-        "key": "qt-sdk-6.11.1-macos-x64",
+        "key": "qt-sdk-6.11.1-${{ matrix.target }}",
     }
-    sdk_install = steps_by_name["Install official Qt SDK on macOS"]
+    sdk_install = steps_by_name["Install official Qt SDK"]
     assert (
         sdk_install["if"]
         == "${{ steps.macos_qt_sdk_cache.outputs.cache-hit != 'true' }}"
@@ -343,13 +321,13 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
         "uv tool run --from aqtinstall==3.3.0 aqt install-qt mac desktop 6.11.1 clang_64"
         in sdk_install["run"]
     )
-    rcc_resolve = steps_by_name["Resolve official Qt rcc on macOS"]
+    rcc_resolve = steps_by_name["Resolve official Qt rcc"]
     assert "qt6_macos_feasibility.py resolve-rcc" in rcc_resolve["run"]
     assert '--sdk-root "$PWD/build/qt-sdk/6.11.1/macos"' in rcc_resolve["run"]
     assert '--github-env "$GITHUB_ENV"' in rcc_resolve["run"]
     assert steps.index(rcc_resolve) < steps.index(
         steps_by_name[
-            "Build, inspect, smoke, archive, and requalify macOS Intel package"
+            "Build and run the first-green packaged workflow"
         ]
     )
 
@@ -369,6 +347,14 @@ def test_direct_provenance_uses_named_cli_and_rejects_missing_named_inputs(tmp_p
             str(tmp_path / "ppm"),
             "--source-commit",
             "c" * 40,
+            "--target",
+            "macos-x64",
+            "--official-r-url",
+            "https://cloud.r-project.org/bin/macosx/big-sur-x86_64/base/R-4.6.1-x86_64.pkg",
+            "--official-r-sha256",
+            "612bb00cb4c627721d6d80b0f5224227c0fcdefb4a5b6c917511480361c16571",
+            "--ppm-contrib-path",
+            "bin/macosx/big-sur-x86_64/contrib/4.6",
             "--bridge",
             str(tmp_path / "missing.so"),
             "--output",
@@ -460,7 +446,7 @@ def test_private_official_r_expansion_creates_only_its_parent_before_pkgutil():
     expand = 'pkgutil --expand-full "$r_pkg" "$r_pkg_expanded"'
     assert build.index(parent) < build.index(absent_target) < build.index(expand)
     assert (
-        'private_r_framework="$repo_root/build/macos-package/x64/staged/R.framework"'
+        'private_r_framework="$repo_root/build/macos-package/$architecture/staged/R.framework"'
         in build
     )
     block = build[
@@ -1202,11 +1188,7 @@ def test_signing_derivation_resolves_framework_api_bridge_from_final_path(tmp_pa
         check=True,
     )
     assert Path(completed.stdout.strip()) == bridge.resolve()
-    signer = text("scripts/sign-notarize-macos-package.sh")
-    assert "resolve-final" in signer
-    assert signer.index("r_kit_derivation.py finalize") < signer.index(
-        'codesign --force --options runtime --timestamp --sign "$RCMS_APPLE_SIGNING_IDENTITY" "$app"'
-    )
+    assert not (ROOT / "scripts/sign-notarize-macos-package.sh").exists()
 
 
 def test_r_relocation_maps_versioned_and_canonical_framework_load_commands():
@@ -2921,16 +2903,15 @@ def test_direct_macos_inputs_remain_manual_and_do_not_block_windows_release_gate
         "scripts/inspect_macos_deployment.py",
         "scripts/qt6_macos_feasibility.py",
         "scripts/sign_macos_app.py",
-        "scripts/sign-notarize-macos-package.sh",
+        "config/macos-package-targets.json",
+        "scripts/resolve_macos_package_target.py",
         "scripts/normalize_macos_macho.py",
         "scripts/install-rcmetar-source.R",
-        "scripts/package-macos-x64-direct-r-spike.sh",
         "scripts/macos_embedded_r_adapter.py",
         "scripts/macos_host_r_isolation.sh",
         "scripts/verify_macos_r_pyinstaller_toc.py",
-        ".github/workflows/macos-x64-direct-r-spike.yml",
         ".github/workflows/package-verification.yml",
-        ".github/workflows/release-candidate.yml",
+        ".github/workflows/community-release-candidate.yml",
         "packaging/pyinstaller/rc-metastudio-macos.spec",
     ]
     assert all(policy.requires_package_qualification([path]) for path in direct_inputs)
@@ -2939,4 +2920,5 @@ def test_direct_macos_inputs_remain_manual_and_do_not_block_windows_release_gate
     manual = text(".github/workflows/package-verification.yml")
     assert "macos-x64-package-qualification" not in workflow
     assert "MACOS_X64_PACKAGE_RESULT" not in workflow
-    assert "macos-package-intel" in manual
+    assert "macos-packages" in manual
+    assert "macos-arm64" in text(".github/workflows/package-target.yml")

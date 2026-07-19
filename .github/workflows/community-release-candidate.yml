@@ -29,6 +29,12 @@ jobs:
           - target: windows-x64
             runner: windows-2025
             artifact: RCMetaStudio-windows-x64.zip
+          - target: macos-x64
+            runner: macos-15-intel
+            artifact: RCMetaStudio-macos-x64.zip
+          - target: macos-arm64
+            runner: macos-15
+            artifact: RCMetaStudio-macos-arm64.zip
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     steps:
@@ -56,7 +62,7 @@ jobs:
           if ($releaseSet.trust_profile -ne 'unsigned-community') { throw "Candidate trust profile is $($releaseSet.trust_profile), expected unsigned-community." }
           if ($releaseSet.version -ne $env:EXPECTED_VERSION) { throw "Candidate version is $($releaseSet.version), expected $env:EXPECTED_VERSION." }
           if ($releaseSet.source.commit -ne $env:EXPECTED_SOURCE_SHA) { throw "Candidate source is $($releaseSet.source.commit), expected $env:EXPECTED_SOURCE_SHA." }
-          if (($releaseSet.release_targets -join ',') -ne 'windows-x64') { throw "Candidate release targets must contain only windows-x64." }
+          if (($releaseSet.release_targets -join ',') -ne 'windows-x64,macos-x64,macos-arm64') { throw "Candidate release targets must contain all three native targets." }
       - name: Expand unsigned Windows artifact
         if: matrix.target == 'windows-x64'
         shell: pwsh
@@ -71,6 +77,19 @@ jobs:
           Remove-Item Env:\QT_QPA_PLATFORM -ErrorAction SilentlyContinue
           $process = Start-Process -FilePath $exe.FullName -ArgumentList @("--automation-native-smoke") -PassThru -Wait -WindowStyle Hidden
           if ($process.ExitCode -ne 0) { throw "Unsigned packaged smoke failed with exit code $($process.ExitCode)." }
+      - name: Expand unsigned native macOS artifact
+        if: startsWith(matrix.target, 'macos-')
+        shell: bash
+        run: mkdir -p qualified/tree && ditto -x -k "candidate/artifacts/${{ matrix.artifact }}" qualified/tree
+      - name: Launch exact unsigned native macOS bytes
+        if: startsWith(matrix.target, 'macos-')
+        shell: bash
+        run: |
+          set -euo pipefail
+          executable="$(find qualified/tree -path '*.app/Contents/MacOS/RCMetaStudio' -print -quit)"
+          sample="$(find qualified/tree -path '*/sample_projects/BCG.rcms' -print -quit)"
+          test -n "$executable" && test -n "$sample"
+          env -u QT_QPA_PLATFORM RCMS_REQUIRE_IN_PROCESS_RPY2=1 "$executable" --automation-native-smoke "$sample"
       - name: Record unsigned qualification and final evidence
         shell: pwsh
         env:
@@ -103,6 +122,10 @@ jobs:
         include:
           - target: windows-x64
             artifact: RCMetaStudio-windows-x64.zip
+          - target: macos-x64
+            artifact: RCMetaStudio-macos-x64.zip
+          - target: macos-arm64
+            artifact: RCMetaStudio-macos-arm64.zip
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -168,8 +191,8 @@ jobs:
           test "$(jq -r .trust_profile "$manifest")" = unsigned-community
           test "$(jq -r .version "$manifest")" = "$EXPECTED_VERSION"
           test "$(jq -r .source.commit "$manifest")" = "$EXPECTED_SOURCE_SHA"
-          test "$(jq -c .release_targets "$manifest")" = '["windows-x64"]'
-          for target in windows-x64; do
+          test "$(jq -c .release_targets "$manifest")" = '["windows-x64","macos-x64","macos-arm64"]'
+          for target in windows-x64 macos-x64 macos-arm64; do
             root="release/targets/community-$target"
             for stage in assembled unsigned-qualified verified attested; do
               python scripts/delivery.py attach --manifest "$manifest" --result "$root/records/$target.$stage.json"
@@ -177,12 +200,12 @@ jobs:
           done
           python scripts/delivery.py verify --manifest "$manifest"
           python scripts/delivery.py promote --manifest "$manifest" --from-channel candidate --channel rc --output release/release-set-rc.json
-          for target in windows-x64; do
+          for target in windows-x64 macos-x64 macos-arm64; do
             root="release/targets/community-$target"
             cp "$root/RCMetaStudio-$target.zip" release/
             cp "$root/$target.cdx.json" release/
           done
-          python scripts/delivery.py checksums --files release/RCMetaStudio-windows-x64.zip --files release/windows-x64.cdx.json --output release/SHA256SUMS
+          python scripts/delivery.py checksums --files release/RCMetaStudio-windows-x64.zip --files release/RCMetaStudio-macos-x64.zip --files release/RCMetaStudio-macos-arm64.zip --files release/windows-x64.cdx.json --files release/macos-x64.cdx.json --files release/macos-arm64.cdx.json --output release/SHA256SUMS
       - name: Publish clearly labeled immutable unsigned RC
         env:
           GH_TOKEN: ${{ github.token }}
@@ -197,4 +220,4 @@ jobs:
           else
             tag_args=(--target "${{ inputs.source_sha }}")
           fi
-          gh release create "$TAG" release/RCMetaStudio-*.zip release/*.cdx.json release/SHA256SUMS release/release-set-rc.json "${tag_args[@]}" --prerelease --title "RC MetaStudio ${{ inputs.version }}" --notes $'**Signing status:** Unsigned Windows x64 community build.\n\nRC MetaStudio 0.2.0 is the Windows-only Qt 6 cutover. macOS packages are deferred to 0.2.1. The Windows artifact was built once, package-smoke tested, SBOM inventoried, checksummed, and provenance-attested.'
+          gh release create "$TAG" release/RCMetaStudio-*.zip release/*.cdx.json release/SHA256SUMS release/release-set-rc.json "${tag_args[@]}" --prerelease --title "RC MetaStudio ${{ inputs.version }}" --notes $'**Signing status:** Unsigned community builds.\n\nWindows x64, macOS Intel x64, and macOS Apple Silicon artifacts were built once on native runners, package-smoke tested, SBOM inventoried, checksummed, and provenance-attested. The immutable unsigned artifacts are suitable inputs for a future no-rebuild signing stage.'
