@@ -485,21 +485,29 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
                 ci.lb = c(0.0, 0.1),
                 ci.ub = c(0.2, 0.3),
                 se = c(0.01, 0.02),
+                zval = c(10, 2.5),
                 pval = c(0.0002, 0.267),
-                QMp = 0.0002
+                method = "REML", test = "z", k = 13, p = 2, m = 1,
+                tau2 = 0.0764, se.tau2 = 0.0591, I2 = 68.39, H2 = 3.16, R2 = 75.62,
+                QM = 16.3571, QMp = 0.0002, QE = 30.7331, QEp = 0.0012
               ),
-              list(digits = 3, measure = "OR"),
+              list(digits = 3, measure = "OR", inference.method = "z"),
               list(
                 cov.display.col = c("intercept", "latitude"),
                 levels.display.col = character(0),
                 studies.display.col = character(0),
                 factor.n.levels = numeric(0),
-                n.cont.covs = 1
+                n.cont.covs = 1,
+                cont.cov.names = "latitude",
+                cont.cov.ranges = list(latitude=c(6, 55)),
+                factor.cov.names = character(0),
+                factor.ref.levels = character(0)
               )
             )
             regression_text <- paste(capture.output(print(regression_display)), collapse="\\n")
             stopifnot(grepl("< 0.001", regression_text, fixed=TRUE))
-            stopifnot(!grepl("Omnibus p-value\\\\n 0.000", regression_text))
+            stopifnot(grepl("Heterogeneity explained (R²)", regression_text, fixed=TRUE))
+            stopifnot(grepl("Overall moderators (Qₘ)", regression_text, fixed=TRUE))
 
             advanced_data <- new(
               "BinaryData",

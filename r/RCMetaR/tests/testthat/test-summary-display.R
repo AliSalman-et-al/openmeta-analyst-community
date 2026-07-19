@@ -253,29 +253,111 @@ test_that("overall display leaves unavailable p-values blank", {
   expect_equal(overall[3, 6], "0.277")
 })
 
-test_that("meta-regression omnibus p-value uses small-p display convention", {
+regression_display_fixture <- function(method = "REML", inference.method = "z") {
+  t.inference <- inference.method %in% c("t", "knha", "adhoc")
   display <- RCMetaR:::create.regression.display(
     list(
       b = c(0.1, 0.2),
       ci.lb = c(0.0, 0.1),
       ci.ub = c(0.2, 0.3),
       se = c(0.01, 0.02),
+      zval = c(10, 2.5),
       pval = c(0.0002, 0.267),
-      QMp = 0.0002
+      ddf = if (t.inference) 11 else NULL,
+      method = method,
+      test = inference.method,
+      k = 13,
+      p = 2,
+      m = 1,
+      tau2 = if (method == "FE") 0 else 0.0764,
+      se.tau2 = if (method == "FE") NA_real_ else 0.0591,
+      I2 = if (method == "FE") 0 else 68.39,
+      H2 = if (method == "FE") 1 else 3.16,
+      R2 = if (method == "FE") 0 else 75.62,
+      QM = 16.3571,
+      QMp = 0.0002,
+      QE = 30.7331,
+      QEp = 0.0012
     ),
-    list(digits = 3, measure = "OR"),
+    list(digits = 3, measure = "OR", inference.method = inference.method),
     list(
       cov.display.col = c("intercept", "latitude"),
       levels.display.col = character(0),
       studies.display.col = character(0),
       factor.n.levels = numeric(0),
-      n.cont.covs = 1
+      n.cont.covs = 1,
+      cont.cov.names = "latitude",
+      cont.cov.ranges = list(latitude = c(6, 55)),
+      factor.cov.names = character(0),
+      factor.ref.levels = character(0)
+    )
+  )
+  display
+}
+
+test_that("meta-regression summary reports model, coefficients, heterogeneity, and tests", {
+  display <- regression_display_fixture()
+  rendered <- paste(capture.output(print(display)), collapse = "\n")
+
+  expect_match(rendered, "< 0.001", fixed = TRUE)
+  expect_match(rendered, "Model overview", fixed = TRUE)
+  expect_match(rendered, "Model specification", fixed = TRUE)
+  expect_match(rendered, "Coefficient estimates (log scale)", fixed = TRUE)
+  expect_match(rendered, "Residual heterogeneity", fixed = TRUE)
+  expect_match(rendered, "Heterogeneity explained (R²)", fixed = TRUE)
+  expect_match(rendered, "Overall moderators (Qₘ)", fixed = TRUE)
+  expect_match(rendered, "Residual heterogeneity (Qₑ)", fixed = TRUE)
+  expect_match(rendered, "extrapolated beyond an observed continuous range", fixed = TRUE)
+  expect_false(grepl("(^|[[:space:]])(NA|NaN|Inf)([[:space:]]|$)", rendered))
+})
+
+test_that("fixed-effect meta-regression omits random-effects heterogeneity statistics", {
+  display <- regression_display_fixture(method = "FE")
+  rendered <- paste(capture.output(print(display)), collapse = "\n")
+
+  expect_match(rendered, "Fixed effect", fixed = TRUE)
+  expect_match(rendered, "Model tests", fixed = TRUE)
+  expect_false(grepl("Heterogeneity explained", rendered, fixed = TRUE))
+  expect_false(grepl("SE of τ²", rendered, fixed = TRUE))
+})
+
+test_that("small-sample meta-regression labels t and F inference", {
+  display <- regression_display_fixture(inference.method = "knha")
+  rendered <- paste(capture.output(print(display)), collapse = "\n")
+
+  expect_match(rendered, "Knapp-Hartung", fixed = TRUE)
+  expect_match(rendered, "Overall moderators (F)", fixed = TRUE)
+  expect_match(rendered, "t", fixed = TRUE)
+  expect_match(rendered, "11", fixed = TRUE)
+})
+
+test_that("multi-level factors receive a joint moderator test", {
+  group <- factor(rep(c("A", "B", "C"), each = 4))
+  fit <- metafor::rma.uni(
+    yi = c(-0.4, -0.2, -0.1, 0.0, 0.2, 0.3, 0.4, 0.5, 0.1, 0.5, 0.7, 0.9),
+    vi = rep(0.08, 12),
+    mods = ~ group,
+    method = "REML"
+  )
+  display <- RCMetaR:::create.regression.display(
+    fit,
+    list(digits = 3, measure = "MD", inference.method = "z"),
+    list(
+      cov.display.col = c("Intercept", "group", "", ""),
+      levels.display.col = c("", "A", "B", "C"),
+      studies.display.col = c("", "4", "4", "4"),
+      factor.n.levels = 3,
+      n.cont.covs = 0,
+      cont.cov.names = character(0),
+      cont.cov.ranges = list(),
+      factor.cov.names = "group",
+      factor.ref.levels = "A"
     )
   )
   rendered <- paste(capture.output(print(display)), collapse = "\n")
 
-  expect_match(rendered, "< 0.001", fixed = TRUE)
-  expect_false(grepl("Omnibus p-value\n 0.000", rendered, fixed = TRUE))
+  expect_match(rendered, "group (joint)", fixed = TRUE)
+  expect_match(rendered, "Categorical; reference level: A", fixed = TRUE)
 })
 
 test_that("forest plot p-value labels use small-p display convention", {

@@ -981,8 +981,11 @@ extract.cov.data <- function(reg.data, dont.make.array = FALSE) {
   
   # initialize names of continuous covariates to empty list
   cont.cov.names <- c()
+  cont.cov.ranges <- list()
   cont.cov.array <- NULL
   factor.cov.array <- NULL
+  factor.cov.names <- c()
+  factor.ref.levels <- c()
   cat.cov.ref.var.and.levels <- list() #### 
   for (n.covs in 1:length(reg.data@covariates)) {
     # put covariate data into two arrays, for continuous and factor covariates.
@@ -1018,6 +1021,8 @@ extract.cov.data <- function(reg.data, dont.make.array = FALSE) {
            studies.col <- c(studies.col, sum(cov.vals==level)) 
       }
       factor.cov.array <- cbind(factor.cov.array, cov.cols)
+      factor.cov.names <- c(factor.cov.names, cov.name)
+      factor.ref.levels <- c(factor.ref.levels, ref.var)
       factor.n.levels <- c(factor.n.levels, length(levels.minus.NA))
       factor.cov.display.col <- c(factor.cov.display.col, cov.name, rep("",length(levels.minus.ref.var)))
       factor.studies.display.col <- c() 
@@ -1028,11 +1033,24 @@ extract.cov.data <- function(reg.data, dont.make.array = FALSE) {
       }
   }
   cov.array <- cbind(cont.cov.array, factor.cov.array)
+  analysis.rows <- is.finite(reg.data@y) & is.finite(reg.data@SE) & complete.cases(cov.array)
+  for (cov.name in cont.cov.names) {
+    analyzed.values <- as.numeric(cont.cov.array[analysis.rows, cov.name])
+    analyzed.values <- analyzed.values[is.finite(analyzed.values)]
+    cont.cov.ranges[[cov.name]] <- if (length(analyzed.values) > 0) {
+      range(analyzed.values)
+    } else {
+      c(NA_real_, NA_real_)
+    }
+  }
   cov.display.col <- c("Intercept", cont.cov.names, factor.cov.display.col)
   levels.display.col <- c(rep("",length(cont.cov.names) + 1), levels.display.col)
   studies.display.col <- c(rep("",length(cont.cov.names) + 1), studies.display.col)
   display.data <- list(cov.display.col=cov.display.col, levels.display.col=levels.display.col,
-                       studies.display.col=studies.display.col, factor.n.levels=factor.n.levels, n.cont.covs=n.cont.covs)
+                       studies.display.col=studies.display.col, factor.n.levels=factor.n.levels,
+                       factor.cov.names=factor.cov.names, factor.ref.levels=factor.ref.levels,
+                       cont.cov.names=cont.cov.names, cont.cov.ranges=cont.cov.ranges,
+                       n.cont.covs=n.cont.covs)
   
   cov.data <- list(cov.array=cov.array, display.data=display.data, cat.ref.var.and.levels=cat.cov.ref.var.and.levels)
                    
