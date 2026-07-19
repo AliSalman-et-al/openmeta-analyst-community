@@ -67,12 +67,24 @@ def test_available_method_labels_are_normalized_without_changing_method_keys():
 
 def test_parameter_value_labels_hide_internal_codes_without_changing_values():
     metadata = {"rm.method.names": {"DL": "DerSimonian-Laird"}}
+    inference_metadata = {
+        "inference.method.names": {"knha": "Knapp-Hartung"}
+    }
 
     assert parameter_value_display_label("rm.method", "DL", metadata) == (
         "DerSimonian-Laird"
     )
     assert parameter_value_display_label("to", "only0") == "Only zero-event studies"
     assert parameter_value_display_label("to", "all") == "All studies"
+    assert (
+        parameter_value_display_label(
+            "inference.method", "knha", inference_metadata
+        )
+        == "Knapp-Hartung"
+    )
+    assert parameter_value_display_label("inference.method", "adhoc") == (
+        "Modified Knapp-Hartung"
+    )
     assert parameter_value_display_label("unknown", "raw-code") == "raw-code"
 
 
@@ -83,6 +95,7 @@ def test_parameter_labels_hide_internal_names_when_metadata_is_missing():
     assert parameter_display_label("num.iters") == "Number of Iterations"
     assert parameter_display_label("conf.level") == "Confidence Level"
     assert parameter_display_label("rm.method") == "Random-Effects Method"
+    assert parameter_display_label("inference.method") == "Inference Method"
 
 
 def test_diagnostic_metric_group_labels_spell_out_abbreviations():

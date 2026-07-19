@@ -431,6 +431,9 @@ rcmetar.run.analysis <- function(om.data, request=NULL, method=NULL, params=list
         "meta-regression"=meta.regression(om.data, request$params, request$cond.means.data, request$stop.at.rma)
     )
 
+    if (!isTRUE(request$stop.at.rma)) {
+        result <- .rcmetar.attach.inference.method(result, request$method, request$params)
+    }
     result <- .rcmetar.attach.plot.display.artifacts(result, request)
     result <- .rcmetar.attach.plot.capabilities(result, request)
     .rcmetar.attach.request(result, request)
@@ -467,6 +470,14 @@ rcmetar.run.diagnostic.analyses <- function(diagnostic.data, methods, params.lis
         "leave-one-out"=multiple.loo.diagnostic(methods, params.list, diagnostic.data),
         subgroup=multiple.subgroup.diagnostic(methods, params.list, diagnostic.data)
     )
+
+    inference.labels <- unique(unlist(Map(function(method, params) {
+        if (!.rcmetar.method.supports.inference(method)) return(character())
+        rcmetar.inference.method.names()[[rcmetar.inference.method(params)]]
+    }, methods, params.list), use.names=FALSE))
+    if (is.list(result) && length(inference.labels) > 0) {
+        result[["Inference Method"]] <- paste(inference.labels, collapse=", ")
+    }
 
     result.request <- list(
         data.type="diagnostic",
@@ -536,6 +547,9 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
 
     if (!is.null(params$conf.level)) {
         validate.conf.level(params$conf.level)
+    }
+    if (!is.null(params$inference.method)) {
+        rcmetar.inference.method(params)
     }
     if (!is.null(params$measure) && !nzchar(as.character(params$measure))) {
         stop("Parameter 'measure' must not be empty.", call.=FALSE)
@@ -698,6 +712,20 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
         return(eval(call(pretty.function)))
     }
     list(pretty.name=method, description="None provided.")
+}
+
+.rcmetar.method.supports.inference <- function(method) {
+    parameters <- rcmetar.method.parameters(method)$parameters
+    "inference.method" %in% names(parameters)
+}
+
+.rcmetar.attach.inference.method <- function(result, method, params) {
+    if (!is.list(result) || !.rcmetar.method.supports.inference(method)) {
+        return(result)
+    }
+    label <- rcmetar.inference.method.names()[[rcmetar.inference.method(params)]]
+    result[["Inference Method"]] <- as.character(label)
+    result
 }
 
 .rcmetar.attach.request <- function(result, request) {

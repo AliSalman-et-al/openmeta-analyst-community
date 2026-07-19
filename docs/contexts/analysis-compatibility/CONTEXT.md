@@ -168,6 +168,10 @@ _Avoid_: Advanced tests, full matrix
 The percentage level used to compute confidence intervals for analysis results and displayed confidence intervals; the default Confidence Level is 95.0% unless a project or user action sets another value.
 _Avoid_: CI setting, interval percentage, confidence placeholder
 
+**Inference Method**:
+The statistical procedure used by an applicable analysis model to compute coefficient tests and their corresponding confidence intervals. An Inference Method is offered only when the underlying model supports a user-selectable procedure.
+_Avoid_: Confidence interval method, test method, CI method
+
 **Modern Test Runner**:
 The test runner used by Python 3 modernization tests and compatibility harness work.
 _Avoid_: Test cleanup, new tests

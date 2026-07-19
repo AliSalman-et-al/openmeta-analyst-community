@@ -560,6 +560,7 @@ rcmetar.revman.summary.effect <- function(bundle) {
             yi=bundle$res$yi[keep],
             vi=bundle$res$vi[keep],
             method=bundle$params$rm.method,
+            test=rcmetar.inference.method(bundle$params),
             level=bundle$params$conf.level,
             digits=bundle$params$digits
         ), silent=TRUE)

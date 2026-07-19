@@ -154,7 +154,6 @@ rcmetar.method.references <- function(method) {
     ),
     "meta.regression"=c(
       "Random-effects meta-regression: Berkey, C. S., Hoaglin, D. C., Mosteller, F., & Colditz, G. A. (1995). A random-effects regression model for meta-analysis. Statistics in Medicine, 14(4), 395-411. doi:10.1002/sim.4780140406.",
-      "Meta-regression testing: Knapp, G., & Hartung, J. (2003). Improved tests for a random effects meta-regression with a single covariate. Statistics in Medicine, 22(17), 2693-2710. doi:10.1002/sim.1482.",
       "Implementation reference: Viechtbauer, W. (2010). Conducting meta-analyses in R with the metafor package. Journal of Statistical Software, 36(3), 1-48. doi:10.18637/jss.v036.i03."
     ),
     "bootstrap"=c(
@@ -174,6 +173,84 @@ rcmetar.method.references <- function(method) {
   )
 
   refs[[method]]
+}
+
+rcmetar.random.effects.methods <- function() {
+  c("HE", "DL", "HS", "HSk", "SJ", "ML", "REML", "EB", "PM", "PMM")
+}
+
+rcmetar.random.effects.method.names <- function() {
+  list(
+    HE="Hedges-Olkin",
+    DL="DerSimonian-Laird",
+    HS="Hunter-Schmidt",
+    HSk="Hunter-Schmidt with small-sample correction",
+    SJ="Sidik-Jonkman",
+    ML="Maximum Likelihood",
+    REML="Restricted Maximum Likelihood",
+    EB="Empirical Bayes",
+    PM="Paule-Mandel",
+    PMM="Median-unbiased Paule-Mandel"
+  )
+}
+
+rcmetar.inference.methods <- function() {
+  c("z", "t", "knha", "adhoc")
+}
+
+rcmetar.inference.method.names <- function() {
+  list(
+    z="Normal approximation",
+    t="Student's t-distribution",
+    knha="Knapp-Hartung",
+    adhoc="Modified Knapp-Hartung"
+  )
+}
+
+rcmetar.inference.method <- function(params) {
+  method <- params$inference.method
+  if (is.null(method) || length(method) == 0 || is.na(method[1]) || !nzchar(as.character(method[1]))) {
+    return("z")
+  }
+  match.arg(as.character(method[1]), rcmetar.inference.methods())
+}
+
+rcmetar.validate.inference.method <- function(params, k, p=1) {
+  method <- rcmetar.inference.method(params)
+  if (method != "z" && k - p <= 0) {
+    stop(sprintf(
+      "The selected Inference Method requires positive residual degrees of freedom (studies: %d, fitted coefficients: %d).",
+      k,
+      p
+    ), call.=FALSE)
+  }
+  method
+}
+
+rcmetar.inference.method.metadata <- function() {
+  list(
+    "pretty.name"="Inference method",
+    "description"="Procedure used to compute coefficient tests and their corresponding confidence intervals",
+    "inference.method.names"=rcmetar.inference.method.names()
+  )
+}
+
+rcmetar.inference.method.references <- function(params) {
+  method <- rcmetar.inference.method(params)
+  if (!(method %in% c("knha", "adhoc"))) {
+    return(character())
+  }
+  references <- c(
+    "Knapp-Hartung inference: Knapp, G., & Hartung, J. (2003). Improved tests for a random effects meta-regression with a single covariate. Statistics in Medicine, 22(17), 2693-2710. doi:10.1002/sim.1482.",
+    "Hartung-Knapp-Sidik-Jonkman inference: Sidik, K., & Jonkman, J. N. (2002). A simple confidence interval for meta-analysis. Statistics in Medicine, 21(21), 3153-3159. doi:10.1002/sim.1262."
+  )
+  if (method == "adhoc") {
+    references <- c(
+      references,
+      "Modified Knapp-Hartung inference: Jackson, D., Law, M., Rucker, G., & Schwarzer, G. (2017). The Hartung-Knapp modification for random-effects meta-analysis: A useful refinement but are there any residual concerns? Statistics in Medicine, 36(25), 3923-3934. doi:10.1002/sim.7411."
+    )
+  }
+  references
 }
 
 rcmetar.unique.references <- function(references) {

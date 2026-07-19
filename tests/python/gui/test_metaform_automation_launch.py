@@ -1424,7 +1424,8 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
     meta_py_r = sys.modules["meta_py_r"]
 
     params = {
-        "rm.method": ["HE", "DL", "SJ", "ML", "REML", "EB"],
+        "rm.method": ["HE", "DL", "HS", "HSk", "SJ", "ML", "REML", "EB", "PM", "PMM"],
+        "inference.method": ["z", "t", "knha", "adhoc"],
         "to": ["only0", "all"],
         "conf.level": "float",
         "digits": "float",
@@ -1433,6 +1434,7 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
     }
     defaults = {
         "rm.method": "DL",
+        "inference.method": "z",
         "to": "only0",
         "conf.level": 95.0,
         "digits": 2,
@@ -1450,6 +1452,16 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
                 "ML": "Maximum likelihood",
                 "REML": "Restricted maximum likelihood",
                 "EB": "Empirical Bayes",
+            },
+        },
+        "inference.method": {
+            "pretty.name": "Inference method",
+            "description": "Procedure used for coefficient tests and confidence intervals",
+            "inference.method.names": {
+                "z": "Normal approximation",
+                "t": "Student's t-distribution",
+                "knha": "Knapp-Hartung",
+                "adhoc": "Modified Knapp-Hartung",
             },
         },
         "to": {
@@ -1490,7 +1502,7 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         lambda method: (
             dict(params),
             dict(defaults),
-            ["rm.method", "to", "conf.level", "digits", "adjust", "theta.lower"],
+            ["rm.method", "inference.method", "to", "conf.level", "digits", "adjust", "theta.lower"],
             pretty_names,
         ),
         raising=False,
@@ -1525,6 +1537,7 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         ]
         assert [str(combo.currentText()) for combo in enum_combos] == [
             "DerSimonian-Laird",
+            "Normal approximation",
             "Only zero-event studies",
         ]
         method_combo = specs[0].method_cbo_box
@@ -1608,6 +1621,7 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
             if str(label.text())
             in {
                 "Random-Effects method",
+                "Inference method",
                 "Correction factor target",
                 "Confidence level",
                 "Decimal places",
@@ -1615,12 +1629,13 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
                 "Prior lower bound",
             }
         ]
-        assert len(parameter_labels) == 6
+        assert len(parameter_labels) == 7
         for label in parameter_labels:
             assert label.minimumWidth() <= label.sizeHint().width()
             assert label.maximumWidth() >= label.sizeHint().width()
 
         assert specs[0].current_param_vals["rm.method"] == "DL"
+        assert specs[0].current_param_vals["inference.method"] == "z"
         assert specs[0].current_param_vals["to"] == "only0"
         assert specs[0].current_param_vals["conf.level"] == 95.0
         assert specs[0].current_param_vals["digits"] == 2

@@ -838,12 +838,15 @@ meta.regression <- function(reg.data, params, cond.means.data=NULL, stop.at.rma=
 
 	# remove when and if method dialog is added
 	method <- as.character(params$rm.method)
-   
+	inference.method <- rcmetar.validate.inference.method(
+		params,
+		length(reg.data@y),
+		ncol(cov.array) + 1)
 
 	
 	res<-rma.uni(yi=reg.data@y, sei=reg.data@SE, slab=reg.data@study.names,
 					level=params$conf.level, digits=params$digits,
-					method=method, mods=cov.array)
+					method=method, test=inference.method, mods=cov.array)
 	pure.res<-res
 	# Used for when we just need the intermediate results (e.g. bootstrapping)
 	if (stop.at.rma) {
@@ -926,17 +929,33 @@ meta.regression <- function(reg.data, params, cond.means.data=NULL, stop.at.rma=
 							"res.info"=rma.uni.value.info())
 		}
 	
-	references <- rcmetar.method.references("meta.regression")
+	references <- rcmetar.unique.references(c(
+		rcmetar.method.references("meta.regression"),
+		rcmetar.inference.method.references(params)))
 	results[["References"]] <- references
     results
 }
 
 meta.regression.parameters <- function() {
-    rm.methods <- c("HE", "DL", "SJ", "ML", "REML", "EB")
+    rm.methods <- rcmetar.random.effects.methods()
     list(
-        parameters=list("rm.method"=rm.methods, "conf.level"="float", "digits"="int"),
-        defaults=list("rm.method"="REML", "conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS),
-        var_order=c("rm.method", "conf.level", "digits")
+        parameters=list("rm.method"=rm.methods, "inference.method"=rcmetar.inference.methods(), "conf.level"="float", "digits"="int"),
+        defaults=list("rm.method"="REML", "inference.method"="z", "conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS),
+        var_order=c("rm.method", "inference.method", "conf.level", "digits")
+    )
+}
+
+meta.regression.pretty.names <- function() {
+    list(
+        "pretty.name"="Meta-Regression",
+        "description"="Models study-level covariates as predictors of effect estimates.",
+        "rm.method"=list(
+            "pretty.name"="Random-Effects method",
+            "description"="Method for estimating residual between-studies heterogeneity",
+            "rm.method.names"=rcmetar.random.effects.method.names()),
+        "inference.method"=rcmetar.inference.method.metadata(),
+        "conf.level"=list("pretty.name"="Confidence level", "description"="Level at which to compute confidence intervals"),
+        "digits"=list("pretty.name"="Decimal places", "description"="Decimal places for displayed estimates and intervals; p-values use at least 3")
     )
 }
 
@@ -1028,8 +1047,9 @@ binary.fixed.meta.regression <- function(reg.data, params){
        cov.vals <- eval(parse(text=cov.val.str))
        cov.data[,cov.name] <- cov.vals
     }     
+    inference.method <- rcmetar.validate.inference.method(params, length(reg.data@y), ncol(cov.data) + 1)
     res<-rma.uni(yi=reg.data@y, sei=reg.data@SE, slab=reg.data@study.names,
-                                level=params$conf.level, digits=params$digits, method="FE", 
+                                level=params$conf.level, digits=params$digits, method="FE", test=inference.method,
                                 mods=cov.data)
     reg.disp <- create.regression.disp(res, params, cov.names)
     if (length(cov.names)==1) {
@@ -1051,9 +1071,10 @@ binary.fixed.meta.regression <- function(reg.data, params){
 random.meta.regression <- function(reg.data, params, cov.name){
     cov.val.str <- paste("reg.data@covariates$", cov.name, sep="")
     cov.vals <- eval(parse(text=cov.val.str))
+    inference.method <- rcmetar.validate.inference.method(params, length(reg.data@y), 2)
     res<-rma.uni(yi=reg.data@y, sei=reg.data@SE, slab=reg.data@study.names,
                                 level=params$conf.level, digits=params$digits, 
-                                method=params$rm.method, 
+                                method=params$rm.method, test=inference.method,
                                 mods=cov.vals)
     reg.disp <- create.regression.disp(res, params)
     reg.disp
@@ -1076,13 +1097,13 @@ random.meta.regression <- function(reg.data, params, cov.name){
 
 binary.random.meta.regression.parameters <- function(){
     # parameters
-    rm_method_ls <- c("HE", "DL", "SJ", "ML", "REML", "EB")
-    params <- list("rm.method"=rm_method_ls, "conf.level"="float", "digits"="int")
+    rm_method_ls <- rcmetar.random.effects.methods()
+    params <- list("rm.method"=rm_method_ls, "inference.method"=rcmetar.inference.methods(), "conf.level"="float", "digits"="int")
     
     # default values
-    defaults <- list("rm.method"="DL", "conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS)
+    defaults <- list("rm.method"="DL", "inference.method"="z", "conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS)
     
-    var_order <- c("rm.method", "conf.level", "digits")
+    var_order <- c("rm.method", "inference.method", "conf.level", "digits")
     parameters <- list("parameters"=params, "defaults"=defaults, "var_order"=var_order)
 }
 
@@ -1105,8 +1126,9 @@ categorical.meta.regression <- function(reg.data, params, cov.names) {
            cov.data <- array.tmp
        }
   }
+  inference.method <- rcmetar.validate.inference.method(params, length(reg.data@y), ncol(cov.data) + 1)
   res <-rma.uni(yi=reg.data@y, sei=reg.data@SE, slab=reg.data@study.names,
-                                level=params$conf.level, digits=params$digits, method="FE", 
+                                level=params$conf.level, digits=params$digits, method="FE", test=inference.method,
                                 mods=cov.data)
   reg.disp <- create.regression.disp(res, params, cov.names=dimnames(cov.data)[[2]]) 
   results <- list("Summary"=reg.disp)

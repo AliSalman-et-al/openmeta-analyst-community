@@ -1273,6 +1273,16 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             meta_py_r.get_params(self.current_method)
         )
 
+        for name, definition in self.current_params.items():
+            if name not in self.current_param_vals:
+                continue
+            saved_value = self.current_param_vals[name]
+            if isinstance(definition, list) and str(saved_value) not in {
+                str(option) for option in definition
+            }:
+                continue
+            self.current_defaults[name] = saved_value
+
         ###
         # user selections overwrite the current parameter defaults.
         # ie., if the user has run this analysis before, the preferences

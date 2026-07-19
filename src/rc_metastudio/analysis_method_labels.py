@@ -44,6 +44,14 @@ _KNOWN_PARAMETER_VALUE_LABELS = {
     ("rm.method", "ML"): "Maximum Likelihood",
     ("rm.method", "REML"): "Restricted Maximum Likelihood",
     ("rm.method", "EB"): "Empirical Bayes",
+    ("rm.method", "HS"): "Hunter-Schmidt",
+    ("rm.method", "HSk"): "Hunter-Schmidt with small-sample correction",
+    ("rm.method", "PM"): "Paule-Mandel",
+    ("rm.method", "PMM"): "Median-unbiased Paule-Mandel",
+    ("inference.method", "z"): "Normal approximation",
+    ("inference.method", "t"): "Student's t-distribution",
+    ("inference.method", "knha"): "Knapp-Hartung",
+    ("inference.method", "adhoc"): "Modified Knapp-Hartung",
     ("to", "only0"): "Only zero-event studies",
     ("to", "all"): "All studies",
     ("to", "if0all"): "All studies if any study has zero events",
@@ -52,6 +60,7 @@ _KNOWN_PARAMETER_VALUE_LABELS = {
 
 _KNOWN_PARAMETER_LABELS = {
     "rm.method": "Random-Effects Method",
+    "inference.method": "Inference Method",
     "to": "Correction Factor Target",
     "conf.level": "Confidence Level",
     "digits": "Decimal Places",
@@ -100,9 +109,9 @@ def normalize_available_method_labels(methods_by_label):
 def parameter_value_display_label(param_name, value, param_metadata=None):
     text = str(value)
     if param_metadata is not None:
-        rm_method_names = param_metadata.get("rm.method.names")
-        if rm_method_names is not None and text in rm_method_names:
-            return str(rm_method_names[text])
+        value_names = param_metadata.get("%s.names" % param_name)
+        if value_names is not None and text in value_names:
+            return str(value_names[text])
     return _KNOWN_PARAMETER_VALUE_LABELS.get((str(param_name), text), text)
 
 

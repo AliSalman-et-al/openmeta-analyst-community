@@ -424,6 +424,7 @@ rcmetar.metafor.subgroup.difference.test <- function(yi, sei, subgroup.values, p
             sei=sei,
             mods=~ subgroup.factor,
             method=params$rm.method,
+            test=rcmetar.inference.method(params),
             level=params$conf.level,
             digits=params$digits
         ),
