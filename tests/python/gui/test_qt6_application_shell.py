@@ -109,8 +109,7 @@ def test_startup_failure_injections_release_qt_objects_with_fatal_warnings():
         )
         assert result.returncode == 0, result.stdout + result.stderr
         assert (
-            "Application shell failure teardown passed at %s." % stage
-            in result.stdout
+            "Application shell failure teardown passed at %s." % stage in result.stdout
         )
 
 
@@ -172,18 +171,30 @@ def test_shell_actions_use_native_resources_and_fire_once(qapp, monkeypatch):
             "Help",
         ]
 
-        assert window.action_open.shortcut().matches(
-            QtGui.QKeySequence(QtGui.QKeySequence.StandardKey.Open)
-        ) == QtGui.QKeySequence.SequenceMatch.ExactMatch
-        assert window.action_save.shortcut().matches(
-            QtGui.QKeySequence(QtGui.QKeySequence.StandardKey.Save)
-        ) == QtGui.QKeySequence.SequenceMatch.ExactMatch
-        assert window.action_new_dataset.shortcut().matches(
-            QtGui.QKeySequence(QtGui.QKeySequence.StandardKey.New)
-        ) == QtGui.QKeySequence.SequenceMatch.ExactMatch
-        assert window.action_quit.shortcut().matches(
-            QtGui.QKeySequence(QtGui.QKeySequence.StandardKey.Quit)
-        ) == QtGui.QKeySequence.SequenceMatch.ExactMatch
+        assert (
+            window.action_open.shortcut().matches(
+                QtGui.QKeySequence(QtGui.QKeySequence.StandardKey.Open)
+            )
+            == QtGui.QKeySequence.SequenceMatch.ExactMatch
+        )
+        assert (
+            window.action_save.shortcut().matches(
+                QtGui.QKeySequence(QtGui.QKeySequence.StandardKey.Save)
+            )
+            == QtGui.QKeySequence.SequenceMatch.ExactMatch
+        )
+        assert (
+            window.action_new_dataset.shortcut().matches(
+                QtGui.QKeySequence(QtGui.QKeySequence.StandardKey.New)
+            )
+            == QtGui.QKeySequence.SequenceMatch.ExactMatch
+        )
+        assert (
+            window.action_quit.shortcut().matches(
+                QtGui.QKeySequence(QtGui.QKeySequence.StandardKey.Quit)
+            )
+            == QtGui.QKeySequence.SequenceMatch.ExactMatch
+        )
 
         window.action_about_legal.trigger()
         window.action_open.trigger()
@@ -287,9 +298,7 @@ def test_workspace_settings_store_only_portable_typed_values(qapp):
 
     assert decoded == {"height": 600, "width": 900, "x": 20, "y": 30}
     assert isinstance(raw_geometry, str)
-    assert isinstance(
-        store.value("workspace_layout/main/maximized", type=bool), bool
-    )
+    assert isinstance(store.value("workspace_layout/main/maximized", type=bool), bool)
     assert settings.load_main_window_placement(
         [QtCore.QRect(0, 0, 1920, 1080)]
     ).frame_geometry == QtCore.QRect(20, 30, 900, 600)
@@ -342,7 +351,7 @@ def test_geometry_codec_rejects_overflow_and_repairs_only_geometry(qapp):
     store = QtCore.QSettings()
     invalid_values = (
         QtCore.QRect(1, 2, 3, 4),
-        '[1,2,3,4]',
+        "[1,2,3,4]",
         '{"height":4,"width":3,"x":true,"y":2}',
         '{"height":4,"width":0,"x":1,"y":2}',
         '{"height":4,"width":3,"x":2147483647,"y":2}',
@@ -369,15 +378,15 @@ def test_workspace_boolean_and_splitter_codecs_repair_only_invalid_fields(qapp):
     store = QtCore.QSettings()
     invalid_splitters = (
         "not-json",
-        '{}',
-        '[0.5]',
-        '[true,0.5]',
+        "{}",
+        "[0.5]",
+        "[true,0.5]",
         '["0.5",0.5]',
-        '[0.0,1.0]',
-        '[-0.1,1.1]',
-        '[0.2,1.2]',
-        '[NaN,0.5]',
-        '[Infinity,0.5]',
+        "[0.0,1.0]",
+        "[-0.1,1.1]",
+        "[0.2,1.2]",
+        "[NaN,0.5]",
+        "[Infinity,0.5]",
     )
     for invalid in invalid_splitters:
         store.clear()
@@ -386,9 +395,7 @@ def test_workspace_boolean_and_splitter_codecs_repair_only_invalid_fields(qapp):
         store.setValue("workspace_layout/results/full_screen", 1)
         store.setValue("workspace_layout/results/splitter_proportions", invalid)
         store.setValue("workspace_layout/results/portable_note", "keep")
-        state = settings.load_results_window_state(
-            [QtCore.QRect(0, 0, 1920, 1080)]
-        )
+        state = settings.load_results_window_state([QtCore.QRect(0, 0, 1920, 1080)])
         assert state.maximized is True
         assert state.full_screen is False
         assert state.splitter_proportions == (0.3, 0.7)
@@ -422,7 +429,9 @@ def test_adaptive_shell_state_is_typed_without_dynamic_qt_properties(qapp):
         state = adaptive_window.adaptive_window_state(window)
         assert state.role is adaptive_window.WindowRole.MAIN
         assert state.policy.archetype is adaptive_window.WindowArchetype.WORKSPACE
-        dynamic_names = {bytes(name).decode("utf-8") for name in window.dynamicPropertyNames()}
+        dynamic_names = {
+            bytes(name).decode("utf-8") for name in window.dynamicPropertyNames()
+        }
         assert "RCMS_window_archetype" not in dynamic_names
         assert "RCMS_window_role" not in dynamic_names
     finally:
@@ -446,7 +455,9 @@ def test_structured_project_lifecycle_opens_every_sample_and_round_trips_state(
         for sample in sorted((ROOT / "sample_projects").glob("*.rcms")):
             expected = project_format.load_project(sample).project["dataset"]
             assert window.open(str(sample)) is True
-            observed = project_adapter.dataset_to_project(window.model.dataset)["dataset"]
+            observed = project_adapter.dataset_to_project(window.model.dataset)[
+                "dataset"
+            ]
             assert observed["title"] == expected["title"]
             assert observed["analysis_family"] == expected["analysis_family"]
             assert observed["outcomes"] == expected["outcomes"]
@@ -703,7 +714,9 @@ def test_failed_open_and_save_preserve_current_project_dirty_state_and_recents(
             }
             mutate(decoded)
             project_payload = (
-                json.dumps(decoded["project.json"], sort_keys=True, separators=(",", ":"))
+                json.dumps(
+                    decoded["project.json"], sort_keys=True, separators=(",", ":")
+                )
                 + "\n"
             ).encode("utf-8")
             state_payload = (
@@ -734,7 +747,9 @@ def test_failed_open_and_save_preserve_current_project_dirty_state_and_recents(
         )
         schema_invalid = rewritten_project(
             "schema-invalid.rcms",
-            lambda members: members["state.json"].update(confidence_level="ninety-five"),
+            lambda members: members["state.json"].update(
+                confidence_level="ninety-five"
+            ),
         )
 
         for rejected, expected_message in (
@@ -765,9 +780,9 @@ def test_failed_open_and_save_preserve_current_project_dirty_state_and_recents(
                 context.setattr(
                     owner,
                     attribute,
-                    lambda *_args, message=boundary, **_kwargs: (
-                        _ for _ in ()
-                    ).throw(OSError(message)),
+                    lambda *_args, message=boundary, **_kwargs: (_ for _ in ()).throw(
+                        OSError(message)
+                    ),
                 )
                 assert window.save_as() is False
             assert window.out_path == prior_path
@@ -811,13 +826,17 @@ def test_durable_save_and_open_succeed_when_recent_project_bookkeeping_fails(
                     context.setattr(
                         meta_form,
                         "add_file_to_recent_files",
-                        lambda _path: (_ for _ in ()).throw(OSError("add recent failed")),
+                        lambda _path: (_ for _ in ()).throw(
+                            OSError("add recent failed")
+                        ),
                     )
                 elif fault == "menu":
                     context.setattr(
                         window,
                         "populate_open_recent_menu",
-                        lambda: (_ for _ in ()).throw(RuntimeError("menu rebuild failed")),
+                        lambda: (_ for _ in ()).throw(
+                            RuntimeError("menu rebuild failed")
+                        ),
                     )
                 else:
                     context.setattr(
@@ -837,13 +856,17 @@ def test_durable_save_and_open_succeed_when_recent_project_bookkeeping_fails(
                     context.setattr(
                         meta_form,
                         "add_file_to_recent_files",
-                        lambda _path: (_ for _ in ()).throw(OSError("add recent failed")),
+                        lambda _path: (_ for _ in ()).throw(
+                            OSError("add recent failed")
+                        ),
                     )
                 elif fault == "menu":
                     context.setattr(
                         window,
                         "populate_open_recent_menu",
-                        lambda: (_ for _ in ()).throw(RuntimeError("menu rebuild failed")),
+                        lambda: (_ for _ in ()).throw(
+                            RuntimeError("menu rebuild failed")
+                        ),
                     )
                 else:
                     context.setattr(
@@ -1006,9 +1029,7 @@ def test_open_rolls_back_constructor_rebind_and_ui_initialization_failures(
                 sync_failures.append(True)
                 raise RuntimeError("column synchronization failed")
 
-            context.setattr(
-                window.tableView, "synchronize_column_widths", always_fail
-            )
+            context.setattr(window.tableView, "synchronize_column_widths", always_fail)
             context.setattr(
                 window,
                 "_restore_metric_menu_state",

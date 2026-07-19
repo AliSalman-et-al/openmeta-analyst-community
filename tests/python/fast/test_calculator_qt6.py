@@ -393,6 +393,7 @@ def test_calculator_consumers_share_one_canonical_meta_py_r_identity(monkeypatch
         )
     )
 
+
 def test_calculator_cell_validators_accept_native_qt6_text():
     import binary_data_form
     import continuous_data_form
@@ -715,7 +716,9 @@ def _assert_calculator_table_grid_fills_width(qapp, table):
         for column in range(table.columnCount())
     )
 
-    assert table.horizontalHeader().sectionResizeMode(0) == QHeaderView.ResizeMode.Stretch
+    assert (
+        table.horizontalHeader().sectionResizeMode(0) == QHeaderView.ResizeMode.Stretch
+    )
     assert section_width >= table.viewport().width() - 1
 
 
@@ -868,7 +871,9 @@ def test_continuous_effect_fields_fit_metric_domain_samples(
     )
     for field in fields.values():
         margins = field.textMargins()
-        frame = field.style().pixelMetric(QStyle.PixelMetric.PM_DefaultFrameWidth, None, field)
+        frame = field.style().pixelMetric(
+            QStyle.PixelMetric.PM_DefaultFrameWidth, None, field
+        )
         required = (
             field.fontMetrics().horizontalAdvance(representative)
             + margins.left()
@@ -1298,7 +1303,9 @@ def test_continuous_calculator_grid_columns_keep_internal_overflow(qapp, monkeyp
     header = table.horizontalHeader()
     assert header.sectionResizeMode(0) == QHeaderView.ResizeMode.Interactive
     assert not header.stretchLastSection()
-    assert table.horizontalScrollBarPolicy() == QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
+    assert (
+        table.horizontalScrollBarPolicy() == QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
+    )
     assert (
         sum(header.sectionSize(column) for column in range(table.columnCount()))
         > table.viewport().width()

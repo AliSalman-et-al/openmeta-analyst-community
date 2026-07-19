@@ -71,9 +71,7 @@ def capture_visible_calculator(
     return image, "QWidget.render(QImage) fallback"
 
 
-def encode_capture_png(
-    capture: QtGui.QPixmap | QtGui.QImage, path: Path
-) -> None:
+def encode_capture_png(capture: QtGui.QPixmap | QtGui.QImage, path: Path) -> None:
     """Encode a Qt capture through Pillow without invoking Qt image plugins."""
     if capture.isNull():
         raise RuntimeError("cannot encode a null calculator capture")
@@ -105,7 +103,9 @@ def install_native_stub_backend():
     if getattr(backend, "_oma_stub_backend", False) is not True:
         raise RuntimeError("native calculator smoke did not install the stub backend")
     if "rpy2.rinterface" in sys.modules:
-        raise RuntimeError("rpy2.rinterface loaded before native calculator GUI imports")
+        raise RuntimeError(
+            "rpy2.rinterface loaded before native calculator GUI imports"
+        )
     _phase("backend-installed")
     return backend
 
@@ -152,7 +152,9 @@ def validate_evidence_bundle(evidence_root: Path) -> list[dict[str, object]]:
         if not isinstance(relative_text, str) or not relative_text:
             raise ValueError("calculator image path must be a non-empty string")
         if "\\" in relative_text:
-            raise ValueError("calculator image path must use canonical POSIX separators")
+            raise ValueError(
+                "calculator image path must use canonical POSIX separators"
+            )
         relative = PurePosixPath(relative_text)
         if (
             relative.is_absolute()
@@ -178,7 +180,9 @@ def validate_evidence_bundle(evidence_root: Path) -> list[dict[str, object]]:
         if not isinstance(expected_hash, str) or len(expected_hash) != 64:
             raise ValueError("calculator image SHA256 is invalid")
         if _sha256(image_path) != expected_hash:
-            raise ValueError("calculator image SHA256 does not match: %s" % relative_text)
+            raise ValueError(
+                "calculator image SHA256 does not match: %s" % relative_text
+            )
     return evidence
 
 
@@ -196,24 +200,45 @@ def _run_main() -> int:
     import ma_data_table_model
 
     binary_data_form.meta_py_r.get_mult_from_r = lambda _level: 1.96
-    setattr(binary_data_form.meta_py_r, "binary_convert_scale", lambda value, *args, **kwargs: value)
+    setattr(
+        binary_data_form.meta_py_r,
+        "binary_convert_scale",
+        lambda value, *args, **kwargs: value,
+    )
     binary_data_form.meta_py_r.impute_bin_data = lambda _data: {"FAIL": True}
     binary_data_form.meta_py_r.effect_for_study = lambda *args, **kwargs: {
         "calc_scale": (1.2, 0.8, 1.8)
     }
-    setattr(binary_data_form.meta_py_r, "effect_triplet", lambda result, scale, metric=None: result[scale])
-    setattr(continuous_data_form.meta_py_r, "continuous_convert_scale", lambda value, *args, **kwargs: value)
-    continuous_data_form.meta_py_r.impute_cont_data = (
-        lambda _data, _alpha: {"succeeded": False, "comment": "complete input"}
+    setattr(
+        binary_data_form.meta_py_r,
+        "effect_triplet",
+        lambda result, scale, metric=None: result[scale],
     )
+    setattr(
+        continuous_data_form.meta_py_r,
+        "continuous_convert_scale",
+        lambda value, *args, **kwargs: value,
+    )
+    continuous_data_form.meta_py_r.impute_cont_data = lambda _data, _alpha: {
+        "succeeded": False,
+        "comment": "complete input",
+    }
     continuous_data_form.meta_py_r.continuous_effect_for_study = (
         lambda *args, **kwargs: {"calc_scale": (1.5, 1.0, 2.0)}
     )
-    setattr(continuous_data_form.meta_py_r, "effect_triplet", lambda result, scale, metric=None: result[scale])
-    continuous_data_form.meta_py_r.back_calc_cont_data = (
-        lambda *args, **kwargs: {"FAIL": True}
+    setattr(
+        continuous_data_form.meta_py_r,
+        "effect_triplet",
+        lambda result, scale, metric=None: result[scale],
     )
-    setattr(diagnostic_data_form.meta_py_r, "diagnostic_convert_scale", lambda value, *args, **kwargs: value)
+    continuous_data_form.meta_py_r.back_calc_cont_data = lambda *args, **kwargs: {
+        "FAIL": True
+    }
+    setattr(
+        diagnostic_data_form.meta_py_r,
+        "diagnostic_convert_scale",
+        lambda value, *args, **kwargs: value,
+    )
     diagnostic_data_form.meta_py_r.impute_diag_data = lambda _data: {
         "TP": None,
         "FP": None,
@@ -225,11 +250,27 @@ def _run_main() -> int:
             metric: {"calc_scale": (0.8, 0.7, 0.9)} for metric in metrics
         }
     )
-    setattr(diagnostic_data_form.meta_py_r, "effect_triplet", lambda result, scale, metric=None: result[scale])
+    setattr(
+        diagnostic_data_form.meta_py_r,
+        "effect_triplet",
+        lambda result, scale, metric=None: result[scale],
+    )
     setattr(diagnostic_data_form.QMessageBox, "warning", lambda *args, **kwargs: None)
-    setattr(ma_data_table_model.meta_py_r, "binary_convert_scale", lambda value, *args, **kwargs: value)
-    setattr(ma_data_table_model.meta_py_r, "continuous_convert_scale", lambda value, *args, **kwargs: value)
-    setattr(ma_data_table_model.meta_py_r, "diagnostic_convert_scale", lambda value, *args, **kwargs: value)
+    setattr(
+        ma_data_table_model.meta_py_r,
+        "binary_convert_scale",
+        lambda value, *args, **kwargs: value,
+    )
+    setattr(
+        ma_data_table_model.meta_py_r,
+        "continuous_convert_scale",
+        lambda value, *args, **kwargs: value,
+    )
+    setattr(
+        ma_data_table_model.meta_py_r,
+        "diagnostic_convert_scale",
+        lambda value, *args, **kwargs: value,
+    )
 
     evidence_root = repo_root / "build/qt6-verification/native-calculators"
     evidence_path = evidence_root / "evidence.json"
@@ -292,37 +333,67 @@ def _run_main() -> int:
                         raise RuntimeError("OK is not the default calculator action")
                     if data_type == "binary":
                         if not isinstance(dialog, binary_data_form.BinaryDataForm2):
-                            raise RuntimeError("binary calculator opened the wrong dialog")
+                            raise RuntimeError(
+                                "binary calculator opened the wrong dialog"
+                            )
                         expected_focus = dialog.raw_data_table
                     elif data_type == "continuous":
-                        if not isinstance(dialog, continuous_data_form.ContinuousDataForm):
-                            raise RuntimeError("continuous calculator opened the wrong dialog")
+                        if not isinstance(
+                            dialog, continuous_data_form.ContinuousDataForm
+                        ):
+                            raise RuntimeError(
+                                "continuous calculator opened the wrong dialog"
+                            )
                         expected_focus = dialog.simple_table
                     else:
-                        if not isinstance(dialog, diagnostic_data_form.DiagnosticDataForm):
-                            raise RuntimeError("diagnostic calculator opened the wrong dialog")
+                        if not isinstance(
+                            dialog, diagnostic_data_form.DiagnosticDataForm
+                        ):
+                            raise RuntimeError(
+                                "diagnostic calculator opened the wrong dialog"
+                            )
                         expected_focus = dialog.two_by_two_table
                     if dialog.focusWidget() is not expected_focus:
-                        raise RuntimeError("calculator did not assign initial table focus")
+                        raise RuntimeError(
+                            "calculator did not assign initial table focus"
+                        )
 
                     if data_type == "binary":
                         assert isinstance(dialog, binary_data_form.BinaryDataForm2)
                         dialog.raw_data_table.setCurrentCell(0, 0)
-                        required(dialog.raw_data_table.item(0, 0), "binary smoke cell").setText("7")
+                        required(
+                            dialog.raw_data_table.item(0, 0), "binary smoke cell"
+                        ).setText("7")
                         action = "valid edit and accept"
                         expected_result = "accepted"
                     elif data_type == "continuous":
-                        assert isinstance(dialog, continuous_data_form.ContinuousDataForm)
+                        assert isinstance(
+                            dialog, continuous_data_form.ContinuousDataForm
+                        )
                         dialog.simple_table.setCurrentCell(0, 1)
-                        required(dialog.simple_table.item(0, 1), "continuous smoke cell").setText("95,5")
+                        required(
+                            dialog.simple_table.item(0, 1), "continuous smoke cell"
+                        ).setText("95,5")
                         action = "comma-decimal edit and accept"
                         expected_result = "accepted"
                     else:
-                        assert isinstance(dialog, diagnostic_data_form.DiagnosticDataForm)
+                        assert isinstance(
+                            dialog, diagnostic_data_form.DiagnosticDataForm
+                        )
                         dialog.two_by_two_table.setCurrentCell(0, 0)
-                        required(dialog.two_by_two_table.item(0, 0), "diagnostic smoke cell").setText("13,5")
-                        if required(dialog.two_by_two_table.item(0, 0), "diagnostic smoke cell").text() != "12":
-                            raise RuntimeError("invalid diagnostic count did not roll back")
+                        required(
+                            dialog.two_by_two_table.item(0, 0), "diagnostic smoke cell"
+                        ).setText("13,5")
+                        if (
+                            required(
+                                dialog.two_by_two_table.item(0, 0),
+                                "diagnostic smoke cell",
+                            ).text()
+                            != "12"
+                        ):
+                            raise RuntimeError(
+                                "invalid diagnostic count did not roll back"
+                            )
                         action = "invalid edit and cancel rollback"
                         expected_result = "rejected"
                     app.processEvents()
@@ -384,9 +455,13 @@ def _run_main() -> int:
                 raise RuntimeError("diagnostic cancel mutated the model")
             accepted = data_type != "diagnostic"
             if table_view.undoStack.count() != int(accepted):
-                raise RuntimeError("calculator transaction created the wrong undo state")
+                raise RuntimeError(
+                    "calculator transaction created the wrong undo state"
+                )
             if window.current_data_unsaved is not accepted:
-                raise RuntimeError("calculator transaction created the wrong dirty state")
+                raise RuntimeError(
+                    "calculator transaction created the wrong dirty state"
+                )
             captured[0]["model_after"] = list(after)
             captured[0]["model_nonmutation"] = not accepted
             captured[0]["undo_commands"] = table_view.undoStack.count()

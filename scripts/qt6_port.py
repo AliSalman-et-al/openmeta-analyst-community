@@ -27,7 +27,9 @@ def _files(paths: Iterable[Path], suffixes: set[str]) -> list[Path]:
     files: list[Path] = []
     for candidate in paths:
         if candidate.is_symlink():
-            raise MigrationTransactionError(f"refusing symbolic link input: {candidate.absolute()}")
+            raise MigrationTransactionError(
+                f"refusing symbolic link input: {candidate.absolute()}"
+            )
         if candidate.is_dir():
             files.extend(
                 path.absolute()
@@ -37,7 +39,9 @@ def _files(paths: Iterable[Path], suffixes: set[str]) -> list[Path]:
         elif candidate.is_file() and candidate.suffix.lower() in suffixes:
             files.append(candidate.absolute())
         else:
-            raise ValueError(f"path does not name a supported file or directory: {candidate}")
+            raise ValueError(
+                f"path does not name a supported file or directory: {candidate}"
+            )
     return sorted(files, key=lambda path: path.as_posix())
 
 
@@ -65,7 +69,9 @@ def _validate_disjoint_paths(files: list[Path], report: Path | None) -> None:
         identity = (details.st_dev, details.st_ino)
         if key in normalized or identity in identities:
             other = normalized.get(key) or identities[identity]
-            raise MigrationTransactionError(f"input paths alias the same file: {other} and {path}")
+            raise MigrationTransactionError(
+                f"input paths alias the same file: {other} and {path}"
+            )
         normalized[key] = path
         identities[identity] = path
     if report is None:
@@ -97,10 +103,14 @@ def _validate_distinct_named_paths(named: dict[str, Path | None]) -> None:
             continue
         absolute = candidate.absolute()
         if absolute.is_symlink():
-            raise MigrationTransactionError(f"{role} path must not be a symbolic link: {absolute}")
+            raise MigrationTransactionError(
+                f"{role} path must not be a symbolic link: {absolute}"
+            )
         key = os.path.normcase(str(absolute.resolve(strict=False)))
         if key in seen_paths:
-            raise MigrationTransactionError(f"{role} path aliases {seen_paths[key]} path: {absolute}")
+            raise MigrationTransactionError(
+                f"{role} path aliases {seen_paths[key]} path: {absolute}"
+            )
         seen_paths[key] = role
         if absolute.exists():
             details = absolute.stat(follow_symlinks=False)
@@ -129,9 +139,7 @@ def _codemod(options: argparse.Namespace) -> int:
         for transformation in plan.result.transformations
     ]
     changed = [
-        plan.path.as_posix()
-        for plan in plans
-        if plan.source_bytes != plan.target_bytes
+        plan.path.as_posix() for plan in plans if plan.source_bytes != plan.target_bytes
     ]
     payload: dict[str, object] = {
         "schema_version": 1,
@@ -181,7 +189,11 @@ def _strict(options: argparse.Namespace) -> int:
         if expected != snapshot:
             print(
                 "strict finding snapshot drifted:\n"
-                + json.dumps({"expected": expected, "observed": snapshot}, indent=2, sort_keys=True),
+                + json.dumps(
+                    {"expected": expected, "observed": snapshot},
+                    indent=2,
+                    sort_keys=True,
+                ),
                 file=sys.stderr,
             )
             return 1
@@ -195,12 +207,16 @@ def _parser() -> argparse.ArgumentParser:
     codemod = commands.add_parser("codemod", help="rewrite unambiguous Python sites")
     mode = codemod.add_mutually_exclusive_group()
     mode.add_argument("--write", action="store_true", help="write changed files")
-    mode.add_argument("--check", action="store_true", help="fail if a rewrite is pending")
+    mode.add_argument(
+        "--check", action="store_true", help="fail if a rewrite is pending"
+    )
     codemod.add_argument("--report", type=Path)
     codemod.add_argument("paths", nargs="+", type=Path)
     codemod.set_defaults(handler=_codemod)
 
-    strict = commands.add_parser("strict", help="reject forbidden active Qt migration patterns")
+    strict = commands.add_parser(
+        "strict", help="reject forbidden active Qt migration patterns"
+    )
     strict.add_argument("--root", type=Path, default=Path.cwd())
     strict.add_argument("--report", type=Path)
     snapshot_mode = strict.add_mutually_exclusive_group()

@@ -55,7 +55,9 @@ class MainWizardPage(QWizardPage):
     def wizard(self) -> "MainWizard":
         wizard = super().wizard()
         if not isinstance(wizard, MainWizard):
-            raise RuntimeError("RC MetaStudio wizard pages require MainWizard ownership")
+            raise RuntimeError(
+                "RC MetaStudio wizard pages require MainWizard ownership"
+            )
         return wizard
 
 
@@ -262,11 +264,15 @@ class DataTypePage(MainWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
         text_height = line_count * button.fontMetrics().lineSpacing()
         margin = max(
             0,
-            button.style().pixelMetric(QStyle.PixelMetric.PM_ButtonMargin, None, button),
+            button.style().pixelMetric(
+                QStyle.PixelMetric.PM_ButtonMargin, None, button
+            ),
         )
         frame = max(
             0,
-            button.style().pixelMetric(QStyle.PixelMetric.PM_DefaultFrameWidth, None, button),
+            button.style().pixelMetric(
+                QStyle.PixelMetric.PM_DefaultFrameWidth, None, button
+            ),
         )
         required = QSize(
             button.sizeHint().width(),
@@ -395,7 +401,6 @@ class ChooseMetricPage(MainWizardPage, forms.ui_choose_metric_page.Ui_WizardPage
             default_item_text += " (DEFAULT)"
             self.metric_cbo_box.setItemText(index_of_default, default_item_text)
             self.metric_cbo_box.blockSignals(False)
-
 
     def _metric_choice_changed(self, newindex):
         self.wizard().set_effect(_qt_item_text(self.metric_cbo_box.itemData(newindex)))
@@ -851,7 +856,11 @@ class MainWizard(QWizard):
             return
         overflow = page.findChild(QScrollArea, "pageScrollArea")
         overflow_content = overflow.widget() if overflow is not None else None
-        if overflow is not None and overflow_content is not None and overflow_content.isAncestorOf(current):
+        if (
+            overflow is not None
+            and overflow_content is not None
+            and overflow_content.isAncestorOf(current)
+        ):
             overflow.ensureWidgetVisible(current)
 
     def set_wizard_path(self, path):

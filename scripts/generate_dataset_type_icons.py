@@ -27,9 +27,7 @@ DETAIL_INK = ""
 CURRENT_THEME = "light"
 
 
-def _new_figure(
-    *, width: float = 48, height: float = 48
-) -> tuple[Figure, object]:
+def _new_figure(*, width: float = 48, height: float = 48) -> tuple[Figure, object]:
     figure = Figure(figsize=(width / 72, height / 72), dpi=72, facecolor="none")
     axes = figure.add_axes((0, 0, 1, 1))
     axes.set_xlim(0, 1)
@@ -127,7 +125,9 @@ def _diagnostic() -> None:
                     0.24,
                     boxstyle="round,pad=0,rounding_size=0.04",
                     linewidth=0,
-                    facecolor=INK if (x, y) in ((0.22, 0.54), (0.54, 0.22)) else MID_INK,
+                    facecolor=INK
+                    if (x, y) in ((0.22, 0.54), (0.54, 0.22))
+                    else MID_INK,
                 )
             )
     axes.plot((0.27, 0.32, 0.41), (0.68, 0.62, 0.72), color=DETAIL_INK, linewidth=1.5)
@@ -154,14 +154,27 @@ def main() -> None:
             "generic-effect-size.svg", r"$(\theta,\,SE)$", size=18, canvas=(54, 40)
         )
         _paired_formula(
-            "two-arm-proportions.svg", r"$\frac{x_1}{N_1}$", r"$\frac{x_2}{N_2}$",
-            size=18, arm_center=0.27, separator_size=9, canvas=(72, 44),
+            "two-arm-proportions.svg",
+            r"$\frac{x_1}{N_1}$",
+            r"$\frac{x_2}{N_2}$",
+            size=18,
+            arm_center=0.27,
+            separator_size=9,
+            canvas=(72, 44),
         )
         _paired_formula(
-            "two-arm-means.svg", r"$\mu_1$", r"$\mu_2$", size=19,
-            arm_center=0.19, separator_size=9.5, canvas=(58, 40), y_center=0.56,
+            "two-arm-means.svg",
+            r"$\mu_1$",
+            r"$\mu_2$",
+            size=19,
+            arm_center=0.19,
+            separator_size=9.5,
+            canvas=(58, 40),
+            y_center=0.56,
         )
-        _single_formula("standardized-mean-difference.svg", r"$g$", size=34, y_center=0.57)
+        _single_formula(
+            "standardized-mean-difference.svg", r"$g$", size=34, y_center=0.57
+        )
         _diagnostic()
 
 

@@ -210,7 +210,9 @@ class DatasetModel(QAbstractTableModel):
 
     dataset: Dataset
 
-    def __init__(self, filename="", dataset: Dataset | None = None, add_blank_study=True):
+    def __init__(
+        self, filename="", dataset: Dataset | None = None, add_blank_study=True
+    ):
         super(DatasetModel, self).__init__()
 
         self.conf_level = self.set_conf_level(DEFAULT_CONF_LEVEL)
@@ -527,7 +529,9 @@ class DatasetModel(QAbstractTableModel):
                             )
                         )
                     else:
-                        raise ValueError(f"Unsupported outcome type: {current_data_type!r}")
+                        raise ValueError(
+                            f"Unsupported outcome type: {current_data_type!r}"
+                        )
 
                     if (
                         current_data_type == CONTINUOUS
@@ -572,9 +576,7 @@ class DatasetModel(QAbstractTableModel):
                     # Sensitivity and specificity have historically been
                     # displayed to three decimals. Preserve that presentation
                     # contract without rounding the stored calculation values.
-                    diagnostic_digits = (
-                        num_digits if num_digits is not None else 3
-                    )
+                    diagnostic_digits = num_digits if num_digits is not None else 3
                     return _item_data(
                         self.format_float(outcome_val, num_digits=diagnostic_digits)
                     )  # issue #31
@@ -603,7 +605,9 @@ class DatasetModel(QAbstractTableModel):
                     # factor
                     return _item_data(_to_native_text(cov_value))
         elif role == Qt.ItemDataRole.TextAlignmentRole:
-            return _item_data(int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter))
+            return _item_data(
+                int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            )
         elif role == Qt.ItemDataRole.CheckStateRole:
             # this is where we deal with the inclusion/exclusion of studies
             if column == self.INCLUDE_STUDY and self._study_has_entered_data(
@@ -820,7 +824,12 @@ class DatasetModel(QAbstractTableModel):
         return True, None
 
     def setData(
-        self, index, value, role=Qt.ItemDataRole.EditRole, import_csv=False, allow_empty_names=False
+        self,
+        index,
+        value,
+        role=Qt.ItemDataRole.EditRole,
+        import_csv=False,
+        allow_empty_names=False,
     ):
         """
         Implementation of the AbstractDataTable method. The view uses this method
@@ -869,8 +878,7 @@ class DatasetModel(QAbstractTableModel):
                         self.dataset.studies[index.row()].manually_excluded
                     ),
                 )
-                if index.row() < len(self.dataset)
-                and column == self.INCLUDE_STUDY
+                if index.row() < len(self.dataset) and column == self.INCLUDE_STUDY
                 else self.data(index, Qt.ItemDataRole.EditRole)
             )
 
@@ -1356,7 +1364,10 @@ class DatasetModel(QAbstractTableModel):
         else:
             return None
 
-        if orientation == Qt.Orientation.Horizontal and role == WORKSPACE_COLUMN_IDENTITY_ROLE:
+        if (
+            orientation == Qt.Orientation.Horizontal
+            and role == WORKSPACE_COLUMN_IDENTITY_ROLE
+        ):
             return self.workspace_column_identity(section)
 
         outcome_type = self.dataset.get_outcome_type(self.current_outcome)
@@ -1492,7 +1503,9 @@ class DatasetModel(QAbstractTableModel):
                     return _item_data()
 
         if role == Qt.ItemDataRole.TextAlignmentRole:
-            return _item_data(int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter))
+            return _item_data(
+                int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            )
 
         ############################# DISPLAY ROLE #############################
         if role == Qt.ItemDataRole.DisplayRole:
@@ -1575,14 +1588,18 @@ class DatasetModel(QAbstractTableModel):
             return Qt.ItemFlag.NoItemFlags
         elif index.column() == self.INCLUDE_STUDY:
             if not self._study_has_entered_data(index.row()):
-                return Qt.ItemFlag(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                return Qt.ItemFlag(
+                    Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+                )
             return Qt.ItemFlag(
                 Qt.ItemFlag.ItemIsUserCheckable
                 | Qt.ItemFlag.ItemIsEnabled
                 | Qt.ItemFlag.ItemIsUserCheckable
                 | Qt.ItemFlag.ItemIsSelectable
             )
-        return Qt.ItemFlag(QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsEditable)
+        return Qt.ItemFlag(
+            QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsEditable
+        )
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         if parent.isValid():

@@ -117,7 +117,10 @@ def _validate_scenario_semantics(record):
         _fail("%s frame is outside its recorded available screen" % name)
     if record.get("capture_region") != "native-frame":
         _fail("%s is not a native-frame capture" % name)
-    if record.get("capture_method") != "QScreen.grabWindow(desktop); physical frame crop":
+    if (
+        record.get("capture_method")
+        != "QScreen.grabWindow(desktop); physical frame crop"
+    ):
         _fail("%s has an unexpected capture method" % name)
     probe = record.get("client_paint_probe_pixel_size")
     if not isinstance(probe, list) or len(probe) != 2 or min(probe) < 1:
@@ -137,7 +140,10 @@ def _validate_unavailable_scenario(record, expected_scale):
         _fail("capability-unavailable scenarios are allowed only at scale 1.5")
     if record.get("status") != "capability-unavailable":
         _fail("%s has an invalid unavailable status" % name)
-    if record.get("reason") != "required native frame exceeds available screen geometry":
+    if (
+        record.get("reason")
+        != "required native frame exceeds available screen geometry"
+    ):
         _fail("%s has an invalid unavailable reason" % name)
     expected_client = EXPECTED_SCENARIO_CONTRACTS[name][1]
     if expected_client is None:
@@ -148,7 +154,9 @@ def _validate_unavailable_scenario(record, expected_scale):
     if not isinstance(margins, dict):
         _fail("%s has no native frame margins" % name)
     try:
-        margin_values = [int(margins[key]) for key in ("left", "top", "right", "bottom")]
+        margin_values = [
+            int(margins[key]) for key in ("left", "top", "right", "bottom")
+        ]
     except (KeyError, TypeError, ValueError):
         _fail("%s has malformed native frame margins" % name)
     if min(margin_values) < 0:
@@ -192,18 +200,29 @@ def validate_evidence(root, expected_platform, expected_scale):
     surface_names = tuple(record.get("name") for record in surfaces)
     unavailable_names = tuple(record.get("name") for record in unavailable)
     observed_names = surface_names + unavailable_names
-    if len(observed_names) != len(set(observed_names)) or set(observed_names) != set(EXPECTED_SCENARIOS):
+    if len(observed_names) != len(set(observed_names)) or set(observed_names) != set(
+        EXPECTED_SCENARIOS
+    ):
         _fail(
             "scenario membership is %r plus unavailable %r, expected %r"
             % (surface_names, unavailable_names, EXPECTED_SCENARIOS)
         )
-    expected_surface_order = tuple(name for name in EXPECTED_SCENARIOS if name in surface_names)
+    expected_surface_order = tuple(
+        name for name in EXPECTED_SCENARIOS if name in surface_names
+    )
     if surface_names != expected_surface_order:
-        _fail("available scenario order is %r, expected %r" % (surface_names, expected_surface_order))
+        _fail(
+            "available scenario order is %r, expected %r"
+            % (surface_names, expected_surface_order)
+        )
     for record in unavailable:
         _validate_unavailable_scenario(record, expected_scale)
 
-    expected_files = {"manifest.json", "HUMAN_REVIEW.md", "intrinsic-ratio-evidence.png"}
+    expected_files = {
+        "manifest.json",
+        "HUMAN_REVIEW.md",
+        "intrinsic-ratio-evidence.png",
+    }
     for record in surfaces:
         frame = _validate_scenario_semantics(record)
         relative = record.get("screenshot")
@@ -242,7 +261,10 @@ def validate_evidence(root, expected_platform, expected_scale):
     if actual_files != expected_files:
         _fail(
             "artifact file membership differs; missing=%r extra=%r"
-            % (sorted(expected_files - actual_files), sorted(actual_files - expected_files))
+            % (
+                sorted(expected_files - actual_files),
+                sorted(actual_files - expected_files),
+            )
         )
     checklist = root / "HUMAN_REVIEW.md"
     if not checklist.read_text(encoding="utf-8").strip():
@@ -253,7 +275,9 @@ def validate_evidence(root, expected_platform, expected_scale):
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", required=True)
-    parser.add_argument("--platform-plugin", required=True, choices=("windows", "cocoa"))
+    parser.add_argument(
+        "--platform-plugin", required=True, choices=("windows", "cocoa")
+    )
     parser.add_argument("--scale-factor", required=True)
     args = parser.parse_args(argv)
     validate_evidence(args.root, args.platform_plugin, args.scale_factor)

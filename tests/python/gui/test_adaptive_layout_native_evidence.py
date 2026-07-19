@@ -17,26 +17,18 @@ def test_native_evidence_rejects_non_native_and_wrong_platform_plugins():
     import adaptive_layout_evidence
 
     with pytest.raises(RuntimeError, match="native Qt platform"):
-        adaptive_layout_evidence.validate_native_platform(
-            "offscreen", "win32", "AMD64"
-        )
+        adaptive_layout_evidence.validate_native_platform("offscreen", "win32", "AMD64")
     with pytest.raises(RuntimeError, match="expected Qt platform cocoa"):
-        adaptive_layout_evidence.validate_native_platform(
-            "windows", "darwin", "x86_64"
-        )
+        adaptive_layout_evidence.validate_native_platform("windows", "darwin", "x86_64")
     with pytest.raises(RuntimeError, match="requires an x64 host"):
         adaptive_layout_evidence.validate_native_platform("cocoa", "darwin", "arm64")
 
     assert (
-        adaptive_layout_evidence.validate_native_platform(
-            "windows", "win32", "AMD64"
-        )
+        adaptive_layout_evidence.validate_native_platform("windows", "win32", "AMD64")
         == "windows"
     )
     assert (
-        adaptive_layout_evidence.validate_native_platform(
-            "cocoa", "darwin", "x86_64"
-        )
+        adaptive_layout_evidence.validate_native_platform("cocoa", "darwin", "x86_64")
         == "cocoa"
     )
 
@@ -57,9 +49,7 @@ def test_exact_client_size_repositions_the_outer_frame_inside_the_screen(qapp):
     window.move(available.bottomRight())
 
     try:
-        adaptive_layout_evidence._show_at_exact_client_size(
-            qapp, window, requested
-        )
+        adaptive_layout_evidence._show_at_exact_client_size(qapp, window, requested)
 
         assert available.contains(window.frameGeometry())
     finally:
@@ -181,9 +171,7 @@ def test_evidence_runner_captures_all_archetypes_and_runtime_contracts(
         painter.end()
         return pixmap
 
-    monkeypatch.setattr(
-        adaptive_layout_evidence, "_grab_native_frame", grab_test_frame
-    )
+    monkeypatch.setattr(adaptive_layout_evidence, "_grab_native_frame", grab_test_frame)
 
     try:
         app, main = launch.start_automation()
@@ -217,12 +205,17 @@ def test_evidence_runner_captures_all_archetypes_and_runtime_contracts(
     assert manifest["runtime_resize"]["table_reachable"] is True
     assert manifest["human_review"]["status"] == "required"
     assert len(list((output / "screenshots").glob("*.png"))) == 7
-    assert json.loads((output / "manifest.json").read_text(encoding="utf-8"))[
-        "platform_plugin"
-    ] == "test-native-plugin"
+    assert (
+        json.loads((output / "manifest.json").read_text(encoding="utf-8"))[
+            "platform_plugin"
+        ]
+        == "test-native-plugin"
+    )
     assert "pixel-diff" in (output / "HUMAN_REVIEW.md").read_text(encoding="utf-8")
     validator_path = ROOT / "scripts" / "validate_adaptive_layout_evidence.py"
-    spec = importlib.util.spec_from_file_location("evidence_validator_gui", validator_path)
+    spec = importlib.util.spec_from_file_location(
+        "evidence_validator_gui", validator_path
+    )
     validator = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(validator)
     constrained_size = adaptive_layout_evidence.CONSTRAINED_WORKSPACE

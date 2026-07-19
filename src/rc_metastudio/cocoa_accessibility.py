@@ -34,12 +34,8 @@ def find_accessibility_element(
         observation = observe(current)
         observed_states["with_role"] += bool(observation.get("role"))
         observed_states["with_title"] += bool(observation.get("title"))
-        observed_states["with_description"] += bool(
-            observation.get("description")
-        )
-        observed_states["unignored_elements"] += (
-            observation.get("is_ignored") is False
-        )
+        observed_states["with_description"] += bool(observation.get("description"))
+        observed_states["unignored_elements"] += observation.get("is_ignored") is False
         if (
             observation.get("role") == expected_role
             and observation.get("title") == expected_title

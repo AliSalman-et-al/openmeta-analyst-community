@@ -12,7 +12,11 @@ from pathlib import Path
 
 def _git(repo: Path, *args: str) -> bytes:
     completed = subprocess.run(
-        ["git", *args], cwd=repo, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        ["git", *args],
+        cwd=repo,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
     return completed.stdout
 
@@ -27,10 +31,14 @@ def _frame(digest: "hashlib._Hash", label: bytes, value: bytes) -> None:
 def collect_source_provenance(repo: Path) -> dict[str, object]:
     repo = repo.resolve()
     head = _git(repo, "rev-parse", "HEAD").decode("ascii").strip()
-    if len(head) != 40 or any(character not in "0123456789abcdef" for character in head):
+    if len(head) != 40 or any(
+        character not in "0123456789abcdef" for character in head
+    ):
         raise RuntimeError("Git did not return a full lowercase HEAD SHA")
     diff = _git(repo, "diff", "--binary", "--full-index", "HEAD")
-    untracked = _git(repo, "ls-files", "--others", "--exclude-standard", "-z").split(b"\0")
+    untracked = _git(repo, "ls-files", "--others", "--exclude-standard", "-z").split(
+        b"\0"
+    )
     untracked = sorted(path for path in untracked if path)
     digest = hashlib.sha256()
     _frame(digest, b"head", head.encode("ascii"))
@@ -45,7 +53,9 @@ def collect_source_provenance(repo: Path) -> dict[str, object]:
             payload = path.read_bytes()
             kind = b"file"
         else:
-            raise RuntimeError(f"untracked path is not a regular file or symlink: {path}")
+            raise RuntimeError(
+                f"untracked path is not a regular file or symlink: {path}"
+            )
         _frame(digest, b"untracked-path", relative)
         _frame(digest, b"untracked-kind", kind)
         _frame(digest, b"untracked-mode", str(stat.st_mode).encode("ascii"))

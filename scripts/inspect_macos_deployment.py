@@ -52,8 +52,7 @@ DIRECT_R_MARKER_SHA256 = (
     "bff2ab12435dd85693745bfd390e12b97ad7fecf284a05b1b339425d40ca720f"
 )
 DIRECT_R_OFFICIAL_URL = (
-    "https://cloud.r-project.org/bin/macosx/big-sur-x86_64/base/"
-    "R-4.6.1-x86_64.pkg"
+    "https://cloud.r-project.org/bin/macosx/big-sur-x86_64/base/R-4.6.1-x86_64.pkg"
 )
 DIRECT_R_OFFICIAL_SHA256 = (
     "612bb00cb4c627721d6d80b0f5224227c0fcdefb4a5b6c917511480361c16571"
@@ -538,9 +537,7 @@ def validate_dependency_graph(
                 )
 
 
-def inspect_unsigned_native_graph(
-    app_root: Path, *, target: str = "macos-x64"
-) -> dict:
+def inspect_unsigned_native_graph(app_root: Path, *, target: str = "macos-x64") -> dict:
     app_root = app_root.resolve(strict=True)
     architecture = TARGET_CONTRACTS[target]["architecture"]
     native_records = []
@@ -1043,9 +1040,7 @@ def inspect_deployment(
         source_commit=source_commit,
     )
     r_delivery_kind = (
-        "direct-spike"
-        if "direct_r_build" in r_delivery_identity
-        else "integration-kit"
+        "direct-spike" if "direct_r_build" in r_delivery_identity else "integration-kit"
     )
 
     records: list[dict] = []
@@ -1107,7 +1102,9 @@ def inspect_deployment(
                 ):
                     with path.open("rb") as stream:
                         record["shebang"] = (
-                            stream.readline(128).decode("ascii", errors="replace").rstrip()
+                            stream.readline(128)
+                            .decode("ascii", errors="replace")
+                            .rstrip()
                         )
                 if _is_macho(path):
                     record["architectures"] = require_macho_architecture(
@@ -1302,7 +1299,9 @@ def finalize_smoke_evidence(
             "packaged-workflow:process-exit:0",
         )
         positions = [log_text.find(marker) for marker in required_markers]
-        if any(position < 0 for position in positions) or positions != sorted(positions):
+        if any(position < 0 for position in positions) or positions != sorted(
+            positions
+        ):
             raise MacOSDeploymentInspectionError(
                 "direct packaged automation lacks an ordered clean-teardown trace"
             )
@@ -1315,8 +1314,7 @@ def finalize_smoke_evidence(
     if require_direct_teardown:
         validate_macos_surface_records(scale_records)
     if require_direct_teardown and (
-        executed_scales != ["1.25", "1.50", "1.75"]
-        or launchservices_marker is None
+        executed_scales != ["1.25", "1.50", "1.75"] or launchservices_marker is None
     ):
         raise MacOSDeploymentInspectionError(
             "direct packaged automation lacks the required surface or LaunchServices gates"
@@ -1352,8 +1350,10 @@ def validate_direct_build_manifest(payload: dict, *, target: str) -> dict:
             "direct-build manifest has the wrong identity or target"
         )
     source_commit = payload.get("source_commit", "")
-    if not isinstance(source_commit, str) or len(source_commit) != 40 or any(
-        character not in "0123456789abcdef" for character in source_commit
+    if (
+        not isinstance(source_commit, str)
+        or len(source_commit) != 40
+        or any(character not in "0123456789abcdef" for character in source_commit)
     ):
         raise MacOSDeploymentInspectionError(
             "direct-build manifest has an invalid source commit"
@@ -1361,7 +1361,8 @@ def validate_direct_build_manifest(payload: dict, *, target: str) -> dict:
     official_r = payload.get("official_r")
     if (
         not isinstance(official_r, dict)
-        or official_r != {
+        or official_r
+        != {
             "url": DIRECT_R_OFFICIAL_URL,
             "sha256": DIRECT_R_OFFICIAL_SHA256,
         }
@@ -1377,7 +1378,10 @@ def validate_direct_build_manifest(payload: dict, *, target: str) -> dict:
             "direct-build manifest has no complete hashed input inventory"
         )
     ppm_archives = payload.get("ppm_archives")
-    records = [*inputs.values(), *(ppm_archives if isinstance(ppm_archives, list) else [])]
+    records = [
+        *inputs.values(),
+        *(ppm_archives if isinstance(ppm_archives, list) else []),
+    ]
     if not isinstance(ppm_archives, list) or not ppm_archives:
         raise MacOSDeploymentInspectionError(
             "direct-build manifest has no PPM archive inventory"
@@ -1426,7 +1430,10 @@ def validate_direct_build_manifest(payload: dict, *, target: str) -> dict:
     hsroc = payload.get("hsroc_source_exception")
     if (
         not isinstance(hsroc, dict)
-        or {key: hsroc.get(key) for key in ("name", "version", "install_type", "url", "sha256")}
+        or {
+            key: hsroc.get(key)
+            for key in ("name", "version", "install_type", "url", "sha256")
+        }
         != {
             "name": "HSROC",
             "version": "2.1.9",
@@ -1445,7 +1452,10 @@ def validate_direct_build_manifest(payload: dict, *, target: str) -> dict:
         not isinstance(rcmetar, dict)
         or rcmetar.get("name") != "RCMetaR"
         or rcmetar.get("version") != "0.2.0"
-        or rcmetar.get("url") != "https://github.com/ResearchConsultancy/rc-metastudio/tree/" + source_commit + "/r/RCMetaR"
+        or rcmetar.get("url")
+        != "https://github.com/ResearchConsultancy/rc-metastudio/tree/"
+        + source_commit
+        + "/r/RCMetaR"
         or rcmetar.get("source_commit") != source_commit
         or not valid_sha256(rcmetar.get("archive_sha256"))
         or not isinstance(rcmetar.get("archive"), dict)
@@ -1485,13 +1495,22 @@ def validate_direct_build_runner(runner: dict, *, target: str) -> None:
         and runner.get("macos_version")
         and runner.get("macos_build")
     ):
-        raise MacOSDeploymentInspectionError("direct-build runner is not native macOS Intel")
+        raise MacOSDeploymentInspectionError(
+            "direct-build runner is not native macOS Intel"
+        )
     hosted = runner.get("github_actions") == "true"
     if hosted:
-        if runner.get("runner_arch") != "X64" or runner.get("runner_image") != "macos-15-intel":
-            raise MacOSDeploymentInspectionError("hosted direct-build runner is not macos-15-intel")
+        if (
+            runner.get("runner_arch") != "X64"
+            or runner.get("runner_image") != "macos-15-intel"
+        ):
+            raise MacOSDeploymentInspectionError(
+                "hosted direct-build runner is not macos-15-intel"
+            )
     elif runner.get("github_actions") not in ("false", False):
-        raise MacOSDeploymentInspectionError("direct-build runner has invalid github_actions state")
+        raise MacOSDeploymentInspectionError(
+            "direct-build runner has invalid github_actions state"
+        )
 
 
 def validate_direct_build_archive_inputs(
@@ -1536,7 +1555,9 @@ def validate_direct_build_archive_inputs(
         and isinstance(signature.get("stderr"), str)
         and "VZLD955F6P" in signature["stdout"]
     ):
-        raise MacOSDeploymentInspectionError("official R package signature evidence is invalid")
+        raise MacOSDeploymentInspectionError(
+            "official R package signature evidence is invalid"
+        )
     ppm_inventory = json.loads(
         bundle.read(prefix + DIRECT_BUILD_INPUT_MEMBERS["ppm_archive_inventory"])
     )
@@ -1578,7 +1599,10 @@ def validate_direct_build_archive_inputs(
                 f"ZIP lacks retained PPM archive: {member}"
             )
         payload = bundle.read(member)
-        if len(payload) != record["size"] or hashlib.sha256(payload).hexdigest() != record["sha256"]:
+        if (
+            len(payload) != record["size"]
+            or hashlib.sha256(payload).hexdigest() != record["sha256"]
+        ):
             raise MacOSDeploymentInspectionError(
                 f"ZIP retained PPM archive differs from provenance: {member}"
             )
@@ -1680,10 +1704,9 @@ def inspect_archive(
                 raise MacOSDeploymentInspectionError(
                     "deployment manifest target differs from the archive target"
                 )
-            if (
-                direct_manifest is not None
-                and deployment.get("source_commit") != direct_manifest.get("source_commit")
-            ):
+            if direct_manifest is not None and deployment.get(
+                "source_commit"
+            ) != direct_manifest.get("source_commit"):
                 raise MacOSDeploymentInspectionError(
                     "direct-build source commit differs from deployment evidence"
                 )
@@ -1922,21 +1945,32 @@ def write_qualification_evidence(
 ) -> dict:
     deployment = json.loads(deployment_manifest.read_text(encoding="utf-8"))
     extracted_probe = json.loads(extracted_runtime_probe.read_text(encoding="utf-8"))
-    extracted_deployment = json.loads(extracted_deployment_manifest.read_text(encoding="utf-8"))
+    extracted_deployment = json.loads(
+        extracted_deployment_manifest.read_text(encoding="utf-8")
+    )
     # Do not accept a forged {"passed": true}: run the same complete smoke
     # finalizer used for the pre-archive app, including Cocoa scales and the
     # bounded LaunchServices completion marker.
     extracted_smoke = finalize_smoke_evidence(
-        extracted_smoke_evidence, extracted_smoke_log,
-        extracted_launchservices_marker, require_direct_teardown=True,
+        extracted_smoke_evidence,
+        extracted_smoke_log,
+        extracted_launchservices_marker,
+        require_direct_teardown=True,
     )
-    if not (extracted_smoke.get("passed") is True and extracted_deployment.get("target") == target and extracted_probe.get("r")):
-        raise MacOSDeploymentInspectionError("extracted ZIP qualification evidence is incomplete")
+    if not (
+        extracted_smoke.get("passed") is True
+        and extracted_deployment.get("target") == target
+        and extracted_probe.get("r")
+    ):
+        raise MacOSDeploymentInspectionError(
+            "extracted ZIP qualification evidence is incomplete"
+        )
     extracted_contract = TARGET_CONTRACTS[target]
     if not (
         extracted_deployment.get("schema_version") == 1
         and extracted_deployment.get("target") == target
-        and extracted_deployment.get("architecture") == extracted_contract["architecture"]
+        and extracted_deployment.get("architecture")
+        == extracted_contract["architecture"]
         and extracted_deployment.get("stack") == EXPECTED_VERSIONS
         and extracted_deployment.get("qt_dependency_collector") == "PyInstaller"
         and isinstance(extracted_deployment.get("source_commit"), str)
@@ -2127,11 +2161,31 @@ def write_qualification_evidence(
             "sha256": sha256_file(direct_build_manifest),
         },
         "extracted_zip_qualification": {
-            "runtime_probe": {"path": extracted_runtime_probe.name, "sha256": sha256_file(extracted_runtime_probe)},
-            "deployment_manifest": {"path": extracted_deployment_manifest.name, "sha256": sha256_file(extracted_deployment_manifest)},
-            "smoke_evidence": {"path": extracted_smoke_evidence.name, "sha256": sha256_file(extracted_smoke_evidence)},
-            "logs": [{"path": path.name, "sha256": sha256_file(path)} for path in (extracted_smoke_log, extracted_smoke_stdout, extracted_smoke_stderr, extracted_hang_trace)],
-            "launchservices_completion": {"path": extracted_launchservices_marker.name, "sha256": sha256_file(extracted_launchservices_marker)},
+            "runtime_probe": {
+                "path": extracted_runtime_probe.name,
+                "sha256": sha256_file(extracted_runtime_probe),
+            },
+            "deployment_manifest": {
+                "path": extracted_deployment_manifest.name,
+                "sha256": sha256_file(extracted_deployment_manifest),
+            },
+            "smoke_evidence": {
+                "path": extracted_smoke_evidence.name,
+                "sha256": sha256_file(extracted_smoke_evidence),
+            },
+            "logs": [
+                {"path": path.name, "sha256": sha256_file(path)}
+                for path in (
+                    extracted_smoke_log,
+                    extracted_smoke_stdout,
+                    extracted_smoke_stderr,
+                    extracted_hang_trace,
+                )
+            ],
+            "launchservices_completion": {
+                "path": extracted_launchservices_marker.name,
+                "sha256": sha256_file(extracted_launchservices_marker),
+            },
         },
         "smoke_evidence": {
             "path": smoke_evidence.name,

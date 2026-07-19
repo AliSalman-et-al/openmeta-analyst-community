@@ -253,9 +253,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
             except ValueError as exc:
                 QMessageBox.warning(self, "Warning", str(exc))
                 return
-            self.groups_model.dataset.add_group(
-                new_group_name, self.selected_outcome
-            )
+            self.groups_model.dataset.add_group(new_group_name, self.selected_outcome)
             self.groups_model.refresh_group_list(
                 self.selected_outcome, self.selected_follow_up
             )

@@ -37,7 +37,7 @@ UPSTREAM_X64_LDFLAGS = (
     "-F/Library/Frameworks/R.framework/.. -framework R "
     "-L/opt/R/x86_64/lib -lbz2 -lz -licucore -ldl -lm -liconv"
 )
-PRIVATE_CONFIG = f'''#!/bin/sh
+PRIVATE_CONFIG = f"""#!/bin/sh
 set -eu
 # RCMS_PRIVATE_R_CONFIG_V1
 R_HOME="${{R_HOME:-$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)}}"
@@ -69,7 +69,7 @@ if [ "$#" -eq 1 ]; then
   esac
 fi
 exec "$real" "$@"
-'''
+"""
 
 
 def _safe_file(path: Path) -> None:

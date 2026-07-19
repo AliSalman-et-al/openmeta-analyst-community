@@ -8,8 +8,9 @@ PLOT_TEXT_INPUT_LIMIT = 80
 
 def apply_plot_text_input_limits(surface):
     """Limit plot-only labels without constraining data or numeric fields."""
-    message = "Plot labels are limited to %d characters for publication readability." % (
-        PLOT_TEXT_INPUT_LIMIT,
+    message = (
+        "Plot labels are limited to %d characters for publication readability."
+        % (PLOT_TEXT_INPUT_LIMIT,)
     )
     for name in (
         "col1_str_edit",

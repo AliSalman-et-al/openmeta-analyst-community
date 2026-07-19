@@ -30,7 +30,10 @@ def test_import_and_strict_ty_use_the_identical_closed_qt_module_set(
     monkeypatch, tmp_path
 ):
     real_subprocess_run = subprocess.run
-    expected = [path.relative_to(ROOT).as_posix() for path in discover_handwritten_qt_files(ROOT)]
+    expected = [
+        path.relative_to(ROOT).as_posix()
+        for path in discover_handwritten_qt_files(ROOT)
+    ]
     completed = subprocess.run(
         [sys.executable, "scripts/import_qt_modules.py", "--root", ".", "--list"],
         cwd=ROOT,
@@ -40,10 +43,15 @@ def test_import_and_strict_ty_use_the_identical_closed_qt_module_set(
     )
     assert completed.stdout.splitlines() == expected
     assert any(path.startswith("scripts/") for path in expected)
-    assert set(discover_application_qt_modules(ROOT)) < set(discover_handwritten_qt_files(ROOT))
+    assert set(discover_application_qt_modules(ROOT)) < set(
+        discover_handwritten_qt_files(ROOT)
+    )
 
     workflow = (ROOT / "scripts/verify-qt6.ps1").read_text(encoding="utf-8")
-    assert "$qtModules = @(uv run python scripts/import_qt_modules.py --root . --list)" in workflow
+    assert (
+        "$qtModules = @(uv run python scripts/import_qt_modules.py --root . --list)"
+        in workflow
+    )
     assert "ty check" in workflow
     assert "$qtModules" in workflow
     calls = []
@@ -172,9 +180,7 @@ def test_import_and_strict_ty_use_the_identical_closed_qt_module_set(
         encoding="utf-8",
     )
     (scripts / "early_exit_surface.py").write_text(
-        "from PyQt6 import QtCore\n"
-        "import sys\n"
-        "sys.exit(0)\n",
+        "from PyQt6 import QtCore\nimport sys\nsys.exit(0)\n",
         encoding="utf-8",
     )
     guarded_main_marker = real_root / "guarded-main-ran"
@@ -200,13 +206,14 @@ def test_import_and_strict_ty_use_the_identical_closed_qt_module_set(
     assert real_results["scripts/backend_surface.py"]["returncode"] == 0
     assert real_results["scripts/backend_surface.py"]["stderr"] == ""
     assert real_results["scripts/warning_surface.py"]["returncode"] != 0
-    assert "fixture import warning" in real_results["scripts/warning_surface.py"][
-        "stderr"
-    ]
+    assert (
+        "fixture import warning" in real_results["scripts/warning_surface.py"]["stderr"]
+    )
     assert real_results["scripts/early_exit_surface.py"]["returncode"] != 0
-    assert "before its success marker" in real_results[
-        "scripts/early_exit_surface.py"
-    ]["stderr"]
+    assert (
+        "before its success marker"
+        in real_results["scripts/early_exit_surface.py"]["stderr"]
+    )
     assert real_results["scripts/guarded_surface.py"]["returncode"] == 0
     assert real_results["scripts/guarded_surface.py"]["stderr"] == ""
     assert not guarded_main_marker.exists()
@@ -217,7 +224,11 @@ def test_final_cutover_audit_has_zero_active_legacy_findings():
 
 
 def test_strict_ty_suppressions_match_the_reviewed_budget_exactly(tmp_path):
-    assert validate_ty_ignore_allowlist(ROOT) == {"files": 14, "total": 31, "maximum": 31}
+    assert validate_ty_ignore_allowlist(ROOT) == {
+        "files": 14,
+        "total": 31,
+        "maximum": 31,
+    }
 
     original = """\
 class Owner:
@@ -242,9 +253,7 @@ class Owner:
         config = root / "config"
         config.mkdir()
         (config / "qt6-ty-ignore-allowlist.json").write_text(
-            json.dumps(
-                {"schema_version": 2, "maximum_total": 1, "entries": entries}
-            ),
+            json.dumps({"schema_version": 2, "maximum_total": 1, "entries": entries}),
             encoding="utf-8",
         )
         assert validate_ty_ignore_allowlist(root) == {

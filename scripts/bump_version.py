@@ -40,7 +40,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if not VERSION_RE.fullmatch(args.version):
-        parser.error("version must use the repo release format X.Y.Z, for example 0.1.2")
+        parser.error(
+            "version must use the repo release format X.Y.Z, for example 0.1.2"
+        )
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", args.date):
         parser.error("date must use YYYY-MM-DD")
 

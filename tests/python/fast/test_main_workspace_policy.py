@@ -75,7 +75,9 @@ def test_layout_settings_migration_deletes_only_legacy_main_geometry(tmp_path):
     import settings
 
     QtCore.QSettings.setPath(
-        QtCore.QSettings.Format.IniFormat, QtCore.QSettings.Scope.UserScope, str(tmp_path)
+        QtCore.QSettings.Format.IniFormat,
+        QtCore.QSettings.Scope.UserScope,
+        str(tmp_path),
     )
     QtCore.QSettings.setDefaultFormat(QtCore.QSettings.Format.IniFormat)
     store = QtCore.QSettings()
@@ -98,7 +100,9 @@ def test_stale_main_placement_is_clamped_to_available_screen(tmp_path):
     import settings
 
     QtCore.QSettings.setPath(
-        QtCore.QSettings.Format.IniFormat, QtCore.QSettings.Scope.UserScope, str(tmp_path)
+        QtCore.QSettings.Format.IniFormat,
+        QtCore.QSettings.Scope.UserScope,
+        str(tmp_path),
     )
     QtCore.QSettings.setDefaultFormat(QtCore.QSettings.Format.IniFormat)
     store = QtCore.QSettings()
@@ -120,7 +124,9 @@ def test_fresh_main_placement_defaults_to_maximized(tmp_path):
     import settings
 
     QtCore.QSettings.setPath(
-        QtCore.QSettings.Format.IniFormat, QtCore.QSettings.Scope.UserScope, str(tmp_path)
+        QtCore.QSettings.Format.IniFormat,
+        QtCore.QSettings.Scope.UserScope,
+        str(tmp_path),
     )
     QtCore.QSettings.setDefaultFormat(QtCore.QSettings.Format.IniFormat)
     QtCore.QSettings().clear()
@@ -136,7 +142,9 @@ def test_main_and_results_share_typed_workspace_placement_policy(tmp_path):
     import settings
 
     QtCore.QSettings.setPath(
-        QtCore.QSettings.Format.IniFormat, QtCore.QSettings.Scope.UserScope, str(tmp_path)
+        QtCore.QSettings.Format.IniFormat,
+        QtCore.QSettings.Scope.UserScope,
+        str(tmp_path),
     )
     QtCore.QSettings.setDefaultFormat(QtCore.QSettings.Format.IniFormat)
     store = QtCore.QSettings()
@@ -170,7 +178,9 @@ def test_main_column_widths_round_trip_in_versioned_workspace_state(tmp_path, qa
     )
 
     QtCore.QSettings.setPath(
-        QtCore.QSettings.Format.IniFormat, QtCore.QSettings.Scope.UserScope, str(tmp_path)
+        QtCore.QSettings.Format.IniFormat,
+        QtCore.QSettings.Scope.UserScope,
+        str(tmp_path),
     )
     QtCore.QSettings.setDefaultFormat(QtCore.QSettings.Format.IniFormat)
     QtCore.QSettings().clear()

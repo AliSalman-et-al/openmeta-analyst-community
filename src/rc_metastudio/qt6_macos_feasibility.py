@@ -140,11 +140,7 @@ def _valid_modified_utf8(value: bytes) -> bool:
             second, third = value[index + 1 : index + 3]
             if second & 0xC0 != 0x80 or third & 0xC0 != 0x80:
                 return False
-            code_unit = (
-                ((first & 0x0F) << 12)
-                | ((second & 0x3F) << 6)
-                | (third & 0x3F)
-            )
+            code_unit = ((first & 0x0F) << 12) | ((second & 0x3F) << 6) | (third & 0x3F)
             if code_unit < 0x800:
                 return False
             index += 3
@@ -177,9 +173,7 @@ def _java_cp_tag(tags: list[int | None], index: int, allowed: set[int]) -> bool:
     return 0 < index < len(tags) and tags[index] in allowed
 
 
-def _skip_java_attributes(
-    stream: BinaryIO, tags: list[int | None], count: int
-) -> None:
+def _skip_java_attributes(stream: BinaryIO, tags: list[int | None], count: int) -> None:
     for _ in range(count):
         name_index = _read_java_u2(stream, "attribute name")
         if not _java_cp_tag(tags, name_index, {1}):
@@ -238,26 +232,41 @@ def is_valid_java_class(path: Path) -> bool:
                     if index >= constant_pool_count:
                         raise _NotJavaClass("wide Java constant has no reserved slot")
                 elif tag in {7, 8, 16, 19, 20}:
-                    references.append((_read_java_u2(stream, "constant reference"), {1}))
+                    references.append(
+                        (_read_java_u2(stream, "constant reference"), {1})
+                    )
                 elif tag in {9, 10, 11}:
                     references.append((_read_java_u2(stream, "class reference"), {7}))
-                    references.append((_read_java_u2(stream, "name/type reference"), {12}))
+                    references.append(
+                        (_read_java_u2(stream, "name/type reference"), {12})
+                    )
                 elif tag == 12:
                     references.append((_read_java_u2(stream, "name reference"), {1}))
-                    references.append((_read_java_u2(stream, "descriptor reference"), {1}))
+                    references.append(
+                        (_read_java_u2(stream, "descriptor reference"), {1})
+                    )
                 elif tag == 15:
                     kind = _read_java_u1(stream, "method-handle kind")
                     reference = _read_java_u2(stream, "method-handle reference")
                     allowed = {
-                        1: {9}, 2: {9}, 3: {9}, 4: {9}, 5: {10}, 6: {10, 11},
-                        7: {10, 11}, 8: {10}, 9: {11},
+                        1: {9},
+                        2: {9},
+                        3: {9},
+                        4: {9},
+                        5: {10},
+                        6: {10, 11},
+                        7: {10, 11},
+                        8: {10},
+                        9: {11},
                     }.get(kind)
                     if allowed is None:
                         raise _NotJavaClass("invalid Java method-handle kind")
                     references.append((reference, allowed))
                 elif tag in {17, 18}:
                     _read_java_u2(stream, "bootstrap-method index")
-                    references.append((_read_java_u2(stream, "name/type reference"), {12}))
+                    references.append(
+                        (_read_java_u2(stream, "name/type reference"), {12})
+                    )
                 else:
                     return False
                 index += 1
@@ -320,9 +329,7 @@ def _validate_retained_file_record(
 ) -> None:
     digest = record.get("sha256")
     size = record.get("size")
-    if not isinstance(record.get("retained_path"), str) or not isinstance(
-        digest, str
-    ):
+    if not isinstance(record.get("retained_path"), str) or not isinstance(digest, str):
         _fail(f"{label} has no retained path or digest")
     if not isinstance(size, int) or isinstance(size, bool) or size < 0:
         _fail(f"{label} has an invalid retained size")
@@ -373,7 +380,10 @@ def _validate_inventory_record_path(path: object, label: str) -> str:
     ):
         _fail(f"{label} is not a canonical relative POSIX path")
     parts = path.split("/")
-    if any(part in {"", ".", ".."} for part in parts) or posixpath.normpath(path) != path:
+    if (
+        any(part in {"", ".", ".."} for part in parts)
+        or posixpath.normpath(path) != path
+    ):
         _fail(f"{label} contains path-normalization ambiguity")
     return path
 
@@ -411,7 +421,9 @@ def _validate_inventory_symlinks(
                     resolution_cache[path] = current
                 return current
             if symlink_path in seen:
-                _fail(f"deployment inventory contains a cyclic symlink at {symlink_path}")
+                _fail(
+                    f"deployment inventory contains a cyclic symlink at {symlink_path}"
+                )
             seen.add(symlink_path)
             if not suffix:
                 cacheable.append(symlink_path)
@@ -457,9 +469,7 @@ def _classify_macos_qt_payload(path: str) -> str | None:
     if (
         any(part.startswith("pyside6") for part in parts)
         or _is_shiboken_native_payload(parts, name)
-        or re.fullmatch(
-            r"libpyside6(?:\.abi3)?(?:\.\d+)*\.dylib", name
-        )
+        or re.fullmatch(r"libpyside6(?:\.abi3)?(?:\.\d+)*\.dylib", name)
     ):
         return "alternate-binding"
     if any(part == "pyqt6" for part in parts):
@@ -481,9 +491,7 @@ def _is_allowed_authoritative_qt_path(path: str) -> bool:
     relative = path.removeprefix("Contents/Frameworks/PyQt6/Qt6/")
     if relative == "translations":
         return True
-    framework = re.fullmatch(
-        r"lib/(Qt[A-Za-z0-9]+)\.framework/(.+)", relative
-    )
+    framework = re.fullmatch(r"lib/(Qt[A-Za-z0-9]+)\.framework/(.+)", relative)
     if framework is not None and framework.group(2) in {
         framework.group(1),
         f"Versions/A/{framework.group(1)}",
@@ -553,13 +561,14 @@ def _validate_deployment_inventory(
                 _fail("deployment inventory file contains missing or unknown fields")
             digest = record.get("sha256")
             architectures = record.get("architectures")
-            if not isinstance(digest, str) or len(digest) != 64 or any(
-                character not in "0123456789abcdef" for character in digest
+            if (
+                not isinstance(digest, str)
+                or len(digest) != 64
+                or any(character not in "0123456789abcdef" for character in digest)
             ):
                 _fail(f"deployment inventory has an invalid digest for {path}")
             if not isinstance(architectures, list) or not all(
-                architecture in {"x86_64", "arm64"}
-                for architecture in architectures
+                architecture in {"x86_64", "arm64"} for architecture in architectures
             ):
                 _fail(f"deployment inventory has invalid architectures for {path}")
         elif kind == "symlink":
@@ -586,9 +595,10 @@ def _validate_deployment_inventory(
             _fail(f"deployment inventory has an invalid kind for {path}")
         records[path] = record
         total += size
-    if inventory.get("file_count") != len(files) or inventory.get(
-        "total_bytes"
-    ) != total:
+    if (
+        inventory.get("file_count") != len(files)
+        or inventory.get("total_bytes") != total
+    ):
         _fail("deployment inventory totals do not match its files")
     if total > MAX_DEPLOYMENT_BYTES:
         _fail("deployment inventory exceeds the bounded feasibility deployment size")
@@ -634,9 +644,9 @@ def _validate_deployment_inventory(
     if not authoritative_files:
         _fail("deployment inventory is missing the authoritative PyQt6 Qt root")
     for path in records:
-        if path.startswith(authoritative_qt_root) and not _is_allowed_authoritative_qt_path(
-            path
-        ):
+        if path.startswith(
+            authoritative_qt_root
+        ) and not _is_allowed_authoritative_qt_path(path):
             _fail(f"unrecognized payload inside the authoritative Qt root: {path}")
     if not any(
         path.startswith(authoritative_binding_root)
@@ -702,9 +712,7 @@ def _validate_deployment_inventory(
             cast(str, record["sha256"]),
             tuple(cast(list[str], record["architectures"])),
         )
-        expected_alias = (
-            f"Contents/Frameworks/PyQt6/Qt6/lib/{name}.framework/{name}"
-        )
+        expected_alias = f"Contents/Frameworks/PyQt6/Qt6/lib/{name}.framework/{name}"
         if path != expected_alias or identity != canonical_frameworks[name]:
             _fail(f"incoherent authoritative Qt framework alias: {path}")
 
@@ -780,17 +788,19 @@ def _validate_deployment_inventory(
         if path in binding_extension_paths.values():
             continue
         if name in canonical_frameworks:
-            if path not in {
-                f"Contents/Frameworks/{name}",
-                f"Contents/Resources/{name}",
-            } or identity != canonical_frameworks[name]:
+            if (
+                path
+                not in {
+                    f"Contents/Frameworks/{name}",
+                    f"Contents/Resources/{name}",
+                }
+                or identity != canonical_frameworks[name]
+            ):
                 _fail(f"incoherent Qt framework alias: {path}")
         elif name in binding_extensions and path == f"Contents/Resources/PyQt6/{name}":
             if identity != binding_extensions[name]:
                 _fail(f"incoherent PyQt6 extension alias: {path}")
-        elif re.fullmatch(
-            r"Contents/Resources/PyQt6/Qt6/translations/[^/]+\.qm", path
-        ):
+        elif re.fullmatch(r"Contents/Resources/PyQt6/Qt6/translations/[^/]+\.qm", path):
             continue
         elif path.startswith("Contents/Resources/PyQt6/"):
             _fail(f"unrecognized PyQt6 resource alias: {path}")
@@ -843,16 +853,18 @@ def _validate_pyinstaller_build_plan(value: object) -> None:
     if normalized_options & collection_options:
         _fail("PyInstaller build plan contains a manual Qt collection mechanism")
     expected_options = ["--noconfirm", "--clean", "--distpath", "--workpath"]
-    if [argument for argument in arguments if argument.startswith("--")] != expected_options:
+    if [
+        argument for argument in arguments if argument.startswith("--")
+    ] != expected_options:
         _fail("PyInstaller build plan does not match the allowlisted invocation")
     if len(arguments) != 7:
         _fail("PyInstaller build plan does not match the allowlisted invocation")
     if (
         arguments[:3] != ["--noconfirm", "--clean", "--distpath"]
         or arguments[4] != "--workpath"
-        or not arguments[6].replace("\\", "/").endswith(
-            "packaging/pyinstaller/qt6-macos-feasibility.spec"
-        )
+        or not arguments[6]
+        .replace("\\", "/")
+        .endswith("packaging/pyinstaller/qt6-macos-feasibility.spec")
     ):
         _fail("PyInstaller build plan contains unexpected manual inputs")
     for path_argument in (arguments[3], arguments[5], arguments[6]):
@@ -911,9 +923,10 @@ def validate_evidence(
     if runner.get("rosetta_translated") is not False:
         _fail("Rosetta translation is forbidden")
     expected_github_arch = "ARM64" if target == "macos-arm64" else "X64"
-    if runner.get("github_runner_os") != "macOS" or runner.get(
-        "github_runner_arch"
-    ) != expected_github_arch:
+    if (
+        runner.get("github_runner_os") != "macOS"
+        or runner.get("github_runner_arch") != expected_github_arch
+    ):
         _fail("GitHub runner OS or architecture identity is inconsistent")
     if not isinstance(runner.get("runner_image"), str) or not re.fullmatch(
         r"macos-[0-9]+(?:-intel)?", runner["runner_image"]
@@ -927,7 +940,9 @@ def validate_evidence(
             for key, value in EXPECTED_VERSIONS.items()
             if dependencies.get(key) != value
         )
-        _fail(f"locked dependency mismatch: {', '.join(differing) or 'unexpected keys'}")
+        _fail(
+            f"locked dependency mismatch: {', '.join(differing) or 'unexpected keys'}"
+        )
 
     source = _mapping(root.get("source_smoke"), "source_smoke")
     if source.get("qpa") != "cocoa":
@@ -946,9 +961,10 @@ def validate_evidence(
         _fail("source smoke did not record the Qt plugin path")
 
     r_call = _mapping(root.get("r_call"), "r_call")
-    if r_call.get("expression") != "sum(c(1.25, 2.5, 3.75))" or r_call.get(
-        "result"
-    ) != 7.5:
+    if (
+        r_call.get("expression") != "sum(c(1.25, 2.5, 3.75))"
+        or r_call.get("result") != 7.5
+    ):
         _fail("R result did not match the representative rpy2 call")
 
     package = _mapping(root.get("package"), "package")
@@ -956,9 +972,9 @@ def validate_evidence(
         _fail(f"packaged target architecture must be {expected_machine}")
     if package.get("qt_dependency_collector") != "PyInstaller":
         _fail("PyInstaller must be the sole Qt dependency collector")
-    if package.get("qpa") != "cocoa" or not str(package.get("cocoa_plugin", "")).endswith(
-        "libqcocoa.dylib"
-    ):
+    if package.get("qpa") != "cocoa" or not str(
+        package.get("cocoa_plugin", "")
+    ).endswith("libqcocoa.dylib"):
         _fail("packaged smoke did not load its Cocoa platform plugin")
     if package.get("dependencies") != {
         key: EXPECTED_VERSIONS[key] for key in ("pyqt6", "qt", "r", "rpy2")
@@ -980,7 +996,9 @@ def validate_evidence(
         _fail("packaged R result did not match the representative call")
 
     executable = _mapping(package.get("executable"), "package.executable")
-    cocoa_plugin = _mapping(package.get("cocoa_plugin_artifact"), "package.cocoa_plugin_artifact")
+    cocoa_plugin = _mapping(
+        package.get("cocoa_plugin_artifact"), "package.cocoa_plugin_artifact"
+    )
     if executable.get("architectures") != [expected_machine]:
         _fail("packaged executable must be a thin native binary")
     if expected_machine not in cocoa_plugin.get("architectures", []):
@@ -990,21 +1008,25 @@ def validate_evidence(
 
     inventory_record = _mapping(package.get("inventory"), "package.inventory")
     build_plan_record = _mapping(package.get("build_plan"), "package.build_plan")
-    _validate_retained_file_record(inventory_record, "deployment inventory", evidence_dir)
-    _validate_retained_file_record(build_plan_record, "PyInstaller build plan", evidence_dir)
+    _validate_retained_file_record(
+        inventory_record, "deployment inventory", evidence_dir
+    )
+    _validate_retained_file_record(
+        build_plan_record, "PyInstaller build plan", evidence_dir
+    )
     if evidence_dir is not None:
         inventory = json.loads(
-            _retained_path(inventory_record, "deployment inventory", evidence_dir).read_text(
-                encoding="utf-8"
-            )
+            _retained_path(
+                inventory_record, "deployment inventory", evidence_dir
+            ).read_text(encoding="utf-8")
         )
         _validate_deployment_inventory(
             inventory, expected_machine, executable, cocoa_plugin
         )
         build_plan = json.loads(
-            _retained_path(build_plan_record, "PyInstaller build plan", evidence_dir).read_text(
-                encoding="utf-8"
-            )
+            _retained_path(
+                build_plan_record, "PyInstaller build plan", evidence_dir
+            ).read_text(encoding="utf-8")
         )
         _validate_pyinstaller_build_plan(build_plan)
 
@@ -1016,12 +1038,16 @@ def validate_evidence(
         digest = record.get("sha256")
         if not isinstance(record.get("path"), str) or not isinstance(digest, str):
             _fail(f"diagnostic {name} has no path or digest")
-        if len(digest) != 64 or any(character not in "0123456789abcdef" for character in digest):
+        if len(digest) != 64 or any(
+            character not in "0123456789abcdef" for character in digest
+        ):
             _fail(f"diagnostic {name} has an invalid SHA-256 digest")
         if evidence_dir is not None:
             relative = Path(record["path"])
             if relative.is_absolute() or ".." in relative.parts:
-                _fail(f"diagnostic {name} path must remain within the evidence directory")
+                _fail(
+                    f"diagnostic {name} path must remain within the evidence directory"
+                )
             diagnostic_path = evidence_dir / relative
             if not diagnostic_path.is_file() or _sha256(diagnostic_path) != digest:
                 _fail(f"diagnostic {name} digest does not match retained bytes")
@@ -1033,15 +1059,20 @@ def validate_evidence(
         record = _mapping(raw_record, f"native_components.{name}")
         retained = record.get("retained")
         source_paths = record.get("source_paths")
-        if not isinstance(retained, list) or not retained or not isinstance(
-            source_paths, list
-        ) or len(source_paths) != len(retained):
+        if (
+            not isinstance(retained, list)
+            or not retained
+            or not isinstance(source_paths, list)
+            or len(source_paths) != len(retained)
+        ):
             _fail(f"native component {name} has an incomplete retained inventory")
         for item in retained:
             item_record = _mapping(item, f"native_components.{name}.retained")
             if expected_machine not in item_record.get("architectures", []):
                 _fail(f"native component {name} has no {expected_machine} slice")
-            _validate_retained_file_record(item_record, f"native component {name}", evidence_dir)
+            _validate_retained_file_record(
+                item_record, f"native component {name}", evidence_dir
+            )
 
 
 def _sha256(path: Path) -> str:
@@ -1311,7 +1342,10 @@ def validate_macos_rcc(
             f"rcc version mismatch: expected 'rcc {expected_version}', got {reported!r}"
         )
     architectures = command_runner(
-        ["/usr/bin/lipo", "-archs", str(rcc)], check=True, capture_output=True, text=True
+        ["/usr/bin/lipo", "-archs", str(rcc)],
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout.split()
     supported = {"x86_64", "arm64"}
     if (
@@ -1453,7 +1487,9 @@ def _write_deployment_inventory(app_root: Path, destination: Path) -> dict[str, 
                 directories.remove(name)
                 resolved = path.resolve(strict=True)
                 if not resolved.is_relative_to(root):
-                    raise RuntimeError(f"packaged symlink escapes the app bundle: {path}")
+                    raise RuntimeError(
+                        f"packaged symlink escapes the app bundle: {path}"
+                    )
                 size = path.lstat().st_size
                 files.append(
                     {
@@ -1471,7 +1507,9 @@ def _write_deployment_inventory(app_root: Path, destination: Path) -> dict[str, 
             if path.is_symlink():
                 resolved = path.resolve(strict=True)
                 if not resolved.is_relative_to(root):
-                    raise RuntimeError(f"packaged symlink escapes the app bundle: {path}")
+                    raise RuntimeError(
+                        f"packaged symlink escapes the app bundle: {path}"
+                    )
                 size = path.lstat().st_size
                 record: dict[str, object] = {
                     "path": relative,
@@ -1492,7 +1530,9 @@ def _write_deployment_inventory(app_root: Path, destination: Path) -> dict[str, 
             files.append(record)
             total_bytes += size
         if len(files) > MAX_DEPLOYMENT_FILES or total_bytes > MAX_DEPLOYMENT_BYTES:
-            raise RuntimeError("minimal PyInstaller deployment exceeded its inventory bound")
+            raise RuntimeError(
+                "minimal PyInstaller deployment exceeded its inventory bound"
+            )
     files.sort(key=lambda record: cast(str, record["path"]))
     inventory = {
         "schema_version": 2,
@@ -1508,7 +1548,9 @@ def _write_deployment_inventory(app_root: Path, destination: Path) -> dict[str, 
     return inventory
 
 
-def _retained_record(path: Path, evidence_dir: Path, *, architectures: bool) -> dict[str, object]:
+def _retained_record(
+    path: Path, evidence_dir: Path, *, architectures: bool
+) -> dict[str, object]:
     return {
         "retained_path": path.relative_to(evidence_dir).as_posix(),
         "size": path.stat().st_size,
@@ -1517,7 +1559,7 @@ def _retained_record(path: Path, evidence_dir: Path, *, architectures: bool) -> 
     }
 
 
-PACKAGED_ENTRY = r'''from __future__ import annotations
+PACKAGED_ENTRY = r"""from __future__ import annotations
 import json
 import os
 from pathlib import Path
@@ -1580,17 +1622,21 @@ report["clean_exit"] = exit_code == 0 and QtCore.QResource.unregisterResource(st
 Path(os.environ["RCMS_FEASIBILITY_REPORT"]).write_text(json.dumps(report, sort_keys=True), encoding="utf-8")
 phase("clean-exit")
 raise SystemExit(exit_code)
-'''
+"""
 
 
 def _prepare_private_r_framework(
     build_root: Path, evidence_dir: Path, architecture: str
 ) -> tuple[Path, Path]:
-    r_home = Path(
-        subprocess.check_output(["R", "RHOME"], text=True).strip()
-    ).resolve(strict=True)
+    r_home = Path(subprocess.check_output(["R", "RHOME"], text=True).strip()).resolve(
+        strict=True
+    )
     source_framework = next(
-        (parent for parent in (r_home, *r_home.parents) if parent.name == "R.framework"),
+        (
+            parent
+            for parent in (r_home, *r_home.parents)
+            if parent.name == "R.framework"
+        ),
         None,
     )
     if source_framework is None:
@@ -1767,8 +1813,7 @@ def run_feasibility(target: str, evidence_dir: Path) -> dict[str, Any]:
         log=pyinstaller_log,
     )
     executable = (
-        build_root
-        / "dist/Qt6MacFeasibility.app/Contents/MacOS/Qt6MacFeasibility"
+        build_root / "dist/Qt6MacFeasibility.app/Contents/MacOS/Qt6MacFeasibility"
     )
     app_root = build_root / "dist/Qt6MacFeasibility.app"
     packaged_bridges = list(app_root.rglob("_rinterface_cffi_api*.so"))

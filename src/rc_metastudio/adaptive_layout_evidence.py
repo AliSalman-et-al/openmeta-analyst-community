@@ -77,11 +77,15 @@ def run_native_adaptive_layout_evidence(app, main_window, sample_path, output_di
 
     sample = Path(sample_path).resolve()
     if not main_window.open(str(sample)):
-        raise RuntimeError("Could not open adaptive-layout evidence project: %s" % sample)
+        raise RuntimeError(
+            "Could not open adaptive-layout evidence project: %s" % sample
+        )
     _flush(app)
     model = main_window.tableView.model()
     if model is None or model.rowCount() < 1:
-        raise RuntimeError("Adaptive-layout evidence project opened without table rows.")
+        raise RuntimeError(
+            "Adaptive-layout evidence project opened without table rows."
+        )
 
     import about_legal_dialog
     import main_wizard
@@ -313,7 +317,10 @@ def _exact_client_size_unavailability(app, window, requested, scenario_name):
         requested.width() + margins.left() + margins.right(),
         requested.height() + margins.top() + margins.bottom(),
     )
-    if available.width() >= required.width() and available.height() >= required.height():
+    if (
+        available.width() >= required.width()
+        and available.height() >= required.height()
+    ):
         return None
     return {
         "name": scenario_name,
@@ -390,7 +397,10 @@ def _capture_surface(
             requested_client_size.height(),
         ],
         "owning_workspace_client_size": (
-            [owning_workspace_client_size.width(), owning_workspace_client_size.height()]
+            [
+                owning_workspace_client_size.width(),
+                owning_workspace_client_size.height(),
+            ]
             if owning_workspace_client_size is not None
             else None
         ),
@@ -464,7 +474,10 @@ def _pixmap_has_pixel_variation(pixmap):
 
 
 def _exercise_main_workspace(window):
-    if window.tableView.viewport().width() < 1 or window.tableView.viewport().height() < 1:
+    if (
+        window.tableView.viewport().width() < 1
+        or window.tableView.viewport().height() < 1
+    ):
         raise RuntimeError("Main Workspace table viewport is not reachable.")
     application = QtWidgets.QApplication.instance()
     if not isinstance(application, QtWidgets.QApplication):
@@ -479,8 +492,13 @@ def _exercise_runtime_resize(app, window):
     window.resize(800, 600)
     _flush(app)
     after = _rect_record(window.frameGeometry())
-    if window.tableView.viewport().width() < 1 or window.tableView.viewport().height() < 1:
-        raise RuntimeError("Main Workspace table became unreachable after runtime resize.")
+    if (
+        window.tableView.viewport().width() < 1
+        or window.tableView.viewport().height() < 1
+    ):
+        raise RuntimeError(
+            "Main Workspace table became unreachable after runtime resize."
+        )
     return {"before": before, "after": after, "table_reachable": True}
 
 
@@ -526,7 +544,9 @@ def _exercise_results_splitter(app, window):
     window.show()
     _flush(app)
     extent = max(2, window.results_nav_splitter.width())
-    window.results_nav_splitter.setSizes([max(1, int(extent * 0.35)), max(1, int(extent * 0.65))])
+    window.results_nav_splitter.setSizes(
+        [max(1, int(extent * 0.35)), max(1, int(extent * 0.65))]
+    )
     _flush(app)
     sizes = window.results_nav_splitter.sizes()
     if len(sizes) != 2 or any(size <= 0 for size in sizes):
@@ -591,8 +611,12 @@ def _pixmap_logical_size(pixmap):
 
 def _assert_screen_reachable(window):
     screen = window.screen() or QtWidgets.QApplication.primaryScreen()
-    if screen is None or not screen.availableGeometry().contains(window.frameGeometry()):
-        raise RuntimeError("%s is not reachable on its owning screen." % window.objectName())
+    if screen is None or not screen.availableGeometry().contains(
+        window.frameGeometry()
+    ):
+        raise RuntimeError(
+            "%s is not reachable on its owning screen." % window.objectName()
+        )
     parent = window.parentWidget()
     if parent is not None and parent.screen() is not screen:
         raise RuntimeError("Parented surface opened on a different screen.")

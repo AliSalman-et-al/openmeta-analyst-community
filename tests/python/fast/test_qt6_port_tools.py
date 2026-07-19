@@ -26,24 +26,27 @@ PORT_SCRIPT = ROOT / "scripts/qt6_port.py"
 
 
 def test_codemod_rewrites_imports_moved_classes_and_scoped_enums_with_comments():
-    source = '''# module comment
+    source = """# module comment
 from PyQt5 import QtCore  # binding comment
 from PyQt5.QtWidgets import QAction, QUndoCommand, QUndoStack, QWidget
 
 alignment = QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter  # enum comment
 action = QAction("Run")
-'''
+"""
 
     result = migrate_source(source, filename="example.py")
 
-    assert result.code == '''# module comment
+    assert (
+        result.code
+        == """# module comment
 from PyQt6 import QtCore  # binding comment
 from PyQt6.QtGui import QAction, QUndoCommand, QUndoStack
 from PyQt6.QtWidgets import QWidget
 
 alignment = QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter  # enum comment
 action = QAction("Run")
-'''
+"""
+    )
     assert [change.kind for change in result.transformations] == [
         "binding-import",
         "moved-class-import",
@@ -57,7 +60,7 @@ action = QAction("Run")
 
 
 def test_codemod_preserves_explicit_overload_and_ignores_unbound_lookalikes():
-    source = '''from PyQt5.QtCore import Qt, pyqtSignal
+    source = """from PyQt5.QtCore import Qt, pyqtSignal
 
 class Local:
     AlignLeft = 1
@@ -67,7 +70,7 @@ signal[int].connect(print)
 local = Local.AlignLeft
 value = "Qt.AlignLeft and PyQt5 stay text"
 qt_value = Qt.AlignLeft
-'''
+"""
 
     result = migrate_source(source, filename="overloads.py")
 
@@ -102,10 +105,10 @@ metric = QtWidgets.QStyle.PM_DefaultFrameWidth
 
 
 def test_codemod_refuses_ambiguous_enum_and_removed_class_with_locations():
-    source = '''from PyQt5.QtCore import Qt, QRegExp
+    source = """from PyQt5.QtCore import Qt, QRegExp
 mode = Qt.AA_EnableHighDpiScaling
 pattern = QRegExp("x")
-'''
+"""
 
     with pytest.raises(MigrationRefused) as caught:
         migrate_source(source, filename="ambiguous.py")
@@ -139,7 +142,9 @@ def test_mapping_manifest_covers_every_discovered_enum_and_displaced_class():
             encoding="utf-8"
         )
     )
-    enum_names = {item["symbol"].rsplit(".", 1)[-1] for item in inventory["short_enums"]}
+    enum_names = {
+        item["symbol"].rsplit(".", 1)[-1] for item in inventory["short_enums"]
+    }
     covered_enums = set(manifest.scoped_enums) | set(manifest.ambiguous_enums)
     displaced = {item["symbol"] for item in inventory["removed_or_displaced_apis"]}
 
@@ -176,7 +181,11 @@ def test_class_scoped_enum_manifest_targets_exist_in_locked_pyqt6():
         ("compat.py", "import qtpy\n", "binding-facade"),
         ("enum.py", "from PyQt6.QtCore import Qt\nx = Qt.AlignLeft\n", "short-enum"),
         ("removed.py", "from PyQt6.QtCore import QRegExp\n", "removed-api"),
-        ("generated.py", "# Form implementation generated from reading ui file\n", "stale-generator"),
+        (
+            "generated.py",
+            "# Form implementation generated from reading ui file\n",
+            "stale-generator",
+        ),
         ("runtime.py", "from PyQt6.uic import loadUi\n", "runtime-form-loading"),
         ("resource.py", "qt_resource_data = b'bytes'\n", "generated-python-resource"),
         ("requirement.txt", "PyQt5==5.15.11\n", "pyqt5-requirement"),
@@ -192,14 +201,16 @@ def test_strict_scan_rejects_forbidden_migration_patterns(tmp_path, name, source
     assert findings[0].line == (2 if name == "enum.py" else 1)
 
 
-def test_strict_scan_has_no_false_positive_for_comments_strings_or_native_scopes(tmp_path):
+def test_strict_scan_has_no_false_positive_for_comments_strings_or_native_scopes(
+    tmp_path,
+):
     candidate = tmp_path / "native.py"
     candidate.write_text(
-        '''from PyQt6.QtCore import Qt
+        """from PyQt6.QtCore import Qt
 # PyQt5, loadUi, Qt.AlignLeft, and qt_resource_data are migration prose.
 message = "Qt5Compat and QRegExp are not active code"
 alignment = Qt.AlignmentFlag.AlignLeft
-''',
+""",
         encoding="utf-8",
     )
 
@@ -278,11 +289,11 @@ def test_manifest_drives_moved_and_removed_module_attribute_diagnostics(tmp_path
 
 
 def test_parenthesized_per_alias_comments_are_refused_without_trivia_loss():
-    source = '''from PyQt5.QtWidgets import (
+    source = """from PyQt5.QtWidgets import (
     QAction,  # moved action
     QWidget,  # retained widget
 )
-'''
+"""
 
     with pytest.raises(MigrationRefused) as caught:
         migrate_source(source, filename="comments.py")
@@ -292,12 +303,12 @@ def test_parenthesized_per_alias_comments_are_refused_without_trivia_loss():
 
 
 def test_qt_bound_method_rewrite_is_safe_and_unrelated_lookalike_is_ignored(tmp_path):
-    source = '''from PyQt5.QtWidgets import QApplication
+    source = """from PyQt5.QtWidgets import QApplication
 app = QApplication([])
 exit_code = app.exec_()
 worker = Worker()
 other = worker.exec_()
-'''
+"""
 
     result = migrate_source(source, filename="methods.py")
 
@@ -309,17 +320,19 @@ other = worker.exec_()
 
 
 def test_shadowed_qt_alias_refuses_every_rewrite_and_leaves_source_unchanged():
-    source = '''from PyQt5.QtCore import Qt
+    source = """from PyQt5.QtCore import Qt
 before = Qt.AlignLeft
 def render(Qt):
     return Qt.AlignRight
-'''
+"""
 
     with pytest.raises(MigrationRefused) as caught:
         migrate_source(source, filename="shadowed.py")
 
     assert caught.value.result.code == source
-    assert any(item.symbol == "Qt" and item.line == 3 for item in caught.value.result.refusals)
+    assert any(
+        item.symbol == "Qt" and item.line == 3 for item in caught.value.result.refusals
+    )
 
 
 def test_file_transaction_rejects_concurrent_edit_and_cleans_temps(tmp_path):
@@ -335,7 +348,9 @@ def test_file_transaction_rejects_concurrent_edit_and_cleans_temps(tmp_path):
     assert not list(tmp_path.glob(".rcms-qt6-*"))
 
 
-def test_file_transaction_rolls_back_prior_replace_and_cleans_temps(tmp_path, monkeypatch):
+def test_file_transaction_rolls_back_prior_replace_and_cleans_temps(
+    tmp_path, monkeypatch
+):
     first = tmp_path / "first.py"
     second = tmp_path / "second.py"
     original = b"from PyQt5.QtCore import Qt\nvalue = Qt.Checked\n"
@@ -404,7 +419,9 @@ def test_maintained_lane_scans_authoritative_inputs_and_treats_warnings_as_error
     assert "uv run pytest -W error" in workflow
 
 
-def test_report_path_cannot_alias_any_input_and_report_replace_is_atomic(tmp_path, monkeypatch):
+def test_report_path_cannot_alias_any_input_and_report_replace_is_atomic(
+    tmp_path, monkeypatch
+):
     candidate = tmp_path / "candidate.py"
     source = b"from PyQt5 import QtCore\n"
     candidate.write_bytes(source)
@@ -501,30 +518,32 @@ def test_qualified_qt5_compatibility_modules_are_rejected(tmp_path):
 
 def test_unresolved_or_reassigned_exec_is_refused_but_non_qt_instance_is_not():
     unresolved = "result = app.exec_()\n"
-    reassigned = '''from PyQt5.QtWidgets import QApplication
+    reassigned = """from PyQt5.QtWidgets import QApplication
 app = QApplication([])
 app = replacement
 result = app.exec_()
-'''
+"""
     for source in (unresolved, reassigned):
         with pytest.raises(MigrationRefused, match="exec_"):
             migrate_source(source, filename="exec.py")
 
 
 def test_same_destination_import_rewrite_preserves_every_byte_except_binding_token():
-    source = '''# before
+    source = """# before
 from PyQt5.QtCore import (  # opening
     Qt,  # enum namespace
     pyqtSignal,  # signal
 )
 # after
-'''
+"""
     result = migrate_source(source, filename="formatting.py")
     assert result.code == source.replace("PyQt5", "PyQt6", 1)
 
 
-def test_dynamic_binding_imports_are_rejected_without_unrelated_false_positives(tmp_path):
-    source = '''import builtins as builtin_api
+def test_dynamic_binding_imports_are_rejected_without_unrelated_false_positives(
+    tmp_path,
+):
+    source = """import builtins as builtin_api
 import importlib
 from builtins import __import__ as builtin_import
 legacy = importlib.import_module("PyQt5.QtCore")
@@ -534,7 +553,7 @@ aliased = builtin_import("PyQt5.QtGui")
 qualified = builtin_api.__import__("PyQt6.QtCore5Compat")
 main = __import__("__main__")
 plugin = plugin_loader.load(plugin_name)
-'''
+"""
     with pytest.raises(MigrationRefused) as caught:
         migrate_source(source, filename="dynamic.py")
     assert {item.symbol for item in caught.value.result.refusals} == {
@@ -554,10 +573,10 @@ plugin = plugin_loader.load(plugin_name)
         "pyqt5-import",
         "binding-facade",
     ]
-    shadowed = '''from builtins import __import__ as dynamic_import
+    shadowed = """from builtins import __import__ as dynamic_import
 dynamic_import = replacement
 module = dynamic_import("PyQt5.QtCore")
-'''
+"""
     with pytest.raises(MigrationRefused) as shadowed_error:
         migrate_source(shadowed, filename="shadowed-import.py")
     assert shadowed_error.value.result.refusals[0].symbol == (
@@ -707,10 +726,16 @@ def test_atomic_report_preserves_primary_error_when_restoration_fails(
     ("call", "rule"),
     [
         ('importlib.import_module(".QtCore", "PyQt5")', "pyqt5-import"),
-        ('importlib.import_module(package="PyQt6", name=".QtCore5Compat")', "binding-facade"),
+        (
+            'importlib.import_module(package="PyQt6", name=".QtCore5Compat")',
+            "binding-facade",
+        ),
         ('importlib.import_module(".QtCore")', "dynamic-binding-import"),
         ('importlib.import_module(".QtCore", package_name)', "dynamic-binding-import"),
-        ('importlib.import_module(".QtCore", "PyQt6", package="PyQt5")', "dynamic-binding-import"),
+        (
+            'importlib.import_module(".QtCore", "PyQt6", package="PyQt5")',
+            "dynamic-binding-import",
+        ),
     ],
 )
 def test_relative_dynamic_import_packages_are_resolved_or_refused(tmp_path, call, rule):
@@ -729,9 +754,7 @@ def test_repository_mechanical_cutover_retains_auditable_behavioral_handoffs():
         )
     )
     report = json.loads(
-        (ROOT / "docs/verification/qt6-codemod-report.json").read_text(
-            encoding="utf-8"
-        )
+        (ROOT / "docs/verification/qt6-codemod-report.json").read_text(encoding="utf-8")
     )
     second_run = json.loads(
         (ROOT / "docs/verification/qt6-codemod-second-run.json").read_text(

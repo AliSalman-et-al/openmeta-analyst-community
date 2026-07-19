@@ -23,7 +23,8 @@ def r_value(rscript: str, expression: str) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--version-only", action="store_true",
+        "--version-only",
+        action="store_true",
         help="emit only pyproject project.version without locating or invoking Rscript",
     )
     args = parser.parse_args()
@@ -36,13 +37,15 @@ def main() -> int:
         rscript = shutil.which("Rscript")
         if not rscript:
             raise SystemExit("Rscript is not available on PATH.")
-        values.update({
-            "r-version": r_value(rscript, "paste0('R-', getRversion())"),
-            "r-runtime-root": r_value(
-                rscript, "normalizePath(R.home(), winslash='/', mustWork=TRUE)"
-            ),
-            "rscript": Path(rscript).resolve(),
-        })
+        values.update(
+            {
+                "r-version": r_value(rscript, "paste0('R-', getRversion())"),
+                "r-runtime-root": r_value(
+                    rscript, "normalizePath(R.home(), winslash='/', mustWork=TRUE)"
+                ),
+                "rscript": Path(rscript).resolve(),
+            }
+        )
     with Path(output_path).open("a", encoding="utf-8") as output:
         for key, value in values.items():
             output.write("%s=%s\n" % (key, value))

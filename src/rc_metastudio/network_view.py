@@ -98,9 +98,7 @@ class ViewDialog(QDialog, ui_network_view.Ui_network_view_dialog):
             item = self.scene.addPixmap(self._network_source_pixmap)
             if item is None:
                 raise RuntimeError("Qt could not create the Network View pixmap item")
-            item.setTransformationMode(
-                Qt.TransformationMode.SmoothTransformation
-            )
+            item.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
             self._network_pixmap_item = item
             # layout-audit: allow=intrinsic-ratio; reason=scene follows its intrinsic-ratio visual artifact
             self.scene.setSceneRect(item.boundingRect())
@@ -137,9 +135,14 @@ class ViewDialog(QDialog, ui_network_view.Ui_network_view_dialog):
     def eventFilter(  # ty: ignore[invalid-method-override] -- PyQt6 generated-form multiple inheritance
         self, watched: QObject | None, event: QEvent | None
     ) -> bool:
-        if event is not None and watched is self._viewport() and event.type() in (
-            QEvent.Type.Resize,
-            QEvent.Type.Show,
+        if (
+            event is not None
+            and watched is self._viewport()
+            and event.type()
+            in (
+                QEvent.Type.Resize,
+                QEvent.Type.Show,
+            )
         ):
             self.schedule_viewport_refit()
         return super(ViewDialog, self).eventFilter(watched, event)

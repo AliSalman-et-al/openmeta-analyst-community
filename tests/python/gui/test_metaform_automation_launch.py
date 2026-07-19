@@ -35,8 +35,9 @@ def _fail_instead_of_blocking_on_unexpected_critical_dialog(monkeypatch):
     monkeypatch.setattr(
         QtWidgets.QMessageBox,
         "critical",
-        lambda _parent, title, message: messages.append((title, message))
-        or QtWidgets.QMessageBox.StandardButton.Ok,
+        lambda _parent, title, message: (
+            messages.append((title, message)) or QtWidgets.QMessageBox.StandardButton.Ok
+        ),
     )
     yield
     assert messages == []
@@ -299,7 +300,9 @@ def test_automation_launch_shows_main_window_maximized():
         os.chdir(REPO_ROOT)
 
 
-def test_open_project_preserves_main_window_state_without_duplicate_windows(monkeypatch):
+def test_open_project_preserves_main_window_state_without_duplicate_windows(
+    monkeypatch,
+):
     import launch
     import ma_data_table_model
     import project_adapter
@@ -317,8 +320,10 @@ def test_open_project_preserves_main_window_state_without_duplicate_windows(monk
     monkeypatch.setattr(
         QtWidgets.QMessageBox,
         "critical",
-        lambda _parent, title, message: critical_messages.append((title, message))
-        or QtWidgets.QMessageBox.StandardButton.Ok,
+        lambda _parent, title, message: (
+            critical_messages.append((title, message))
+            or QtWidgets.QMessageBox.StandardButton.Ok
+        ),
     )
 
     try:
@@ -474,9 +479,7 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
             expected_width, expected_height = wide_dataset_icon_sizes.get(
                 base_dataset_path, (48, 48)
             )
-        assert root.attrib["viewBox"] == (
-            f"0 0 {expected_width} {expected_height}"
-        )
+        assert root.attrib["viewBox"] == (f"0 0 {expected_width} {expected_height}")
         assert not root.findall(".//{http://www.w3.org/2000/svg}text")
         if resource_path.startswith(":/icons/dataset-types/"):
             source_text = source_path.read_text(encoding="utf-8").lower()
@@ -584,13 +587,15 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
                     assert abs(center_x - (rendered_width - 1) / 2) <= 2
                     assert abs(center_y - (rendered_height - 1) / 2) <= 2
                     if base_dataset_path in simple_dataset_height_ranges:
-                        minimum_height, maximum_height = (
-                            simple_dataset_height_ranges[base_dataset_path]
-                        )
+                        minimum_height, maximum_height = simple_dataset_height_ranges[
+                            base_dataset_path
+                        ]
                         assert minimum_height <= visible_height <= maximum_height
 
         if base_dataset_path in wide_dataset_icon_sizes:
-            requested_width, requested_height = wide_dataset_icon_sizes[base_dataset_path]
+            requested_width, requested_height = wide_dataset_icon_sizes[
+                base_dataset_path
+            ]
             ui_pixmap = icon.pixmap(requested_width, requested_height)
             assert ui_pixmap.width() == requested_width
             assert ui_pixmap.height() == requested_height
@@ -710,8 +715,10 @@ def test_main_data_grid_leaves_spare_width_outside_data_columns(
     monkeypatch.setattr(
         QtWidgets.QMessageBox,
         "critical",
-        lambda _parent, title, message: critical_messages.append((title, message))
-        or QtWidgets.QMessageBox.StandardButton.Ok,
+        lambda _parent, title, message: (
+            critical_messages.append((title, message))
+            or QtWidgets.QMessageBox.StandardButton.Ok
+        ),
     )
     app, window = launch.start_automation()
     try:
@@ -737,8 +744,10 @@ def test_undo_immediately_after_open_does_not_clear_loaded_project(
     monkeypatch.setattr(
         QtWidgets.QMessageBox,
         "critical",
-        lambda _parent, title, message: critical_messages.append((title, message))
-        or QtWidgets.QMessageBox.StandardButton.Ok,
+        lambda _parent, title, message: (
+            critical_messages.append((title, message))
+            or QtWidgets.QMessageBox.StandardButton.Ok
+        ),
     )
     app, window = launch.start_automation()
     try:
@@ -900,10 +909,7 @@ def test_automation_launch_opens_meantime_project_and_enables_subgroup_analysis(
 
     app, window = launch.start_automation()
     try:
-        assert (
-            window.open(_sample_project_path("meantime.rcms"))
-            is True
-        )
+        assert window.open(_sample_project_path("meantime.rcms")) is True
 
         assert window.tableView.model() is window.model
         assert window.model.rowCount() >= 1
@@ -951,52 +957,71 @@ def test_opened_sample_projects_return_native_table_values_for_pyqt6_rendering()
     for project_name, first_study, raw_headers_for_groups in cases:
         app, window = launch.start_automation()
         try:
-            assert (
-                window.open(
-                    _sample_project_path(project_name)
-                )
-                is True
-            )
+            assert window.open(_sample_project_path(project_name)) is True
             model = window.tableView.model()
 
             assert (
                 model.headerData(
-                    model.NAME, QtCore.Qt.Orientation.Horizontal, QtCore.Qt.ItemDataRole.DisplayRole
+                    model.NAME,
+                    QtCore.Qt.Orientation.Horizontal,
+                    QtCore.Qt.ItemDataRole.DisplayRole,
                 )
                 == "Study Name"
             )
             assert (
                 model.headerData(
-                    model.YEAR, QtCore.Qt.Orientation.Horizontal, QtCore.Qt.ItemDataRole.DisplayRole
+                    model.YEAR,
+                    QtCore.Qt.Orientation.Horizontal,
+                    QtCore.Qt.ItemDataRole.DisplayRole,
                 )
                 == "Year"
             )
             raw_headers = raw_headers_for_groups(model.current_txs)
             assert [
-                model.headerData(column, QtCore.Qt.Orientation.Horizontal, QtCore.Qt.ItemDataRole.DisplayRole)
+                model.headerData(
+                    column,
+                    QtCore.Qt.Orientation.Horizontal,
+                    QtCore.Qt.ItemDataRole.DisplayRole,
+                )
                 for column in model.RAW_DATA
             ] == raw_headers
-            assert model.headerData(0, QtCore.Qt.Orientation.Vertical, QtCore.Qt.ItemDataRole.DisplayRole) == 1
+            assert (
+                model.headerData(
+                    0,
+                    QtCore.Qt.Orientation.Vertical,
+                    QtCore.Qt.ItemDataRole.DisplayRole,
+                )
+                == 1
+            )
 
             assert (
-                model.data(model.index(0, model.NAME), QtCore.Qt.ItemDataRole.DisplayRole)
+                model.data(
+                    model.index(0, model.NAME), QtCore.Qt.ItemDataRole.DisplayRole
+                )
                 == first_study
             )
             assert isinstance(
-                model.data(model.index(0, model.YEAR), QtCore.Qt.ItemDataRole.DisplayRole), int
+                model.data(
+                    model.index(0, model.YEAR), QtCore.Qt.ItemDataRole.DisplayRole
+                ),
+                int,
             )
             assert (
                 model.data(
-                    model.index(0, model.INCLUDE_STUDY), QtCore.Qt.ItemDataRole.CheckStateRole
+                    model.index(0, model.INCLUDE_STUDY),
+                    QtCore.Qt.ItemDataRole.CheckStateRole,
                 )
                 == QtCore.Qt.CheckState.Checked
             )
             assert model.data(
                 model.index(0, model.NAME), QtCore.Qt.ItemDataRole.TextAlignmentRole
-            ) == int(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter)
+            ) == int(
+                QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter
+            )
             assert isinstance(
                 model.data(
-                    model.index(0, model.OUTCOMES[0]), QtCore.Qt.ItemDataRole.BackgroundRole
+                    model.index(0, model.OUTCOMES[0]),
+                    QtCore.Qt.ItemDataRole.BackgroundRole,
                 ),
                 QtGui.QColor,
             )
@@ -1025,10 +1050,7 @@ def test_edit_list_models_return_native_values_and_accept_native_edits():
 
     app, window = launch.start_automation()
     try:
-        assert (
-            window.open(_sample_project_path("amino.rcms"))
-            is True
-        )
+        assert window.open(_sample_project_path("amino.rcms")) is True
         dataset = window.model.dataset
         window.model.add_covariate(
             "Dose",
@@ -1058,11 +1080,15 @@ def test_edit_list_models_return_native_values_and_accept_native_edits():
         for list_model in models:
             index = list_model.index(0, 0)
             display_value = list_model.data(index, QtCore.Qt.ItemDataRole.DisplayRole)
-            alignment_value = list_model.data(index, QtCore.Qt.ItemDataRole.TextAlignmentRole)
+            alignment_value = list_model.data(
+                index, QtCore.Qt.ItemDataRole.TextAlignmentRole
+            )
 
             assert display_value not in (None, "")
             assert not hasattr(display_value, "value")
-            assert alignment_value == int(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter)
+            assert alignment_value == int(
+                QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter
+            )
 
         group_model = edit_list_models.TXGroupsModel(
             dataset=dataset,
@@ -1071,7 +1097,9 @@ def test_edit_list_models_return_native_values_and_accept_native_edits():
         )
         assert group_model.setData(group_model.index(0, 0), "Renamed Group") is True
         assert "Renamed Group" in [
-            group_model.data(group_model.index(row, 0), QtCore.Qt.ItemDataRole.DisplayRole)
+            group_model.data(
+                group_model.index(row, 0), QtCore.Qt.ItemDataRole.DisplayRole
+            )
             for row in range(group_model.rowCount())
         ]
 
@@ -1083,14 +1111,18 @@ def test_edit_list_models_return_native_values_and_accept_native_edits():
             is True
         )
         assert (
-            follow_up_model.data(follow_up_model.index(0, 0), QtCore.Qt.ItemDataRole.DisplayRole)
+            follow_up_model.data(
+                follow_up_model.index(0, 0), QtCore.Qt.ItemDataRole.DisplayRole
+            )
             == "Renamed Follow Up"
         )
 
         studies_model = edit_list_models.StudiesModel(dataset=dataset)
         assert studies_model.setData(studies_model.index(0, 0), "Renamed Study") is True
         assert (
-            studies_model.data(studies_model.index(0, 0), QtCore.Qt.ItemDataRole.DisplayRole)
+            studies_model.data(
+                studies_model.index(0, 0), QtCore.Qt.ItemDataRole.DisplayRole
+            )
             == "Renamed Study"
         )
 
@@ -1100,7 +1132,9 @@ def test_edit_list_models_return_native_values_and_accept_native_edits():
             is True
         )
         assert (
-            covariates_model.data(covariates_model.index(0, 0), QtCore.Qt.ItemDataRole.DisplayRole)
+            covariates_model.data(
+                covariates_model.index(0, 0), QtCore.Qt.ItemDataRole.DisplayRole
+            )
             == "Renamed Dose"
         )
 
@@ -1110,7 +1144,9 @@ def test_edit_list_models_return_native_values_and_accept_native_edits():
             is True
         )
         assert (
-            outcomes_model.data(outcomes_model.index(0, 0), QtCore.Qt.ItemDataRole.DisplayRole)
+            outcomes_model.data(
+                outcomes_model.index(0, 0), QtCore.Qt.ItemDataRole.DisplayRole
+            )
             == "Renamed Outcome"
         )
 
@@ -1137,10 +1173,7 @@ def test_change_covariate_type_model_returns_native_values_and_accepts_native_ed
 
     app, window = launch.start_automation()
     try:
-        assert (
-            window.open(_sample_project_path("amino.rcms"))
-            is True
-        )
+        assert window.open(_sample_project_path("amino.rcms")) is True
         dataset = window.model.dataset
         window.model.add_covariate(
             "Dose",
@@ -1153,19 +1186,27 @@ def test_change_covariate_type_model_returns_native_values_and_accepts_native_ed
         cov_model = change_cov_type_form.CovModel(dataset, dataset.covariates[0])
         assert (
             cov_model.headerData(
-                cov_model.STUDY_COL, QtCore.Qt.Orientation.Horizontal, QtCore.Qt.ItemDataRole.DisplayRole
+                cov_model.STUDY_COL,
+                QtCore.Qt.Orientation.Horizontal,
+                QtCore.Qt.ItemDataRole.DisplayRole,
             )
             == "study"
         )
         assert (
             cov_model.headerData(
-                cov_model.NEW_VAL, QtCore.Qt.Orientation.Horizontal, QtCore.Qt.ItemDataRole.DisplayRole
+                cov_model.NEW_VAL,
+                QtCore.Qt.Orientation.Horizontal,
+                QtCore.Qt.ItemDataRole.DisplayRole,
             )
             == "Dose (factor)"
         )
         assert cov_model.headerData(
-            cov_model.NEW_VAL, QtCore.Qt.Orientation.Horizontal, QtCore.Qt.ItemDataRole.TextAlignmentRole
-        ) == int(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter)
+            cov_model.NEW_VAL,
+            QtCore.Qt.Orientation.Horizontal,
+            QtCore.Qt.ItemDataRole.TextAlignmentRole,
+        ) == int(
+            QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter
+        )
 
         display_value = cov_model.data(
             cov_model.index(0, cov_model.STUDY_COL), QtCore.Qt.ItemDataRole.DisplayRole
@@ -1175,7 +1216,10 @@ def test_change_covariate_type_model_returns_native_values_and_accepts_native_ed
 
         assert cov_model.setData(cov_model.index(0, cov_model.NEW_VAL), "High") is True
         assert (
-            cov_model.data(cov_model.index(0, cov_model.NEW_VAL), QtCore.Qt.ItemDataRole.DisplayRole)
+            cov_model.data(
+                cov_model.index(0, cov_model.NEW_VAL),
+                QtCore.Qt.ItemDataRole.DisplayRole,
+            )
             == "High"
         )
 
@@ -1232,10 +1276,7 @@ def test_factor_covariate_edits_render_as_native_paint_text():
 
     app, window = launch.start_automation()
     try:
-        assert (
-            window.open(_sample_project_path("amino.rcms"))
-            is True
-        )
+        assert window.open(_sample_project_path("amino.rcms")) is True
         model = window.tableView.model()
         model.add_covariate("Region", "factor")
         factor_column = model.columnCount() - 1
@@ -1352,10 +1393,7 @@ def test_standard_meta_analysis_opens_specs_and_runs_through_backend(monkeypatch
         monkeypatch.setattr(meta_py_r, "run_continuous_ma", run, raising=False)
 
         try:
-            assert (
-                window.open(_sample_project_path(name))
-                is True
-            )
+            assert window.open(_sample_project_path(name)) is True
 
             window.action_go.trigger()
             specs = window.findChildren(meta_form.ma_specs.MA_Specs)
@@ -1471,10 +1509,7 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
     )
 
     try:
-        assert (
-            window.open(_sample_project_path("amino.rcms"))
-            is True
-        )
+        assert window.open(_sample_project_path("amino.rcms")) is True
 
         window.action_go.trigger()
         specs = window.findChildren(meta_form.ma_specs.MA_Specs)
@@ -1493,14 +1528,15 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
             "Only zero-event studies",
         ]
         method_combo = specs[0].method_cbo_box
-        assert method_combo.sizeAdjustPolicy() == QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
-        widest_method_label = (
-            max(
-                method_combo.fontMetrics().horizontalAdvance(
-                    str(method_combo.itemText(index))
-                )
-                for index in range(method_combo.count())
+        assert (
+            method_combo.sizeAdjustPolicy()
+            == QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+        )
+        widest_method_label = max(
+            method_combo.fontMetrics().horizontalAdvance(
+                str(method_combo.itemText(index))
             )
+            for index in range(method_combo.count())
         )
         assert method_combo.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
         assert method_combo.view().minimumWidth() >= widest_method_label
@@ -1511,17 +1547,19 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         )
 
         for combo in enum_combos:
-            assert combo.sizeAdjustPolicy() == QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
-            widest_enum_label = (
-                max(
-                    combo.fontMetrics().horizontalAdvance(str(combo.itemText(index)))
-                    for index in range(combo.count())
-                )
+            assert (
+                combo.sizeAdjustPolicy()
+                == QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+            )
+            widest_enum_label = max(
+                combo.fontMetrics().horizontalAdvance(str(combo.itemText(index)))
+                for index in range(combo.count())
             )
             assert combo.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
             assert combo.view().minimumWidth() >= widest_enum_label
             assert (
-                combo.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Policy.Expanding
+                combo.sizePolicy().horizontalPolicy()
+                == QtWidgets.QSizePolicy.Policy.Expanding
             )
 
         confidence_spinboxes = specs[0].parameter_grp_box.findChildren(
@@ -1646,10 +1684,7 @@ def test_method_parameters_dialog_normalizes_missing_parameter_metadata(monkeypa
     )
 
     try:
-        assert (
-            window.open(_sample_project_path("amino.rcms"))
-            is True
-        )
+        assert window.open(_sample_project_path("amino.rcms")) is True
 
         window.action_go.trigger()
         specs = window.findChildren(meta_form.ma_specs.MA_Specs)
@@ -1751,10 +1786,7 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
     )
 
     try:
-        assert (
-            window.open(_sample_project_path("amino.rcms"))
-            is True
-        )
+        assert window.open(_sample_project_path("amino.rcms")) is True
 
         window.action_go.trigger()
         specs = window.findChildren(meta_form.ma_specs.MA_Specs)
@@ -1766,10 +1798,19 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
         stable_width = specs.width()
         stable_height = specs.height()
         assert _window_archetype(specs) == "transactional"
-        assert specs.layout().sizeConstraint() == QtWidgets.QLayout.SizeConstraint.SetMinimumSize
+        assert (
+            specs.layout().sizeConstraint()
+            == QtWidgets.QLayout.SizeConstraint.SetMinimumSize
+        )
         assert specs.maximumSize() == QtCore.QSize(16777215, 16777215)
-        assert specs.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Policy.Preferred
-        assert specs.sizePolicy().verticalPolicy() == QtWidgets.QSizePolicy.Policy.Preferred
+        assert (
+            specs.sizePolicy().horizontalPolicy()
+            == QtWidgets.QSizePolicy.Policy.Preferred
+        )
+        assert (
+            specs.sizePolicy().verticalPolicy()
+            == QtWidgets.QSizePolicy.Policy.Preferred
+        )
         assert specs.isSizeGripEnabled() is False
 
         specs.resize(stable_width + 300, stable_height + 200)
@@ -1795,7 +1836,8 @@ def test_method_parameters_dialog_stays_stable_when_method_description_changes(
 
         assert specs.width() == stable_width
         assert (
-            specs.parameter_grp_box.layout().alignment() & QtCore.Qt.AlignmentFlag.AlignTop
+            specs.parameter_grp_box.layout().alignment()
+            & QtCore.Qt.AlignmentFlag.AlignTop
         ) == QtCore.Qt.AlignmentFlag.AlignTop
 
         descriptions = [
@@ -1855,10 +1897,7 @@ def test_required_advanced_analysis_actions_open_real_gui_dialogs(monkeypatch):
         )
 
         try:
-            assert (
-                window.open(_sample_project_path(name))
-                is True
-            )
+            assert window.open(_sample_project_path(name)) is True
             cov_values = {
                 study.name: index
                 for index, study in enumerate(window.model.dataset.studies)
@@ -1967,7 +2006,12 @@ def test_meta_regression_dialog_disables_ok_and_does_not_run_without_covariates(
         form = meta_reg_form.MetaRegForm(window.model, parent=window)
 
         assert form.covs_and_check_boxes == []
-        assert form.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok).isEnabled() is False
+        assert (
+            form.buttonBox.button(
+                QtWidgets.QDialogButtonBox.StandardButton.Ok
+            ).isEnabled()
+            is False
+        )
 
         form.run_meta_reg()
 
@@ -1991,10 +2035,7 @@ def test_diagnostic_meta_regression_dialog_fits_radio_group_labels():
     form = None
 
     try:
-        assert (
-            window.open(_sample_project_path("lymph.rcms"))
-            is True
-        )
+        assert window.open(_sample_project_path("lymph.rcms")) is True
         cov_values = {
             study.name: index + 1
             for index, study in enumerate(window.model.dataset.studies)
@@ -2028,10 +2069,7 @@ def test_diagnostic_metric_dialog_fits_checkbox_group_labels():
     form = None
 
     try:
-        assert (
-            window.open(_sample_project_path("lymph.rcms"))
-            is True
-        )
+        assert window.open(_sample_project_path("lymph.rcms")) is True
 
         form = diag_metrics.Diag_Metrics(window.model, parent=window)
         form.show()
@@ -2077,10 +2115,7 @@ def test_deleting_last_covariate_refreshes_advanced_analysis_actions():
     app, window = launch.start_automation()
 
     try:
-        assert (
-            window.open(_sample_project_path("amino.rcms"))
-            is True
-        )
+        assert window.open(_sample_project_path("amino.rcms")) is True
         window._add_new_covariate("region", "factor")
 
         assert window.action_meta_regression.isEnabled()
@@ -2128,7 +2163,12 @@ def test_subgroup_dialog_disables_ok_and_does_not_run_without_factor_covariates(
         form = meta_subgroup_form.MetaSubgroupForm(window.model, parent=window)
 
         assert form.cov_subgroup_cbo_box.count() == 0
-        assert form.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok).isEnabled() is False
+        assert (
+            form.buttonBox.button(
+                QtWidgets.QDialogButtonBox.StandardButton.Ok
+            ).isEnabled()
+            is False
+        )
 
         form.get_selected_cov()
 
@@ -2192,10 +2232,7 @@ def test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe(monke
     )
 
     try:
-        assert (
-            window.open(_sample_project_path("amino.rcms"))
-            is True
-        )
+        assert window.open(_sample_project_path("amino.rcms")) is True
         group_values = {
             study.name: "East" if index % 2 else "West"
             for index, study in enumerate(window.model.dataset.studies)
@@ -2258,10 +2295,7 @@ def test_subgroup_covariate_dialog_constructs_with_factor_covariate():
 
     app, window = launch.start_automation()
     try:
-        assert (
-            window.open(_sample_project_path("amino.rcms"))
-            is True
-        )
+        assert window.open(_sample_project_path("amino.rcms")) is True
         group_values = {
             study.name: "north" if index % 2 else "south"
             for index, study in enumerate(window.model.dataset.studies)
@@ -2370,9 +2404,7 @@ def test_results_window_renders_summary_text_and_plot_navigation(tmp_path):
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     plot_path = tmp_path / "forest.png"
-    image = results_window.QImage(
-        80, 40, results_window.QImage.Format.Format_RGB32
-    )
+    image = results_window.QImage(80, 40, results_window.QImage.Format.Format_RGB32)
     image.fill(results_window.Qt.GlobalColor.white)
     assert image.save(str(plot_path), "PNG")
 
@@ -2428,9 +2460,7 @@ def test_results_window_displays_canonical_svg_plot_artifact(tmp_path):
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     plot_path = tmp_path / "forest.png"
     svg_path = tmp_path / "forest.display.svg"
-    image = results_window.QImage(
-        1600, 800, results_window.QImage.Format.Format_RGB32
-    )
+    image = results_window.QImage(1600, 800, results_window.QImage.Format.Format_RGB32)
     image.fill(results_window.Qt.GlobalColor.white)
     assert image.save(str(plot_path), "PNG")
     svg_path.write_text(
@@ -2669,9 +2699,7 @@ def test_results_window_refits_raster_fallback_from_original_source(tmp_path):
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     plot_path = tmp_path / "legacy-plot.png"
-    image = results_window.QImage(
-        1600, 800, results_window.QImage.Format.Format_ARGB32
-    )
+    image = results_window.QImage(1600, 800, results_window.QImage.Format.Format_ARGB32)
     image.fill(0xFFFFFFFF)
     assert image.save(str(plot_path), "PNG")
     window = results_window.ResultsWindow(
@@ -2926,9 +2954,7 @@ def test_results_window_places_references_after_images_and_wraps_them(tmp_path):
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     plot_path = tmp_path / "forest.png"
-    image = results_window.QImage(
-        80, 40, results_window.QImage.Format.Format_RGB32
-    )
+    image = results_window.QImage(80, 40, results_window.QImage.Format.Format_RGB32)
     image.fill(results_window.Qt.GlobalColor.white)
     assert image.save(str(plot_path), "PNG")
 
@@ -3172,14 +3198,38 @@ def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_p
     try:
         menu_cases = [
             ("plot.data", "Forest Plot", "forest", True, "forest"),
-            ("plot.data", "Cumulative Forest Plot", "cumulative_forest", True, "forest"),
-            ("plot.data", "Leave-one-out Forest plot", "leave_one_out_forest", True, "forest"),
+            (
+                "plot.data",
+                "Cumulative Forest Plot",
+                "cumulative_forest",
+                True,
+                "forest",
+            ),
+            (
+                "plot.data",
+                "Leave-one-out Forest plot",
+                "leave_one_out_forest",
+                True,
+                "forest",
+            ),
             ("plot.data", "Subgroup Forest Plot", "subgroup_forest", True, "forest"),
             ("plot.data", "Subgroups Forest Plot", "subgroup_forest", True, "forest"),
             ("plot.data", "Sensitivity Forest Plot", "forest", True, "forest"),
             ("plot.data", "Specificity Forest Plot", "forest", True, "forest"),
-            ("plot.data", "Negative Likelihood Ratio Forest Plot", "forest", True, "forest"),
-            ("plot.data", "Positive Likelihood Ratio Forest Plot", "forest", True, "forest"),
+            (
+                "plot.data",
+                "Negative Likelihood Ratio Forest Plot",
+                "forest",
+                True,
+                "forest",
+            ),
+            (
+                "plot.data",
+                "Positive Likelihood Ratio Forest Plot",
+                "forest",
+                True,
+                "forest",
+            ),
             ("plot.data", "Regression Plot", "regression", True, "regression"),
             ("plot.data", "A title without a plot hint", "forest", True, "forest"),
             ("plot.data", "Forest Plot", "other", False, "none"),
@@ -3274,9 +3324,7 @@ def test_results_window_applies_forest_edits_to_selected_variant_artifact(
             "images": {title: str(image_path)},
             "image_params_paths": {title: params_path},
             "image_order": [title],
-            "plot_capabilities": {
-                title: _plot_capability(plot_kind=plot_kind)
-            },
+            "plot_capabilities": {title: _plot_capability(plot_kind=plot_kind)},
         }
     )
     monkeypatch.setattr(
@@ -3669,8 +3717,12 @@ def test_edit_forest_plot_dialog_apply_stays_open_and_ok_applies_and_closes():
     try:
         dialog.show()
         app.processEvents()
-        apply_button = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Apply)
-        ok_button = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
+        apply_button = dialog.buttonBox.button(
+            QtWidgets.QDialogButtonBox.StandardButton.Apply
+        )
+        ok_button = dialog.buttonBox.button(
+            QtWidgets.QDialogButtonBox.StandardButton.Ok
+        )
 
         assert apply_button is not None
         assert ok_button is not None
@@ -3788,6 +3840,7 @@ def test_apply_regression_plot_edits_rebuilds_and_redraws_bubble_plot(
         lambda: calls.append(("regenerate",)),
         raising=False,
     )
+
     def generate_reg_plot(path):
         calls.append(("draw", path))
         height = 300 + 100 * sum(call[0] == "draw" for call in calls)
@@ -4274,6 +4327,7 @@ def test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog(
         lambda: calls.append(("regenerate",)),
         raising=False,
     )
+
     def generate_forest_plot(outpath):
         calls.append(("generate", outpath))
         height = 300 + 100 * sum(call[0] == "generate" for call in calls)
@@ -4411,9 +4465,7 @@ def test_results_window_uses_reader_oriented_section_names_and_order(tmp_path):
     plot_paths = {}
     for name in ["forest", "roc", "density", "trace"]:
         plot_path = tmp_path / ("%s.png" % name)
-        image = results_window.QImage(
-            80, 40, results_window.QImage.Format.Format_RGB32
-        )
+        image = results_window.QImage(80, 40, results_window.QImage.Format.Format_RGB32)
         image.fill(results_window.Qt.GlobalColor.white)
         assert image.save(str(plot_path), "PNG")
         plot_paths[name] = str(plot_path)
@@ -4426,9 +4478,7 @@ def test_results_window_uses_reader_oriented_section_names_and_order(tmp_path):
             },
             "images": {"Forest Plot": plot_paths["forest"]},
             "image_order": ["Forest Plot"],
-            "plot_capabilities": {
-                "Forest Plot": _plot_capability(editable=False)
-            },
+            "plot_capabilities": {"Forest Plot": _plot_capability(editable=False)},
         }
     )
     try:
@@ -4508,10 +4558,7 @@ def test_real_metaform_save_as_round_trips_representative_projects(
         saved_path = str(tmp_path / name)
 
         try:
-            assert (
-                window.open(_sample_project_path(name))
-                is True
-            )
+            assert window.open(_sample_project_path(name)) is True
             expected = _dataset_summary(window.model.dataset)
             meta_form = sys.modules["meta_form"]
             monkeypatch.setattr(
@@ -4546,7 +4593,9 @@ def test_recent_files_persist_through_pyqt6_settings(tmp_path):
     import settings
 
     QtCore.QSettings.setPath(
-        QtCore.QSettings.Format.IniFormat, QtCore.QSettings.Scope.UserScope, str(tmp_path)
+        QtCore.QSettings.Format.IniFormat,
+        QtCore.QSettings.Scope.UserScope,
+        str(tmp_path),
     )
     QtCore.QSettings.setDefaultFormat(QtCore.QSettings.Format.IniFormat)
     settings.reset_settings()
@@ -4563,7 +4612,9 @@ def test_main_window_maximized_state_persists_through_pyqt6_settings(tmp_path):
     import settings
 
     QtCore.QSettings.setPath(
-        QtCore.QSettings.Format.IniFormat, QtCore.QSettings.Scope.UserScope, str(tmp_path)
+        QtCore.QSettings.Format.IniFormat,
+        QtCore.QSettings.Scope.UserScope,
+        str(tmp_path),
     )
     QtCore.QSettings.setDefaultFormat(QtCore.QSettings.Format.IniFormat)
     settings.reset_settings()
@@ -4858,13 +4909,8 @@ def test_wizard_uses_modern_style_with_explicit_back_navigation(path):
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     wizard = main_wizard.MainWizard(path=path)
     try:
-        assert (
-            wizard.wizardStyle()
-            == main_wizard.QWizard.WizardStyle.ModernStyle
-        )
-        assert (
-            wizard.button(main_wizard.QWizard.WizardButton.BackButton) is not None
-        )
+        assert wizard.wizardStyle() == main_wizard.QWizard.WizardStyle.ModernStyle
+        assert wizard.button(main_wizard.QWizard.WizardButton.BackButton) is not None
     finally:
         wizard.close()
         app.processEvents()
@@ -5219,8 +5265,8 @@ def test_removed_help_surfaces_do_not_leave_active_ui_or_urls():
 
         about_dialogs = []
         original_exec = about_legal_dialog.AboutLegalDialog.exec
-        about_legal_dialog.AboutLegalDialog.exec = (
-            lambda dialog: about_dialogs.append(dialog)
+        about_legal_dialog.AboutLegalDialog.exec = lambda dialog: about_dialogs.append(
+            dialog
         )
         try:
             window.action_about_legal.trigger()
@@ -5345,10 +5391,7 @@ def test_data_entry_dialogs_construct_with_stub_backend(monkeypatch):
     )
 
     try:
-        assert (
-            window.open(_sample_project_path("amino.rcms"))
-            is True
-        )
+        assert window.open(_sample_project_path("amino.rcms")) is True
         model = window.model
         binary_dialog = binary_data_form.BinaryDataForm2(
             copy.deepcopy(model.get_current_ma_unit_for_study(0)),
@@ -5360,12 +5403,7 @@ def test_data_entry_dialogs_construct_with_stub_backend(monkeypatch):
         )
         binary_dialog.close()
 
-        assert (
-            window.open(
-                _sample_project_path("continuous.rcms")
-            )
-            is True
-        )
+        assert window.open(_sample_project_path("continuous.rcms")) is True
         model = window.model
         continuous_dialog = continuous_data_form.ContinuousDataForm(
             copy.deepcopy(model.get_current_ma_unit_for_study(0)),
@@ -5377,10 +5415,7 @@ def test_data_entry_dialogs_construct_with_stub_backend(monkeypatch):
         )
         continuous_dialog.close()
 
-        assert (
-            window.open(_sample_project_path("lymph.rcms"))
-            is True
-        )
+        assert window.open(_sample_project_path("lymph.rcms")) is True
         model = window.model
         diagnostic_dialog = diagnostic_data_form.DiagnosticDataForm(
             copy.deepcopy(model.get_current_ma_unit_for_study(0)),
@@ -5410,10 +5445,7 @@ def test_data_entry_dialog_tables_expand_and_show_all_rows(monkeypatch):
     )
 
     try:
-        assert (
-            window.open(_sample_project_path("amino.rcms"))
-            is True
-        )
+        assert window.open(_sample_project_path("amino.rcms")) is True
         model = window.model
         dialogs.append(
             binary_data_form.BinaryDataForm2(
@@ -5426,12 +5458,7 @@ def test_data_entry_dialog_tables_expand_and_show_all_rows(monkeypatch):
             )
         )
 
-        assert (
-            window.open(
-                _sample_project_path("continuous.rcms")
-            )
-            is True
-        )
+        assert window.open(_sample_project_path("continuous.rcms")) is True
         model = window.model
         dialogs.append(
             continuous_data_form.ContinuousDataForm(
@@ -5444,10 +5471,7 @@ def test_data_entry_dialog_tables_expand_and_show_all_rows(monkeypatch):
             )
         )
 
-        assert (
-            window.open(_sample_project_path("lymph.rcms"))
-            is True
-        )
+        assert window.open(_sample_project_path("lymph.rcms")) is True
         model = window.model
         dialogs.append(
             diagnostic_data_form.DiagnosticDataForm(
@@ -5513,10 +5537,7 @@ def test_analysis_dialog_family_declares_migrated_transactional_surfaces(monkeyp
     )
 
     try:
-        assert (
-            window.open(_sample_project_path("amino.rcms"))
-            is True
-        )
+        assert window.open(_sample_project_path("amino.rcms")) is True
         model = window.model
         cov_values = {
             study.name: "north" if index % 2 else "south"
@@ -5538,12 +5559,7 @@ def test_analysis_dialog_family_declares_migrated_transactional_surfaces(monkeyp
             ]
         )
 
-        assert (
-            window.open(
-                _sample_project_path("continuous.rcms")
-            )
-            is True
-        )
+        assert window.open(_sample_project_path("continuous.rcms")) is True
         model = window.model
         dialogs.append(
             continuous_data_form.ContinuousDataForm(
@@ -5556,10 +5572,7 @@ def test_analysis_dialog_family_declares_migrated_transactional_surfaces(monkeyp
             )
         )
 
-        assert (
-            window.open(_sample_project_path("lymph.rcms"))
-            is True
-        )
+        assert window.open(_sample_project_path("lymph.rcms")) is True
         model = window.model
         dialogs.append(
             diagnostic_data_form.DiagnosticDataForm(
@@ -5602,7 +5615,10 @@ def test_add_covariate_dialog_fields_and_buttons_fill_fitted_width():
         assert dialog.layout() is not None
         assert dialog.minimumSize() == dialog.minimumSizeHint()
         assert dialog.maximumSize() == QtCore.QSize(16777215, 16777215)
-        assert dialog.covariate_name_le.sizePolicy().horizontalPolicy() == QtWidgets.QSizePolicy.Policy.Expanding
+        assert (
+            dialog.covariate_name_le.sizePolicy().horizontalPolicy()
+            == QtWidgets.QSizePolicy.Policy.Expanding
+        )
         assert dialog.buttonBox.isVisible()
         assert dialog.contentsRect().contains(dialog.buttonBox.geometry().center())
     finally:
@@ -5850,10 +5866,7 @@ def test_table_paint_roles_do_not_raise_across_all_cells():
 
     app, window = launch.start_automation()
     try:
-        assert (
-            window.open(_sample_project_path("amino.rcms"))
-            is True
-        )
+        assert window.open(_sample_project_path("amino.rcms")) is True
         model = window.tableView.model()
         for row in range(model.rowCount()):
             for column in range(model.columnCount()):
@@ -5862,10 +5875,14 @@ def test_table_paint_roles_do_not_raise_across_all_cells():
                     model.data(index, role)  # must not raise
         for section in range(model.columnCount()):
             for role in paint_roles:
-                model.headerData(section, QtCore.Qt.Orientation.Horizontal, role)  # must not raise
+                model.headerData(
+                    section, QtCore.Qt.Orientation.Horizontal, role
+                )  # must not raise
         for section in range(model.rowCount()):
             for role in paint_roles:
-                model.headerData(section, QtCore.Qt.Orientation.Vertical, role)  # must not raise
+                model.headerData(
+                    section, QtCore.Qt.Orientation.Vertical, role
+                )  # must not raise
     finally:
         window.close()
         app.processEvents()

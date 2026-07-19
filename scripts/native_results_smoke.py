@@ -97,7 +97,9 @@ def _canonical_member(root: Path, value: object, suffix: str) -> Path:
     ):
         raise ValueError("native Results evidence path is not canonical")
     if relative.suffix.lower() != suffix:
-        raise ValueError("native Results evidence member must be a %s file" % suffix.upper())
+        raise ValueError(
+            "native Results evidence member must be a %s file" % suffix.upper()
+        )
     resolved = (root / Path(*relative.parts)).resolve()
     if not resolved.is_relative_to(root.resolve()):
         raise ValueError("native Results evidence path escapes its root")
@@ -175,9 +177,7 @@ def _validate_png_capture(
         "internal image device pixel ratio",
         minimum=0.01,
     )
-    _require_close(
-        image_dpr, expected_dpr, "internal image device pixel ratio"
-    )
+    _require_close(image_dpr, expected_dpr, "internal image device pixel ratio")
     logical = _rect(capture.get("logical_frame"), "logical frame")
     screen = _rect(capture.get("screen_geometry"), "screen geometry")
     physical = _rect(capture.get("physical_crop"), "physical frame")
@@ -216,7 +216,10 @@ def _validate_png_capture(
         minimum=1,
         maximum=MAX_CAPTURE_ATTEMPTS,
     )
-    if capture.get("capture_method") != "QScreen.grabWindow(desktop); physical frame crop":
+    if (
+        capture.get("capture_method")
+        != "QScreen.grabWindow(desktop); physical frame crop"
+    ):
         raise ValueError("native Results evidence capture method is invalid")
     if capture.get("varied_pixels") is not True or not _image_has_variation(image):
         raise ValueError("native Results evidence capture is blank or single-colour")
@@ -244,9 +247,7 @@ def validate_evidence(root: Path) -> list[dict[str, object]]:
             "top-level device pixel ratio",
             minimum=0.01,
         )
-        _require_close(
-            device_pixel_ratio, expected_dpr, "top-level device pixel ratio"
-        )
+        _require_close(device_pixel_ratio, expected_dpr, "top-level device pixel ratio")
         if record.get("navigation") != [
             "Meta-Analysis Summary",
             "Forest Plot",
@@ -269,7 +270,9 @@ def validate_evidence(root: Path) -> list[dict[str, object]]:
         network = record.get("network")
         if not isinstance(network, dict):
             raise ValueError("native Results evidence has malformed Network View state")
-        item_count = _strict_int(network.get("item_count"), "network item count", minimum=0)
+        item_count = _strict_int(
+            network.get("item_count"), "network item count", minimum=0
+        )
         if {
             "follow_up": network.get("follow_up"),
             "item_count": item_count,
@@ -287,9 +290,7 @@ def validate_evidence(root: Path) -> list[dict[str, object]]:
             raise ValueError("native Results evidence capture set is incomplete")
         dpr_values = [scale_factor, device_pixel_ratio]
         for capture in captures.values():
-            capture_dpr, image_dpr = _validate_png_capture(
-                root, capture, expected_dpr
-            )
+            capture_dpr, image_dpr = _validate_png_capture(root, capture, expected_dpr)
             dpr_values.extend((capture_dpr, image_dpr))
         _require_single_dpr_band(dpr_values)
         artifact = _canonical_member(root, record.get("plot_artifact"), ".svg")
@@ -304,7 +305,9 @@ def validate_evidence(root: Path) -> list[dict[str, object]]:
         if "Forest Plot 95% confidence interval" not in artifact_text:
             raise ValueError("native Results Plot Artifact lost its readable label")
         if 'stroke="#000000"' not in artifact_text:
-            raise ValueError("native Results Plot Artifact lost its confidence interval")
+            raise ValueError(
+                "native Results Plot Artifact lost its confidence interval"
+            )
         records.append(record)
     return records
 
@@ -346,12 +349,18 @@ def _capture_window(
                     continue
                 dpr = float(desktop.devicePixelRatioF())
                 physical = QtCore.QRect(
-                    logical_extent_to_physical_pixels(frame.x() - screen_geometry.x(), dpr),
-                    logical_extent_to_physical_pixels(frame.y() - screen_geometry.y(), dpr),
+                    logical_extent_to_physical_pixels(
+                        frame.x() - screen_geometry.x(), dpr
+                    ),
+                    logical_extent_to_physical_pixels(
+                        frame.y() - screen_geometry.y(), dpr
+                    ),
                     logical_extent_to_physical_pixels(frame.width(), dpr),
                     logical_extent_to_physical_pixels(frame.height(), dpr),
                 )
-                captured = desktop.copy(physical) if not desktop.isNull() else QtGui.QPixmap()
+                captured = (
+                    desktop.copy(physical) if not desktop.isNull() else QtGui.QPixmap()
+                )
                 expected_size = [physical.width(), physical.height()]
                 actual_size = [captured.width(), captured.height()]
                 if captured.isNull() or actual_size != expected_size:
@@ -370,18 +379,24 @@ def _capture_window(
                         "device_pixel_ratio": dpr,
                         "image_device_pixel_ratio": image_dpr,
                         "logical_frame": {
-                            "x": frame.x(), "y": frame.y(),
-                            "width": frame.width(), "height": frame.height(),
+                            "x": frame.x(),
+                            "y": frame.y(),
+                            "width": frame.width(),
+                            "height": frame.height(),
                         },
                         "path": destination.name,
                         "physical_crop": {
-                            "x": physical.x(), "y": physical.y(),
-                            "width": physical.width(), "height": physical.height(),
+                            "x": physical.x(),
+                            "y": physical.y(),
+                            "width": physical.width(),
+                            "height": physical.height(),
                         },
                         "pixel_size": actual_size,
                         "screen_geometry": {
-                            "x": screen_geometry.x(), "y": screen_geometry.y(),
-                            "width": screen_geometry.width(), "height": screen_geometry.height(),
+                            "x": screen_geometry.x(),
+                            "y": screen_geometry.y(),
+                            "width": screen_geometry.width(),
+                            "height": screen_geometry.height(),
                         },
                         "sha256": hashlib.sha256(payload).hexdigest(),
                         "size_bytes": len(payload),
@@ -439,7 +454,7 @@ def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
         'viewBox="0 0 800 400"><rect width="800" height="400" fill="white"/>'
         '<line x1="80" y1="210" x2="720" y2="210" stroke="#000000" '
         'stroke-width="4"/><text x="80" y="100" font-size="32">Forest Plot '
-        '95% confidence interval</text></svg>',
+        "95% confidence interval</text></svg>",
         encoding="utf-8",
     )
     app = app_error_handler.get_or_create_application([])
@@ -495,7 +510,11 @@ def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
         def get_outcome_type(self, _outcome, get_str=False):
             return "binary"
 
-    setattr(network_view.meta_py_r, "ma_dataset_to_simple_network", lambda **_kwargs: str(network_image))
+    setattr(
+        network_view.meta_py_r,
+        "ma_dataset_to_simple_network",
+        lambda **_kwargs: str(network_image),
+    )
     network = network_view.ViewDialog(Model())
     results_image = evidence_root / ("results-%s.png" % slug)
     network_capture = evidence_root / ("network-%s.png" % slug)

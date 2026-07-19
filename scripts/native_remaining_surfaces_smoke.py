@@ -126,9 +126,7 @@ def _validated_rect(value: object, label: str) -> dict[str, int]:
     mapping = cast(dict[str, object], value)
     if any(type(item) is not int for item in mapping.values()):
         raise ValueError("remaining-surface evidence %s is not integral" % label)
-    result = {
-        key: cast(int, mapping[key]) for key in ("x", "y", "width", "height")
-    }
+    result = {key: cast(int, mapping[key]) for key in ("x", "y", "width", "height")}
     if result["width"] < 1 or result["height"] < 1:
         raise ValueError("remaining-surface evidence %s is empty" % label)
     return result
@@ -160,7 +158,9 @@ def validate_evidence(root: Path = DEFAULT_EVIDENCE_ROOT) -> list[dict[str, obje
         if qpa not in {"windows", "cocoa"}:
             raise ValueError("remaining-surface evidence is not native hosted Qt")
         if record["tab_focus_behavior"] != "TabFocusAllControls":
-            raise ValueError("remaining-surface evidence lacks all-control keyboard navigation")
+            raise ValueError(
+                "remaining-surface evidence lacks all-control keyboard navigation"
+            )
         if abs(_number(record["scale_factor"], "scale") - scale) > TOLERANCE:
             raise ValueError("remaining-surface evidence scale does not match")
         surfaces = record["surfaces"]
@@ -188,11 +188,15 @@ def validate_evidence(root: Path = DEFAULT_EVIDENCE_ROOT) -> list[dict[str, obje
             if not isinstance(surface, dict) or set(surface) != required:
                 raise ValueError("remaining-surface %s fields drifted" % surface_id)
             if surface["accessibility"] is not True:
-                raise ValueError("remaining-surface %s accessibility failed" % surface_id)
+                raise ValueError(
+                    "remaining-surface %s accessibility failed" % surface_id
+                )
             _validate_focus_observation(surface_id, surface["focus"])
             _validate_action_observation(surface_id, surface["actions"])
             if surface["close_semantics"] is not True:
-                raise ValueError("remaining-surface %s did not close cleanly" % surface_id)
+                raise ValueError(
+                    "remaining-surface %s did not close cleanly" % surface_id
+                )
             if surface["screen_clamped"] is not True:
                 raise ValueError("remaining-surface %s escaped its screen" % surface_id)
             contract = contracts[surface_id]
@@ -201,15 +205,21 @@ def validate_evidence(root: Path = DEFAULT_EVIDENCE_ROOT) -> list[dict[str, obje
             if surface["archetype"] != contract["archetype"]:
                 raise ValueError("remaining-surface %s archetype drifted" % surface_id)
             if surface["geometry_owner"] != contract["geometry_owner"]:
-                raise ValueError("remaining-surface %s geometry ownership drifted" % surface_id)
+                raise ValueError(
+                    "remaining-surface %s geometry ownership drifted" % surface_id
+                )
             if surface["overflow"] != contract["overflow"]:
-                raise ValueError("remaining-surface %s overflow contract drifted" % surface_id)
+                raise ValueError(
+                    "remaining-surface %s overflow contract drifted" % surface_id
+                )
             expected_application_owner = surface["geometry_owner"] in {
                 "application",
                 "application-first-use",
             }
             if surface["application_owns_geometry"] is not expected_application_owner:
-                raise ValueError("remaining-surface %s geometry policy drifted" % surface_id)
+                raise ValueError(
+                    "remaining-surface %s geometry policy drifted" % surface_id
+                )
             expected_first_use = {
                 "EDIT_DATASET": "screen_fraction",
                 "MAIN": "maximized",
@@ -217,7 +227,9 @@ def validate_evidence(root: Path = DEFAULT_EVIDENCE_ROOT) -> list[dict[str, obje
                 "RESULTS": "maximized",
             }.get(contract["role"], "content_preferred")
             if surface["first_use_behavior"] != expected_first_use:
-                raise ValueError("remaining-surface %s first-use behavior drifted" % surface_id)
+                raise ValueError(
+                    "remaining-surface %s first-use behavior drifted" % surface_id
+                )
             dpr = _number(surface["device_pixel_ratio"], "device pixel ratio")
             if abs(dpr - scale) > TOLERANCE:
                 raise ValueError("remaining-surface %s DPR does not match" % surface_id)
@@ -230,24 +242,38 @@ def validate_evidence(root: Path = DEFAULT_EVIDENCE_ROOT) -> list[dict[str, obje
                 and logical["x"] + logical["width"] <= screen["x"] + screen["width"]
                 and logical["y"] + logical["height"] <= screen["y"] + screen["height"]
             ):
-                raise ValueError("remaining-surface %s logical frame escaped" % surface_id)
+                raise ValueError(
+                    "remaining-surface %s logical frame escaped" % surface_id
+                )
             for dimension in ("width", "height"):
                 if abs(physical[dimension] - round(logical[dimension] * dpr)) > 2:
-                    raise ValueError("remaining-surface %s physical frame drifted" % surface_id)
+                    raise ValueError(
+                        "remaining-surface %s physical frame drifted" % surface_id
+                    )
             if (
                 abs(physical["x"] - round((logical["x"] - screen["x"]) * dpr)) > 2
                 or abs(physical["y"] - round((logical["y"] - screen["y"]) * dpr)) > 2
             ):
-                raise ValueError("remaining-surface %s physical origin drifted" % surface_id)
+                raise ValueError(
+                    "remaining-surface %s physical origin drifted" % surface_id
+                )
             capture = surface["capture"]
             if not isinstance(capture, dict) or set(capture) != {
-                "path", "pixel_size", "sha256", "size_bytes", "varied_pixels"
+                "path",
+                "pixel_size",
+                "sha256",
+                "size_bytes",
+                "varied_pixels",
             }:
-                raise ValueError("remaining-surface %s capture fields drifted" % surface_id)
+                raise ValueError(
+                    "remaining-surface %s capture fields drifted" % surface_id
+                )
             expected_relative = _capture_relative_path(scale, surface_id).as_posix()
             capture_path = capture["path"]
             if isinstance(capture_path, str) and capture_path in seen_capture_paths:
-                raise ValueError("remaining-surface evidence capture path is duplicated")
+                raise ValueError(
+                    "remaining-surface evidence capture path is duplicated"
+                )
             if capture_path != expected_relative:
                 raise ValueError(
                     "remaining-surface %s capture path does not match its scale and surface"
@@ -264,12 +290,16 @@ def validate_evidence(root: Path = DEFAULT_EVIDENCE_ROOT) -> list[dict[str, obje
             if capture["size_bytes"] != len(payload):
                 raise ValueError("remaining-surface %s PNG size drifted" % surface_id)
             if capture["pixel_size"] != [image.width(), image.height()]:
-                raise ValueError("remaining-surface %s PNG dimensions drifted" % surface_id)
+                raise ValueError(
+                    "remaining-surface %s PNG dimensions drifted" % surface_id
+                )
             if capture["varied_pixels"] is not True or not _has_variation(image):
                 raise ValueError("remaining-surface %s PNG is blank" % surface_id)
         records.append(record)
     if len(seen_capture_paths) != len(SCALE_FACTORS) * len(expected_ids):
-        raise ValueError("remaining-surface evidence does not contain 60 unique captures")
+        raise ValueError(
+            "remaining-surface evidence does not contain 60 unique captures"
+        )
     return records
 
 
@@ -292,13 +322,17 @@ def _validate_focus_observation(surface_id: str, observation: object) -> None:
     focus = cast(dict[str, object], observation)
     applicable = focus["applicable"]
     if applicable is False:
-        if surface_id not in {"analysis-progress", "import-progress", "shared-progress", "startup-splash"}:
-            raise ValueError("remaining-surface %s unexpectedly lacks focus traversal" % surface_id)
-        if (
-            any(
-                focus[key] is not None
-                for key in ("after_tab", "attempts", "initial")
+        if surface_id not in {
+            "analysis-progress",
+            "import-progress",
+            "shared-progress",
+            "startup-splash",
+        }:
+            raise ValueError(
+                "remaining-surface %s unexpectedly lacks focus traversal" % surface_id
             )
+        if (
+            any(focus[key] is not None for key in ("after_tab", "attempts", "initial"))
             or any(
                 focus[key] is not False
                 for key in (
@@ -313,10 +347,14 @@ def _validate_focus_observation(surface_id: str, observation: object) -> None:
             or focus["steps"] != []
             or focus["traversed"] != []
         ):
-            raise ValueError("remaining-surface %s focus exemption is malformed" % surface_id)
+            raise ValueError(
+                "remaining-surface %s focus exemption is malformed" % surface_id
+            )
         return
     if applicable is not True:
-        raise ValueError("remaining-surface %s focus applicability is invalid" % surface_id)
+        raise ValueError(
+            "remaining-surface %s focus applicability is invalid" % surface_id
+        )
     if (
         not isinstance(focus["initial"], str)
         or not focus["initial"]
@@ -345,7 +383,9 @@ def _validate_focus_observation(surface_id: str, observation: object) -> None:
         or any(not isinstance(item, str) or not item for item in focus["traversed"])
         or any(item not in focus["focusables"] for item in focus["traversed"])
     ):
-        raise ValueError("remaining-surface %s focus traversal was not observed" % surface_id)
+        raise ValueError(
+            "remaining-surface %s focus traversal was not observed" % surface_id
+        )
     steps = cast(list[object], focus["steps"])
     traversed = cast(list[str], focus["traversed"])
     for index, raw_step in enumerate(steps):
@@ -355,7 +395,9 @@ def _validate_focus_observation(surface_id: str, observation: object) -> None:
             "kind",
             "returned",
         }:
-            raise ValueError("remaining-surface %s focus traversal step drifted" % surface_id)
+            raise ValueError(
+                "remaining-surface %s focus traversal step drifted" % surface_id
+            )
         step = cast(dict[str, object], raw_step)
         expected_direction = "forward" if index % 2 == 0 else "backward"
         if (
@@ -365,10 +407,14 @@ def _validate_focus_observation(surface_id: str, observation: object) -> None:
             or step["kind"] != "key-event"
             or step["returned"] is not None
         ):
-            raise ValueError("remaining-surface %s focus traversal step drifted" % surface_id)
+            raise ValueError(
+                "remaining-surface %s focus traversal step drifted" % surface_id
+            )
         changed = step["focus"] != traversed[index]
         if changed != (index == len(steps) - 1):
-            raise ValueError("remaining-surface %s key traversal protocol drifted" % surface_id)
+            raise ValueError(
+                "remaining-surface %s key traversal protocol drifted" % surface_id
+            )
 
 
 def _validate_action_observation(surface_id: str, observation: object) -> None:
@@ -402,7 +448,9 @@ def _validate_action_observation(surface_id: str, observation: object) -> None:
         raise ValueError("remaining-surface %s action fields drifted" % surface_id)
     for key, value in actions.items():
         if key != "contract" and value is not True:
-            raise ValueError("remaining-surface %s action behavior was not observed" % surface_id)
+            raise ValueError(
+                "remaining-surface %s action behavior was not observed" % surface_id
+            )
 
 
 def _surface_factories():
@@ -428,9 +476,15 @@ def _surface_factories():
     setattr(change_cov_type_form, "CovModel", PreviewModel)
     return {
         "about-legal": about_legal_dialog.AboutLegalDialog,
-        "change-covariate-type": lambda: change_cov_type_form.ChangeCovTypeForm(object(), object()),
-        "edit-group-name": lambda: edit_group_name_form.EditGroupName("Treatment group"),
-        "edit-covariate-name": lambda: edit_group_name_form.EditCovariateName("Baseline risk"),
+        "change-covariate-type": lambda: change_cov_type_form.ChangeCovTypeForm(
+            object(), object()
+        ),
+        "edit-group-name": lambda: edit_group_name_form.EditGroupName(
+            "Treatment group"
+        ),
+        "edit-covariate-name": lambda: edit_group_name_form.EditCovariateName(
+            "Baseline risk"
+        ),
         "main-wizard": lambda: main_wizard.MainWizard(path="new_dataset"),
         "confidence-level": conf_level_dialog.ChangeConfLevelDlg,
         "add-covariate": add_new_dialogs.AddNewCovariateForm,
@@ -445,9 +499,7 @@ def _surface_factories():
     }
 
 
-def _capture(
-    window, destination: Path, evidence_root: Path
-) -> dict[str, object]:
+def _capture(window, destination: Path, evidence_root: Path) -> dict[str, object]:
     # QWidget.grab() synchronously paints the real hosted widget without
     # depending on desktop/screen-recording permissions in macOS CI.
     pixmap = window.grab()
@@ -496,7 +548,9 @@ def _widget_identity(window, widget) -> str:
     return "%s[%s]" % (type(widget).__name__, siblings.index(widget))
 
 
-def _observe_focus_traversal(app, window, QtCore, QtGui, QtWidgets) -> dict[str, object]:
+def _observe_focus_traversal(
+    app, window, QtCore, QtGui, QtWidgets
+) -> dict[str, object]:
     tab_focus = QtCore.Qt.FocusPolicy.TabFocus
     focusables = [
         widget
@@ -619,7 +673,9 @@ def _button_for_roles(box, roles):
     )
 
 
-def _observe_actions(app, factory, surface_id, QtCore, QtWidgets, QTest) -> dict[str, object]:
+def _observe_actions(
+    app, factory, surface_id, QtCore, QtWidgets, QTest
+) -> dict[str, object]:
     contract = ACTION_CONTRACTS[surface_id]
     if contract == "none":
         return {"contract": contract, "not_applicable": True}
@@ -634,9 +690,7 @@ def _observe_actions(app, factory, surface_id, QtCore, QtWidgets, QTest) -> dict
             rejected = []
             dialog.rejected.connect(lambda: rejected.append(True))
             visible_enabled = close_button.isVisible() and close_button.isEnabled()
-            QTest.mouseClick(
-                close_button, QtCore.Qt.MouseButton.LeftButton
-            )
+            QTest.mouseClick(close_button, QtCore.Qt.MouseButton.LeftButton)
             app.processEvents()
             return {
                 "close_visible_enabled": visible_enabled,
@@ -672,9 +726,7 @@ def _observe_actions(app, factory, surface_id, QtCore, QtWidgets, QTest) -> dict
             reject_wizard.rejected.connect(lambda: rejected.append(True))
             before = _snapshot_edit_state(reject_wizard, QtWidgets)
             cancel_visible = cancel.isVisible() and cancel.isEnabled()
-            QTest.mouseClick(
-                cancel, QtCore.Qt.MouseButton.LeftButton
-            )
+            QTest.mouseClick(cancel, QtCore.Qt.MouseButton.LeftButton)
             app.processEvents()
             return {
                 "cancel_visible_enabled": cancel_visible,
@@ -706,10 +758,10 @@ def _observe_actions(app, factory, surface_id, QtCore, QtWidgets, QTest) -> dict
             raise RuntimeError("accept-cancel surface has no accept action")
         accepted = []
         accept_dialog.accepted.connect(lambda: accepted.append(True))
-        default_accept = accept.isVisible() and accept.isEnabled() and accept.isDefault()
-        QTest.mouseClick(
-            accept, QtCore.Qt.MouseButton.LeftButton
+        default_accept = (
+            accept.isVisible() and accept.isEnabled() and accept.isDefault()
         )
+        QTest.mouseClick(accept, QtCore.Qt.MouseButton.LeftButton)
         app.processEvents()
         accepted_observed = accepted == [True] and not accept_dialog.isVisible()
     finally:
@@ -733,16 +785,15 @@ def _observe_actions(app, factory, surface_id, QtCore, QtWidgets, QTest) -> dict
         reject_dialog.rejected.connect(lambda: rejected.append(True))
         before = _snapshot_edit_state(reject_dialog, QtWidgets)
         cancel_visible = cancel.isVisible() and cancel.isEnabled()
-        QTest.mouseClick(
-            cancel, QtCore.Qt.MouseButton.LeftButton
-        )
+        QTest.mouseClick(cancel, QtCore.Qt.MouseButton.LeftButton)
         app.processEvents()
         return {
             "accepted_observed": accepted_observed,
             "cancel_visible_enabled": cancel_visible,
             "contract": contract,
             "default_accept_visible_enabled": default_accept,
-            "reject_nonmutation": before == _snapshot_edit_state(reject_dialog, QtWidgets),
+            "reject_nonmutation": before
+            == _snapshot_edit_state(reject_dialog, QtWidgets),
             "rejected_observed": rejected == [True] and not reject_dialog.isVisible(),
         }
     finally:
@@ -755,23 +806,17 @@ def _observe_overflow(window, QtWidgets) -> str:
             raise RuntimeError("splash overflow evidence has no pixmap")
         return "screen-bounded-pixmap"
     visible_text = [
-        view
-        for view in window.findChildren(QtWidgets.QTextBrowser)
-        if view.isVisible()
+        view for view in window.findChildren(QtWidgets.QTextBrowser) if view.isVisible()
     ]
     if visible_text:
         return "text-browser"
     visible_tables = [
-        view
-        for view in window.findChildren(QtWidgets.QTableView)
-        if view.isVisible()
+        view for view in window.findChildren(QtWidgets.QTableView) if view.isVisible()
     ]
     if visible_tables:
         return "bounded-table"
     visible_scrolls = [
-        area
-        for area in window.findChildren(QtWidgets.QScrollArea)
-        if area.isVisible()
+        area for area in window.findChildren(QtWidgets.QScrollArea) if area.isVisible()
     ]
     if isinstance(window, QtWidgets.QWizard) and visible_scrolls:
         return "page-scroll-area"
@@ -787,7 +832,11 @@ def _observe_window_contract(window, adaptive_window) -> dict[str, object]:
     state = controller.state
     policy = state.policy
     if policy.application_owns_geometry:
-        owner = "application" if state.role is adaptive_window.WindowRole.TRANSIENT else "application-first-use"
+        owner = (
+            "application"
+            if state.role is adaptive_window.WindowRole.TRANSIENT
+            else "application-first-use"
+        )
     else:
         owner = "window-manager-after-first-show"
     return {
@@ -840,9 +889,7 @@ def _run_scale(scale: float, evidence_root: Path) -> None:
             screen = window.screen().availableGeometry()
             observed_contract = _observe_window_contract(window, adaptive_window)
             observed_overflow = _observe_overflow(window, QtWidgets)
-            focus = _observe_focus_traversal(
-                app, window, QtCore, QtGui, QtWidgets
-            )
+            focus = _observe_focus_traversal(app, window, QtCore, QtGui, QtWidgets)
             accessible = True
             for view in window.findChildren(QtWidgets.QAbstractItemView):
                 if (
@@ -897,7 +944,9 @@ def _run_scale(scale: float, evidence_root: Path) -> None:
         finally:
             window.close()
             window.deleteLater()
-            QtWidgets.QApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
+            QtWidgets.QApplication.sendPostedEvents(
+                None, QtCore.QEvent.Type.DeferredDelete
+            )
             app.processEvents()
     record = {
         "qpa": app.platformName(),
@@ -953,7 +1002,14 @@ def main() -> int:
         environment["QT_SCALE_FACTOR"] = str(scale / native_dpr)
         environment["QT_SCALE_FACTOR_ROUNDING_POLICY"] = "PassThrough"
         subprocess.run(
-            [sys.executable, str(Path(__file__).resolve()), "--scale", str(scale), "--evidence-root", str(args.evidence_root)],
+            [
+                sys.executable,
+                str(Path(__file__).resolve()),
+                "--scale",
+                str(scale),
+                "--evidence-root",
+                str(args.evidence_root),
+            ],
             cwd=ROOT,
             env=environment,
             check=True,

@@ -147,9 +147,11 @@ def update_setting(field, value):
     spec = SETTING_SPECS[field]
     settings = QSettings()
     if spec.value_type is list:
-        if not isinstance(value, list) or any(
-            not isinstance(item, str) for item in value
-        ) or len(value) > MAX_RECENT_FILES:
+        if (
+            not isinstance(value, list)
+            or any(not isinstance(item, str) for item in value)
+            or len(value) > MAX_RECENT_FILES
+        ):
             raise TypeError("%s must be a list of strings" % field)
         encoded = json.dumps(value, ensure_ascii=False)
     elif spec.value_type is bool:
@@ -180,10 +182,7 @@ def get_setting(field):
     try:
         return _get_setting_helper(field)
     except (TypeError, ValueError, json.JSONDecodeError):
-        print(
-            "Invalid value for setting '%s'; resetting only that field"
-            % field
-        )
+        print("Invalid value for setting '%s'; resetting only that field" % field)
         update_setting(field, SETTING_SPECS[field].default)
         return _get_setting_helper(field)
 
@@ -203,9 +202,11 @@ def _get_setting_helper(field):
         if not isinstance(raw, str):
             raise TypeError("%s must use the JSON string codec" % field)
         decoded = json.loads(raw)
-        if not isinstance(decoded, list) or any(
-            not isinstance(item, str) for item in decoded
-        ) or len(decoded) > MAX_RECENT_FILES:
+        if (
+            not isinstance(decoded, list)
+            or any(not isinstance(item, str) for item in decoded)
+            or len(decoded) > MAX_RECENT_FILES
+        ):
             raise ValueError("%s must contain a list of strings" % field)
         return decoded
     if spec.value_type is bool:
@@ -465,11 +466,7 @@ def _splitter_proportions(sizes, default=DEFAULT_RESULTS_SPLITTER_PROPORTIONS):
     if values is None:
         return list(default)
     total = sum(values)
-    if (
-        len(values) != len(default)
-        or not math.isfinite(total)
-        or total <= 0
-    ):
+    if len(values) != len(default) or not math.isfinite(total) or total <= 0:
         return list(default)
     return [value / total for value in values]
 
@@ -546,12 +543,16 @@ def restore_workspace_placement(
         if show_window:
             window.showFullScreen()
         else:
-            window.setWindowState(window.windowState() | QtCore.Qt.WindowState.WindowFullScreen)
+            window.setWindowState(
+                window.windowState() | QtCore.Qt.WindowState.WindowFullScreen
+            )
     elif placement.maximized or (default_maximized and geometry is None):
         if show_window:
             window.showMaximized()
         else:
-            window.setWindowState(window.windowState() | QtCore.Qt.WindowState.WindowMaximized)
+            window.setWindowState(
+                window.windowState() | QtCore.Qt.WindowState.WindowMaximized
+            )
     elif show_window:
         window.show()
     else:
@@ -567,9 +568,7 @@ def save_results_window_state(window):
     settings = save_workspace_placement(RESULTS_WORKSPACE_GROUP, window)
     settings.setValue(
         RESULTS_WORKSPACE_GROUP + "/splitter_proportions",
-        _encode_float_list(
-            _splitter_proportions(window.results_nav_splitter.sizes())
-        ),
+        _encode_float_list(_splitter_proportions(window.results_nav_splitter.sizes())),
     )
     settings.sync()
 
@@ -826,7 +825,9 @@ def get_base_path(normalize=False):
     because it sees it as an escape character and Qt is fine with / throughout """
 
     base_path = str(
-        QtCore.QStandardPaths.writableLocation(QtCore.QStandardPaths.StandardLocation.AppDataLocation)
+        QtCore.QStandardPaths.writableLocation(
+            QtCore.QStandardPaths.StandardLocation.AppDataLocation
+        )
     )
     if normalize:
         base_path = str(QDir.toNativeSeparators(base_path))
@@ -890,7 +891,9 @@ def clear_r_tmp():
 
 def get_user_documents_path():
     docs_path = str(
-        QtCore.QStandardPaths.writableLocation(QtCore.QStandardPaths.StandardLocation.DocumentsLocation)
+        QtCore.QStandardPaths.writableLocation(
+            QtCore.QStandardPaths.StandardLocation.DocumentsLocation
+        )
     )
     return docs_path
 

@@ -336,9 +336,11 @@ def test_data_type_icons_follow_button_text_color_across_palette_changes(qapp):
                 ]
                 assert colors, (theme, button.objectName(), button.icon().isNull())
 
-            diagnostic = page.diagnostic_Button.icon().pixmap(
-                page.diagnostic_Button.iconSize()
-            ).toImage()
+            diagnostic = (
+                page.diagnostic_Button.icon()
+                .pixmap(page.diagnostic_Button.iconSize())
+                .toImage()
+            )
             diagnostic_colors = {
                 diagnostic.pixelColor(x, y).rgba()
                 for y in range(diagnostic.height())

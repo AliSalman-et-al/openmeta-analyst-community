@@ -194,8 +194,10 @@ def test_binary_back_calculation_choices_are_scrollable_and_screen_bounded(monke
         mapped = dialog.choice2_btn.mapTo(
             dialog.content_scroll.viewport(), QtCore.QPoint()
         )
-        assert dialog.content_scroll.viewport().rect().intersects(
-            QtCore.QRect(mapped, dialog.choice2_btn.size())
+        assert (
+            dialog.content_scroll.viewport()
+            .rect()
+            .intersects(QtCore.QRect(mapped, dialog.choice2_btn.size()))
         )
     finally:
         dialog.close()
@@ -219,7 +221,9 @@ def test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction(
         "op1": {"a": 2, "b": 10, "c": 3, "d": 12},
         "op2": {"a": 4, "b": 14, "c": 5, "d": 16},
     }
-    monkeypatch.setattr(binary_data_form.meta_py_r, "impute_bin_data", lambda _d: imputed)
+    monkeypatch.setattr(
+        binary_data_form.meta_py_r, "impute_bin_data", lambda _d: imputed
+    )
 
     def cancel_choice(chooser):
         chooser.show()
@@ -230,7 +234,9 @@ def test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction(
         )
         return chooser.result()
 
-    monkeypatch.setattr(binary_data_form.ChooseBackCalcResultForm, "exec", cancel_choice)
+    monkeypatch.setattr(
+        binary_data_form.ChooseBackCalcResultForm, "exec", cancel_choice
+    )
     try:
         dialog.clear_form()
         dialog.undoStack.clear()
@@ -265,7 +271,9 @@ def test_binary_back_calculation_chooser_accept_commits_selected_option(monkeypa
         "op1": {"a": 2, "b": 10, "c": 3, "d": 12},
         "op2": {"a": 4, "b": 14, "c": 5, "d": 16},
     }
-    monkeypatch.setattr(binary_data_form.meta_py_r, "impute_bin_data", lambda _d: imputed)
+    monkeypatch.setattr(
+        binary_data_form.meta_py_r, "impute_bin_data", lambda _d: imputed
+    )
 
     def accept_second_choice(chooser):
         chooser.show()
@@ -288,13 +296,20 @@ def test_binary_back_calculation_chooser_accept_commits_selected_option(monkeypa
         app.processEvents()
 
         assert _binary_table_snapshot(dialog)[:6] == ["4", "10", "14", "5", "11", "16"]
-        assert dialog.ma_unit.get_raw_data_for_groups(dialog.cur_groups) == [4, 14, 5, 16]
+        assert dialog.ma_unit.get_raw_data_for_groups(dialog.cur_groups) == [
+            4,
+            14,
+            5,
+            16,
+        ]
         assert dialog.undoStack.count() == 1
     finally:
         _close(app, window, dialog)
 
 
-def test_binary_data_focus_reveals_offscreen_controls_without_moving_actions(monkeypatch):
+def test_binary_data_focus_reveals_offscreen_controls_without_moving_actions(
+    monkeypatch,
+):
     app, window, dialog = _open_binary_dialog(monkeypatch)
     try:
         dialog.show()
@@ -308,7 +323,9 @@ def test_binary_data_focus_reveals_offscreen_controls_without_moving_actions(mon
         mapped = dialog.high_txt_box.mapTo(
             dialog.content_scroll.viewport(), QtCore.QPoint()
         )
-        assert viewport_rect.intersects(QtCore.QRect(mapped, dialog.high_txt_box.size()))
+        assert viewport_rect.intersects(
+            QtCore.QRect(mapped, dialog.high_txt_box.size())
+        )
         assert dialog.buttonBox.isVisible()
         assert dialog.buttonBox.geometry() == footer_before
     finally:
@@ -347,9 +364,13 @@ def test_binary_table_long_count_overflows_inside_table_and_remains_accessible(
         assert table.item(0, 0).text() == long_count
         assert table.columnWidth(0) >= table.fontMetrics().horizontalAdvance(long_count)
         table.horizontalScrollBar().setValue(0)
-        assert table.viewport().rect().intersects(table.visualItemRect(table.item(0, 0)))
+        assert (
+            table.viewport().rect().intersects(table.visualItemRect(table.item(0, 0)))
+        )
         table.horizontalScrollBar().setValue(table.horizontalScrollBar().maximum())
-        assert table.horizontalScrollBar().value() == table.horizontalScrollBar().maximum()
+        assert (
+            table.horizontalScrollBar().value() == table.horizontalScrollBar().maximum()
+        )
     finally:
         _close(app, window, dialog)
 
@@ -378,10 +399,14 @@ def test_binary_validation_message_wraps_and_is_revealed(monkeypatch):
         mapped = dialog.inconsistencyLabel.mapTo(
             dialog.content_scroll.viewport(), QtCore.QPoint()
         )
-        assert dialog.content_scroll.viewport().rect().intersects(
-            QtCore.QRect(mapped, dialog.inconsistencyLabel.size())
+        assert (
+            dialog.content_scroll.viewport()
+            .rect()
+            .intersects(QtCore.QRect(mapped, dialog.inconsistencyLabel.size()))
         )
-        assert not dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok).isEnabled()
+        assert not dialog.buttonBox.button(
+            QtWidgets.QDialogButtonBox.StandardButton.Ok
+        ).isEnabled()
     finally:
         _close(app, window, dialog)
 

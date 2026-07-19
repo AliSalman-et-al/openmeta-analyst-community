@@ -189,7 +189,9 @@ def _schema(version: int, member: str) -> JsonObject:
     try:
         payload = schema_resource.read_text(encoding="utf-8")
     except FileNotFoundError as exc:
-        raise ProjectFormatError(f"unsupported project format version: {version}") from exc
+        raise ProjectFormatError(
+            f"unsupported project format version: {version}"
+        ) from exc
     return _decode_json(filename, payload.encode("utf-8"))
 
 
@@ -200,12 +202,16 @@ def _validate(version: int, member: str, value: JsonObject) -> None:
         Draft202012Validator.check_schema(schema)
         Draft202012Validator(schema).validate(value)
     except SchemaError as exc:
-        raise ProjectFormatError(f"invalid committed schema for {member}: {exc.message}") from exc
+        raise ProjectFormatError(
+            f"invalid committed schema for {member}: {exc.message}"
+        ) from exc
     except ValidationError as exc:
         location = "/".join(str(part) for part in exc.absolute_path) or "<root>"
         raise ProjectFormatError(f"{member}:{location}: {exc.message}") from exc
     except RecursionError as exc:
-        raise ProjectFormatError(f"{member}: schema validation exceeded nesting limits") from exc
+        raise ProjectFormatError(
+            f"{member}: schema validation exceeded nesting limits"
+        ) from exc
 
 
 def _canonical_json(value: Mapping[str, JsonValue]) -> bytes:
@@ -266,19 +272,27 @@ def _inspect_archive(
             if not _regular_member(info):
                 raise ProjectFormatError(f"unsafe archive member type: {info.filename}")
             if info.flag_bits & 0x1:
-                raise ProjectFormatError(f"encrypted archive member is not supported: {info.filename}")
+                raise ProjectFormatError(
+                    f"encrypted archive member is not supported: {info.filename}"
+                )
             if info.compress_type not in _SUPPORTED_COMPRESSION_METHODS:
                 raise ProjectFormatError(
                     f"unsupported archive compression method for member: {info.filename}"
                 )
             if info.file_size > limits.max_member_size:
-                raise ProjectFormatError(f"archive member exceeds size limit: {info.filename}")
+                raise ProjectFormatError(
+                    f"archive member exceeds size limit: {info.filename}"
+                )
             total_size += info.file_size
             if total_size > limits.max_total_uncompressed_size:
-                raise ProjectFormatError("project archive exceeds total uncompressed size limit")
+                raise ProjectFormatError(
+                    "project archive exceeds total uncompressed size limit"
+                )
             ratio = info.file_size / max(info.compress_size, 1)
             if ratio > limits.max_compression_ratio:
-                raise ProjectFormatError(f"archive member exceeds compression ratio limit: {info.filename}")
+                raise ProjectFormatError(
+                    f"archive member exceeds compression ratio limit: {info.filename}"
+                )
         return archive, {info.filename: info for info in infos}
     except BaseException:
         archive.close()
@@ -328,9 +342,7 @@ def migrate_to_latest(
             raise ProjectFormatError(
                 f"no Project Format Migration from version {version}"
             )
-        migrated_project, migrated_state = migration(
-            migrated_project, migrated_state
-        )
+        migrated_project, migrated_state = migration(migrated_project, migrated_state)
         version += 1
     return migrated_project, migrated_state
 

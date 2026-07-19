@@ -30,9 +30,7 @@ def _run_build(*arguments: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_qt6_runtime_and_verification_tools_are_exactly_locked(
-    tmp_path, monkeypatch
-):
+def test_qt6_runtime_and_verification_tools_are_exactly_locked(tmp_path, monkeypatch):
     metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     lock = tomllib.loads((ROOT / "uv.lock").read_text(encoding="utf-8"))
     dependencies = set(metadata["project"]["dependencies"])
@@ -45,7 +43,9 @@ def test_qt6_runtime_and_verification_tools_are_exactly_locked(
     assert (ROOT / ".python-version").read_text(encoding="utf-8").strip() == "3.11.9"
     assert "PyQt6==6.11.0" in dependencies
     assert "pyinstaller==6.21.0" in dependencies
-    assert not any(requirement.lower().startswith("pyqt5") for requirement in dependencies)
+    assert not any(
+        requirement.lower().startswith("pyqt5") for requirement in dependencies
+    )
     assert "ty==0.0.18" in development
     assert "py7zr==1.1.3" in development
     assert locked_versions["pyqt6"] == "6.11.0"
@@ -242,9 +242,7 @@ def test_official_archive_stops_streaming_at_the_pinned_byte_ceiling(
     assert not destination.with_suffix(".download").exists()
 
 
-def test_official_archive_rejects_short_download_before_digest(
-    tmp_path, monkeypatch
-):
+def test_official_archive_rejects_short_download_before_digest(tmp_path, monkeypatch):
     response = _DownloadResponse([b"abc"], content_length=3)
     monkeypatch.setattr(qt6_build.urllib.request, "urlopen", lambda *_a, **_k: response)
     destination = tmp_path / "qt.7z"
@@ -550,9 +548,7 @@ def test_qt6_generation_and_type_checks_have_a_maintained_entry_point():
     assert "macos-x64" in hosted
     assert "macos-arm64" in hosted
     assert "timeout-minutes: 45" in hosted
-    assert (
-        "Rebuild and prove macOS rpy2 API bridge against installed R" in hosted
-    )
+    assert "Rebuild and prove macOS rpy2 API bridge against installed R" in hosted
     rebuild = hosted.index(
         "Rebuild and prove macOS rpy2 API bridge against installed R"
     )

@@ -48,6 +48,7 @@ class MainGuiProtocol(Protocol):
     def set_model(self, dataset, state_dict=None) -> None: ...
     def data_error(self, message: str) -> None: ...
 
+
 # it's a questionable practice to import the
 # underlying model into the view, but sometimes
 # it's easiest to manipulate the model directly
@@ -317,19 +318,25 @@ class MADataTable(QtWidgets.QTableView):
             )
             context_menu.addAction(action_rename)
             # sorting
-            col_name = _to_text(self.model().headerData(column_clicked, Qt.Orientation.Horizontal))
+            col_name = _to_text(
+                self.model().headerData(column_clicked, Qt.Orientation.Horizontal)
+            )
             action_sort = QAction("Sort Studies by %s" % col_name, self)
             _connect_action(action_sort, lambda: self.sort_by_col(column_clicked))
             context_menu.addAction(action_sort)
         elif column_clicked in raw_data_columns and data_type == "diagnostic":
             # sorting
-            col_name = _to_text(self.model().headerData(column_clicked, Qt.Orientation.Horizontal))
+            col_name = _to_text(
+                self.model().headerData(column_clicked, Qt.Orientation.Horizontal)
+            )
             action_sort = QAction("Sort Studies by %s" % col_name, self)
             _connect_action(action_sort, lambda: self.sort_by_col(column_clicked))
             context_menu.addAction(action_sort)
         elif column_clicked in outcomes_columns:
             # sorting
-            col_name = _to_text(self.model().headerData(column_clicked, Qt.Orientation.Horizontal))
+            col_name = _to_text(
+                self.model().headerData(column_clicked, Qt.Orientation.Horizontal)
+            )
             action_sort = QAction("Sort Studies by %s" % col_name, self)
             _connect_action(action_sort, lambda: self.sort_by_col(column_clicked))
             context_menu.addAction(action_sort)
@@ -357,7 +364,9 @@ class MADataTable(QtWidgets.QTableView):
             action_change = QAction(
                 "Create a %s Copy of %s" % (convert_to_str, cov.name), self
             )
-            _connect_action(action_change, lambda: self._main_gui().change_cov_type(cov))
+            _connect_action(
+                action_change, lambda: self._main_gui().change_cov_type(cov)
+            )
             context_menu.addAction(action_change)
 
         app_error_handler.popup_context_menu(
@@ -401,7 +410,9 @@ class MADataTable(QtWidgets.QTableView):
                 self._main_gui().keyPressEvent(event)
         elif self._is_return_key(event):
             self._move_current_index_vertically(
-                -1 if event.modifiers() & QtCore.Qt.KeyboardModifier.ShiftModifier else 1
+                -1
+                if event.modifiers() & QtCore.Qt.KeyboardModifier.ShiftModifier
+                else 1
             )
             event.accept()
         elif self._is_clear_key(event):
@@ -472,7 +483,9 @@ class MADataTable(QtWidgets.QTableView):
             self.scrollTo(target)
 
     def copy(self):
-        selected_indexes = required(self.selectionModel(), "workspace selection model").selectedIndexes()
+        selected_indexes = required(
+            self.selectionModel(), "workspace selection model"
+        ).selectedIndexes()
         if not selected_indexes:
             return
         upper_left_index = self._upper_left(selected_indexes)
@@ -482,7 +495,9 @@ class MADataTable(QtWidgets.QTableView):
         )
 
     def paste(self):
-        selected_indexes = required(self.selectionModel(), "workspace selection model").selectedIndexes()
+        selected_indexes = required(
+            self.selectionModel(), "workspace selection model"
+        ).selectedIndexes()
         if not selected_indexes:
             return
         upper_left_index = self._upper_left(selected_indexes)
@@ -752,7 +767,9 @@ class MADataTable(QtWidgets.QTableView):
         if upper_left_index.row() + len(content) > model.rowCount():
             return False, "Clipboard data extends beyond the workspace rows."
 
-        candidate = type(model)(dataset=copy.deepcopy(model.dataset), add_blank_study=False)
+        candidate = type(model)(
+            dataset=copy.deepcopy(model.dataset), add_blank_study=False
+        )
         candidate.set_state(copy.deepcopy(model.get_stateful_dict()))
         for row_offset, row in enumerate(content):
             for column_offset, value in enumerate(row):
@@ -831,9 +848,7 @@ class MADataTable(QtWidgets.QTableView):
         original_state_dict = copy.deepcopy(self.model().get_stateful_dict())
         original_model = self.model()
         original_unsaved = (
-            self._main_gui().current_data_unsaved
-            if self.main_gui is not None
-            else None
+            self._main_gui().current_data_unsaved if self.main_gui is not None else None
         )
         original_model.blockSignals(True)
         failure = None
@@ -1173,9 +1188,7 @@ class CommandCellEdit(QUndoCommand):
             study.include = bool(content.include)
             study.manually_excluded = bool(content.manually_excluded)
             return True
-        return model.setData(
-            index, content, allow_empty_names=allow_empty_names
-        )
+        return model.setData(index, content, allow_empty_names=allow_empty_names)
 
     def _restore_selection(self):
         _restore_table_selection(
@@ -1373,11 +1386,17 @@ class StudyDelegate(QItemDelegate):
             and event.key() in (QtCore.Qt.Key.Key_Return, QtCore.Qt.Key.Key_Enter)
             and not event.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier
         ):
-            direction = -1 if event.modifiers() & QtCore.Qt.KeyboardModifier.ShiftModifier else 1
+            direction = (
+                -1
+                if event.modifiers() & QtCore.Qt.KeyboardModifier.ShiftModifier
+                else 1
+            )
             table = self._table_for_editor(editor)
             edited_index = table.currentIndex() if table is not None else None
             self.commitData.emit(editor)
-            self.closeEditor.emit(editor, QtWidgets.QAbstractItemDelegate.EndEditHint.NoHint)
+            self.closeEditor.emit(
+                editor, QtWidgets.QAbstractItemDelegate.EndEditHint.NoHint
+            )
             if table is not None:
                 QtCore.QTimer.singleShot(
                     0,

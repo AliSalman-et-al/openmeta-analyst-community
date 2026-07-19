@@ -140,7 +140,9 @@ class TXGroupsModel(ResettableTableModel):
     def flags(self, index):
         if not self.valid_index(index, len(self.group_list)):
             return Qt.ItemFlag.NoItemFlags
-        return Qt.ItemFlag(QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsEditable)
+        return Qt.ItemFlag(
+            QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsEditable
+        )
 
 
 class OutcomesModel(ResettableTableModel):
@@ -207,7 +209,9 @@ class OutcomesModel(ResettableTableModel):
     def flags(self, index):
         if not self.valid_index(index, len(self.outcome_list)):
             return Qt.ItemFlag.NoItemFlags
-        return Qt.ItemFlag(QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsEditable)
+        return Qt.ItemFlag(
+            QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsEditable
+        )
 
 
 class FollowUpsModel(ResettableTableModel):
@@ -280,7 +284,9 @@ class FollowUpsModel(ResettableTableModel):
     def flags(self, index):
         if not self.valid_index(index, len(self.follow_up_list)):
             return Qt.ItemFlag.NoItemFlags
-        return Qt.ItemFlag(QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsEditable)
+        return Qt.ItemFlag(
+            QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsEditable
+        )
 
 
 class StudiesModel(ResettableTableModel):
@@ -333,7 +339,9 @@ class StudiesModel(ResettableTableModel):
     def flags(self, index):
         if not self.valid_index(index, len(self.studies_list)):
             return Qt.ItemFlag.NoItemFlags
-        return Qt.ItemFlag(QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsEditable)
+        return Qt.ItemFlag(
+            QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsEditable
+        )
 
 
 class CovariatesModel(ResettableTableModel):
@@ -391,4 +399,6 @@ class CovariatesModel(ResettableTableModel):
     def flags(self, index):
         if not self.valid_index(index, len(self.covariates_list)):
             return Qt.ItemFlag.NoItemFlags
-        return Qt.ItemFlag(QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsEditable)
+        return Qt.ItemFlag(
+            QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsEditable
+        )

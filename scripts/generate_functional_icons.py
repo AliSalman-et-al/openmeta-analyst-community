@@ -209,7 +209,9 @@ TABLE = {
 def write_family(directory, view_box, icons):
     directory.mkdir(parents=True, exist_ok=True)
     for name, body in icons.items():
-        (directory / name).write_text(svg(view_box, body), encoding="utf-8", newline="\n")
+        (directory / name).write_text(
+            svg(view_box, body), encoding="utf-8", newline="\n"
+        )
 
 
 def main():

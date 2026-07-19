@@ -24,7 +24,7 @@ def text(path: str) -> str:
 
 
 def official_macos_r_config_fixture() -> str:
-    return '''#!/bin/sh
+    return """#!/bin/sh
 ## config -- Simple shell script to get the values of basic R configure
 includes="-I${R_INCLUDE_DIR}"
 MAIN_LDFLAGS="-Wl,-headerpad_max_install_names"
@@ -44,7 +44,7 @@ case "$1" in
       ;;
     CC) echo clang ;;
 esac
-'''
+"""
 
 
 def load_inspector():
@@ -515,7 +515,9 @@ def test_private_r_launcher_configuration_is_exact_and_precedes_rpy2_build(tmp_p
     runtime_rscript.write_text('#!/bin/sh\nexec official "$@"\n', encoding="utf-8")
     runtime_rscript.chmod(0o755)
     runtime_config = runtime_resources / "bin/config"
-    runtime_config.write_text("arm64 build configuration is not adapted\n", encoding="utf-8")
+    runtime_config.write_text(
+        "arm64 build configuration is not adapted\n", encoding="utf-8"
+    )
     runtime_config_snapshot = runtime_config.read_bytes()
     launchers.configure(runtime_resources, configure_build=False)
     assert runtime_config.read_bytes() == runtime_config_snapshot
@@ -567,9 +569,7 @@ def test_private_r_launcher_configuration_is_exact_and_precedes_rpy2_build(tmp_p
         assert delegated.stdout.strip() == "clang"
         real_config = resources / "bin/config.real"
         real_config.write_text(
-            real_config.read_text(encoding="utf-8").replace(
-                "-liconv", "-lunexpected"
-            ),
+            real_config.read_text(encoding="utf-8").replace("-liconv", "-lunexpected"),
             encoding="utf-8",
         )
         rejected = subprocess.run(

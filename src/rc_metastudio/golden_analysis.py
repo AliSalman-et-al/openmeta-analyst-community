@@ -195,13 +195,9 @@ def write_golden_coverage_matrix(report_path, root_dir=None, method_discoverer=N
 
 
 def comprehensive_golden_baseline_manifest(root_dir=None, timestamp=None):
-    captured_at = (
-        timestamp
-        or datetime.datetime.now(datetime.timezone.utc)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z")
-    )
+    captured_at = timestamp or datetime.datetime.now(datetime.timezone.utc).replace(
+        microsecond=0
+    ).isoformat().replace("+00:00", "Z")
     return {
         "baseline": "comprehensive-golden",
         "captured_at": captured_at,
@@ -882,13 +878,9 @@ def capture_bundle(
     reference_environment=None,
 ):
     runner = runner or headless_analysis.run_headless_analysis
-    captured_at = (
-        timestamp
-        or datetime.datetime.now(datetime.timezone.utc)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z")
-    )
+    captured_at = timestamp or datetime.datetime.now(datetime.timezone.utc).replace(
+        microsecond=0
+    ).isoformat().replace("+00:00", "Z")
     capture_mode = capture_mode or os.environ.get(
         "RCMS_GOLDEN_CAPTURE_MODE", "local-debug"
     )
@@ -1027,7 +1019,9 @@ def _capture_plot_descriptors(bundle, result):
     descriptors = []
     for label in sorted(bundle.get("artifacts", {})):
         display_label = _matching_key(displays, label)
-        display_path = displays.get(display_label) if display_label is not None else None
+        display_path = (
+            displays.get(display_label) if display_label is not None else None
+        )
         capability_label = _matching_key(capabilities, label)
         capability = (
             capabilities.get(capability_label, {})
@@ -1295,7 +1289,9 @@ def _parse_summary(text):
 def _parse_result_table(text):
     values = {}
     lines = text.splitlines()
-    is_regression = any("Covariate" in line and "Coefficients" in line for line in lines)
+    is_regression = any(
+        "Covariate" in line and "Coefficients" in line for line in lines
+    )
     is_subgroup = any("Subgroups" in line and "Studies" in line for line in lines)
     in_heterogeneity = False
     for line in lines:

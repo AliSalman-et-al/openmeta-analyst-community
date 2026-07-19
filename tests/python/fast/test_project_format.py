@@ -92,7 +92,11 @@ def _group_project(
                             "entered_effects": {},
                             "follow_up": "first",
                             "groups": [
-                                {"id": index, "name": f"Tx {index + 1}", "raw_data": raw}
+                                {
+                                    "id": index,
+                                    "name": f"Tx {index + 1}",
+                                    "raw_data": raw,
+                                }
                                 for index, raw in enumerate(raw_values)
                             ],
                             "outcome": "Outcome",
@@ -185,7 +189,9 @@ def _patch_first_central_header(path: Path, offset: int, value: int) -> None:
 @pytest.mark.fast
 @pytest.mark.small
 @pytest.mark.release_readiness
-def test_project_round_trip_has_schema_validated_integrity_members(tmp_path: Path) -> None:
+def test_project_round_trip_has_schema_validated_integrity_members(
+    tmp_path: Path,
+) -> None:
     destination = tmp_path / "example.rcms"
 
     save_project(destination, _minimal_project(), _minimal_state())
@@ -260,14 +266,24 @@ def test_state_schema_contains_only_explicit_durable_v1_fields(tmp_path: Path) -
             "undeclared outcome",
         ),
         (
-            lambda dataset: dataset["studies"][0]["analysis_units"][1]["groups"][0].update(
-                raw_data=[1.0]
-            ),
+            lambda dataset: dataset["studies"][0]["analysis_units"][1]["groups"][
+                0
+            ].update(raw_data=[1.0]),
             "raw-data arity",
         ),
         (
-            lambda dataset: dataset["studies"][0]["analysis_units"][1]["entered_effects"]["OR"].update(
-                {"unknown comparison": next(iter(dataset["studies"][0]["analysis_units"][1]["entered_effects"]["OR"].values()))}
+            lambda dataset: dataset["studies"][0]["analysis_units"][1][
+                "entered_effects"
+            ]["OR"].update(
+                {
+                    "unknown comparison": next(
+                        iter(
+                            dataset["studies"][0]["analysis_units"][1][
+                                "entered_effects"
+                            ]["OR"].values()
+                        )
+                    )
+                }
             ),
             "undeclared group comparison",
         ),
@@ -364,34 +380,46 @@ def test_schema_rejects_values_outside_the_domain_vocabulary(
     [
         (
             "amino.rcms",
-            lambda dataset: dataset["studies"].append(copy.deepcopy(dataset["studies"][0])),
+            lambda dataset: dataset["studies"].append(
+                copy.deepcopy(dataset["studies"][0])
+            ),
             "duplicate study identifier",
         ),
         (
             "amino.rcms",
-            lambda dataset: dataset["studies"][0]["analysis_units"][1]["groups"][1].update(id=0),
+            lambda dataset: dataset["studies"][0]["analysis_units"][1]["groups"][
+                1
+            ].update(id=0),
             "duplicate group identifier",
         ),
         (
             "BCG.rcms",
-            lambda dataset: dataset["covariates"].append(copy.deepcopy(dataset["covariates"][0])),
+            lambda dataset: dataset["covariates"].append(
+                copy.deepcopy(dataset["covariates"][0])
+            ),
             "duplicate covariate identifier",
         ),
         (
             "amino.rcms",
-            lambda dataset: dataset["studies"][0]["analysis_units"][1].update(follow_up="missing"),
+            lambda dataset: dataset["studies"][0]["analysis_units"][1].update(
+                follow_up="missing"
+            ),
             "undeclared follow-up",
         ),
         (
             "amino.rcms",
-            lambda dataset: dataset["studies"][0]["analysis_units"][1]["entered_effects"].update(
+            lambda dataset: dataset["studies"][0]["analysis_units"][1][
+                "entered_effects"
+            ].update(
                 MD=dataset["studies"][0]["analysis_units"][1]["entered_effects"]["OR"]
             ),
             "metric conflicts with family",
         ),
         (
             "amino.rcms",
-            lambda dataset: dataset["studies"][0]["analysis_units"][1]["groups"][0].update(raw_data=[-1.0, 27.0]),
+            lambda dataset: dataset["studies"][0]["analysis_units"][1]["groups"][
+                0
+            ].update(raw_data=[-1.0, 27.0]),
             "count data cannot be negative",
         ),
     ],
@@ -528,7 +556,9 @@ def test_study_sample_size_requires_a_finite_positive_integer_on_save_and_load(
         project = _snapshot_project("amino.rcms")
         project["dataset"]["studies"][0]["sample_size"] = invalid
         with pytest.raises(ProjectFormatError, match="positive integer"):
-            save_project(tmp_path / f"save-sample-size-{invalid}.rcms", project, _minimal_state())
+            save_project(
+                tmp_path / f"save-sample-size-{invalid}.rcms", project, _minimal_state()
+            )
 
         destination = tmp_path / f"load-sample-size-{invalid}.rcms"
         valid = _snapshot_project("amino.rcms")
@@ -560,7 +590,9 @@ def test_reader_rejects_unsupported_versions_before_decoding_project_data(
     members["project.json"] = b"not even json"
     _write_archive(destination, [(name, members[name]) for name in members])
 
-    with pytest.raises(ProjectFormatError, match="unsupported project format version: 999"):
+    with pytest.raises(
+        ProjectFormatError, match="unsupported project format version: 999"
+    ):
         load_project(destination)
 
 
@@ -663,7 +695,9 @@ def test_reader_rejects_symlink_encryption_and_unsupported_compression_metadata(
         for name, payload in members.items():
             info = zipfile.ZipInfo(name)
             info.create_system = 3
-            mode = stat.S_IFLNK | 0o777 if name == "project.json" else stat.S_IFREG | 0o600
+            mode = (
+                stat.S_IFLNK | 0o777 if name == "project.json" else stat.S_IFREG | 0o600
+            )
             info.external_attr = mode << 16
             info.compress_type = zipfile.ZIP_DEFLATED
             archive.writestr(info, payload)
@@ -699,7 +733,9 @@ def test_reader_enforces_archive_total_size_and_member_count_ceilings(
     with pytest.raises(ProjectFormatError, match="configured size limit"):
         load_project(
             destination,
-            limits=ProjectArchiveLimits(max_archive_size=destination.stat().st_size - 1),
+            limits=ProjectArchiveLimits(
+                max_archive_size=destination.stat().st_size - 1
+            ),
         )
     with pytest.raises(ProjectFormatError, match="total uncompressed size limit"):
         load_project(
@@ -808,7 +844,9 @@ def test_pre_replace_failures_preserve_previous_project_and_clean_temporary_file
             lambda context: context.setattr(
                 project_format,
                 "_write_container",
-                lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("archive write")),
+                lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                    OSError("archive write")
+                ),
             ),
         ),
         (
@@ -919,7 +957,9 @@ def test_cleanup_failure_preserves_and_annotates_the_primary_error(
             "unlink",
             lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("cleanup denied")),
         )
-        with pytest.raises(ProjectFormatError, match="primary archive failure") as error:
+        with pytest.raises(
+            ProjectFormatError, match="primary archive failure"
+        ) as error:
             save_project(destination, _minimal_project(), _minimal_state())
 
     assert error.value.__notes__ == ["temporary cleanup also failed: cleanup denied"]
@@ -1094,17 +1134,16 @@ def test_all_committed_samples_match_the_frozen_semantics_and_round_trip(
     snapshot_paths = sorted(SNAPSHOT_DIR.glob("*.rcms.json"))
     assert snapshot_paths
     sample_manifest = json.loads((SAMPLE_DIR / "manifest.json").read_text("utf-8"))
-    manifest_projects = {
-        item["file"]: item for item in sample_manifest["projects"]
-    }
+    manifest_projects = {item["file"]: item for item in sample_manifest["projects"]}
     assert sample_manifest["format_version"] == CURRENT_FORMAT_VERSION
 
     for snapshot_path in snapshot_paths:
         snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
         sample_path = SAMPLE_DIR / snapshot_path.stem
-        assert manifest_projects[sample_path.name]["sha256"] == hashlib.sha256(
-            sample_path.read_bytes()
-        ).hexdigest()
+        assert (
+            manifest_projects[sample_path.name]["sha256"]
+            == hashlib.sha256(sample_path.read_bytes()).hexdigest()
+        )
         loaded = load_project(sample_path)
         assert loaded.project["dataset"] == snapshot["dataset"]
         assert loaded.state == {

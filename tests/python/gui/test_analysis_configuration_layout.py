@@ -13,9 +13,7 @@ from PyQt6.QtTest import QTest
 ROOT = Path(__file__).resolve().parents[3]
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("RCMS_STUB_BACKEND", "1")
-os.environ.setdefault(
-    "RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification")
-)
+os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
 prepare_generated_ui_imports()
@@ -167,9 +165,7 @@ def test_method_dialog_wording_is_scoped_to_its_analysis_family(
         dialog.close()
 
 
-def test_method_parameters_variants_stay_bounded_and_stable(
-    qapp, monkeypatch
-):
+def test_method_parameters_variants_stay_bounded_and_stable(qapp, monkeypatch):
     import adaptive_window
     import ma_specs
 
@@ -247,10 +243,13 @@ def test_method_parameters_variants_stay_bounded_and_stable(
                 qapp.processEvents()
                 visible_region = dialog.content_scroll_area.viewport().rect()
                 control_center = editable_value.mapTo(
-                    dialog.content_scroll_area.viewport(), editable_value.rect().center()
+                    dialog.content_scroll_area.viewport(),
+                    editable_value.rect().center(),
                 )
                 assert visible_region.contains(control_center)
-            assert dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok).isVisible()
+            assert dialog.buttonBox.button(
+                QtWidgets.QDialogButtonBox.StandardButton.Ok
+            ).isVisible()
             assert dialog.buttonBox.button(
                 QtWidgets.QDialogButtonBox.StandardButton.Cancel
             ).isVisible()
@@ -341,6 +340,7 @@ def test_regression_and_subgroup_selectors_use_transactional_layouts(qapp, monke
     parent.meta_subgroup = lambda _covariate: None
     regression = meta_reg_form.MetaRegForm(Model(), parent=parent)
     subgroup = meta_subgroup_form.MetaSubgroupForm(Model(), parent=parent)
+
     class PreviewModel(QtGui.QStandardItemModel):
         dataError = QtCore.pyqtSignal(str)
 
@@ -380,7 +380,10 @@ def test_regression_and_subgroup_selectors_use_transactional_layouts(qapp, monke
         popup = choice.view().window()
         assert available.contains(popup.frameGeometry())
         assert choice.view().textElideMode() == QtCore.Qt.TextElideMode.ElideNone
-        assert choice.view().horizontalScrollBarPolicy() == QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        assert (
+            choice.view().horizontalScrollBarPolicy()
+            == QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
         assert choice.view().horizontalScrollBar().maximum() > 0
         assert choice.itemData(0, QtCore.Qt.ItemDataRole.ToolTipRole) == long_name
         assert choice.toolTip() == long_name
@@ -391,7 +394,7 @@ def test_regression_and_subgroup_selectors_use_transactional_layouts(qapp, monke
             is adaptive_window.WindowArchetype.TRANSACTIONAL
         )
         assert covariate_type.cov_prev_table.verticalScrollMode() == (
-                QtWidgets.QAbstractItemView.ScrollMode.ScrollPerItem
+            QtWidgets.QAbstractItemView.ScrollMode.ScrollPerItem
         )
         assert covariate_type.buttonBox.isVisible()
     finally:
@@ -441,7 +444,9 @@ def test_choice_control_remeasures_font_and_style_before_bounded_popup(
         assert font_width > initial_width
         assert combo.view().minimumWidth() > font_width
         assert combo.view().window().frameGeometry().width() <= 2000
-        assert combo.itemData(1, QtCore.Qt.ItemDataRole.ToolTipRole) == combo.itemText(1)
+        assert combo.itemData(1, QtCore.Qt.ItemDataRole.ToolTipRole) == combo.itemText(
+            1
+        )
     finally:
         combo.hidePopup()
         combo.close()
@@ -476,7 +481,9 @@ def test_choice_popup_show_burst_coalesces_measurement_tooltips_and_clamp(qapp):
         assert applied == (1, 1, 1)
         assert available.contains(combo.view().window().frameGeometry())
         assert combo.view().horizontalScrollBar().maximum() > 0
-        assert combo.itemData(1, QtCore.Qt.ItemDataRole.ToolTipRole) == combo.itemText(1)
+        assert combo.itemData(1, QtCore.Qt.ItemDataRole.ToolTipRole) == combo.itemText(
+            1
+        )
     finally:
         combo.hidePopup()
         combo.close()
@@ -486,7 +493,7 @@ def test_native_windows_promoted_choice_popup_is_bounded_at_real_right_edge():
     if sys.platform != "win32":
         pytest.skip("The native Windows Qt platform is unavailable on this host")
 
-    script = r'''
+    script = r"""
 import json
 import app_error_handler
 from PyQt6 import QtCore, QtWidgets
@@ -542,12 +549,10 @@ print("NATIVE_CHOICE_POPUP=" + json.dumps(result))
 combo.hidePopup()
 dialog.close()
 app.processEvents()
-'''
+"""
     environment = os.environ.copy()
     environment.pop("QT_QPA_PLATFORM", None)
-    environment["RCMS_QT6_BUILD_ROOT"] = str(
-        ROOT / "build" / "qt6-verification"
-    )
+    environment["RCMS_QT6_BUILD_ROOT"] = str(ROOT / "build" / "qt6-verification")
     environment["PYTHONPATH"] = os.pathsep.join(
         [
             str(ROOT / "src"),
@@ -611,7 +616,7 @@ def test_method_parameters_default_and_cancel_keyboard_actions(qapp, monkeypatch
 
 
 def test_dot_and_comma_decimal_locales_produce_equivalent_analysis_requests():
-    script = r'''
+    script = r"""
 import json
 from types import SimpleNamespace
 from PyQt6 import QtCore, QtWidgets
@@ -671,13 +676,11 @@ print("LOCALE_ANALYSIS_REQUESTS=" + json.dumps({
     "requests": observed, "backend_calls": backend_calls,
     "data_calls": execution_data_calls
 }))
-'''
+"""
     environment = os.environ.copy()
     environment["QT_QPA_PLATFORM"] = "offscreen"
     environment["RCMS_STUB_BACKEND"] = "1"
-    environment["RCMS_QT6_BUILD_ROOT"] = str(
-        ROOT / "build" / "qt6-verification"
-    )
+    environment["RCMS_QT6_BUILD_ROOT"] = str(ROOT / "build" / "qt6-verification")
     environment["PYTHONPATH"] = os.pathsep.join(
         [str(ROOT / "src"), str(ROOT / "src" / "rc_metastudio")]
     )
@@ -736,7 +739,9 @@ def test_backend_execution_uses_only_frozen_analysis_requests(monkeypatch):
         request = analysis_adapter.make_analysis_request(
             data_type=data_type,
             workflow=workflow,
-            method="diagnostic.random" if data_type == "diagnostic" else data_type + ".random",
+            method="diagnostic.random"
+            if data_type == "diagnostic"
+            else data_type + ".random",
             metric=metric,
             parameters=mutable_parameters,
         )

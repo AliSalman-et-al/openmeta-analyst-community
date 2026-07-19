@@ -262,7 +262,11 @@ def _validate_evidence_registry(evidence: object) -> None:
     registry = cast(dict[str, object], evidence)
     for name, expected in EVIDENCE_ALLOWLIST.items():
         entry = registry[name]
-        if not isinstance(entry, dict) or set(entry) != {"issue", "command", "artifact"}:
+        if not isinstance(entry, dict) or set(entry) != {
+            "issue",
+            "command",
+            "artifact",
+        }:
             _fail(f"evidence {name} has invalid fields")
         fields = cast(dict[str, object], entry)
         if (

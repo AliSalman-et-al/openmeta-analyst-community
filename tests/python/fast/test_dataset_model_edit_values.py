@@ -49,9 +49,9 @@ def test_raw_data_uses_the_shared_strict_decimal_parser(monkeypatch):
     model = _continuous_model_with_named_study()
     monkeypatch.setattr(model, "update_outcome_if_possible", lambda _row: None)
     index = model.index(0, model.RAW_DATA[0])
-    raw_data = model.get_current_ma_unit_for_study(0).tx_groups[
-        model.current_txs[0]
-    ].raw_data
+    raw_data = (
+        model.get_current_ma_unit_for_study(0).tx_groups[model.current_txs[0]].raw_data
+    )
 
     assert model.setData(index, "1.25") is True
     assert raw_data[0] == 1.25
@@ -91,12 +91,20 @@ def test_workspace_model_rejects_invalid_index_and_unscoped_roles_once():
     model.dataError.connect(errors.append)
 
     assert model.setData(model.index(-1, -1), "ignored") is False
-    assert model.setData(
-        model.index(0, model.NAME), "ignored", Qt.ItemDataRole.DisplayRole
-    ) is False
-    assert model.setData(
-        model.index(0, model.NAME), Qt.CheckState.Checked, Qt.ItemDataRole.CheckStateRole
-    ) is False
+    assert (
+        model.setData(
+            model.index(0, model.NAME), "ignored", Qt.ItemDataRole.DisplayRole
+        )
+        is False
+    )
+    assert (
+        model.setData(
+            model.index(0, model.NAME),
+            Qt.CheckState.Checked,
+            Qt.ItemDataRole.CheckStateRole,
+        )
+        is False
+    )
 
     assert len(errors) == 3
     assert model.dataset.studies[0].name == "Alpha"
@@ -107,8 +115,7 @@ def test_workspace_model_rejects_invalid_headers_and_flags():
 
     assert model.flags(model.index(-1, -1)) == Qt.ItemFlag.NoItemFlags
     assert (
-        model.flags(model.createIndex(model.rowCount(), 0))
-        == Qt.ItemFlag.NoItemFlags
+        model.flags(model.createIndex(model.rowCount(), 0)) == Qt.ItemFlag.NoItemFlags
     )
     assert (
         model.flags(model.createIndex(0, model.columnCount()))
@@ -165,11 +172,14 @@ def test_inclusion_workspace_edit_captures_complete_semantic_state():
     edits = []
     model.workspaceEditCommitted.connect(edits.append)
 
-    assert model.setData(
-        model.index(0, model.INCLUDE_STUDY),
-        Qt.CheckState.Checked,
-        Qt.ItemDataRole.CheckStateRole,
-    ) is True
+    assert (
+        model.setData(
+            model.index(0, model.INCLUDE_STUDY),
+            Qt.CheckState.Checked,
+            Qt.ItemDataRole.CheckStateRole,
+        )
+        is True
+    )
 
     assert len(edits) == 1
     assert edits[0].old_value == ma_data_table_model.StudyInclusionState(False, False)
@@ -400,8 +410,13 @@ def test_empty_editable_cells_return_blank_edit_text():
 def test_normal_study_cells_do_not_override_view_alternating_row_background():
     model = _continuous_model_with_named_study()
 
-    assert model.data(model.index(0, model.NAME), Qt.ItemDataRole.BackgroundRole) is None
-    assert model.data(model.index(0, model.RAW_DATA[0]), Qt.ItemDataRole.BackgroundRole) is None
+    assert (
+        model.data(model.index(0, model.NAME), Qt.ItemDataRole.BackgroundRole) is None
+    )
+    assert (
+        model.data(model.index(0, model.RAW_DATA[0]), Qt.ItemDataRole.BackgroundRole)
+        is None
+    )
     assert model.data(
         model.index(0, model.OUTCOMES[0]), Qt.ItemDataRole.BackgroundRole
     ) == QColor(Qt.GlobalColor.yellow)
@@ -411,12 +426,12 @@ def test_highlighted_outcome_cells_use_dark_text_for_theme_independent_contrast(
     model = _continuous_model_with_named_study()
     outcome_index = model.index(0, model.OUTCOMES[0])
 
-    assert model.data(
-        outcome_index, Qt.ItemDataRole.BackgroundRole
-    ) == QColor(Qt.GlobalColor.yellow)
-    assert model.data(
-        outcome_index, Qt.ItemDataRole.ForegroundRole
-    ) == QColor(Qt.GlobalColor.black)
+    assert model.data(outcome_index, Qt.ItemDataRole.BackgroundRole) == QColor(
+        Qt.GlobalColor.yellow
+    )
+    assert model.data(outcome_index, Qt.ItemDataRole.ForegroundRole) == QColor(
+        Qt.GlobalColor.black
+    )
 
 
 def test_one_arm_inactive_raw_data_cells_keep_disabled_background():
@@ -426,7 +441,10 @@ def test_one_arm_inactive_raw_data_cells_keep_disabled_background():
     assert model.data(
         model.index(0, model.RAW_DATA[3]), Qt.ItemDataRole.BackgroundRole
     ) == QColor(Qt.GlobalColor.gray)
-    assert model.data(model.index(0, model.RAW_DATA[0]), Qt.ItemDataRole.BackgroundRole) is None
+    assert (
+        model.data(model.index(0, model.RAW_DATA[0]), Qt.ItemDataRole.BackgroundRole)
+        is None
+    )
 
 
 def test_empty_new_entry_row_does_not_render_populated_study_chrome():
@@ -438,15 +456,25 @@ def test_empty_new_entry_row_does_not_render_populated_study_chrome():
         model = _model_with_real_study_and_empty_new_entry_row(data_type)
         blank_row = 1
 
-        assert model.headerData(blank_row, Qt.Orientation.Vertical, Qt.ItemDataRole.DecorationRole) is None
         assert (
-            model.data(model.index(blank_row, model.INCLUDE_STUDY), Qt.ItemDataRole.CheckStateRole)
+            model.headerData(
+                blank_row, Qt.Orientation.Vertical, Qt.ItemDataRole.DecorationRole
+            )
+            is None
+        )
+        assert (
+            model.data(
+                model.index(blank_row, model.INCLUDE_STUDY),
+                Qt.ItemDataRole.CheckStateRole,
+            )
             is None
         )
 
         for column in model.OUTCOMES:
             assert (
-                model.data(model.index(blank_row, column), Qt.ItemDataRole.BackgroundRole)
+                model.data(
+                    model.index(blank_row, column), Qt.ItemDataRole.BackgroundRole
+                )
                 is None
             )
 
@@ -459,9 +487,15 @@ def test_named_new_entry_row_keeps_populated_study_chrome(qapp):
     model.dataset.studies[1].name = "Beta"
     model.dataset.studies[1].include = True
 
-    assert model.headerData(1, Qt.Orientation.Vertical, Qt.ItemDataRole.DecorationRole).isNull() is False
     assert (
-        model.data(model.index(1, model.INCLUDE_STUDY), Qt.ItemDataRole.CheckStateRole) == Qt.CheckState.Checked
+        model.headerData(
+            1, Qt.Orientation.Vertical, Qt.ItemDataRole.DecorationRole
+        ).isNull()
+        is False
+    )
+    assert (
+        model.data(model.index(1, model.INCLUDE_STUDY), Qt.ItemDataRole.CheckStateRole)
+        == Qt.CheckState.Checked
     )
     assert model.data(
         model.index(1, model.OUTCOMES[0]), Qt.ItemDataRole.BackgroundRole

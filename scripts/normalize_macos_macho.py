@@ -25,7 +25,9 @@ def _run_lipo(arguments: Sequence[str]) -> subprocess.CompletedProcess[str]:
             text=True,
         )
     except (OSError, subprocess.CalledProcessError) as exc:
-        raise MachONormalizationError(f"lipo failed for {arguments[-1]}: {exc}") from exc
+        raise MachONormalizationError(
+            f"lipo failed for {arguments[-1]}: {exc}"
+        ) from exc
 
 
 def _architectures(path: Path) -> tuple[str, ...]:
@@ -53,9 +55,7 @@ def normalize_macho(path: Path, *, architecture: str = "x86_64") -> None:
     os.close(descriptor)
     temporary = Path(temporary_name)
     try:
-        _run_lipo(
-            ["-thin", architecture, str(path), "-output", str(temporary)]
-        )
+        _run_lipo(["-thin", architecture, str(path), "-output", str(temporary)])
         temporary_architectures = _architectures(temporary)
         if temporary_architectures != (architecture,):
             raise MachONormalizationError(

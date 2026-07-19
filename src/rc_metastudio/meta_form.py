@@ -8,7 +8,15 @@ import os
 from functools import cmp_to_key
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction, QCloseEvent, QKeyEvent, QKeySequence, QResizeEvent, QTextDocument, QUndoCommand
+from PyQt6.QtGui import (
+    QAction,
+    QCloseEvent,
+    QKeyEvent,
+    QKeySequence,
+    QResizeEvent,
+    QTextDocument,
+    QUndoCommand,
+)
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
@@ -183,7 +191,9 @@ class ElidingStatusLabel(QLabel):
 
     def _refresh_elision(self):
         width = max(0, self.contentsRect().width())
-        elided = self.fontMetrics().elidedText(self._full_text, Qt.TextElideMode.ElideRight, width)
+        elided = self.fontMetrics().elidedText(
+            self._full_text, Qt.TextElideMode.ElideRight, width
+        )
         QLabel.setText(self, elided)
 
 
@@ -382,7 +392,9 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             "current_index": (current.row(), current.column()),
             "selection": [
                 (index.row(), index.column())
-                for index in required(self.tableView.selectionModel(), "workspace selection model").selectedIndexes()
+                for index in required(
+                    self.tableView.selectionModel(), "workspace selection model"
+                ).selectedIndexes()
             ],
         }
 
@@ -434,6 +446,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
 
         old_model = previous["model"]
         if self.model is not old_model:
+
             def disconnect_candidate():
                 for connection in self._model_signal_connections:
                     try:
@@ -482,7 +495,9 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             )
 
         def restore_selection():
-            selection_model = required(self.tableView.selectionModel(), "workspace selection model")
+            selection_model = required(
+                self.tableView.selectionModel(), "workspace selection model"
+            )
             selection_model.clearSelection()
             for row, column in previous["selection"]:
                 selection_model.select(
@@ -535,8 +550,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                 "RC MetaStudio installed the saved project at %s, but the operating "
                 "system could not confirm final directory durability. The document "
                 "is treated as saved so later actions do not discard work by retrying "
-                "a replacement.\n\nDetails: %s"
-                % (destination, exception),
+                "a replacement.\n\nDetails: %s" % (destination, exception),
             )
         except Exception:
             pass
@@ -1248,9 +1262,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             # the same name!
             new_covariate_type = str(form.datatype_cbo_box.currentText()).lower()
             self.tableView.undoStack.push(
-                self._make_add_covariate_command(
-                    new_covariate_name, new_covariate_type
-                )
+                self._make_add_covariate_command(new_covariate_name, new_covariate_type)
             )
 
     def _make_add_covariate_command(self, cov_name, cov_type):
@@ -1270,9 +1282,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         )
 
     def _add_new_covariate(self, cov_name, cov_type, stable_id=None):
-        covariate = self.model.add_covariate(
-            cov_name, cov_type, stable_id=stable_id
-        )
+        covariate = self.model.add_covariate(cov_name, cov_type, stable_id=stable_id)
         print("New Covariate Name: %s with type %s" % (cov_name, cov_type))
         self.tableView.synchronize_column_widths()
         self._refresh_advanced_analysis_actions()
@@ -1593,7 +1603,9 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         data_model = None
         print("loading %s..." % file_path)
         try:
-            data_model, state_dict, restored_selection = _load_structured_project(file_path)
+            data_model, state_dict, restored_selection = _load_structured_project(
+                file_path
+            )
             data_model = _validate_open_project_dataset(data_model)
             print("successfully loaded data")
         except Exception as e:
@@ -1855,7 +1867,9 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
             self,
             "Warning",
             "You've made unsaved changes to your data. Do you want to save your changes?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Yes
+            | QMessageBox.StandardButton.No
+            | QMessageBox.StandardButton.Cancel,
         )
         return choice
 

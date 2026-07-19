@@ -27,7 +27,9 @@ def numeric_value(value):
     """Return finite interface numeric input using explicit decimal rules."""
     number, valid = qt_text.parse_decimal(value)
     if not valid:
-        raise ValueError("Enter an unambiguous finite number using '.' or ',' as decimal separator.")
+        raise ValueError(
+            "Enter an unambiguous finite number using '.' or ',' as decimal separator."
+        )
     return number
 
 
@@ -463,7 +465,9 @@ class CommandFieldChanged(QUndoCommand):
         if self.just_created:
             self.just_created = False
             if self.refresh_on_initial_redo:
-                required(self.parent, "calculator command owner").enable_back_calculation_btn()
+                required(
+                    self.parent, "calculator command owner"
+                ).enable_back_calculation_btn()
         else:
             print("Restoring new ma_unit")
             required(self.restore_new_f, "calculator redo callback")()
@@ -507,7 +511,9 @@ def table_cells_editable(table):
             item = table.item(row, col)
             if item is None:
                 continue
-            if (item.flags() & Qt.ItemFlag.ItemIsEditable) == Qt.ItemFlag.ItemIsEditable:
+            if (
+                item.flags() & Qt.ItemFlag.ItemIsEditable
+            ) == Qt.ItemFlag.ItemIsEditable:
                 cells_uneditable = False
     return cells_uneditable
 

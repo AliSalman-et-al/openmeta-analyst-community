@@ -41,7 +41,11 @@ def _multi_arm_project(family: str) -> dict[str, object]:
                             "entered_effects": {},
                             "follow_up": "first",
                             "groups": [
-                                {"id": index, "name": f"Tx {index + 1}", "raw_data": raw}
+                                {
+                                    "id": index,
+                                    "name": f"Tx {index + 1}",
+                                    "raw_data": raw,
+                                }
                                 for index, raw in enumerate(raw_values)
                             ],
                             "outcome": "Outcome",
@@ -76,7 +80,9 @@ def test_adapter_round_trip_preserves_every_multi_arm_group(family: str) -> None
     expected_units = project["dataset"]["studies"][0]["analysis_units"]
     rebuilt_units = rebuilt["dataset"]["studies"][0]["analysis_units"]
     assert rebuilt_units == expected_units
-    assert list(dataset.studies[0].outcomes_to_follow_ups["Outcome"]["first"].tx_groups) == [
+    assert list(
+        dataset.studies[0].outcomes_to_follow_ups["Outcome"]["first"].tx_groups
+    ) == [
         "Tx 1",
         "Tx 2",
         "Tx 3",

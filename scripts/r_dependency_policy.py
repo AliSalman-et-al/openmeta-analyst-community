@@ -60,30 +60,45 @@ def load_policy(manifest_path: Path) -> dict:
     if not isinstance(policy, dict):
         raise PolicyError("binary_package_policy must be an object")
     if policy.get("provider") != "Posit Public Package Manager":
-        raise PolicyError("normal R package provider must be Posit Public Package Manager")
+        raise PolicyError(
+            "normal R package provider must be Posit Public Package Manager"
+        )
     if policy.get("repository") != POLICY_REPOSITORY:
         raise PolicyError(f"normal R package repository must be {POLICY_REPOSITORY}")
     if policy.get("snapshot") != "2026-07-16":
         raise PolicyError("normal R package snapshot must be 2026-07-16")
-    if policy.get("normal_install_type") != "binary" or policy.get("source_fallback") is not False:
-        raise PolicyError("normal R packages must be binary-only without source fallback")
+    if (
+        policy.get("normal_install_type") != "binary"
+        or policy.get("source_fallback") is not False
+    ):
+        raise PolicyError(
+            "normal R packages must be binary-only without source fallback"
+        )
     if policy.get("install_options") != {
         "install.packages.check.source": "no",
         "install.packages.compile.from.source": "never",
     }:
-        raise PolicyError("binary install options must disable source checks and compilation")
+        raise PolicyError(
+            "binary install options must disable source checks and compilation"
+        )
 
     platforms = policy.get("platforms")
     if not isinstance(platforms, dict) or set(platforms) != set(EXPECTED_PLATFORMS):
-        raise PolicyError("binary package platforms must be Windows x64 and both macOS architectures")
+        raise PolicyError(
+            "binary package platforms must be Windows x64 and both macOS architectures"
+        )
     for target, expected in EXPECTED_PLATFORMS.items():
         record = platforms.get(target)
         actual = (
-            record.get("system"),
-            record.get("r_arch"),
-            record.get("pkg_type"),
-            record.get("contrib_path"),
-        ) if isinstance(record, dict) else None
+            (
+                record.get("system"),
+                record.get("r_arch"),
+                record.get("pkg_type"),
+                record.get("contrib_path"),
+            )
+            if isinstance(record, dict)
+            else None
+        )
         if actual != expected:
             raise PolicyError(f"invalid native binary mapping for {target}: {actual!r}")
 
@@ -107,9 +122,13 @@ def load_policy(manifest_path: Path) -> dict:
         or len(set(normal_packages)) != 54
         or not all(isinstance(name, str) and name for name in normal_packages)
     ):
-        raise PolicyError("required_normal_packages must contain 54 unique package names")
+        raise PolicyError(
+            "required_normal_packages must contain 54 unique package names"
+        )
     if not declared_normal_packages <= set(normal_packages):
-        raise PolicyError("every manifest CRAN dependency must be in required_normal_packages")
+        raise PolicyError(
+            "every manifest CRAN dependency must be in required_normal_packages"
+        )
     normal_packages = sorted(normal_packages)
     runtime_packages = sorted(
         record["name"]
@@ -124,7 +143,9 @@ def load_policy(manifest_path: Path) -> dict:
         if isinstance(record, dict) and record.get("name") == "HSROC"
     ]
     if len(direct_hsroc) != 1 or direct_hsroc[0].get("source") != "cran-archive":
-        raise PolicyError("HSROC source exception must match the direct dependency manifest")
+        raise PolicyError(
+            "HSROC source exception must match the direct dependency manifest"
+        )
     if direct_hsroc[0].get("installed_version") != HSROC["version"]:
         raise PolicyError("HSROC manifest version does not match the source exception")
 
@@ -171,7 +192,10 @@ def emit_dcf(policy: dict) -> str:
             "Source-Exception-Dependencies": ",".join(exception["dependencies"]),
         }
     )
-    return "\n".join(f"{key}: {_dcf_value(str(value))}" for key, value in fields.items()) + "\n"
+    return (
+        "\n".join(f"{key}: {_dcf_value(str(value))}" for key, value in fields.items())
+        + "\n"
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
