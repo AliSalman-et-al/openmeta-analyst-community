@@ -449,7 +449,7 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
         },
         "rcmetar_source": {
             "name": "RCMetaR",
-            "version": "0.1.2",
+            "version": "0.2.0",
             "source_commit": "c" * 40,
             "url": "https://github.com/ResearchConsultancy/rc-metastudio/tree/"
             + "c" * 40

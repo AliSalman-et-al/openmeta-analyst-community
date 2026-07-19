@@ -2900,7 +2900,7 @@ def test_cocoa_accessibility_finds_exact_exposed_descendant_fail_closed():
     assert len(diagnostic) == 240
 
 
-def test_package_classifier_and_gate_cover_all_direct_macos_inputs():
+def test_direct_macos_inputs_remain_manual_and_do_not_block_windows_release_gate():
     policy = load_package_policy()
     direct_inputs = [
         "scripts/validate_test_taxonomy.py",
@@ -2925,8 +2925,7 @@ def test_package_classifier_and_gate_cover_all_direct_macos_inputs():
     assert all(policy.requires_package_qualification([path]) for path in direct_inputs)
     assert policy.requires_package_qualification(["docs/user-guide.md"]) is False
     workflow = text(".github/workflows/fast-verification.yml")
-    assert "macos-x64-package-qualification" in workflow
-    assert "MACOS_X64_PACKAGE_RESULT" in workflow
-    assert workflow.index('if [ "$RUN_WINDOWS" != "true" ]') < workflow.index(
-        'if [ "$RUN_MACOS_X64_PACKAGE" = "true" ]'
-    )
+    manual = text(".github/workflows/package-verification.yml")
+    assert "macos-x64-package-qualification" not in workflow
+    assert "MACOS_X64_PACKAGE_RESULT" not in workflow
+    assert "macos-package-intel" in manual

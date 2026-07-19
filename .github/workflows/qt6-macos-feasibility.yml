@@ -2,32 +2,6 @@ name: Native macOS Qt6 Feasibility
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - .github/workflows/qt6-macos-feasibility.yml
-      - .python-version
-      - pyproject.toml
-      - uv.lock
-      - scripts/build_qt6.py
-      - scripts/qt6_macos_feasibility.py
-      - scripts/native_remaining_surfaces_smoke.py
-      - scripts/configure_macos_r_launchers.py
-      - scripts/macos_embedded_r_adapter.py
-      - scripts/normalize_macos_macho.py
-      - scripts/profile_macos_embedded_r_runtime.py
-      - scripts/relocate_macos_r_runtime.sh
-      - scripts/validate_qt6_surface_inventory.py
-      - packaging/pyinstaller/qt6-macos-feasibility.spec
-      - docs/verification/native-qt6-surface-inventory.json
-      - docs/verification/native-qt6-remaining-surfaces.md
-      - docs/verification/RCMetaR-r-dependencies.json
-      - docs/verification/native-macos-qt6-feasibility.md
-      - src/rc_metastudio/**
-      - src/rc_metastudio/forms/about_legal.ui
-      - src/rc_metastudio/images/**
-      - src/rc_metastudio/qt6_build.py
-      - src/rc_metastudio/qt6_macos_feasibility.py
-      - tests/python/fast/test_qt6_macos_feasibility.py
 
 permissions:
   contents: read

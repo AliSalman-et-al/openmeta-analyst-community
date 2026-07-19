@@ -79,7 +79,7 @@ DIRECT_BUILD_INPUT_MEMBERS = {
     "signing_inventory": "qualification/ad-hoc-signing-inventory.json",
     "ppm_archive_inventory": "qualification/ppm-archive-inventory.json",
     "hsroc_source_archive": "qualification/HSROC_2.1.9.tar.gz",
-    "rcmetar_source_archive": "qualification/RCMetaR-0.1.2-source.tar.gz",
+    "rcmetar_source_archive": "qualification/RCMetaR-0.2.0-source.tar.gz",
     "r_runtime_profile": "qualification/embedded-r-runtime-profile.json",
     "runtime_probe": "qualification/runtime-probe.json",
     "runtime_stdout": "qualification/runtime-probe.stdout.log",
@@ -1444,7 +1444,7 @@ def validate_direct_build_manifest(payload: dict, *, target: str) -> dict:
     if (
         not isinstance(rcmetar, dict)
         or rcmetar.get("name") != "RCMetaR"
-        or rcmetar.get("version") != "0.1.2"
+        or rcmetar.get("version") != "0.2.0"
         or rcmetar.get("url") != "https://github.com/ResearchConsultancy/rc-metastudio/tree/" + source_commit + "/r/RCMetaR"
         or rcmetar.get("source_commit") != source_commit
         or not valid_sha256(rcmetar.get("archive_sha256"))

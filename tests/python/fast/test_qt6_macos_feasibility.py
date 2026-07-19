@@ -577,17 +577,7 @@ def test_native_macos_workflow_rebuilds_and_proves_locked_rpy2_api_bridge():
     assert 'openrlib.cffi_mode.name != "API"' in script
     assert 'robjects.r("sum(c(1.25, 2.5, 3.75))")' in script
 
-    trigger_paths = set(workflow[True]["pull_request"]["paths"])
-    assert {
-        "packaging/pyinstaller/qt6-macos-feasibility.spec",
-        "scripts/configure_macos_r_launchers.py",
-        "scripts/macos_embedded_r_adapter.py",
-        "scripts/normalize_macos_macho.py",
-        "scripts/profile_macos_embedded_r_runtime.py",
-        "scripts/relocate_macos_r_runtime.sh",
-        "docs/verification/RCMetaR-r-dependencies.json",
-        "docs/verification/native-macos-qt6-feasibility.md",
-    } <= trigger_paths
+    assert set(workflow[True]) == {"workflow_dispatch"}
     specification = (
         ROOT / "packaging/pyinstaller/qt6-macos-feasibility.spec"
     ).read_text(encoding="utf-8")

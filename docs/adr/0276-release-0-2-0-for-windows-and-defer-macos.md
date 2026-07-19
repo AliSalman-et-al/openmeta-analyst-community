@@ -1,0 +1,3 @@
+# Release 0.2.0 for Windows and defer macOS
+
+RC MetaStudio 0.2.0 will make the Qt 6 cutover available as one qualified, unsigned Windows x64 package. Native Intel and Apple Silicon macOS packages are deferred together to 0.2.1 because their embedded R/rpy2 packaging architecture is not yet reliable, and repeated CI-only repairs should not delay the working Windows release. This is a version-scoped exception to the three-platform first-release gates in ADRs 0240, 0249, 0258, and 0274: issues #342, #343, and #344 remain open, no macOS artifact may be represented as a 0.2.0 release deliverable, and the maintained source remains Qt 6-only rather than restoring a Qt 5 release line.

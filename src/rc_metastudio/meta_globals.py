@@ -25,7 +25,7 @@ PERCENTAGE_DISPLAY_DIGITS = 1
 #   levels of granularity).
 CALC_NUM_DIGITS = 4
 
-VERSION = "0.1.2"
+VERSION = "0.2.0"
 
 DISABLE_NETWORK_STUFF = True  # disable this until we can package jags, rjags, getmc
 DEFAULT_DATASET_NAME = "untitled_dataset"

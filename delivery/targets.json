@@ -16,7 +16,7 @@
   },
   "targets": {
     "windows-x64": {
-      "runner": "windows-latest",
+      "runner": "windows-2025",
       "os": "windows",
       "architecture": "x86_64",
       "artifact": "RCMetaStudio-windows-x64.zip",

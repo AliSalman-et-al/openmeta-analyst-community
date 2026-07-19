@@ -29,7 +29,7 @@ def build_args(tmp_path: Path, kit=None) -> argparse.Namespace:
     library = runtime / "library"
     runtime.mkdir()
     (runtime / "COPYING").write_text("R test license\n", encoding="utf-8")
-    versions = {"RCMetaR": "0.1.2", "HSROC": "2.1.9", "metafor": "4.8-0"}
+    versions = {"RCMetaR": "0.2.0", "HSROC": "2.1.9", "metafor": "4.8-0"}
     for name, version in versions.items():
         package = library / name
         package.mkdir(parents=True)
@@ -96,7 +96,7 @@ def build_args(tmp_path: Path, kit=None) -> argparse.Namespace:
                         ),
                         (
                             "RCMetaR",
-                            "0.1.2",
+                            "0.2.0",
                             f"https://github.com/AliSalman-et-al/rc-metastudio/archive/{'c' * 40}.tar.gz",
                         ),
                     )
@@ -512,7 +512,7 @@ def test_installed_package_inventory_rejects_unclaimed_non_base_package():
         "ppm_packages": [{"name": "metafor", "version": "4.8-0"}],
         "source_packages": [
             {"name": "HSROC", "version": "2.1.9"},
-            {"name": "RCMetaR", "version": "0.1.2"},
+            {"name": "RCMetaR", "version": "0.2.0"},
         ],
     }
     installed = [
@@ -520,7 +520,7 @@ def test_installed_package_inventory_rejects_unclaimed_non_base_package():
         for name, version in (
             ("metafor", "4.8-0"),
             ("HSROC", "2.1.9"),
-            ("RCMetaR", "0.1.2"),
+            ("RCMetaR", "0.2.0"),
             ("ambientPackage", "1.0"),
         )
     ]

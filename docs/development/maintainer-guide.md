@@ -50,7 +50,7 @@ See [Agent Testing Guidance](../agents/testing.md) for the maintained verificati
 RC MetaStudio and the bundled RCMetaR package use the same version. To update all maintained version surfaces, run:
 
 ```powershell
-uv run python scripts\bump_version.py 0.1.2 --date 2026-08-09
+uv run python scripts\bump_version.py 0.2.0 --date 2026-07-19
 ```
 
 The script updates `pyproject.toml`, `uv.lock`, application version constants, `r/RCMetaR/DESCRIPTION`, and creates a changelog section when one does not already exist. Edit `CHANGELOG.md` afterward so the release notes describe user-visible changes rather than commit history.
@@ -60,8 +60,9 @@ The script updates `pyproject.toml`, `uv.lock`, application version constants, `
 Desktop releases use the build-once candidate, protected signing, immutable RC,
 and exact-byte stable promotion process in
 [`docs/release/desktop-delivery-runbook.md`](../release/desktop-delivery-runbook.md).
-Version tags never trigger a rebuild. Apple Silicon packaging remains
-experimental and is available only through manual package qualification.
+Version tags never trigger a rebuild. Version 0.2.0 publishes only the
+qualified Windows x64 Qt 6 package. Native Intel and Apple Silicon macOS
+packages remain development targets and are planned for 0.2.1.
 
 Package locally only when packaging evidence is needed:
 

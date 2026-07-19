@@ -26,7 +26,6 @@ jobs:
     outputs:
       run-windows: ${{ steps.classify.outputs.run-windows }}
       run-windows-package: ${{ steps.classify.outputs.run-windows-package }}
-      run-macos-x64-package: ${{ steps.classify.outputs.run-macos-x64-package }}
       reason: ${{ steps.classify.outputs.reason }}
 
     steps:
@@ -46,7 +45,6 @@ jobs:
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             echo "run-windows=true" >> "$GITHUB_OUTPUT"
             echo "run-windows-package=true" >> "$GITHUB_OUTPUT"
-            echo "run-macos-x64-package=true" >> "$GITHUB_OUTPUT"
             echo "reason=manual dispatch" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -54,7 +52,6 @@ jobs:
           if [ "$EVENT_NAME" = "push" ]; then
             echo "run-windows=true" >> "$GITHUB_OUTPUT"
             echo "run-windows-package=true" >> "$GITHUB_OUTPUT"
-            echo "run-macos-x64-package=true" >> "$GITHUB_OUTPUT"
             echo "reason=push to ${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -79,7 +76,6 @@ jobs:
 
           echo "run-windows=$run_windows" >> "$GITHUB_OUTPUT"
           echo "run-windows-package=$package_required" >> "$GITHUB_OUTPUT"
-          echo "run-macos-x64-package=$package_required" >> "$GITHUB_OUTPUT"
           echo "reason=$reason" >> "$GITHUB_OUTPUT"
           echo "$reason"
 
@@ -294,14 +290,6 @@ jobs:
     if: ${{ needs.change-classifier.outputs.run-windows-package == 'true' }}
     uses: ./.github/workflows/package-windows.yml
 
-  macos-x64-package-qualification:
-    name: Required macOS Intel x64 Package Qualification
-    needs: change-classifier
-    if: ${{ needs.change-classifier.outputs.run-macos-x64-package == 'true' }}
-    uses: ./.github/workflows/package-target.yml
-    with:
-      artifact_name: RCMetaStudio-macos-x64
-
   fast-verification-gate:
     name: Qt6 Integration Verification Gate
     needs:
@@ -309,7 +297,6 @@ jobs:
       - qt6-verification
       - source-fast-targets
       - windows-package-qualification
-      - macos-x64-package-qualification
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -324,8 +311,6 @@ jobs:
           SOURCE_FAST_RESULT: ${{ needs.source-fast-targets.result }}
           RUN_WINDOWS_PACKAGE: ${{ needs.change-classifier.outputs.run-windows-package }}
           WINDOWS_PACKAGE_RESULT: ${{ needs.windows-package-qualification.result }}
-          RUN_MACOS_X64_PACKAGE: ${{ needs.change-classifier.outputs.run-macos-x64-package }}
-          MACOS_X64_PACKAGE_RESULT: ${{ needs.macos-x64-package-qualification.result }}
         run: |
           set -euo pipefail
           echo "Qt6 integration verification classifier: $REASON"
@@ -343,10 +328,6 @@ jobs:
           fi
           if [ "$RUN_WINDOWS_PACKAGE" = "true" ] && [ "$WINDOWS_PACKAGE_RESULT" != "success" ]; then
             echo "Required Windows x64 package qualification result: $WINDOWS_PACKAGE_RESULT" >&2
-            exit 1
-          fi
-          if [ "$RUN_MACOS_X64_PACKAGE" = "true" ] && [ "$MACOS_X64_PACKAGE_RESULT" != "success" ]; then
-            echo "Required macOS Intel x64 package qualification result: $MACOS_X64_PACKAGE_RESULT" >&2
             exit 1
           fi
           echo "Required classified Qt6 verification passed."

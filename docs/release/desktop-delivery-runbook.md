@@ -2,6 +2,11 @@
 
 ## Current unsigned community releases
 
+RC MetaStudio 0.2.0 is a Windows x64-only Qt 6 release. The candidate,
+qualification, attestation, and promotion workflows deliberately contain only
+`windows-x64`. Native Intel and Apple Silicon macOS packages are deferred to
+0.2.1 and must not be attached manually to the 0.2.0 release set.
+
 No paid certificate is required. Select `unsigned-community` in **Build
 Immutable Candidate**, then dispatch **Publish Unsigned Community Release
 Candidate**. The release manifest and GitHub release title explicitly disclose
@@ -37,17 +42,17 @@ the workflows.
 
 1. Merge all release changes and version metadata to protected `master`.
 2. Record the full 40-character `master` SHA.
-3. Dispatch **Build Immutable Candidate** with an RC version such as
-   `0.1.2-rc.1` and that SHA.
-4. Confirm both unsigned target artifacts and their assembled stage records are
-   present. A failed target invalidates the candidate run.
+3. Dispatch **Build Immutable Candidate** with `0.2.0-rc.1` and that SHA.
+4. Confirm the unsigned Windows x64 artifact and its assembled stage record are
+   present. A failed Windows target invalidates the candidate run.
 5. For the current profile, dispatch **Publish Unsigned Community Release
-   Candidate**. When certificates become available and the candidate was built
-   with `trusted-signed`, dispatch **Sign and Publish Release Candidate**.
+   Candidate**. The trusted-signed path is intentionally disabled for 0.2.0;
+   re-enable its candidate profile and target matrix as part of the later
+   signing release work before using **Sign and Publish Release Candidate**.
 6. Confirm final-byte packaged smoke, packaged-tree SBOM generation, provenance
    attestation, and release-set verification. For `trusted-signed`, also confirm
    Authenticode verification and Developer ID/notarization/stapling.
-7. Review the immutable prerelease, `SHA256SUMS`, both SBOMs, and
+7. Review the immutable prerelease, `SHA256SUMS`, the Windows SBOM, and
    `release-set-rc.json`. Never rerun into the same RC tag; increment `rc.N`.
 
 For layout-system, Qt, supported-OS, font, or icon changes, run the controlled

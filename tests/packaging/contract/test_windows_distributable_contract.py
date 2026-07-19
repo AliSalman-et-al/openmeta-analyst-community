@@ -33,7 +33,7 @@ def test_package_metadata_version_only_needs_no_ambient_rscript(tmp_path):
         text=True, capture_output=True,
     )
     assert version_only.returncode == 0, version_only.stderr
-    assert output.read_text(encoding="utf-8") == "version=0.1.2\n"
+    assert output.read_text(encoding="utf-8") == "version=0.2.0\n"
     default = subprocess.run(
         [sys.executable, str(script)], env=env, text=True, capture_output=True
     )
@@ -276,7 +276,6 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
         "qt6-verification",
         "source-fast-targets",
         "windows-package-qualification",
-        "macos-x64-package-qualification",
         "fast-verification-gate",
     } <= workflow["jobs"]
     assert workflow["needs"]["source-fast-targets"] == {"change-classifier"}
@@ -285,7 +284,6 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
         "qt6-verification",
         "source-fast-targets",
         "windows-package-qualification",
-        "macos-x64-package-qualification",
     }
     assert workflow["events"] == {"workflow_dispatch", "push", "pull_request"}
     assert workflow["legacy_uses"] == []
@@ -339,6 +337,7 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
         assert policy.requires_package_qualification([package_input])
     assert "Required Windows x64 Package Qualification" in workflow["text"]
     assert "Required Windows x64 package qualification result" in workflow["text"]
+    assert "Required macOS Intel x64 Package Qualification" not in workflow["text"]
     assert "docs/verification/*" in workflow["text"]
     assert ".\\scripts\\verify-smoke.ps1 -Sync" in workflow["text"]
     assert ".\\scripts\\verify-fast.ps1 -StrictTaxonomy" in workflow["text"]
@@ -1163,7 +1162,7 @@ def test_windows_runtime_probe_survives_relocation_but_rejects_tampering(tmp_pat
     original = _windows_deployment_fixture(tmp_path / "original")
     probe = _windows_runtime_probe(original)
     probe["r"].pop("kit_sha256")
-    relocated = tmp_path / "extracted" / "RCMetaStudio-0.1.2-windows-x64"
+    relocated = tmp_path / "extracted" / "RCMetaStudio-0.2.0-windows-x64"
     shutil.copytree(original, relocated)
     versions = dict(inspector.EXPECTED_VERSIONS)
     provenance = {"schema_version": 1, "head_sha": "a" * 40, "working_tree": "clean", "worktree_sha256": "b" * 64}
@@ -1981,7 +1980,7 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
         ),
         encoding="utf-8",
     )
-    root = "RCMetaStudio-0.1.2-windows-x64"
+    root = "RCMetaStudio-0.2.0-windows-x64"
     embedded = {
         "qualification/deployment-manifest.json": deployment,
         "qualification/runtime-probe.json": runtime_probe,

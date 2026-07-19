@@ -18,7 +18,6 @@ on:
         type: choice
         options:
           - unsigned-community
-          - trusted-signed
 
 permissions:
   contents: read
@@ -44,8 +43,8 @@ jobs:
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
           git fetch origin master --depth=1
           git merge-base --is-ancestor "$SOURCE_SHA" origin/master
-      - name: Initialize release set
-        run: python scripts/delivery.py init --version "${{ inputs.version }}" --commit "${{ inputs.source_sha }}" --repository "${{ github.repository }}" --trust-profile "${{ inputs.trust_profile }}" --output candidate/release-set.json
+      - name: Initialize Windows-only 0.2.0 release set
+        run: python scripts/delivery.py init --version "${{ inputs.version }}" --commit "${{ inputs.source_sha }}" --repository "${{ github.repository }}" --trust-profile "${{ inputs.trust_profile }}" --target windows-x64 --output candidate/release-set.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-set-initial
@@ -59,11 +58,8 @@ jobs:
       matrix:
         include:
           - target: windows-x64
-            runner: windows-latest
+            runner: windows-2025
             artifact: RCMetaStudio-windows-x64.zip
-          - target: macos-x64
-            runner: macos-15-intel
-            artifact: RCMetaStudio-macos-x64.zip
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     steps:
@@ -88,10 +84,6 @@ jobs:
         if: matrix.target == 'windows-x64'
         shell: powershell
         run: .\scripts\package-windows.ps1 -ArtifactName RCMetaStudio-windows-x64 -ArchiveRootName "RCMetaStudio-${{ inputs.version }}-windows-x64" -RRuntimeRoot "${{ steps.metadata.outputs.r-runtime-root }}"
-      - name: Build macOS unsigned candidate
-        if: matrix.target == 'macos-x64'
-        shell: bash
-        run: bash scripts/package-macos.sh --architecture x64 --artifact-name RCMetaStudio-macos-x64 --archive-root-name "RCMetaStudio-${{ inputs.version }}-macos-x64" --r-runtime-root "${{ steps.metadata.outputs.r-runtime-root }}"
       - name: Inventory and describe candidate
         shell: pwsh
         env:
@@ -119,4 +111,4 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Unsigned candidates were built once and are ready for protected signing."
+      - run: echo "The Windows x64 candidate was built once and is ready for protected qualification."

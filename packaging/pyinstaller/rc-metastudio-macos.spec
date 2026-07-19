@@ -135,7 +135,7 @@ app = BUNDLE(
     bundle_identifier=os.environ.get(
         "RCMS_BUNDLE_IDENTIFIER", "org.researchconsultancy.rc-metastudio"
     ),
-    version=os.environ.get("RCMS_PROJECT_VERSION", "0.1.2"),
+    version=os.environ.get("RCMS_PROJECT_VERSION", "0.2.0"),
     info_plist={
         "LSMinimumSystemVersion": os.environ.get("RCMS_MINIMUM_MACOS_VERSION", "13.0"),
         "NSHighResolutionCapable": True,

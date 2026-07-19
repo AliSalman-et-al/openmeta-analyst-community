@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from jsonschema import validate
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -26,14 +27,19 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     commit = "a" * 40
     delivery.init_release(
         argparse.Namespace(
-            version="0.1.2-rc.1",
+            version="0.2.0-rc.1",
             commit=commit,
             repository="AliSalman-et-al/rc-metastudio",
             trust_profile="unsigned-community",
+            target=["windows-x64"],
             output=str(manifest_path),
         )
     )
     manifest = delivery.load(manifest_path)
+    schema = json.loads(
+        (ROOT / "delivery" / "release-set.schema.json").read_text(encoding="utf-8")
+    )
+    validate(instance=manifest, schema=schema)
     assert manifest["channel"] == "candidate"
     assert set(manifest["policy_inputs"]) == set(delivery.POLICY_INPUTS)
     assert "scripts/test-bounded-package-process.ps1" in delivery.POLICY_INPUTS
@@ -43,7 +49,8 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     assert "scripts/sign-notarize-macos-package.sh" in delivery.POLICY_INPUTS
     assert ".github/workflows/release-candidate.yml" in delivery.POLICY_INPUTS
 
-    for target in delivery.targets():
+    assert manifest["release_targets"] == ["windows-x64"]
+    for target in manifest["release_targets"]:
         previous = delivery.release_identity_digest(manifest)
         for stage in delivery.required_stages(manifest, target):
             artifact = tmp_path / f"{target}-{stage}.bin"
@@ -79,13 +86,13 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
             manifest=str(rc_path),
             from_channel="rc",
             channel="stable",
-            version="0.1.2",
+            version="0.2.0",
             output=str(stable_path),
         )
     )
     stable = delivery.load(stable_path)
     assert stable["channel"] == "stable"
-    assert stable["version"] == "0.1.2"
+    assert stable["version"] == "0.2.0"
 
     bad = json.loads(manifest_path.read_text(encoding="utf-8"))
     bad["targets"]["windows-x64"]["stages"].pop()
@@ -128,5 +135,5 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     assert "git push origin" not in community + sign + promote
     assert "UNSIGNED COMMUNITY BUILD" not in community + promote
     assert "SmartScreen and Gatekeeper warnings" not in community + promote
-    assert "**Signing status:** Unsigned community build." in community
-    assert "**Signing status:** Unsigned community build." in promote
+    assert "**Signing status:** Unsigned Windows x64 community build." in community
+    assert "**Signing status:** Unsigned Windows x64 community build." in promote
