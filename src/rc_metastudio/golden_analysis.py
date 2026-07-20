@@ -1381,6 +1381,13 @@ def _parse_result_table(text):
                     values["%s.%s" % (prefix, metric)] = _to_float(raw)
     if is_regression:
         omnibus = re.search(r"Omnibus p-value\s*\n\s*(?:<\s*)?(-?\d+(?:\.\d+)?)", text)
+        if not omnibus:
+            omnibus = re.search(
+                r"^\s*Overall moderators \((?:Qₘ|F)\).*?"
+                r"(?:<\s*)?(-?\d+(?:\.\d+)?)\s*$",
+                text,
+                re.M,
+            )
         if omnibus:
             values["omnibus.p_value"] = _to_float(omnibus.group(1))
     return values

@@ -468,8 +468,9 @@ def test_meta_regression_parser_keeps_numeric_values_out_of_row_identity():
     Intercept 124.77 100.00 149.54 12.64 9.87 < 0.001
     Golden year 0.06 0.01 0.11 0.03 2.33 0.020
 
-Omnibus p-value
-0.020
+Model tests
+Test Statistic df p-value
+Overall moderators (Qₘ) 5.43 1 0.020
 """
 
     assert verify_golden_compatibility.golden_analysis._parse_result_table(text) == {
@@ -485,6 +486,23 @@ Omnibus p-value
         "model.golden_year.p_value": 0.02,
         "omnibus.p_value": 0.02,
     }
+
+
+def test_meta_regression_parser_reads_small_sample_moderator_test():
+    text = """Model Results
+Covariate Estimate Lower bound Upper bound Std. error t df p-value
+Intercept 124.77 100.00 149.54 12.64 9.87 11 < 0.001
+Golden year 0.06 0.01 0.11 0.03 2.33 11 0.020
+
+Model tests
+Test Statistic df p-value
+Overall moderators (F) 5.43 1 11 < 0.001
+"""
+
+    parsed = verify_golden_compatibility.golden_analysis._parse_result_table(text)
+    assert parsed["model.intercept.coefficient"] == 124.77
+    assert parsed["model.golden_year.p_value"] == 0.02
+    assert parsed["omnibus.p_value"] == 0.001
 
 
 def test_numeric_contract_rejects_hash_canonicalization_and_coverage_tamper(tmp_path):
