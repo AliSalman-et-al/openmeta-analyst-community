@@ -23,7 +23,7 @@ def test_shared_target_manifest_defines_both_native_macos_builds():
     assert x64["runner"] == "macos-15-intel"
     assert arm64["machine"] == "arm64"
     assert arm64["runner"] == "macos-15"
-    assert x64["minimum_macos"] == arm64["minimum_macos"] == "13.0"
+    assert x64["minimum_macos"] == arm64["minimum_macos"] == "14.0"
     assert x64["r_url"].endswith("R-4.6.1-x86_64.pkg")
     assert arm64["r_url"].endswith("R-4.6.1-arm64.pkg")
     assert arm64["r_component_identifier"] == "org.R-project.R.fw.pkg"

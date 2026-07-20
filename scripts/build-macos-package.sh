@@ -686,7 +686,21 @@ relocate_rpy2_api_bridge "$rpy2_api_bridge"
 "$python_exe" - "$preflight_report_path" "$(git rev-parse HEAD)" <<'PY'
 import json, sys
 from pathlib import Path
-Path(sys.argv[1]).write_text(json.dumps({"schema_version": 1, "source_commit": sys.argv[2], "pyinstaller_version": "6.21.0", "system": "Darwin", "machine": __import__("platform").machine(), "passed": True}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+Path(sys.argv[1]).write_text(json.dumps({
+    "schema_version": 1,
+    "source_commit": sys.argv[2],
+    "pyinstaller_version": "6.21.0",
+    "system": "Darwin",
+    "machine": __import__("platform").machine(),
+    "aliases": {
+        "Versions/Current": "4.6-x86_64",
+        "Resources": "Versions/Current/Resources",
+        "R": "Versions/Current/R",
+        "Versions/4.6-x86_64/R": "Resources/lib/libR.dylib",
+        "Versions/4.6-x86_64/Resources/R": "bin/R",
+    },
+    "passed": True,
+}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
 "$python_exe" - "$runner_environment_path" <<'PY'
 import json, os, platform, subprocess, sys
