@@ -1493,7 +1493,7 @@ def test_frozen_runtime_rejects_missing_kit_before_rpy2_import(monkeypatch, tmp_
     monkeypatch.setattr(r_runtime.sys, "platform", "darwin")
     monkeypatch.setattr(r_runtime, "_RUNTIME_IDENTITY", None)
     monkeypatch.setattr(r_runtime, "_BOOTSTRAP_THREAD_ID", None)
-    isolated = dict(os.environ, RCMS_DIRECT_R_SPIKE="1")
+    isolated = dict(os.environ)
     monkeypatch.setattr(r_runtime.os, "environ", isolated)
     with pytest.raises(RuntimeError, match="integration-kit identity"):
         r_runtime.configure_bundled_r_environment(str(app_root))
