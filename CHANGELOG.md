@@ -4,6 +4,24 @@ All notable RC MetaStudio changes will be recorded in this file.
 
 RC MetaStudio starts a fresh maintained-product changelog. Historical release history for the Original OpenMeta[Analyst] Project is not reconstructed here; see [NOTICE.md](NOTICE.md) for provenance.
 
+## 0.2.1 - 2026-07-20
+
+### Added
+
+- Added native unsigned macOS packages for Intel x64 and Apple Silicon ARM64, each built and qualified on matching GitHub-hosted hardware.
+- Added one immutable three-platform candidate and release-candidate path for Windows x64, macOS Intel x64, and macOS Apple Silicon ARM64.
+
+### Changed
+
+- Simplified CI around one source-verification workflow, one manual package matrix, and one no-rebuild candidate promotion path.
+- Set the supported macOS deployment floor to macOS 14, matching the official R 4.6.1 Apple Silicon runtime requirement.
+- Kept unsigned community artifacts structurally ready for a future protected signing and notarization stage without rebuilding them.
+
+### Fixed
+
+- Fixed native macOS packaging, embedded R/rpy2 relocation, Qt framework collection, signing-order preflight, archive reinspection, and packaged sample-project smoke qualification.
+- Fixed Golden compatibility parsing for modern meta-regression tables and made reviewed compatibility exceptions exact-row scoped.
+
 ## 0.2.0 - 2026-07-19
 
 ### Added

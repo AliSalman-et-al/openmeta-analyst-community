@@ -85,7 +85,7 @@ def test_version_bump_script_updates_all_release_version_surfaces(tmp_path):
         "bump_version_for_release_contract", ROOT / "scripts" / "bump_version.py"
     )
     result = bump_version.main(
-        ["0.2.1", "--root", str(tmp_path), "--date", "2026-08-09"]
+        ["0.2.2", "--root", str(tmp_path), "--date", "2026-08-09"]
     )
 
     assert result == 0
@@ -101,13 +101,13 @@ def test_version_bump_script_updates_all_release_version_surfaces(tmp_path):
     lockfile = (tmp_path / "uv.lock").read_text("utf-8")
     changelog = (tmp_path / "CHANGELOG.md").read_text("utf-8")
 
-    assert pyproject["project"]["version"] == "0.2.1"
-    assert package.__version__ == "0.2.1"
-    assert meta_globals.VERSION == "0.2.1"
-    assert rcmetar_fields["Version"] == "0.2.1"
+    assert pyproject["project"]["version"] == "0.2.2"
+    assert package.__version__ == "0.2.2"
+    assert meta_globals.VERSION == "0.2.2"
+    assert rcmetar_fields["Version"] == "0.2.2"
     assert rcmetar_fields["Date"] == "2026-08-09"
-    assert 'name = "rc-metastudio"\nversion = "0.2.1"' in lockfile
-    assert "## 0.2.1 - Unreleased" in changelog
+    assert 'name = "rc-metastudio"\nversion = "0.2.2"' in lockfile
+    assert "## 0.2.2 - Unreleased" in changelog
 
 
 def test_active_rcmetar_package_metadata_uses_current_maintainer_identity():
