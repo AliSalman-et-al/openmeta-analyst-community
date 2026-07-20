@@ -165,11 +165,24 @@ def _main_executables(bundle: Path, native: set[Path]) -> set[Path]:
     return executables
 
 
+def _validate_symlinks(app: Path) -> None:
+    resolved_app = app.resolve(strict=True)
+    for path in sorted(app.rglob("*")):
+        if not path.is_symlink():
+            continue
+        try:
+            resolved = path.resolve(strict=True)
+            resolved.relative_to(resolved_app)
+        except (OSError, RuntimeError, ValueError) as exc:
+            _fail(f"macOS app contains a dangling or escaping symlink: {path}: {exc}")
+
+
 def build_signing_plan(app: Path) -> SigningPlan:
     """Classify every Mach-O and real nested bundle without name-based deep signing."""
     app = Path(app).absolute()
     if app.suffix != ".app" or not app.is_dir():
         _fail(f"macOS signing target is not an application bundle: {app}")
+    _validate_symlinks(app)
 
     native_files = _native_files(app)
     native = set(native_files)

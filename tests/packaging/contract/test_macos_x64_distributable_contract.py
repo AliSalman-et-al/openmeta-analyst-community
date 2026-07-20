@@ -205,6 +205,8 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     assert 'os.environ.get("RCMS_PYINSTALLER_R_MAP")' in spec
     assert "a.datas.extend(" not in spec
     assert 'RCMS_STAGED_R_FRAMEWORK' in spec
+    assert 'a.binaries = adapter_module.filter_pyinstaller_r_binaries' in spec
+    assert 'a.datas = adapter_module.filter_pyinstaller_r_binaries' in spec
     assert 'copy_tree "$staged_r_framework" "$r_framework"' in build
     assert '(direct_r_framework, "R.framework")' not in spec
     assert '"direct-r-spike.marker"' in spec
@@ -1775,6 +1777,18 @@ def test_explicit_codesign_signs_inside_out_and_verifies_fail_closed(
     with pytest.raises(signer.MacOSSigningError, match="verification rejected"):
         signer.sign_and_verify(app, identity="-")
     assert diagnosed == [app.absolute()]
+
+
+def test_explicit_codesign_rejects_dangling_bundle_symlink(tmp_path):
+    signer = load_macos_signer()
+    app = tmp_path / "RCMetaStudio.app"
+    macos_code_bundle(app, executable_name="RCMetaStudio")
+    dangling = app / "Contents" / "Frameworks" / "libRblas.dylib"
+    dangling.parent.mkdir(parents=True, exist_ok=True)
+    dangling.symlink_to("libRblas.0.dylib")
+
+    with pytest.raises(signer.MacOSSigningError, match="dangling or escaping symlink"):
+        signer.build_signing_plan(app)
 
 
 def test_explicit_codesign_rejects_native_inventory_drift(monkeypatch, tmp_path):

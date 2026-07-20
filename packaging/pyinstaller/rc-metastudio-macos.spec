@@ -91,6 +91,9 @@ if direct_r_toc:
     a.binaries = adapter_module.filter_pyinstaller_r_binaries(
         list(a.binaries), r_framework_root
     )
+    a.datas = adapter_module.filter_pyinstaller_r_binaries(
+        list(a.datas), r_framework_root
+    )
     if hashlib.sha256(bridge_source.read_bytes()).hexdigest() != expected_bridge_sha256:
         raise ValueError("rpy2 API bridge changed during PyInstaller Analysis")
 pyz = PYZ(a.pure)
