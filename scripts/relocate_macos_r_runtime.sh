@@ -134,7 +134,13 @@ while IFS= read -r -d '' binary; do
     status=$?
     [ "$status" -eq 1 ] || { echo "private R retains unsupported install ID: $dylib_id ($binary)" >&2; exit 1; }
     case "$dylib_id" in
-      ""|@loader_path/*) ;;
+      "") ;;
+      @loader_path/*)
+        canonical_id="@loader_path/$(basename "$binary")"
+        if [ "$dylib_id" != "$canonical_id" ]; then
+          install_name_tool -id "$canonical_id" "$binary"
+        fi
+        ;;
       *)
         [ "$dylib_id" = "${dylib_id##*/}" ] || {
           echo "private R install ID is not a safe leaf name: $dylib_id ($binary)" >&2

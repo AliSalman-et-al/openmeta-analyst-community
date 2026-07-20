@@ -98,6 +98,7 @@ def test_nested_r_extensions_rebase_broken_loader_relative_runtime_edges():
     assert 'loader_target="$(dirname "$binary")/${dependency#@loader_path/}"' in relocator
     assert 'target="$resources/lib/${dependency##*/}"' in relocator
     assert 'install_name_tool -change "$dependency" "$replacement" "$binary"' in relocator
+    assert 'canonical_id="@loader_path/$(basename "$binary")"' in relocator
 
 
 def test_arm64_framework_component_is_selected_by_its_real_package_identifier(
