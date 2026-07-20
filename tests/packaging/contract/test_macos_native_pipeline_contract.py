@@ -80,6 +80,16 @@ def test_source_r_packages_link_against_the_private_staged_runtime():
     assert build.count('R_MAKEVARS_USER="$r_makevars"') == 2
 
 
+def test_private_r_framework_is_completed_as_a_signable_code_bundle():
+    build = (ROOT / "scripts/build-macos-package.sh").read_text(encoding="utf-8")
+
+    complete = build.index('info["CFBundleExecutable"] = "R"')
+    package = build.index("run_strict_r_dependency_policy")
+    collect = build.index('"packaging/pyinstaller/rc-metastudio-macos.spec"')
+    assert complete < package < collect
+    assert 'existing not in (None, "R")' in build
+
+
 def test_rpy2_bridge_is_relocated_before_it_is_imported():
     build = (ROOT / "scripts/build-macos-package.sh").read_text(encoding="utf-8")
 

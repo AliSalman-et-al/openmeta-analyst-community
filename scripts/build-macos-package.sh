@@ -420,6 +420,21 @@ if [ ! -x "$rscript" ] || [ ! -x "$r_binary" ]; then
   echo "Bundled R runtime is missing R or Rscript under $r_home/bin." >&2
   exit 1
 fi
+"$python_exe" - "$r_home/Info.plist" <<'PY'
+from pathlib import Path
+import plistlib
+import sys
+
+info_path = Path(sys.argv[1]).resolve(strict=True)
+with info_path.open("rb") as stream:
+    info = plistlib.load(stream)
+existing = info.get("CFBundleExecutable")
+if existing not in (None, "R"):
+    raise SystemExit(f"unexpected R framework executable identity: {existing!r}")
+info["CFBundleExecutable"] = "R"
+with info_path.open("wb") as stream:
+    plistlib.dump(info, stream, sort_keys=True)
+PY
 
 run_strict_r_dependency_policy() {
   local library="$1"
