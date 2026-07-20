@@ -530,6 +530,7 @@ def start_automation_smoke(sample_path, require_native_window=False):
         _write_automation_smoke_log("packaged-workflow:paint:complete")
         _write_automation_smoke_log("packaged-workflow:project-exercise:start")
         workflow = _exercise_packaged_project_workflow(app, meta, sample_path)
+        workflow["sample_projects"] = _exercise_all_packaged_samples(meta, sample_path)
         _write_automation_smoke_log("packaged-workflow:project-exercise:complete")
         _write_automation_smoke_log("packaged-workflow:save-reopen-complete")
         evidence_path = os.environ.get("RCMS_PACKAGE_SMOKE_EVIDENCE")
@@ -581,6 +582,54 @@ def start_automation_smoke(sample_path, require_native_window=False):
     _write_automation_smoke_log("packaged-workflow:post-close")
     _write_automation_smoke_log("packaged-workflow:return")
     return 0
+
+
+def _exercise_all_packaged_samples(meta, representative_sample):
+    import project_adapter
+    import project_format
+
+    sample_root = Path(representative_sample).resolve().parent
+    manifest_path = sample_root / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    declared = sorted(item["file"] for item in manifest["projects"])
+    packaged = sorted(path.name for path in sample_root.glob("*.rcms"))
+    if declared != packaged:
+        raise RuntimeError("packaged sample manifest does not match the project set")
+
+    metadata = {item["file"]: item for item in manifest["projects"]}
+    records = []
+    for name in declared:
+        path = sample_root / name
+        raw_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+        if raw_sha256 != metadata[name]["sha256"]:
+            raise RuntimeError("packaged sample hash mismatch: %s" % name)
+        document = project_format.load_project(path)
+        reconstructed = project_format.reconstruct_analysis_dataset(document)
+        if reconstructed.semantic_sha256 != metadata[name]["semantic_sha256"]:
+            raise RuntimeError("packaged sample semantic mismatch: %s" % name)
+        if not meta.open(str(path), raise_on_error=True):
+            raise RuntimeError("packaged application could not open sample: %s" % name)
+        observed = project_adapter.dataset_to_project(meta.model.dataset)["dataset"]
+        expected = document.project["dataset"]
+        for field in ("title", "analysis_family", "outcomes", "studies"):
+            if observed[field] != expected[field]:
+                raise RuntimeError(
+                    "packaged application loaded different %s semantics: %s"
+                    % (field, name)
+                )
+        records.append(
+            {
+                "project": name,
+                "sha256": raw_sha256,
+                "semantic_sha256": reconstructed.semantic_sha256,
+                "opened_in_packaged_application": True,
+            }
+        )
+    return {
+        "passed": True,
+        "manifest_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+        "projects": records,
+    }
 
 
 def _start_automation_hang_trace():

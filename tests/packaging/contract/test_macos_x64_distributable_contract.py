@@ -2106,8 +2106,37 @@ def valid_packaged_workflow_evidence(inspector):
                 }
                 for locale in ("en_US", "de_DE")
             ],
+            "sample_projects": {
+                "passed": True,
+                "manifest_sha256": "c" * 64,
+                "projects": [
+                    {
+                        "project": "BCG.rcms",
+                        "sha256": "d" * 64,
+                        "semantic_sha256": "e" * 64,
+                        "opened_in_packaged_application": True,
+                    }
+                ],
+            },
         },
     }
+
+
+def test_qualification_hash_composition_accepts_authenticated_superset():
+    inspector = load_inspector()
+    required = {"qualification/deployment-manifest.json": "a" * 64}
+
+    assert inspector._contains_expected_hashes(
+        {
+            **required,
+            "qualification/runtime-probe.stdout.log": "b" * 64,
+            "qualification/runtime-probe.stderr.log": "c" * 64,
+        },
+        required,
+    )
+    assert not inspector._contains_expected_hashes(
+        {"qualification/deployment-manifest.json": "d" * 64}, required
+    )
 
 
 def test_smoke_finalizer_requires_the_post_close_marker(tmp_path):

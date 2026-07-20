@@ -626,6 +626,18 @@ def test_direct_smoke_finalizer_requires_executed_teardown_surface_and_launch(tm
                             }
                             for locale in ("en_US", "de_DE")
                         ],
+                        "sample_projects": {
+                            "passed": True,
+                            "manifest_sha256": "c" * 64,
+                            "projects": [
+                                {
+                                    "project": "BCG.rcms",
+                                    "sha256": "d" * 64,
+                                    "semantic_sha256": "e" * 64,
+                                    "opened_in_packaged_application": True,
+                                }
+                            ],
+                        },
                     },
                 }
         ),

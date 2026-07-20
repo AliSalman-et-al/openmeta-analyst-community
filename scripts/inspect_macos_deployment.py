@@ -1345,6 +1345,8 @@ def finalize_smoke_evidence(
 def validate_packaged_workflow_evidence(evidence: dict) -> None:
     workflows = evidence.get("workflows", {})
     locale_variants = workflows.get("locale_variants", [])
+    sample_projects = workflows.get("sample_projects", {})
+    sample_records = sample_projects.get("projects", [])
     if not (
         evidence.get("passed") is True
         and not evidence.get("failures")
@@ -1370,6 +1372,20 @@ def validate_packaged_workflow_evidence(evidence: dict) -> None:
             item.get("normalized_summary_sha256") == EXPECTED_SUMMARY_SHA256
             and item.get("raw_summary_sha256") == workflows.get("raw_summary_sha256")
             for item in locale_variants
+        )
+        and sample_projects.get("passed") is True
+        and _valid_sha256(sample_projects.get("manifest_sha256"))
+        and isinstance(sample_records, list)
+        and bool(sample_records)
+        and len({item.get("project") for item in sample_records})
+        == len(sample_records)
+        and all(
+            isinstance(item.get("project"), str)
+            and item.get("project", "").endswith(".rcms")
+            and _valid_sha256(item.get("sha256"))
+            and _valid_sha256(item.get("semantic_sha256"))
+            and item.get("opened_in_packaged_application") is True
+            for item in sample_records
         )
     ):
         raise MacOSDeploymentInspectionError(
@@ -1877,6 +1893,12 @@ def _valid_sha256(value: object) -> bool:
     )
 
 
+def _contains_expected_hashes(actual: object, expected: dict[str, str]) -> bool:
+    return isinstance(actual, dict) and all(
+        actual.get(path) == digest for path, digest in expected.items()
+    )
+
+
 def validate_macos_surface_records(scales: object) -> None:
     if not isinstance(scales, list) or not all(
         isinstance(item, dict) for item in scales
@@ -2006,6 +2028,7 @@ def write_qualification_evidence(
         extracted_smoke_log,
         extracted_launchservices_marker,
         require_direct_teardown=True,
+        persist=False,
     )
     if not (
         extracted_smoke.get("passed") is True
@@ -2073,6 +2096,7 @@ def write_qualification_evidence(
         "qualification/packaged-smoke.stderr.log": sha256_file(smoke_stderr),
         "qualification/packaged-smoke.hang-trace.log": sha256_file(hang_trace),
     }
+    archived_embedded = archive_report.get("embedded_sha256", {})
     if not (
         deployment.get("target") == target
         and deployment.get("stack") == EXPECTED_VERSIONS
@@ -2086,7 +2110,7 @@ def write_qualification_evidence(
         and smoke.get("execution", {}).get("launchservices_completion_marker") is True
         and archive_report.get("target") == target
         and archive_report.get("archive_sha256") == sha256_file(archive)
-        and archive_report.get("embedded_sha256") == expected_embedded
+        and _contains_expected_hashes(archived_embedded, expected_embedded)
     ):
         raise MacOSDeploymentInspectionError(
             "macOS packaged qualification evidence is incomplete"
