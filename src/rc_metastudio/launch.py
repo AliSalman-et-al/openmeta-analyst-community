@@ -590,13 +590,16 @@ def _exercise_all_packaged_samples(meta, representative_sample):
 
     sample_root = Path(representative_sample).resolve().parent
     manifest_path = sample_root / "manifest.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    declared = sorted(item["file"] for item in manifest["projects"])
+    manifest = cast(
+        dict[str, Any], json.loads(manifest_path.read_text(encoding="utf-8"))
+    )
+    manifest_projects = cast(list[dict[str, Any]], manifest["projects"])
+    declared = sorted(cast(str, item["file"]) for item in manifest_projects)
     packaged = sorted(path.name for path in sample_root.glob("*.rcms"))
     if declared != packaged:
         raise RuntimeError("packaged sample manifest does not match the project set")
 
-    metadata = {item["file"]: item for item in manifest["projects"]}
+    metadata = {cast(str, item["file"]): item for item in manifest_projects}
     records = []
     for name in declared:
         path = sample_root / name
@@ -609,8 +612,11 @@ def _exercise_all_packaged_samples(meta, representative_sample):
             raise RuntimeError("packaged sample semantic mismatch: %s" % name)
         if not meta.open(str(path), raise_on_error=True):
             raise RuntimeError("packaged application could not open sample: %s" % name)
-        observed = project_adapter.dataset_to_project(meta.model.dataset)["dataset"]
-        expected = document.project["dataset"]
+        observed = cast(
+            dict[str, Any],
+            project_adapter.dataset_to_project(meta.model.dataset)["dataset"],
+        )
+        expected = cast(dict[str, Any], document.project["dataset"])
         for field in ("title", "analysis_family", "outcomes", "studies"):
             if observed[field] != expected[field]:
                 raise RuntimeError(
