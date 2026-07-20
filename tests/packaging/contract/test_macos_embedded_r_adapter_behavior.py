@@ -114,6 +114,12 @@ def test_adapter_relocates_bridge_and_rejects_displaced_libr(tmp_path, monkeypat
     assert json.loads(output.read_text(encoding="utf-8"))["r_dependency"].startswith(
         "@loader_path/"
     )
+    version_root = framework / "Versions/4.6-x86_64"
+    executable = version_root / "R"
+    runtime_library = version_root / "Resources/lib/libR.dylib"
+    executable.unlink()
+    runtime_library.replace(executable)
+    runtime_library.symlink_to(Path("../../R"))
     monkeypatch.setattr(adapter, "audit_symlinks", lambda _root: [])
     monkeypatch.setattr(
         adapter,

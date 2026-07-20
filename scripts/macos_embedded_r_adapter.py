@@ -530,10 +530,16 @@ def post_app_gate(app: Path, architecture: str, output: Path) -> None:
     native = macho_inventory(framework, architecture)
     validate_relocated_inventory(framework, native)
     lib_r_paths = list(app.rglob("libR.dylib"))
-    expected_lib_r = (framework / "Resources/lib/libR.dylib").resolve(strict=True)
+    version = current_version(framework)
+    expected_lib_r_link = (
+        framework / f"Versions/{version}/Resources/lib/libR.dylib"
+    )
+    expected_lib_r = (framework / f"Versions/{version}/R").resolve(strict=True)
     if (
         len(lib_r_paths) != 1
-        or lib_r_paths[0].is_symlink()
+        or lib_r_paths[0] != expected_lib_r_link
+        or not lib_r_paths[0].is_symlink()
+        or Path(os.readlink(lib_r_paths[0])) != Path("../../R")
         or lib_r_paths[0].resolve() != expected_lib_r
         or not is_macho_candidate(expected_lib_r)
         or architectures(expected_lib_r) != [architecture]
@@ -561,7 +567,7 @@ def post_app_gate(app: Path, architecture: str, output: Path) -> None:
                 "framework_symlinks": links,
                 "framework_mach_o": native,
                 "api_bridge": str(bridges[0].relative_to(app)),
-                "lib_r": str(expected_lib_r.relative_to(app)),
+                "lib_r": str(expected_lib_r_link.relative_to(app)),
             },
             indent=2,
             sort_keys=True,
