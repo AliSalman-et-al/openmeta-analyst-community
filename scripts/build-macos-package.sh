@@ -876,11 +876,13 @@ step "Recording canonical direct target-native production provenance"
 cp "$repo_root/scripts/macos_embedded_r_adapter.py" "$qualification_root/embedded-r-adapter.py"
 cp "$repo_root/scripts/macos_host_r_isolation.sh" "$qualification_root/macos-host-r-isolation.sh"
 cp "$repo_root/scripts/verify_macos_r_pyinstaller_toc.py" "$qualification_root/verify-macos-r-pyinstaller-toc.py"
+ppm_contrib_path="$("$python_exe" -c 'import json,sys; p=json.load(open(sys.argv[1])); print(p["binary_package_policy"]["platforms"][sys.argv[2]]["contrib_path"])' "$repo_root/docs/verification/RCMetaR-r-dependencies.json" "macos-$architecture")"
+[ -n "$ppm_contrib_path" ] || { echo "Locked PPM contribution path is empty." >&2; exit 1; }
 "$python_exe" "$repo_root/scripts/build_macos_direct_provenance.py" \
   --qualification-root "$qualification_root" --ppm-root "$ppm_archive_root" \
   --target "macos-$architecture" --official-r-url "$r_url" \
   --official-r-sha256 "$r_sha256" \
-  --ppm-contrib-path "$("$python_exe" -c 'import json,sys; p=json.load(open(sys.argv[1])); print(p["binary_package_policy"]["targets"][sys.argv[2]]["contrib_path"])' "$repo_root/docs/verification/RCMetaR-r-dependencies.json" "macos-$architecture")" \
+  --ppm-contrib-path "$ppm_contrib_path" \
   --source-commit "$source_commit" --bridge "$rpy2_api_bridge" \
   --output "$r_direct_build_manifest_path"
 
