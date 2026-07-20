@@ -116,6 +116,11 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     assert "-ArtifactName" not in candidate
     assert "Expected exactly one versioned Windows package" in candidate
     assert "Move-Item -LiteralPath $builtArchives[0].FullName" in candidate
+    assert "RCMS_RUNNER_LABEL: ${{ matrix.runner }}" in candidate
+    assert "Upload native macOS candidate diagnostics" in candidate
+    assert "candidate-${{ matrix.target }}-diagnostics" in candidate
+    assert "work/rc-metastudio-macos/warn-rc-metastudio-macos.txt" in candidate
+    assert "work/rc-metastudio-macos/BUNDLE-00.toc" in candidate
     assert not (ROOT / ".github/workflows/release-candidate.yml").exists()
     assert "attestations: write" in community
     assert "--automation-native-smoke" in community
