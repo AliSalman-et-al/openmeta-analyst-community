@@ -111,6 +111,7 @@ def test_rpy2_bridge_is_relocated_before_it_is_imported():
     api_proof = build.index("from rpy2 import robjects")
     assert locate < relocate < api_proof
     assert "import _rinterface_cffi_api as m" not in build
+    assert '@loader_path/libR.dylib)' in build
     assert '@rpath/*.dylib)' in build
     assert 'source_relative="lib/${dependency#@rpath/}"' in build
     assert "grep -E '@rpath/|" in build
