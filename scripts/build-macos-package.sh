@@ -969,6 +969,7 @@ if [ "$skip_smoke" -eq 0 ]; then
     --deployment-manifest "$deployment_manifest_path" \
     --signing-inventory "$signing_inventory_path" \
     --runtime-probe "$runtime_probe_path" \
+    --runtime-stdout "$runtime_stdout_path" --runtime-stderr "$runtime_stderr_path" \
     --r-runtime-profile "$r_runtime_profile_path" \
     --direct-build-manifest "$r_direct_build_manifest_path" \
     --smoke-evidence "$smoke_evidence_path" --smoke-log "$smoke_log_path" \
