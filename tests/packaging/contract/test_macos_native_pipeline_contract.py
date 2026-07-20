@@ -88,8 +88,13 @@ def test_private_r_framework_is_completed_as_a_signable_code_bundle():
     collect = build.index('"packaging/pyinstaller/rc-metastudio-macos.spec"')
     assert complete < package < collect
     assert 'existing not in (None, "R")' in build
-    assert 'runtime_library.replace(main_executable)' in build
+    canonicalize = build.index('runtime_library.replace(main_executable)')
+    inspect = build.index('inspect_macos_deployment.py" native-graph')
+    assert collect < canonicalize < inspect
     assert 'runtime_library.symlink_to(Path("../../R"))' in build
+    assert 'info_plist.is_file() or info_plist.is_symlink()' in build
+    assert 'codesign --force --options runtime --sign - "$app_bundle"' not in build
+    assert 'codesign --verify --strict --deep --verbose=2 "$app_bundle"' in build
 
 
 def test_rpy2_bridge_is_relocated_before_it_is_imported():

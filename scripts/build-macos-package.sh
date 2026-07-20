@@ -604,26 +604,6 @@ bridge, output = map(Path, sys.argv[1:])
 output.write_text(json.dumps({"schema_version": 1, "versions": {name: importlib.metadata.version(name) for name in ("rpy2", "rpy2-rinterface", "rpy2-robjects")}, "bridge": str(bridge), "sha256": hashlib.sha256(bridge.read_bytes()).hexdigest(), "dependencies": subprocess.run(["otool", "-L", str(bridge)], check=True, capture_output=True, text=True).stdout.splitlines()}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
 
-step "Canonicalizing the embedded R framework executable for code signing"
-"$python_exe" - "$r_framework" <<'PY'
-from pathlib import Path
-import sys
-
-framework = Path(sys.argv[1]).resolve(strict=True)
-version_root = (framework / "Versions/Current").resolve(strict=True)
-main_executable = version_root / "R"
-runtime_library = version_root / "Resources/lib/libR.dylib"
-if not main_executable.is_symlink() or main_executable.resolve(strict=True) != runtime_library:
-    raise SystemExit("official R framework executable alias is not canonical")
-main_executable.unlink()
-runtime_library.replace(main_executable)
-runtime_library.symlink_to(Path("../../R"))
-if not main_executable.is_file() or main_executable.is_symlink():
-    raise SystemExit("R framework main executable is not a regular file")
-if runtime_library.resolve(strict=True) != main_executable:
-    raise SystemExit("R runtime library alias does not resolve to the framework executable")
-PY
-
 step "Building the app from the completed staged R framework"
 (
   cd "$repo_root"
@@ -654,6 +634,30 @@ r_home="$r_framework/Resources"
 r_lib="$r_home/library"
 rscript="$r_home/bin/Rscript"
 r_binary="$r_home/bin/R"
+step "Canonicalizing the collected R framework executable for code signing"
+"$python_exe" - "$r_framework" <<'PY'
+from pathlib import Path
+import sys
+
+framework = Path(sys.argv[1]).resolve(strict=True)
+version_root = (framework / "Versions/Current").resolve(strict=True)
+main_executable = version_root / "R"
+runtime_library = version_root / "Resources/lib/libR.dylib"
+info_plist = version_root / "Resources/Info.plist"
+if not main_executable.is_symlink() or main_executable.resolve(strict=True) != runtime_library:
+    raise SystemExit("collected R framework executable alias is not canonical")
+main_executable.unlink()
+runtime_library.replace(main_executable)
+runtime_library.symlink_to(Path("../../R"))
+if not main_executable.is_file() or main_executable.is_symlink():
+    raise SystemExit("collected R framework main executable is not a regular file")
+if not info_plist.is_file() or info_plist.is_symlink():
+    raise SystemExit("collected R framework Info.plist is not a regular file")
+if not runtime_library.is_symlink() or runtime_library.readlink() != Path("../../R"):
+    raise SystemExit("collected R runtime library alias is not relative and canonical")
+if runtime_library.resolve(strict=True) != main_executable:
+    raise SystemExit("collected R runtime library alias does not resolve to the framework executable")
+PY
 relocate_rpy2_api_bridge "$rpy2_api_bridge"
 "$python_exe" - "$preflight_report_path" "$(git rev-parse HEAD)" <<'PY'
 import json, sys
@@ -744,8 +748,7 @@ step "Applying and verifying the replaceable ad-hoc app-bundle signature"
 "$python_exe" "$repo_root/scripts/sign_macos_app.py" "$app_bundle" \
   --identity - \
   --inventory-output "$signing_inventory_path"
-codesign --force --options runtime --sign - "$app_bundle"
-codesign --verify --strict --deep "$app_bundle"
+codesign --verify --strict --deep --verbose=2 "$app_bundle"
 # Re-enumerate after the outer signature is finalized; this is deliberately
 # not a copy of the pre-final signing inventory.
 "$python_exe" "$repo_root/scripts/sign_macos_app.py" "$app_bundle" \
