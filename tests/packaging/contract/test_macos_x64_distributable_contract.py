@@ -214,7 +214,7 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     )
     assert 'minimum_macos_version="$minimum_macos"' in build
     launch = text("src/rc_metastudio/launch.py")
-    assert 'robjects.r("capabilities(\'tcltk\')")' in launch
+    assert "isTRUE(requireNamespace('tcltk', quietly=TRUE))" in launch
     assert "raise SystemExit(1) from exc" in launch
     spike = text("scripts/package-macos-x64-direct-r-spike.sh")
     assert not (ROOT / ".github/workflows/macos-x64-direct-r-spike.yml").exists()

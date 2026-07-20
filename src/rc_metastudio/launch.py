@@ -1392,7 +1392,12 @@ def start_package_runtime_probe(output_path):
     )
     macos_r_policy = None
     if sys.platform == "darwin":
-        tcltk_available = bool(cast(Any, robjects.r("capabilities('tcltk')"))[0])
+        tcltk_available = bool(
+            cast(
+                Any,
+                robjects.r("isTRUE(requireNamespace('tcltk', quietly=TRUE))"),
+            )[0]
+        )
         tcltk_loaded = bool(cast(Any, robjects.r("'tcltk' %in% loadedNamespaces()"))[0])
         aqua = bool(cast(Any, robjects.r("capabilities('aqua')"))[0])
         bitmap_type = str(cast(Any, robjects.r("getOption('bitmapType')"))[0])
