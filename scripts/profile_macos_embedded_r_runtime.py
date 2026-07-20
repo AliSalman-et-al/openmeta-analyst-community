@@ -26,6 +26,7 @@ EXCLUSIONS = (
     ("library/grDevices/libs/cairo.so", "X11-linked Cairo device"),
 )
 DEPENDENCY_FIELDS = ("Depends", "Imports", "LinkingTo")
+PROFILE_POLICY = "official-cran-r-with-optional-x11-tcl-surfaces-removed"
 MACH_O_MAGICS = {
     b"\xfe\xed\xfa\xce",  # MH_MAGIC
     b"\xce\xfa\xed\xfe",  # MH_CIGAM
@@ -40,6 +41,56 @@ MACH_O_MAGICS = {
 
 class ProfileError(RuntimeError):
     pass
+
+
+def validate_profile_evidence(
+    payload: dict, *, expected_r_version: str, expected_architecture: str
+) -> None:
+    expected_paths = sorted(relative for relative, _ in EXCLUSIONS)
+    source = payload.get("source_framework", {})
+    canonical = source.get("canonical_macho", {})
+    executable = source.get("executable_macho", {})
+    launcher = source.get("launcher", {})
+    hashes = (
+        payload.get("dependency_manifest", {}).get("sha256"),
+        source.get("source_tree_identity_sha256"),
+        source.get("pre_profile_tree_identity_sha256"),
+        launcher.get("sha256"),
+    )
+    valid_hashes = all(
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+        for value in hashes
+    )
+    observed_paths = sorted(
+        entry.get("relative_path")
+        for entry in payload.get("excluded_surfaces", [])
+        if isinstance(entry, dict) and isinstance(entry.get("relative_path"), str)
+    )
+    if not (
+        payload.get("schema_version") == 1
+        and payload.get("phase") == "finalize"
+        and payload.get("policy") == PROFILE_POLICY
+        and payload.get("hard_dependency_fields") == list(DEPENDENCY_FIELDS)
+        and "tcltk"
+        not in {
+            str(name).casefold()
+            for name in payload.get("hard_dependency_closure", [])
+        }
+        and payload.get("post_profile_exclusions") == expected_paths
+        and observed_paths == expected_paths
+        and source.get("version") == expected_r_version
+        and source.get("expected_architecture") == expected_architecture
+        and canonical.get("relative_path") == "lib/libR.dylib"
+        and canonical.get("architectures") == [expected_architecture]
+        and executable.get("relative_path") == "bin/exec/R"
+        and executable.get("architectures") == [expected_architecture]
+        and launcher.get("relative_path") == "bin/R"
+        and launcher.get("kind") == "script"
+        and valid_hashes
+    ):
+        raise ProfileError("embedded R profile evidence is incomplete")
 
 
 def sha256(path: Path) -> str:
@@ -388,7 +439,7 @@ def quarantine(
         json.dumps(
             {
                 "schema_version": 1,
-                "policy": "official-cran-r-with-optional-x11-tcl-surfaces-removed",
+                "policy": PROFILE_POLICY,
                 "phase": "quarantine",
                 "source_framework": {
                     "version": r_version,
@@ -443,11 +494,10 @@ def finalize(
     roots, builtin, manifest_sha256 = manifest_roots(manifest_path)
     closure = hard_dependency_closure(resources / "library", roots, builtin)
     evidence.parent.mkdir(parents=True, exist_ok=True)
-    evidence.write_text(
-        json.dumps(
-            {
+    payload = {
                 "schema_version": 1,
                 "phase": "finalize",
+                "policy": quarantine_data["policy"],
                 "quarantine_evidence": {
                     "path": quarantine_evidence.name,
                     "sha256": sha256(quarantine_evidence),
@@ -462,10 +512,20 @@ def finalize(
                 "hard_dependency_closure": closure,
                 "source_framework": quarantine_data["source_framework"],
                 "excluded_surfaces": quarantine_data["excluded_surfaces"],
-            },
-            indent=2,
-            sort_keys=True,
-        )
+                "post_profile_exclusions": quarantine_data[
+                    "post_profile_exclusions"
+                ],
+                "allowed_non_tcl_opt_r_dependencies": quarantine_data[
+                    "allowed_non_tcl_opt_r_dependencies"
+                ],
+            }
+    validate_profile_evidence(
+        payload,
+        expected_r_version=payload["source_framework"]["version"],
+        expected_architecture=payload["source_framework"]["expected_architecture"],
+    )
+    evidence.write_text(
+        json.dumps(payload, indent=2, sort_keys=True)
         + "\n",
         encoding="utf-8",
     )
@@ -492,17 +552,6 @@ def profile(
         official_framework_layout=official_framework_layout,
     )
     finalize(resources, evidence, manifest_path, quarantine_path)
-    final = json.loads(evidence.read_text(encoding="utf-8"))
-    early = json.loads(quarantine_path.read_text(encoding="utf-8"))
-    final.update(
-        {
-            key: early[key]
-            for key in ("post_profile_exclusions", "allowed_non_tcl_opt_r_dependencies")
-        }
-    )
-    evidence.write_text(
-        json.dumps(final, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
 
 
 def main() -> int:

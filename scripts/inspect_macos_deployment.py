@@ -17,12 +17,17 @@ from typing import Any, cast
 import unicodedata
 import zipfile
 
+SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
 from rc_metastudio.qt6_macos_feasibility import (
     EvidenceError,
     _archs,
     is_macho_candidate,
 )
 from rc_metastudio.r_runtime import macos_r_framework_version
+from profile_macos_embedded_r_runtime import ProfileError, validate_profile_evidence
 
 
 EXPECTED_VERSIONS = {
@@ -1993,68 +1998,16 @@ def write_qualification_evidence(
     contract = TARGET_CONTRACTS[target]
     architecture = contract["architecture"]
     profile = json.loads(r_runtime_profile.read_text(encoding="utf-8"))
-    expected_profile_paths = [
-        "library/grDevices/libs/cairo.so",
-        "library/tcltk",
-        "modules/R_X11.so",
-        "modules/R_de.so",
-    ]
-    if not (
-        profile.get("schema_version") == 1
-        and profile.get("policy")
-        == "official-cran-r-with-optional-x11-tcl-surfaces-removed"
-        and profile.get("hard_dependency_fields") == ["Depends", "Imports", "LinkingTo"]
-        and _valid_sha256(profile.get("dependency_manifest", {}).get("sha256"))
-        and "tcltk"
-        not in {
-            str(name).casefold() for name in profile.get("hard_dependency_closure", [])
-        }
-        and profile.get("source_framework", {}).get("version") == EXPECTED_VERSIONS["r"]
-        and profile.get("source_framework", {}).get("expected_architecture")
-        == architecture
-        and profile.get("source_framework", {})
-        .get("canonical_macho", {})
-        .get("relative_path")
-        == "lib/libR.dylib"
-        and profile.get("source_framework", {})
-        .get("canonical_macho", {})
-        .get("architectures")
-        == [architecture]
-        and profile.get("source_framework", {})
-        .get("executable_macho", {})
-        .get("relative_path")
-        == "bin/exec/R"
-        and profile.get("source_framework", {})
-        .get("executable_macho", {})
-        .get("architectures")
-        == [architecture]
-        and profile.get("source_framework", {}).get("launcher", {}).get("relative_path")
-        == "bin/R"
-        and profile.get("source_framework", {}).get("launcher", {}).get("kind")
-        == "script"
-        and _valid_sha256(
-            profile.get("source_framework", {}).get("launcher", {}).get("sha256")
+    try:
+        validate_profile_evidence(
+            profile,
+            expected_r_version=EXPECTED_VERSIONS["r"],
+            expected_architecture=architecture,
         )
-        and _valid_sha256(
-            profile.get("source_framework", {}).get("source_tree_identity_sha256")
-        )
-        and _valid_sha256(
-            profile.get("source_framework", {}).get("pre_profile_tree_identity_sha256")
-        )
-        and profile.get("post_profile_exclusions") == expected_profile_paths
-        and [
-            entry.get("relative_path") for entry in profile.get("excluded_surfaces", [])
-        ]
-        == [
-            "library/tcltk",
-            "modules/R_X11.so",
-            "modules/R_de.so",
-            "library/grDevices/libs/cairo.so",
-        ]
-    ):
+    except ProfileError as exc:
         raise MacOSDeploymentInspectionError(
             "embedded R profile evidence is incomplete"
-        )
+        ) from exc
     smoke = json.loads(smoke_evidence.read_text(encoding="utf-8"))
     archive_report = json.loads(archive_inspection.read_text(encoding="utf-8"))
     validate_direct_build_manifest(
