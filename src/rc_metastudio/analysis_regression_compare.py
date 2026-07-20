@@ -59,6 +59,7 @@ def compare_golden_baseline(reference, current, exceptions=None, manifest=None):
                 "Current capture contains a case absent from the frozen baseline.",
             )
         )
+    _apply_scoped_exceptions(rows, exceptions)
     return {
         "mode": "analysis-regression-comparison",
         "rows": rows,
@@ -406,7 +407,31 @@ def _accepted_exception(row_id, exceptions):
 
 
 def _maybe_accepted(classification, exception):
-    return ACCEPTED_EXCEPTION if exception else classification
+    return (
+        ACCEPTED_EXCEPTION
+        if exception and "accepted_details" not in exception
+        else classification
+    )
+
+
+def _apply_scoped_exceptions(rows, exceptions):
+    for row in rows:
+        for exception in exceptions:
+            if "accepted_details" not in exception:
+                continue
+            ids = set(exception.get("ids", []))
+            if exception.get("id"):
+                ids.add(exception["id"])
+            if row["id"] not in ids:
+                continue
+            if row["detail"] not in exception["accepted_details"]:
+                continue
+            classifications = exception.get("accepted_classifications", [])
+            if classifications and row["classification"] not in classifications:
+                continue
+            row["classification"] = ACCEPTED_EXCEPTION
+            row["exception"] = exception.get("reason", "")
+            break
 
 
 def _row(bundle, classification, detail, exception=None):
@@ -418,7 +443,7 @@ def _row(bundle, classification, detail, exception=None):
         "classification": classification,
         "detail": detail,
     }
-    if exception:
+    if exception and classification == ACCEPTED_EXCEPTION:
         row["exception"] = exception.get("reason", "")
     return row
 

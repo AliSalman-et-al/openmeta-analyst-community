@@ -462,6 +462,31 @@ def test_numeric_oracle_is_independent_from_runtime_parser(monkeypatch):
     assert any(row["classification"] == UNEXPECTED_OUTPUT for row in rows)
 
 
+def test_meta_regression_parser_keeps_numeric_values_out_of_row_identity():
+    text = """Model Results
+Covariate Coefficients Lower bound Upper bound Std. error p-Value
+Intercept 124.77 100.00 149.54 12.64 < 0.001
+Golden year 0.06 0.01 0.11 0.03 0.020
+
+Omnibus p-value
+0.020
+"""
+
+    assert verify_golden_compatibility.golden_analysis._parse_result_table(text) == {
+        "model.intercept.coefficient": 124.77,
+        "model.intercept.lower_bound": 100.0,
+        "model.intercept.upper_bound": 149.54,
+        "model.intercept.standard_error": 12.64,
+        "model.intercept.p_value": 0.001,
+        "model.golden_year.coefficient": 0.06,
+        "model.golden_year.lower_bound": 0.01,
+        "model.golden_year.upper_bound": 0.11,
+        "model.golden_year.standard_error": 0.03,
+        "model.golden_year.p_value": 0.02,
+        "omnibus.p_value": 0.02,
+    }
+
+
 def test_numeric_contract_rejects_hash_canonicalization_and_coverage_tamper(tmp_path):
     root = _copy_frozen_contract(tmp_path)
     archive, frozen = verify_golden_compatibility._load_frozen_reference(root)
@@ -621,6 +646,38 @@ def test_analysis_regression_comparison_marks_only_matching_exception_as_accepte
     assert report["passed"] is True
     assert report["rows"][0]["classification"] == ACCEPTED_EXCEPTION
     assert report["rows"][0]["exception"] == "documented"
+
+
+def test_scoped_exception_accepts_only_named_detail_and_classification():
+    reference = _baseline()
+    current = _current()
+    current["curated_golden_set"][0]["texts"]["New Section"] = "intentional"
+    current["curated_golden_set"][0]["outputs"]["Summary"]["unexpected"] = 1.0
+    report = compare_golden_baseline(
+        reference,
+        current,
+        exceptions=[
+            {
+                "id": "amino-binary-random",
+                "reason": "reviewed output addition",
+                "accepted_classifications": [TEXT_ARTIFACT_DRIFT],
+                "accepted_details": [
+                    "Unexpected text section New Section was produced."
+                ],
+            }
+        ],
+    )
+
+    accepted = [row for row in report["rows"] if row["classification"] == ACCEPTED_EXCEPTION]
+    assert [row["detail"] for row in accepted] == [
+        "Unexpected text section New Section was produced."
+    ]
+    assert any(
+        row["classification"] == UNEXPECTED_OUTPUT
+        and "unexpected numeric metric" in row["detail"]
+        for row in report["rows"]
+    )
+    assert report["passed"] is False
 
 
 def test_analysis_regression_comparison_cli_writes_report(tmp_path):

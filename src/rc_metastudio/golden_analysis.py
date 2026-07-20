@@ -1341,10 +1341,13 @@ def _parse_result_table(text):
                     if raw is not None:
                         values["%s.%s" % (prefix, metric)] = _to_float(raw)
             continue
+        numeric = r"(?:<\s*)?(-?\d+(?:\.\d+)?)"
+        required_values = 5 if is_regression else 4
+        value_columns = r"\s+".join([numeric] * required_values)
+        if not is_regression:
+            value_columns += r"(?:\s+" + numeric + r")?"
         match = re.match(
-            r"^\s*([+\-]?\s*.+?)\s{2,}(-?\d+(?:\.\d+)?)\s+"
-            r"(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+"
-            r"(-?\d+(?:\.\d+)?)(?:\s+(?:<\s*)?(-?\d+(?:\.\d+)?))?\s*$",
+            r"^\s*([+\-]?\s*.*?)\s+" + value_columns + r"\s*$",
             line,
         )
         if match:

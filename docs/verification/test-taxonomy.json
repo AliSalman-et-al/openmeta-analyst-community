@@ -3897,6 +3897,11 @@
       "reason": "Proves runtime parser drift can alter only current candidates and cannot rewrite the committed numeric oracle.", "runtime_class": "subsecond", "size": "small"
     },
     {
+      "decision": "keep", "evidence": ["golden", "analysis_behavior"], "external_dependencies": [], "lane": "golden",
+      "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_meta_regression_parser_keeps_numeric_values_out_of_row_identity",
+      "reason": "Guards meta-regression row identity against display-spacing changes that previously absorbed the first numeric value into the covariate label.", "runtime_class": "subsecond", "size": "small"
+    },
+    {
       "decision": "keep", "evidence": ["golden", "release_readiness"], "external_dependencies": ["filesystem"], "lane": "golden",
       "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_numeric_contract_rejects_hash_canonicalization_and_coverage_tamper",
       "reason": "Guards numeric contract byte authentication, canonical serialization, and exact case-section-metric coverage.", "runtime_class": "subsecond", "size": "small"
@@ -3975,6 +3980,11 @@
       "reason": "Protects golden baseline comparison and manifest tooling.",
       "runtime_class": "seconds",
       "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["golden", "analysis_behavior"], "external_dependencies": [], "lane": "golden",
+      "nodeid": "tests/analysis_regression/golden/test_analysis_regression_compare.py::test_scoped_exception_accepts_only_named_detail_and_classification",
+      "reason": "Proves a reviewed exception cannot mask unrelated numeric or textual Golden drift in the same workflow.", "runtime_class": "subsecond", "size": "small"
     },
     {
       "decision": "keep",
