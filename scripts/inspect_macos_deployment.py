@@ -1282,7 +1282,7 @@ def finalize_smoke_evidence(
         if (
             marker.get("schema_version") != 1
             or marker.get("platform_plugin") != "cocoa"
-            or marker.get("project") != "amino.rcms"
+            or marker.get("project") != "BCG.rcms"
             or marker.get("post_close") is not True
             or not isinstance(marker.get("pid"), int)
         ):
@@ -2109,7 +2109,7 @@ def write_qualification_evidence(
                 "analysis_after_reopen",
             )
         )
-        and workflows.get("converted_sample") == "amino.rcms"
+        and workflows.get("converted_sample") == "BCG.rcms"
         and workflows.get("expected_normalized_summary_sha256")
         == EXPECTED_SUMMARY_SHA256
         and workflows.get("normalized_summary_sha256") == EXPECTED_SUMMARY_SHA256

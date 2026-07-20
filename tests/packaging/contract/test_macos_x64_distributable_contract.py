@@ -2115,7 +2115,7 @@ def test_smoke_finalizer_authenticates_launchservices_completion(tmp_path):
                 "schema_version": 1,
                 "pid": 123,
                 "platform_plugin": "cocoa",
-                "project": "amino.rcms",
+                "project": "BCG.rcms",
                 "post_close": True,
             }
         ),
