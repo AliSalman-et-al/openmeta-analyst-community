@@ -501,7 +501,10 @@ if "$python_exe" -c 'import importlib.util,sys; sys.exit(importlib.util.find_spe
 else
   echo "rpy2 ABI bridge is present in the strict API environment." >&2; exit 1
 fi
-while IFS= read -r dependency; do
+relocate_rpy2_api_bridge() {
+  local bridge="$1"
+  local dependency source_relative target relative_target
+  while IFS= read -r dependency; do
   case "$dependency" in
     @rpath/lib/libR.dylib)
       source_relative="lib/libR.dylib"
@@ -525,17 +528,19 @@ while IFS= read -r dependency; do
   esac
   target="$r_home/$source_relative"
   [ -f "$target" ] || { echo "rpy2 API bridge dependency has no staged R target: $dependency -> $target" >&2; exit 1; }
-  relative_target="$($python_exe - "$(dirname "$rpy2_api_bridge")" "$target" <<'PY'
+  relative_target="$($python_exe - "$(dirname "$bridge")" "$target" <<'PY'
 import os, sys
 print(os.path.relpath(sys.argv[2], sys.argv[1]))
 PY
 )"
-  install_name_tool -change "$dependency" "@loader_path/$relative_target" "$rpy2_api_bridge"
-done < <(otool -L "$rpy2_api_bridge" | awk 'NR > 1 { print $1 }')
-if otool -L "$rpy2_api_bridge" | grep -E '@rpath/|/Library/Frameworks/R\.framework/|/opt/R/'; then
-  echo "rpy2 API bridge retains an external R dependency." >&2
-  exit 1
-fi
+    install_name_tool -change "$dependency" "@loader_path/$relative_target" "$bridge"
+  done < <(otool -L "$bridge" | awk 'NR > 1 { print $1 }')
+  if otool -L "$bridge" | grep -E '@rpath/|/Library/Frameworks/R\.framework/|/opt/R/'; then
+    echo "rpy2 API bridge retains an external R dependency." >&2
+    exit 1
+  fi
+}
+relocate_rpy2_api_bridge "$rpy2_api_bridge"
 R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" RPY2_CFFI_MODE=API \
   "$python_exe" - "$rpy2_api_bridge" "$machine" <<'PY'
 import importlib.util
@@ -614,6 +619,7 @@ r_home="$r_framework/Resources"
 r_lib="$r_home/library"
 rscript="$r_home/bin/Rscript"
 r_binary="$r_home/bin/R"
+relocate_rpy2_api_bridge "$rpy2_api_bridge"
 "$python_exe" - "$preflight_report_path" "$(git rev-parse HEAD)" <<'PY'
 import json, sys
 from pathlib import Path
