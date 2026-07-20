@@ -601,11 +601,33 @@ def test_direct_smoke_finalizer_requires_executed_teardown_surface_and_launch(tm
     marker = tmp_path / "launch.json"
     evidence.write_text(
         json.dumps(
-            {
-                "failures": [],
-                "surface_progress": [],
-                "scales": [{"requested": scale} for scale in ("1.25", "1.50", "1.75")],
-            }
+                {
+                    "passed": True,
+                    "failures": [],
+                    "surface_progress": [],
+                    "scales": [{"requested": scale} for scale in ("1.25", "1.50", "1.75")],
+                    "workflows": {
+                        "automation_entry_point": True,
+                        "representative_edit": True,
+                        "real_r_analysis": True,
+                        "result_text": True,
+                        "save_reopen": True,
+                        "analysis_after_reopen": True,
+                        "converted_sample": "BCG.rcms",
+                        "expected_normalized_summary_sha256": inspector.EXPECTED_SUMMARY_SHA256,
+                        "normalized_summary_sha256": inspector.EXPECTED_SUMMARY_SHA256,
+                        "raw_summary_sha256": "a" * 64,
+                        "svg_sha256": {"forest": "b" * 64},
+                        "locale_variants": [
+                            {
+                                "locale": locale,
+                                "normalized_summary_sha256": inspector.EXPECTED_SUMMARY_SHA256,
+                                "raw_summary_sha256": "a" * 64,
+                            }
+                            for locale in ("en_US", "de_DE")
+                        ],
+                    },
+                }
         ),
         encoding="utf-8",
     )

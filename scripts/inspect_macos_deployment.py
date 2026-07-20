@@ -17,17 +17,16 @@ from typing import Any, cast
 import unicodedata
 import zipfile
 
-SCRIPTS_DIR = Path(__file__).resolve().parent
-if str(SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPTS_DIR))
-
 from rc_metastudio.qt6_macos_feasibility import (
     EvidenceError,
     _archs,
     is_macho_candidate,
 )
 from rc_metastudio.r_runtime import macos_r_framework_version
-from profile_macos_embedded_r_runtime import ProfileError, validate_profile_evidence
+from rc_metastudio.macos_r_profile_schema import (
+    ProfileSchemaError,
+    validate_profile_evidence,
+)
 
 
 EXPECTED_VERSIONS = {
@@ -1293,6 +1292,7 @@ def finalize_smoke_evidence(
             raise MacOSDeploymentInspectionError(
                 "normal LaunchServices app entry did not produce its completion marker"
             )
+    validate_packaged_workflow_evidence(evidence)
     if require_direct_teardown:
         required_markers = (
             "packaged-workflow:teardown:close:start",
@@ -1338,6 +1338,41 @@ def finalize_smoke_evidence(
         json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     return evidence
+
+
+def validate_packaged_workflow_evidence(evidence: dict) -> None:
+    workflows = evidence.get("workflows", {})
+    locale_variants = workflows.get("locale_variants", [])
+    if not (
+        evidence.get("passed") is True
+        and not evidence.get("failures")
+        and all(
+            workflows.get(key) is True
+            for key in (
+                "automation_entry_point",
+                "representative_edit",
+                "real_r_analysis",
+                "result_text",
+                "save_reopen",
+                "analysis_after_reopen",
+            )
+        )
+        and workflows.get("converted_sample") == "BCG.rcms"
+        and workflows.get("expected_normalized_summary_sha256")
+        == EXPECTED_SUMMARY_SHA256
+        and workflows.get("normalized_summary_sha256") == EXPECTED_SUMMARY_SHA256
+        and _valid_sha256(workflows.get("raw_summary_sha256"))
+        and _valid_sha256_map(workflows.get("svg_sha256"))
+        and [item.get("locale") for item in locale_variants] == ["en_US", "de_DE"]
+        and all(
+            item.get("normalized_summary_sha256") == EXPECTED_SUMMARY_SHA256
+            and item.get("raw_summary_sha256") == workflows.get("raw_summary_sha256")
+            for item in locale_variants
+        )
+    ):
+        raise MacOSDeploymentInspectionError(
+            "packaged workflow result evidence is incomplete"
+        )
 
 
 def validate_direct_build_manifest(payload: dict, *, target: str) -> dict:
@@ -2004,30 +2039,20 @@ def write_qualification_evidence(
             expected_r_version=EXPECTED_VERSIONS["r"],
             expected_architecture=architecture,
         )
-    except ProfileError as exc:
+    except ProfileSchemaError as exc:
         raise MacOSDeploymentInspectionError(
             "embedded R profile evidence is incomplete"
         ) from exc
-    smoke = json.loads(smoke_evidence.read_text(encoding="utf-8"))
+    smoke = finalize_smoke_evidence(
+        smoke_evidence,
+        smoke_log,
+        launchservices_marker,
+        require_direct_teardown=True,
+    )
     archive_report = json.loads(archive_inspection.read_text(encoding="utf-8"))
     validate_direct_build_manifest(
         json.loads(direct_build_manifest.read_text(encoding="utf-8")), target=target
     )
-    workflows = smoke.get("workflows", {})
-    scales = smoke.get("scales", [])
-    log_text = smoke_log.read_text(encoding="utf-8")
-    required_markers = {
-        "packaged-runtime-probe:passed",
-        "packaged-workflow:shell-created",
-        "packaged-workflow:paint:complete",
-        "packaged-workflow:project-exercise:complete",
-        "packaged-workflow:evidence-written",
-        "packaged-workflow:post-close",
-        "startup-project:normal-entry-point-passed",
-        "packaged-surface:scale-1.25-passed",
-        "packaged-surface:scale-1.50-passed",
-        "packaged-surface:scale-1.75-passed",
-    }
     expected_embedded = {
         "qualification/deployment-manifest.json": sha256_file(deployment_manifest),
         "qualification/ad-hoc-signing-inventory.json": sha256_file(signing_inventory),
@@ -2045,8 +2070,6 @@ def write_qualification_evidence(
         "qualification/packaged-smoke.stderr.log": sha256_file(smoke_stderr),
         "qualification/packaged-smoke.hang-trace.log": sha256_file(hang_trace),
     }
-    validate_macos_surface_records(scales)
-    locale_variants = workflows.get("locale_variants", [])
     if not (
         deployment.get("target") == target
         and deployment.get("stack") == EXPECTED_VERSIONS
@@ -2056,35 +2079,8 @@ def write_qualification_evidence(
         == "qualification/ad-hoc-signing-inventory.json"
         and deployment.get("signing_inventory", {}).get("sha256")
         == sha256_file(signing_inventory)
-        and smoke.get("passed") is True
-        and not smoke.get("failures")
-        and not smoke.get("surface_progress")
-        and all(
-            workflows.get(key) is True
-            for key in (
-                "automation_entry_point",
-                "representative_edit",
-                "real_r_analysis",
-                "result_text",
-                "save_reopen",
-                "analysis_after_reopen",
-            )
-        )
-        and workflows.get("converted_sample") == "BCG.rcms"
-        and workflows.get("expected_normalized_summary_sha256")
-        == EXPECTED_SUMMARY_SHA256
-        and workflows.get("normalized_summary_sha256") == EXPECTED_SUMMARY_SHA256
-        and _valid_sha256(workflows.get("raw_summary_sha256"))
-        and _valid_sha256_map(workflows.get("svg_sha256"))
-        and [item.get("locale") for item in locale_variants] == ["en_US", "de_DE"]
-        and all(
-            item.get("normalized_summary_sha256") == EXPECTED_SUMMARY_SHA256
-            and item.get("raw_summary_sha256") == workflows.get("raw_summary_sha256")
-            for item in locale_variants
-        )
         and smoke.get("execution", {}).get("clean_exit") is True
         and smoke.get("execution", {}).get("launchservices_completion_marker") is True
-        and required_markers <= set(log_text.splitlines())
         and archive_report.get("target") == target
         and archive_report.get("archive_sha256") == sha256_file(archive)
         and archive_report.get("embedded_sha256") == expected_embedded

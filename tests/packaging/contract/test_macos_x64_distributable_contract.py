@@ -2077,11 +2077,46 @@ def test_archive_inspection_enforces_canonical_r_framework_symlinks_and_members(
             )
 
 
+def valid_packaged_workflow_evidence(inspector):
+    raw = "a" * 64
+    return {
+        "passed": True,
+        "workflows": {
+            **{
+                key: True
+                for key in (
+                    "automation_entry_point",
+                    "representative_edit",
+                    "real_r_analysis",
+                    "result_text",
+                    "save_reopen",
+                    "analysis_after_reopen",
+                )
+            },
+            "converted_sample": "BCG.rcms",
+            "expected_normalized_summary_sha256": inspector.EXPECTED_SUMMARY_SHA256,
+            "normalized_summary_sha256": inspector.EXPECTED_SUMMARY_SHA256,
+            "raw_summary_sha256": raw,
+            "svg_sha256": {"forest": "b" * 64},
+            "locale_variants": [
+                {
+                    "locale": locale,
+                    "normalized_summary_sha256": inspector.EXPECTED_SUMMARY_SHA256,
+                    "raw_summary_sha256": raw,
+                }
+                for locale in ("en_US", "de_DE")
+            ],
+        },
+    }
+
+
 def test_smoke_finalizer_requires_the_post_close_marker(tmp_path):
     inspector = load_inspector()
     evidence = tmp_path / "smoke.json"
     log = tmp_path / "smoke.log"
-    evidence.write_text(json.dumps({"passed": True}), encoding="utf-8")
+    evidence.write_text(
+        json.dumps(valid_packaged_workflow_evidence(inspector)), encoding="utf-8"
+    )
     log.write_text("packaged-workflow:start\n", encoding="utf-8")
 
     with pytest.raises(inspector.MacOSDeploymentInspectionError, match="post-close"):
@@ -2122,7 +2157,9 @@ def test_smoke_finalizer_authenticates_launchservices_completion(tmp_path):
     evidence = tmp_path / "smoke.json"
     log = tmp_path / "smoke.log"
     marker = tmp_path / "launchservices.json"
-    evidence.write_text(json.dumps({"passed": True}), encoding="utf-8")
+    evidence.write_text(
+        json.dumps(valid_packaged_workflow_evidence(inspector)), encoding="utf-8"
+    )
     log.write_text("packaged-workflow:post-close\n", encoding="utf-8")
     marker.write_text(
         json.dumps(
