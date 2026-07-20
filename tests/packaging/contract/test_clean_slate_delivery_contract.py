@@ -124,6 +124,12 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     assert not (ROOT / ".github/workflows/release-candidate.yml").exists()
     assert "attestations: write" in community
     assert "--automation-native-smoke" in community
+    assert "RCMS_PACKAGE_BASELINE_DPR" in community
+    assert "RCMS_PACKAGE_SMOKE_EVIDENCE" in community
+    assert "scripts/run_bounded_process.py --timeout-seconds 900" in community
+    assert 'Get-ChildItem qualified/tree -Recurse -Filter amino.rcms' in community
+    assert "Upload RC qualification diagnostics" in community
+    assert "rc-qualification-${{ matrix.target }}-diagnostics" in community
     assert community.index("astral-sh/setup-uv@") < community.index(
         "uv python install 3.11.9"
     )

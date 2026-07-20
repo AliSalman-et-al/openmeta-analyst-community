@@ -72,11 +72,25 @@ jobs:
         shell: pwsh
         run: |
           $exe = Get-ChildItem qualified/tree -Recurse -Filter RCMetaStudio.exe | Select-Object -First 1
+          $sample = Get-ChildItem qualified/tree -Recurse -Filter amino.rcms | Select-Object -First 1
+          $runtimeProbe = Get-ChildItem qualified/tree -Recurse -Filter runtime-probe.json | Select-Object -First 1
           if (-not $exe) { throw "RCMetaStudio.exe is missing." }
+          if (-not $sample) { throw "amino.rcms is missing." }
+          if (-not $runtimeProbe) { throw "runtime-probe.json is missing." }
+          New-Item -ItemType Directory -Force qualified/diagnostics | Out-Null
           $env:RCMS_REQUIRE_IN_PROCESS_RPY2 = "1"
+          $env:RPY2_CFFI_MODE = "API"
+          $env:QT_SCALE_FACTOR = "1.25"
+          $env:RCMS_PACKAGE_BASELINE_DPR = (Get-Content $runtimeProbe.FullName -Raw | ConvertFrom-Json).qt.baseline_device_pixel_ratio
+          $env:RCMS_PACKAGE_SMOKE_EVIDENCE = (Resolve-Path qualified/diagnostics).Path + "\packaged-smoke.json"
+          $env:RCMS_AUTOMATION_SMOKE_LOG = (Resolve-Path qualified/diagnostics).Path + "\packaged-smoke.log"
+          $env:RCMS_AUTOMATION_HANG_TRACE = (Resolve-Path qualified/diagnostics).Path + "\packaged-smoke.hang-trace.log"
           Remove-Item Env:\QT_QPA_PLATFORM -ErrorAction SilentlyContinue
-          $process = Start-Process -FilePath $exe.FullName -ArgumentList @("--automation-native-smoke") -PassThru -Wait -WindowStyle Hidden
+          $quotedSample = '"{0}"' -f $sample.FullName
+          $process = Start-Process -FilePath $exe.FullName -ArgumentList @("--automation-native-smoke", $quotedSample) -PassThru -Wait -WindowStyle Hidden -RedirectStandardOutput qualified/diagnostics/packaged-smoke.stdout.log -RedirectStandardError qualified/diagnostics/packaged-smoke.stderr.log
           if ($process.ExitCode -ne 0) { throw "Unsigned packaged smoke failed with exit code $($process.ExitCode)." }
+          $evidence = Get-Content $env:RCMS_PACKAGE_SMOKE_EVIDENCE -Raw | ConvertFrom-Json
+          if ($evidence.passed -ne $true) { throw "Unsigned packaged smoke did not produce passing evidence." }
       - name: Expand unsigned native macOS artifact
         if: startsWith(matrix.target, 'macos-')
         shell: bash
@@ -86,10 +100,39 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          executable="$(find qualified/tree -path '*.app/Contents/MacOS/RCMetaStudio' -print -quit)"
+          app="$(find qualified/tree -type d -name 'RCMetaStudio.app' -print -quit)"
+          app="$PWD/$app"
+          executable="$app/Contents/MacOS/RCMetaStudio"
           sample="$(find qualified/tree -path '*/sample_projects/BCG.rcms' -print -quit)"
-          test -n "$executable" && test -n "$sample"
-          env -u QT_QPA_PLATFORM RCMS_REQUIRE_IN_PROCESS_RPY2=1 "$executable" --automation-native-smoke "$sample"
+          runtime_probe="$(find qualified/tree -path '*/qualification/runtime-probe.json' -print -quit)"
+          test -n "$app" && test -x "$executable" && test -n "$sample" && test -n "$runtime_probe"
+          sample="$PWD/$sample"
+          runtime_probe="$PWD/$runtime_probe"
+          baseline_dpr="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["qt"]["baseline_device_pixel_ratio"])' "$runtime_probe")"
+          mkdir -p qualified/diagnostics
+          QT_SCALE_FACTOR=1.25 \
+            RCMS_PACKAGE_BASELINE_DPR="$baseline_dpr" \
+            RCMS_PACKAGE_SMOKE_EVIDENCE="$PWD/qualified/diagnostics/packaged-smoke.json" \
+            RCMS_AUTOMATION_SMOKE_LOG="$PWD/qualified/diagnostics/packaged-smoke.log" \
+            RCMS_AUTOMATION_HANG_TRACE="$PWD/qualified/diagnostics/packaged-smoke.hang-trace.log" \
+            env -u QT_QPA_PLATFORM RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=API \
+              RCMS_R_HOME="$app/Contents/Frameworks/R.framework/Resources" \
+              RCMS_R_LIBS="$app/Contents/Frameworks/R.framework/Resources/library" \
+              uv run python scripts/run_bounded_process.py --timeout-seconds 900 \
+                --stdout qualified/diagnostics/packaged-smoke.stdout.log \
+                --stderr qualified/diagnostics/packaged-smoke.stderr.log \
+                --completion-log qualified/diagnostics/packaged-smoke.log -- \
+                "$executable" --automation-native-smoke "$sample"
+          python3 -c 'import json,sys; evidence=json.load(open(sys.argv[1])); assert evidence.get("passed") is True' qualified/diagnostics/packaged-smoke.json
+      - name: Upload RC qualification diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: rc-qualification-${{ matrix.target }}-diagnostics
+          path: qualified/diagnostics
+          if-no-files-found: warn
+          retention-days: 30
+          compression-level: 0
       - name: Record unsigned qualification and final evidence
         shell: pwsh
         env:
