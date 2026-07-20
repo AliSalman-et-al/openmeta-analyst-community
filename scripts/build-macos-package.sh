@@ -403,16 +403,9 @@ require_free_space_gb "$repo_root" 6
 # Complete and prove the one private framework before PyInstaller sees it.
 # No R member is populated or mutated in the generated app bundle.
 r_framework="$private_r_framework"
-r_framework_version="$("$python_exe" - "$r_version" <<'PY'
-import sys
-
-from rc_metastudio.r_runtime import macos_r_framework_version
-
-print(macos_r_framework_version(sys.argv[1]))
-PY
-)"
+r_framework_version="$(readlink "$r_framework/Versions/Current")"
 case "$r_framework_version" in
-  [0-9]*.[0-9]*) ;;
+  [0-9]*.[0-9]*|[0-9]*.[0-9]*-*) ;;
   *) echo "Cannot derive the bundled R framework version." >&2; exit 1 ;;
 esac
 r_home="$r_framework/Resources"
