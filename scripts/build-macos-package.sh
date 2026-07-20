@@ -817,7 +817,12 @@ PY
     RCMS_PACKAGE_SMOKE_EVIDENCE="$smoke_evidence_path" \
     RCMS_AUTOMATION_SMOKE_LOG="$smoke_log_path" \
     RCMS_AUTOMATION_HANG_TRACE="$hang_trace_path" \
-    run_packaged_process "$app_root/RCMetaStudio" --automation-native-smoke "$sample_path"
+    env -u QT_QPA_PLATFORM RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=API \
+      RCMS_R_HOME="$r_home" RCMS_R_LIBS="$r_lib" \
+      "$python_exe" "$repo_root/scripts/run_bounded_process.py" --timeout-seconds 900 \
+      --stdout "$smoke_stdout_path" --stderr "$smoke_stderr_path" \
+      --completion-log "$smoke_log_path" -- \
+      "$app_root/RCMetaStudio" --automation-native-smoke "$sample_path"
 
   for scale in "1.25" "1.50" "1.75"; do
     step "Running packaged Cocoa surface smoke at scale $scale"
@@ -1025,7 +1030,12 @@ if [ "$skip_smoke" -eq 0 ]; then
   run_extracted "$extracted_app/Contents/MacOS/RCMetaStudio" --automation-package-runtime-probe "$extracted_probe"
   QT_SCALE_FACTOR=1.25 RCMS_PACKAGE_BASELINE_DPR="$("$python_exe" -c 'import json,sys; print(json.load(open(sys.argv[1]))["qt"]["baseline_device_pixel_ratio"])' "$extracted_probe")" \
     RCMS_PACKAGE_SMOKE_EVIDENCE="$extracted_smoke" RCMS_AUTOMATION_SMOKE_LOG="$extracted_smoke_log" RCMS_AUTOMATION_HANG_TRACE="$extracted_hang_trace" \
-    run_extracted "$extracted_app/Contents/MacOS/RCMetaStudio" --automation-native-smoke "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"
+    env -u QT_QPA_PLATFORM RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=API \
+      RCMS_R_HOME="$extracted_r_home" RCMS_R_LIBS="$extracted_r_lib" \
+      "$python_exe" "$repo_root/scripts/run_bounded_process.py" --timeout-seconds 900 \
+      --stdout "$extracted_stdout" --stderr "$extracted_stderr" \
+      --completion-log "$extracted_smoke_log" -- \
+      "$extracted_app/Contents/MacOS/RCMetaStudio" --automation-native-smoke "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"
   for scale in "1.25" "1.50" "1.75"; do
     QT_SCALE_FACTOR="$scale" RCMS_PACKAGE_BASELINE_DPR="$("$python_exe" -c 'import json,sys; print(json.load(open(sys.argv[1]))["qt"]["baseline_device_pixel_ratio"])' "$extracted_probe")" \
       RCMS_AUTOMATION_SMOKE_LOG="$extracted_smoke_log" RCMS_PACKAGED_PROCESS_TIMEOUT_SECONDS=60 \

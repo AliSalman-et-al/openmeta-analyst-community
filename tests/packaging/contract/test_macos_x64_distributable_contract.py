@@ -2578,6 +2578,19 @@ def test_bounded_process_preserves_exit_code_and_redirected_output(tmp_path):
     assert stderr.read_text().strip() == "err"
 
 
+def test_bounded_process_records_the_observed_process_exit(tmp_path):
+    runner = load_bounded_runner()
+    log = tmp_path / "smoke.log"
+
+    runner.record_completion(log, 0)
+    runner.record_completion(log, 7)
+
+    assert log.read_text(encoding="utf-8").splitlines() == [
+        "packaged-workflow:process-exit:0",
+        "packaged-workflow:process-exit:7",
+    ]
+
+
 def test_bounded_process_times_out(tmp_path):
     import sys
 
