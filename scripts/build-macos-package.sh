@@ -520,8 +520,8 @@ relocate_rpy2_api_bridge() {
   local dependency source_relative target relative_target
   while IFS= read -r dependency; do
   case "$dependency" in
-    @loader_path/libR.dylib)
-      source_relative="lib/libR.dylib"
+    @loader_path/*.dylib)
+      source_relative="lib/${dependency#@loader_path/}"
       ;;
     @rpath/lib/libR.dylib)
       source_relative="lib/libR.dylib"
