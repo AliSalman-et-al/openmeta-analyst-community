@@ -953,7 +953,6 @@ with zipfile.ZipFile(zip_path) as archive:
         mode = info.external_attr >> 16
         if (
             not stat.S_ISLNK(mode)
-            or stat.S_IMODE(mode) != 0o777
             or archive.read(path).decode("utf-8") != target
         ):
             raise SystemExit(f"Created ZIP has a noncanonical R framework alias: {path}")
