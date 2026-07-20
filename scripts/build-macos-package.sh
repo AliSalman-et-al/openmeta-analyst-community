@@ -661,6 +661,7 @@ if not main_executable.is_symlink() or main_executable.resolve(strict=True) != r
     raise SystemExit("collected R framework executable alias is not canonical")
 main_executable.unlink()
 runtime_library.replace(main_executable)
+main_executable.chmod(main_executable.stat().st_mode | 0o111)
 runtime_library.symlink_to(Path("../../R"))
 if not main_executable.is_file() or main_executable.is_symlink():
     raise SystemExit("collected R framework main executable is not a regular file")

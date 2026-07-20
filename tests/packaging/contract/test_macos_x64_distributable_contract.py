@@ -213,6 +213,7 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
         in spec
     )
     assert 'minimum_macos_version="$minimum_macos"' in build
+    assert "main_executable.chmod(main_executable.stat().st_mode | 0o111)" in build
     assert 'export MACOSX_DEPLOYMENT_TARGET="$minimum_macos_version"' in build
     assert "MACOSX_DEPLOYMENT_TARGET=13.0" not in build
     launch = text("src/rc_metastudio/launch.py")
