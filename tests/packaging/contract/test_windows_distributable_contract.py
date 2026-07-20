@@ -1971,6 +1971,18 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
                     ],
                     "save_reopen": True,
                     "analysis_after_reopen": True,
+                    "sample_projects": {
+                        "passed": True,
+                        "manifest_sha256": "c" * 64,
+                        "projects": [
+                            {
+                                "project": "amino.rcms",
+                                "sha256": "d" * 64,
+                                "semantic_sha256": "e" * 64,
+                                "opened_in_packaged_application": True,
+                            }
+                        ],
+                    },
                 },
                 "execution": {
                     "automation_exit_code": 0,

@@ -53,6 +53,8 @@ jobs:
             build/windows-package/work/RCMetaStudio/warn-RCMetaStudio.txt
             build/windows-package/work/RCMetaStudio/xref-RCMetaStudio.html
             build/windows-package/dist/RCMetaStudio/qualification
-            build/windows-package/work/archive-qualification
+            build/windows-package/work/archive-qualification/archive-inputs
+            build/windows-package/work/archive-qualification/deployment-reinspection.json
+            build/windows-package/work/archive-qualification/*/qualification
           if-no-files-found: ignore
           retention-days: 14
