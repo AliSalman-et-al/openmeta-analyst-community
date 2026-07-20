@@ -103,8 +103,12 @@ jobs:
             artifacts/${{ matrix.artifact }}-archive-inspection.json
             build/macos-package/${{ matrix.architecture }}/work/qualification/**
             build/macos-package/${{ matrix.architecture }}/work/qualification/packaged-smoke*.log
-            build/macos-package/${{ matrix.architecture }}/work/RCMetaStudio/warn-RCMetaStudio.txt
-            build/macos-package/${{ matrix.architecture }}/work/RCMetaStudio/xref-RCMetaStudio.html
+            build/macos-package/${{ matrix.architecture }}/work/rc-metastudio-macos/warn-rc-metastudio-macos.txt
+            build/macos-package/${{ matrix.architecture }}/work/rc-metastudio-macos/xref-rc-metastudio-macos.html
+            build/macos-package/${{ matrix.architecture }}/work/rc-metastudio-macos/Analysis-00.toc
+            build/macos-package/${{ matrix.architecture }}/work/rc-metastudio-macos/EXE-00.toc
+            build/macos-package/${{ matrix.architecture }}/work/rc-metastudio-macos/COLLECT-00.toc
+            build/macos-package/${{ matrix.architecture }}/work/rc-metastudio-macos/BUNDLE-00.toc
           if-no-files-found: warn
           retention-days: 30
           compression-level: 0

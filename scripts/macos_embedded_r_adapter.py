@@ -55,10 +55,11 @@ def filter_pyinstaller_r_binaries(
         return retained
     staged_root = staged_framework.resolve(strict=True)
     retained = []
+    excluded = []
     for destination, source, typecode in binaries:
         try:
             Path(source).resolve(strict=True).relative_to(staged_root)
-        except ValueError:
+        except (OSError, ValueError):
             source_text = str(source).replace("\\", "/")
             destination_text = str(destination).replace("\\", "/")
             if (
@@ -74,8 +75,15 @@ def filter_pyinstaller_r_binaries(
             # The explicit framework TOC is authoritative.  Exclude exactly
             # its members from PyInstaller's dependency walk rather than
             # recognizing a few host-path prefixes.
+            excluded.append((destination, source, typecode))
             continue
         retained.append((destination, source, typecode))
+    if excluded:
+        destinations = ", ".join(sorted(str(item[0]) for item in excluded))
+        print(
+            f"[RCMS-PYINSTALLER-FILTER] excluded {len(excluded)} staged-R "
+            f"entries: {destinations}"
+        )
     return retained
 
 

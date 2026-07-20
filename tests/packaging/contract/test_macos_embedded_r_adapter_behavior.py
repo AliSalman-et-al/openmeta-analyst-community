@@ -145,6 +145,18 @@ def test_host_binary_filter_and_unsigned_graph_fail_closed(tmp_path, monkeypatch
         {},
     )
     assert [item[0] for item in retained] == ["keep"]
+    staged = tmp_path / "R.framework"
+    staged.mkdir()
+    staged_member = staged / "libRblas.dylib"
+    staged_member.write_bytes(b"blas")
+    retained = adapter.filter_pyinstaller_r_binaries(
+        [
+            ("PyQt6", "PyQt6", "DATA"),
+            ("libRblas.dylib", str(staged_member), "DATA"),
+        ],
+        staged,
+    )
+    assert retained == [("PyQt6", "PyQt6", "DATA")]
     with pytest.raises(adapter.AdapterError, match="unmapped /opt/R"):
         adapter.filter_pyinstaller_r_binaries(
             [("bad", "/opt/R/x86_64/lib/bad.dylib", "BINARY")], {}
