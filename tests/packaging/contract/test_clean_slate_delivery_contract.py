@@ -27,7 +27,7 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     commit = "a" * 40
     delivery.init_release(
         argparse.Namespace(
-            version="0.2.0-rc.1",
+            version="0.2.1-rc.1",
             commit=commit,
             repository="AliSalman-et-al/rc-metastudio",
             trust_profile="unsigned-community",
@@ -88,13 +88,13 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
             manifest=str(rc_path),
             from_channel="rc",
             channel="stable",
-            version="0.2.0",
+            version="0.2.1",
             output=str(stable_path),
         )
     )
     stable = delivery.load(stable_path)
     assert stable["channel"] == "stable"
-    assert stable["version"] == "0.2.0"
+    assert stable["version"] == "0.2.1"
 
     bad = json.loads(manifest_path.read_text(encoding="utf-8"))
     bad["targets"]["windows-x64"]["stages"].pop()

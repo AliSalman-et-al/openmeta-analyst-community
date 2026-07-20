@@ -35,7 +35,7 @@ def test_package_metadata_version_only_needs_no_ambient_rscript(tmp_path):
         capture_output=True,
     )
     assert version_only.returncode == 0, version_only.stderr
-    assert output.read_text(encoding="utf-8") == "version=0.2.0\n"
+    assert output.read_text(encoding="utf-8") == "version=0.2.1\n"
     default = subprocess.run(
         [sys.executable, str(script)], env=env, text=True, capture_output=True
     )
