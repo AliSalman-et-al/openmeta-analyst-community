@@ -634,7 +634,13 @@ relocate_canonical_r_framework_main() {
   local framework="$1"
   local framework_home="$framework/Resources"
   local framework_main="$framework/Versions/Current/R"
-  local dependency dependency_name dependency_target
+  local dependency dependency_name dependency_target install_id
+  install_id="$(otool -D "$framework_main" | awk 'NR == 2 { print $1 }')"
+  case "$install_id" in
+    @loader_path/*.dylib)
+      install_name_tool -id "@loader_path/Resources/lib/${install_id#@loader_path/}" "$framework_main"
+      ;;
+  esac
   while IFS= read -r dependency; do
     case "$dependency" in
       @loader_path/*.dylib)
@@ -647,6 +653,10 @@ relocate_canonical_r_framework_main() {
   done < <(otool -L "$framework_main" | awk 'NR > 2 { print $1 }')
   if otool -L "$framework_main" | awk 'NR > 2 { print $1 }' | grep -E '^@loader_path/[^/]+\.dylib$'; then
     echo "canonical R framework main executable retains a pre-move loader edge." >&2
+    exit 1
+  fi
+  if otool -D "$framework_main" | awk 'NR == 2 { print $1 }' | grep -E '^@loader_path/[^/]+\.dylib$'; then
+    echo "canonical R framework main executable retains a pre-move install identity." >&2
     exit 1
   fi
 }
