@@ -54,9 +54,20 @@ def filter_pyinstaller_r_binaries(
             retained.append((destination, source, typecode))
         return retained
     staged_root = staged_framework.resolve(strict=True)
+    staged_library = staged_root / "Resources/lib"
+    staged_library_names = {
+        path.name for path in staged_library.iterdir() if path.is_file() or path.is_symlink()
+    }
     retained = []
     excluded = []
     for destination, source, typecode in binaries:
+        destination_path = Path(str(destination).replace("\\", "/"))
+        if (
+            destination_path.parent == Path(".")
+            and destination_path.name in staged_library_names
+        ):
+            excluded.append((destination, source, typecode))
+            continue
         try:
             Path(source).resolve(strict=True).relative_to(staged_root)
         except (OSError, ValueError):

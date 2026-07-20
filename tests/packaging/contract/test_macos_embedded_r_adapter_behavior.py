@@ -146,13 +146,14 @@ def test_host_binary_filter_and_unsigned_graph_fail_closed(tmp_path, monkeypatch
     )
     assert [item[0] for item in retained] == ["keep"]
     staged = tmp_path / "R.framework"
-    staged.mkdir()
-    staged_member = staged / "libRblas.dylib"
+    staged_member = staged / "Resources/lib/libRblas.dylib"
+    staged_member.parent.mkdir(parents=True)
     staged_member.write_bytes(b"blas")
     retained = adapter.filter_pyinstaller_r_binaries(
         [
             ("PyQt6", "PyQt6", "DATA"),
             ("libRblas.dylib", str(staged_member), "DATA"),
+            ("libRblas.dylib", "libRblas.0.dylib", "SYMLINK"),
         ],
         staged,
     )
