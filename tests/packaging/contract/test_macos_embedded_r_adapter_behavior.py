@@ -295,13 +295,14 @@ def test_pkgutil_signature_parser_handles_certificate_chain_and_rejectable_team(
     assert spec.loader is not None
     spec.loader.exec_module(module)
     payload = module.parse_pkgutil_signature(
-        "Package: R-4.6.1-x86_64.pkg\nStatus: signed by a certificate trusted by macOS\n   1. Developer ID Installer: R for macOS (VZLD955F6P)\n   2. Developer ID Certification Authority\n",
+        "Package: R-4.6.1-x86_64.pkg\n   Status: signed by a certificate trusted by macOS\n   1. Developer ID Installer: R for macOS (VZLD955F6P)\n   2. Developer ID Certification Authority\n",
         "",
         0,
     )
     assert payload["team_id"] == "VZLD955F6P"
     assert payload["signer"] == "Developer ID Installer: R for macOS (VZLD955F6P)"
     assert payload["certificate"]
+    assert payload["status_line"] == "signed by a certificate trusted by macOS"
     bad = module.parse_pkgutil_signature(
         "Status: signed\n   1. Developer ID Installer: Other (AAAAAAAAAA)\n", "", 0
     )
@@ -617,7 +618,7 @@ def test_direct_smoke_finalizer_requires_executed_teardown_surface_and_launch(tm
             {
                 "schema_version": 1,
                 "platform_plugin": "cocoa",
-                "project": "amino.rcms",
+                    "project": "BCG.rcms",
                 "post_close": True,
                 "pid": 123,
             }
