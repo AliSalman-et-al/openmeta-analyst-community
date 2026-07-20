@@ -298,14 +298,19 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
     assert {
         "change-classifier",
         "qt6-verification",
+        "remaining-surface-verification",
         "source-fast-targets",
         "windows-package-qualification",
         "fast-verification-gate",
     } <= workflow["jobs"]
     assert workflow["needs"]["source-fast-targets"] == {"change-classifier"}
+    assert workflow["needs"]["remaining-surface-verification"] == {
+        "change-classifier"
+    }
     assert workflow["needs"]["fast-verification-gate"] == {
         "change-classifier",
         "qt6-verification",
+        "remaining-surface-verification",
         "source-fast-targets",
         "windows-package-qualification",
     }
@@ -330,7 +335,7 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
         assert f"{top_level}/*" in workflow["text"]
     assert (
         workflow["text"].count("needs.change-classifier.outputs.run-windows == 'true'")
-        == 2
+        == 3
     )
     assert (
         "needs.change-classifier.outputs.run-windows-package == 'true'"
