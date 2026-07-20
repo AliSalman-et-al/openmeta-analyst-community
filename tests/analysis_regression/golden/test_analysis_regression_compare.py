@@ -464,9 +464,9 @@ def test_numeric_oracle_is_independent_from_runtime_parser(monkeypatch):
 
 def test_meta_regression_parser_keeps_numeric_values_out_of_row_identity():
     text = """Model Results
-Covariate Coefficients Lower bound Upper bound Std. error p-Value
-Intercept 124.77 100.00 149.54 12.64 < 0.001
-Golden year 0.06 0.01 0.11 0.03 0.020
+    Covariate Estimate Lower bound Upper bound Std. error z p-value
+    Intercept 124.77 100.00 149.54 12.64 9.87 < 0.001
+    Golden year 0.06 0.01 0.11 0.03 2.33 0.020
 
 Omnibus p-value
 0.020
