@@ -58,6 +58,12 @@ def _record_path(root: Path, scale: float) -> Path:
     return root / ("scale-%s.json" % _slug(scale))
 
 
+def _surface_record_path(root: Path, scale: float, surface_id: str) -> Path:
+    return root / ".surface-records" / (
+        "scale-%s-%s.json" % (_slug(scale), surface_id)
+    )
+
+
 def _rect(rect) -> dict[str, int]:
     return {
         "x": rect.x(),
@@ -848,7 +854,7 @@ def _observe_window_contract(window, adaptive_window) -> dict[str, object]:
     }
 
 
-def _run_scale(scale: float, evidence_root: Path) -> None:
+def _capture_surface(scale: float, evidence_root: Path, surface_id: str) -> None:
     os.environ.setdefault("RCMS_STUB_BACKEND", "1")
     from PyQt6 import QtCore, QtGui, QtWidgets
     from PyQt6.QtTest import QTest
@@ -877,10 +883,12 @@ def _run_scale(scale: float, evidence_root: Path) -> None:
     factories = _surface_factories()
     if set(factories) != _remaining_surface_ids():
         raise RuntimeError("native remaining-surface factory inventory drifted")
+    if surface_id not in factories:
+        raise ValueError("surface is not in the remaining-surface inventory")
     image_dir = evidence_root / ("scale-%s" % _scale_label(scale))
     image_dir.mkdir(parents=True, exist_ok=True)
     records = {}
-    for surface_id, factory in factories.items():
+    for surface_id, factory in [(surface_id, factories[surface_id])]:
         print("capturing %s at %s" % (surface_id, scale), flush=True)
         window = factory()
         try:
@@ -954,10 +962,63 @@ def _run_scale(scale: float, evidence_root: Path) -> None:
         "surfaces": records,
         "tab_focus_behavior": tab_focus_behavior,
     }
-    evidence_root.mkdir(parents=True, exist_ok=True)
-    _record_path(evidence_root, scale).write_text(
+    record_path = _surface_record_path(evidence_root, scale, surface_id)
+    record_path.parent.mkdir(parents=True, exist_ok=True)
+    record_path.write_text(
         json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+
+
+def _run_scale(scale: float, evidence_root: Path) -> None:
+    environment = os.environ.copy()
+    for surface_id in sorted(_remaining_surface_ids()):
+        subprocess.run(
+            [
+                sys.executable,
+                str(Path(__file__).resolve()),
+                "--scale",
+                str(scale),
+                "--surface",
+                surface_id,
+                "--evidence-root",
+                str(evidence_root),
+            ],
+            cwd=ROOT,
+            env=environment,
+            check=True,
+        )
+    fragments = [
+        json.loads(
+            _surface_record_path(evidence_root, scale, surface_id).read_text(
+                encoding="utf-8"
+            )
+        )
+        for surface_id in sorted(_remaining_surface_ids())
+    ]
+    if not fragments:
+        raise RuntimeError("remaining-surface inventory is empty")
+    common = {
+        key: fragments[0][key]
+        for key in ("qpa", "scale_factor", "tab_focus_behavior")
+    }
+    if any(
+        any(fragment[key] != value for key, value in common.items())
+        for fragment in fragments
+    ):
+        raise RuntimeError("isolated remaining-surface runtime identity drifted")
+    surfaces = {}
+    for fragment in fragments:
+        if len(fragment["surfaces"]) != 1:
+            raise RuntimeError("isolated remaining-surface record is not singular")
+        surfaces.update(fragment["surfaces"])
+    evidence_root.mkdir(parents=True, exist_ok=True)
+    _record_path(evidence_root, scale).write_text(
+        json.dumps({**common, "surfaces": surfaces}, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    for surface_id in sorted(_remaining_surface_ids()):
+        _surface_record_path(evidence_root, scale, surface_id).unlink()
+    _surface_record_path(evidence_root, scale, "placeholder").parent.rmdir()
 
 
 def _native_dpr() -> float:
@@ -984,6 +1045,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--evidence-root", type=Path, default=DEFAULT_EVIDENCE_ROOT)
     parser.add_argument("--scale", type=float)
+    parser.add_argument("--surface")
     parser.add_argument("--validate-only", action="store_true")
     args = parser.parse_args()
     if args.validate_only:
@@ -992,8 +1054,13 @@ def main() -> int:
     if args.scale is not None:
         if args.scale not in SCALE_FACTORS:
             raise ValueError("scale must be one of the four required factors")
+        if args.surface is not None:
+            _capture_surface(args.scale, args.evidence_root, args.surface)
+            return 0
         _run_scale(args.scale, args.evidence_root)
         return 0
+    if args.surface is not None:
+        raise ValueError("surface requires scale")
     native_dpr = _native_dpr()
     if native_dpr <= 0:
         raise RuntimeError("native Qt reported an invalid device pixel ratio")
