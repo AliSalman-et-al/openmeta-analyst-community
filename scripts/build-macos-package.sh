@@ -640,6 +640,15 @@ from pathlib import Path
 import sys
 
 framework = Path(sys.argv[1]).resolve(strict=True)
+for development_alias in ("Headers", "Libraries", "PrivateHeaders"):
+    alias = framework / development_alias
+    if alias.is_symlink():
+        alias.unlink()
+    elif alias.exists():
+        raise SystemExit(f"collected R framework root member is not a removable alias: {alias}")
+root_members = {item.name for item in framework.iterdir()}
+if root_members != {"R", "Resources", "Versions"}:
+    raise SystemExit(f"collected R framework root is not minimal: {sorted(root_members)}")
 version_root = (framework / "Versions/Current").resolve(strict=True)
 main_executable = version_root / "R"
 runtime_library = version_root / "Resources/lib/libR.dylib"
