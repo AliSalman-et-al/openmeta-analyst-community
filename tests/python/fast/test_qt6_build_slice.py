@@ -537,6 +537,10 @@ def test_qt6_generation_and_type_checks_have_a_maintained_entry_point():
         encoding="utf-8"
     )
     assert "scripts\\verify-qt6.ps1 -Sync" in hosted
+    assert "scripts\\verify-qt6.ps1 -Sync -Section Core" in hosted
+    assert "scripts\\verify-qt6.ps1 -Sync -Section RemainingSurfaces" in hosted
+    assert "Native Qt6 Remaining Surfaces result: $REMAINING_SURFACE_RESULT" in hosted
+    assert "if-no-files-found: error" in hosted
     assert ".python-version|pyproject.toml" in hosted
     assert "config/*" in hosted
     assert "scripts/*" in hosted

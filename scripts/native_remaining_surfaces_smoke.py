@@ -71,6 +71,15 @@ def _surface_capture_order() -> tuple[str, ...]:
     return ("main-wizard", *sorted(surfaces - {"main-wizard"}))
 
 
+def _qt_message_handler(message_type, context, message) -> None:
+    """Keep native Qt diagnostics visible even when a warning is fatal."""
+    location = ""
+    if context.file:
+        location = " (%s:%s)" % (context.file, context.line)
+    payload = "Qt %s%s: %s\n" % (message_type.name, location, message)
+    os.write(2, payload.encode("utf-8", errors="backslashreplace"))
+
+
 def _rect(rect) -> dict[str, int]:
     return {
         "x": rect.x(),
@@ -868,10 +877,12 @@ def _capture_surface(scale: float, evidence_root: Path, surface_id: str) -> None
     from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
     prepare_generated_ui_imports()
+    QtCore.qInstallMessageHandler(_qt_message_handler)
     sys.path.append(str(ROOT / "src/rc_metastudio"))
-    from rc_metastudio import meta_py_r_backend
+    from rc_metastudio import meta_py_r_backend, qt6_resources
 
     meta_py_r_backend.install_stub_meta_py_r()
+    qt6_resources.ensure_application_resources()
     import adaptive_window
     import app_error_handler
 

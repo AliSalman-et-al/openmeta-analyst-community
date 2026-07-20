@@ -29,6 +29,16 @@ inventory_validator = _load_script("validate_qt6_surface_inventory")
 native_smoke = _load_script("native_remaining_surfaces_smoke")
 
 
+def test_native_smoke_registers_application_resources_before_surface_factories():
+    source = (ROOT / "scripts/native_remaining_surfaces_smoke.py").read_text(
+        encoding="utf-8"
+    )
+
+    registration = source.index("qt6_resources.ensure_application_resources()")
+    factory_construction = source.index("factories = _surface_factories()")
+    assert registration < factory_construction
+
+
 def _write_bundle(root: Path) -> None:
     inventory = inventory_validator.load_and_validate()
     contracts = {

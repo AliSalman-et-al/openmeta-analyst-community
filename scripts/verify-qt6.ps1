@@ -1,6 +1,8 @@
 param(
     [switch]$Sync,
-    [string]$BuildRoot = "build/qt6-verification"
+    [string]$BuildRoot = "build/qt6-verification",
+    [ValidateSet("Full", "Core", "RemainingSurfaces")]
+    [string]$Section = "Full"
 )
 
 $ErrorActionPreference = "Stop"
@@ -24,11 +26,73 @@ function Invoke-NativeSmokeCommand {
     }
 }
 
+function Invoke-NativeRemainingSurfaceSmoke {
+    Invoke-NativeSmokeCommand -Label "Native Qt6 remaining-surface smoke" -Command @(
+        "uv", "run", "python", "scripts/native_remaining_surfaces_smoke.py"
+    )
+    Invoke-NativeSmokeCommand -Label "Native Qt6 remaining-surface evidence validation" -Command @(
+        "uv", "run", "python", "scripts/native_remaining_surfaces_smoke.py", "--validate-only"
+    )
+}
+
 Push-Location $repoRoot
 try {
     if ($Sync) {
         uv sync --locked
         if ($LASTEXITCODE -ne 0) { throw "uv sync --locked failed." }
+    }
+
+    if ($Section -eq "RemainingSurfaces") {
+        uv run python scripts/build_qt6.py generate --build-root $BuildRoot
+        if ($LASTEXITCODE -ne 0) { throw "Qt6 form or resource generation failed." }
+        $env:RCMS_QT6_BUILD_ROOT = (Resolve-Path $BuildRoot).Path
+
+        uv run python scripts/validate_qt6_surface_inventory.py --check-document
+        if ($LASTEXITCODE -ne 0) { throw "Native Qt6 surface inventory validation failed." }
+
+        uv run python scripts/validate_test_taxonomy.py `
+            --tests-path tests/python/fast/test_native_remaining_surfaces_evidence.py `
+            --require-covered
+        if ($LASTEXITCODE -ne 0) { throw "Native remaining-surface taxonomy validation failed." }
+
+        $remainingSurfaceTests = @(
+            "tests/python/gui/test_adaptive_window_policy.py",
+            "tests/python/gui/test_compact_transient_layout.py",
+            "tests/python/gui/test_declarative_dialog_sizing.py",
+            "tests/python/gui/test_edit_dataset_workspace_layout.py",
+            "tests/python/gui/test_main_wizard_workflow_layout.py"
+        )
+        foreach ($remainingSurfaceTest in $remainingSurfaceTests) {
+            uv run python scripts/validate_test_taxonomy.py `
+                --tests-path $remainingSurfaceTest `
+                --require-covered
+            if ($LASTEXITCODE -ne 0) {
+                throw "Qt6 remaining-surface taxonomy validation failed: $remainingSurfaceTest"
+            }
+        }
+
+        uv run pytest -W error `
+            tests/python/fast/test_native_remaining_surfaces_evidence.py `
+            @remainingSurfaceTests
+        if ($LASTEXITCODE -ne 0) { throw "Qt6 remaining-surface tests failed." }
+
+        $previousQpa = $env:QT_QPA_PLATFORM
+        $previousFatalWarnings = $env:QT_FATAL_WARNINGS
+        Remove-Item Env:QT_QPA_PLATFORM -ErrorAction SilentlyContinue
+        $env:QT_FATAL_WARNINGS = "1"
+        try {
+            Invoke-NativeRemainingSurfaceSmoke
+        }
+        finally {
+            if ($null -ne $previousQpa) { $env:QT_QPA_PLATFORM = $previousQpa }
+            if ($null -ne $previousFatalWarnings) {
+                $env:QT_FATAL_WARNINGS = $previousFatalWarnings
+            }
+            else {
+                Remove-Item Env:QT_FATAL_WARNINGS -ErrorAction SilentlyContinue
+            }
+        }
+        return
     }
 
     uv run python scripts/build_qt6.py generate --build-root $BuildRoot
@@ -254,12 +318,9 @@ try {
         Invoke-NativeSmokeCommand -Label "Native Qt6 Results evidence validation" -Command @(
             "uv", "run", "python", "scripts/native_results_smoke.py", "--validate-only"
         )
-        Invoke-NativeSmokeCommand -Label "Native Qt6 remaining-surface smoke" -Command @(
-            "uv", "run", "python", "scripts/native_remaining_surfaces_smoke.py"
-        )
-        Invoke-NativeSmokeCommand -Label "Native Qt6 remaining-surface evidence validation" -Command @(
-            "uv", "run", "python", "scripts/native_remaining_surfaces_smoke.py", "--validate-only"
-        )
+        if ($Section -eq "Full") {
+            Invoke-NativeRemainingSurfaceSmoke
+        }
         Invoke-NativeSmokeCommand -Label "Native R-load teardown smoke" -Command @(
             "uv", "run", "rc-metastudio", "--automation-shell-failure-smoke", "r-load"
         )

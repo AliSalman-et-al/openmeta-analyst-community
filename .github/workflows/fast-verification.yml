@@ -110,7 +110,7 @@ jobs:
           key: qt-rcc-6.11.1-windows-x64-7f97edc3937fec7383eb865e010ed5128155bf9c80a563abca450860f3e9bef5
 
       - name: Run Native Qt6 Vertical Slice
-        run: .\scripts\verify-qt6.ps1 -Sync
+        run: .\scripts\verify-qt6.ps1 -Sync -Section Core
 
       - name: Upload native calculator evidence
         if: ${{ always() }}
@@ -121,13 +121,42 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      - name: Prune uv cache
+        if: ${{ always() }}
+        run: uv cache prune --ci
+
+  remaining-surface-verification:
+    name: Native Qt6 Remaining Surfaces
+    needs: change-classifier
+    if: ${{ needs.change-classifier.outputs.run-windows == 'true' }}
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: powershell
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install 3.11.9
+
+      - name: Run remaining-surface verification on a fresh runner
+        run: .\scripts\verify-qt6.ps1 -Sync -Section RemainingSurfaces
+
       - name: Upload native remaining-surface evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: native-remaining-surface-evidence
           path: build/qt6-verification/native-remaining-surfaces
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 14
 
       - name: Prune uv cache
@@ -295,6 +324,7 @@ jobs:
     needs:
       - change-classifier
       - qt6-verification
+      - remaining-surface-verification
       - source-fast-targets
       - windows-package-qualification
     if: ${{ always() }}
@@ -308,6 +338,7 @@ jobs:
           RUN_WINDOWS: ${{ needs.change-classifier.outputs.run-windows }}
           REASON: ${{ needs.change-classifier.outputs.reason }}
           QT6_RESULT: ${{ needs.qt6-verification.result }}
+          REMAINING_SURFACE_RESULT: ${{ needs.remaining-surface-verification.result }}
           SOURCE_FAST_RESULT: ${{ needs.source-fast-targets.result }}
           RUN_WINDOWS_PACKAGE: ${{ needs.change-classifier.outputs.run-windows-package }}
           WINDOWS_PACKAGE_RESULT: ${{ needs.windows-package-qualification.result }}
@@ -319,6 +350,10 @@ jobs:
           else
             if [ "$QT6_RESULT" != "success" ]; then
               echo "Native Qt6 Vertical Slice result: $QT6_RESULT" >&2
+              exit 1
+            fi
+            if [ "$REMAINING_SURFACE_RESULT" != "success" ]; then
+              echo "Native Qt6 Remaining Surfaces result: $REMAINING_SURFACE_RESULT" >&2
               exit 1
             fi
             if [ "$SOURCE_FAST_RESULT" != "success" ]; then
