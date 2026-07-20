@@ -634,17 +634,24 @@ relocate_canonical_r_framework_main() {
   local framework="$1"
   local framework_home="$framework/Resources"
   local framework_main="$framework/Versions/Current/R"
-  local dependency dependency_name dependency_target install_id
+  local dependency dependency_name dependency_target install_id install_id_name
   install_id="$(otool -D "$framework_main" | awk 'NR == 2 { print $1 }')"
   case "$install_id" in
     @loader_path/*.dylib)
-      install_name_tool -id "@loader_path/Resources/lib/${install_id#@loader_path/}" "$framework_main"
+      install_id_name="${install_id#@loader_path/}"
+      case "$install_id_name" in
+        */*) ;;
+        *) install_name_tool -id "@loader_path/Resources/lib/$install_id_name" "$framework_main" ;;
+      esac
       ;;
   esac
   while IFS= read -r dependency; do
     case "$dependency" in
       @loader_path/*.dylib)
         dependency_name="${dependency#@loader_path/}"
+        case "$dependency_name" in
+          */*) continue ;;
+        esac
         dependency_target="$framework_home/lib/$dependency_name"
         [ -f "$dependency_target" ] || { echo "canonical R framework dependency is absent: $dependency" >&2; exit 1; }
         install_name_tool -change "$dependency" "@loader_path/Resources/lib/$dependency_name" "$framework_main"
