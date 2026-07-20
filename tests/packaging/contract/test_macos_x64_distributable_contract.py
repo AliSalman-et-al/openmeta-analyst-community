@@ -1476,6 +1476,8 @@ def test_frozen_runtime_ignores_poisoned_system_r_overrides(monkeypatch, tmp_pat
     assert Path(configured["R_LIBS"]).resolve() == (private / "library").resolve()
     assert configured["cffi_mode"] == "API"
     assert str(tmp_path / "system-R/bin") not in poisoned["PATH"]
+    if os.name != "nt":
+        assert "/usr/bin" in poisoned["PATH"].split(os.pathsep)
     derivation["pre_sign"]["api_bridge"]["sha256"] = "0" * 64
     (metadata / "derivation.json").write_text(json.dumps(derivation), encoding="utf-8")
     monkeypatch.setattr(r_runtime, "_RUNTIME_IDENTITY", None)

@@ -198,6 +198,11 @@ def configure_bundled_r_environment(app_root=None):
         ]
         if frozen and sys.platform == "win32":
             dll_paths.extend(_private_windows_dll_directories(r_home))
+        elif frozen and sys.platform == "darwin":
+            # Rscript is a shell wrapper that requires fixed macOS system tools
+            # such as dirname. Keep the ambient runner PATH isolated while
+            # retaining only Apple's standard, non-R command directories.
+            dll_paths.extend(("/usr/bin", "/bin", "/usr/sbin", "/sbin"))
         _prepend_path(dll_paths, preserve_existing=not frozen)
         _add_dll_directories(dll_paths)
     elif frozen:
