@@ -1670,18 +1670,26 @@ def inspect_archive(
         embedded_hashes = {}
         for relative, source in embedded_files.items():
             member = prefix + relative
-            if member not in names or bundle.read(member) != source.read_bytes():
+            archived_payload = bundle.read(member) if member in names else None
+            source_payload = source.read_bytes()
+            matches = archived_payload == source_payload
+            if relative == "qualification/direct-build-manifest.json" and archived_payload:
+                try:
+                    matches = json.loads(archived_payload) == json.loads(source_payload)
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    matches = False
+            if not matches:
                 raise MacOSDeploymentInspectionError(
                     f"ZIP qualification input is missing or changed: {member}"
                 )
-            embedded_hashes[relative] = hashlib.sha256(bundle.read(member)).hexdigest()
+            embedded_hashes[relative] = hashlib.sha256(archived_payload).hexdigest()
         direct_manifest_path = embedded_files.get(
             "qualification/direct-build-manifest.json"
         )
         direct_manifest = None
         if direct_manifest_path is not None:
             direct_manifest = validate_direct_build_manifest(
-                json.loads(direct_manifest_path.read_text(encoding="utf-8")),
+                json.loads(bundle.read(prefix + "qualification/direct-build-manifest.json")),
                 target=target,
             )
             validate_direct_build_archive_inputs(
