@@ -240,6 +240,23 @@ def audit_symlinks(framework: Path) -> list[dict[str, str]]:
     version = current_version(framework)
     observed = {record["path"] for record in records}
     required = {item.format(version=version) for item in OFFICIAL_ALIASES}
+    version_executable = f"Versions/{version}/R"
+    # The official installer ships the framework executable as a symlink to
+    # libR. Before code signing we invert that pair into Apple's canonical
+    # framework form: a regular versioned executable and a relative libR
+    # compatibility symlink back to it. Accept and prove either boundary.
+    if version_executable not in observed:
+        required.remove(version_executable)
+        executable = framework / version_executable
+        runtime_alias = framework / f"Versions/{version}/Resources/lib/libR.dylib"
+        if (
+            not executable.is_file()
+            or executable.is_symlink()
+            or not runtime_alias.is_symlink()
+            or Path(os.readlink(runtime_alias)) != Path("../../R")
+            or runtime_alias.resolve(strict=True) != executable.resolve(strict=True)
+        ):
+            raise AdapterError("canonical R framework executable layout is invalid")
     missing = required - observed
     if missing:
         raise AdapterError(

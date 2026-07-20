@@ -64,6 +64,33 @@ def _framework(root: Path) -> Path:
     return framework
 
 
+def test_adapter_accepts_and_collects_canonical_signable_framework(tmp_path):
+    adapter = load_embedded_r_adapter()
+    framework = _framework(tmp_path)
+    version_root = framework / "Versions/4.6-x86_64"
+    executable = version_root / "R"
+    runtime_library = version_root / "Resources/lib/libR.dylib"
+
+    executable.unlink()
+    runtime_library.replace(executable)
+    runtime_library.symlink_to(Path("../../R"))
+    adapter.normalize_fontconfig_links(framework)
+
+    links = adapter.audit_symlinks(framework)
+    assert any(
+        record["path"] == "Versions/4.6-x86_64/Resources/lib/libR.dylib"
+        and Path(record["target"]) == Path("../../R")
+        for record in links
+    )
+    toc = {entry["destination"]: entry for entry in adapter.explicit_toc(framework)}
+    assert toc["R.framework/Versions/4.6-x86_64/R"]["type"] == "DATA"
+    runtime_entry = toc[
+        "R.framework/Versions/4.6-x86_64/Resources/lib/libR.dylib"
+    ]
+    assert runtime_entry["type"] == "SYMLINK"
+    assert Path(runtime_entry["source"]) == Path("../../R")
+
+
 def test_adapter_relocates_bridge_and_rejects_displaced_libr(tmp_path, monkeypatch):
     adapter = load_embedded_r_adapter()
     app = tmp_path / "RCMetaStudio.app"
