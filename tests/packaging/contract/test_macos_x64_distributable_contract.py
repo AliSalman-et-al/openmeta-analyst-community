@@ -203,8 +203,9 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     assert "generated_form_modules" in spec
     assert 'os.environ.get("RCMS_PYINSTALLER_R_TOC")' in spec
     assert 'os.environ.get("RCMS_PYINSTALLER_R_MAP")' in spec
-    assert "a.datas.extend(" in spec
-    assert 'entry["type"]' in spec
+    assert "a.datas.extend(" not in spec
+    assert 'RCMS_STAGED_R_FRAMEWORK' in spec
+    assert 'copy_tree "$staged_r_framework" "$r_framework"' in build
     assert '(direct_r_framework, "R.framework")' not in spec
     assert '"direct-r-spike.marker"' in spec
     assert '"_rinterface_cffi_api"' in spec

@@ -697,6 +697,7 @@ step "Building the app from the completed staged R framework"
   export RCMS_MINIMUM_MACOS_VERSION="$minimum_macos_version"
   export RCMS_PYINSTALLER_R_TOC="$adapter_toc_path"
   export RCMS_PYINSTALLER_R_MAP="$adapter_map_path"
+  export RCMS_STAGED_R_FRAMEWORK="$r_framework"
   export RCMS_RPY2_API_BRIDGE_SHA256="$(shasum -a 256 "$rpy2_api_bridge" | awk '{print $1}')"
   pyinstaller_args=(--noconfirm --distpath "$dist_root" --workpath "$work_root" "packaging/pyinstaller/rc-metastudio-macos.spec")
   [ "$skip_clean" -eq 1 ] || pyinstaller_args=(--clean "${pyinstaller_args[@]}")
@@ -710,15 +711,19 @@ rpy2_api_bridge="$(find "$app_bundle" -type f -name '_rinterface_cffi_api*.so' -
 resources_root="$app_bundle/Contents/Resources"
 sample_root="$resources_root/sample_projects"
 copy_tree "$repo_root/sample_projects" "$sample_root"
+staged_r_framework="$r_framework"
 r_framework="$app_bundle/Contents/Frameworks/R.framework"
+[ ! -e "$r_framework" ] && [ ! -L "$r_framework" ] || { echo "PyInstaller unexpectedly collected R.framework." >&2; exit 1; }
+step "Injecting the completed R framework after PyInstaller"
+copy_tree "$staged_r_framework" "$r_framework"
 r_home="$r_framework/Resources"
 r_lib="$r_home/library"
 rscript="$r_home/bin/Rscript"
 r_binary="$r_home/bin/R"
-step "Canonicalizing the collected R framework executable for code signing"
-canonicalize_r_framework "$r_framework"
-relocate_canonical_r_framework_main "$r_framework"
 relocate_rpy2_api_bridge "$rpy2_api_bridge"
+"$python_exe" "$repo_root/scripts/macos_embedded_r_adapter.py" post-app \
+  --app "$app_bundle" --architecture "$expected_machine" \
+  --output "$qualification_root/post-injection-r-gate.json"
 "$python_exe" - "$preflight_report_path" "$(git rev-parse HEAD)" <<'PY'
 import json, sys
 from pathlib import Path
