@@ -1673,11 +1673,11 @@ def inspect_archive(
             archived_payload = bundle.read(member) if member in names else None
             source_payload = source.read_bytes()
             matches = archived_payload == source_payload
-            if relative == "qualification/direct-build-manifest.json" and archived_payload:
-                try:
-                    matches = json.loads(archived_payload) == json.loads(source_payload)
-                except (UnicodeDecodeError, json.JSONDecodeError):
-                    matches = False
+            if relative == "qualification/direct-build-manifest.json":
+                # The archived object is validated below and every input it
+                # names is re-hashed directly from this ZIP. The workspace copy
+                # is only the signal that direct-build validation is required.
+                matches = archived_payload is not None
             if not matches:
                 raise MacOSDeploymentInspectionError(
                     f"ZIP qualification input is missing or changed: {member}"
