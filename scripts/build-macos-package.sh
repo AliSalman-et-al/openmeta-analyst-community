@@ -168,6 +168,10 @@ if [ "$host_machine" != "$expected_machine" ]; then
   exit 1
 fi
 
+# Native wheels and R source packages compiled on the runner must not inherit
+# the runner image's newer deployment floor.
+export MACOSX_DEPLOYMENT_TARGET="$minimum_macos_version"
+
 artifact_name="${artifact_name:-$default_artifact}"
 dist_root="$repo_root/build/macos-package/$architecture/dist"
 work_root="$repo_root/build/macos-package/$architecture/work"
@@ -493,7 +497,7 @@ bash "$repo_root/scripts/relocate_macos_r_runtime.sh" --resources "$r_home" --ar
   --normalizer "$repo_root/scripts/normalize_macos_macho.py"
 
 step "Building the target-native rpy2 API bridge against completed staged R"
-R_HOME="$r_home" PATH="$r_home/bin:$PATH" RPY2_CFFI_MODE=API MACOSX_DEPLOYMENT_TARGET=13.0 uv pip install \
+R_HOME="$r_home" PATH="$r_home/bin:$PATH" RPY2_CFFI_MODE=API uv pip install \
   --python "$python_exe" --reinstall --no-binary rpy2-rinterface \
   "rpy2-rinterface==3.6.6"
 

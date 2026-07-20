@@ -213,6 +213,8 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
         in spec
     )
     assert 'minimum_macos_version="$minimum_macos"' in build
+    assert 'export MACOSX_DEPLOYMENT_TARGET="$minimum_macos_version"' in build
+    assert "MACOSX_DEPLOYMENT_TARGET=13.0" not in build
     launch = text("src/rc_metastudio/launch.py")
     assert "isTRUE(requireNamespace('tcltk', quietly=TRUE))" in launch
     assert "raise SystemExit(1) from exc" in launch
