@@ -259,7 +259,7 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
     assert 'r_framework="$private_r_framework"' in build
     assert 'export RCMS_PYINSTALLER_R_TOC="$adapter_toc_path"' in build
     assert 'copy_tree "$r_runtime_root" "$app_root/R"' not in build
-    assert "from rc_metastudio.r_runtime import macos_r_framework_version" in build
+    assert 'r_framework_version="$(readlink "$r_framework/Versions/Current")"' in build
     assert "v$minor" not in build
     assert (
         'expected_r_home = app_root / "Contents/Frameworks/R.framework/Resources"'
