@@ -506,6 +506,9 @@ while IFS= read -r dependency; do
     @rpath/lib/libR.dylib)
       source_relative="lib/libR.dylib"
       ;;
+    @rpath/*.dylib)
+      source_relative="lib/${dependency#@rpath/}"
+      ;;
     "$r_runtime_root"/*)
       source_relative="${dependency#"$r_runtime_root"/}"
       ;;
@@ -521,6 +524,7 @@ while IFS= read -r dependency; do
     *) continue ;;
   esac
   target="$r_home/$source_relative"
+  [ -f "$target" ] || { echo "rpy2 API bridge dependency has no staged R target: $dependency -> $target" >&2; exit 1; }
   relative_target="$($python_exe - "$(dirname "$rpy2_api_bridge")" "$target" <<'PY'
 import os, sys
 print(os.path.relpath(sys.argv[2], sys.argv[1]))
@@ -528,7 +532,7 @@ PY
 )"
   install_name_tool -change "$dependency" "@loader_path/$relative_target" "$rpy2_api_bridge"
 done < <(otool -L "$rpy2_api_bridge" | awk 'NR > 1 { print $1 }')
-if otool -L "$rpy2_api_bridge" | grep -E '@rpath/lib/libR\.dylib|/Library/Frameworks/R\.framework/|/opt/R/'; then
+if otool -L "$rpy2_api_bridge" | grep -E '@rpath/|/Library/Frameworks/R\.framework/|/opt/R/'; then
   echo "rpy2 API bridge retains an external R dependency." >&2
   exit 1
 fi
