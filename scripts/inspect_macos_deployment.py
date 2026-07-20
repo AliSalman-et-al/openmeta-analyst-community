@@ -36,7 +36,7 @@ EXPECTED_VERSIONS = {
     "pyinstaller": "6.21.0",
 }
 EXPECTED_SUMMARY_SHA256 = (
-    "78294820c83cd94c19dfdca8c24b6a96cdc8b6f1319a5cd1bedffacde73851e2"
+    "f83aafec6de6b2ba65e0fdc9def3c47e8deb9cb86ad6a990adf962e79b9d18b5"
 )
 MAX_FILES = 25_000
 MAX_BYTES = 3_000_000_000
