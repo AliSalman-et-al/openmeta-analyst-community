@@ -531,7 +531,7 @@ def test_native_macos_workflow_uses_one_ordered_native_package_matrix():
         },
     ]
     assert job["strategy"]["fail-fast"] is False
-    assert job["strategy"]["max-parallel"] == 1
+    assert job["strategy"]["max-parallel"] == 2
     assert job["runs-on"] == "${{ matrix.runner }}"
     steps = {step["name"]: step for step in job["steps"]}
     assert steps["Upload immutable unsigned package"]["with"]["if-no-files-found"] == "error"
