@@ -658,6 +658,21 @@ if not runtime_library.is_symlink() or runtime_library.readlink() != Path("../..
 if runtime_library.resolve(strict=True) != main_executable:
     raise SystemExit("collected R runtime library alias does not resolve to the framework executable")
 PY
+framework_main="$r_framework/Versions/Current/R"
+while IFS= read -r dependency; do
+  case "$dependency" in
+    @loader_path/*.dylib)
+      dependency_name="${dependency#@loader_path/}"
+      dependency_target="$r_home/lib/$dependency_name"
+      [ -f "$dependency_target" ] || { echo "collected R framework dependency is absent: $dependency" >&2; exit 1; }
+      install_name_tool -change "$dependency" "@loader_path/Resources/lib/$dependency_name" "$framework_main"
+      ;;
+  esac
+done < <(otool -L "$framework_main" | awk 'NR > 2 { print $1 }')
+if otool -L "$framework_main" | awk 'NR > 2 { print $1 }' | grep -E '^@loader_path/[^/]+\.dylib$'; then
+  echo "collected R framework main executable retains a pre-move loader edge." >&2
+  exit 1
+fi
 relocate_rpy2_api_bridge "$rpy2_api_bridge"
 "$python_exe" - "$preflight_report_path" "$(git rev-parse HEAD)" <<'PY'
 import json, sys

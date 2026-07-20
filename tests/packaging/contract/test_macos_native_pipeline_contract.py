@@ -93,6 +93,8 @@ def test_private_r_framework_is_completed_as_a_signable_code_bundle():
     assert collect < canonicalize < inspect
     assert 'runtime_library.symlink_to(Path("../../R"))' in build
     assert 'info_plist.is_file() or info_plist.is_symlink()' in build
+    assert '"@loader_path/Resources/lib/$dependency_name" "$framework_main"' in build
+    assert "awk 'NR > 2 { print $1 }'" in build
     assert 'codesign --force --options runtime --sign - "$app_bundle"' not in build
     assert 'codesign --verify --strict --deep --verbose=2 "$app_bundle"' in build
 
