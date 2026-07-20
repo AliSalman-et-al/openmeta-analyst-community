@@ -881,7 +881,7 @@ def validate_r_framework_inventory(
     native_paths = [f"{version_root}/R"]
     if delivery_kind == "direct-spike":
         native_paths.extend(
-            [f"{resources}/bin/Rscript", f"{resources}/bin/exec/R"]
+            [f"{resources}/bin/Rscript.real", f"{resources}/bin/exec/R"]
         )
     if delivery_kind == "direct-spike":
         launcher = by_path.get(f"{resources}/bin/R", {})

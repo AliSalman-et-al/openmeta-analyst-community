@@ -1900,7 +1900,8 @@ def test_archive_inspection_enforces_canonical_r_framework_symlinks_and_members(
     direct_records = []
     for path, payload, native in (
         (f"{direct_resources}/bin/R", b"#!/bin/sh\n", False),
-        (f"{direct_resources}/bin/Rscript", b"rscript", True),
+        (f"{direct_resources}/bin/Rscript", b"#!/bin/sh\n", False),
+        (f"{direct_resources}/bin/Rscript.real", b"rscript", True),
         (f"{direct_resources}/bin/exec/R", b"r-exec", True),
         (f"{direct_version_root}/R", b"libR", True),
         (f"{direct_resources}/library/RCMetaR/DESCRIPTION", b"package", False),
