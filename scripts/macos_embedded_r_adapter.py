@@ -545,18 +545,24 @@ def post_app_gate(app: Path, architecture: str, output: Path) -> None:
         or architectures(expected_lib_r) != [architecture]
     ):
         raise AdapterError(f"final app has duplicate or displaced libR: {lib_r_paths}")
-    bridges = [path for path in app.rglob("_rinterface_cffi_api*.so") if path.is_file()]
-    if len(bridges) != 1 or any(app.rglob("_rinterface_cffi_abi*")):
+    bridge_paths = [
+        path for path in app.rglob("_rinterface_cffi_api*.so") if path.is_file()
+    ]
+    bridge_targets = {path.resolve(strict=True) for path in bridge_paths}
+    if len(bridge_targets) != 1 or any(app.rglob("_rinterface_cffi_abi*")):
         raise AdapterError("final app must contain one API bridge and no ABI bridge")
-    if architectures(bridges[0]) != [architecture]:
+    bridge = bridge_targets.pop()
+    if app / "Contents/Frameworks" not in bridge.parents:
+        raise AdapterError("final API bridge is outside Contents/Frameworks")
+    if architectures(bridge) != [architecture]:
         raise AdapterError("final API bridge has the wrong architecture")
     r_edge = [
-        value for value in dependencies(bridges[0]) if value.endswith("libR.dylib")
+        value for value in dependencies(bridge) if value.endswith("libR.dylib")
     ]
     if len(r_edge) != 1 or not r_edge[0].startswith("@loader_path/"):
         raise AdapterError("final API bridge does not resolve uniquely to private libR")
     if (
-        bridges[0].parent / r_edge[0][len("@loader_path/") :]
+        bridge.parent / r_edge[0][len("@loader_path/") :]
     ).resolve() != expected_lib_r:
         raise AdapterError("final API bridge resolves outside the private R.framework")
     output.write_text(
@@ -566,7 +572,7 @@ def post_app_gate(app: Path, architecture: str, output: Path) -> None:
                 "architecture": architecture,
                 "framework_symlinks": links,
                 "framework_mach_o": native,
-                "api_bridge": str(bridges[0].relative_to(app)),
+                "api_bridge": str(bridge.relative_to(app)),
                 "lib_r": str(expected_lib_r_link.relative_to(app)),
             },
             indent=2,
