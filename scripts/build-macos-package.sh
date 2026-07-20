@@ -592,11 +592,51 @@ if (!file.exists(output) || file.info(output)$size <= 0) stop("default Quartz pn
   unlink(output)
 '
 
+canonicalize_r_framework() {
+  local framework="$1"
+  "$python_exe" - "$framework" <<'PY'
+from pathlib import Path
+import sys
+
+framework = Path(sys.argv[1]).resolve(strict=True)
+for development_alias in ("Headers", "Libraries", "PrivateHeaders"):
+    alias = framework / development_alias
+    if alias.is_symlink():
+        alias.unlink()
+    elif alias.exists():
+        raise SystemExit(f"R framework root member is not a removable alias: {alias}")
+root_members = {item.name for item in framework.iterdir()}
+if root_members != {"R", "Resources", "Versions"}:
+    raise SystemExit(f"R framework root is not minimal: {sorted(root_members)}")
+version_root = (framework / "Versions/Current").resolve(strict=True)
+main_executable = version_root / "R"
+runtime_library = version_root / "Resources/lib/libR.dylib"
+info_plist = version_root / "Resources/Info.plist"
+if main_executable.is_symlink():
+    if main_executable.resolve(strict=True) != runtime_library:
+        raise SystemExit("R framework executable alias is not canonical")
+    main_executable.unlink()
+    runtime_library.replace(main_executable)
+    main_executable.chmod(main_executable.stat().st_mode | 0o111)
+    runtime_library.symlink_to(Path("../../R"))
+if not main_executable.is_file() or main_executable.is_symlink():
+    raise SystemExit("R framework main executable is not a regular file")
+if not info_plist.is_file() or info_plist.is_symlink():
+    raise SystemExit("R framework Info.plist is not a regular file")
+if not runtime_library.is_symlink() or runtime_library.readlink() != Path("../../R"):
+    raise SystemExit("R runtime library alias is not relative and canonical")
+if runtime_library.resolve(strict=True) != main_executable:
+    raise SystemExit("R runtime library alias does not resolve to the framework executable")
+PY
+}
+
 # These retained records are the authoritative acquisition/build inputs for the
 # direct native production manifest; no installed library tree is reused.
 [ -s "$hsroc_archive_path" ] || { echo "HSROC acquisition archive was not retained." >&2; exit 1; }
 [ -s "$rcmetar_archive_path" ] || { echo "RCMetaR source archive was not retained." >&2; exit 1; }
 [ "$(shasum -a 256 "$hsroc_archive_path" | awk '{print $1}')" = "5476fa76d7723717e203925a1da442813e3645790ef9b633a145cbc04a08b874" ] || { echo "HSROC archive digest changed." >&2; exit 1; }
+step "Canonicalizing the staged R framework before PyInstaller signing"
+canonicalize_r_framework "$r_framework"
 "$python_exe" "$repo_root/scripts/macos_embedded_r_adapter.py" finalize-toc --framework "$r_framework" --architecture "$expected_machine" --output "$adapter_map_path" --toc-output "$adapter_toc_path"
 cp "$adapter_map_path" "$adapter_audit_path"
 "$python_exe" - "$rpy2_api_bridge" "$rpy2_build_path" <<'PY'
@@ -637,39 +677,7 @@ r_lib="$r_home/library"
 rscript="$r_home/bin/Rscript"
 r_binary="$r_home/bin/R"
 step "Canonicalizing the collected R framework executable for code signing"
-"$python_exe" - "$r_framework" <<'PY'
-from pathlib import Path
-import sys
-
-framework = Path(sys.argv[1]).resolve(strict=True)
-for development_alias in ("Headers", "Libraries", "PrivateHeaders"):
-    alias = framework / development_alias
-    if alias.is_symlink():
-        alias.unlink()
-    elif alias.exists():
-        raise SystemExit(f"collected R framework root member is not a removable alias: {alias}")
-root_members = {item.name for item in framework.iterdir()}
-if root_members != {"R", "Resources", "Versions"}:
-    raise SystemExit(f"collected R framework root is not minimal: {sorted(root_members)}")
-version_root = (framework / "Versions/Current").resolve(strict=True)
-main_executable = version_root / "R"
-runtime_library = version_root / "Resources/lib/libR.dylib"
-info_plist = version_root / "Resources/Info.plist"
-if not main_executable.is_symlink() or main_executable.resolve(strict=True) != runtime_library:
-    raise SystemExit("collected R framework executable alias is not canonical")
-main_executable.unlink()
-runtime_library.replace(main_executable)
-main_executable.chmod(main_executable.stat().st_mode | 0o111)
-runtime_library.symlink_to(Path("../../R"))
-if not main_executable.is_file() or main_executable.is_symlink():
-    raise SystemExit("collected R framework main executable is not a regular file")
-if not info_plist.is_file() or info_plist.is_symlink():
-    raise SystemExit("collected R framework Info.plist is not a regular file")
-if not runtime_library.is_symlink() or runtime_library.readlink() != Path("../../R"):
-    raise SystemExit("collected R runtime library alias is not relative and canonical")
-if runtime_library.resolve(strict=True) != main_executable:
-    raise SystemExit("collected R runtime library alias does not resolve to the framework executable")
-PY
+canonicalize_r_framework "$r_framework"
 framework_main="$r_framework/Versions/Current/R"
 while IFS= read -r dependency; do
   case "$dependency" in

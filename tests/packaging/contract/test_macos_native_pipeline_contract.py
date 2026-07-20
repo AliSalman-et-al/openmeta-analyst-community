@@ -91,8 +91,11 @@ def test_private_r_framework_is_completed_as_a_signable_code_bundle():
     assert complete < package < collect
     assert 'existing not in (None, "R")' in build
     canonicalize = build.index('runtime_library.replace(main_executable)')
+    staged_canonicalization = build.index('canonicalize_r_framework "$r_framework"')
+    collected_canonicalization = build.rindex('canonicalize_r_framework "$r_framework"')
     inspect = build.index('inspect_macos_deployment.py" native-graph')
-    assert collect < canonicalize < inspect
+    assert canonicalize < staged_canonicalization < collect
+    assert collect < collected_canonicalization < inspect
     assert 'runtime_library.symlink_to(Path("../../R"))' in build
     assert 'info_plist.is_file() or info_plist.is_symlink()' in build
     assert '("Headers", "Libraries", "PrivateHeaders")' in build
