@@ -1673,7 +1673,7 @@ def inspect_archive(
             archived_payload = bundle.read(member) if member in names else None
             source_payload = source.read_bytes()
             matches = archived_payload == source_payload
-            if relative == "qualification/direct-build-manifest.json":
+            if relative == "qualification/direct-r-build-manifest.json":
                 # The archived object is validated below and every input it
                 # names is re-hashed directly from this ZIP. The workspace copy
                 # is only the signal that direct-build validation is required.
@@ -1684,12 +1684,12 @@ def inspect_archive(
                 )
             embedded_hashes[relative] = hashlib.sha256(archived_payload).hexdigest()
         direct_manifest_path = embedded_files.get(
-            "qualification/direct-build-manifest.json"
+            "qualification/direct-r-build-manifest.json"
         )
         direct_manifest = None
         if direct_manifest_path is not None:
             direct_manifest = validate_direct_build_manifest(
-                json.loads(bundle.read(prefix + "qualification/direct-build-manifest.json")),
+                json.loads(bundle.read(prefix + "qualification/direct-r-build-manifest.json")),
                 target=target,
             )
             validate_direct_build_archive_inputs(
@@ -2373,7 +2373,7 @@ def main() -> int:
                     args.launchservices_marker
                 )
             if args.direct_build_manifest is not None:
-                embedded_files["qualification/direct-build-manifest.json"] = (
+                embedded_files["qualification/direct-r-build-manifest.json"] = (
                     args.direct_build_manifest
                 )
             else:
