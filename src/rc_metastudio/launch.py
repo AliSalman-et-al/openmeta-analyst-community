@@ -122,7 +122,10 @@ def _run_automation_smoke(callback):
         return callback()
     except BaseException as exc:
         _write_automation_smoke_log("".join(traceback.format_exception(exc)))
-        raise
+        # The installed Qt exception hook can otherwise keep the application
+        # event loop alive after a probe failure, obscuring the real error until
+        # the outer package watchdog expires.
+        raise SystemExit(1) from exc
 
 
 def _native_windows_command_line_argv():
@@ -1389,9 +1392,7 @@ def start_package_runtime_probe(output_path):
     )
     macos_r_policy = None
     if sys.platform == "darwin":
-        tcltk_available = bool(
-            cast(Any, robjects.r("requireNamespace('tcltk', quietly=TRUE)"))[0]
-        )
+        tcltk_available = bool(cast(Any, robjects.r("capabilities('tcltk')"))[0])
         tcltk_loaded = bool(cast(Any, robjects.r("'tcltk' %in% loadedNamespaces()"))[0])
         aqua = bool(cast(Any, robjects.r("capabilities('aqua')"))[0])
         bitmap_type = str(cast(Any, robjects.r("getOption('bitmapType')"))[0])
