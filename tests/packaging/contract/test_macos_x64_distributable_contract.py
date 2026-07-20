@@ -1761,12 +1761,19 @@ def test_explicit_codesign_signs_inside_out_and_verifies_fail_closed(
     assert all("--timestamp" not in call for call in ad_hoc_sign_calls)
 
     def reject_verification(arguments):
-        if "--verify" in arguments:
+        if "--verify" in arguments and "--deep" in arguments:
             raise signer.MacOSSigningError("verification rejected")
 
+    diagnosed = []
+    monkeypatch.setattr(
+        signer,
+        "_diagnose_deep_verification_failure",
+        lambda plan: diagnosed.append(plan.app),
+    )
     monkeypatch.setattr(signer, "_run_codesign", reject_verification)
     with pytest.raises(signer.MacOSSigningError, match="verification rejected"):
         signer.sign_and_verify(app, identity="-")
+    assert diagnosed == [app.absolute()]
 
 
 def test_explicit_codesign_rejects_native_inventory_drift(monkeypatch, tmp_path):

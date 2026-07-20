@@ -11,6 +11,7 @@ from pathlib import Path
 import plistlib
 import stat
 import subprocess
+import sys
 from typing import NoReturn, Sequence
 
 from rc_metastudio.qt6_macos_feasibility import is_macho_candidate
@@ -235,6 +236,42 @@ def _run_codesign(arguments: Sequence[str]) -> None:
         _fail(f"codesign failed for {arguments[-1]}: {exc}")
 
 
+def _diagnose_deep_verification_failure(plan: SigningPlan) -> None:
+    """Emit bounded evidence that identifies the bundle object rejected by codesign."""
+    prefix = "[RCMS-CODESIGN-DIAGNOSTIC]"
+    print(f"{prefix} outer deep verification failed: {plan.app}", file=sys.stderr)
+    for path in sorted(plan.app.rglob("*")):
+        if not path.is_symlink():
+            continue
+        try:
+            target = os.readlink(path)
+            resolved = path.resolve(strict=True)
+            resolved.relative_to(plan.app.resolve(strict=True))
+        except (OSError, RuntimeError, ValueError) as exc:
+            print(f"{prefix} invalid symlink {path}: {target!r}: {exc}", file=sys.stderr)
+
+    probes = [
+        ["--display", "--verbose=4", str(plan.app)],
+        ["--verify", "--strict", "--verbose=4", str(plan.app)],
+    ]
+    probes.extend(
+        ["--verify", "--deep", "--strict", "--verbose=4", str(bundle)]
+        for bundle in plan.nested_bundles
+    )
+    for arguments in probes:
+        result = subprocess.run(
+            ["codesign", *arguments], capture_output=True, text=True, check=False
+        )
+        output = "\n".join(
+            part.strip() for part in (result.stdout, result.stderr) if part.strip()
+        )
+        print(
+            f"{prefix} exit={result.returncode} command=codesign "
+            f"{' '.join(arguments)}\n{output}",
+            file=sys.stderr,
+        )
+
+
 def _sign(path: Path, *, identity: str, timestamp: bool) -> None:
     arguments = ["--force", "--options", "runtime"]
     if timestamp:
@@ -288,7 +325,11 @@ def sign_and_verify(
     # Apple's Gatekeeper-equivalent bundle check is strict deep verification.
     # A separate shallow pass is redundant and can misclassify PyInstaller's
     # sealed launcher context before the authoritative recursive validation.
-    _verify(plan.app, deep=True)
+    try:
+        _verify(plan.app, deep=True)
+    except MacOSSigningError:
+        _diagnose_deep_verification_failure(plan)
+        raise
     return plan
 
 
