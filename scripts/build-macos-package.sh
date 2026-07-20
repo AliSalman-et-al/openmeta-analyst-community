@@ -706,7 +706,7 @@ PY
 import json, os, platform, subprocess, sys
 from pathlib import Path
 run = lambda *args: subprocess.check_output(args, text=True).strip()
-Path(sys.argv[1]).write_text(json.dumps({"schema_version": 1, "github_actions": os.environ.get("GITHUB_ACTIONS", "false"), "runner_image": os.environ.get("ImageOS", "local"), "runner_os": os.environ.get("RUNNER_OS", platform.system()), "runner_arch": os.environ.get("RUNNER_ARCH", platform.machine()), "macos_version": run("sw_vers", "-productVersion"), "macos_build": run("sw_vers", "-buildVersion"), "uname_system": run("uname", "-s"), "uname_machine": run("uname", "-m"), "python_machine": platform.machine()}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+Path(sys.argv[1]).write_text(json.dumps({"schema_version": 1, "github_actions": os.environ.get("GITHUB_ACTIONS", "false"), "runner_label": os.environ.get("RCMS_RUNNER_LABEL", "local"), "runner_image": os.environ.get("ImageOS", "local"), "runner_os": os.environ.get("RUNNER_OS", platform.system()), "runner_arch": os.environ.get("RUNNER_ARCH", platform.machine()), "macos_version": run("sw_vers", "-productVersion"), "macos_build": run("sw_vers", "-buildVersion"), "uname_system": run("uname", "-s"), "uname_machine": run("uname", "-m"), "python_machine": platform.machine()}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
 "$python_exe" "$repo_root/scripts/inspect_macos_deployment.py" native-graph --app "$app_bundle" --target "macos-$architecture" --output "$pre_sign_graph_path"
 

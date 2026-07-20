@@ -75,6 +75,8 @@ jobs:
 
       - name: Build and run the first-green packaged workflow
         shell: bash
+        env:
+          RCMS_RUNNER_LABEL: ${{ matrix.runner }}
         run: |
           set -euo pipefail
           test ! -e /opt/X11

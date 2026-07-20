@@ -48,8 +48,8 @@ TARGET_CONTRACTS = {
     "macos-arm64": {"architecture": "arm64", "minimum_macos": "14.0"},
 }
 TARGET_RUNNERS = {
-    "macos-x64": {"architecture": "X64", "image": "macos-15-intel"},
-    "macos-arm64": {"architecture": "ARM64", "image": "macos-15"},
+    "macos-x64": {"architecture": "X64", "label": "macos-15-intel"},
+    "macos-arm64": {"architecture": "ARM64", "label": "macos-15"},
 }
 DIRECT_R_MARKER_RELATIVE = Path("Contents/Resources/direct-r-spike.marker")
 DIRECT_R_MARKER_SHA256 = (
@@ -1501,7 +1501,8 @@ def validate_direct_build_runner(runner: dict, *, target: str) -> None:
         expected = TARGET_RUNNERS[target]
         if (
             runner.get("runner_arch") != expected["architecture"]
-            or runner.get("runner_image") != expected["image"]
+            or runner.get("runner_label") != expected["label"]
+            or not runner.get("runner_image")
         ):
             raise MacOSDeploymentInspectionError(
                 f"hosted direct-build runner does not match {target}"

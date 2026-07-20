@@ -327,7 +327,8 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
         {
             "schema_version": 1,
             "github_actions": "true",
-            "runner_image": "macos-15-intel",
+            "runner_image": "macos15",
+            "runner_label": "macos-15-intel",
             "runner_os": "macOS",
             "runner_arch": "X64",
             "macos_version": "15.5",
@@ -341,6 +342,7 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
         "schema_version": 1,
         "github_actions": "false",
         "runner_image": "local",
+        "runner_label": "local",
         "runner_os": "macOS",
         "runner_arch": "x86_64",
         "macos_version": "15.5",
@@ -351,6 +353,12 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
     }
     inspector.validate_direct_build_runner(valid_local_runner, target="macos-x64")
     inspector.validate_direct_build_runner(json.loads(runner), target="macos-x64")
+    wrong_label = json.loads(runner)
+    wrong_label["runner_label"] = "macos-15"
+    with pytest.raises(
+        inspector.MacOSDeploymentInspectionError, match="hosted direct-build runner"
+    ):
+        inspector.validate_direct_build_runner(wrong_label, target="macos-x64")
     valid_local_runner["uname_machine"] = "arm64"
     with pytest.raises(
         inspector.MacOSDeploymentInspectionError, match="native macos-x64"
