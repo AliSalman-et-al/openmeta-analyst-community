@@ -64,6 +64,13 @@ def _surface_record_path(root: Path, scale: float, surface_id: str) -> Path:
     )
 
 
+def _surface_capture_order() -> tuple[str, ...]:
+    surfaces = _remaining_surface_ids()
+    if "main-wizard" not in surfaces:
+        raise RuntimeError("remaining-surface inventory has no Main Wizard")
+    return ("main-wizard", *sorted(surfaces - {"main-wizard"}))
+
+
 def _rect(rect) -> dict[str, int]:
     return {
         "x": rect.x(),
@@ -916,9 +923,6 @@ def _capture_surface(scale: float, evidence_root: Path, surface_id: str) -> None
                     accessible = False
             destination = image_dir / (surface_id + ".png")
             capture = _capture(window, destination, evidence_root)
-            actions = _observe_actions(
-                app, factory, surface_id, QtCore, QtWidgets, QTest
-            )
             dpr = float(window.devicePixelRatioF())
             logical = _rect(frame)
             physical = {
@@ -929,6 +933,14 @@ def _capture_surface(scale: float, evidence_root: Path, surface_id: str) -> None
             }
             window.close()
             app.processEvents()
+            # Finish the capture instance before action probes construct their
+            # own top-level windows. Keeping a captured QWizard alive while two
+            # more MainWizard trees were created caused an intermittent Windows
+            # native fast-fail (0xC0000409) despite each evidence surface already
+            # having its own process.
+            actions = _observe_actions(
+                app, factory, surface_id, QtCore, QtWidgets, QTest
+            )
             records[surface_id] = {
                 "accessibility": accessible,
                 "actions": actions,
@@ -971,7 +983,7 @@ def _capture_surface(scale: float, evidence_root: Path, surface_id: str) -> None
 
 def _run_scale(scale: float, evidence_root: Path) -> None:
     environment = os.environ.copy()
-    for surface_id in sorted(_remaining_surface_ids()):
+    for surface_id in _surface_capture_order():
         subprocess.run(
             [
                 sys.executable,
@@ -993,7 +1005,7 @@ def _run_scale(scale: float, evidence_root: Path) -> None:
                 encoding="utf-8"
             )
         )
-        for surface_id in sorted(_remaining_surface_ids())
+        for surface_id in _surface_capture_order()
     ]
     if not fragments:
         raise RuntimeError("remaining-surface inventory is empty")
@@ -1016,7 +1028,7 @@ def _run_scale(scale: float, evidence_root: Path) -> None:
         json.dumps({**common, "surfaces": surfaces}, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    for surface_id in sorted(_remaining_surface_ids()):
+    for surface_id in _surface_capture_order():
         _surface_record_path(evidence_root, scale, surface_id).unlink()
     _surface_record_path(evidence_root, scale, "placeholder").parent.rmdir()
 

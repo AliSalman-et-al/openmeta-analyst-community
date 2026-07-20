@@ -323,6 +323,10 @@ def test_wizard_action_observer_uses_fresh_factory_choice_timing_and_return(qapp
         "reject_nonmutation": True,
         "rejected_observed": True,
     }
+    assert native_smoke._surface_capture_order()[0] == "main-wizard"
+    assert set(native_smoke._surface_capture_order()) == set(
+        native_smoke._remaining_surface_ids()
+    )
 
 
 def test_native_remaining_surface_evidence_rejects_programmatic_focus_movement(
