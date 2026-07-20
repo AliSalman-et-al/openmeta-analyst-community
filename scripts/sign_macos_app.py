@@ -138,6 +138,32 @@ def _is_valid_code_bundle(bundle: Path, native: set[Path]) -> bool:
     return False
 
 
+def _main_executables(bundle: Path, native: set[Path]) -> set[Path]:
+    """Return native files whose signatures are owned by ``bundle`` itself."""
+    executables: set[Path] = set()
+    for info_path in _bundle_info_plists(bundle):
+        try:
+            with info_path.open("rb") as stream:
+                info = plistlib.load(stream)
+        except (OSError, plistlib.InvalidFileException) as exc:
+            _fail(f"cannot read code-bundle metadata {info_path}: {exc}")
+        executable_name = info.get("CFBundleExecutable")
+        if not isinstance(executable_name, str):
+            continue
+        for executable in _bundle_executables(bundle, executable_name):
+            try:
+                if not executable.exists():
+                    continue
+                resolved = executable.resolve(strict=True)
+            except (OSError, RuntimeError) as exc:
+                _fail(f"cannot inspect code-bundle executable {executable}: {exc}")
+            if executable in native:
+                executables.add(executable)
+            elif resolved in native:
+                executables.add(resolved)
+    return executables
+
+
 def build_signing_plan(app: Path) -> SigningPlan:
     """Classify every Mach-O and real nested bundle without name-based deep signing."""
     app = Path(app).absolute()
@@ -232,8 +258,20 @@ def sign_and_verify(
     plan = build_signing_plan(app)
     use_timestamp = identity != "-" if timestamp is None else timestamp
 
-    for native in plan.native_files:
-        _sign(native, identity=identity, timestamp=use_timestamp)
+    # codesign signs a bundle's main executable as part of signing the bundle.
+    # Treating that executable as loose nested code signs it twice; after the
+    # outer app signature is applied, standalone verification of the earlier
+    # signature can fail even though strict deep bundle verification succeeds.
+    bundle_executables: set[Path] = set()
+    native = set(plan.native_files)
+    for bundle in (*plan.nested_bundles, plan.app):
+        bundle_executables.update(_main_executables(bundle, native))
+    loose_native_files = tuple(
+        path for path in plan.native_files if path not in bundle_executables
+    )
+
+    for native_file in loose_native_files:
+        _sign(native_file, identity=identity, timestamp=use_timestamp)
     for bundle in plan.nested_bundles:
         _sign(bundle, identity=identity, timestamp=use_timestamp)
     _sign(plan.app, identity=identity, timestamp=use_timestamp)
@@ -245,8 +283,8 @@ def sign_and_verify(
     ):
         _fail("macOS native-code inventory changed during signing")
 
-    for native in plan.native_files:
-        _verify(native)
+    for native_file in loose_native_files:
+        _verify(native_file)
     for bundle in plan.nested_bundles:
         _verify(bundle)
     _verify(plan.app)
