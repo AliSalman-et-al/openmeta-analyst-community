@@ -1269,6 +1269,7 @@ def finalize_smoke_evidence(
     launchservices_marker: Path | None = None,
     *,
     require_direct_teardown: bool = False,
+    persist: bool = True,
 ) -> dict:
     evidence = json.loads(path.read_text(encoding="utf-8"))
     if evidence.get("failures") or evidence.get("surface_progress"):
@@ -1334,9 +1335,10 @@ def finalize_smoke_evidence(
         "clean_exit": True,
         "direct_teardown_trace": require_direct_teardown,
     }
-    path.write_text(
-        json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    if persist:
+        path.write_text(
+            json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
     return evidence
 
 
@@ -2048,6 +2050,7 @@ def write_qualification_evidence(
         smoke_log,
         launchservices_marker,
         require_direct_teardown=True,
+        persist=False,
     )
     archive_report = json.loads(archive_inspection.read_text(encoding="utf-8"))
     validate_direct_build_manifest(

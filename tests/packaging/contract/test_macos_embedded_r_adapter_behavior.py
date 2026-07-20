@@ -656,7 +656,7 @@ def test_direct_smoke_finalizer_requires_executed_teardown_surface_and_launch(tm
         encoding="utf-8",
     )
     finalized = inspector.finalize_smoke_evidence(
-        evidence, log, marker, require_direct_teardown=True
+        evidence, log, marker, require_direct_teardown=True, persist=False
     )
     execution = finalized["execution"]
     assert execution["surface_scale_exit_codes"] == {
@@ -665,6 +665,7 @@ def test_direct_smoke_finalizer_requires_executed_teardown_surface_and_launch(tm
         "1.75": 0,
     }
     assert "positional_user_entry_exit_code" not in execution
+    assert "execution" not in json.loads(evidence.read_text(encoding="utf-8"))
     assert [record["requested"] for record in validated_scales] == [
         "1.25",
         "1.50",
