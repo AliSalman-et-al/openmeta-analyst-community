@@ -878,15 +878,11 @@ def validate_r_framework_inventory(
         f"{resources}/library/RCMetaR/DESCRIPTION",
         f"{resources}/Info.plist",
     }
-    native_paths = (
-        [
-            f"{resources}/bin/Rscript",
-            f"{resources}/bin/exec/R",
-            f"{resources}/lib/libR.dylib",
-        ]
-        if delivery_kind == "direct-spike"
-        else [f"{version_root}/R"]
-    )
+    native_paths = [f"{version_root}/R"]
+    if delivery_kind == "direct-spike":
+        native_paths.extend(
+            [f"{resources}/bin/Rscript", f"{resources}/bin/exec/R"]
+        )
     if delivery_kind == "direct-spike":
         launcher = by_path.get(f"{resources}/bin/R", {})
         if (
@@ -928,15 +924,15 @@ def validate_r_framework_inventory(
             {
                 f"{framework}/R": (
                     "Versions/Current/R",
-                    f"{resources}/lib/libR.dylib",
-                ),
-                f"{version_root}/R": (
-                    "Resources/lib/libR.dylib",
-                    f"{resources}/lib/libR.dylib",
+                    f"{version_root}/R",
                 ),
                 f"{resources}/R": (
                     "bin/R",
                     f"{resources}/bin/R",
+                ),
+                f"{resources}/lib/libR.dylib": (
+                    "../../R",
+                    f"{version_root}/R",
                 ),
             }
         )

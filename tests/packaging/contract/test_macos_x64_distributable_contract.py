@@ -1894,7 +1894,7 @@ def test_archive_inspection_enforces_canonical_r_framework_symlinks_and_members(
         (f"{direct_resources}/bin/R", b"#!/bin/sh\n", False),
         (f"{direct_resources}/bin/Rscript", b"rscript", True),
         (f"{direct_resources}/bin/exec/R", b"r-exec", True),
-        (f"{direct_resources}/lib/libR.dylib", b"libR", True),
+        (f"{direct_version_root}/R", b"libR", True),
         (f"{direct_resources}/library/RCMetaR/DESCRIPTION", b"package", False),
         (f"{direct_resources}/Info.plist", b"plist", False),
     ):
@@ -1920,12 +1920,12 @@ def test_archive_inspection_enforces_canonical_r_framework_symlinks_and_members(
         (
             f"{framework}/R",
             "Versions/Current/R",
-            f"{direct_resources}/lib/libR.dylib",
+            f"{direct_version_root}/R",
         ),
         (
-            f"{direct_version_root}/R",
-            "Resources/lib/libR.dylib",
             f"{direct_resources}/lib/libR.dylib",
+            "../../R",
+            f"{direct_version_root}/R",
         ),
         (f"{direct_resources}/R", "bin/R", f"{direct_resources}/bin/R"),
     ):

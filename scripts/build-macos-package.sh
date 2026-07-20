@@ -604,6 +604,26 @@ bridge, output = map(Path, sys.argv[1:])
 output.write_text(json.dumps({"schema_version": 1, "versions": {name: importlib.metadata.version(name) for name in ("rpy2", "rpy2-rinterface", "rpy2-robjects")}, "bridge": str(bridge), "sha256": hashlib.sha256(bridge.read_bytes()).hexdigest(), "dependencies": subprocess.run(["otool", "-L", str(bridge)], check=True, capture_output=True, text=True).stdout.splitlines()}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
 
+step "Canonicalizing the embedded R framework executable for code signing"
+"$python_exe" - "$r_framework" <<'PY'
+from pathlib import Path
+import sys
+
+framework = Path(sys.argv[1]).resolve(strict=True)
+version_root = (framework / "Versions/Current").resolve(strict=True)
+main_executable = version_root / "R"
+runtime_library = version_root / "Resources/lib/libR.dylib"
+if not main_executable.is_symlink() or main_executable.resolve(strict=True) != runtime_library:
+    raise SystemExit("official R framework executable alias is not canonical")
+main_executable.unlink()
+runtime_library.replace(main_executable)
+runtime_library.symlink_to(Path("../../R"))
+if not main_executable.is_file() or main_executable.is_symlink():
+    raise SystemExit("R framework main executable is not a regular file")
+if runtime_library.resolve(strict=True) != main_executable:
+    raise SystemExit("R runtime library alias does not resolve to the framework executable")
+PY
+
 step "Building the app from the completed staged R framework"
 (
   cd "$repo_root"
