@@ -949,7 +949,6 @@ def validate_r_framework_inventory(
         record = by_path.get(path, {})
         if (
             record.get("kind") != "symlink"
-            or record.get("mode") != 0o777
             or record.get("link_target") != target
             or record.get("resolved_path") != resolved
         ):

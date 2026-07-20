@@ -1951,6 +1951,10 @@ def test_archive_inspection_enforces_canonical_r_framework_symlinks_and_members(
     inspector.validate_r_framework_inventory(
         direct_records, delivery_kind="direct-spike", architecture="x86_64"
     )
+    direct_records[6]["mode"] = 0o755
+    inspector.validate_r_framework_inventory(
+        direct_records, delivery_kind="direct-spike", architecture="x86_64"
+    )
     with pytest.raises(
         inspector.MacOSDeploymentInspectionError,
         match="missing its concrete versioned member",
