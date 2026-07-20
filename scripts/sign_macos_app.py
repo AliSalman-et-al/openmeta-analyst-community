@@ -285,7 +285,9 @@ def sign_and_verify(
         _verify(native_file)
     for bundle in plan.nested_bundles:
         _verify(bundle)
-    _verify(plan.app)
+    # Apple's Gatekeeper-equivalent bundle check is strict deep verification.
+    # A separate shallow pass is redundant and can misclassify PyInstaller's
+    # sealed launcher context before the authoritative recursive validation.
     _verify(plan.app, deep=True)
     return plan
 

@@ -1753,7 +1753,6 @@ def test_explicit_codesign_signs_inside_out_and_verifies_fail_closed(
         native,
         framework_executable,
         framework,
-        app,
     }
 
     calls.clear()
