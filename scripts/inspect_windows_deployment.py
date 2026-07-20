@@ -790,7 +790,7 @@ def write_qualification_evidence(
     }
     if (
         smoke.get("passed") is not True
-        or set(workflows) != required_workflows
+        or not required_workflows <= set(workflows)
         or any(
             workflows[name] is not True
             for name in {
@@ -809,6 +809,7 @@ def write_qualification_evidence(
         or not _valid_sha256(workflows.get("raw_summary_sha256"))
         or not _valid_sha256_map(workflows.get("svg_sha256"))
         or not _valid_locale_variants(workflows.get("locale_variants"), workflows)
+        or not _valid_sample_projects(workflows.get("sample_projects"))
         or smoke.get("execution")
         != {
             "automation_exit_code": 0,
@@ -989,6 +990,29 @@ def _valid_sha256(value: object) -> bool:
         isinstance(value, str)
         and len(value) == 64
         and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _valid_sample_projects(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    records = value.get("projects")
+    return (
+        value.get("passed") is True
+        and _valid_sha256(value.get("manifest_sha256"))
+        and isinstance(records, list)
+        and bool(records)
+        and len({item.get("project") for item in records if isinstance(item, dict)})
+        == len(records)
+        and all(
+            isinstance(item, dict)
+            and isinstance(item.get("project"), str)
+            and item.get("project", "").endswith(".rcms")
+            and _valid_sha256(item.get("sha256"))
+            and _valid_sha256(item.get("semantic_sha256"))
+            and item.get("opened_in_packaged_application") is True
+            for item in records
+        )
     )
 
 

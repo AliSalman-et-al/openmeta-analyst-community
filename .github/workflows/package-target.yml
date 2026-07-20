@@ -1,11 +1,8 @@
-name: Package macOS Intel x64
+name: Package native macOS applications
 
 on:
   workflow_call:
-    inputs:
-      artifact_name:
-        required: true
-        type: string
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,8 +12,21 @@ env:
 
 jobs:
   package:
-    name: ${{ inputs.artifact_name }}
-    runs-on: macos-15-intel
+    name: ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - target: macos-x64
+            architecture: x64
+            runner: macos-15-intel
+            artifact: RCMetaStudio-macos-x64
+          - target: macos-arm64
+            architecture: arm64
+            runner: macos-15
+            artifact: RCMetaStudio-macos-arm64
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     steps:
       - name: Check out exact source
@@ -37,66 +47,68 @@ jobs:
         shell: bash
         run: uv run --no-project --python 3.11.9 python scripts/resolve_package_ci_metadata.py --version-only
 
-      - name: Cache official Qt SDK on macOS
+      - name: Resolve target contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          eval "$(python3 scripts/resolve_macos_package_target.py '${{ matrix.architecture }}' --format shell)"
+          test "$delivery_target" = '${{ matrix.target }}'
+          test "$runner" = '${{ matrix.runner }}'
+          test "$artifact" = '${{ matrix.artifact }}'
+          test "$(uname -m)" = "$machine"
+
+      - name: Cache official Qt SDK
         id: macos_qt_sdk_cache
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: build/qt-sdk
-          key: qt-sdk-6.11.1-macos-x64
+          key: qt-sdk-6.11.1-${{ matrix.target }}
 
-      - name: Install official Qt SDK on macOS
+      - name: Install official Qt SDK
         if: ${{ steps.macos_qt_sdk_cache.outputs.cache-hit != 'true' }}
         shell: bash
         run: uv tool run --from aqtinstall==3.3.0 aqt install-qt mac desktop 6.11.1 clang_64 --outputdir "$PWD/build/qt-sdk"
 
-      - name: Resolve official Qt rcc on macOS
+      - name: Resolve official Qt rcc
         shell: bash
-        run: PYTHONPATH="$PWD/src" uv run --no-project --python 3.11.9 python scripts/qt6_macos_feasibility.py resolve-rcc --sdk-root "$PWD/build/qt-sdk/6.11.1/macos" --github-env "$GITHUB_ENV" --diagnostic "build/qt-sdk/macos-x64-rcc.json"
+        run: PYTHONPATH="$PWD/src" uv run --no-project --python 3.11.9 python scripts/qt6_macos_feasibility.py resolve-rcc --sdk-root "$PWD/build/qt-sdk/6.11.1/macos" --github-env "$GITHUB_ENV" --diagnostic "build/qt-sdk/${{ matrix.target }}-rcc.json"
 
-      - name: Build, inspect, smoke, archive, and requalify macOS Intel package
+      - name: Build and run the first-green packaged workflow
         shell: bash
+        env:
+          RCMS_RUNNER_LABEL: ${{ matrix.runner }}
         run: |
           set -euo pipefail
-          test "$(uname -m)" = x86_64
           test ! -e /opt/X11
-          bash scripts/package-macos.sh --architecture x64 \
-            --artifact-name "${{ inputs.artifact_name }}" \
-            --archive-root-name "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-macos-x64"
+          bash scripts/package-macos.sh --architecture "${{ matrix.architecture }}" \
+            --artifact-name "${{ matrix.artifact }}" \
+            --archive-root-name "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ matrix.target }}"
 
-      - name: Upload package artifact
+      - name: Upload immutable unsigned package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: ${{ inputs.artifact_name }}
-          path: artifacts/${{ inputs.artifact_name }}.zip
+          name: ${{ matrix.artifact }}
+          path: artifacts/${{ matrix.artifact }}.zip
           if-no-files-found: error
           retention-days: 30
           compression-level: 0
 
-      - name: Upload qualification evidence
+      - name: Upload bring-up evidence and failure diagnostics
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: ${{ inputs.artifact_name }}-evidence
+          name: ${{ matrix.artifact }}-evidence
           path: |
-            artifacts/${{ inputs.artifact_name }}-evidence.json
-            artifacts/${{ inputs.artifact_name }}-archive-inspection.json
-            build/macos-package/x64/work/qualification/**
-            build/macos-package/x64/work/qualification/packaged-smoke*.log
+            artifacts/${{ matrix.artifact }}-evidence.json
+            artifacts/${{ matrix.artifact }}-archive-inspection.json
+            build/macos-package/${{ matrix.architecture }}/work/qualification/**
+            build/macos-package/${{ matrix.architecture }}/work/qualification/packaged-smoke*.log
+            build/macos-package/${{ matrix.architecture }}/work/rc-metastudio-macos/warn-rc-metastudio-macos.txt
+            build/macos-package/${{ matrix.architecture }}/work/rc-metastudio-macos/xref-rc-metastudio-macos.html
+            build/macos-package/${{ matrix.architecture }}/work/rc-metastudio-macos/Analysis-00.toc
+            build/macos-package/${{ matrix.architecture }}/work/rc-metastudio-macos/EXE-00.toc
+            build/macos-package/${{ matrix.architecture }}/work/rc-metastudio-macos/COLLECT-00.toc
+            build/macos-package/${{ matrix.architecture }}/work/rc-metastudio-macos/BUNDLE-00.toc
           if-no-files-found: warn
           retention-days: 30
-          compression-level: 0
-
-      - name: Upload failure diagnostics
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: ${{ inputs.artifact_name }}-diagnostics
-          path: |
-            build/macos-package/x64/work/RCMetaStudio/warn-RCMetaStudio.txt
-            build/macos-package/x64/work/RCMetaStudio/xref-RCMetaStudio.html
-            build/macos-package/x64/work/qualification/**
-            artifacts/*-archive-inspection.json
-            artifacts/*-evidence.json
-          if-no-files-found: ignore
-          retention-days: 14
           compression-level: 0

@@ -12,7 +12,7 @@ EXPECTED_TEAM_ID = "VZLD955F6P"
 
 
 def parse_pkgutil_signature(stdout: str, stderr: str, status: int) -> dict[str, object]:
-    status_line = re.search(r"^Status:\s*(.+)$", stdout, re.MULTILINE)
+    status_line = re.search(r"^\s*Status:\s*(.+)$", stdout, re.MULTILINE)
     # pkgutil emits a certificate chain, not codesign's Team Identifier field.
     certificate_lines = re.findall(r"^\s*\d+\.\s+(.+?)\s*$", stdout, re.MULTILINE)
     team = re.search(r"\(([A-Z0-9]{10})\)", "\n".join(certificate_lines))

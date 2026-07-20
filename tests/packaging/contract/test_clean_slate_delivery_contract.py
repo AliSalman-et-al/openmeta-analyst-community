@@ -27,7 +27,7 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     commit = "a" * 40
     delivery.init_release(
         argparse.Namespace(
-            version="0.2.0-rc.1",
+            version="0.2.1-rc.1",
             commit=commit,
             repository="AliSalman-et-al/rc-metastudio",
             trust_profile="unsigned-community",
@@ -46,8 +46,8 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     assert "scripts/qt6_macos_feasibility.py" in delivery.POLICY_INPUTS
     assert "scripts/normalize_macos_macho.py" in delivery.POLICY_INPUTS
     assert "scripts/sign_macos_app.py" in delivery.POLICY_INPUTS
-    assert "scripts/sign-notarize-macos-package.sh" in delivery.POLICY_INPUTS
-    assert ".github/workflows/release-candidate.yml" in delivery.POLICY_INPUTS
+    assert "config/macos-package-targets.json" in delivery.POLICY_INPUTS
+    assert ".github/workflows/community-release-candidate.yml" in delivery.POLICY_INPUTS
 
     assert manifest["release_targets"] == ["windows-x64"]
     for target in manifest["release_targets"]:
@@ -88,13 +88,13 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
             manifest=str(rc_path),
             from_channel="rc",
             channel="stable",
-            version="0.2.0",
+            version="0.2.1",
             output=str(stable_path),
         )
     )
     stable = delivery.load(stable_path)
     assert stable["channel"] == "stable"
-    assert stable["version"] == "0.2.0"
+    assert stable["version"] == "0.2.1"
 
     bad = json.loads(manifest_path.read_text(encoding="utf-8"))
     bad["targets"]["windows-x64"]["stages"].pop()
@@ -104,9 +104,6 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
         delivery.verify(argparse.Namespace(manifest=str(bad_path)))
 
     candidate = (ROOT / ".github/workflows/candidate.yml").read_text(encoding="utf-8")
-    sign = (ROOT / ".github/workflows/release-candidate.yml").read_text(
-        encoding="utf-8"
-    )
     community = (ROOT / ".github/workflows/community-release-candidate.yml").read_text(
         encoding="utf-8"
     )
@@ -119,19 +116,16 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     assert "-ArtifactName" not in candidate
     assert "Expected exactly one versioned Windows package" in candidate
     assert "Move-Item -LiteralPath $builtArchives[0].FullName" in candidate
-    assert "environment: ${{ matrix.environment }}" in sign
-    assert "attestations: write" in sign
-    assert "--automation-native-smoke" in sign
+    assert not (ROOT / ".github/workflows/release-candidate.yml").exists()
+    assert "attestations: write" in community
     assert "--automation-native-smoke" in community
-    for qualification in (sign, community):
-        assert qualification.index("astral-sh/setup-uv@") < qualification.index(
-            "uv python install 3.11.9"
-        )
-    assert "automation-adaptive-layout-evidence" not in sign
-    assert "--clobber" not in sign + promote + legacy
+    assert community.index("astral-sh/setup-uv@") < community.index(
+        "uv python install 3.11.9"
+    )
+    assert "--clobber" not in promote + legacy
     assert "push:\n    tags:" not in legacy
     assert (
-        "refusing overwrite" in sign.lower() and "refusing overwrite" in promote.lower()
+        "refusing overwrite" in community.lower() and "refusing overwrite" in promote.lower()
     )
     assert "sha256sum --check SHA256SUMS" in promote
     verification_step = promote[
@@ -139,15 +133,14 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     ]
     assert "GH_TOKEN: ${{ github.token }}" in verification_step
     assert 'git fetch origin "refs/tags/$RC_TAG:refs/tags/$RC_TAG"' in verification_step
-    for publisher in (community, sign, promote):
+    for publisher in (community, promote):
         assert "git ls-remote --exit-code --tags origin" in publisher
         assert "tag_args=(--verify-tag)" in publisher
         assert '"${tag_args[@]}"' in publisher
     assert 'tag_args=(--target "${{ inputs.source_sha }}")' in community
-    assert 'tag_args=(--target "${{ inputs.source_sha }}")' in sign
     assert 'tag_args=(--target "$source_sha")' in promote
-    assert "git push origin" not in community + sign + promote
+    assert "git push origin" not in community + promote
     assert "UNSIGNED COMMUNITY BUILD" not in community + promote
     assert "SmartScreen and Gatekeeper warnings" not in community + promote
-    assert "**Signing status:** Unsigned Windows x64 community build." in community
-    assert "**Signing status:** Unsigned Windows x64 community build." in promote
+    assert "**Signing status:** Unsigned community builds." in community
+    assert "**Signing status:** Unsigned community builds." in promote

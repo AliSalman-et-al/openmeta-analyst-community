@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resolve the official Intel R.framework from an expanded macOS installer."""
+"""Resolve an official architecture-native R.framework from an expanded installer."""
 
 from __future__ import annotations
 
@@ -20,7 +20,11 @@ MAX_DIAGNOSTICS = 12
 MAX_DIAGNOSTIC_CHARS = 2048
 
 
-def resolve_framework(expanded_root: Path, expected_version: str | None = None) -> Path:
+def resolve_framework(
+    expanded_root: Path,
+    expected_version: str | None = None,
+    expected_identifier: str = IDENTIFIER,
+) -> Path:
     if expanded_root.is_symlink():
         raise RuntimeError("expanded installer root must not be a symlink")
     root = expanded_root.resolve(strict=True)
@@ -87,7 +91,7 @@ def resolve_framework(expanded_root: Path, expected_version: str | None = None) 
             diagnostics.append(diagnostic)
         else:
             omitted += 1
-        if identifier != IDENTIFIER or location != INSTALL_LOCATION:
+        if identifier != expected_identifier or location != INSTALL_LOCATION:
             continue
         if expected_version is not None and version != expected_version:
             raise RuntimeError(
@@ -115,7 +119,7 @@ def resolve_framework(expanded_root: Path, expected_version: str | None = None) 
         if omitted:
             detail += f"; {omitted} additional component(s) omitted"
         raise RuntimeError(
-            f"expected exactly one official Intel R framework component; found {len(candidates)} ({detail})"
+            f"expected exactly one official R framework component; found {len(candidates)} ({detail})"
         )
     return candidates[0]
 
@@ -124,8 +128,9 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--expanded-root", type=Path, required=True)
     parser.add_argument("--expected-version", default=LOCKED_VERSION)
+    parser.add_argument("--identifier", default=IDENTIFIER)
     args = parser.parse_args()
-    print(resolve_framework(args.expanded_root, args.expected_version))
+    print(resolve_framework(args.expanded_root, args.expected_version, args.identifier))
     return 0
 
 

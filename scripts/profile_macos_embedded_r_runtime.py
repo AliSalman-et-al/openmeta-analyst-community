@@ -18,6 +18,14 @@ import subprocess
 import sys
 from typing import cast
 
+from rc_metastudio.macos_r_profile_schema import (
+    DEPENDENCY_FIELDS,
+    PROFILE_EXCLUSION_PATHS,
+    PROFILE_POLICY,
+    ProfileSchemaError,
+    validate_profile_evidence,
+)
+
 
 EXCLUSIONS = (
     ("library/tcltk", "tcltk"),
@@ -25,7 +33,7 @@ EXCLUSIONS = (
     ("modules/R_de.so", "X11 data editor"),
     ("library/grDevices/libs/cairo.so", "X11-linked Cairo device"),
 )
-DEPENDENCY_FIELDS = ("Depends", "Imports", "LinkingTo")
+assert tuple(relative for relative, _ in EXCLUSIONS) == PROFILE_EXCLUSION_PATHS
 MACH_O_MAGICS = {
     b"\xfe\xed\xfa\xce",  # MH_MAGIC
     b"\xce\xfa\xed\xfe",  # MH_CIGAM
@@ -38,8 +46,7 @@ MACH_O_MAGICS = {
 }
 
 
-class ProfileError(RuntimeError):
-    pass
+ProfileError = ProfileSchemaError
 
 
 def sha256(path: Path) -> str:
@@ -388,7 +395,7 @@ def quarantine(
         json.dumps(
             {
                 "schema_version": 1,
-                "policy": "official-cran-r-with-optional-x11-tcl-surfaces-removed",
+                "policy": PROFILE_POLICY,
                 "phase": "quarantine",
                 "source_framework": {
                     "version": r_version,
@@ -443,11 +450,10 @@ def finalize(
     roots, builtin, manifest_sha256 = manifest_roots(manifest_path)
     closure = hard_dependency_closure(resources / "library", roots, builtin)
     evidence.parent.mkdir(parents=True, exist_ok=True)
-    evidence.write_text(
-        json.dumps(
-            {
+    payload = {
                 "schema_version": 1,
                 "phase": "finalize",
+                "policy": quarantine_data["policy"],
                 "quarantine_evidence": {
                     "path": quarantine_evidence.name,
                     "sha256": sha256(quarantine_evidence),
@@ -462,10 +468,20 @@ def finalize(
                 "hard_dependency_closure": closure,
                 "source_framework": quarantine_data["source_framework"],
                 "excluded_surfaces": quarantine_data["excluded_surfaces"],
-            },
-            indent=2,
-            sort_keys=True,
-        )
+                "post_profile_exclusions": quarantine_data[
+                    "post_profile_exclusions"
+                ],
+                "allowed_non_tcl_opt_r_dependencies": quarantine_data[
+                    "allowed_non_tcl_opt_r_dependencies"
+                ],
+            }
+    validate_profile_evidence(
+        payload,
+        expected_r_version=payload["source_framework"]["version"],
+        expected_architecture=payload["source_framework"]["expected_architecture"],
+    )
+    evidence.write_text(
+        json.dumps(payload, indent=2, sort_keys=True)
         + "\n",
         encoding="utf-8",
     )
@@ -492,17 +508,6 @@ def profile(
         official_framework_layout=official_framework_layout,
     )
     finalize(resources, evidence, manifest_path, quarantine_path)
-    final = json.loads(evidence.read_text(encoding="utf-8"))
-    early = json.loads(quarantine_path.read_text(encoding="utf-8"))
-    final.update(
-        {
-            key: early[key]
-            for key in ("post_profile_exclusions", "allowed_non_tcl_opt_r_dependencies")
-        }
-    )
-    evidence.write_text(
-        json.dumps(final, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
 
 
 def main() -> int:

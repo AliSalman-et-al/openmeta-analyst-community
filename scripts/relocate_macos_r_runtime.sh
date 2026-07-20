@@ -134,13 +134,23 @@ while IFS= read -r -d '' binary; do
     status=$?
     [ "$status" -eq 1 ] || { echo "private R retains unsupported install ID: $dylib_id ($binary)" >&2; exit 1; }
     case "$dylib_id" in
-      ""|@loader_path/*) ;;
+      "") ;;
+      @loader_path/*)
+        canonical_id="@loader_path/$(basename "$binary")"
+        if [ "$dylib_id" != "$canonical_id" ]; then
+          install_name_tool -id "$canonical_id" "$binary"
+        fi
+        ;;
       *)
-        [ "$dylib_id" = "$(basename "$binary")" ] || {
-          echo "private R install ID is not its exact basename: $dylib_id ($binary)" >&2
+        [ "$dylib_id" = "${dylib_id##*/}" ] || {
+          echo "private R install ID is not a safe leaf name: $dylib_id ($binary)" >&2
           exit 1
         }
-        install_name_tool -id "@loader_path/$dylib_id" "$binary"
+        case "$dylib_id" in
+          *.dylib|*.so) ;;
+          *) echo "private R install ID has an unsupported leaf name: $dylib_id ($binary)" >&2; exit 1 ;;
+        esac
+        install_name_tool -id "@loader_path/$(basename "$binary")" "$binary"
         ;;
     esac
   fi
@@ -153,7 +163,16 @@ while IFS= read -r -d '' binary; do
       status=$?
       [ "$status" -eq 1 ] || { echo "private R retains unsupported external dependency: $dependency ($binary)" >&2; exit 1; }
       case "$dependency" in
-        /usr/lib/*|/System/Library/*|@loader_path/*) ;;
+        /usr/lib/*|/System/Library/*) ;;
+        @loader_path/*)
+          loader_target="$(dirname "$binary")/${dependency#@loader_path/}"
+          if [ ! -e "$loader_target" ]; then
+            target="$resources/lib/${dependency##*/}"
+            [ -e "$target" ] || { echo "private R loader-relative dependency target is absent: $dependency ($binary)" >&2; exit 1; }
+            replacement="@loader_path/$(relative_loader_target "$(dirname "$binary")" "$target")"
+            install_name_tool -change "$dependency" "$replacement" "$binary"
+          fi
+          ;;
         *) echo "private R retains unresolved dependency: $dependency ($binary)" >&2; exit 1 ;;
       esac
     fi

@@ -151,44 +151,26 @@ if [ "$(uname -s)" != "Darwin" ]; then
 fi
 
 host_machine="$(uname -m)"
-case "${architecture:-}" in
-  x64)
-    expected_machine="x86_64"
-    pyinstaller_target_architecture="x86_64"
-    default_artifact="RCMetaStudio-macos-x64"
-    minimum_macos_version="13.0"
-    ;;
-  arm64)
-    expected_machine="arm64"
-    pyinstaller_target_architecture="arm64"
-    default_artifact="RCMetaStudio-macos-arm64"
-    minimum_macos_version="14.0"
-    ;;
-  "")
-    if [ "$host_machine" = "arm64" ]; then
-      architecture="arm64"
-      expected_machine="arm64"
-      pyinstaller_target_architecture="arm64"
-      default_artifact="RCMetaStudio-macos-arm64"
-      minimum_macos_version="14.0"
-    else
-      architecture="x64"
-      expected_machine="x86_64"
-      pyinstaller_target_architecture="x86_64"
-      default_artifact="RCMetaStudio-macos-x64"
-      minimum_macos_version="13.0"
-    fi
-    ;;
-  *)
-    echo "--architecture must be x64 or arm64." >&2
-    exit 1
-    ;;
-esac
+if [ -z "$architecture" ]; then
+  [ "$host_machine" = "arm64" ] && architecture="arm64" || architecture="x64"
+fi
+case "$architecture" in x64|arm64) ;; *) echo "--architecture must be x64 or arm64." >&2; exit 1 ;; esac
+target_python="$(command -v python3 || true)"
+[ -n "$target_python" ] || { echo "macOS packaging requires python3 to resolve its target manifest." >&2; exit 1; }
+eval "$("$target_python" "$repo_root/scripts/resolve_macos_package_target.py" "$architecture" --format shell)"
+expected_machine="$machine"
+pyinstaller_target_architecture="$machine"
+default_artifact="$artifact"
+minimum_macos_version="$minimum_macos"
 
 if [ "$host_machine" != "$expected_machine" ]; then
   echo "Requested $architecture build requires $expected_machine host, but this host is $host_machine." >&2
   exit 1
 fi
+
+# Native wheels and R source packages compiled on the runner must not inherit
+# the runner image's newer deployment floor.
+export MACOSX_DEPLOYMENT_TARGET="$minimum_macos_version"
 
 artifact_name="${artifact_name:-$default_artifact}"
 dist_root="$repo_root/build/macos-package/$architecture/dist"
@@ -200,6 +182,8 @@ zip_path="$artifact_dir/$artifact_name.zip"
 tmp_zip_path="$zip_path.tmp"
 qualification_root="$work_root/qualification"
 runtime_probe_path="$qualification_root/runtime-probe.json"
+runtime_stdout_path="$qualification_root/runtime-probe.stdout.log"
+runtime_stderr_path="$qualification_root/runtime-probe.stderr.log"
 deployment_manifest_path="$qualification_root/deployment-manifest.json"
 smoke_evidence_path="$qualification_root/packaged-smoke.json"
 smoke_log_path="$qualification_root/packaged-smoke.log"
@@ -246,31 +230,31 @@ fi
 python_exe="${python_exe:-$repo_root/.venv/bin/python}"
 
 if [ -z "$r_runtime_root" ]; then
-  r_download_cache="$artifact_dir/download-cache/macos-x64"
-  r_pkg="$r_download_cache/R-4.6.1-x86_64.pkg"
+  r_download_cache="$artifact_dir/download-cache/macos-$architecture"
+  r_pkg="$r_download_cache/$(basename "$r_url")"
   r_pkg_tmp="$r_pkg.partial"
-  r_url="https://cloud.r-project.org/bin/macosx/big-sur-x86_64/base/R-4.6.1-x86_64.pkg"
-  r_sha256="612bb00cb4c627721d6d80b0f5224227c0fcdefb4a5b6c917511480361c16571"
   mkdir -p "$r_download_cache"
-  if [ ! -f "$r_pkg" ] || [ "$(shasum -a 256 "$r_pkg" | awk '{print $1}')" != "$r_sha256" ]; then
+  if [ ! -f "$r_pkg" ] || { [ -n "$r_sha256" ] && [ "$(shasum -a 256 "$r_pkg" | awk '{print $1}')" != "$r_sha256" ]; }; then
     rm -f "$r_pkg" "$r_pkg_tmp"
-    step "Downloading authenticated official Intel R into the immutable cache"
+    step "Downloading authenticated official $architecture R into the immutable cache"
     curl --fail --location --proto '=https' --tlsv1.2 "$r_url" --output "$r_pkg_tmp"
-    [ "$(shasum -a 256 "$r_pkg_tmp" | awk '{print $1}')" = "$r_sha256" ] || { rm -f "$r_pkg_tmp"; echo "Official R package SHA-256 mismatch." >&2; exit 1; }
+    if [ -n "$r_sha256" ]; then
+      [ "$(shasum -a 256 "$r_pkg_tmp" | awk '{print $1}')" = "$r_sha256" ] || { rm -f "$r_pkg_tmp"; echo "Official R package SHA-256 mismatch." >&2; exit 1; }
+    fi
     mv "$r_pkg_tmp" "$r_pkg"
   fi
   signature_stdout="$r_pkg.signature.stdout"; signature_stderr="$r_pkg.signature.stderr"
   set +e; pkgutil --check-signature "$r_pkg" >"$signature_stdout" 2>"$signature_stderr"; signature_status=$?; set -e
   [ "$signature_status" -eq 0 ] && grep -q 'VZLD955F6P' "$signature_stdout" || { echo "Official R package signature is not the R for macOS signer." >&2; exit 1; }
-  step "Extracting the authenticated official Intel R.framework into private staging"
-  r_pkg_expanded="$repo_root/build/macos-package/x64/official-r-pkg"
+  step "Extracting the authenticated official $architecture R.framework into private staging"
+  r_pkg_expanded="$repo_root/build/macos-package/$architecture/official-r-pkg"
   r_stage_parent="$(dirname "$r_pkg_expanded")"
   mkdir -p "$r_stage_parent"
   [ -d "$r_stage_parent" ] || { echo "Private R staging parent was not created: $r_stage_parent" >&2; exit 1; }
   rm -rf "$r_pkg_expanded"
   [ ! -e "$r_pkg_expanded" ] || { echo "pkgutil expansion target must be absent: $r_pkg_expanded" >&2; exit 1; }
   pkgutil --expand-full "$r_pkg" "$r_pkg_expanded"
-  r_pkg_framework="$("$python_exe" "$repo_root/scripts/resolve_macos_r_framework_component.py" --expanded-root "$r_pkg_expanded" --expected-version 4.6.1)"
+  r_pkg_framework="$("$python_exe" "$repo_root/scripts/resolve_macos_r_framework_component.py" --expanded-root "$r_pkg_expanded" --expected-version "$r_version" --identifier "$r_component_identifier")"
   [ -d "$r_pkg_framework" ] || { echo "Official R framework component resolver returned no directory." >&2; exit 1; }
   r_runtime_root="$r_pkg_framework/Resources"
 fi
@@ -301,7 +285,7 @@ if framework is None:
 print(framework)
 PY
 )"
-private_r_framework="$repo_root/build/macos-package/x64/staged/R.framework"
+private_r_framework="$repo_root/build/macos-package/$architecture/staged/R.framework"
 if [ "$(cd "$source_r_framework" && pwd -P)" = "$(cd "$private_r_framework" 2>/dev/null && pwd -P || true)" ]; then
   echo "Source R framework must not be the private staging destination: $source_r_framework" >&2
   exit 1
@@ -337,10 +321,10 @@ step "Applying the explicit non-X11 embedded R product profile to private staged
   --source-resources "$source_r_runtime_root"
 
 step "Configuring private staged R launchers before native bridge build"
-"$python_exe" "$repo_root/scripts/configure_macos_r_launchers.py" --resources "$r_runtime_root"
+"$python_exe" "$repo_root/scripts/configure_macos_r_launchers.py" --resources "$r_runtime_root" --architecture "$expected_machine"
 step "Relocating private staged R dependencies before native bridge build"
 bash "$repo_root/scripts/relocate_macos_r_runtime.sh" --resources "$r_runtime_root" --architecture "$expected_machine" \
-  --python "$python_exe" --allowed-root "$repo_root/build/macos-package/x64" \
+  --python "$python_exe" --allowed-root "$repo_root/build/macos-package/$architecture" \
   --normalizer "$repo_root/scripts/normalize_macos_macho.py"
 step "Probing the self-contained staged R substrate"
 run_staged_r_config() {
@@ -362,7 +346,7 @@ actual_r_version="$(R_HOME="$r_runtime_root" "$r_runtime_root/bin/Rscript" -e 'c
 [ "$actual_r_version" = "$r_version" ] || { echo "Private staged R version mismatch: expected $r_version, got $actual_r_version" >&2; exit 1; }
 R_HOME="$r_runtime_root" "$r_runtime_root/bin/R" RHOME | grep -Fx "$r_runtime_root" >/dev/null \
   || { echo "Private staged R does not report its private RHOME." >&2; exit 1; }
-R_HOME="$r_runtime_root" "$r_runtime_root/bin/Rscript" -e 'stopifnot(identical(R.home(), Sys.getenv("R_HOME"))); stopifnot(identical(Sys.getenv("RHOME"), Sys.getenv("R_HOME"))); stopifnot(!capabilities("X11"), !capabilities("tcltk")); cat("staged-r-ok\\n")' \
+R_HOME="$r_runtime_root" "$r_runtime_root/bin/Rscript" -e 'stopifnot(identical(R.home(), Sys.getenv("R_HOME"))); stopifnot(identical(Sys.getenv("RHOME"), Sys.getenv("R_HOME"))); stopifnot(!capabilities("X11")); cat("staged-r-ok\\n")' \
   | grep -Fx 'staged-r-ok' >/dev/null \
   || { echo "Private staged R capability probe failed." >&2; exit 1; }
 "$python_exe" - "$r_substrate_probe_path" "$r_runtime_root" "$r_version" "$quarantine_profile_path" <<'PY'
@@ -377,7 +361,7 @@ output.write_text(json.dumps({
     "r_version": str(version),
     "launcher": "bin/R",
     "rscript": "bin/Rscript (native wrapper)",
-    "probes": ["R RHOME", "R CMD config --ldflags", "R CMD config --cppflags", "Rscript private R.home", "non-X11/Tcl capabilities"],
+    "probes": ["R RHOME", "R CMD config --ldflags", "R CMD config --cppflags", "Rscript private R.home", "non-X11 capability"],
     "quarantine_evidence_sha256": hashlib.sha256(quarantine.read_bytes()).hexdigest(),
 }, indent=2, sort_keys=True) + "\\n", encoding="utf-8")
 PY
@@ -419,32 +403,42 @@ require_free_space_gb "$repo_root" 6
 # Complete and prove the one private framework before PyInstaller sees it.
 # No R member is populated or mutated in the generated app bundle.
 r_framework="$private_r_framework"
-r_framework_version="$("$python_exe" - "$r_version" <<'PY'
-import sys
-
-from rc_metastudio.r_runtime import macos_r_framework_version
-
-print(macos_r_framework_version(sys.argv[1]))
-PY
-)"
+r_framework_version="$(readlink "$r_framework/Versions/Current")"
 case "$r_framework_version" in
-  [0-9]*.[0-9]*) ;;
+  [0-9]*.[0-9]*|[0-9]*.[0-9]*-*) ;;
   *) echo "Cannot derive the bundled R framework version." >&2; exit 1 ;;
 esac
 r_home="$r_framework/Resources"
 r_lib="$r_home/library"
 rscript="$r_home/bin/Rscript"
 r_binary="$r_home/bin/R"
+r_makevars="$work_root/private-r.Makevars"
+printf 'LDFLAGS = -L%s/lib\nLIBR = -L%s/lib -lR\n' "$r_home" "$r_home" > "$r_makevars"
 
 if [ ! -x "$rscript" ] || [ ! -x "$r_binary" ]; then
   echo "Bundled R runtime is missing R or Rscript under $r_home/bin." >&2
   exit 1
 fi
+"$python_exe" - "$r_home/Info.plist" <<'PY'
+from pathlib import Path
+import plistlib
+import sys
+
+info_path = Path(sys.argv[1]).resolve(strict=True)
+with info_path.open("rb") as stream:
+    info = plistlib.load(stream)
+existing = info.get("CFBundleExecutable")
+if existing not in (None, "R"):
+    raise SystemExit(f"unexpected R framework executable identity: {existing!r}")
+info["CFBundleExecutable"] = "R"
+with info_path.open("wb") as stream:
+    plistlib.dump(info, stream, sort_keys=True)
+PY
 
 run_strict_r_dependency_policy() {
   local library="$1"
   mkdir -p "$library"
-  R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" \
+  R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" R_MAKEVARS_USER="$r_makevars" \
     RCMS_CRAN_REPO="$pinned_cran_repo" RCMS_POLICY_PYTHON="$python_exe" \
     RCMS_R_PACKAGE_ARCHIVE_DIR="$ppm_archive_root" RCMS_HSROC_ARCHIVE="$hsroc_archive_path" \
     "$rscript" "$repo_root/scripts/install-r-deps.R"
@@ -469,7 +463,8 @@ install_local_r_packages() {
   [ -n "$built_archive" ] || { echo "RCMetaR source archive was not built." >&2; exit 1; }
   cp "$built_archive" "$rcmetar_archive_path"
 
-  R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$r_binary" CMD INSTALL --library="$r_lib" "$rcmetar_archive_path"
+  R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" R_MAKEVARS_USER="$r_makevars" \
+    "$r_binary" CMD INSTALL --library="$r_lib" "$rcmetar_archive_path"
 }
 
 step "Installing bundled R package dependencies into this private staged runtime"
@@ -493,16 +488,25 @@ step "Finalizing the embedded R product profile after package installation"
 
 step "Relocating completed bundled R runtime dependencies"
 bash "$repo_root/scripts/relocate_macos_r_runtime.sh" --resources "$r_home" --architecture "$expected_machine" \
-  --python "$python_exe" --allowed-root "$repo_root/build/macos-package/x64" \
+  --python "$python_exe" --allowed-root "$repo_root/build/macos-package/$architecture" \
   --normalizer "$repo_root/scripts/normalize_macos_macho.py"
 
 step "Building the target-native rpy2 API bridge against completed staged R"
-R_HOME="$r_home" PATH="$r_home/bin:$PATH" RPY2_CFFI_MODE=API MACOSX_DEPLOYMENT_TARGET=13.0 uv pip install \
+R_HOME="$r_home" PATH="$r_home/bin:$PATH" RPY2_CFFI_MODE=API uv pip install \
   --python "$python_exe" --reinstall --no-binary rpy2-rinterface \
   "rpy2-rinterface==3.6.6"
 
 step "Proving and relocating the rpy2 API bridge against staged R"
-rpy2_api_bridge="$($python_exe -c 'from pathlib import Path; import _rinterface_cffi_api as m; print(Path(m.__file__).resolve())')"
+rpy2_api_bridge="$($python_exe - <<'PY'
+from pathlib import Path
+import sysconfig
+
+matches = list(Path(sysconfig.get_paths()["platlib"]).glob("_rinterface_cffi_api*.so"))
+if len(matches) != 1:
+    raise SystemExit(f"expected exactly one rpy2 API bridge, found {matches}")
+print(matches[0].resolve(strict=True))
+PY
+)"
 [ -f "$rpy2_api_bridge" ] || { echo "rpy2 API bridge is absent after source build." >&2; exit 1; }
 [ "$(find "$(dirname "$rpy2_api_bridge")" -maxdepth 1 -name '_rinterface_cffi_api*.so' | wc -l | tr -d ' ')" = 1 ] \
   || { echo "rpy2 API build must contain exactly one API extension." >&2; exit 1; }
@@ -511,10 +515,19 @@ if "$python_exe" -c 'import importlib.util,sys; sys.exit(importlib.util.find_spe
 else
   echo "rpy2 ABI bridge is present in the strict API environment." >&2; exit 1
 fi
-while IFS= read -r dependency; do
+relocate_rpy2_api_bridge() {
+  local bridge="$1"
+  local dependency source_relative target relative_target
+  while IFS= read -r dependency; do
   case "$dependency" in
+    @loader_path/*.dylib)
+      source_relative="lib/${dependency#@loader_path/}"
+      ;;
     @rpath/lib/libR.dylib)
       source_relative="lib/libR.dylib"
+      ;;
+    @rpath/*.dylib)
+      source_relative="lib/${dependency#@rpath/}"
       ;;
     "$r_runtime_root"/*)
       source_relative="${dependency#"$r_runtime_root"/}"
@@ -531,27 +544,31 @@ while IFS= read -r dependency; do
     *) continue ;;
   esac
   target="$r_home/$source_relative"
-  relative_target="$($python_exe - "$(dirname "$rpy2_api_bridge")" "$target" <<'PY'
+  [ -f "$target" ] || { echo "rpy2 API bridge dependency has no staged R target: $dependency -> $target" >&2; exit 1; }
+  relative_target="$($python_exe - "$(dirname "$bridge")" "$target" <<'PY'
 import os, sys
 print(os.path.relpath(sys.argv[2], sys.argv[1]))
 PY
 )"
-  install_name_tool -change "$dependency" "@loader_path/$relative_target" "$rpy2_api_bridge"
-done < <(otool -L "$rpy2_api_bridge" | awk 'NR > 1 { print $1 }')
-if otool -L "$rpy2_api_bridge" | grep -E '@rpath/lib/libR\.dylib|/Library/Frameworks/R\.framework/|/opt/R/'; then
-  echo "rpy2 API bridge retains an external R dependency." >&2
-  exit 1
-fi
+    install_name_tool -change "$dependency" "@loader_path/$relative_target" "$bridge"
+  done < <(otool -L "$bridge" | awk 'NR > 1 { print $1 }')
+  if otool -L "$bridge" | grep -E '@rpath/|/Library/Frameworks/R\.framework/|/opt/R/'; then
+    echo "rpy2 API bridge retains an external R dependency." >&2
+    exit 1
+  fi
+}
+relocate_rpy2_api_bridge "$rpy2_api_bridge"
 R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" RPY2_CFFI_MODE=API \
-  "$python_exe" - "$rpy2_api_bridge" <<'PY'
+  "$python_exe" - "$rpy2_api_bridge" "$machine" <<'PY'
 import importlib.util
 from pathlib import Path
 import subprocess
 import sys
 
 bridge = Path(sys.argv[1]).resolve(strict=True)
-if subprocess.check_output(["lipo", "-archs", str(bridge)], text=True).split() != ["x86_64"]:
-    raise SystemExit("rpy2 API bridge is not x86_64-only")
+expected_architecture = sys.argv[2]
+if subprocess.check_output(["lipo", "-archs", str(bridge)], text=True).split() != [expected_architecture]:
+    raise SystemExit(f"rpy2 API bridge is not {expected_architecture}-only")
 loads = subprocess.check_output(["otool", "-L", str(bridge)], text=True).splitlines()[1:]
 r_edges = [line for line in loads if "libR.dylib" in line or "/R " in line]
 if len(r_edges) != 1:
@@ -575,11 +592,90 @@ if (!file.exists(output) || file.info(output)$size <= 0) stop("default Quartz pn
   unlink(output)
 '
 
+canonicalize_r_framework() {
+  local framework="$1"
+  "$python_exe" - "$framework" <<'PY'
+from pathlib import Path
+import sys
+
+framework = Path(sys.argv[1]).resolve(strict=True)
+for development_alias in ("Headers", "Libraries", "PrivateHeaders"):
+    alias = framework / development_alias
+    if alias.is_symlink():
+        alias.unlink()
+    elif alias.exists():
+        raise SystemExit(f"R framework root member is not a removable alias: {alias}")
+root_members = {item.name for item in framework.iterdir()}
+if root_members != {"R", "Resources", "Versions"}:
+    raise SystemExit(f"R framework root is not minimal: {sorted(root_members)}")
+version_root = (framework / "Versions/Current").resolve(strict=True)
+main_executable = version_root / "R"
+runtime_library = version_root / "Resources/lib/libR.dylib"
+info_plist = version_root / "Resources/Info.plist"
+if main_executable.is_symlink():
+    if main_executable.resolve(strict=True) != runtime_library:
+        raise SystemExit("R framework executable alias is not canonical")
+    main_executable.unlink()
+    runtime_library.replace(main_executable)
+    main_executable.chmod(main_executable.stat().st_mode | 0o111)
+    runtime_library.symlink_to(Path("../../R"))
+if not main_executable.is_file() or main_executable.is_symlink():
+    raise SystemExit("R framework main executable is not a regular file")
+if not info_plist.is_file() or info_plist.is_symlink():
+    raise SystemExit("R framework Info.plist is not a regular file")
+if not runtime_library.is_symlink() or runtime_library.readlink() != Path("../../R"):
+    raise SystemExit("R runtime library alias is not relative and canonical")
+if runtime_library.resolve(strict=True) != main_executable:
+    raise SystemExit("R runtime library alias does not resolve to the framework executable")
+PY
+}
+
+relocate_canonical_r_framework_main() {
+  local framework="$1"
+  local framework_home="$framework/Resources"
+  local framework_main="$framework/Versions/Current/R"
+  local dependency dependency_name dependency_target install_id install_id_name
+  install_id="$(otool -D "$framework_main" | awk 'NR == 2 { print $1 }')"
+  case "$install_id" in
+    @loader_path/*.dylib)
+      install_id_name="${install_id#@loader_path/}"
+      case "$install_id_name" in
+        */*) ;;
+        *) install_name_tool -id "@loader_path/Resources/lib/$install_id_name" "$framework_main" ;;
+      esac
+      ;;
+  esac
+  while IFS= read -r dependency; do
+    case "$dependency" in
+      @loader_path/*.dylib)
+        dependency_name="${dependency#@loader_path/}"
+        case "$dependency_name" in
+          */*) continue ;;
+        esac
+        dependency_target="$framework_home/lib/$dependency_name"
+        [ -f "$dependency_target" ] || { echo "canonical R framework dependency is absent: $dependency" >&2; exit 1; }
+        install_name_tool -change "$dependency" "@loader_path/Resources/lib/$dependency_name" "$framework_main"
+        ;;
+    esac
+  done < <(otool -L "$framework_main" | awk 'NR > 2 { print $1 }')
+  if otool -L "$framework_main" | awk 'NR > 2 { print $1 }' | grep -E '^@loader_path/[^/]+\.dylib$'; then
+    echo "canonical R framework main executable retains a pre-move loader edge." >&2
+    exit 1
+  fi
+  if otool -D "$framework_main" | awk 'NR == 2 { print $1 }' | grep -E '^@loader_path/[^/]+\.dylib$'; then
+    echo "canonical R framework main executable retains a pre-move install identity." >&2
+    exit 1
+  fi
+}
+
 # These retained records are the authoritative acquisition/build inputs for the
 # direct native production manifest; no installed library tree is reused.
 [ -s "$hsroc_archive_path" ] || { echo "HSROC acquisition archive was not retained." >&2; exit 1; }
 [ -s "$rcmetar_archive_path" ] || { echo "RCMetaR source archive was not retained." >&2; exit 1; }
 [ "$(shasum -a 256 "$hsroc_archive_path" | awk '{print $1}')" = "5476fa76d7723717e203925a1da442813e3645790ef9b633a145cbc04a08b874" ] || { echo "HSROC archive digest changed." >&2; exit 1; }
+step "Canonicalizing the staged R framework before PyInstaller signing"
+canonicalize_r_framework "$r_framework"
+relocate_canonical_r_framework_main "$r_framework"
 "$python_exe" "$repo_root/scripts/macos_embedded_r_adapter.py" finalize-toc --framework "$r_framework" --architecture "$expected_machine" --output "$adapter_map_path" --toc-output "$adapter_toc_path"
 cp "$adapter_map_path" "$adapter_audit_path"
 "$python_exe" - "$rpy2_api_bridge" "$rpy2_build_path" <<'PY'
@@ -601,6 +697,7 @@ step "Building the app from the completed staged R framework"
   export RCMS_MINIMUM_MACOS_VERSION="$minimum_macos_version"
   export RCMS_PYINSTALLER_R_TOC="$adapter_toc_path"
   export RCMS_PYINSTALLER_R_MAP="$adapter_map_path"
+  export RCMS_STAGED_R_FRAMEWORK="$r_framework"
   export RCMS_RPY2_API_BRIDGE_SHA256="$(shasum -a 256 "$rpy2_api_bridge" | awk '{print $1}')"
   pyinstaller_args=(--noconfirm --distpath "$dist_root" --workpath "$work_root" "packaging/pyinstaller/rc-metastudio-macos.spec")
   [ "$skip_clean" -eq 1 ] || pyinstaller_args=(--clean "${pyinstaller_args[@]}")
@@ -614,21 +711,43 @@ rpy2_api_bridge="$(find "$app_bundle" -type f -name '_rinterface_cffi_api*.so' -
 resources_root="$app_bundle/Contents/Resources"
 sample_root="$resources_root/sample_projects"
 copy_tree "$repo_root/sample_projects" "$sample_root"
+staged_r_framework="$r_framework"
 r_framework="$app_bundle/Contents/Frameworks/R.framework"
+[ ! -e "$r_framework" ] && [ ! -L "$r_framework" ] || { echo "PyInstaller unexpectedly collected R.framework." >&2; exit 1; }
+step "Injecting the completed R framework after PyInstaller"
+copy_tree "$staged_r_framework" "$r_framework"
 r_home="$r_framework/Resources"
 r_lib="$r_home/library"
 rscript="$r_home/bin/Rscript"
 r_binary="$r_home/bin/R"
+relocate_rpy2_api_bridge "$rpy2_api_bridge"
+"$python_exe" "$repo_root/scripts/macos_embedded_r_adapter.py" post-app \
+  --app "$app_bundle" --architecture "$expected_machine" \
+  --output "$qualification_root/post-injection-r-gate.json"
 "$python_exe" - "$preflight_report_path" "$(git rev-parse HEAD)" <<'PY'
 import json, sys
 from pathlib import Path
-Path(sys.argv[1]).write_text(json.dumps({"schema_version": 1, "source_commit": sys.argv[2], "pyinstaller_version": "6.21.0", "system": "Darwin", "machine": "x86_64", "aliases": {"Versions/Current":"4.6-x86_64", "Resources":"Versions/Current/Resources", "R":"Versions/Current/R", "Versions/4.6-x86_64/R":"Resources/lib/libR.dylib", "Versions/4.6-x86_64/Resources/R":"bin/R"}, "passed": True}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+Path(sys.argv[1]).write_text(json.dumps({
+    "schema_version": 1,
+    "source_commit": sys.argv[2],
+    "pyinstaller_version": "6.21.0",
+    "system": "Darwin",
+    "machine": __import__("platform").machine(),
+    "aliases": {
+        "Versions/Current": "4.6-x86_64",
+        "Resources": "Versions/Current/Resources",
+        "R": "Versions/Current/R",
+        "Versions/4.6-x86_64/R": "Resources/lib/libR.dylib",
+        "Versions/4.6-x86_64/Resources/R": "bin/R",
+    },
+    "passed": True,
+}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
 "$python_exe" - "$runner_environment_path" <<'PY'
 import json, os, platform, subprocess, sys
 from pathlib import Path
 run = lambda *args: subprocess.check_output(args, text=True).strip()
-Path(sys.argv[1]).write_text(json.dumps({"schema_version": 1, "github_actions": os.environ.get("GITHUB_ACTIONS", "false"), "runner_image": os.environ.get("ImageOS", "local"), "runner_os": os.environ.get("RUNNER_OS", platform.system()), "runner_arch": os.environ.get("RUNNER_ARCH", platform.machine()), "macos_version": run("sw_vers", "-productVersion"), "macos_build": run("sw_vers", "-buildVersion"), "uname_system": run("uname", "-s"), "uname_machine": run("uname", "-m"), "python_machine": platform.machine()}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+Path(sys.argv[1]).write_text(json.dumps({"schema_version": 1, "github_actions": os.environ.get("GITHUB_ACTIONS", "false"), "runner_label": os.environ.get("RCMS_RUNNER_LABEL", "local"), "runner_image": os.environ.get("ImageOS", "local"), "runner_os": os.environ.get("RUNNER_OS", platform.system()), "runner_arch": os.environ.get("RUNNER_ARCH", platform.machine()), "macos_version": run("sw_vers", "-productVersion"), "macos_build": run("sw_vers", "-buildVersion"), "uname_system": run("uname", "-s"), "uname_machine": run("uname", "-m"), "python_machine": platform.machine()}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
 "$python_exe" "$repo_root/scripts/inspect_macos_deployment.py" native-graph --app "$app_bundle" --target "macos-$architecture" --output "$pre_sign_graph_path"
 
@@ -708,8 +827,7 @@ step "Applying and verifying the replaceable ad-hoc app-bundle signature"
 "$python_exe" "$repo_root/scripts/sign_macos_app.py" "$app_bundle" \
   --identity - \
   --inventory-output "$signing_inventory_path"
-codesign --force --options runtime --sign - "$app_bundle"
-codesign --verify --strict --deep "$app_bundle"
+codesign --verify --strict --deep --verbose=2 "$app_bundle"
 # Re-enumerate after the outer signature is finalized; this is deliberately
 # not a copy of the pre-final signing inventory.
 "$python_exe" "$repo_root/scripts/sign_macos_app.py" "$app_bundle" \
@@ -717,6 +835,8 @@ codesign --verify --strict --deep "$app_bundle"
 
 step "Probing the frozen macOS runtime"
 RCMS_AUTOMATION_SMOKE_LOG="$smoke_log_path" \
+  RCMS_PACKAGED_STDOUT_PATH="$runtime_stdout_path" \
+  RCMS_PACKAGED_STDERR_PATH="$runtime_stderr_path" \
   run_packaged_process "$app_root/RCMetaStudio" \
     --automation-package-runtime-probe "$runtime_probe_path"
 if [ ! -s "$runtime_probe_path" ]; then
@@ -725,7 +845,7 @@ if [ ! -s "$runtime_probe_path" ]; then
 fi
 
 if [ "$skip_smoke" -eq 0 ]; then
-  sample_path="$sample_root/amino.rcms"
+  sample_path="$sample_root/BCG.rcms"
   baseline_dpr="$("$python_exe" - "$runtime_probe_path" <<'PY'
 import json
 import sys
@@ -738,7 +858,12 @@ PY
     RCMS_PACKAGE_SMOKE_EVIDENCE="$smoke_evidence_path" \
     RCMS_AUTOMATION_SMOKE_LOG="$smoke_log_path" \
     RCMS_AUTOMATION_HANG_TRACE="$hang_trace_path" \
-    run_packaged_process "$app_root/RCMetaStudio" --automation-native-smoke "$sample_path"
+    env -u QT_QPA_PLATFORM RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=API \
+      RCMS_R_HOME="$r_home" RCMS_R_LIBS="$r_lib" \
+      "$python_exe" "$repo_root/scripts/run_bounded_process.py" --timeout-seconds 900 \
+      --stdout "$smoke_stdout_path" --stderr "$smoke_stderr_path" \
+      --completion-log "$smoke_log_path" -- \
+      "$app_root/RCMetaStudio" --automation-native-smoke "$sample_path"
 
   for scale in "1.25" "1.50" "1.75"; do
     step "Running packaged Cocoa surface smoke at scale $scale"
@@ -811,8 +936,13 @@ step "Recording canonical direct target-native production provenance"
 cp "$repo_root/scripts/macos_embedded_r_adapter.py" "$qualification_root/embedded-r-adapter.py"
 cp "$repo_root/scripts/macos_host_r_isolation.sh" "$qualification_root/macos-host-r-isolation.sh"
 cp "$repo_root/scripts/verify_macos_r_pyinstaller_toc.py" "$qualification_root/verify-macos-r-pyinstaller-toc.py"
+ppm_contrib_path="$("$python_exe" -c 'import json,sys; p=json.load(open(sys.argv[1])); print(p["binary_package_policy"]["platforms"][sys.argv[2]]["contrib_path"])' "$repo_root/docs/verification/RCMetaR-r-dependencies.json" "macos-$architecture")"
+[ -n "$ppm_contrib_path" ] || { echo "Locked PPM contribution path is empty." >&2; exit 1; }
 "$python_exe" "$repo_root/scripts/build_macos_direct_provenance.py" \
   --qualification-root "$qualification_root" --ppm-root "$ppm_archive_root" \
+  --target "macos-$architecture" --official-r-url "$r_url" \
+  --official-r-sha256 "$r_sha256" \
+  --ppm-contrib-path "$ppm_contrib_path" \
   --source-commit "$source_commit" --bridge "$rpy2_api_bridge" \
   --output "$r_direct_build_manifest_path"
 
@@ -878,7 +1008,6 @@ with zipfile.ZipFile(zip_path) as archive:
         mode = info.external_attr >> 16
         if (
             not stat.S_ISLNK(mode)
-            or stat.S_IMODE(mode) != 0o777
             or archive.read(path).decode("utf-8") != target
         ):
             raise SystemExit(f"Created ZIP has a noncanonical R framework alias: {path}")
@@ -902,6 +1031,7 @@ if [ "$skip_smoke" -eq 0 ]; then
     --deployment-manifest "$deployment_manifest_path" \
     --signing-inventory "$signing_inventory_path" \
     --runtime-probe "$runtime_probe_path" \
+    --runtime-stdout "$runtime_stdout_path" --runtime-stderr "$runtime_stderr_path" \
     --r-runtime-profile "$r_runtime_profile_path" \
     --direct-build-manifest "$r_direct_build_manifest_path" \
     --smoke-evidence "$smoke_evidence_path" --smoke-log "$smoke_log_path" \
@@ -941,7 +1071,12 @@ if [ "$skip_smoke" -eq 0 ]; then
   run_extracted "$extracted_app/Contents/MacOS/RCMetaStudio" --automation-package-runtime-probe "$extracted_probe"
   QT_SCALE_FACTOR=1.25 RCMS_PACKAGE_BASELINE_DPR="$("$python_exe" -c 'import json,sys; print(json.load(open(sys.argv[1]))["qt"]["baseline_device_pixel_ratio"])' "$extracted_probe")" \
     RCMS_PACKAGE_SMOKE_EVIDENCE="$extracted_smoke" RCMS_AUTOMATION_SMOKE_LOG="$extracted_smoke_log" RCMS_AUTOMATION_HANG_TRACE="$extracted_hang_trace" \
-    run_extracted "$extracted_app/Contents/MacOS/RCMetaStudio" --automation-native-smoke "$extracted_app/Contents/Resources/sample_projects/amino.rcms"
+    env -u QT_QPA_PLATFORM RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=API \
+      RCMS_R_HOME="$extracted_r_home" RCMS_R_LIBS="$extracted_r_lib" \
+      "$python_exe" "$repo_root/scripts/run_bounded_process.py" --timeout-seconds 900 \
+      --stdout "$extracted_stdout" --stderr "$extracted_stderr" \
+      --completion-log "$extracted_smoke_log" -- \
+      "$extracted_app/Contents/MacOS/RCMetaStudio" --automation-native-smoke "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"
   for scale in "1.25" "1.50" "1.75"; do
     QT_SCALE_FACTOR="$scale" RCMS_PACKAGE_BASELINE_DPR="$("$python_exe" -c 'import json,sys; print(json.load(open(sys.argv[1]))["qt"]["baseline_device_pixel_ratio"])' "$extracted_probe")" \
       RCMS_AUTOMATION_SMOKE_LOG="$extracted_smoke_log" RCMS_PACKAGED_PROCESS_TIMEOUT_SECONDS=60 \
@@ -955,7 +1090,7 @@ if [ "$skip_smoke" -eq 0 ]; then
       --timeout-seconds 900 --stdout "$extracted_stdout" --stderr "$extracted_stderr" --owned-pid-file "$extracted_pid" -- \
       open -W -n "$extracted_app" --args --automation-startup-project-smoke \
         --automation-startup-completion-marker "$extracted_marker" --automation-pid-file "$extracted_pid" \
-        --automation-smoke-log "$extracted_smoke_log" "$extracted_app/Contents/Resources/sample_projects/amino.rcms"
+        --automation-smoke-log "$extracted_smoke_log" "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"
   "$python_exe" "$repo_root/scripts/inspect_macos_deployment.py" finalize-smoke \
     --smoke-evidence "$extracted_smoke" --smoke-log "$extracted_smoke_log" --launchservices-marker "$extracted_marker" \
     --require-direct-teardown

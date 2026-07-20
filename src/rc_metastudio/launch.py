@@ -46,7 +46,9 @@ APPLICATION_ICON_PATH = ":/misc/meta.png"
 AUTOMATION_SMOKE_LOG_ENV = "RCMS_AUTOMATION_SMOKE_LOG"
 ADAPTIVE_LAYOUT_EVIDENCE_LOG_ENV = "RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG"
 PACKAGED_SUMMARY_SHA256 = (
-    "78294820c83cd94c19dfdca8c24b6a96cdc8b6f1319a5cd1bedffacde73851e2"
+    "f83aafec6de6b2ba65e0fdc9def3c47e8deb9cb86ad6a990adf962e79b9d18b5"
+    if sys.platform == "darwin"
+    else "78294820c83cd94c19dfdca8c24b6a96cdc8b6f1319a5cd1bedffacde73851e2"
 )
 NATIVE_FILE_DIALOG_OBSERVE_DELAY_MS = 250
 NATIVE_FILE_DIALOG_TIMEOUT_MS = 10_000
@@ -122,7 +124,10 @@ def _run_automation_smoke(callback):
         return callback()
     except BaseException as exc:
         _write_automation_smoke_log("".join(traceback.format_exception(exc)))
-        raise
+        # The installed Qt exception hook can otherwise keep the application
+        # event loop alive after a probe failure, obscuring the real error until
+        # the outer package watchdog expires.
+        raise SystemExit(1) from exc
 
 
 def _native_windows_command_line_argv():
@@ -525,6 +530,7 @@ def start_automation_smoke(sample_path, require_native_window=False):
         _write_automation_smoke_log("packaged-workflow:paint:complete")
         _write_automation_smoke_log("packaged-workflow:project-exercise:start")
         workflow = _exercise_packaged_project_workflow(app, meta, sample_path)
+        workflow["sample_projects"] = _exercise_all_packaged_samples(meta, sample_path)
         _write_automation_smoke_log("packaged-workflow:project-exercise:complete")
         _write_automation_smoke_log("packaged-workflow:save-reopen-complete")
         evidence_path = os.environ.get("RCMS_PACKAGE_SMOKE_EVIDENCE")
@@ -576,6 +582,60 @@ def start_automation_smoke(sample_path, require_native_window=False):
     _write_automation_smoke_log("packaged-workflow:post-close")
     _write_automation_smoke_log("packaged-workflow:return")
     return 0
+
+
+def _exercise_all_packaged_samples(meta, representative_sample):
+    import project_adapter
+    import project_format
+
+    sample_root = Path(representative_sample).resolve().parent
+    manifest_path = sample_root / "manifest.json"
+    manifest = cast(
+        dict[str, Any], json.loads(manifest_path.read_text(encoding="utf-8"))
+    )
+    manifest_projects = cast(list[dict[str, Any]], manifest["projects"])
+    declared = sorted(cast(str, item["file"]) for item in manifest_projects)
+    packaged = sorted(path.name for path in sample_root.glob("*.rcms"))
+    if declared != packaged:
+        raise RuntimeError("packaged sample manifest does not match the project set")
+
+    metadata = {cast(str, item["file"]): item for item in manifest_projects}
+    records = []
+    for name in declared:
+        path = sample_root / name
+        raw_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+        if raw_sha256 != metadata[name]["sha256"]:
+            raise RuntimeError("packaged sample hash mismatch: %s" % name)
+        document = project_format.load_project(path)
+        reconstructed = project_format.reconstruct_analysis_dataset(document)
+        if reconstructed.semantic_sha256 != metadata[name]["semantic_sha256"]:
+            raise RuntimeError("packaged sample semantic mismatch: %s" % name)
+        if not meta.open(str(path), raise_on_error=True):
+            raise RuntimeError("packaged application could not open sample: %s" % name)
+        observed = cast(
+            dict[str, Any],
+            project_adapter.dataset_to_project(meta.model.dataset)["dataset"],
+        )
+        expected = cast(dict[str, Any], document.project["dataset"])
+        for field in ("title", "analysis_family", "outcomes", "studies"):
+            if observed[field] != expected[field]:
+                raise RuntimeError(
+                    "packaged application loaded different %s semantics: %s"
+                    % (field, name)
+                )
+        records.append(
+            {
+                "project": name,
+                "sha256": raw_sha256,
+                "semantic_sha256": reconstructed.semantic_sha256,
+                "opened_in_packaged_application": True,
+            }
+        )
+    return {
+        "passed": True,
+        "manifest_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+        "projects": records,
+    }
 
 
 def _start_automation_hang_trace():
@@ -1390,7 +1450,10 @@ def start_package_runtime_probe(output_path):
     macos_r_policy = None
     if sys.platform == "darwin":
         tcltk_available = bool(
-            cast(Any, robjects.r("requireNamespace('tcltk', quietly=TRUE)"))[0]
+            cast(
+                Any,
+                robjects.r("isTRUE(requireNamespace('tcltk', quietly=TRUE))"),
+            )[0]
         )
         tcltk_loaded = bool(cast(Any, robjects.r("'tcltk' %in% loadedNamespaces()"))[0])
         aqua = bool(cast(Any, robjects.r("capabilities('aqua')"))[0])

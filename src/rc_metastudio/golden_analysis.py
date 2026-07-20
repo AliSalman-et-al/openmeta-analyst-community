@@ -1289,9 +1289,16 @@ def _parse_summary(text):
 def _parse_result_table(text):
     values = {}
     lines = text.splitlines()
-    is_regression = any(
-        "Covariate" in line and "Coefficients" in line for line in lines
+    regression_header = next(
+        (
+            line
+            for line in lines
+            if "Covariate" in line
+            and ("Coefficients" in line or "Estimate" in line)
+        ),
+        "",
     )
+    is_regression = bool(regression_header)
     is_subgroup = any("Subgroups" in line and "Studies" in line for line in lines)
     in_heterogeneity = False
     for line in lines:
@@ -1341,12 +1348,21 @@ def _parse_result_table(text):
                     if raw is not None:
                         values["%s.%s" % (prefix, metric)] = _to_float(raw)
             continue
-        match = re.match(
-            r"^\s*([+\-]?\s*.+?)\s{2,}(-?\d+(?:\.\d+)?)\s+"
-            r"(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+"
-            r"(-?\d+(?:\.\d+)?)(?:\s+(?:<\s*)?(-?\d+(?:\.\d+)?))?\s*$",
-            line,
-        )
+        if is_regression:
+            numeric = r"(?:<\s*)?(-?\d+(?:\.\d+)?)"
+            statistic_columns = 2 if re.search(r"\bdf\b", regression_header) else 1
+            value_columns = r"\s+".join([numeric] * (5 + statistic_columns))
+            match = re.match(
+                r"^\s*([+\-]?\s*.*?)\s+" + value_columns + r"\s*$",
+                line,
+            )
+        else:
+            match = re.match(
+                r"^\s*([+\-]?\s*.+?)\s{2,}(-?\d+(?:\.\d+)?)\s+"
+                r"(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+"
+                r"(-?\d+(?:\.\d+)?)(?:\s+(?:<\s*)?(-?\d+(?:\.\d+)?))?\s*$",
+                line,
+            )
         if match:
             prefix = "model.%s" % _result_row_key(match.group(1))
             first_metric = "coefficient" if is_regression else "estimate"
@@ -1357,11 +1373,21 @@ def _parse_result_table(text):
                 "standard_error",
                 "p_value",
             )
-            for metric, raw in zip(names, match.groups()[1:]):
+            raw_values = list(match.groups()[1:])
+            if is_regression:
+                raw_values = raw_values[:4] + raw_values[-1:]
+            for metric, raw in zip(names, raw_values):
                 if raw is not None:
                     values["%s.%s" % (prefix, metric)] = _to_float(raw)
     if is_regression:
         omnibus = re.search(r"Omnibus p-value\s*\n\s*(?:<\s*)?(-?\d+(?:\.\d+)?)", text)
+        if not omnibus:
+            omnibus = re.search(
+                r"^\s*Overall moderators \((?:Qₘ|F)\).*?"
+                r"(?:<\s*)?(-?\d+(?:\.\d+)?)\s*$",
+                text,
+                re.M,
+            )
         if omnibus:
             values["omnibus.p_value"] = _to_float(omnibus.group(1))
     return values

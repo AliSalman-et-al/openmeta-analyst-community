@@ -150,23 +150,33 @@ def run_bounded(
             stderr_stream.close()
 
 
+def record_completion(path: Path, result: int) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as stream:
+        stream.write(f"packaged-workflow:process-exit:{result}\n")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--timeout-seconds", type=int, default=900)
     parser.add_argument("--stdout", type=Path)
     parser.add_argument("--stderr", type=Path)
     parser.add_argument("--owned-pid-file", type=Path)
+    parser.add_argument("--completion-log", type=Path)
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     command = args.command[1:] if args.command[:1] == ["--"] else args.command
     try:
-        return run_bounded(
+        result = run_bounded(
             command,
             timeout_seconds=args.timeout_seconds,
             stdout_path=args.stdout,
             stderr_path=args.stderr,
             owned_pid_path=args.owned_pid_file,
         )
+        if args.completion_log is not None:
+            record_completion(args.completion_log, result)
+        return result
     except (OSError, ValueError, subprocess.SubprocessError) as exc:
         print(f"bounded package process failed: {exc}", file=sys.stderr)
         return 125

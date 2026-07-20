@@ -158,7 +158,7 @@ def configure_bundled_r_environment(app_root=None):
     direct_spike_marker = Path(root).parent / "Resources" / "direct-r-spike.marker"
     direct_spike = (
         frozen
-        and os.environ.get("RCMS_DIRECT_R_SPIKE") == "1"
+        and sys.platform == "darwin"
         and direct_spike_marker.is_file()
     )
     if frozen:
@@ -172,8 +172,9 @@ def configure_bundled_r_environment(app_root=None):
             )
         if _RUNTIME_IDENTITY is not None:
             return dict(_RUNTIME_IDENTITY)
-        # Windows packages assemble their R closure in this native job; macOS
-        # continues to consume a signed, separately derived integration kit.
+        # Direct macOS packages carry an authenticated, target-native R closure
+        # assembled by the same job. Older macOS packages consume the separately
+        # derived integration-kit identity instead.
         if not direct_spike and sys.platform != "win32":
             manifest, derivation = _frozen_kit_identity(root)
         _configure_private_runtime_directories(root)
@@ -197,6 +198,11 @@ def configure_bundled_r_environment(app_root=None):
         ]
         if frozen and sys.platform == "win32":
             dll_paths.extend(_private_windows_dll_directories(r_home))
+        elif frozen and sys.platform == "darwin":
+            # Rscript is a shell wrapper that requires fixed macOS system tools
+            # such as dirname. Keep the ambient runner PATH isolated while
+            # retaining only Apple's standard, non-R command directories.
+            dll_paths.extend(("/usr/bin", "/bin", "/usr/sbin", "/sbin"))
         _prepend_path(dll_paths, preserve_existing=not frozen)
         _add_dll_directories(dll_paths)
     elif frozen:

@@ -39,12 +39,12 @@ jobs:
           manifest="$(find promotion -name 'release-set-rc.json' -print -quit)"
           test -n "$manifest"
           test "$(jq -r .channel "$manifest")" = rc
-          test "$(jq -c .release_targets "$manifest")" = '["windows-x64"]'
+          test "$(jq -c .release_targets "$manifest")" = '["windows-x64","macos-x64","macos-arm64"]'
           mapfile -t assets < <(find promotion -maxdepth 1 -type f -printf '%f\n' | sort)
-          expected=(RCMetaStudio-windows-x64.zip SHA256SUMS release-set-rc.json windows-x64.cdx.json)
+          expected=(RCMetaStudio-macos-arm64.zip RCMetaStudio-macos-x64.zip RCMetaStudio-windows-x64.zip SHA256SUMS macos-arm64.cdx.json macos-x64.cdx.json release-set-rc.json windows-x64.cdx.json)
           test "${assets[*]}" = "${expected[*]}"
           (cd promotion && sha256sum --check SHA256SUMS)
-          gh attestation verify promotion/RCMetaStudio-windows-x64.zip --repo "${{ github.repository }}"
+          for artifact in promotion/RCMetaStudio-*.zip; do gh attestation verify "$artifact" --repo "${{ github.repository }}"; done
           source_sha="$(jq -r .source.commit "$manifest")"
           git fetch origin "refs/tags/$RC_TAG:refs/tags/$RC_TAG"
           test "$(git rev-list -n 1 "$RC_TAG")" = "$source_sha"
@@ -61,7 +61,7 @@ jobs:
           profile="$(jq -r .trust_profile promotion/release-set-stable.json)"
           if [ "$profile" = unsigned-community ]; then
             title="RC MetaStudio ${{ inputs.stable_version }}"
-            notes=$'**Signing status:** Unsigned Windows x64 community build.\n\nRC MetaStudio 0.2.0 is the Windows-only Qt 6 cutover; macOS packages are deferred to 0.2.1. Promoted from ${{ inputs.rc_tag }} without rebuilding or modifying deliverables.'
+            notes=$'**Signing status:** Unsigned community builds.\n\nWindows x64, macOS Intel x64, and macOS Apple Silicon artifacts were promoted from ${{ inputs.rc_tag }} without rebuilding or modifying deliverables. Their immutable hashes form the handoff boundary for future signing.'
           else
             title="RC MetaStudio ${{ inputs.stable_version }}"
             notes="Promoted from ${{ inputs.rc_tag }} without rebuilding or modifying deliverables."
@@ -73,6 +73,6 @@ jobs:
           else
             tag_args=(--target "$source_sha")
           fi
-          gh release create "$STABLE_TAG" promotion/RCMetaStudio-windows-x64.zip promotion/windows-x64.cdx.json promotion/SHA256SUMS promotion/release-set-stable.json "${tag_args[@]}" --title "$title" --notes "$notes"
+          gh release create "$STABLE_TAG" promotion/RCMetaStudio-*.zip promotion/*.cdx.json promotion/SHA256SUMS promotion/release-set-stable.json "${tag_args[@]}" --title "$title" --notes "$notes"
       - name: Prove promotion preserved artifact bytes
         run: (cd promotion && sha256sum --check SHA256SUMS)

@@ -29,6 +29,16 @@ inventory_validator = _load_script("validate_qt6_surface_inventory")
 native_smoke = _load_script("native_remaining_surfaces_smoke")
 
 
+def test_native_smoke_registers_application_resources_before_surface_factories():
+    source = (ROOT / "scripts/native_remaining_surfaces_smoke.py").read_text(
+        encoding="utf-8"
+    )
+
+    registration = source.index("qt6_resources.ensure_application_resources()")
+    factory_construction = source.index("factories = _surface_factories()")
+    assert registration < factory_construction
+
+
 def _write_bundle(root: Path) -> None:
     inventory = inventory_validator.load_and_validate()
     contracts = {
@@ -155,18 +165,13 @@ def _write_bundle(root: Path) -> None:
 
 def test_surface_inventory_matches_canonical_forms_factories_tests_and_document():
     payload = inventory_validator.load_and_validate()
-    workflow = (ROOT / ".github/workflows/qt6-macos-feasibility.yml").read_text(
-        encoding="utf-8"
-    )
 
     assert len(payload["forms"]) == 29
     assert inventory_validator.render_markdown(
         payload
     ) == inventory_validator.DOCUMENT_PATH.read_text(encoding="utf-8")
-    keyboard_setup = "defaults write NSGlobalDomain AppleKeyboardUIMode -int 3"
-    native_capture = "uv run python scripts/native_remaining_surfaces_smoke.py"
-    assert keyboard_setup in workflow
-    assert workflow.index(keyboard_setup) < workflow.index(native_capture)
+    assert not (ROOT / ".github/workflows/qt6-macos-feasibility.yml").exists()
+    assert (ROOT / ".github/workflows/package-target.yml").exists()
 
 
 def test_surface_inventory_rejects_canonical_form_drift(tmp_path):
@@ -328,6 +333,10 @@ def test_wizard_action_observer_uses_fresh_factory_choice_timing_and_return(qapp
         "reject_nonmutation": True,
         "rejected_observed": True,
     }
+    assert native_smoke._surface_capture_order()[0] == "main-wizard"
+    assert set(native_smoke._surface_capture_order()) == set(
+        native_smoke._remaining_surface_ids()
+    )
 
 
 def test_native_remaining_surface_evidence_rejects_programmatic_focus_movement(

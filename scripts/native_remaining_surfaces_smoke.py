@@ -58,6 +58,28 @@ def _record_path(root: Path, scale: float) -> Path:
     return root / ("scale-%s.json" % _slug(scale))
 
 
+def _surface_record_path(root: Path, scale: float, surface_id: str) -> Path:
+    return root / ".surface-records" / (
+        "scale-%s-%s.json" % (_slug(scale), surface_id)
+    )
+
+
+def _surface_capture_order() -> tuple[str, ...]:
+    surfaces = _remaining_surface_ids()
+    if "main-wizard" not in surfaces:
+        raise RuntimeError("remaining-surface inventory has no Main Wizard")
+    return ("main-wizard", *sorted(surfaces - {"main-wizard"}))
+
+
+def _qt_message_handler(message_type, context, message) -> None:
+    """Keep native Qt diagnostics visible even when a warning is fatal."""
+    location = ""
+    if context.file:
+        location = " (%s:%s)" % (context.file, context.line)
+    payload = "Qt %s%s: %s\n" % (message_type.name, location, message)
+    os.write(2, payload.encode("utf-8", errors="backslashreplace"))
+
+
 def _rect(rect) -> dict[str, int]:
     return {
         "x": rect.x(),
@@ -848,17 +870,19 @@ def _observe_window_contract(window, adaptive_window) -> dict[str, object]:
     }
 
 
-def _run_scale(scale: float, evidence_root: Path) -> None:
+def _capture_surface(scale: float, evidence_root: Path, surface_id: str) -> None:
     os.environ.setdefault("RCMS_STUB_BACKEND", "1")
     from PyQt6 import QtCore, QtGui, QtWidgets
     from PyQt6.QtTest import QTest
     from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
     prepare_generated_ui_imports()
+    QtCore.qInstallMessageHandler(_qt_message_handler)
     sys.path.append(str(ROOT / "src/rc_metastudio"))
-    from rc_metastudio import meta_py_r_backend
+    from rc_metastudio import meta_py_r_backend, qt6_resources
 
     meta_py_r_backend.install_stub_meta_py_r()
+    qt6_resources.ensure_application_resources()
     import adaptive_window
     import app_error_handler
 
@@ -877,10 +901,12 @@ def _run_scale(scale: float, evidence_root: Path) -> None:
     factories = _surface_factories()
     if set(factories) != _remaining_surface_ids():
         raise RuntimeError("native remaining-surface factory inventory drifted")
+    if surface_id not in factories:
+        raise ValueError("surface is not in the remaining-surface inventory")
     image_dir = evidence_root / ("scale-%s" % _scale_label(scale))
     image_dir.mkdir(parents=True, exist_ok=True)
     records = {}
-    for surface_id, factory in factories.items():
+    for surface_id, factory in [(surface_id, factories[surface_id])]:
         print("capturing %s at %s" % (surface_id, scale), flush=True)
         window = factory()
         try:
@@ -908,9 +934,6 @@ def _run_scale(scale: float, evidence_root: Path) -> None:
                     accessible = False
             destination = image_dir / (surface_id + ".png")
             capture = _capture(window, destination, evidence_root)
-            actions = _observe_actions(
-                app, factory, surface_id, QtCore, QtWidgets, QTest
-            )
             dpr = float(window.devicePixelRatioF())
             logical = _rect(frame)
             physical = {
@@ -921,6 +944,14 @@ def _run_scale(scale: float, evidence_root: Path) -> None:
             }
             window.close()
             app.processEvents()
+            # Finish the capture instance before action probes construct their
+            # own top-level windows. Keeping a captured QWizard alive while two
+            # more MainWizard trees were created caused an intermittent Windows
+            # native fast-fail (0xC0000409) despite each evidence surface already
+            # having its own process.
+            actions = _observe_actions(
+                app, factory, surface_id, QtCore, QtWidgets, QTest
+            )
             records[surface_id] = {
                 "accessibility": accessible,
                 "actions": actions,
@@ -954,10 +985,63 @@ def _run_scale(scale: float, evidence_root: Path) -> None:
         "surfaces": records,
         "tab_focus_behavior": tab_focus_behavior,
     }
-    evidence_root.mkdir(parents=True, exist_ok=True)
-    _record_path(evidence_root, scale).write_text(
+    record_path = _surface_record_path(evidence_root, scale, surface_id)
+    record_path.parent.mkdir(parents=True, exist_ok=True)
+    record_path.write_text(
         json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+
+
+def _run_scale(scale: float, evidence_root: Path) -> None:
+    environment = os.environ.copy()
+    for surface_id in _surface_capture_order():
+        subprocess.run(
+            [
+                sys.executable,
+                str(Path(__file__).resolve()),
+                "--scale",
+                str(scale),
+                "--surface",
+                surface_id,
+                "--evidence-root",
+                str(evidence_root),
+            ],
+            cwd=ROOT,
+            env=environment,
+            check=True,
+        )
+    fragments = [
+        json.loads(
+            _surface_record_path(evidence_root, scale, surface_id).read_text(
+                encoding="utf-8"
+            )
+        )
+        for surface_id in _surface_capture_order()
+    ]
+    if not fragments:
+        raise RuntimeError("remaining-surface inventory is empty")
+    common = {
+        key: fragments[0][key]
+        for key in ("qpa", "scale_factor", "tab_focus_behavior")
+    }
+    if any(
+        any(fragment[key] != value for key, value in common.items())
+        for fragment in fragments
+    ):
+        raise RuntimeError("isolated remaining-surface runtime identity drifted")
+    surfaces = {}
+    for fragment in fragments:
+        if len(fragment["surfaces"]) != 1:
+            raise RuntimeError("isolated remaining-surface record is not singular")
+        surfaces.update(fragment["surfaces"])
+    evidence_root.mkdir(parents=True, exist_ok=True)
+    _record_path(evidence_root, scale).write_text(
+        json.dumps({**common, "surfaces": surfaces}, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    for surface_id in _surface_capture_order():
+        _surface_record_path(evidence_root, scale, surface_id).unlink()
+    _surface_record_path(evidence_root, scale, "placeholder").parent.rmdir()
 
 
 def _native_dpr() -> float:
@@ -984,6 +1068,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--evidence-root", type=Path, default=DEFAULT_EVIDENCE_ROOT)
     parser.add_argument("--scale", type=float)
+    parser.add_argument("--surface")
     parser.add_argument("--validate-only", action="store_true")
     args = parser.parse_args()
     if args.validate_only:
@@ -992,8 +1077,13 @@ def main() -> int:
     if args.scale is not None:
         if args.scale not in SCALE_FACTORS:
             raise ValueError("scale must be one of the four required factors")
+        if args.surface is not None:
+            _capture_surface(args.scale, args.evidence_root, args.surface)
+            return 0
         _run_scale(args.scale, args.evidence_root)
         return 0
+    if args.surface is not None:
+        raise ValueError("surface requires scale")
     native_dpr = _native_dpr()
     if native_dpr <= 0:
         raise RuntimeError("native Qt reported an invalid device pixel ratio")

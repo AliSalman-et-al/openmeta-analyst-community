@@ -23,6 +23,10 @@ from rc_metastudio.qt6_macos_feasibility import (
     is_macho_candidate,
 )
 from rc_metastudio.r_runtime import macos_r_framework_version
+from rc_metastudio.macos_r_profile_schema import (
+    ProfileSchemaError,
+    validate_profile_evidence,
+)
 
 
 EXPECTED_VERSIONS = {
@@ -36,7 +40,7 @@ EXPECTED_VERSIONS = {
     "pyinstaller": "6.21.0",
 }
 EXPECTED_SUMMARY_SHA256 = (
-    "78294820c83cd94c19dfdca8c24b6a96cdc8b6f1319a5cd1bedffacde73851e2"
+    "f83aafec6de6b2ba65e0fdc9def3c47e8deb9cb86ad6a990adf962e79b9d18b5"
 )
 MAX_FILES = 25_000
 MAX_BYTES = 3_000_000_000
@@ -44,8 +48,12 @@ MAX_ARCHIVE_MEMBERS = 30_000
 MAX_ARCHIVE_UNCOMPRESSED_BYTES = 3_000_000_000
 PORTABLE_FORBIDDEN = set('<>:"/\\|?*')
 TARGET_CONTRACTS = {
-    "macos-x64": {"architecture": "x86_64", "minimum_macos": "13.0"},
+    "macos-x64": {"architecture": "x86_64", "minimum_macos": "14.0"},
     "macos-arm64": {"architecture": "arm64", "minimum_macos": "14.0"},
+}
+TARGET_RUNNERS = {
+    "macos-x64": {"architecture": "X64", "label": "macos-15-intel"},
+    "macos-arm64": {"architecture": "ARM64", "label": "macos-15"},
 }
 DIRECT_R_MARKER_RELATIVE = Path("Contents/Resources/direct-r-spike.marker")
 DIRECT_R_MARKER_SHA256 = (
@@ -57,6 +65,16 @@ DIRECT_R_OFFICIAL_URL = (
 DIRECT_R_OFFICIAL_SHA256 = (
     "612bb00cb4c627721d6d80b0f5224227c0fcdefb4a5b6c917511480361c16571"
 )
+DIRECT_R_OFFICIAL_INPUTS = {
+    "macos-x64": {
+        "url": DIRECT_R_OFFICIAL_URL,
+        "sha256": DIRECT_R_OFFICIAL_SHA256,
+    },
+    "macos-arm64": {
+        "url": "https://cloud.r-project.org/bin/macosx/sonoma-arm64/base/R-4.6.1-arm64.pkg",
+        "sha256": "67f6eea4ced4ce48f0a0d4fa3a1cac43d1859a05a88993ee3dff7c52e7edbc4b",
+    },
+}
 DIRECT_R_PPM_SNAPSHOT = "https://packagemanager.posit.co/cran/2026-07-16"
 DIRECT_R_HSROC_URL = (
     "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz"
@@ -183,10 +201,6 @@ def validate_r_delivery_identity(
         )
 
     if probe_direct:
-        if target != "macos-x64" or architecture != "x86_64":
-            raise MacOSDeploymentInspectionError(
-                "direct R spike identity is only valid for macOS Intel x64"
-            )
         if kit_root.exists():
             raise MacOSDeploymentInspectionError(
                 "deployment mixes direct R spike and integration-kit identities"
@@ -198,17 +212,14 @@ def validate_r_delivery_identity(
             )
         return {
             "direct_r_build": {
-                "kind": "non-release-macos-x64-direct-r-spike",
+                "kind": "target-native-macos-r",
                 "source_commit": source_commit,
                 "runtime_probe_sha256": _canonical_json_sha256(runtime_probe),
                 "marker": {
                     "path": DIRECT_R_MARKER_RELATIVE.as_posix(),
                     "sha256": marker_sha256,
                 },
-                "official_r": {
-                    "url": DIRECT_R_OFFICIAL_URL,
-                    "sha256": DIRECT_R_OFFICIAL_SHA256,
-                },
+                "official_r": DIRECT_R_OFFICIAL_INPUTS[target],
                 "ppm_snapshot": DIRECT_R_PPM_SNAPSHOT,
             }
         }
@@ -871,15 +882,11 @@ def validate_r_framework_inventory(
         f"{resources}/library/RCMetaR/DESCRIPTION",
         f"{resources}/Info.plist",
     }
-    native_paths = (
-        [
-            f"{resources}/bin/Rscript",
-            f"{resources}/bin/exec/R",
-            f"{resources}/lib/libR.dylib",
-        ]
-        if delivery_kind == "direct-spike"
-        else [f"{version_root}/R"]
-    )
+    native_paths = [f"{version_root}/R"]
+    if delivery_kind == "direct-spike":
+        native_paths.extend(
+            [f"{resources}/bin/Rscript.real", f"{resources}/bin/exec/R"]
+        )
     if delivery_kind == "direct-spike":
         launcher = by_path.get(f"{resources}/bin/R", {})
         if (
@@ -921,15 +928,15 @@ def validate_r_framework_inventory(
             {
                 f"{framework}/R": (
                     "Versions/Current/R",
-                    f"{resources}/lib/libR.dylib",
-                ),
-                f"{version_root}/R": (
-                    "Resources/lib/libR.dylib",
-                    f"{resources}/lib/libR.dylib",
+                    f"{version_root}/R",
                 ),
                 f"{resources}/R": (
                     "bin/R",
                     f"{resources}/bin/R",
+                ),
+                f"{resources}/lib/libR.dylib": (
+                    "../../R",
+                    f"{version_root}/R",
                 ),
             }
         )
@@ -946,7 +953,6 @@ def validate_r_framework_inventory(
         record = by_path.get(path, {})
         if (
             record.get("kind") != "symlink"
-            or record.get("mode") != 0o777
             or record.get("link_target") != target
             or record.get("resolved_path") != resolved
         ):
@@ -1263,6 +1269,7 @@ def finalize_smoke_evidence(
     launchservices_marker: Path | None = None,
     *,
     require_direct_teardown: bool = False,
+    persist: bool = True,
 ) -> dict:
     evidence = json.loads(path.read_text(encoding="utf-8"))
     if evidence.get("failures") or evidence.get("surface_progress"):
@@ -1279,13 +1286,14 @@ def finalize_smoke_evidence(
         if (
             marker.get("schema_version") != 1
             or marker.get("platform_plugin") != "cocoa"
-            or marker.get("project") != "amino.rcms"
+            or marker.get("project") != "BCG.rcms"
             or marker.get("post_close") is not True
             or not isinstance(marker.get("pid"), int)
         ):
             raise MacOSDeploymentInspectionError(
                 "normal LaunchServices app entry did not produce its completion marker"
             )
+    validate_packaged_workflow_evidence(evidence)
     if require_direct_teardown:
         required_markers = (
             "packaged-workflow:teardown:close:start",
@@ -1327,10 +1335,62 @@ def finalize_smoke_evidence(
         "clean_exit": True,
         "direct_teardown_trace": require_direct_teardown,
     }
-    path.write_text(
-        json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    if persist:
+        path.write_text(
+            json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
     return evidence
+
+
+def validate_packaged_workflow_evidence(evidence: dict) -> None:
+    workflows = evidence.get("workflows", {})
+    locale_variants = workflows.get("locale_variants", [])
+    sample_projects = workflows.get("sample_projects", {})
+    sample_records = sample_projects.get("projects", [])
+    if not (
+        evidence.get("passed") is True
+        and not evidence.get("failures")
+        and all(
+            workflows.get(key) is True
+            for key in (
+                "automation_entry_point",
+                "representative_edit",
+                "real_r_analysis",
+                "result_text",
+                "save_reopen",
+                "analysis_after_reopen",
+            )
+        )
+        and workflows.get("converted_sample") == "BCG.rcms"
+        and workflows.get("expected_normalized_summary_sha256")
+        == EXPECTED_SUMMARY_SHA256
+        and workflows.get("normalized_summary_sha256") == EXPECTED_SUMMARY_SHA256
+        and _valid_sha256(workflows.get("raw_summary_sha256"))
+        and _valid_sha256_map(workflows.get("svg_sha256"))
+        and [item.get("locale") for item in locale_variants] == ["en_US", "de_DE"]
+        and all(
+            item.get("normalized_summary_sha256") == EXPECTED_SUMMARY_SHA256
+            and item.get("raw_summary_sha256") == workflows.get("raw_summary_sha256")
+            for item in locale_variants
+        )
+        and sample_projects.get("passed") is True
+        and _valid_sha256(sample_projects.get("manifest_sha256"))
+        and isinstance(sample_records, list)
+        and bool(sample_records)
+        and len({item.get("project") for item in sample_records})
+        == len(sample_records)
+        and all(
+            isinstance(item.get("project"), str)
+            and item.get("project", "").endswith(".rcms")
+            and _valid_sha256(item.get("sha256"))
+            and _valid_sha256(item.get("semantic_sha256"))
+            and item.get("opened_in_packaged_application") is True
+            for item in sample_records
+        )
+    ):
+        raise MacOSDeploymentInspectionError(
+            "packaged workflow result evidence is incomplete"
+        )
 
 
 def validate_direct_build_manifest(payload: dict, *, target: str) -> dict:
@@ -1361,11 +1421,7 @@ def validate_direct_build_manifest(payload: dict, *, target: str) -> dict:
     official_r = payload.get("official_r")
     if (
         not isinstance(official_r, dict)
-        or official_r
-        != {
-            "url": DIRECT_R_OFFICIAL_URL,
-            "sha256": DIRECT_R_OFFICIAL_SHA256,
-        }
+        or official_r != DIRECT_R_OFFICIAL_INPUTS[target]
         or payload.get("ppm_snapshot") != DIRECT_R_PPM_SNAPSHOT
         or not valid_sha256(payload.get("rpy2_api_bridge_source_sha256"))
     ):
@@ -1496,16 +1552,18 @@ def validate_direct_build_runner(runner: dict, *, target: str) -> None:
         and runner.get("macos_build")
     ):
         raise MacOSDeploymentInspectionError(
-            "direct-build runner is not native macOS Intel"
+            f"direct-build runner is not native {target}"
         )
     hosted = runner.get("github_actions") == "true"
     if hosted:
+        expected = TARGET_RUNNERS[target]
         if (
-            runner.get("runner_arch") != "X64"
-            or runner.get("runner_image") != "macos-15-intel"
+            runner.get("runner_arch") != expected["architecture"]
+            or runner.get("runner_label") != expected["label"]
+            or not runner.get("runner_image")
         ):
             raise MacOSDeploymentInspectionError(
-                "hosted direct-build runner is not macos-15-intel"
+                f"hosted direct-build runner does not match {target}"
             )
     elif runner.get("github_actions") not in ("false", False):
         raise MacOSDeploymentInspectionError(
@@ -1671,18 +1729,26 @@ def inspect_archive(
         embedded_hashes = {}
         for relative, source in embedded_files.items():
             member = prefix + relative
-            if member not in names or bundle.read(member) != source.read_bytes():
+            archived_payload = bundle.read(member) if member in names else None
+            source_payload = source.read_bytes()
+            matches = archived_payload == source_payload
+            if relative == "qualification/direct-r-build-manifest.json":
+                # The archived object is validated below and every input it
+                # names is re-hashed directly from this ZIP. The workspace copy
+                # is only the signal that direct-build validation is required.
+                matches = archived_payload is not None
+            if not matches:
                 raise MacOSDeploymentInspectionError(
                     f"ZIP qualification input is missing or changed: {member}"
                 )
-            embedded_hashes[relative] = hashlib.sha256(bundle.read(member)).hexdigest()
+            embedded_hashes[relative] = hashlib.sha256(archived_payload).hexdigest()
         direct_manifest_path = embedded_files.get(
-            "qualification/direct-build-manifest.json"
+            "qualification/direct-r-build-manifest.json"
         )
         direct_manifest = None
         if direct_manifest_path is not None:
             direct_manifest = validate_direct_build_manifest(
-                json.loads(direct_manifest_path.read_text(encoding="utf-8")),
+                json.loads(bundle.read(prefix + "qualification/direct-r-build-manifest.json")),
                 target=target,
             )
             validate_direct_build_archive_inputs(
@@ -1827,6 +1893,12 @@ def _valid_sha256(value: object) -> bool:
     )
 
 
+def _contains_expected_hashes(actual: object, expected: dict[str, str]) -> bool:
+    return isinstance(actual, dict) and all(
+        actual.get(path) == digest for path, digest in expected.items()
+    )
+
+
 def validate_macos_surface_records(scales: object) -> None:
     if not isinstance(scales, list) or not all(
         isinstance(item, dict) for item in scales
@@ -1956,6 +2028,7 @@ def write_qualification_evidence(
         extracted_smoke_log,
         extracted_launchservices_marker,
         require_direct_teardown=True,
+        persist=False,
     )
     if not (
         extracted_smoke.get("passed") is True
@@ -1985,88 +2058,27 @@ def write_qualification_evidence(
     contract = TARGET_CONTRACTS[target]
     architecture = contract["architecture"]
     profile = json.loads(r_runtime_profile.read_text(encoding="utf-8"))
-    expected_profile_paths = [
-        "library/grDevices/libs/cairo.so",
-        "library/tcltk",
-        "modules/R_X11.so",
-        "modules/R_de.so",
-    ]
-    if not (
-        profile.get("schema_version") == 1
-        and profile.get("policy")
-        == "official-cran-r-with-optional-x11-tcl-surfaces-removed"
-        and profile.get("hard_dependency_fields") == ["Depends", "Imports", "LinkingTo"]
-        and _valid_sha256(profile.get("dependency_manifest", {}).get("sha256"))
-        and "tcltk"
-        not in {
-            str(name).casefold() for name in profile.get("hard_dependency_closure", [])
-        }
-        and profile.get("source_framework", {}).get("version") == EXPECTED_VERSIONS["r"]
-        and profile.get("source_framework", {}).get("expected_architecture")
-        == architecture
-        and profile.get("source_framework", {})
-        .get("canonical_macho", {})
-        .get("relative_path")
-        == "lib/libR.dylib"
-        and profile.get("source_framework", {})
-        .get("canonical_macho", {})
-        .get("architectures")
-        == [architecture]
-        and profile.get("source_framework", {})
-        .get("executable_macho", {})
-        .get("relative_path")
-        == "bin/exec/R"
-        and profile.get("source_framework", {})
-        .get("executable_macho", {})
-        .get("architectures")
-        == [architecture]
-        and profile.get("source_framework", {}).get("launcher", {}).get("relative_path")
-        == "bin/R"
-        and profile.get("source_framework", {}).get("launcher", {}).get("kind")
-        == "script"
-        and _valid_sha256(
-            profile.get("source_framework", {}).get("launcher", {}).get("sha256")
+    try:
+        validate_profile_evidence(
+            profile,
+            expected_r_version=EXPECTED_VERSIONS["r"],
+            expected_architecture=architecture,
         )
-        and _valid_sha256(
-            profile.get("source_framework", {}).get("source_tree_identity_sha256")
-        )
-        and _valid_sha256(
-            profile.get("source_framework", {}).get("pre_profile_tree_identity_sha256")
-        )
-        and profile.get("post_profile_exclusions") == expected_profile_paths
-        and [
-            entry.get("relative_path") for entry in profile.get("excluded_surfaces", [])
-        ]
-        == [
-            "library/tcltk",
-            "modules/R_X11.so",
-            "modules/R_de.so",
-            "library/grDevices/libs/cairo.so",
-        ]
-    ):
+    except ProfileSchemaError as exc:
         raise MacOSDeploymentInspectionError(
             "embedded R profile evidence is incomplete"
-        )
-    smoke = json.loads(smoke_evidence.read_text(encoding="utf-8"))
+        ) from exc
+    smoke = finalize_smoke_evidence(
+        smoke_evidence,
+        smoke_log,
+        launchservices_marker,
+        require_direct_teardown=True,
+        persist=False,
+    )
     archive_report = json.loads(archive_inspection.read_text(encoding="utf-8"))
     validate_direct_build_manifest(
         json.loads(direct_build_manifest.read_text(encoding="utf-8")), target=target
     )
-    workflows = smoke.get("workflows", {})
-    scales = smoke.get("scales", [])
-    log_text = smoke_log.read_text(encoding="utf-8")
-    required_markers = {
-        "packaged-runtime-probe:passed",
-        "packaged-workflow:shell-created",
-        "packaged-workflow:paint:complete",
-        "packaged-workflow:project-exercise:complete",
-        "packaged-workflow:evidence-written",
-        "packaged-workflow:post-close",
-        "startup-project:normal-entry-point-passed",
-        "packaged-surface:scale-1.25-passed",
-        "packaged-surface:scale-1.50-passed",
-        "packaged-surface:scale-1.75-passed",
-    }
     expected_embedded = {
         "qualification/deployment-manifest.json": sha256_file(deployment_manifest),
         "qualification/ad-hoc-signing-inventory.json": sha256_file(signing_inventory),
@@ -2084,8 +2096,7 @@ def write_qualification_evidence(
         "qualification/packaged-smoke.stderr.log": sha256_file(smoke_stderr),
         "qualification/packaged-smoke.hang-trace.log": sha256_file(hang_trace),
     }
-    validate_macos_surface_records(scales)
-    locale_variants = workflows.get("locale_variants", [])
+    archived_embedded = archive_report.get("embedded_sha256", {})
     if not (
         deployment.get("target") == target
         and deployment.get("stack") == EXPECTED_VERSIONS
@@ -2095,38 +2106,11 @@ def write_qualification_evidence(
         == "qualification/ad-hoc-signing-inventory.json"
         and deployment.get("signing_inventory", {}).get("sha256")
         == sha256_file(signing_inventory)
-        and smoke.get("passed") is True
-        and not smoke.get("failures")
-        and not smoke.get("surface_progress")
-        and all(
-            workflows.get(key) is True
-            for key in (
-                "automation_entry_point",
-                "representative_edit",
-                "real_r_analysis",
-                "result_text",
-                "save_reopen",
-                "analysis_after_reopen",
-            )
-        )
-        and workflows.get("converted_sample") == "amino.rcms"
-        and workflows.get("expected_normalized_summary_sha256")
-        == EXPECTED_SUMMARY_SHA256
-        and workflows.get("normalized_summary_sha256") == EXPECTED_SUMMARY_SHA256
-        and _valid_sha256(workflows.get("raw_summary_sha256"))
-        and _valid_sha256_map(workflows.get("svg_sha256"))
-        and [item.get("locale") for item in locale_variants] == ["en_US", "de_DE"]
-        and all(
-            item.get("normalized_summary_sha256") == EXPECTED_SUMMARY_SHA256
-            and item.get("raw_summary_sha256") == workflows.get("raw_summary_sha256")
-            for item in locale_variants
-        )
         and smoke.get("execution", {}).get("clean_exit") is True
         and smoke.get("execution", {}).get("launchservices_completion_marker") is True
-        and required_markers <= set(log_text.splitlines())
         and archive_report.get("target") == target
         and archive_report.get("archive_sha256") == sha256_file(archive)
-        and archive_report.get("embedded_sha256") == expected_embedded
+        and _contains_expected_hashes(archived_embedded, expected_embedded)
     ):
         raise MacOSDeploymentInspectionError(
             "macOS packaged qualification evidence is incomplete"
@@ -2366,7 +2350,7 @@ def main() -> int:
                     args.launchservices_marker
                 )
             if args.direct_build_manifest is not None:
-                embedded_files["qualification/direct-build-manifest.json"] = (
+                embedded_files["qualification/direct-r-build-manifest.json"] = (
                     args.direct_build_manifest
                 )
             else:

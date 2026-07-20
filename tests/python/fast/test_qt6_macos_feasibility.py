@@ -510,101 +510,62 @@ def test_native_macos_evidence_fails_closed_on_incomplete_or_mismatched_proof(
         validate_evidence(evidence, "macos-arm64")
 
 
-def test_native_macos_workflow_uses_two_strict_native_jobs_and_retains_evidence():
-    workflow_path = ROOT / ".github/workflows/qt6-macos-feasibility.yml"
+def test_native_macos_workflow_uses_one_ordered_native_package_matrix():
+    workflow_path = ROOT / ".github/workflows/package-target.yml"
     workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
-    job = workflow["jobs"]["native-macos-feasibility"]
+    job = workflow["jobs"]["package"]
     targets = job["strategy"]["matrix"]["include"]
 
     assert targets == [
-        {"target": "macos-x64", "runner": "macos-15-intel", "machine": "x86_64"},
-        {"target": "macos-arm64", "runner": "macos-14", "machine": "arm64"},
+        {
+            "target": "macos-x64",
+            "architecture": "x64",
+            "runner": "macos-15-intel",
+            "artifact": "RCMetaStudio-macos-x64",
+        },
+        {
+            "target": "macos-arm64",
+            "architecture": "arm64",
+            "runner": "macos-15",
+            "artifact": "RCMetaStudio-macos-arm64",
+        },
     ]
     assert job["strategy"]["fail-fast"] is False
-    assert job["continue-on-error"] is False
+    assert job["strategy"]["max-parallel"] == 2
     assert job["runs-on"] == "${{ matrix.runner }}"
     steps = {step["name"]: step for step in job["steps"]}
-    success_upload = steps["Upload successful native feasibility evidence"]
-    failure_upload = steps["Upload early failure diagnostics"]
-    assert success_upload["if"] == "${{ success() }}"
-    assert success_upload["with"]["if-no-files-found"] == "error"
-    assert failure_upload["if"] == "${{ failure() }}"
-    assert failure_upload["continue-on-error"] is True
-    assert failure_upload["with"]["if-no-files-found"] == "warn"
-    step_names = list(steps)
-    assert step_names.index("Prepare retained setup diagnostics") < step_names.index(
-        "Install uv"
-    )
-    assert "mkdir -p" in steps["Prepare retained setup diagnostics"]["run"]
-    assert "setup.log" in steps["Prepare retained setup diagnostics"]["run"]
+    assert steps["Upload immutable unsigned package"]["with"]["if-no-files-found"] == "error"
+    evidence_upload = steps["Upload bring-up evidence and failure diagnostics"]
+    assert evidence_upload["if"] == "${{ always() }}"
+    assert evidence_upload["with"]["if-no-files-found"] == "warn"
 
     script_steps = "\n".join(str(step.get("run", "")) for step in job["steps"])
-    assert "uv sync --locked" in script_steps
-    assert "uv run aqt install-qt mac desktop" in script_steps
+    assert "aqt install-qt mac desktop" in script_steps
     assert "qt6_macos_feasibility.py resolve-rcc" in script_steps
-    assert "/macos/bin/rcc" not in script_steps
-    assert workflow["env"]["R_VERSION"] == "4.6.1"
-    assert "qt6_macos_feasibility.py run" in script_steps
-    assert "qt6_macos_feasibility.py validate" in script_steps
+    assert "scripts/package-macos.sh --architecture" in script_steps
     assert "continue-on-error" not in script_steps
+    assert not (ROOT / ".github/workflows/qt6-macos-feasibility.yml").exists()
 
     metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     assert "aqtinstall==3.3.0" in metadata["dependency-groups"]["dev"]
 
 
 def test_native_macos_workflow_rebuilds_and_proves_locked_rpy2_api_bridge():
-    workflow = yaml.safe_load(
-        (ROOT / ".github/workflows/qt6-macos-feasibility.yml").read_text(
-            encoding="utf-8"
-        )
-    )
-    steps = workflow["jobs"]["native-macos-feasibility"]["steps"]
-    step_names = [step["name"] for step in steps]
-    rebuild = next(
-        step
-        for step in steps
-        if step["name"] == "Rebuild and prove native rpy2 API bridge"
-    )
-    script = rebuild["run"]
-
-    assert (
-        step_names.index("Install native R")
-        < step_names.index("Sync locked application stack")
-        < step_names.index("Rebuild and prove native rpy2 API bridge")
-    )
-    assert step_names.index(
-        "Rebuild and prove native rpy2 API bridge"
-    ) < step_names.index("Run source, R, and packaged native proof")
-    assert 'export R_HOME="$(R RHOME)"' in script
-    assert "export RPY2_CFFI_MODE=API" in script
-    assert "uv sync --locked --reinstall-package rpy2-rinterface" in script
-    assert "--no-binary-package rpy2-rinterface" in script
-    assert 'metadata.version("rpy2-rinterface")' in script
-    assert '= "3.6.6"' in script
-    assert 'lipo -archs "$bridge"' in script
-    assert "otool -L" in script and "count + 0" in script
-    assert 'openrlib.cffi_mode.name != "API"' in script
-    assert 'robjects.r("sum(c(1.25, 2.5, 3.75))")' in script
-
-    assert set(workflow[True]) == {"workflow_dispatch"}
-    specification = (
-        ROOT / "packaging/pyinstaller/qt6-macos-feasibility.spec"
-    ).read_text(encoding="utf-8")
-    assert "filter_pyinstaller_r_binaries" in specification
-    assert "RCMS_FEASIBILITY_R_TOC" in specification
-    assert '"_rinterface_cffi_api"' in specification
-    assert '"_rinterface_cffi_abi"' in specification
-    assert "collect_all(" not in specification
-    assert "qt.conf" not in specification
-    feasibility = (ROOT / "src/rc_metastudio/qt6_macos_feasibility.py").read_text(
+    script = (ROOT / "scripts/build-macos-package.sh").read_text(encoding="utf-8")
+    specification = (ROOT / "packaging/pyinstaller/rc-metastudio-macos.spec").read_text(
         encoding="utf-8"
     )
-    profile = feasibility.index("profile_macos_embedded_r_runtime.py")
-    launchers = feasibility.index("configure_macos_r_launchers.py")
-    relocation = feasibility.index("relocate_macos_r_runtime.sh")
-    assert profile < launchers < relocation
-    assert '"--runtime-only"' in feasibility
-    assert '"--official-framework-layout"' in feasibility
+
+    assert "RPY2_CFFI_MODE=API" in script
+    assert "--no-binary rpy2-rinterface" in script
+    assert '"$python_exe" - "$rpy2_api_bridge" "$machine"' in script
+    assert 'expected_architecture = sys.argv[2]' in script
+    assert '["lipo", "-archs", str(bridge)]' in script
+    assert "otool -L" in script
+    assert 'openrlib.cffi_mode.name != "API"' in script
+    assert 'robjects.r("1 + 1")' in script
+    assert '"_rinterface_cffi_api"' in specification
+    assert '"_rinterface_cffi_abi"' in specification
 
 
 def test_locked_rpy2_runtime_discovers_concrete_native_extensions():

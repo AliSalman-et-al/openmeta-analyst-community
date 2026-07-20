@@ -501,6 +501,28 @@ def test_structured_project_lifecycle_opens_every_sample_and_round_trips_state(
         _close_shell(app, window)
 
 
+def test_packaged_sample_evidence_covers_the_authoritative_manifest(qapp):
+    import launch
+
+    app, window = launch.start_automation()
+    try:
+        evidence = launch._exercise_all_packaged_samples(
+            window, ROOT / "sample_projects" / "BCG.rcms"
+        )
+        manifest = json.loads(
+            (ROOT / "sample_projects" / "manifest.json").read_text(encoding="utf-8")
+        )
+        assert evidence["passed"] is True
+        assert [item["project"] for item in evidence["projects"]] == sorted(
+            item["file"] for item in manifest["projects"]
+        )
+        assert all(
+            item["opened_in_packaged_application"] for item in evidence["projects"]
+        )
+    finally:
+        _close_shell(app, window)
+
+
 def test_structured_project_restores_nondefault_active_selection_without_normalizing_it(
     qapp, tmp_path, monkeypatch
 ):

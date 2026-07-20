@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""Authoritative PyInstaller definition for the native macOS Intel app."""
+"""Authoritative PyInstaller definition for both native macOS applications."""
 
 import os
 import hashlib
@@ -36,6 +36,8 @@ expected_bridge_sha256 = os.environ.get("RCMS_RPY2_API_BRIDGE_SHA256")
 if direct_r_toc_path:
     direct_r_toc = json.loads(Path(direct_r_toc_path).read_text(encoding="utf-8"))["entries"]
     direct_r_map = json.loads(Path(direct_r_map_path).read_text(encoding="utf-8"))["mapped_sources"]
+    # Retain only the provenance marker. R.framework itself is injected after
+    # PyInstaller so that it has exactly one layout/signing owner.
     direct_r_datas.append(
         (str(repo_root / "packaging" / "pyinstaller" / "direct-r-spike.marker"), ".")
     )
@@ -83,24 +85,14 @@ a = Analysis(
     optimize=0,
 )
 if direct_r_toc:
-    r_framework_sources = [
-        Path(entry["source"]).resolve()
-        for entry in direct_r_toc
-        if entry["type"] == "DATA"
-    ]
-    if not r_framework_sources:
-        raise ValueError("explicit R TOC has no data members")
-    r_framework_root = Path(os.path.commonpath(r_framework_sources)).parent
-    while r_framework_root.name != "R.framework":
-        if r_framework_root.parent == r_framework_root:
-            raise ValueError("explicit R TOC is not rooted in R.framework")
-        r_framework_root = r_framework_root.parent
+    r_framework_root = Path(os.environ["RCMS_STAGED_R_FRAMEWORK"]).resolve(strict=True)
+    if r_framework_root.name != "R.framework":
+        raise ValueError("staged R framework root is invalid")
     a.binaries = adapter_module.filter_pyinstaller_r_binaries(
         list(a.binaries), r_framework_root
     )
-    a.datas.extend(
-        (entry["destination"], entry["source"], entry["type"])
-        for entry in direct_r_toc
+    a.datas = adapter_module.filter_pyinstaller_r_binaries(
+        list(a.datas), r_framework_root
     )
     if hashlib.sha256(bridge_source.read_bytes()).hexdigest() != expected_bridge_sha256:
         raise ValueError("rpy2 API bridge changed during PyInstaller Analysis")
@@ -138,7 +130,7 @@ app = BUNDLE(
     ),
     version=os.environ.get("RCMS_PROJECT_VERSION", "0.2.0"),
     info_plist={
-        "LSMinimumSystemVersion": os.environ.get("RCMS_MINIMUM_MACOS_VERSION", "13.0"),
+        "LSMinimumSystemVersion": os.environ.get("RCMS_MINIMUM_MACOS_VERSION", "14.0"),
         "NSHighResolutionCapable": True,
         "NSPrincipalClass": "NSApplication",
     },

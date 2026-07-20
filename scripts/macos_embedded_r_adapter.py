@@ -54,11 +54,23 @@ def filter_pyinstaller_r_binaries(
             retained.append((destination, source, typecode))
         return retained
     staged_root = staged_framework.resolve(strict=True)
+    staged_library = staged_root / "Resources/lib"
+    staged_library_names = {
+        path.name for path in staged_library.iterdir() if path.is_file() or path.is_symlink()
+    }
     retained = []
+    excluded = []
     for destination, source, typecode in binaries:
+        destination_path = Path(str(destination).replace("\\", "/"))
+        if (
+            destination_path.parent == Path(".")
+            and destination_path.name in staged_library_names
+        ):
+            excluded.append((destination, source, typecode))
+            continue
         try:
             Path(source).resolve(strict=True).relative_to(staged_root)
-        except ValueError:
+        except (OSError, ValueError):
             source_text = str(source).replace("\\", "/")
             destination_text = str(destination).replace("\\", "/")
             if (
@@ -74,8 +86,15 @@ def filter_pyinstaller_r_binaries(
             # The explicit framework TOC is authoritative.  Exclude exactly
             # its members from PyInstaller's dependency walk rather than
             # recognizing a few host-path prefixes.
+            excluded.append((destination, source, typecode))
             continue
         retained.append((destination, source, typecode))
+    if excluded:
+        destinations = ", ".join(sorted(str(item[0]) for item in excluded))
+        print(
+            f"[RCMS-PYINSTALLER-FILTER] excluded {len(excluded)} staged-R "
+            f"entries: {destinations}"
+        )
     return retained
 
 
@@ -240,6 +259,23 @@ def audit_symlinks(framework: Path) -> list[dict[str, str]]:
     version = current_version(framework)
     observed = {record["path"] for record in records}
     required = {item.format(version=version) for item in OFFICIAL_ALIASES}
+    version_executable = f"Versions/{version}/R"
+    # The official installer ships the framework executable as a symlink to
+    # libR. Before code signing we invert that pair into Apple's canonical
+    # framework form: a regular versioned executable and a relative libR
+    # compatibility symlink back to it. Accept and prove either boundary.
+    if version_executable not in observed:
+        required.remove(version_executable)
+        executable = framework / version_executable
+        runtime_alias = framework / f"Versions/{version}/Resources/lib/libR.dylib"
+        if (
+            not executable.is_file()
+            or executable.is_symlink()
+            or not runtime_alias.is_symlink()
+            or Path(os.readlink(runtime_alias)) != Path("../../R")
+            or runtime_alias.resolve(strict=True) != executable.resolve(strict=True)
+        ):
+            raise AdapterError("canonical R framework executable layout is invalid")
     missing = required - observed
     if missing:
         raise AdapterError(
@@ -513,27 +549,39 @@ def post_app_gate(app: Path, architecture: str, output: Path) -> None:
     native = macho_inventory(framework, architecture)
     validate_relocated_inventory(framework, native)
     lib_r_paths = list(app.rglob("libR.dylib"))
-    expected_lib_r = (framework / "Resources/lib/libR.dylib").resolve(strict=True)
+    version = current_version(framework)
+    expected_lib_r_link = (
+        framework / f"Versions/{version}/Resources/lib/libR.dylib"
+    )
+    expected_lib_r = (framework / f"Versions/{version}/R").resolve(strict=True)
     if (
         len(lib_r_paths) != 1
-        or lib_r_paths[0].is_symlink()
+        or lib_r_paths[0] != expected_lib_r_link
+        or not lib_r_paths[0].is_symlink()
+        or Path(os.readlink(lib_r_paths[0])) != Path("../../R")
         or lib_r_paths[0].resolve() != expected_lib_r
         or not is_macho_candidate(expected_lib_r)
         or architectures(expected_lib_r) != [architecture]
     ):
         raise AdapterError(f"final app has duplicate or displaced libR: {lib_r_paths}")
-    bridges = [path for path in app.rglob("_rinterface_cffi_api*.so") if path.is_file()]
-    if len(bridges) != 1 or any(app.rglob("_rinterface_cffi_abi*")):
+    bridge_paths = [
+        path for path in app.rglob("_rinterface_cffi_api*.so") if path.is_file()
+    ]
+    bridge_targets = {path.resolve(strict=True) for path in bridge_paths}
+    if len(bridge_targets) != 1 or any(app.rglob("_rinterface_cffi_abi*")):
         raise AdapterError("final app must contain one API bridge and no ABI bridge")
-    if architectures(bridges[0]) != [architecture]:
+    bridge = bridge_targets.pop()
+    if app / "Contents/Frameworks" not in bridge.parents:
+        raise AdapterError("final API bridge is outside Contents/Frameworks")
+    if architectures(bridge) != [architecture]:
         raise AdapterError("final API bridge has the wrong architecture")
     r_edge = [
-        value for value in dependencies(bridges[0]) if value.endswith("libR.dylib")
+        value for value in dependencies(bridge) if value.endswith("libR.dylib")
     ]
     if len(r_edge) != 1 or not r_edge[0].startswith("@loader_path/"):
         raise AdapterError("final API bridge does not resolve uniquely to private libR")
     if (
-        bridges[0].parent / r_edge[0][len("@loader_path/") :]
+        bridge.parent / r_edge[0][len("@loader_path/") :]
     ).resolve() != expected_lib_r:
         raise AdapterError("final API bridge resolves outside the private R.framework")
     output.write_text(
@@ -543,8 +591,8 @@ def post_app_gate(app: Path, architecture: str, output: Path) -> None:
                 "architecture": architecture,
                 "framework_symlinks": links,
                 "framework_mach_o": native,
-                "api_bridge": str(bridges[0].relative_to(app)),
-                "lib_r": str(expected_lib_r.relative_to(app)),
+                "api_bridge": str(bridge.relative_to(app)),
+                "lib_r": str(expected_lib_r_link.relative_to(app)),
             },
             indent=2,
             sort_keys=True,

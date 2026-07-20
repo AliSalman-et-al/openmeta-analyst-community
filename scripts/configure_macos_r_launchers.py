@@ -37,7 +37,22 @@ UPSTREAM_X64_LDFLAGS = (
     "-F/Library/Frameworks/R.framework/.. -framework R "
     "-L/opt/R/x86_64/lib -lbz2 -lz -licucore -ldl -lm -liconv"
 )
-PRIVATE_CONFIG = f"""#!/bin/sh
+def private_config(architecture: str) -> str:
+    if architecture not in {"x86_64", "arm64"}:
+        raise RuntimeError(f"unsupported R build architecture: {architecture}")
+    exact_guard = (
+        f'''expected='{UPSTREAM_X64_LDFLAGS}'
+      if [ "$upstream" != "$expected" ]; then
+        echo "Unexpected upstream R CMD config --ldflags output: $upstream" >&2
+        exit 1
+      fi'''
+        if architecture == "x86_64"
+        else '''case "$upstream" in
+        *"/opt/R/arm64/lib"*"-framework R"*) ;;
+        *) echo "Unexpected upstream R CMD config --ldflags output: $upstream" >&2; exit 1 ;;
+      esac'''
+    )
+    return f"""#!/bin/sh
 set -eu
 # RCMS_PRIVATE_R_CONFIG_V1
 R_HOME="${{R_HOME:-$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)}}"
@@ -58,11 +73,7 @@ if [ "$#" -eq 1 ]; then
       ;;
     --ldflags)
       upstream="$("$real" --ldflags)"
-      expected='{UPSTREAM_X64_LDFLAGS}'
-      if [ "$upstream" != "$expected" ]; then
-        echo "Unexpected upstream R CMD config --ldflags output: $upstream" >&2
-        exit 1
-      fi
+      {exact_guard}
       printf '%s\\n' "-Wl,-headerpad_max_install_names -L$R_HOME/lib -lR -lbz2 -lz -licucore -ldl -lm -liconv"
       exit 0
       ;;
@@ -70,6 +81,9 @@ if [ "$#" -eq 1 ]; then
 fi
 exec "$real" "$@"
 """
+
+
+PRIVATE_CONFIG = private_config("x86_64")
 
 
 def _safe_file(path: Path) -> None:
@@ -103,20 +117,23 @@ def _validate_official_config(path: Path) -> None:
         )
 
 
-def configure(resources: Path, *, configure_build: bool = True) -> None:
+def configure(
+    resources: Path, *, configure_build: bool = True, architecture: str = "x86_64"
+) -> None:
     # R.framework/Resources is normally a Versions/Current symlink.  Resolve
     # that framework-level link, then reject links in the launcher payload.
     root = resources.resolve(strict=True)
     binary, rscript = root / "bin/R", root / "bin/Rscript"
     config = root / "bin/config"
     real_config = root / "bin/config.real"
+    configured_wrapper = private_config(architecture)
     if configure_build:
         if real_config.exists() or real_config.is_symlink():
             _validate_official_config(real_config)
             _safe_file(config)
             if (
                 not config.is_file()
-                or config.read_text(encoding="utf-8") != PRIVATE_CONFIG
+                or config.read_text(encoding="utf-8") != configured_wrapper
             ):
                 raise RuntimeError(
                     "private R config wrapper does not match its exact marker"
@@ -161,20 +178,25 @@ def configure(resources: Path, *, configure_build: bool = True) -> None:
     if configure_build and not real_config.exists():
         config.rename(real_config)
         real_config.chmod(0o755)
-        config.write_text(PRIVATE_CONFIG, encoding="utf-8")
+        config.write_text(configured_wrapper, encoding="utf-8")
         config.chmod(0o755)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--resources", type=Path, required=True)
+    parser.add_argument("--architecture", choices=("x86_64", "arm64"), default="x86_64")
     parser.add_argument(
         "--runtime-only",
         action="store_true",
         help="relocate runtime launchers without installing the x64 build-config adapter",
     )
     args = parser.parse_args()
-    configure(args.resources, configure_build=not args.runtime_only)
+    configure(
+        args.resources,
+        configure_build=not args.runtime_only,
+        architecture=args.architecture,
+    )
     return 0
 
 

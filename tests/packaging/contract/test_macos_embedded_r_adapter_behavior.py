@@ -64,6 +64,33 @@ def _framework(root: Path) -> Path:
     return framework
 
 
+def test_adapter_accepts_and_collects_canonical_signable_framework(tmp_path):
+    adapter = load_embedded_r_adapter()
+    framework = _framework(tmp_path)
+    version_root = framework / "Versions/4.6-x86_64"
+    executable = version_root / "R"
+    runtime_library = version_root / "Resources/lib/libR.dylib"
+
+    executable.unlink()
+    runtime_library.replace(executable)
+    runtime_library.symlink_to(Path("../../R"))
+    adapter.normalize_fontconfig_links(framework)
+
+    links = adapter.audit_symlinks(framework)
+    assert any(
+        record["path"] == "Versions/4.6-x86_64/Resources/lib/libR.dylib"
+        and Path(record["target"]) == Path("../../R")
+        for record in links
+    )
+    toc = {entry["destination"]: entry for entry in adapter.explicit_toc(framework)}
+    assert toc["R.framework/Versions/4.6-x86_64/R"]["type"] == "DATA"
+    runtime_entry = toc[
+        "R.framework/Versions/4.6-x86_64/Resources/lib/libR.dylib"
+    ]
+    assert runtime_entry["type"] == "SYMLINK"
+    assert Path(runtime_entry["source"]) == Path("../../R")
+
+
 def test_adapter_relocates_bridge_and_rejects_displaced_libr(tmp_path, monkeypatch):
     adapter = load_embedded_r_adapter()
     app = tmp_path / "RCMetaStudio.app"
@@ -87,6 +114,12 @@ def test_adapter_relocates_bridge_and_rejects_displaced_libr(tmp_path, monkeypat
     assert json.loads(output.read_text(encoding="utf-8"))["r_dependency"].startswith(
         "@loader_path/"
     )
+    version_root = framework / "Versions/4.6-x86_64"
+    executable = version_root / "R"
+    runtime_library = version_root / "Resources/lib/libR.dylib"
+    executable.unlink()
+    runtime_library.replace(executable)
+    runtime_library.symlink_to(Path("../../R"))
     monkeypatch.setattr(adapter, "audit_symlinks", lambda _root: [])
     monkeypatch.setattr(
         adapter,
@@ -112,6 +145,19 @@ def test_host_binary_filter_and_unsigned_graph_fail_closed(tmp_path, monkeypatch
         {},
     )
     assert [item[0] for item in retained] == ["keep"]
+    staged = tmp_path / "R.framework"
+    staged_member = staged / "Resources/lib/libRblas.dylib"
+    staged_member.parent.mkdir(parents=True)
+    staged_member.write_bytes(b"blas")
+    retained = adapter.filter_pyinstaller_r_binaries(
+        [
+            ("PyQt6", "PyQt6", "DATA"),
+            ("libRblas.dylib", str(staged_member), "DATA"),
+            ("libRblas.dylib", "libRblas.0.dylib", "SYMLINK"),
+        ],
+        staged,
+    )
+    assert retained == [("PyQt6", "PyQt6", "DATA")]
     with pytest.raises(adapter.AdapterError, match="unmapped /opt/R"):
         adapter.filter_pyinstaller_r_binaries(
             [("bad", "/opt/R/x86_64/lib/bad.dylib", "BINARY")], {}
@@ -295,13 +341,14 @@ def test_pkgutil_signature_parser_handles_certificate_chain_and_rejectable_team(
     assert spec.loader is not None
     spec.loader.exec_module(module)
     payload = module.parse_pkgutil_signature(
-        "Package: R-4.6.1-x86_64.pkg\nStatus: signed by a certificate trusted by macOS\n   1. Developer ID Installer: R for macOS (VZLD955F6P)\n   2. Developer ID Certification Authority\n",
+        "Package: R-4.6.1-x86_64.pkg\n   Status: signed by a certificate trusted by macOS\n   1. Developer ID Installer: R for macOS (VZLD955F6P)\n   2. Developer ID Certification Authority\n",
         "",
         0,
     )
     assert payload["team_id"] == "VZLD955F6P"
     assert payload["signer"] == "Developer ID Installer: R for macOS (VZLD955F6P)"
     assert payload["certificate"]
+    assert payload["status_line"] == "signed by a certificate trusted by macOS"
     bad = module.parse_pkgutil_signature(
         "Status: signed\n   1. Developer ID Installer: Other (AAAAAAAAAA)\n", "", 0
     )
@@ -326,7 +373,8 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
         {
             "schema_version": 1,
             "github_actions": "true",
-            "runner_image": "macos-15-intel",
+            "runner_image": "macos15",
+            "runner_label": "macos-15-intel",
             "runner_os": "macOS",
             "runner_arch": "X64",
             "macos_version": "15.5",
@@ -340,6 +388,7 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
         "schema_version": 1,
         "github_actions": "false",
         "runner_image": "local",
+        "runner_label": "local",
         "runner_os": "macOS",
         "runner_arch": "x86_64",
         "macos_version": "15.5",
@@ -350,9 +399,15 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
     }
     inspector.validate_direct_build_runner(valid_local_runner, target="macos-x64")
     inspector.validate_direct_build_runner(json.loads(runner), target="macos-x64")
+    wrong_label = json.loads(runner)
+    wrong_label["runner_label"] = "macos-15"
+    with pytest.raises(
+        inspector.MacOSDeploymentInspectionError, match="hosted direct-build runner"
+    ):
+        inspector.validate_direct_build_runner(wrong_label, target="macos-x64")
     valid_local_runner["uname_machine"] = "arm64"
     with pytest.raises(
-        inspector.MacOSDeploymentInspectionError, match="native macOS Intel"
+        inspector.MacOSDeploymentInspectionError, match="native macos-x64"
     ):
         inspector.validate_direct_build_runner(valid_local_runner, target="macos-x64")
     ppm = json.dumps(
@@ -592,11 +647,45 @@ def test_direct_smoke_finalizer_requires_executed_teardown_surface_and_launch(tm
     marker = tmp_path / "launch.json"
     evidence.write_text(
         json.dumps(
-            {
-                "failures": [],
-                "surface_progress": [],
-                "scales": [{"requested": scale} for scale in ("1.25", "1.50", "1.75")],
-            }
+                {
+                    "passed": True,
+                    "failures": [],
+                    "surface_progress": [],
+                    "scales": [{"requested": scale} for scale in ("1.25", "1.50", "1.75")],
+                    "workflows": {
+                        "automation_entry_point": True,
+                        "representative_edit": True,
+                        "real_r_analysis": True,
+                        "result_text": True,
+                        "save_reopen": True,
+                        "analysis_after_reopen": True,
+                        "converted_sample": "BCG.rcms",
+                        "expected_normalized_summary_sha256": inspector.EXPECTED_SUMMARY_SHA256,
+                        "normalized_summary_sha256": inspector.EXPECTED_SUMMARY_SHA256,
+                        "raw_summary_sha256": "a" * 64,
+                        "svg_sha256": {"forest": "b" * 64},
+                        "locale_variants": [
+                            {
+                                "locale": locale,
+                                "normalized_summary_sha256": inspector.EXPECTED_SUMMARY_SHA256,
+                                "raw_summary_sha256": "a" * 64,
+                            }
+                            for locale in ("en_US", "de_DE")
+                        ],
+                        "sample_projects": {
+                            "passed": True,
+                            "manifest_sha256": "c" * 64,
+                            "projects": [
+                                {
+                                    "project": "BCG.rcms",
+                                    "sha256": "d" * 64,
+                                    "semantic_sha256": "e" * 64,
+                                    "opened_in_packaged_application": True,
+                                }
+                            ],
+                        },
+                    },
+                }
         ),
         encoding="utf-8",
     )
@@ -617,7 +706,7 @@ def test_direct_smoke_finalizer_requires_executed_teardown_surface_and_launch(tm
             {
                 "schema_version": 1,
                 "platform_plugin": "cocoa",
-                "project": "amino.rcms",
+                "project": "BCG.rcms",
                 "post_close": True,
                 "pid": 123,
             }
@@ -625,7 +714,7 @@ def test_direct_smoke_finalizer_requires_executed_teardown_surface_and_launch(tm
         encoding="utf-8",
     )
     finalized = inspector.finalize_smoke_evidence(
-        evidence, log, marker, require_direct_teardown=True
+        evidence, log, marker, require_direct_teardown=True, persist=False
     )
     execution = finalized["execution"]
     assert execution["surface_scale_exit_codes"] == {
@@ -634,6 +723,7 @@ def test_direct_smoke_finalizer_requires_executed_teardown_surface_and_launch(tm
         "1.75": 0,
     }
     assert "positional_user_entry_exit_code" not in execution
+    assert "execution" not in json.loads(evidence.read_text(encoding="utf-8"))
     assert [record["requested"] for record in validated_scales] == [
         "1.25",
         "1.50",

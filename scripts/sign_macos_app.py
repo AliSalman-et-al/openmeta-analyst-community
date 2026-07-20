@@ -11,6 +11,7 @@ from pathlib import Path
 import plistlib
 import stat
 import subprocess
+import sys
 from typing import NoReturn, Sequence
 
 from rc_metastudio.qt6_macos_feasibility import is_macho_candidate
@@ -138,11 +139,50 @@ def _is_valid_code_bundle(bundle: Path, native: set[Path]) -> bool:
     return False
 
 
+def _main_executables(bundle: Path, native: set[Path]) -> set[Path]:
+    """Return native files whose signatures are owned by ``bundle`` itself."""
+    executables: set[Path] = set()
+    for info_path in _bundle_info_plists(bundle):
+        try:
+            with info_path.open("rb") as stream:
+                info = plistlib.load(stream)
+        except (OSError, plistlib.InvalidFileException) as exc:
+            _fail(f"cannot read code-bundle metadata {info_path}: {exc}")
+        executable_name = info.get("CFBundleExecutable")
+        if not isinstance(executable_name, str):
+            continue
+        for executable in _bundle_executables(bundle, executable_name):
+            try:
+                if not executable.exists():
+                    continue
+                resolved = executable.resolve(strict=True)
+            except (OSError, RuntimeError) as exc:
+                _fail(f"cannot inspect code-bundle executable {executable}: {exc}")
+            if executable in native:
+                executables.add(executable)
+            elif resolved in native:
+                executables.add(resolved)
+    return executables
+
+
+def _validate_symlinks(app: Path) -> None:
+    resolved_app = app.resolve(strict=True)
+    for path in sorted(app.rglob("*")):
+        if not path.is_symlink():
+            continue
+        try:
+            resolved = path.resolve(strict=True)
+            resolved.relative_to(resolved_app)
+        except (OSError, RuntimeError, ValueError) as exc:
+            _fail(f"macOS app contains a dangling or escaping symlink: {path}: {exc}")
+
+
 def build_signing_plan(app: Path) -> SigningPlan:
     """Classify every Mach-O and real nested bundle without name-based deep signing."""
     app = Path(app).absolute()
     if app.suffix != ".app" or not app.is_dir():
         _fail(f"macOS signing target is not an application bundle: {app}")
+    _validate_symlinks(app)
 
     native_files = _native_files(app)
     native = set(native_files)
@@ -209,6 +249,42 @@ def _run_codesign(arguments: Sequence[str]) -> None:
         _fail(f"codesign failed for {arguments[-1]}: {exc}")
 
 
+def _diagnose_deep_verification_failure(plan: SigningPlan) -> None:
+    """Emit bounded evidence that identifies the bundle object rejected by codesign."""
+    prefix = "[RCMS-CODESIGN-DIAGNOSTIC]"
+    print(f"{prefix} outer deep verification failed: {plan.app}", file=sys.stderr)
+    for path in sorted(plan.app.rglob("*")):
+        if not path.is_symlink():
+            continue
+        try:
+            target = os.readlink(path)
+            resolved = path.resolve(strict=True)
+            resolved.relative_to(plan.app.resolve(strict=True))
+        except (OSError, RuntimeError, ValueError) as exc:
+            print(f"{prefix} invalid symlink {path}: {target!r}: {exc}", file=sys.stderr)
+
+    probes = [
+        ["--display", "--verbose=4", str(plan.app)],
+        ["--verify", "--strict", "--verbose=4", str(plan.app)],
+    ]
+    probes.extend(
+        ["--verify", "--deep", "--strict", "--verbose=4", str(bundle)]
+        for bundle in plan.nested_bundles
+    )
+    for arguments in probes:
+        result = subprocess.run(
+            ["codesign", *arguments], capture_output=True, text=True, check=False
+        )
+        output = "\n".join(
+            part.strip() for part in (result.stdout, result.stderr) if part.strip()
+        )
+        print(
+            f"{prefix} exit={result.returncode} command=codesign "
+            f"{' '.join(arguments)}\n{output}",
+            file=sys.stderr,
+        )
+
+
 def _sign(path: Path, *, identity: str, timestamp: bool) -> None:
     arguments = ["--force", "--options", "runtime"]
     if timestamp:
@@ -232,8 +308,18 @@ def sign_and_verify(
     plan = build_signing_plan(app)
     use_timestamp = identity != "-" if timestamp is None else timestamp
 
-    for native in plan.native_files:
-        _sign(native, identity=identity, timestamp=use_timestamp)
+    # Preserve the proven inside-out signing sequence for every Mach-O and
+    # nested bundle. The outer app seal owns the final signing context of its
+    # launcher, however, so validate that launcher through the strict outer-app
+    # checks instead of attempting a standalone check after the app is sealed.
+    native = set(plan.native_files)
+    app_executables = _main_executables(plan.app, native)
+    standalone_verification_files = tuple(
+        path for path in plan.native_files if path not in app_executables
+    )
+
+    for native_file in plan.native_files:
+        _sign(native_file, identity=identity, timestamp=use_timestamp)
     for bundle in plan.nested_bundles:
         _sign(bundle, identity=identity, timestamp=use_timestamp)
     _sign(plan.app, identity=identity, timestamp=use_timestamp)
@@ -245,12 +331,18 @@ def sign_and_verify(
     ):
         _fail("macOS native-code inventory changed during signing")
 
-    for native in plan.native_files:
-        _verify(native)
+    for native_file in standalone_verification_files:
+        _verify(native_file)
     for bundle in plan.nested_bundles:
         _verify(bundle)
-    _verify(plan.app)
-    _verify(plan.app, deep=True)
+    # Apple's Gatekeeper-equivalent bundle check is strict deep verification.
+    # A separate shallow pass is redundant and can misclassify PyInstaller's
+    # sealed launcher context before the authoritative recursive validation.
+    try:
+        _verify(plan.app, deep=True)
+    except MacOSSigningError:
+        _diagnose_deep_verification_failure(plan)
+        raise
     return plan
 
 

@@ -578,6 +578,9 @@ def verify(root: Path, output_root: Path) -> dict[str, Any]:
     comparison = compare_golden_baseline(
         comparison_reference,
         current,
+        exceptions=_load_json(
+            root / "docs/verification/compatibility-exceptions.json"
+        ).get("exceptions", []),
         manifest=_load_json(
             root / "docs/verification/comprehensive-golden-baseline-manifest.json"
         ),
