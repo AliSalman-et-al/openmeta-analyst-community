@@ -630,6 +630,27 @@ if runtime_library.resolve(strict=True) != main_executable:
 PY
 }
 
+relocate_canonical_r_framework_main() {
+  local framework="$1"
+  local framework_home="$framework/Resources"
+  local framework_main="$framework/Versions/Current/R"
+  local dependency dependency_name dependency_target
+  while IFS= read -r dependency; do
+    case "$dependency" in
+      @loader_path/*.dylib)
+        dependency_name="${dependency#@loader_path/}"
+        dependency_target="$framework_home/lib/$dependency_name"
+        [ -f "$dependency_target" ] || { echo "canonical R framework dependency is absent: $dependency" >&2; exit 1; }
+        install_name_tool -change "$dependency" "@loader_path/Resources/lib/$dependency_name" "$framework_main"
+        ;;
+    esac
+  done < <(otool -L "$framework_main" | awk 'NR > 2 { print $1 }')
+  if otool -L "$framework_main" | awk 'NR > 2 { print $1 }' | grep -E '^@loader_path/[^/]+\.dylib$'; then
+    echo "canonical R framework main executable retains a pre-move loader edge." >&2
+    exit 1
+  fi
+}
+
 # These retained records are the authoritative acquisition/build inputs for the
 # direct native production manifest; no installed library tree is reused.
 [ -s "$hsroc_archive_path" ] || { echo "HSROC acquisition archive was not retained." >&2; exit 1; }
@@ -637,6 +658,7 @@ PY
 [ "$(shasum -a 256 "$hsroc_archive_path" | awk '{print $1}')" = "5476fa76d7723717e203925a1da442813e3645790ef9b633a145cbc04a08b874" ] || { echo "HSROC archive digest changed." >&2; exit 1; }
 step "Canonicalizing the staged R framework before PyInstaller signing"
 canonicalize_r_framework "$r_framework"
+relocate_canonical_r_framework_main "$r_framework"
 "$python_exe" "$repo_root/scripts/macos_embedded_r_adapter.py" finalize-toc --framework "$r_framework" --architecture "$expected_machine" --output "$adapter_map_path" --toc-output "$adapter_toc_path"
 cp "$adapter_map_path" "$adapter_audit_path"
 "$python_exe" - "$rpy2_api_bridge" "$rpy2_build_path" <<'PY'
@@ -678,21 +700,7 @@ rscript="$r_home/bin/Rscript"
 r_binary="$r_home/bin/R"
 step "Canonicalizing the collected R framework executable for code signing"
 canonicalize_r_framework "$r_framework"
-framework_main="$r_framework/Versions/Current/R"
-while IFS= read -r dependency; do
-  case "$dependency" in
-    @loader_path/*.dylib)
-      dependency_name="${dependency#@loader_path/}"
-      dependency_target="$r_home/lib/$dependency_name"
-      [ -f "$dependency_target" ] || { echo "collected R framework dependency is absent: $dependency" >&2; exit 1; }
-      install_name_tool -change "$dependency" "@loader_path/Resources/lib/$dependency_name" "$framework_main"
-      ;;
-  esac
-done < <(otool -L "$framework_main" | awk 'NR > 2 { print $1 }')
-if otool -L "$framework_main" | awk 'NR > 2 { print $1 }' | grep -E '^@loader_path/[^/]+\.dylib$'; then
-  echo "collected R framework main executable retains a pre-move loader edge." >&2
-  exit 1
-fi
+relocate_canonical_r_framework_main "$r_framework"
 relocate_rpy2_api_bridge "$rpy2_api_bridge"
 "$python_exe" - "$preflight_report_path" "$(git rev-parse HEAD)" <<'PY'
 import json, sys
