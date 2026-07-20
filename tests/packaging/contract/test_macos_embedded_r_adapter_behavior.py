@@ -618,7 +618,7 @@ def test_direct_smoke_finalizer_requires_executed_teardown_surface_and_launch(tm
             {
                 "schema_version": 1,
                 "platform_plugin": "cocoa",
-                    "project": "BCG.rcms",
+                "project": "BCG.rcms",
                 "post_close": True,
                 "pid": 123,
             }
