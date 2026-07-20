@@ -182,6 +182,8 @@ zip_path="$artifact_dir/$artifact_name.zip"
 tmp_zip_path="$zip_path.tmp"
 qualification_root="$work_root/qualification"
 runtime_probe_path="$qualification_root/runtime-probe.json"
+runtime_stdout_path="$qualification_root/runtime-probe.stdout.log"
+runtime_stderr_path="$qualification_root/runtime-probe.stderr.log"
 deployment_manifest_path="$qualification_root/deployment-manifest.json"
 smoke_evidence_path="$qualification_root/packaged-smoke.json"
 smoke_log_path="$qualification_root/packaged-smoke.log"
@@ -785,6 +787,8 @@ codesign --verify --strict --deep --verbose=2 "$app_bundle"
 
 step "Probing the frozen macOS runtime"
 RCMS_AUTOMATION_SMOKE_LOG="$smoke_log_path" \
+  RCMS_PACKAGED_STDOUT_PATH="$runtime_stdout_path" \
+  RCMS_PACKAGED_STDERR_PATH="$runtime_stderr_path" \
   run_packaged_process "$app_root/RCMetaStudio" \
     --automation-package-runtime-probe "$runtime_probe_path"
 if [ ! -s "$runtime_probe_path" ]; then
