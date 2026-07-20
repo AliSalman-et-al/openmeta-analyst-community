@@ -68,6 +68,8 @@ def test_first_green_gate_uses_the_bcg_packaged_workflow():
     build = (ROOT / "scripts/build-macos-package.sh").read_text(encoding="utf-8")
 
     assert 'sample_path="$sample_root/BCG.rcms"' in build
+    assert '--automation-native-smoke "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"' in build
+    assert '--automation-smoke-log "$extracted_smoke_log" "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"' in build
     assert "--automation-native-smoke" in build
     assert "RCMS_REQUIRE_IN_PROCESS_RPY2=1" in build
 
