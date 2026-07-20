@@ -258,25 +258,17 @@ def sign_and_verify(
     plan = build_signing_plan(app)
     use_timestamp = identity != "-" if timestamp is None else timestamp
 
-    # A nested bundle owns its main executable, so signing that bundle covers
-    # the executable. PyInstaller's app launcher is already signed before the
-    # BUNDLE phase, however, and the failed automatic deep-sign attempt can
-    # leave that signature unusable. Refresh the app executable explicitly
-    # before sealing the outer bundle, but do not verify it as standalone code
-    # after the outer signature has replaced its signing context.
-    nested_bundle_executables: set[Path] = set()
+    # Preserve the proven inside-out signing sequence for every Mach-O and
+    # nested bundle. The outer app seal owns the final signing context of its
+    # launcher, however, so validate that launcher through the strict outer-app
+    # checks instead of attempting a standalone check after the app is sealed.
     native = set(plan.native_files)
-    for bundle in plan.nested_bundles:
-        nested_bundle_executables.update(_main_executables(bundle, native))
-    native_signing_files = tuple(
-        path for path in plan.native_files if path not in nested_bundle_executables
-    )
     app_executables = _main_executables(plan.app, native)
     standalone_verification_files = tuple(
-        path for path in native_signing_files if path not in app_executables
+        path for path in plan.native_files if path not in app_executables
     )
 
-    for native_file in native_signing_files:
+    for native_file in plan.native_files:
         _sign(native_file, identity=identity, timestamp=use_timestamp)
     for bundle in plan.nested_bundles:
         _sign(bundle, identity=identity, timestamp=use_timestamp)

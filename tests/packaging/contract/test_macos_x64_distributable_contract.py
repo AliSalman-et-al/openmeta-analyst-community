@@ -1735,10 +1735,10 @@ def test_explicit_codesign_signs_inside_out_and_verifies_fail_closed(
 
     sign_calls = [call for call in calls if "--sign" in call]
     signed_targets = [Path(call[-1]) for call in sign_calls]
-    assert set(signed_targets[:-2]) == {app_executable, native}
+    assert set(signed_targets[:-2]) == {app_executable, native, framework_executable}
     assert signed_targets[-2:] == [framework, app]
     assert signed_targets.index(framework) < signed_targets.index(app)
-    assert framework_executable not in signed_targets
+    assert signed_targets.index(framework_executable) < signed_targets.index(framework)
     assert all("--deep" not in call for call in sign_calls)
     assert all("--options" in call and "runtime" in call for call in sign_calls)
     assert all("--timestamp" in call for call in sign_calls)
@@ -1751,6 +1751,7 @@ def test_explicit_codesign_signs_inside_out_and_verifies_fail_closed(
     }
     assert individually_verified == {
         native,
+        framework_executable,
         framework,
         app,
     }
