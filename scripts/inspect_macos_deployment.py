@@ -44,8 +44,8 @@ MAX_ARCHIVE_MEMBERS = 30_000
 MAX_ARCHIVE_UNCOMPRESSED_BYTES = 3_000_000_000
 PORTABLE_FORBIDDEN = set('<>:"/\\|?*')
 TARGET_CONTRACTS = {
-    "macos-x64": {"architecture": "x86_64", "minimum_macos": "13.0"},
-    "macos-arm64": {"architecture": "arm64", "minimum_macos": "13.0"},
+    "macos-x64": {"architecture": "x86_64", "minimum_macos": "14.0"},
+    "macos-arm64": {"architecture": "arm64", "minimum_macos": "14.0"},
 }
 TARGET_RUNNERS = {
     "macos-x64": {"architecture": "X64", "image": "macos-15-intel"},

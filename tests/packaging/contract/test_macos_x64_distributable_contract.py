@@ -209,7 +209,7 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     assert '"direct-r-spike.marker"' in spec
     assert '"_rinterface_cffi_api"' in spec
     assert (
-        '"LSMinimumSystemVersion": os.environ.get("RCMS_MINIMUM_MACOS_VERSION", "13.0")'
+        '"LSMinimumSystemVersion": os.environ.get("RCMS_MINIMUM_MACOS_VERSION", "14.0")'
         in spec
     )
     assert 'minimum_macos_version="$minimum_macos"' in build

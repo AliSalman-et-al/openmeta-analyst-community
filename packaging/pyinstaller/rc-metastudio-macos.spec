@@ -138,7 +138,7 @@ app = BUNDLE(
     ),
     version=os.environ.get("RCMS_PROJECT_VERSION", "0.2.0"),
     info_plist={
-        "LSMinimumSystemVersion": os.environ.get("RCMS_MINIMUM_MACOS_VERSION", "13.0"),
+        "LSMinimumSystemVersion": os.environ.get("RCMS_MINIMUM_MACOS_VERSION", "14.0"),
         "NSHighResolutionCapable": True,
         "NSPrincipalClass": "NSApplication",
     },
