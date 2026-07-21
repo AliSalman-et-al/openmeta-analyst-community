@@ -18,6 +18,7 @@ on:
         type: choice
         options:
           - unsigned-community
+          - macos-trusted
 
 permissions:
   contents: read
@@ -43,7 +44,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
           git fetch origin master --depth=1
           git merge-base --is-ancestor "$SOURCE_SHA" origin/master
-      - name: Initialize unsigned three-platform release set
+      - name: Initialize three-platform release set
         run: python scripts/delivery.py init --version "${{ inputs.version }}" --commit "${{ inputs.source_sha }}" --repository "${{ github.repository }}" --trust-profile "${{ inputs.trust_profile }}" --target windows-x64 --target macos-x64 --target macos-arm64 --output candidate/release-set.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -180,4 +181,4 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - run: echo "All three unsigned candidate artifacts were built once and are ready for native qualification."
+      - run: echo "All three unsigned candidate artifacts were built once and are ready for the selected trust-profile qualification."

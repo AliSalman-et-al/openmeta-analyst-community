@@ -16,6 +16,7 @@ TARGETS_PATH = ROOT / "delivery" / "targets.json"
 POLICY_INPUTS = (
     ".github/workflows/candidate.yml",
     ".github/workflows/community-release-candidate.yml",
+    ".github/workflows/macos-trusted-release-candidate.yml",
     "uv.lock",
     "pyproject.toml",
     "docs/verification/RCMetaR-r-dependencies.json",
@@ -30,6 +31,7 @@ POLICY_INPUTS = (
     "scripts/inspect_macos_deployment.py",
     "scripts/normalize_macos_macho.py",
     "scripts/sign_macos_app.py",
+    "scripts/sign-notarize-macos-artifact.sh",
     "config/macos-package-targets.json",
     "scripts/resolve_macos_package_target.py",
     "scripts/qt6_macos_feasibility.py",
@@ -89,7 +91,7 @@ def targets() -> dict:
 def required_stages(manifest: dict, target: str) -> list[str]:
     registry = load(TARGETS_PATH)
     profile = registry["trust_profiles"][manifest["trust_profile"]]
-    if manifest["trust_profile"] == "unsigned-community":
+    if "stages" in profile:
         return profile["stages"]
     os_name = registry["targets"][target]["os"]
     return profile[f"{os_name}_stages"]
@@ -268,6 +270,8 @@ def promote(args: argparse.Namespace) -> None:
     expected = {"candidate": "rc", "rc": "stable"}
     if expected.get(source["channel"]) != args.channel:
         raise ValueError(f"cannot promote {source['channel']} to {args.channel}")
+    if args.channel == "stable" and source["trust_profile"] != "macos-trusted":
+        raise ValueError("stable promotion requires the macos-trusted profile")
     source_digest = canonical_digest(source)
     if args.version:
         if (
@@ -314,7 +318,7 @@ def parser() -> argparse.ArgumentParser:
     init.add_argument("--repository", required=True)
     init.add_argument(
         "--trust-profile",
-        choices=("unsigned-community", "trusted-signed"),
+        choices=("unsigned-community", "macos-trusted", "trusted-signed"),
         default="unsigned-community",
     )
     init.add_argument(

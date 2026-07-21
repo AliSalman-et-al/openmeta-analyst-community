@@ -1,37 +1,39 @@
 # Desktop delivery runbook
 
-## Current unsigned community releases
+## Release trust profiles
 
-RC MetaStudio 0.2.0 is a Windows x64-only Qt 6 release. The candidate,
-qualification, attestation, and promotion workflows deliberately contain only
-`windows-x64`. Native Intel and Apple Silicon macOS packages are deferred to
-0.2.1 and must not be attached manually to the 0.2.0 release set.
+Every current candidate contains Windows x64, macOS Intel x64, and macOS ARM64
+artifacts built once from one protected `master` commit. Select
+`macos-trusted` for a stable-release candidate: the protected signing workflow
+Developer ID signs, notarizes, staples, verifies, and requalifies both macOS
+applications while carrying the explicitly unsigned Windows artifact forward
+unchanged.
 
-No paid certificate is required. Select `unsigned-community` in **Build
-Immutable Candidate**, then dispatch **Publish Unsigned Community Release
-Candidate**. The release manifest and GitHub release title explicitly disclose
-that Windows Authenticode, Apple Developer ID, and notarization are absent.
-SmartScreen and Gatekeeper warnings are therefore expected and must not be
-documented as security failures or bypassed invisibly.
+`unsigned-community` remains available for explicitly unsigned prereleases.
+Select it in **Build Immutable Candidate**, then dispatch **Publish Unsigned
+Community Release Candidate**. It can never be promoted to stable, and a failed
+`macos-trusted` run must never fall back to it automatically.
 
 The `release-candidate` and `production-release` environments should still use
 reviewers because publishing and promotion mutate repository release state.
 
-## Future signed-release configuration
+## Protected release configuration
 
-Create three protected GitHub environments:
+Create these protected GitHub environments:
 
 | Environment | Required protection | Configuration |
 | --- | --- | --- |
-| `windows-signing` | production reviewer; protected `master` and `v*` tags; prevent self-review | Variables `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `ARTIFACT_SIGNING_ENDPOINT`, `ARTIFACT_SIGNING_ACCOUNT`, `ARTIFACT_SIGNING_PROFILE`; Azure federated credential restricted to this environment |
-| `macos-signing` | production reviewer; protected `master` and `v*` tags; prevent self-review | Secrets `APPLE_CERTIFICATE_P12_BASE64`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_KEYCHAIN_PASSWORD`, `APPLE_NOTARY_KEY_BASE64`; variables `APPLE_SIGNING_IDENTITY`, `APPLE_NOTARY_KEY_ID`, `APPLE_NOTARY_ISSUER` |
+| `macos-signing` | required release reviewer; protected branches; manual approval | Secrets `APPLE_CERTIFICATE_P12_BASE64`, `APPLE_CERTIFICATE_PASSWORD`, `KEYCHAIN_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` |
 | `release-candidate` | release reviewer; protected `master` | no long-lived secret |
 | `production-release` | distinct production reviewer; protected `master`; prevent self-review | no long-lived secret |
 
-Azure Artifact Signing must trust GitHub OIDC for the repository and
-`windows-signing` environment. Apple credentials must be Developer ID
-Application and App Store Connect notary credentials. Never configure signing
-secrets at repository scope.
+The P12 must contain exactly one valid Developer ID Application identity for
+`APPLE_TEAM_ID`. `APPLE_APP_SPECIFIC_PASSWORD` is the app-specific password for
+`APPLE_ID`; `KEYCHAIN_PASSWORD` is an independent random password used only for
+the ephemeral runner keychain. Store all six values on the `macos-signing`
+environment, never at repository scope. The workflow discovers the identity
+from the imported certificate and refuses missing, expired, wrong-team, or
+ambiguous identities.
 
 Add rulesets that prevent deletion or movement of `v*` tags, require pull
 requests for `master`, and restrict tag/release creation to maintainers and the
@@ -42,17 +44,17 @@ the workflows.
 
 1. Merge all release changes and version metadata to protected `master`.
 2. Record the full 40-character `master` SHA.
-3. Dispatch **Build Immutable Candidate** with `0.2.0-rc.1` and that SHA.
-4. Confirm the unsigned Windows x64 artifact and its assembled stage record are
-   present. A failed Windows target invalidates the candidate run.
-5. For the current profile, dispatch **Publish Unsigned Community Release
-   Candidate**. The trusted-signed path is intentionally disabled for 0.2.0;
-   re-enable its candidate profile and target matrix as part of the later
-   signing release work before using **Sign and Publish Release Candidate**.
-6. Confirm final-byte packaged smoke, packaged-tree SBOM generation, provenance
-   attestation, and release-set verification. For `trusted-signed`, also confirm
-   Authenticode verification and Developer ID/notarization/stapling.
-7. Review the immutable prerelease, `SHA256SUMS`, the Windows SBOM, and
+3. Dispatch **Build Immutable Candidate** with the RC version, full SHA, and
+   `macos-trusted` profile.
+4. Confirm all three unsigned artifacts and their assembled stage records are
+   present. Any failed target invalidates the candidate run.
+5. Dispatch **Publish macOS-Trusted Release Candidate** with the exact candidate
+   run ID, RC version, and source SHA, then approve `macos-signing`.
+6. Confirm both Developer ID identities match the configured team, Apple accepts
+   both notarization submissions, both tickets are stapled, Gatekeeper accepts
+   each final app, and final-byte packaged smoke passes on both native runners.
+7. Confirm the unchanged Windows artifact also passes packaged smoke, then
+   review all three SBOMs, attestations, `SHA256SUMS`, and
    `release-set-rc.json`. Never rerun into the same RC tag; increment `rc.N`.
 
 For layout-system, Qt, supported-OS, font, or icon changes, run the controlled
@@ -63,7 +65,8 @@ substitute hosted-runner screenshots.
 
 ## Stable promotion
 
-1. Complete human native-layout review and release acceptance against the RC.
+1. Complete human native-layout review and release acceptance against the
+   `macos-trusted` RC. Unsigned-community RCs are ineligible.
 2. Dispatch **Promote Release Candidate** with the RC tag and stable base
    version.
 3. Approve `production-release`.
@@ -79,8 +82,8 @@ evidence, marks the bad release as withdrawn, and files a tracking issue. Do not
 delete the release or move its tag. Build and promote a new patch release for
 changed bytes.
 
-Twice yearly, rehearse a rejected notarization, invalid Windows signature,
-missing target, checksum mismatch, and post-release withdrawal.
+Twice yearly, rehearse a rejected notarization, wrong-team Developer ID
+certificate, missing target, checksum mismatch, and post-release withdrawal.
 
 ## Local policy checks
 

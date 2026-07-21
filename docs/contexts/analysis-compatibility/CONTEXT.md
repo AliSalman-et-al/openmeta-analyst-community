@@ -40,6 +40,10 @@ _Avoid_: Nice-to-have speed goal, rough timing target
 The Modern CI Path route that produces a Windows Distributable or macOS application artifact through PyInstaller, bundled R runtime assembly, packaged smoke checks, and artifact upload.
 _Avoid_: Release test, build-all path
 
+**macOS-Trusted Release Profile**:
+A three-platform release trust posture in which both native macOS artifacts are Developer ID signed, notarized, and stapled while the Windows artifact remains explicitly unsigned.
+_Avoid_: Fully signed release, trusted-signed release, unsigned community release
+
 **Release Cutover**:
 The point where the Modern CI Path replaces the Legacy CI Path as the accepted release path.
 _Avoid_: Migration complete, switch over

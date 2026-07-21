@@ -39,6 +39,7 @@ jobs:
           manifest="$(find promotion -name 'release-set-rc.json' -print -quit)"
           test -n "$manifest"
           test "$(jq -r .channel "$manifest")" = rc
+          test "$(jq -r .trust_profile "$manifest")" = macos-trusted
           test "$(jq -c .release_targets "$manifest")" = '["windows-x64","macos-x64","macos-arm64"]'
           mapfile -t assets < <(find promotion -maxdepth 1 -type f -printf '%f\n' | sort)
           expected=(RCMetaStudio-macos-arm64.zip RCMetaStudio-macos-x64.zip RCMetaStudio-windows-x64.zip SHA256SUMS macos-arm64.cdx.json macos-x64.cdx.json release-set-rc.json windows-x64.cdx.json)
@@ -59,13 +60,9 @@ jobs:
           if gh release view "$STABLE_TAG" >/dev/null 2>&1; then echo "Stable release already exists; refusing overwrite." >&2; exit 1; fi
           source_sha="$(jq -r .source.commit promotion/release-set-stable.json)"
           profile="$(jq -r .trust_profile promotion/release-set-stable.json)"
-          if [ "$profile" = unsigned-community ]; then
-            title="RC MetaStudio ${{ inputs.stable_version }}"
-            notes=$'**Signing status:** Unsigned community builds.\n\nWindows x64, macOS Intel x64, and macOS Apple Silicon artifacts were promoted from ${{ inputs.rc_tag }} without rebuilding or modifying deliverables. Their immutable hashes form the handoff boundary for future signing.'
-          else
-            title="RC MetaStudio ${{ inputs.stable_version }}"
-            notes="Promoted from ${{ inputs.rc_tag }} without rebuilding or modifying deliverables."
-          fi
+          test "$profile" = macos-trusted
+          title="RC MetaStudio ${{ inputs.stable_version }}"
+          notes=$'**Signing status:** macOS Developer ID signed, notarized, and stapled; Windows unsigned.\n\nPromoted from ${{ inputs.rc_tag }} without rebuilding or modifying deliverables.'
           if git ls-remote --exit-code --tags origin "refs/tags/$STABLE_TAG" >/dev/null 2>&1; then
             git fetch origin "refs/tags/$STABLE_TAG:refs/tags/$STABLE_TAG"
             test "$(git rev-list -n 1 "$STABLE_TAG")" = "$source_sha"

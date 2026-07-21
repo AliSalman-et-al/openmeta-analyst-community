@@ -8,7 +8,7 @@
     "product": {"const": "RC MetaStudio"},
     "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-rc\\.[0-9]+)?$"},
     "channel": {"enum": ["candidate", "rc", "stable", "withdrawn"]},
-    "trust_profile": {"enum": ["unsigned-community", "trusted-signed"]},
+    "trust_profile": {"enum": ["unsigned-community", "macos-trusted", "trusted-signed"]},
     "source": {
       "type": "object",
       "required": ["repository", "commit"],
