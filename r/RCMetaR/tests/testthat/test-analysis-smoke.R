@@ -268,6 +268,35 @@ test_that("representative continuous analysis paths execute", {
   expect_analysis_result(rcmetar.run.analysis(fixture$data, list(method = "continuous.random", params = fixture$params, workflow = "subgroup")))
 })
 
+test_that("single-arm continuous GUI metric label produces a metafor forest bundle", {
+  fixture <- continuous_fixture()
+  fixture$params$measure <- "TX Mean"
+  fixture$params$create.plot <- TRUE
+  fixture$params$fp_outpath <- tempfile(fileext = ".png")
+  fixture$data <- new(
+    "ContinuousData",
+    y = fixture$data@mean1,
+    SE = fixture$data@sd1 / sqrt(fixture$data@N1),
+    study.names = fixture$data@study.names,
+    years = fixture$data@years
+  )
+
+  result <- rcmetar.run.analysis(
+    fixture$data,
+    list(method = "continuous.random", params = fixture$params)
+  )
+  plot.data.env <- new.env(parent = emptyenv())
+  load(
+    paste0(unname(result$plot_params_paths[["Forest Plot"]]), ".plotdata"),
+    envir = plot.data.env
+  )
+  plot.data <- plot.data.env$plot.data
+
+  expect_true(rcmetar.is.metafor.forest.bundle(plot.data))
+  expect_equal(plot.data$params$measure, "TXMean")
+  expect_true(file.exists(unname(result$images[["Forest Plot"]])))
+})
+
 test_that("representative diagnostic analysis paths execute", {
   fixture <- diagnostic_fixture("Sens")
   expect_analysis_result(rcmetar.run.analysis(fixture$data, list(method = "diagnostic.random", params = fixture$params)))
