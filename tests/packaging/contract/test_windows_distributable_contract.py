@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -35,7 +36,10 @@ def test_package_metadata_version_only_needs_no_ambient_rscript(tmp_path):
         capture_output=True,
     )
     assert version_only.returncode == 0, version_only.stderr
-    assert output.read_text(encoding="utf-8") == "version=0.2.1\n"
+    project_version = tomllib.loads(
+        (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    )["project"]["version"]
+    assert output.read_text(encoding="utf-8") == f"version={project_version}\n"
     default = subprocess.run(
         [sys.executable, str(script)], env=env, text=True, capture_output=True
     )

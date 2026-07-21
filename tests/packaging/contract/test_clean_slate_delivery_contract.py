@@ -25,9 +25,11 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     delivery = load_delivery()
     manifest_path = tmp_path / "release-set.json"
     commit = "a" * 40
+    release_version = delivery.repository_version()
+    rc_version = f"{release_version}-rc.1"
     delivery.init_release(
         argparse.Namespace(
-            version="0.2.1-rc.1",
+            version=rc_version,
             commit=commit,
             repository="AliSalman-et-al/rc-metastudio",
             trust_profile="unsigned-community",
@@ -90,7 +92,7 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
                 manifest=str(rc_path),
                 from_channel="rc",
                 channel="stable",
-                version="0.2.1",
+                version=release_version,
                 output=str(tmp_path / "unsigned-stable.json"),
             )
         )
@@ -98,7 +100,7 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     trusted_manifest_path = tmp_path / "macos-trusted-release-set.json"
     delivery.init_release(
         argparse.Namespace(
-            version="0.2.1-rc.1",
+            version=rc_version,
             commit=commit,
             repository="AliSalman-et-al/rc-metastudio",
             trust_profile="macos-trusted",
@@ -160,13 +162,13 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
             manifest=str(trusted_rc_path),
             from_channel="rc",
             channel="stable",
-            version="0.2.1",
+            version=release_version,
             output=str(stable_path),
         )
     )
     stable = delivery.load(stable_path)
     assert stable["channel"] == "stable"
-    assert stable["version"] == "0.2.1"
+    assert stable["version"] == release_version
     assert stable["trust_profile"] == "macos-trusted"
 
     bad = json.loads(manifest_path.read_text(encoding="utf-8"))

@@ -63,6 +63,9 @@ def test_rc_metastudio_and_rcmetar_versions_are_aligned_for_release():
 
 
 def test_version_bump_script_updates_all_release_version_surfaces(tmp_path):
+    current_version = tomllib.loads(read_text("pyproject.toml"))["project"]["version"]
+    major, minor, patch = map(int, current_version.split("."))
+    next_version = f"{major}.{minor}.{patch + 1}"
     paths_to_copy = [
         "pyproject.toml",
         "uv.lock",
@@ -85,7 +88,7 @@ def test_version_bump_script_updates_all_release_version_surfaces(tmp_path):
         "bump_version_for_release_contract", ROOT / "scripts" / "bump_version.py"
     )
     result = bump_version.main(
-        ["0.2.2", "--root", str(tmp_path), "--date", "2026-08-09"]
+        [next_version, "--root", str(tmp_path), "--date", "2026-08-09"]
     )
 
     assert result == 0
@@ -101,13 +104,13 @@ def test_version_bump_script_updates_all_release_version_surfaces(tmp_path):
     lockfile = (tmp_path / "uv.lock").read_text("utf-8")
     changelog = (tmp_path / "CHANGELOG.md").read_text("utf-8")
 
-    assert pyproject["project"]["version"] == "0.2.2"
-    assert package.__version__ == "0.2.2"
-    assert meta_globals.VERSION == "0.2.2"
-    assert rcmetar_fields["Version"] == "0.2.2"
+    assert pyproject["project"]["version"] == next_version
+    assert package.__version__ == next_version
+    assert meta_globals.VERSION == next_version
+    assert rcmetar_fields["Version"] == next_version
     assert rcmetar_fields["Date"] == "2026-08-09"
-    assert 'name = "rc-metastudio"\nversion = "0.2.2"' in lockfile
-    assert "## 0.2.2 - Unreleased" in changelog
+    assert f'name = "rc-metastudio"\nversion = "{next_version}"' in lockfile
+    assert f"## {next_version} - Unreleased" in changelog
 
 
 def test_active_rcmetar_package_metadata_uses_current_maintainer_identity():

@@ -4,6 +4,23 @@ All notable RC MetaStudio changes will be recorded in this file.
 
 RC MetaStudio starts a fresh maintained-product changelog. Historical release history for the Original OpenMeta[Analyst] Project is not reconstructed here; see [NOTICE.md](NOTICE.md) for provenance.
 
+## 0.2.2 - 2026-07-22
+
+### Added
+
+- Added protected Developer ID signing, Apple notarization, ticket stapling, Gatekeeper verification, and native requalification for the Intel and Apple Silicon macOS packages.
+- Added an immutable `macos-trusted` release profile that carries the unsigned Windows package forward unchanged while requiring both macOS packages to pass the complete Apple trust path.
+
+### Changed
+
+- Reordered the main-toolbar analysis actions to match the Analysis menu and removed non-analysis editing and application actions from the toolbar.
+- Restricted stable promotion to macOS-trusted release candidates while retaining explicitly unsigned community builds as prereleases.
+
+### Fixed
+
+- Normalized spaced and dotted `TX Mean` spellings before continuous analyses reach the RCMetaR measure dispatcher.
+- Strengthened downloaded release-candidate qualification on Windows and macOS with explicit sample projects, frozen runtime inputs, bounded native smoke execution, and retained diagnostics.
+
 ## 0.2.1 - 2026-07-20
 
 ### Added
