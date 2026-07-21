@@ -34,3 +34,19 @@ def test_toolbar_analysis_actions_follow_analysis_menu_order():
     assert toolbar_actions[
         first_analysis_action : first_analysis_action + len(analysis_actions)
     ] == analysis_actions
+
+
+def test_toolbar_omits_menu_and_shortcut_actions_after_analysis_group():
+    root = ElementTree.parse(META_UI).getroot()
+    toolbar = root.find(".//widget[@name='toolBar']")
+    assert toolbar is not None
+
+    toolbar_actions = _action_names(toolbar)
+    assert toolbar_actions[-1] == "action_change_conf_level"
+    assert not {
+        "action_undo",
+        "action_redo",
+        "action_copy",
+        "action_paste",
+        "action_quit",
+    }.intersection(toolbar_actions)

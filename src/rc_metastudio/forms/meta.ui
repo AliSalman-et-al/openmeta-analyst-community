@@ -393,14 +393,6 @@
    <addaction name="action_subgroup_ma"/>
    <addaction name="action_meta_regression"/>
    <addaction name="action_change_conf_level"/>
-   <addaction name="separator"/>
-   <addaction name="action_undo"/>
-   <addaction name="action_redo"/>
-   <addaction name="separator"/>
-   <addaction name="action_copy"/>
-   <addaction name="action_paste"/>
-   <addaction name="separator"/>
-   <addaction name="action_quit"/>
   </widget>
   <action name="action_save">
    <property name="icon">
