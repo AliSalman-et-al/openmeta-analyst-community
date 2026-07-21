@@ -1,0 +1,383 @@
+name: Publish macOS-Trusted Release Candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_run_id:
+        description: Successful macos-trusted candidate workflow run ID.
+        required: true
+        type: string
+      version:
+        description: RC version, for example 0.2.1-rc.1.
+        required: true
+        type: string
+      source_sha:
+        description: Exact candidate source SHA.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  validate-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ inputs.source_sha }}
+      - name: Validate protected candidate run and manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.candidate_run_id }}
+          EXPECTED_VERSION: ${{ inputs.version }}
+          EXPECTED_SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          run_json="$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID")"
+          test "$(jq -r .conclusion <<<"$run_json")" = success
+          test "$(jq -r .event <<<"$run_json")" = workflow_dispatch
+          test "$(jq -r .path <<<"$run_json")" = .github/workflows/candidate.yml
+          gh run download "$RUN_ID" --name release-set-initial --dir validation
+          manifest=validation/release-set.json
+          test "$(jq -r .trust_profile "$manifest")" = macos-trusted
+          test "$(jq -r .version "$manifest")" = "$EXPECTED_VERSION"
+          test "$(jq -r .source.commit "$manifest")" = "$EXPECTED_SOURCE_SHA"
+          test "$(jq -c .release_targets "$manifest")" = '["windows-x64","macos-x64","macos-arm64"]'
+          artifacts="$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID/artifacts" --paginate --jq '.artifacts[] | select(.expired == false) | .name')"
+          for required in release-set-initial candidate-windows-x64 candidate-macos-x64 candidate-macos-arm64; do
+            grep -Fx "$required" <<<"$artifacts"
+          done
+          git fetch origin master --depth=1
+          git merge-base --is-ancestor "$EXPECTED_SOURCE_SHA" origin/master
+
+  carry-windows:
+    needs: validate-candidate
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ inputs.source_sha }}
+      - name: Download exact unsigned Windows candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.candidate_run_id }}
+        shell: pwsh
+        run: gh run download "$env:RUN_ID" --name candidate-windows-x64 --dir candidate
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      - run: uv python install 3.11.9
+      - name: Launch unchanged unsigned Windows bytes
+        shell: pwsh
+        run: |
+          Expand-Archive -LiteralPath candidate/artifacts/RCMetaStudio-windows-x64.zip -DestinationPath qualified/tree
+          $exe = Get-ChildItem qualified/tree -Recurse -Filter RCMetaStudio.exe | Select-Object -First 1
+          $sample = Get-ChildItem qualified/tree -Recurse -Filter amino.rcms | Select-Object -First 1
+          $runtimeProbe = Get-ChildItem qualified/tree -Recurse -Filter runtime-probe.json | Select-Object -First 1
+          if (-not $exe -or -not $sample -or -not $runtimeProbe) { throw "Windows candidate is incomplete." }
+          New-Item -ItemType Directory -Force qualified/diagnostics | Out-Null
+          $env:RCMS_REQUIRE_IN_PROCESS_RPY2 = "1"
+          $env:RPY2_CFFI_MODE = "API"
+          $env:QT_SCALE_FACTOR = "1.25"
+          $env:RCMS_PACKAGE_BASELINE_DPR = (Get-Content $runtimeProbe.FullName -Raw | ConvertFrom-Json).qt.baseline_device_pixel_ratio
+          $env:RCMS_PACKAGE_SMOKE_EVIDENCE = (Resolve-Path qualified/diagnostics).Path + "\packaged-smoke.json"
+          $env:RCMS_AUTOMATION_SMOKE_LOG = (Resolve-Path qualified/diagnostics).Path + "\packaged-smoke.log"
+          $env:RCMS_AUTOMATION_HANG_TRACE = (Resolve-Path qualified/diagnostics).Path + "\packaged-smoke.hang-trace.log"
+          Remove-Item Env:\QT_QPA_PLATFORM -ErrorAction SilentlyContinue
+          $quotedSample = '"{0}"' -f $sample.FullName
+          $process = Start-Process -FilePath $exe.FullName -ArgumentList @("--automation-native-smoke", $quotedSample) -PassThru -Wait -WindowStyle Hidden -RedirectStandardOutput qualified/diagnostics/packaged-smoke.stdout.log -RedirectStandardError qualified/diagnostics/packaged-smoke.stderr.log
+          if ($process.ExitCode -ne 0) { throw "Windows packaged smoke failed with exit code $($process.ExitCode)." }
+          $evidence = Get-Content $env:RCMS_PACKAGE_SMOKE_EVIDENCE -Raw | ConvertFrom-Json
+          if ($evidence.passed -ne $true) { throw "Windows packaged smoke did not produce passing evidence." }
+      - name: Record unchanged Windows qualification
+        shell: pwsh
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          New-Item -ItemType Directory -Force qualified/records | Out-Null
+          Copy-Item candidate/artifacts/RCMetaStudio-windows-x64.zip qualified/RCMetaStudio-windows-x64.zip
+          $candidateHash = (Get-FileHash candidate/artifacts/RCMetaStudio-windows-x64.zip -Algorithm SHA256).Hash
+          $carriedHash = (Get-FileHash qualified/RCMetaStudio-windows-x64.zip -Algorithm SHA256).Hash
+          if ($candidateHash -ne $carriedHash) { throw "Windows artifact changed while being carried into the macos-trusted release." }
+          $assembled = Get-ChildItem candidate -Recurse -Filter windows-x64.assembled.json | Select-Object -First 1
+          if (-not $assembled) { throw "Missing assembled stage result." }
+          Copy-Item $assembled.FullName qualified/records/windows-x64.assembled.json
+          uv run python scripts/delivery.py inventory --root qualified/tree --output qualified/windows-x64.inventory.json
+          uv run python scripts/delivery.py sbom --inventory qualified/windows-x64.inventory.json --version "$env:VERSION" --output qualified/windows-x64.cdx.json
+          $input = uv run python scripts/delivery.py digest --json $assembled.FullName
+          uv run python scripts/delivery.py stage-result --target windows-x64 --stage unsigned-qualified --commit "$env:SOURCE_SHA" --input-digest "$input" --output-file qualified/RCMetaStudio-windows-x64.zip --result qualified/records/windows-x64.unsigned-qualified.json
+          $input = uv run python scripts/delivery.py digest --json qualified/records/windows-x64.unsigned-qualified.json
+          uv run python scripts/delivery.py stage-result --target windows-x64 --stage verified --commit "$env:SOURCE_SHA" --input-digest "$input" --output-file qualified/RCMetaStudio-windows-x64.zip --output-file qualified/windows-x64.inventory.json --output-file qualified/windows-x64.cdx.json --result qualified/records/windows-x64.verified.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: prepared-windows-x64
+          path: qualified
+          compression-level: 0
+
+  sign-macos:
+    needs: validate-candidate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: macos-x64
+            runner: macos-15-intel
+            artifact: RCMetaStudio-macos-x64.zip
+          - target: macos-arm64
+            runner: macos-15
+            artifact: RCMetaStudio-macos-arm64.zip
+    runs-on: ${{ matrix.runner }}
+    environment: macos-signing
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ inputs.source_sha }}
+      - name: Download exact unsigned macOS candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.candidate_run_id }}
+          TARGET: ${{ matrix.target }}
+        run: gh run download "$RUN_ID" --name "candidate-$TARGET" --dir candidate
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      - run: uv python install 3.11.9
+      - name: Import the Developer ID certificate into a temporary keychain
+        shell: bash
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          certificate_path="$RUNNER_TEMP/developer-id-application.p12"
+          keychain_path="$RUNNER_TEMP/rcms-signing.keychain-db"
+          printf '%s' "$APPLE_CERTIFICATE_P12_BASE64" | base64 --decode -o "$certificate_path"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security import "$certificate_path" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain_path"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security list-keychains -d user -s "$keychain_path"
+          identities="$(security find-identity -v -p codesigning "$keychain_path")"
+          signing_identity="$(python3 -c 'import re,sys; team=sys.argv[1]; matches=[m.group(1) for line in sys.stdin for m in [re.match(r"^\s*\d+\)\s+([0-9A-Fa-f]{40})\s+\"Developer ID Application: .+ \(([^)]+)\)\"$", line)] if m and m.group(2)==team]; print(matches[0] if len(matches)==1 else ""); raise SystemExit(0 if len(matches)==1 else 1)' "$APPLE_TEAM_ID" <<<"$identities")"
+          printf 'RCMS_SIGNING_IDENTITY=%s\n' "$signing_identity" >> "$GITHUB_ENV"
+          rm -f "$certificate_path"
+      - name: Sign, notarize, staple, and verify exact candidate app
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ARTIFACT: ${{ matrix.artifact }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          mkdir -p qualified/records qualified/evidence
+          bash scripts/sign-notarize-macos-artifact.sh \
+            --input-archive "candidate/artifacts/$ARTIFACT" \
+            --output-archive "qualified/$ARTIFACT" \
+            --signing-identity "$RCMS_SIGNING_IDENTITY" \
+            --signing-inventory "qualified/evidence/$TARGET.signing-inventory.json" \
+            --notarization-result "qualified/evidence/$TARGET.notarization.json" \
+            --verification-result "qualified/evidence/$TARGET.gatekeeper.txt"
+      - name: Launch final signed and stapled macOS bytes
+        shell: bash
+        env:
+          ARTIFACT: ${{ matrix.artifact }}
+        run: |
+          set -euo pipefail
+          mkdir -p qualified/tree qualified/diagnostics
+          ditto -x -k "qualified/$ARTIFACT" qualified/tree
+          app="$(find qualified/tree -type d -name RCMetaStudio.app -print -quit)"
+          app="$PWD/$app"
+          executable="$app/Contents/MacOS/RCMetaStudio"
+          sample="$(find qualified/tree -path '*/sample_projects/BCG.rcms' -print -quit)"
+          runtime_probe="$(find qualified/tree -path '*/qualification/runtime-probe.json' -print -quit)"
+          test -n "$app" && test -x "$executable" && test -n "$sample" && test -n "$runtime_probe"
+          sample="$PWD/$sample"
+          runtime_probe="$PWD/$runtime_probe"
+          baseline_dpr="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["qt"]["baseline_device_pixel_ratio"])' "$runtime_probe")"
+          QT_SCALE_FACTOR=1.25 \
+            RCMS_PACKAGE_BASELINE_DPR="$baseline_dpr" \
+            RCMS_PACKAGE_SMOKE_EVIDENCE="$PWD/qualified/diagnostics/packaged-smoke.json" \
+            RCMS_AUTOMATION_SMOKE_LOG="$PWD/qualified/diagnostics/packaged-smoke.log" \
+            RCMS_AUTOMATION_HANG_TRACE="$PWD/qualified/diagnostics/packaged-smoke.hang-trace.log" \
+            env -u QT_QPA_PLATFORM RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=API \
+              RCMS_R_HOME="$app/Contents/Frameworks/R.framework/Resources" \
+              RCMS_R_LIBS="$app/Contents/Frameworks/R.framework/Resources/library" \
+              uv run python scripts/run_bounded_process.py --timeout-seconds 900 \
+                --stdout qualified/diagnostics/packaged-smoke.stdout.log \
+                --stderr qualified/diagnostics/packaged-smoke.stderr.log \
+                --completion-log qualified/diagnostics/packaged-smoke.log -- \
+                "$executable" --automation-native-smoke "$sample"
+          python3 -c 'import json,sys; evidence=json.load(open(sys.argv[1])); assert evidence.get("passed") is True' qualified/diagnostics/packaged-smoke.json
+      - name: Record macOS trusted stages and final evidence
+        shell: bash
+        env:
+          ARTIFACT: ${{ matrix.artifact }}
+          TARGET: ${{ matrix.target }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          assembled="$(find candidate -name "$TARGET.assembled.json" -print -quit)"
+          test -n "$assembled"
+          cp "$assembled" "qualified/records/$TARGET.assembled.json"
+          uv run python scripts/delivery.py inventory --root qualified/tree --output "qualified/$TARGET.inventory.json"
+          uv run python scripts/delivery.py sbom --inventory "qualified/$TARGET.inventory.json" --version "$VERSION" --output "qualified/$TARGET.cdx.json"
+          input="$(uv run python scripts/delivery.py digest --json "$assembled")"
+          uv run python scripts/delivery.py stage-result --target "$TARGET" --stage signed --commit "$SOURCE_SHA" --input-digest "$input" --output-file "qualified/evidence/$TARGET.signing-inventory.json" --result "qualified/records/$TARGET.signed.json"
+          input="$(uv run python scripts/delivery.py digest --json "qualified/records/$TARGET.signed.json")"
+          uv run python scripts/delivery.py stage-result --target "$TARGET" --stage notarized --commit "$SOURCE_SHA" --input-digest "$input" --output-file "qualified/evidence/$TARGET.notarization.json" --result "qualified/records/$TARGET.notarized.json"
+          input="$(uv run python scripts/delivery.py digest --json "qualified/records/$TARGET.notarized.json")"
+          uv run python scripts/delivery.py stage-result --target "$TARGET" --stage verified --commit "$SOURCE_SHA" --input-digest "$input" --output-file "qualified/$ARTIFACT" --output-file "qualified/$TARGET.inventory.json" --output-file "qualified/$TARGET.cdx.json" --output-file "qualified/evidence/$TARGET.gatekeeper.txt" --result "qualified/records/$TARGET.verified.json"
+      - name: Upload signing and launch diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: macos-trusted-${{ matrix.target }}-diagnostics
+          path: |
+            qualified/evidence
+            qualified/diagnostics
+          if-no-files-found: warn
+          retention-days: 30
+          compression-level: 0
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: prepared-${{ matrix.target }}
+          path: qualified
+          compression-level: 0
+      - name: Delete temporary signing keychain
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          security delete-keychain "$RUNNER_TEMP/rcms-signing.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/developer-id-application.p12"
+
+  attest:
+    needs: [carry-windows, sign-macos]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: windows-x64
+            artifact: RCMetaStudio-windows-x64.zip
+          - target: macos-x64
+            artifact: RCMetaStudio-macos-x64.zip
+          - target: macos-arm64
+            artifact: RCMetaStudio-macos-arm64.zip
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ inputs.source_sha }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: prepared-${{ matrix.target }}
+          path: bundle
+      - uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
+        with:
+          subject-path: bundle/${{ matrix.artifact }}
+      - uses: actions/attest-sbom@51e74621a501c89df81fc1391c5a8f4cfc9fab2f # v3
+        with:
+          subject-path: bundle/${{ matrix.artifact }}
+          sbom-path: bundle/${{ matrix.target }}.cdx.json
+      - name: Record attested stage
+        env:
+          TARGET: ${{ matrix.target }}
+          ARTIFACT: ${{ matrix.artifact }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          input="$(python scripts/delivery.py digest --json "bundle/records/$TARGET.verified.json")"
+          python scripts/delivery.py stage-result --target "$TARGET" --stage attested --commit "$SOURCE_SHA" --input-digest "$input" --output-file "bundle/$ARTIFACT" --output-file "bundle/$TARGET.cdx.json" --result "bundle/records/$TARGET.attested.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: macos-trusted-${{ matrix.target }}
+          path: bundle
+          compression-level: 0
+
+  publish-rc:
+    needs: attest
+    runs-on: ubuntu-latest
+    environment: release-candidate
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ inputs.source_sha }}
+      - name: Download initial manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.candidate_run_id }}
+        run: gh run download "$RUN_ID" --name release-set-initial --dir release
+      - name: Download attested Windows artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: macos-trusted-windows-x64
+          path: release/targets/macos-trusted-windows-x64
+      - name: Download attested Intel macOS artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: macos-trusted-macos-x64
+          path: release/targets/macos-trusted-macos-x64
+      - name: Download attested Apple Silicon artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: macos-trusted-macos-arm64
+          path: release/targets/macos-trusted-macos-arm64
+      - name: Assemble macOS-trusted release set
+        env:
+          EXPECTED_VERSION: ${{ inputs.version }}
+          EXPECTED_SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          manifest=release/release-set.json
+          test "$(jq -r .trust_profile "$manifest")" = macos-trusted
+          test "$(jq -r .version "$manifest")" = "$EXPECTED_VERSION"
+          test "$(jq -r .source.commit "$manifest")" = "$EXPECTED_SOURCE_SHA"
+          test "$(jq -c .release_targets "$manifest")" = '["windows-x64","macos-x64","macos-arm64"]'
+          for target in windows-x64 macos-x64 macos-arm64; do
+            root="release/targets/macos-trusted-$target"
+            if [ "$target" = windows-x64 ]; then
+              stages=(assembled unsigned-qualified verified attested)
+            else
+              stages=(assembled signed notarized verified attested)
+            fi
+            for stage in "${stages[@]}"; do
+              python scripts/delivery.py attach --manifest "$manifest" --result "$root/records/$target.$stage.json"
+            done
+          done
+          python scripts/delivery.py verify --manifest "$manifest"
+          python scripts/delivery.py promote --manifest "$manifest" --from-channel candidate --channel rc --output release/release-set-rc.json
+          for target in windows-x64 macos-x64 macos-arm64; do
+            root="release/targets/macos-trusted-$target"
+            cp "$root/RCMetaStudio-$target.zip" release/
+            cp "$root/$target.cdx.json" release/
+          done
+          python scripts/delivery.py checksums --files release/RCMetaStudio-windows-x64.zip --files release/RCMetaStudio-macos-x64.zip --files release/RCMetaStudio-macos-arm64.zip --files release/windows-x64.cdx.json --files release/macos-x64.cdx.json --files release/macos-arm64.cdx.json --output release/SHA256SUMS
+      - name: Publish immutable macOS-trusted RC
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then echo "Release $TAG already exists; refusing overwrite." >&2; exit 1; fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            git fetch origin "refs/tags/$TAG:refs/tags/$TAG"
+            test "$(git rev-list -n 1 "$TAG")" = "${{ inputs.source_sha }}"
+            tag_args=(--verify-tag)
+          else
+            tag_args=(--target "${{ inputs.source_sha }}")
+          fi
+          gh release create "$TAG" release/RCMetaStudio-*.zip release/*.cdx.json release/SHA256SUMS release/release-set-rc.json "${tag_args[@]}" --prerelease --title "RC MetaStudio ${{ inputs.version }}" --notes $'**Signing status:** macOS Developer ID signed, notarized, and stapled; Windows unsigned.\n\nThe Intel and Apple Silicon applications passed final signed-artifact smoke and Gatekeeper verification. Windows bytes remain explicitly unsigned. All three artifacts were promoted from one immutable candidate without rebuilding.'

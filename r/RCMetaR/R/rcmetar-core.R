@@ -554,6 +554,10 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
     if (!is.null(params$measure) && !nzchar(as.character(params$measure))) {
         stop("Parameter 'measure' must not be empty.", call.=FALSE)
     }
+    if (!is.null(params$measure) &&
+            identical(gsub("[[:space:].]+", "", trimws(as.character(params$measure))), "TXMean")) {
+        params$measure <- "TXMean"
+    }
 
     if (workflow == "subgroup") {
         selected.cov <- .rcmetar.resolve.selected.cov(om.data, selected.cov, params)

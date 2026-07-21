@@ -387,20 +387,12 @@
    <addaction name="action_import_csv"/>
    <addaction name="action_save"/>
    <addaction name="separator"/>
-   <addaction name="action_change_conf_level"/>
    <addaction name="action_go"/>
    <addaction name="action_cum_ma"/>
+   <addaction name="action_loo_ma"/>
    <addaction name="action_subgroup_ma"/>
    <addaction name="action_meta_regression"/>
-   <addaction name="action_loo_ma"/>
-   <addaction name="separator"/>
-   <addaction name="action_undo"/>
-   <addaction name="action_redo"/>
-   <addaction name="separator"/>
-   <addaction name="action_copy"/>
-   <addaction name="action_paste"/>
-   <addaction name="separator"/>
-   <addaction name="action_quit"/>
+   <addaction name="action_change_conf_level"/>
   </widget>
   <action name="action_save">
    <property name="icon">

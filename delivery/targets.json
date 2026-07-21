@@ -8,6 +8,11 @@
       "release_label": "UNSIGNED COMMUNITY BUILD",
       "stages": ["assembled", "unsigned-qualified", "verified", "attested"]
     },
+    "macos-trusted": {
+      "release_label": "MACOS SIGNED AND NOTARIZED BUILD; WINDOWS UNSIGNED",
+      "windows_stages": ["assembled", "unsigned-qualified", "verified", "attested"],
+      "macos_stages": ["assembled", "signed", "notarized", "verified", "attested"]
+    },
     "trusted-signed": {
       "release_label": "SIGNED AND PLATFORM-TRUSTED BUILD",
       "windows_stages": ["assembled", "signed", "verified", "attested"],
