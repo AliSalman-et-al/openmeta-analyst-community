@@ -70,30 +70,55 @@ for result in "$signing_inventory" "$submission_result" "$notarization_result" "
 done
 
 work_root="$(mktemp -d "${RUNNER_TEMP:-/tmp}/rcms-macos-trust.XXXXXX")"
-tmp_output="$output_archive.tmp"
+if [[ "$output_archive" = *.dmg ]]; then
+  tmp_output="$output_archive.tmp.dmg"
+else
+  tmp_output="$output_archive.tmp"
+fi
 cleanup() {
   rm -rf "$work_root"
   rm -f "$tmp_output"
 }
 trap cleanup EXIT
 
-extracted_root="$work_root/extracted"
-mkdir -p "$extracted_root"
-ditto -x -k "$input_archive" "$extracted_root"
-shopt -s nullglob dotglob
-archive_roots=("$extracted_root"/*)
-shopt -u nullglob dotglob
-if [ "${#archive_roots[@]}" -ne 1 ] || [ ! -d "${archive_roots[0]}" ]; then
-  echo "Expected exactly one top-level directory in $input_archive." >&2
-  exit 1
-fi
-archive_root="${archive_roots[0]}"
-app="$archive_root/RCMetaStudio.app"
-qualification="$archive_root/qualification"
-if [ ! -d "$app" ] || [ ! -d "$qualification" ]; then
-  echo "Archive does not contain RCMetaStudio.app and qualification evidence." >&2
-  exit 1
-fi
+app=""
+qualification="$work_root/qualification"
+mkdir -p "$qualification"
+
+copy_app_from_dmg() {
+  local dmg="$1"
+  local destination="$2"
+  local attach_plist="$work_root/attach.plist"
+  local mount_point
+
+  hdiutil verify "$dmg"
+  hdiutil attach "$dmg" -readonly -nobrowse -plist > "$attach_plist"
+  mount_point="$(python3 - "$attach_plist" <<'PY'
+import plistlib
+import sys
+
+with open(sys.argv[1], "rb") as stream:
+    payload = plistlib.load(stream)
+points = [
+    entity.get("mount-point")
+    for entity in payload.get("system-entities", [])
+    if entity.get("mount-point")
+]
+if len(points) != 1:
+    raise SystemExit("Expected exactly one mounted DMG volume")
+print(points[0])
+PY
+)"
+  trap 'hdiutil detach "$mount_point" >/dev/null 2>&1 || true; cleanup' EXIT
+  if [ ! -d "$mount_point/RCMetaStudio.app" ]; then
+    echo "DMG does not contain RCMetaStudio.app." >&2
+    exit 1
+  fi
+  mkdir -p "$destination"
+  ditto "$mount_point/RCMetaStudio.app" "$destination/RCMetaStudio.app"
+  hdiutil detach "$mount_point"
+  trap cleanup EXIT
+}
 
 qualify_signed_app() {
   local phase="$1"
@@ -141,6 +166,29 @@ auth=(
 )
 
 if [ "$mode" = "sign-and-submit" ]; then
+  case "$input_archive:$output_archive" in
+    *.zip:*.dmg) ;;
+    *) echo "sign-and-submit requires a ZIP candidate and DMG output." >&2; exit 2 ;;
+  esac
+  extracted_root="$work_root/extracted"
+  mkdir -p "$extracted_root"
+  ditto -x -k "$input_archive" "$extracted_root"
+  shopt -s nullglob dotglob
+  archive_roots=("$extracted_root"/*)
+  shopt -u nullglob dotglob
+  if [ "${#archive_roots[@]}" -ne 1 ] || [ ! -d "${archive_roots[0]}" ]; then
+    echo "Expected exactly one top-level directory in $input_archive." >&2
+    exit 1
+  fi
+  archive_root="${archive_roots[0]}"
+  app="$archive_root/RCMetaStudio.app"
+  candidate_qualification="$archive_root/qualification"
+  if [ ! -d "$app" ] || [ ! -d "$candidate_qualification" ]; then
+    echo "Candidate ZIP does not contain RCMetaStudio.app and qualification evidence." >&2
+    exit 1
+  fi
+  cp -R "$candidate_qualification/." "$qualification/"
+
   PYTHONPATH="$repo_root/src" uv run --no-project --python 3.11.9 python \
     "$repo_root/scripts/sign_macos_app.py" "$app" \
     --identity "$signing_identity" \
@@ -149,9 +197,17 @@ if [ "$mode" = "sign-and-submit" ]; then
   codesign --verify --deep --strict --verbose=4 "$app"
   qualify_signed_app "developer-id"
 
-  notary_submission="$work_root/RCMetaStudio-notary-submission.zip"
-  ditto -c -k --norsrc --keepParent "$app" "$notary_submission"
-  xcrun notarytool submit "$notary_submission" \
+  dmg_root="$work_root/dmg-root"
+  mkdir -p "$dmg_root"
+  ditto "$app" "$dmg_root/RCMetaStudio.app"
+  ln -s /Applications "$dmg_root/Applications"
+  hdiutil create -volname "RC MetaStudio" -srcfolder "$dmg_root" \
+    -format UDZO -ov "$tmp_output"
+  codesign --force --timestamp --sign "$signing_identity" \
+    --identifier org.rcmetastudio.release "$tmp_output"
+  codesign --verify --verbose=4 "$tmp_output"
+  hdiutil verify "$tmp_output"
+  xcrun notarytool submit "$tmp_output" \
     "${auth[@]}" \
     --output-format json > "$submission_result"
   python3 - "$submission_result" <<'PY'
@@ -166,12 +222,15 @@ if result.get("status") not in {None, "In Progress", "Accepted"}:
     raise SystemExit(f"Apple rejected notarization submission: {result.get('status')!r}")
 PY
   cp "$submission_result" "$qualification/notarization-submission.json"
-
-  ditto -c -k --norsrc --keepParent "$archive_root" "$tmp_output"
   mv "$tmp_output" "$output_archive"
-  echo "Created resumable signed artifact and submitted it to Apple: $output_archive"
+  echo "Created signed DMG and submitted its exact bytes to Apple: $output_archive"
   exit 0
 fi
+
+case "$input_archive:$output_archive" in
+  *.dmg:*.dmg) ;;
+  *) echo "finalize requires DMG input and output." >&2; exit 2 ;;
+esac
 
 submission_id="$(python3 - "$submission_result" <<'PY'
 import json
@@ -200,17 +259,23 @@ if result.get("id") != sys.argv[2]:
 if result.get("status") != "Accepted":
     raise SystemExit(f"Apple notarization was not accepted: {result.get('status')!r}")
 PY
-cp "$notarization_result" "$qualification/notarization-result.json"
+cp "$input_archive" "$tmp_output"
+xcrun stapler staple "$tmp_output"
+xcrun stapler validate "$tmp_output"
+codesign --verify --verbose=4 "$tmp_output"
+hdiutil verify "$tmp_output"
 
-xcrun stapler staple "$app"
+installed_root="$work_root/installed"
+copy_app_from_dmg "$tmp_output" "$installed_root"
+app="$installed_root/RCMetaStudio.app"
 qualify_signed_app "notarized"
 {
+  hdiutil verify "$tmp_output"
+  codesign --verify --verbose=4 "$tmp_output"
+  xcrun stapler validate "$tmp_output"
+  spctl --assess --type open --context context:primary-signature --verbose=4 "$tmp_output"
   codesign --verify --deep --strict --verbose=4 "$app"
-  xcrun stapler validate "$app"
   spctl --assess --type execute --verbose=4 "$app"
 } > "$verification_result" 2>&1
-cp "$verification_result" "$qualification/gatekeeper-verification.txt"
-
-ditto -c -k --norsrc --keepParent "$archive_root" "$tmp_output"
 mv "$tmp_output" "$output_archive"
-echo "Created signed, notarized, and stapled artifact: $output_archive"
+echo "Created signed, notarized, and stapled DMG: $output_archive"

@@ -31,14 +31,16 @@
       "runner": "macos-15-intel",
       "os": "macos",
       "architecture": "x86_64",
-      "artifact": "RCMetaStudio-macos-x64.zip",
+      "candidate_artifact": "RCMetaStudio-macos-x64.zip",
+      "artifact": "RCMetaStudio-macos-x64.dmg",
       "signing_profile": "developer-id-notarized"
     },
     "macos-arm64": {
       "runner": "macos-15",
       "os": "macos",
       "architecture": "arm64",
-      "artifact": "RCMetaStudio-macos-arm64.zip",
+      "candidate_artifact": "RCMetaStudio-macos-arm64.zip",
+      "artifact": "RCMetaStudio-macos-arm64.dmg",
       "signing_profile": "developer-id-notarized"
     }
   }

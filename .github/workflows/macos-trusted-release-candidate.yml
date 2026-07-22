@@ -125,10 +125,12 @@ jobs:
         include:
           - target: macos-x64
             runner: macos-15-intel
-            artifact: RCMetaStudio-macos-x64.zip
+            candidate_artifact: RCMetaStudio-macos-x64.zip
+            artifact: RCMetaStudio-macos-x64.dmg
           - target: macos-arm64
             runner: macos-15
-            artifact: RCMetaStudio-macos-arm64.zip
+            candidate_artifact: RCMetaStudio-macos-arm64.zip
+            artifact: RCMetaStudio-macos-arm64.dmg
     runs-on: ${{ matrix.runner }}
     environment: macos-signing
     timeout-minutes: 45
@@ -173,13 +175,14 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           ARTIFACT: ${{ matrix.artifact }}
+          CANDIDATE_ARTIFACT: ${{ matrix.candidate_artifact }}
           TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
           mkdir -p submitted/evidence
           bash scripts/sign-notarize-macos-artifact.sh \
             --mode sign-and-submit \
-            --input-archive "candidate/artifacts/$ARTIFACT" \
+            --input-archive "candidate/artifacts/$CANDIDATE_ARTIFACT" \
             --output-archive "submitted/$ARTIFACT" \
             --signing-identity "$RCMS_SIGNING_IDENTITY" \
             --signing-inventory "submitted/evidence/$TARGET.signing-inventory.json" \
@@ -217,10 +220,12 @@ jobs:
         include:
           - target: macos-x64
             runner: macos-15-intel
-            artifact: RCMetaStudio-macos-x64.zip
+            candidate_artifact: RCMetaStudio-macos-x64.zip
+            artifact: RCMetaStudio-macos-x64.dmg
           - target: macos-arm64
             runner: macos-15
-            artifact: RCMetaStudio-macos-arm64.zip
+            candidate_artifact: RCMetaStudio-macos-arm64.zip
+            artifact: RCMetaStudio-macos-arm64.dmg
     runs-on: ${{ matrix.runner }}
     environment: macos-signing
     timeout-minutes: 180
@@ -266,15 +271,26 @@ jobs:
         shell: bash
         env:
           ARTIFACT: ${{ matrix.artifact }}
+          CANDIDATE_ARTIFACT: ${{ matrix.candidate_artifact }}
         run: |
           set -euo pipefail
-          mkdir -p qualified/tree qualified/diagnostics
-          ditto -x -k "qualified/$ARTIFACT" qualified/tree
+          mkdir -p qualified/tree qualified/candidate-tree qualified/diagnostics
+          ditto -x -k "candidate/artifacts/$CANDIDATE_ARTIFACT" qualified/candidate-tree
+          attach_plist="$RUNNER_TEMP/rcms-release-attach.plist"
+          hdiutil verify "qualified/$ARTIFACT"
+          codesign --verify --verbose=4 "qualified/$ARTIFACT"
+          xcrun stapler validate "qualified/$ARTIFACT"
+          hdiutil attach "qualified/$ARTIFACT" -readonly -nobrowse -plist > "$attach_plist"
+          mount_point="$(python3 -c 'import plistlib,sys; p=plistlib.load(open(sys.argv[1], "rb")); m=[e["mount-point"] for e in p["system-entities"] if "mount-point" in e]; assert len(m)==1; print(m[0])' "$attach_plist")"
+          trap 'hdiutil detach "$mount_point" >/dev/null 2>&1 || true' EXIT
+          ditto "$mount_point/RCMetaStudio.app" qualified/tree/RCMetaStudio.app
+          hdiutil detach "$mount_point"
+          trap - EXIT
           app="$(find qualified/tree -type d -name RCMetaStudio.app -print -quit)"
           app="$PWD/$app"
           executable="$app/Contents/MacOS/RCMetaStudio"
           sample="$(find qualified/tree -path '*/sample_projects/BCG.rcms' -print -quit)"
-          runtime_probe="$(find qualified/tree -path '*/qualification/runtime-probe.json' -print -quit)"
+          runtime_probe="$(find qualified/candidate-tree -path '*/qualification/runtime-probe.json' -print -quit)"
           test -n "$app" && test -x "$executable" && test -n "$sample" && test -n "$runtime_probe"
           sample="$PWD/$sample"
           runtime_probe="$PWD/$runtime_probe"
@@ -317,7 +333,7 @@ jobs:
           uv run python scripts/delivery.py inventory --root qualified/tree --output "qualified/$TARGET.inventory.json"
           uv run python scripts/delivery.py sbom --inventory "qualified/$TARGET.inventory.json" --version "$VERSION" --output "qualified/$TARGET.cdx.json"
           input="$(uv run python scripts/delivery.py digest --json "$assembled")"
-          uv run python scripts/delivery.py stage-result --target "$TARGET" --stage signed --commit "$SOURCE_SHA" --input-digest "$input" --output-file "qualified/evidence/$TARGET.signing-inventory.json" --result "qualified/records/$TARGET.signed.json"
+          uv run python scripts/delivery.py stage-result --target "$TARGET" --stage signed --commit "$SOURCE_SHA" --input-digest "$input" --output-file "submitted/$ARTIFACT" --output-file "qualified/evidence/$TARGET.signing-inventory.json" --output-file "submitted/evidence/$TARGET.notarization-submission.json" --result "qualified/records/$TARGET.signed.json"
           input="$(uv run python scripts/delivery.py digest --json "qualified/records/$TARGET.signed.json")"
           uv run python scripts/delivery.py stage-result --target "$TARGET" --stage notarized --commit "$SOURCE_SHA" --input-digest "$input" --output-file "qualified/evidence/$TARGET.notarization.json" --result "qualified/records/$TARGET.notarized.json"
           input="$(uv run python scripts/delivery.py digest --json "qualified/records/$TARGET.notarized.json")"
@@ -347,9 +363,9 @@ jobs:
           - target: windows-x64
             artifact: RCMetaStudio-windows-x64.zip
           - target: macos-x64
-            artifact: RCMetaStudio-macos-x64.zip
+            artifact: RCMetaStudio-macos-x64.dmg
           - target: macos-arm64
-            artifact: RCMetaStudio-macos-arm64.zip
+            artifact: RCMetaStudio-macos-arm64.dmg
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -442,10 +458,11 @@ jobs:
           python scripts/delivery.py promote --manifest "$manifest" --from-channel candidate --channel rc --output release/release-set-rc.json
           for target in windows-x64 macos-x64 macos-arm64; do
             root="release/targets/macos-trusted-$target"
-            cp "$root/RCMetaStudio-$target.zip" release/
+            if [ "$target" = windows-x64 ]; then extension=zip; else extension=dmg; fi
+            cp "$root/RCMetaStudio-$target.$extension" release/
             cp "$root/$target.cdx.json" release/
           done
-          python scripts/delivery.py checksums --files release/RCMetaStudio-windows-x64.zip --files release/RCMetaStudio-macos-x64.zip --files release/RCMetaStudio-macos-arm64.zip --files release/windows-x64.cdx.json --files release/macos-x64.cdx.json --files release/macos-arm64.cdx.json --output release/SHA256SUMS
+          python scripts/delivery.py checksums --files release/RCMetaStudio-windows-x64.zip --files release/RCMetaStudio-macos-x64.dmg --files release/RCMetaStudio-macos-arm64.dmg --files release/windows-x64.cdx.json --files release/macos-x64.cdx.json --files release/macos-arm64.cdx.json --output release/SHA256SUMS
       - name: Publish immutable macOS-trusted RC
         env:
           GH_TOKEN: ${{ github.token }}
@@ -460,4 +477,4 @@ jobs:
           else
             tag_args=(--target "${{ inputs.source_sha }}")
           fi
-          gh release create "$TAG" release/RCMetaStudio-*.zip release/*.cdx.json release/SHA256SUMS release/release-set-rc.json "${tag_args[@]}" --prerelease --title "RC MetaStudio ${{ inputs.version }}" --notes $'**Signing status:** macOS Developer ID signed, notarized, and stapled; Windows unsigned.\n\nThe Intel and Apple Silicon applications passed final signed-artifact smoke and Gatekeeper verification. Windows bytes remain explicitly unsigned. All three artifacts were promoted from one immutable candidate without rebuilding.'
+          gh release create "$TAG" release/RCMetaStudio-windows-x64.zip release/RCMetaStudio-macos-*.dmg release/*.cdx.json release/SHA256SUMS release/release-set-rc.json "${tag_args[@]}" --prerelease --title "RC MetaStudio ${{ inputs.version }}" --notes $'**Signing status:** macOS DMGs are Developer ID signed, notarized, and stapled; Windows is unsigned.\n\nThe Intel and Apple Silicon disk images passed final mounted-artifact smoke and Gatekeeper verification. Windows bytes remain explicitly unsigned. All three artifacts were promoted from one immutable candidate without rebuilding.'

@@ -233,7 +233,7 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     assert "UNSIGNED COMMUNITY BUILD" not in community + promote
     assert "SmartScreen and Gatekeeper warnings" not in community + promote
     assert "**Signing status:** Unsigned community builds." in community
-    assert "macOS Developer ID signed, notarized, and stapled; Windows unsigned" in promote
+    assert "macOS DMGs are Developer ID signed, notarized, and stapled" in promote
     assert "environment: macos-signing" in macos_trusted
     assert "secrets.APPLE_CERTIFICATE_P12_BASE64" in macos_trusted
     assert "secrets.APPLE_CERTIFICATE_PASSWORD" in macos_trusted
@@ -252,6 +252,14 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     assert "needs: [carry-windows, finalize-macos]" in macos_trusted
     assert "Preserve exact signed bytes and submission ID" in macos_trusted
     assert "submitted-${{ matrix.target }}" in macos_trusted
+    assert "RCMetaStudio-macos-x64.dmg" in macos_trusted
+    assert "RCMetaStudio-macos-arm64.dmg" in macos_trusted
+    assert "candidate_artifact: RCMetaStudio-macos-x64.zip" in macos_trusted
+    assert "candidate_artifact: RCMetaStudio-macos-arm64.zip" in macos_trusted
+    assert "hdiutil attach" in macos_trusted
+    assert "hdiutil detach" in macos_trusted
+    assert '--stage signed' in macos_trusted
+    assert '--output-file "submitted/$ARTIFACT"' in macos_trusted
     assert '(cd submitted && shasum -a 256 "$ARTIFACT"' in macos_trusted
     assert '(cd submitted && shasum -a 256 -c "$ARTIFACT.sha256")' in macos_trusted
     assert macos_trusted.index("--mode sign-and-submit") < macos_trusted.index(
@@ -270,6 +278,12 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     assert "--wait" not in signing_adapter
     assert "xcrun stapler staple" in signing_adapter
     assert "xcrun stapler validate" in signing_adapter
+    assert 'hdiutil create -volname "RC MetaStudio"' in signing_adapter
+    assert "-format UDZO" in signing_adapter
+    assert 'ln -s /Applications "$dmg_root/Applications"' in signing_adapter
+    assert "codesign --force --timestamp" in signing_adapter
+    assert "spctl --assess --type open --context context:primary-signature" in signing_adapter
+    assert "copy_app_from_dmg" in signing_adapter
     assert "spctl --assess --type execute" in signing_adapter
     assert "--entitlements" not in signing_adapter
 
