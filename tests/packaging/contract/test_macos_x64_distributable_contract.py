@@ -2390,7 +2390,7 @@ def test_locked_qt_inventory_rejects_identity_mutation(tmp_path, monkeypatch):
         )
 
 
-def test_codesign_observation_requires_runtime_and_no_entitlements(
+def test_codesign_observation_records_runtime_and_rejects_entitlements(
     tmp_path, monkeypatch
 ):
     inspector = load_inspector()
@@ -2422,12 +2422,14 @@ def test_codesign_observation_requires_runtime_and_no_entitlements(
         [
             Completed(stdout="", stderr=""),
             Completed(stdout="", stderr="flags=0x0(none)"),
+            Completed(stdout=b"", stderr=b""),
         ]
     )
-    with pytest.raises(
-        inspector.MacOSDeploymentInspectionError, match="hardened-runtime"
-    ):
-        inspector._codesign_observation(tmp_path)
+    assert inspector._codesign_observation(tmp_path) == {
+        "verified": True,
+        "runtime": False,
+        "entitlements": {},
+    }
     responses = iter(
         [
             Completed(stdout="", stderr=""),
