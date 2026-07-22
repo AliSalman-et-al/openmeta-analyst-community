@@ -790,8 +790,11 @@ def test_copy_paste_undo_and_redo_work_through_real_table_path(tmp_path):
 
         table.set_data_in_model(model.index(1, model.NAME), _variant("Beta"))
         paste_origin = model.index(1, model.RAW_DATA[0])
-        table.setCurrentIndex(paste_origin)
         table.selectRow(1)
+        # selectRow() may move the current index to the row's first column on
+        # the native Windows Qt backend. Set the explicit paste origin after
+        # selecting so the edit/undo focus contract is deterministic.
+        table.setCurrentIndex(paste_origin)
         table.undoStack.clear()
         table.undoStack.setClean()
         window.current_data_unsaved = False
