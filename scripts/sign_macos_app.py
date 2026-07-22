@@ -286,7 +286,12 @@ def _diagnose_deep_verification_failure(plan: SigningPlan) -> None:
 
 
 def _sign(path: Path, *, identity: str, timestamp: bool) -> None:
-    arguments = ["--force", "--options", "runtime"]
+    arguments = ["--force"]
+    # Hardened runtime enforces library validation. Developer ID members share
+    # a Team ID and satisfy it; ad-hoc members do not, so applying `runtime` to
+    # a local package makes its launcher reject its own bundled libpython.
+    if identity != "-":
+        arguments.extend(("--options", "runtime"))
     if timestamp:
         arguments.append("--timestamp")
     arguments.extend(("--sign", identity, str(path)))

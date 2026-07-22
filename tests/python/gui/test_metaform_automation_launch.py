@@ -4760,19 +4760,21 @@ def test_modal_dialogs_center_over_parent_window():
 
 def test_startup_wizard_cancel_preserves_loaded_dataset(monkeypatch):
     import launch
-    from PyQt6 import QtWidgets
+    from PyQt6 import QtCore, QtWidgets
 
     meta_form = launch._import_meta_form()
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     window = meta_form.MetaForm()
     sample_project = _sample_project_path("amino.rcms")
 
-    class RejectedWizard:
-        def __init__(self, *args, **kwargs):
-            pass
+    class RejectedWizard(QtCore.QObject):
+        finished = QtCore.pyqtSignal(int)
 
-        def exec(self):
-            return 0
+        def __init__(self, *args, **kwargs):
+            super().__init__()
+
+        def open(self):
+            self.finished.emit(int(QtWidgets.QDialog.DialogCode.Rejected))
 
     quit_calls = []
     monkeypatch.setattr(meta_form.main_wizard, "MainWizard", RejectedWizard)
@@ -4785,12 +4787,65 @@ def test_startup_wizard_cancel_preserves_loaded_dataset(monkeypatch):
         loaded_studies = [study.name for study in loaded_dataset.studies]
 
         window.start()
+        app.processEvents()
 
         assert quit_calls == []
         assert window.model.dataset is loaded_dataset
         assert window.model.dataset.title == loaded_title
         assert [study.name for study in window.model.dataset.studies] == loaded_studies
     finally:
+        window.close()
+        app.processEvents()
+
+
+def test_startup_wizard_opens_after_event_loop_and_reactivates_main_window(monkeypatch):
+    import launch
+    from PyQt6 import QtCore, QtWidgets
+
+    meta_form = launch._import_meta_form()
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    window = meta_form.MetaForm()
+    events = []
+
+    class AsyncWizard(QtCore.QObject):
+        finished = QtCore.pyqtSignal(int)
+
+        def __init__(self, *args, **kwargs):
+            super().__init__()
+            events.append("created")
+
+        def open(self):
+            events.append("opened")
+
+        def get_results(self):
+            return {"path": "open", "selected_dataset": "chosen.rcms", "outcome_info": None}
+
+        def deleteLater(self):
+            events.append("deleted")
+
+    monkeypatch.setattr(meta_form.main_wizard, "MainWizard", AsyncWizard)
+    monkeypatch.setattr(
+        window, "_handle_wizard_results", lambda data: events.append(("handled", data))
+    )
+    monkeypatch.setattr(window, "show", lambda: events.append("shown"))
+    monkeypatch.setattr(window, "raise_", lambda: events.append("raised"))
+    monkeypatch.setattr(window, "activateWindow", lambda: events.append("activated"))
+
+    try:
+        window.start()
+        assert events == []
+
+        app.processEvents()
+        assert events == ["created", "opened"]
+
+        window._startup_wizard.finished.emit(
+            int(QtWidgets.QDialog.DialogCode.Accepted)
+        )
+        assert events[2][0] == "handled"
+        assert events[3:] == ["deleted", "shown", "raised", "activated"]
+        assert window._startup_wizard is None
+    finally:
+        window.current_data_unsaved = False
         window.close()
         app.processEvents()
 

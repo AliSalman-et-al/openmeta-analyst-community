@@ -325,14 +325,42 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         return None
 
     def start(self):
-        # show the welcome dialog
+        # Enter the ordinary application event loop before opening the startup
+        # workflow. QDialog.exec() creates a nested loop, which is not supported
+        # uniformly by every windowing system (notably Cocoa during startup).
+        self._startup_wizard = None
+        QtCore.QTimer.singleShot(0, self._open_startup_wizard)
+
+    def _open_startup_wizard(self):
         start_up_wizard = main_wizard.MainWizard(
             parent=self, recent_datasets=get_setting("recent_files")
         )
+        self._startup_wizard = start_up_wizard
+        start_up_wizard.finished.connect(self._finish_startup_wizard)
+        start_up_wizard.open()
 
-        if start_up_wizard.exec():
-            wizard_data = start_up_wizard.get_results()
-            self._handle_wizard_results(wizard_data)
+    def _finish_startup_wizard(self, result):
+        start_up_wizard = self._startup_wizard
+        if start_up_wizard is None:
+            return
+
+        try:
+            if result == int(QDialog.DialogCode.Accepted):
+                wizard_data = start_up_wizard.get_results()
+                self._handle_wizard_results(wizard_data)
+        finally:
+            start_up_wizard.deleteLater()
+            self._startup_wizard = None
+            self._reactivate_after_startup_wizard()
+
+    def _reactivate_after_startup_wizard(self):
+        if self.isMinimized():
+            self.setWindowState(
+                self.windowState() & ~QtCore.Qt.WindowState.WindowMinimized
+            )
+        self.show()
+        self.raise_()
+        self.activateWindow()
 
     def closeEvent(  # ty: ignore[invalid-method-override] -- PyQt6's QMainWindow and QWidget stubs conflict for this runtime-supported override.
         self, event: QCloseEvent | None

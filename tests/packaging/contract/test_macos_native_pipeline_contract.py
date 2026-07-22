@@ -74,6 +74,37 @@ def test_first_green_gate_uses_the_bcg_packaged_workflow():
     assert "RCMS_REQUIRE_IN_PROCESS_RPY2=1" in build
 
 
+def test_both_native_packages_gate_the_real_wizard_to_cocoa_workspace_transition():
+    build = (ROOT / "scripts/build-macos-package.sh").read_text(encoding="utf-8")
+    launcher = (ROOT / "src/rc_metastudio/launch.py").read_text(encoding="utf-8")
+    trust = (ROOT / "scripts/sign-notarize-macos-artifact.sh").read_text(
+        encoding="utf-8"
+    )
+    trusted_workflow = (
+        ROOT / ".github/workflows/macos-trusted-release-candidate.yml"
+    ).read_text(encoding="utf-8")
+
+    assert build.count("--automation-startup-wizard-smoke") == 2
+    assert (
+        'startup_wizard_evidence_path="$qualification_root/startup-wizard-smoke.json"'
+        in build
+    )
+    assert (
+        'extracted_wizard="$qualification_root/extracted-startup-wizard-smoke.json"'
+        in build
+    )
+    assert 'evidence.get("platform_plugin") != "cocoa"' in build
+    assert 'not evidence.get("passed")' in build
+    assert 'handle.isExposed()' in launcher
+    assert 'geometry.width() <= 0 or geometry.height() <= 0' in launcher
+    assert '"rows": model.rowCount() if model is not None else 0' in launcher
+    assert 'qualify_signed_app "developer-id"' in trust
+    assert 'qualify_signed_app "notarized"' in trust
+    assert trust.count("--automation-startup-wizard-smoke") == 1
+    assert 'qualified/diagnostics/startup-wizard.json' in trusted_workflow
+    assert 'evidence.get("platform_plugin") == "cocoa"' in trusted_workflow
+
+
 def test_source_r_packages_link_against_the_private_staged_runtime():
     build = (ROOT / "scripts/build-macos-package.sh").read_text(encoding="utf-8")
 
@@ -137,6 +168,7 @@ def test_nested_r_extensions_rebase_broken_loader_relative_runtime_edges():
     assert 'target="$resources/lib/${dependency##*/}"' in relocator
     assert 'install_name_tool -change "$dependency" "$replacement" "$binary"' in relocator
     assert 'canonical_id="@loader_path/$(basename "$binary")"' in relocator
+    assert 'codesign --force --sign - "$binary"' in relocator
 
 
 def test_arm64_framework_component_is_selected_by_its_real_package_identifier(
