@@ -1,0 +1,107 @@
+name: Check Apple Notarization Status
+
+on:
+  workflow_dispatch:
+    inputs:
+      submission_id:
+        description: Optional notarization submission UUID to inspect
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  status:
+    name: Query Apple notary service
+    runs-on: macos-15
+    environment: macos-signing
+    timeout-minutes: 10
+
+    steps:
+      - name: Query notarization history and status
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          SUBMISSION_ID: ${{ inputs.submission_id }}
+        run: |
+          set -euo pipefail
+
+          if [[ -n "$SUBMISSION_ID" ]] &&
+             [[ ! "$SUBMISSION_ID" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+            echo "submission_id must be a UUID" >&2
+            exit 2
+          fi
+
+          mkdir -p notarization-status
+          auth=(
+            --apple-id "$APPLE_ID"
+            --password "$APPLE_APP_SPECIFIC_PASSWORD"
+            --team-id "$APPLE_TEAM_ID"
+          )
+
+          xcrun notarytool history "${auth[@]}" --output-format json \
+            > notarization-status/history.json
+
+          if [[ -n "$SUBMISSION_ID" ]]; then
+            xcrun notarytool info "$SUBMISSION_ID" "${auth[@]}" --output-format json \
+              > notarization-status/submission.json
+          fi
+
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          output = Path("notarization-status")
+          history_payload = json.loads(
+              (output / "history.json").read_text(encoding="utf-8")
+          )
+          history = history_payload.get("history", [])
+
+          lines = ["# Apple notarization status", ""]
+          submission_path = output / "submission.json"
+          if submission_path.exists():
+              submission = json.loads(submission_path.read_text(encoding="utf-8"))
+              lines.extend(
+                  [
+                      f"**Requested submission:** `{submission.get('id', 'unknown')}`",
+                      f"**Status:** {submission.get('status', 'unknown')}",
+                      f"**Name:** {submission.get('name', 'unknown')}",
+                      "",
+                  ]
+              )
+
+          lines.extend(
+              [
+                  "## Recent submissions",
+                  "",
+                  "| Created | Status | Name | ID |",
+                  "| --- | --- | --- | --- |",
+              ]
+          )
+          for item in history[:20]:
+              created = str(item.get("createdDate", "unknown")).replace("|", "\\|")
+              status = str(item.get("status", "unknown")).replace("|", "\\|")
+              name = str(item.get("name", "unknown")).replace("|", "\\|")
+              identifier = str(item.get("id", "unknown")).replace("|", "\\|")
+              lines.append(f"| {created} | {status} | {name} | `{identifier}` |")
+
+          if not history:
+              lines.append("| — | — | No submissions returned | — |")
+
+          summary = "\n".join(lines) + "\n"
+          print(summary)
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as stream:
+              stream.write(summary)
+          PY
+
+      - name: Upload notarization status
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: notarization-status-${{ github.run_id }}
+          path: notarization-status
+          if-no-files-found: error
+          retention-days: 7

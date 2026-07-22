@@ -54,6 +54,16 @@
     },
     {
       "decision": "keep",
+      "evidence": ["release_readiness"],
+      "external_dependencies": ["filesystem"],
+      "lane": "packaging_contract",
+      "nodeid": "tests/packaging/contract/test_clean_slate_delivery_contract.py::test_notarization_status_workflow_uses_protected_credentials",
+      "reason": "Guards the protected manual Apple notarization status query and its least-privilege credential boundary.",
+      "runtime_class": "subsecond",
+      "size": "small"
+    },
+    {
+      "decision": "keep",
       "evidence": ["gui_compatibility", "release_readiness"],
       "external_dependencies": ["qt"],
       "lane": "gui",
