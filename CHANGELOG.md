@@ -6,6 +6,10 @@ RC MetaStudio starts a fresh maintained-product changelog. Historical release hi
 
 ## 0.2.3 - 2026-07-22
 
+### Changed
+
+- Replaced the macOS release ZIPs with signed, notarized, and stapled disk images that are mounted, copied, and smoke-tested before immutable promotion.
+
 ### Fixed
 
 - Fixed the macOS startup wizard lifecycle so the main workspace remains visible, exposed, and active after creating or opening a project.

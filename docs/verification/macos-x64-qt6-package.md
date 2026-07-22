@@ -101,7 +101,7 @@ The same explicit signer applies either the replaceable ad-hoc identity used by
 package qualification or a timestamped Developer ID identity in the future
 release stage. The ad-hoc inventory is embedded in the qualification ZIP and
 hash-bound by both archive inspection and final evidence; the Developer ID
-inventory is retained beside the signed ZIP, bound into the immutable delivery
+inventory is retained beside the signed and notarized DMG, bound into the immutable delivery
 stage chain, checksummed, and published with the release candidate. Every
 classified Mach-O and real nested bundle receives the
 hardened-runtime option and individual strict verification; the outer app also
