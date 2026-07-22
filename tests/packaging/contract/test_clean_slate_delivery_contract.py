@@ -281,6 +281,8 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     assert 'hdiutil create -volname "RC MetaStudio"' in signing_adapter
     assert "-format UDZO" in signing_adapter
     assert 'ln -s /Applications "$dmg_root/Applications"' in signing_adapter
+    assert 'tmp_output="${output_archive%.dmg}.tmp.dmg"' in signing_adapter
+    assert 'tmp_output="$output_archive.tmp.dmg"' not in signing_adapter
     assert "codesign --force --timestamp" in signing_adapter
     assert "spctl --assess --type open --context context:primary-signature" in signing_adapter
     assert "copy_app_from_dmg" in signing_adapter

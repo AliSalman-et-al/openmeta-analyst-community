@@ -71,7 +71,7 @@ done
 
 work_root="$(mktemp -d "${RUNNER_TEMP:-/tmp}/rcms-macos-trust.XXXXXX")"
 if [[ "$output_archive" = *.dmg ]]; then
-  tmp_output="$output_archive.tmp.dmg"
+  tmp_output="${output_archive%.dmg}.tmp.dmg"
 else
   tmp_output="$output_archive.tmp"
 fi
