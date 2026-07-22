@@ -1,28 +1,43 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+mode=""
 input_archive=""
 output_archive=""
 signing_identity=""
 signing_inventory=""
+submission_result=""
 notarization_result=""
 verification_result=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    --mode) mode="$2"; shift 2 ;;
     --input-archive) input_archive="$2"; shift 2 ;;
     --output-archive) output_archive="$2"; shift 2 ;;
     --signing-identity) signing_identity="$2"; shift 2 ;;
     --signing-inventory) signing_inventory="$2"; shift 2 ;;
+    --submission-result) submission_result="$2"; shift 2 ;;
     --notarization-result) notarization_result="$2"; shift 2 ;;
     --verification-result) verification_result="$2"; shift 2 ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
 
-for required in input_archive output_archive signing_identity signing_inventory notarization_result verification_result; do
-  if [ -z "${!required}" ]; then
-    echo "--${required//_/-} is required." >&2
+if [ "$mode" != "sign-and-submit" ] && [ "$mode" != "finalize" ]; then
+  echo "--mode must be sign-and-submit or finalize." >&2
+  exit 2
+fi
+
+required=(input_archive output_archive)
+if [ "$mode" = "sign-and-submit" ]; then
+  required+=(signing_identity signing_inventory submission_result)
+else
+  required+=(submission_result notarization_result verification_result)
+fi
+for name in "${required[@]}"; do
+  if [ -z "${!name}" ]; then
+    echo "--${name//_/-} is required for $mode." >&2
     exit 2
   fi
 done
@@ -36,21 +51,24 @@ done
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
 input_archive="$(cd "$(dirname "$input_archive")" && pwd)/$(basename "$input_archive")"
+mkdir -p "$(dirname "$output_archive")"
 output_parent="$(cd "$(dirname "$output_archive")" && pwd)"
 output_archive="$output_parent/$(basename "$output_archive")"
 if [ "$input_archive" = "$output_archive" ]; then
-  echo "The signed output archive must not overwrite the unsigned input archive." >&2
+  echo "The output archive must not overwrite its input archive." >&2
   exit 2
 fi
 if [ ! -s "$input_archive" ]; then
-  echo "Unsigned input archive is missing or empty: $input_archive" >&2
+  echo "Input archive is missing or empty: $input_archive" >&2
   exit 2
 fi
 
-mkdir -p \
-  "$(dirname "$signing_inventory")" \
-  "$(dirname "$notarization_result")" \
-  "$(dirname "$verification_result")"
+for result in "$signing_inventory" "$submission_result" "$notarization_result" "$verification_result"; do
+  if [ -n "$result" ]; then
+    mkdir -p "$(dirname "$result")"
+  fi
+done
+
 work_root="$(mktemp -d "${RUNNER_TEMP:-/tmp}/rcms-macos-trust.XXXXXX")"
 tmp_output="$output_archive.tmp"
 cleanup() {
@@ -73,34 +91,74 @@ archive_root="${archive_roots[0]}"
 app="$archive_root/RCMetaStudio.app"
 qualification="$archive_root/qualification"
 if [ ! -d "$app" ] || [ ! -d "$qualification" ]; then
-  echo "Candidate archive does not contain RCMetaStudio.app and qualification evidence." >&2
+  echo "Archive does not contain RCMetaStudio.app and qualification evidence." >&2
   exit 1
 fi
 
-PYTHONPATH="$repo_root/src" uv run --no-project --python 3.11.9 python \
-  "$repo_root/scripts/sign_macos_app.py" "$app" \
-  --identity "$signing_identity" \
-  --inventory-output "$signing_inventory"
-cp "$signing_inventory" "$qualification/developer-id-signing-inventory.json"
+auth=(
+  --apple-id "$APPLE_ID"
+  --password "$APPLE_APP_SPECIFIC_PASSWORD"
+  --team-id "$APPLE_TEAM_ID"
+)
 
-notary_submission="$work_root/RCMetaStudio-notary-submission.zip"
-ditto -c -k --norsrc --keepParent "$app" "$notary_submission"
-xcrun notarytool submit "$notary_submission" \
-  --apple-id "$APPLE_ID" \
-  --password "$APPLE_APP_SPECIFIC_PASSWORD" \
-  --team-id "$APPLE_TEAM_ID" \
-  --wait \
-  --output-format json > "$notarization_result"
-python3 - "$notarization_result" <<'PY'
+if [ "$mode" = "sign-and-submit" ]; then
+  PYTHONPATH="$repo_root/src" uv run --no-project --python 3.11.9 python \
+    "$repo_root/scripts/sign_macos_app.py" "$app" \
+    --identity "$signing_identity" \
+    --inventory-output "$signing_inventory"
+  cp "$signing_inventory" "$qualification/developer-id-signing-inventory.json"
+  codesign --verify --deep --strict --verbose=4 "$app"
+
+  notary_submission="$work_root/RCMetaStudio-notary-submission.zip"
+  ditto -c -k --norsrc --keepParent "$app" "$notary_submission"
+  xcrun notarytool submit "$notary_submission" \
+    "${auth[@]}" \
+    --output-format json > "$submission_result"
+  python3 - "$submission_result" <<'PY'
 import json
 import sys
 
 with open(sys.argv[1], encoding="utf-8") as stream:
     result = json.load(stream)
+if not result.get("id"):
+    raise SystemExit("Apple notarization submission did not return an ID")
+if result.get("status") not in {None, "In Progress", "Accepted"}:
+    raise SystemExit(f"Apple rejected notarization submission: {result.get('status')!r}")
+PY
+  cp "$submission_result" "$qualification/notarization-submission.json"
+
+  ditto -c -k --norsrc --keepParent "$archive_root" "$tmp_output"
+  mv "$tmp_output" "$output_archive"
+  echo "Created resumable signed artifact and submitted it to Apple: $output_archive"
+  exit 0
+fi
+
+submission_id="$(python3 - "$submission_result" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    result = json.load(stream)
+identifier = result.get("id")
+if not identifier:
+    raise SystemExit("Saved Apple notarization submission does not contain an ID")
+print(identifier)
+PY
+)"
+
+xcrun notarytool wait "$submission_id" \
+  "${auth[@]}" \
+  --output-format json > "$notarization_result"
+python3 - "$notarization_result" "$submission_id" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    result = json.load(stream)
+if result.get("id") != sys.argv[2]:
+    raise SystemExit("Apple notarization result does not match the saved submission ID")
 if result.get("status") != "Accepted":
     raise SystemExit(f"Apple notarization was not accepted: {result.get('status')!r}")
-if not result.get("id"):
-    raise SystemExit("Apple notarization did not return a submission ID")
 PY
 cp "$notarization_result" "$qualification/notarization-result.json"
 

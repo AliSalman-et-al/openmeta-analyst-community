@@ -117,7 +117,7 @@ jobs:
           path: qualified
           compression-level: 0
 
-  sign-macos:
+  sign-submit-macos:
     needs: validate-candidate
     strategy:
       fail-fast: false
@@ -131,7 +131,7 @@ jobs:
             artifact: RCMetaStudio-macos-arm64.zip
     runs-on: ${{ matrix.runner }}
     environment: macos-signing
-    timeout-minutes: 180
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
@@ -166,7 +166,7 @@ jobs:
           signing_identity="$(python3 -c 'import re,sys; team=sys.argv[1]; matches=[m.group(1) for line in sys.stdin for m in [re.match(r"^\s*\d+\)\s+([0-9A-Fa-f]{40})\s+\"Developer ID Application: .+ \(([^)]+)\)\"$", line)] if m and m.group(2)==team]; print(matches[0] if len(matches)==1 else ""); raise SystemExit(0 if len(matches)==1 else 1)' "$APPLE_TEAM_ID" <<<"$identities")"
           printf 'RCMS_SIGNING_IDENTITY=%s\n' "$signing_identity" >> "$GITHUB_ENV"
           rm -f "$certificate_path"
-      - name: Sign, notarize, staple, and verify exact candidate app
+      - name: Sign exact candidate app and submit it to Apple
         shell: bash
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -176,12 +176,90 @@ jobs:
           TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
-          mkdir -p qualified/records qualified/evidence
+          mkdir -p submitted/evidence
           bash scripts/sign-notarize-macos-artifact.sh \
+            --mode sign-and-submit \
             --input-archive "candidate/artifacts/$ARTIFACT" \
-            --output-archive "qualified/$ARTIFACT" \
+            --output-archive "submitted/$ARTIFACT" \
             --signing-identity "$RCMS_SIGNING_IDENTITY" \
-            --signing-inventory "qualified/evidence/$TARGET.signing-inventory.json" \
+            --signing-inventory "submitted/evidence/$TARGET.signing-inventory.json" \
+            --submission-result "submitted/evidence/$TARGET.notarization-submission.json"
+          (cd submitted && shasum -a 256 "$ARTIFACT" > "$ARTIFACT.sha256")
+      - name: Upload submission diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: macos-submission-${{ matrix.target }}-diagnostics
+          path: submitted/evidence
+          if-no-files-found: warn
+          retention-days: 30
+          compression-level: 0
+      - name: Preserve exact signed bytes and submission ID
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: submitted-${{ matrix.target }}
+          path: submitted
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+      - name: Delete temporary signing keychain
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          security delete-keychain "$RUNNER_TEMP/rcms-signing.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/developer-id-application.p12"
+
+  finalize-macos:
+    needs: [validate-candidate, sign-submit-macos]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: macos-x64
+            runner: macos-15-intel
+            artifact: RCMetaStudio-macos-x64.zip
+          - target: macos-arm64
+            runner: macos-15
+            artifact: RCMetaStudio-macos-arm64.zip
+    runs-on: ${{ matrix.runner }}
+    environment: macos-signing
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ inputs.source_sha }}
+      - name: Download exact unsigned macOS candidate evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.candidate_run_id }}
+          TARGET: ${{ matrix.target }}
+        run: gh run download "$RUN_ID" --name "candidate-$TARGET" --dir candidate
+      - name: Download preserved signed bytes and submission ID
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: submitted-${{ matrix.target }}
+          path: submitted
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      - run: uv python install 3.11.9
+      - name: Wait for Apple, then staple and verify preserved bytes
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ARTIFACT: ${{ matrix.artifact }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          (cd submitted && shasum -a 256 -c "$ARTIFACT.sha256")
+          mkdir -p qualified/records qualified/evidence
+          cp "submitted/evidence/$TARGET.signing-inventory.json" \
+            "qualified/evidence/$TARGET.signing-inventory.json"
+          bash scripts/sign-notarize-macos-artifact.sh \
+            --mode finalize \
+            --input-archive "submitted/$ARTIFACT" \
+            --output-archive "qualified/$ARTIFACT" \
+            --submission-result "submitted/evidence/$TARGET.notarization-submission.json" \
             --notarization-result "qualified/evidence/$TARGET.notarization.json" \
             --verification-result "qualified/evidence/$TARGET.gatekeeper.txt"
       - name: Launch final signed and stapled macOS bytes
@@ -251,15 +329,8 @@ jobs:
           name: prepared-${{ matrix.target }}
           path: qualified
           compression-level: 0
-      - name: Delete temporary signing keychain
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          security delete-keychain "$RUNNER_TEMP/rcms-signing.keychain-db" 2>/dev/null || true
-          rm -f "$RUNNER_TEMP/developer-id-application.p12"
-
   attest:
-    needs: [carry-windows, sign-macos]
+    needs: [carry-windows, finalize-macos]
     strategy:
       fail-fast: false
       matrix:
