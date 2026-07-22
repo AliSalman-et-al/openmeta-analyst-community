@@ -638,7 +638,7 @@ def _codesign_observation(app_root: Path) -> dict:
     )
     if verified.returncode != 0:
         raise MacOSDeploymentInspectionError(
-            f"hardened ad-hoc code signature verification failed: {verified.stderr}"
+            f"replaceable ad-hoc code signature verification failed: {verified.stderr}"
         )
     details = subprocess.run(
         ["codesign", "-d", "--verbose=4", str(app_root)],
@@ -647,10 +647,9 @@ def _codesign_observation(app_root: Path) -> dict:
         check=False,
     )
     detail_text = details.stdout + details.stderr
-    if details.returncode != 0 or "runtime" not in detail_text.lower():
-        raise MacOSDeploymentInspectionError(
-            "app bundle signature does not carry the hardened-runtime flag"
-        )
+    if details.returncode != 0:
+        raise MacOSDeploymentInspectionError("app bundle signature details are unreadable")
+    runtime = "runtime" in detail_text.lower()
     entitlements = subprocess.run(
         ["codesign", "-d", "--entitlements", ":-", str(app_root)],
         capture_output=True,
@@ -674,7 +673,7 @@ def _codesign_observation(app_root: Path) -> dict:
         raise MacOSDeploymentInspectionError(
             f"unreviewed hardened-runtime entitlements are present: {sorted(parsed_entitlements)}"
         )
-    return {"verified": True, "runtime": True, "entitlements": {}}
+    return {"verified": True, "runtime": runtime, "entitlements": {}}
 
 
 def _normalize_runtime_path(value: object) -> Path:
@@ -1238,7 +1237,12 @@ def inspect_deployment(
             "executable": "Contents/MacOS/RCMetaStudio",
             "normal_entry_point": True,
             "codesign": codesign,
-            "hardened_runtime_signing_compatible": codesign["runtime"],
+            # The runnable candidate uses a replaceable ad-hoc signature without
+            # hardened runtime. Developer ID finalization applies hardened
+            # runtime after every nested member shares the signing Team ID.
+            "hardened_runtime_signing_compatible": (
+                codesign["verified"] and not codesign["entitlements"]
+            ),
         },
         "qt": {
             "root": qt_root,
