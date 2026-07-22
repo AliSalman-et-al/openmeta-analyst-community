@@ -259,3 +259,20 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     assert "xcrun stapler validate" in signing_adapter
     assert "spctl --assess --type execute" in signing_adapter
     assert "--entitlements" not in signing_adapter
+
+
+def test_notarization_status_workflow_uses_protected_credentials():
+    workflow = (
+        ROOT / ".github" / "workflows" / "notarization-status.yml"
+    ).read_text(encoding="utf-8")
+
+    assert "workflow_dispatch:" in workflow
+    assert "environment: macos-signing" in workflow
+    assert "secrets.APPLE_ID" in workflow
+    assert "secrets.APPLE_APP_SPECIFIC_PASSWORD" in workflow
+    assert "secrets.APPLE_TEAM_ID" in workflow
+    assert "secrets.APPLE_CERTIFICATE_P12_BASE64" not in workflow
+    assert "xcrun notarytool history" in workflow
+    assert 'xcrun notarytool info "$SUBMISSION_ID"' in workflow
+    assert "--output-format json" in workflow
+    assert "submission_id must be a UUID" in workflow
