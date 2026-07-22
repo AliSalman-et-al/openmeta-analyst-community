@@ -306,6 +306,21 @@ class AdaptiveWindowController(QObject):
         ):
             self._screen_placer(self.window, screen)
         if self.policy.first_use_behavior == FirstUseBehavior.MAXIMIZED:
+            available = self._available_geometry()
+            if available.isValid() and self.window.size().isEmpty():
+                normal_frame = centered_bounded_geometry(
+                    self._preferred_outer_frame_size(),
+                    available,
+                    self._first_use_center(available),
+                    maximum_fraction=self.policy.maximum_screen_fraction,
+                )
+                self._set_outer_frame_geometry(normal_frame)
+                self._normal_frame_geometry = normal_frame
+            # The maximized state is complete before first display. Reapplying
+            # setWindowState() from the ensuing Show event can hide the native
+            # Cocoa window after Qt has requested it, leaving a logically
+            # visible QWidget with an unexposed zero-sized QWindow.
+            self._first_show_pending = False
             self.window.setWindowState(
                 self.window.windowState() | Qt.WindowState.WindowMaximized
             )

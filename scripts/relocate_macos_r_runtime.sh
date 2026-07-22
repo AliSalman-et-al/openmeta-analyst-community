@@ -186,5 +186,9 @@ while IFS= read -r -d '' binary; do
   if printf '%s\n' "$report" | grep -E '/Library/Frameworks/R\.framework/|/opt/R/|/opt/X11/' >/dev/null; then
     echo "private R retains an external framework reference: $binary" >&2; exit 1
   fi
+  # lipo and install_name_tool invalidate the official hardened-runtime
+  # signature. Re-sign each relocated member ad hoc before executing the
+  # staged R substrate; the complete app receives its final signature later.
+  codesign --force --sign - "$binary"
 done < "$manifest"
 echo "Relocated and verified $macho_count private R Mach-O files."

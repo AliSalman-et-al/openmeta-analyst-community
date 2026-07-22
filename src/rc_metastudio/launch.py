@@ -325,6 +325,16 @@ def start():
         return _run_automation_smoke(start_wizard_layout_smoke)
     if (
         len(startup_argv) > 1
+        and startup_argv[1] == "--automation-startup-wizard-smoke"
+    ):
+        if len(startup_argv) != 4:
+            raise SystemExit(
+                "--automation-startup-wizard-smoke requires an evidence path "
+                "and project path."
+            )
+        return start_startup_wizard_smoke(startup_argv[2], startup_argv[3])
+    if (
+        len(startup_argv) > 1
         and startup_argv[1] == "--automation-adaptive-layout-evidence"
     ):
         if len(startup_argv) < 3:
@@ -1966,6 +1976,83 @@ def _assert_visible_children_are_laid_out(page, scenario_name):
 def _flush_gui_events(app):
     for _index in range(3):
         app.processEvents()
+
+
+def start_startup_wizard_smoke(evidence_path, sample_path):
+    """Exercise the real wizard-to-workspace transition in a packaged app."""
+    qt6_resources.ensure_application_resources()
+    app_error_handler.install_global_exception_handler()
+    app = app_error_handler.get_or_create_application(list(sys.argv))
+    _configure_application(app)
+    meta_form = _import_meta_form()
+    baseline_ids = _top_level_ids(app)
+    result = {"completed": False}
+
+    try:
+        settings.setup_directories()
+        meta = _create_interactive_shell(app, meta_form.MetaForm, load_R_libraries)
+
+        def complete_wizard():
+            wizard = getattr(meta, "_startup_wizard", None)
+            if wizard is None or not wizard.isVisible():
+                raise SystemExit("Startup wizard did not become visible.")
+            if not meta.open(sample_path):
+                raise SystemExit("Startup wizard could not open project: %s" % sample_path)
+            wizard.accept()
+
+        def verify_workspace():
+            handle = meta.windowHandle()
+            geometry = meta.frameGeometry()
+            model = meta.tableView.model()
+            evidence = {
+                "schema_version": 1,
+                "platform_plugin": app.platformName().lower(),
+                "project": Path(sample_path).name,
+                "visible": meta.isVisible(),
+                "active": meta.isActiveWindow(),
+                "minimized": meta.isMinimized(),
+                "maximized": meta.isMaximized(),
+                "exposed": bool(handle and handle.isExposed()),
+                "frame": [
+                    geometry.x(),
+                    geometry.y(),
+                    geometry.width(),
+                    geometry.height(),
+                ],
+                "rows": model.rowCount() if model is not None else 0,
+            }
+            failures = []
+            if not evidence["visible"]:
+                failures.append("workspace is not visible")
+            if evidence["minimized"]:
+                failures.append("workspace is minimized")
+            if not evidence["exposed"]:
+                failures.append("native workspace is not exposed")
+            if geometry.width() <= 0 or geometry.height() <= 0:
+                failures.append("workspace has an empty native frame")
+            if evidence["rows"] < 1:
+                failures.append("opened project has no table rows")
+            evidence["passed"] = not failures
+            evidence["failures"] = failures
+            Path(evidence_path).write_text(
+                json.dumps(evidence, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            result["completed"] = True
+            meta.current_data_unsaved = False
+            meta.close()
+            app.exit(0 if not failures else 1)
+
+        meta.start()
+        QtCore.QTimer.singleShot(100, complete_wizard)
+        QtCore.QTimer.singleShot(750, verify_workspace)
+        QtCore.QTimer.singleShot(30_000, lambda: app.exit(124))
+        exit_code = app.exec()
+        if not result["completed"]:
+            raise SystemExit("Startup wizard smoke timed out before producing evidence.")
+        return exit_code
+    finally:
+        _dispose_new_top_levels(app, baseline_ids)
 
 
 def _assert_opened_project_for_startup_smoke(

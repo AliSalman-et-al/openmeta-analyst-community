@@ -293,6 +293,15 @@ jobs:
                 --completion-log qualified/diagnostics/packaged-smoke.log -- \
                 "$executable" --automation-native-smoke "$sample"
           python3 -c 'import json,sys; evidence=json.load(open(sys.argv[1])); assert evidence.get("passed") is True' qualified/diagnostics/packaged-smoke.json
+          env -u QT_QPA_PLATFORM RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=API \
+            RCMS_R_HOME="$app/Contents/Frameworks/R.framework/Resources" \
+            RCMS_R_LIBS="$app/Contents/Frameworks/R.framework/Resources/library" \
+            uv run python scripts/run_bounded_process.py --timeout-seconds 900 \
+              --stdout qualified/diagnostics/startup-wizard.stdout.log \
+              --stderr qualified/diagnostics/startup-wizard.stderr.log -- \
+              "$executable" --automation-startup-wizard-smoke \
+                "$PWD/qualified/diagnostics/startup-wizard.json" "$sample"
+          python3 -c 'import json,sys; evidence=json.load(open(sys.argv[1])); assert evidence.get("platform_plugin") == "cocoa" and evidence.get("passed") is True' qualified/diagnostics/startup-wizard.json
       - name: Record macOS trusted stages and final evidence
         shell: bash
         env:

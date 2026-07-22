@@ -806,6 +806,9 @@ esac
     )
     otool.chmod(0o755)
     install_name_tool.chmod(0o755)
+    codesign = tools / "codesign"
+    codesign.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    codesign.chmod(0o755)
     normalizer = tmp_path / "normalizer.py"
     normalizer.write_text("", encoding="utf-8")
 
@@ -1762,6 +1765,7 @@ def test_explicit_codesign_signs_inside_out_and_verifies_fail_closed(
     signer.sign_and_verify(app, identity="-")
     ad_hoc_sign_calls = [call for call in calls if "--sign" in call]
     assert all("--timestamp" not in call for call in ad_hoc_sign_calls)
+    assert all("--options" not in call for call in ad_hoc_sign_calls)
 
     def reject_verification(arguments):
         if "--verify" in arguments and "--deep" in arguments:

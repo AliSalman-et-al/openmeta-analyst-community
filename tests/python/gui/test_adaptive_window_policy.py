@@ -167,6 +167,32 @@ def test_unparented_workspace_uses_active_screen_before_maximizing(qapp):
     assert main.windowState() & QtCore.Qt.WindowState.WindowMaximized
 
 
+def test_maximized_workspace_does_not_reapply_window_state_during_show(qapp):
+    import adaptive_window
+
+    window = QtWidgets.QMainWindow()
+    controller = adaptive_window.register_adaptive_window(
+        window,
+        adaptive_window.WindowRole.MAIN,
+        available_geometry_provider=lambda _window: QtCore.QRect(0, 0, 1200, 800),
+    )
+    refits_after_registration = []
+    controller.refitApplied.connect(lambda: refits_after_registration.append(True))
+
+    try:
+        assert not window.size().isEmpty()
+        window.showMaximized()
+        qapp.processEvents()
+
+        assert refits_after_registration == []
+        assert window.isVisible()
+        assert window.windowHandle() is not None
+        assert window.windowHandle().isVisible()
+    finally:
+        window.close()
+        qapp.processEvents()
+
+
 def test_content_refit_requests_are_local_and_coalesced(qapp):
     import adaptive_window
 
