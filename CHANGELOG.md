@@ -4,6 +4,13 @@ All notable RC MetaStudio changes will be recorded in this file.
 
 RC MetaStudio starts a fresh maintained-product changelog. Historical release history for the Original OpenMeta[Analyst] Project is not reconstructed here; see [NOTICE.md](NOTICE.md) for provenance.
 
+## 0.2.3 - 2026-07-22
+
+### Fixed
+
+- Fixed the macOS startup wizard lifecycle so the main workspace remains visible, exposed, and active after creating or opening a project.
+- Hardened native macOS packaging and Developer ID qualification by repairing relocated R signatures and exercising the final signed and notarized application before release.
+
 ## 0.2.2 - 2026-07-22
 
 ### Added
