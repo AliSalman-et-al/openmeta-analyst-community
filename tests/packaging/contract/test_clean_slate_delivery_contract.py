@@ -246,6 +246,17 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     assert "scripts/sign-notarize-macos-artifact.sh" in macos_trusted
     assert "bash scripts/package-macos.sh" not in macos_trusted
     assert "Windows artifact changed while being carried" in macos_trusted
+    assert "sign-submit-macos:" in macos_trusted
+    assert "finalize-macos:" in macos_trusted
+    assert "needs: [validate-candidate, sign-submit-macos]" in macos_trusted
+    assert "needs: [carry-windows, finalize-macos]" in macos_trusted
+    assert "Preserve exact signed bytes and submission ID" in macos_trusted
+    assert "submitted-${{ matrix.target }}" in macos_trusted
+    assert '(cd submitted && shasum -a 256 "$ARTIFACT"' in macos_trusted
+    assert '(cd submitted && shasum -a 256 -c "$ARTIFACT.sha256")' in macos_trusted
+    assert macos_trusted.index("--mode sign-and-submit") < macos_trusted.index(
+        "--mode finalize"
+    )
     assert "Publish immutable macOS-trusted RC" in macos_trusted
     assert "test \"$(jq -r .trust_profile \"$manifest\")\" = macos-trusted" in promote
 
@@ -255,6 +266,8 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     assert "--options runtime" not in signing_adapter
     assert "sign_macos_app.py" in signing_adapter
     assert "xcrun notarytool submit" in signing_adapter
+    assert "xcrun notarytool wait" in signing_adapter
+    assert "--wait" not in signing_adapter
     assert "xcrun stapler staple" in signing_adapter
     assert "xcrun stapler validate" in signing_adapter
     assert "spctl --assess --type execute" in signing_adapter
