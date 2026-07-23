@@ -12,6 +12,8 @@ RC MetaStudio starts a fresh maintained-product changelog. Historical release hi
 
 ### Fixed
 
+- Fixed the continuous-outcome Back-Calculate Table button remaining disabled when the available summary statistics can be completed under either the mean difference or standardized mean difference assumptions.
+- Fixed the dichotomous-outcome Back-Calculate Table button remaining disabled while arm totals are available but event or non-event counts are incomplete; supplied totals are now preserved and become read-only after back-calculation.
 - Fixed the macOS startup wizard lifecycle so the main workspace remains visible, exposed, and active after creating or opening a project.
 - Hardened native macOS packaging and Developer ID qualification by repairing relocated R signatures and exercising the final signed and notarized application before release.
 
