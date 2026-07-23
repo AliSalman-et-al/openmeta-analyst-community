@@ -1513,6 +1513,30 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                 self._content_layout_changed()
 
         (group1_data, group2_data, effect_data) = build_data_dicts()
+
+        # The metric-specific assumption is chosen only after the user clicks.
+        # Probe both choices here so the button can become reachable without
+        # prematurely committing either assumption to the form.
+        if not engage and self.metric_parameter is None:
+            for candidate in (True, False):
+                candidate_effect_data = dict(effect_data)
+                candidate_effect_data["met.param"] = candidate
+                candidate_imputed = meta_py_r.back_calc_cont_data(
+                    group1_data,
+                    group2_data,
+                    candidate_effect_data,
+                    self.conf_level,
+                )
+                if "FAIL" not in candidate_imputed and new_data(
+                    group1_data, group2_data, candidate_imputed
+                ):
+                    self.back_calc_btn.setEnabled(True)
+                    self.set_clear_btn_color()
+                    return None
+            self.back_calc_btn.setEnabled(False)
+            self.set_clear_btn_color()
+            return None
+
         imputed = meta_py_r.back_calc_cont_data(
             group1_data, group2_data, effect_data, self.conf_level
         )

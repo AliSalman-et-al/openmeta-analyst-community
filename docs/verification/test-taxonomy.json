@@ -8822,6 +8822,26 @@
       "reason": "Guards the Continuous Data dialog from opening a nested back-calculation choice before the user invokes that action.", "runtime_class": "seconds", "size": "medium"
     },
     {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_back_calculation_enablement_probes_metric_assumptions[MD-True-expected_parameters0]",
+      "reason": "Proves MD back-calculation enablement can probe the default equal-SD assumption without committing the user's later choice.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_back_calculation_enablement_probes_metric_assumptions[MD-False-expected_parameters1]",
+      "reason": "Proves MD back-calculation enablement falls through to the unequal-SD assumption without committing it.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_back_calculation_enablement_probes_metric_assumptions[SMD-True-expected_parameters0]",
+      "reason": "Proves SMD back-calculation enablement can probe Hedges' g without committing the user's later bias-correction choice.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_continuous_data_transactional_layout.py::test_continuous_back_calculation_enablement_probes_metric_assumptions[SMD-False-expected_parameters1]",
+      "reason": "Proves SMD back-calculation enablement falls through to Cohen's d without committing it.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
       "decision": "keep", "evidence": ["gui_compatibility", "release_readiness"], "external_dependencies": ["filesystem", "qt"], "lane": "gui",
       "nodeid": "tests/python/gui/test_metaform_data_workflows.py::test_binary_calculator_accept_cancel_and_project_round_trip[7,0]",
       "reason": "Proves comma-decimal integer-equivalent binary input commits as a count and survives project save and reopen.", "runtime_class": "seconds", "size": "large"
@@ -8950,6 +8970,11 @@
       "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
       "nodeid": "tests/python/gui/test_binary_data_transactional_layout.py::test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction",
       "reason": "Proves cancelling the real binary back-calculation chooser preserves table, copied model, outer dialog, and undo state exactly.", "runtime_class": "seconds", "size": "medium"
+    },
+    {
+      "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",
+      "nodeid": "tests/python/gui/test_binary_data_transactional_layout.py::test_binary_back_calculation_unlocks_from_arm_totals_and_effect",
+      "reason": "Proves direct arm totals survive model restoration, unlock dichotomous back-calculation, and return to derived read-only margins after counts are filled.", "runtime_class": "seconds", "size": "medium"
     },
     {
       "decision": "keep", "evidence": ["gui_compatibility", "analysis_behavior"], "external_dependencies": ["qt"], "lane": "gui",

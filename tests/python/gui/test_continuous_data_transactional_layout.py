@@ -187,6 +187,63 @@ def test_continuous_back_calculation_choice_opens_only_after_user_action(monkeyp
         _close(app, dialog)
 
 
+@pytest.mark.parametrize(
+    ("working_parameter", "expected_parameters"),
+    [(True, [True]), (False, [True, False])],
+)
+@pytest.mark.parametrize("metric", ["MD", "SMD"])
+def test_continuous_back_calculation_enablement_probes_metric_assumptions(
+    monkeypatch, metric, working_parameter, expected_parameters
+):
+    import continuous_data_form
+
+    unit = FakeContinuousMAUnit(
+        raw_data={
+            "Group 1": [100, 10, 10],
+            "Group 2": [100, 6, None],
+        },
+        effects={metric: (4.0, 2.0, 6.0)},
+    )
+    app, dialog = _open_continuous_dialog(
+        monkeypatch,
+        QtCore.QRect(20, 30, 1024, 640),
+        metric=metric,
+        ma_unit=unit,
+    )
+    observed_parameters = []
+
+    def assumption_dependent_solver(
+        _group1_data, _group2_data, effect_data, _conf_level
+    ):
+        parameter = effect_data.get("met.param")
+        observed_parameters.append(parameter)
+        if parameter is not working_parameter:
+            return {"FAIL": True}
+        return {
+            "n1": 100,
+            "mean1": 10,
+            "sd1": 10,
+            "n2": 100,
+            "mean2": 6,
+            "sd2": 2.0,
+        }
+
+    monkeypatch.setattr(
+        continuous_data_form.meta_py_r,
+        "back_calc_cont_data",
+        assumption_dependent_solver,
+    )
+    try:
+        dialog.metric_parameter = None
+        dialog.enable_back_calculation_btn()
+
+        assert dialog.back_calc_btn.isEnabled()
+        assert dialog.metric_parameter is None
+        assert observed_parameters == expected_parameters
+    finally:
+        _close(app, dialog)
+
+
 def test_continuous_assumptions_cancel_button_prevents_r_and_state_mutation(
     monkeypatch,
 ):

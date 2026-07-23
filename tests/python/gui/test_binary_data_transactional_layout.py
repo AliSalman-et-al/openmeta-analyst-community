@@ -203,6 +203,78 @@ def test_binary_back_calculation_choices_are_scrollable_and_screen_bounded(monke
         dialog.close()
 
 
+def test_binary_back_calculation_unlocks_from_arm_totals_and_effect(monkeypatch):
+    import binary_data_form
+
+    app, window, dialog = _open_binary_dialog(monkeypatch)
+    observed = []
+
+    def back_calculate(data):
+        observed.append(dict(data))
+        required = ("metric", "estimate", "lower", "upper", "N_A", "N_B")
+        if any(data.get(name) is None for name in required):
+            return {"FAIL": True}
+        return {
+            "op1": {
+                "a": 10,
+                "b": data["N_A"],
+                "c": 5,
+                "d": data["N_B"],
+            }
+        }
+
+    monkeypatch.setattr(binary_data_form.meta_py_r, "impute_bin_data", back_calculate)
+    try:
+        dialog.clear_form()
+        for row in (0, 1):
+            total_item = dialog.raw_data_table.item(row, 2)
+            assert total_item.flags() & QtCore.Qt.ItemFlag.ItemIsEditable
+            total_item.setText("100")
+
+        for widget, value in (
+            (dialog.effect_txt_box, "2"),
+            (dialog.low_txt_box, "1.2"),
+            (dialog.high_txt_box, "3.3"),
+        ):
+            widget.setText(value)
+            widget.editingFinished.emit()
+        app.processEvents()
+
+        assert observed[-1]["N_A"] == 100
+        assert observed[-1]["N_B"] == 100
+        assert dialog.back_calc_btn.isEnabled()
+        assert dialog.ma_unit.get_raw_data_for_groups(dialog.cur_groups) == [
+            None,
+            100,
+            None,
+            100,
+        ]
+        dialog.restore_ma_unit(copy.deepcopy(dialog.ma_unit))
+        for row in (0, 1):
+            total_item = dialog.raw_data_table.item(row, 2)
+            assert total_item.text() == "100"
+            assert total_item.flags() & QtCore.Qt.ItemFlag.ItemIsEditable
+        assert dialog.back_calc_btn.isEnabled()
+
+        QtTest.QTest.mouseClick(
+            dialog.back_calc_btn, QtCore.Qt.MouseButton.LeftButton
+        )
+        app.processEvents()
+
+        assert dialog.ma_unit.get_raw_data_for_groups(dialog.cur_groups) == [
+            10,
+            100,
+            5,
+            100,
+        ]
+        for row in (0, 1):
+            total_item = dialog.raw_data_table.item(row, 2)
+            assert total_item.text() == "100"
+            assert not total_item.flags() & QtCore.Qt.ItemFlag.ItemIsEditable
+    finally:
+        _close(app, window, dialog)
+
+
 def _binary_table_snapshot(dialog):
     return [
         dialog.raw_data_table.item(row, column).text()
