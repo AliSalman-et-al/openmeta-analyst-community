@@ -34,6 +34,7 @@ from runtime_types import required
 # when computing 2x2 data
 THRESHOLD = 1e-5
 BINARY_RAW_COUNT_CELLS = frozenset(((0, 0), (0, 1), (1, 0), (1, 1)))
+BINARY_ARM_TOTAL_CELLS = frozenset(((0, 2), (1, 2)))
 
 
 class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
@@ -412,7 +413,23 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         self.content_scroll.ensureVisible(center.x(), center.y(), 12, 12)
 
     def _raw_count_cell_is_editable(self, row, col):
-        return (row, col) in BINARY_RAW_COUNT_CELLS
+        if (row, col) in BINARY_RAW_COUNT_CELLS:
+            return True
+        if (row, col) in BINARY_ARM_TOTAL_CELLS:
+            return any(self._is_empty(row, inner_col) for inner_col in (0, 1))
+        return False
+
+    def _refresh_raw_data_editability(self):
+        self.raw_data_table.blockSignals(True)
+        try:
+            for row in range(self.raw_data_table.rowCount()):
+                for col in range(self.raw_data_table.columnCount()):
+                    calc_fncs.set_table_item_editable(
+                        self.raw_data_table.item(row, col),
+                        self._raw_count_cell_is_editable(row, col),
+                    )
+        finally:
+            self.raw_data_table.blockSignals(False)
 
     def on_raw_data_table_currentCellChanged(
         self, currentRow, currentColumn, previousRow, previousColumn
@@ -685,6 +702,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
                 no_events = total - events
             self._set_val(row, 0, events)
             self._set_val(row, 1, no_events)
+            self._set_val(row, 2, total)
 
     def _update_ma_unit(self):
         """Copy data from binary data table to the MA_unit"""
@@ -696,7 +714,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         for row in range(2):
             events = self._get_int(row, 0)
             no_events = self._get_int(row, 1)
-            total = None
+            total = self._get_int(row, 2)
             if events not in EMPTY_VALS and no_events not in EMPTY_VALS:
                 total = events + no_events
             raw_data = self.ma_unit.get_raw_data_for_group(self.cur_groups[row])
@@ -924,6 +942,17 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
 
         params = self._get_table_vals()
         computed_params = calc_fncs.compute_2x2_table_from_inner_counts(params)
+        for total_name in ("r1sum", "r2sum"):
+            if computed_params[total_name] in EMPTY_VALS:
+                computed_params[total_name] = params[total_name]
+        if (
+            computed_params["total"] in EMPTY_VALS
+            and computed_params["r1sum"] not in EMPTY_VALS
+            and computed_params["r2sum"] not in EMPTY_VALS
+        ):
+            computed_params["total"] = (
+                computed_params["r1sum"] + computed_params["r2sum"]
+            )
         print("Computed Params", computed_params)
         if computed_params:
             self._set_vals(computed_params)  # computed --> table widget
@@ -1031,7 +1060,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
 
         # clear line edits
         self.set_current_effect()
-        calc_fncs.set_table_cells_editable(self.raw_data_table, BINARY_RAW_COUNT_CELLS)
+        self._refresh_raw_data_editability()
         ####self.enable_txt_box_input()
 
         new_ma_unit, new_table = self._save_ma_unit_and_table_state(
