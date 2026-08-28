@@ -81,6 +81,47 @@ def test_full_r_verifier_drops_unsupported_posix_locale_on_windows():
     assert verifier.verification_base_env(source, platform_name="posix") == source
 
 
+def test_full_r_stack_orchestration_prepares_and_propagates_qt_environment(
+    monkeypatch, tmp_path
+):
+    verifier_path = REPO_ROOT / "scripts" / "verify.py"
+    spec = importlib.util.spec_from_file_location("verify", verifier_path)
+    verifier = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(verifier)
+
+    captured = {}
+
+    def prepare_qt_environment(build_root):
+        captured["build_root"] = build_root
+        return {"RCMS_QT6_BUILD_ROOT": str(build_root), "PYTHONPATH": "generated"}
+
+    def selected_rscript(_args):
+        return "Rscript"
+
+    def run(command, *, env=None):
+        captured["command"] = command
+        captured["env"] = env
+
+    monkeypatch.setattr(verifier, "prepare_qt_environment", prepare_qt_environment)
+    monkeypatch.setattr(verifier, "selected_rscript", selected_rscript)
+    monkeypatch.setattr(verifier, "run", run)
+
+    args = argparse.Namespace(
+        sync=False,
+        build_root=tmp_path,
+        rscript=None,
+        r_runtime_root=None,
+        r_library_cache_root=None,
+    )
+    verifier.run_full_r_stack(args)
+
+    assert captured["build_root"] == tmp_path.resolve()
+    assert captured["env"]["RCMS_QT6_BUILD_ROOT"] == str(tmp_path.resolve())
+    assert captured["env"]["PYTHONPATH"] == "generated"
+    assert captured["command"][-1] == str(verifier.FULL_R_LIBRARY_CACHE)
+
+
 def test_r_verifiers_preserve_symlinked_python_identity(monkeypatch, tmp_path):
     base_python = tmp_path / "uv-python-dir" / "python3.11"
     base_python.parent.mkdir()

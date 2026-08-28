@@ -213,6 +213,8 @@ def run_full_r_stack(args: argparse.Namespace) -> None:
         sync_environment()
     else:
         write_step("Skipping dependency sync for warm local R verification")
+    build_root = (REPO_ROOT / args.build_root).resolve()
+    env = prepare_qt_environment(build_root)
     command = [
         sys.executable,
         "scripts/verify_rcmetar_r_stack.py",
@@ -222,7 +224,7 @@ def run_full_r_stack(args: argparse.Namespace) -> None:
         str(args.r_library_cache_root or FULL_R_LIBRARY_CACHE),
     ]
     write_step("Delegating Full R Stack Evidence")
-    run(command)
+    run(command, env=env)
 
 
 def parser() -> argparse.ArgumentParser:
@@ -260,6 +262,7 @@ def parser() -> argparse.ArgumentParser:
     r_stack = subparsers.add_parser("r-stack", help="run Full R Stack Evidence")
     r_stack.add_argument("--sync", action="store_true")
     add_rscript_options(r_stack)
+    r_stack.add_argument("--build-root", default=DEFAULT_BUILD_ROOT, type=Path)
     return cli
 
 
